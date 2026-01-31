@@ -1,45 +1,56 @@
 ---
 name: github-skills-manager
-description: Manage Gemini skills stored in GitHub repositories (monorepos or individual). Use this when you need to clone, update (pull), check status, or publish (push) skills.
+description: Comprehensive management suite for Gemini skills. Features an interactive dashboard to create, install, sync (git), and manage dependencies for skills in a monorepo or individual repositories.
 ---
 
 # GitHub Skills Manager
 
 ## Overview
-This skill helps you manage your collection of Gemini skills across one or more Git repositories. It supports both monorepos (multiple skills in one repo) and individual skill repositories.
+This skill acts as a central command center for your Gemini skills ecosystem. It simplifies the lifecycle of skill development by providing an interactive dashboard to manage Git repositories, install skills into your workspace, resolve dependencies, and create new skills from templates.
+
+Whether you maintain a single monorepo of skills or multiple standalone repositories, this manager streamlines the process.
 
 ## Quick Start
-To see the status of all your skill repositories in the current directory:
-1. Run `node scripts/git_status.cjs`
-2. It will list all directories that are Git repositories, their current branch, and if they have uncommitted changes.
+The most powerful way to use this skill is via its interactive dashboard:
+
+```bash
+node scripts/dashboard.cjs
+```
+
+This launches a Text User Interface (TUI) where you can perform almost all available actions.
 
 ## Capabilities
 
-### 1. Interactive Dashboard
-Launch a text-based menu to manage your skills.
-- Run `node scripts/dashboard.cjs`
-- Provides options to list status, create skills, sync, and push changes.
+### 1. Interactive Dashboard (Recommended)
+Launch a unified menu system to manage your skills.
+- **Command**: `node scripts/dashboard.cjs`
+- **Features**:
+    - **List & Status**: See all skills, their installation status (`[INSTALLED]`), and Git modification status.
+    - **One-Click Install**: Install any skill (or ALL skills) into your workspace with a single keypress.
+    - **Dependency Management**: Automatically detects `package.json` and offers to run `npm install`.
+    - **Create & Delete**: Generate new skills from templates or safely remove them.
 
-### 2. List and Status
-Check which skills are under Git control and if they need attention.
-- Use `node scripts/git_status.cjs [path]` to see an overview.
+### 2. Batch Operations
+Manage your entire skill library at once via the dashboard main menu.
+- **Sync All**: Run `git pull` across the root repository to update all skills.
+- **Install All**: Loop through every skill directory and install it to your workspace.
+- **Push All**: Commit and push changes for the entire monorepo.
 
-### 3. Sync (Pull)
-Keep your skills up to date with the remote repository.
-- Run `git pull` inside the specific skill directory.
-- To update all, loop through directories and run `git pull`.
+### 3. Skill Creation
+Rapidly prototype new ideas.
+- **Command**: `node scripts/create_skill.cjs <skill-name>` (or use Dashboard "Create New Skill")
+- **Effect**: Initializes a new skill directory with the standard structure (`SKILL.md`, `scripts/`, `references/`) using `skill-creator`.
 
-### 4. Clone New Skills
-Bring in new skills from GitHub.
-- Use `git clone <url>` inside your skills directory.
+### 4. Git Integration
+Keep your skills version-controlled.
+- **Status Checks**: Instantly see which skills have uncommitted changes.
+- **Sync**: Pull latest changes from GitHub.
+- **Publish**: Push your local improvements to the remote repository.
 
-### 4. Create New Skill
-Initialize a new skill in the current monorepo.
-- Run `node scripts/create_skill.cjs <skill-name>`
-- This uses the standard `skill-creator` to set up the directory structure.
-
-### 5. Publish Changes
-To save your changes to GitHub:
-1. `git add .`
-2. `git commit -m "Update skills"`
-3. `git push`
+## Workflow Example
+1. Run `node scripts/dashboard.cjs`.
+2. Select **"c. Create New Skill"** and name it `my-new-tool`.
+3. Select the new skill from the list.
+4. Choose **"1. Install Skill"** to make it available to Gemini.
+5. Edit the skill files in your editor.
+6. In the dashboard, choose **"3. Git Push"** to save your work.
