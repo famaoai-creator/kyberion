@@ -28,10 +28,13 @@ Keep your skills up to date with the remote repository.
 Bring in new skills from GitHub.
 - Use `git clone <url>` inside your skills directory.
 
-### 4. Create and Publish
-When creating a new skill, use `skill-creator` and then:
-1. `git init` (if it's a new standalone repo)
-2. `git add .`
-3. `git commit -m "Initial commit"`
-4. `git remote add origin <url>`
-5. `git push -u origin main`
+### 4. Create New Skill
+Initialize a new skill in the current monorepo.
+- Run `node scripts/create_skill.cjs <skill-name>`
+- This uses the standard `skill-creator` to set up the directory structure.
+
+### 5. Publish Changes
+To save your changes to GitHub:
+1. `git add .`
+2. `git commit -m "Update skills"`
+3. `git push`
