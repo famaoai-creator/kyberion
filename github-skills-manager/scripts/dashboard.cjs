@@ -17,17 +17,31 @@ function clearScreen() {
 function getSkills() {
     return fs.readdirSync(rootDir).filter(item => {
         const fullPath = path.join(rootDir, item);
-        // It's a skill if it's a directory and has SKILL.md
         return fs.statSync(fullPath).isDirectory() && 
                !item.startsWith('.') && 
                fs.existsSync(path.join(fullPath, 'SKILL.md'));
     });
 }
 
+function getSkillDescription(skillDir) {
+    try {
+        const content = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
+        const match = content.match(/description:\s*(.*)/);
+        return match ? match[1].trim() : '(No description)';
+    } catch (e) {
+        return '(Error reading SKILL.md)';
+    }
+}
+
+function isInstalled(skillName) {
+    // Check workspace scope installation
+    const installedPath = path.join(rootDir, '.gemini/skills', skillName);
+    return fs.existsSync(installedPath);
+}
+
 function getGitStatus(dir) {
     try {
         if (!fs.existsSync(path.join(dir, '.git')) && dir !== rootDir) {
-             // If not a git repo, maybe the root is?
              return null;
         }
         const status = execSync('git status --short', { cwd: dir }).toString().trim();
@@ -51,81 +65,121 @@ function mainMenu() {
     const skills = getSkills();
     console.log(`Found ${skills.length} skills in ${rootDir}\n`);
 
-    console.log("1. List Skills & Status");
-    console.log("2. Create New Skill");
-    console.log("3. Sync All (Git Pull)");
-    console.log("4. Push All Changes");
+    console.log("--- Actions ---");
+    console.log("c. Create New Skill");
+    console.log("s. Sync All (Git Pull)");
+    console.log("p. Push All Changes");
     console.log("q. Quit");
-
-    rl.question("\nSelect an option: ", (answer) => {
-        switch(answer.trim()) {
-            case '1': listSkills(); break;
-            case '2': createSkill(); break;
-            case '3': syncAll(); break;
-            case '4': pushAll(); break;
-            case 'q': rl.close(); break;
-            default: mainMenu();
-        }
-    });
-}
-
-function getSkillDescription(skillDir) {
-    try {
-        const content = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
-        const match = content.match(/description:\s*(.*)/);
-        return match ? match[1].trim() : '(No description)';
-    } catch (e) {
-        return '(Error reading SKILL.md)';
-    }
-}
-
-function listSkills() {
-    showHeader();
-    console.log("--- Skills Status ---\n");
     
-    // Root status
-    const rootStatus = getGitStatus(rootDir);
-    if (rootStatus) {
-        const mark = rootStatus.hasChanges ? ' [MODIFIED]' : '';
-        console.log(`[ROOT] . (${rootStatus.branch})${mark}`);
-    }
-
-    const skills = getSkills();
-    skills.forEach(skill => {
-        const fullPath = path.join(rootDir, skill);
-        // Simple check: is it modified? (Checking root git status for subdir changes)
-        let mark = '';
-        try {
-            const status = execSync(`git status --short ${skill}`, { cwd: rootDir }).toString().trim();
-            mark = status.length > 0 ? ' [MODIFIED]' : '';
-        } catch (e) {
-            mark = ' (?)';
-        }
-
-        const desc = getSkillDescription(fullPath);
-        // Truncate description if too long
-        const shortDesc = desc.length > 50 ? desc.substring(0, 47) + '...' : desc;
-        
-        console.log(`- ${skill.padEnd(20)} : ${shortDesc}${mark}`);
+    console.log("\n--- Select a Skill to Manage ---");
+    skills.forEach((skill, index) => {
+        const installedMark = isInstalled(skill) ? ' [INSTALLED]' : '';
+        const desc = getSkillDescription(path.join(rootDir, skill));
+        const shortDesc = desc.length > 40 ? desc.substring(0, 37) + '...' : desc;
+        console.log(`${index + 1}. ${skill.padEnd(20)} ${installedMark}`);
+        console.log(`   └─ ${shortDesc}`);
     });
 
-    console.log("\n(Press Enter to return)");
-    rl.question("", () => mainMenu());
+    rl.question("\nSelect option or skill number: ", (answer) => {
+        const choice = answer.trim();
+        if (choice === 'q') {
+            rl.close();
+        } else if (choice === 'c') {
+            createSkill();
+        } else if (choice === 's') {
+            syncAll();
+        } else if (choice === 'p') {
+            pushAll();
+        } else {
+            const index = parseInt(choice) - 1;
+            if (index >= 0 && index < skills.length) {
+                skillMenu(skills[index]);
+            } else {
+                mainMenu();
+            }
+        }
+    });
+}
+
+function skillMenu(skillName) {
+    showHeader();
+    console.log(`Managing Skill: ${skillName}`);
+    const skillDir = path.join(rootDir, skillName);
+    const installed = isInstalled(skillName);
+    const hasPackageJson = fs.existsSync(path.join(skillDir, 'package.json'));
+
+    console.log(`\nStatus: ${installed ? 'INSTALLED (Workspace)' : 'NOT INSTALLED'}`);
+    if (hasPackageJson) console.log("Detected: package.json (Node.js dependencies)");
+
+    console.log("\n1. Install Skill (Workspace Scope)");
+    console.log("2. Git Pull (Update)");
+    console.log("3. Git Push");
+    if (hasPackageJson) console.log("4. npm install");
+    console.log("b. Back to Main Menu");
+
+    rl.question("\nSelect action: ", (answer) => {
+        switch(answer.trim()) {
+            case '1':
+                try {
+                    console.log(`\nInstalling ${skillName}...`);
+                    // Note: This requires user confirmation in the CLI usually. 
+                    // We output the command for visibility.
+                    const cmd = `gemini skills install ${skillName}/SKILL.md --scope workspace`;
+                    console.log(`Running: ${cmd}`);
+                    execSync(cmd, { stdio: 'inherit' });
+                    console.log("\n(Press Enter)");
+                    rl.question("", () => skillMenu(skillName));
+                } catch(e) {
+                    console.log("\nInstallation might have been cancelled or failed.");
+                    setTimeout(() => skillMenu(skillName), 2000);
+                }
+                break;
+            case '2':
+                try {
+                    execSync('git pull', { cwd: skillDir, stdio: 'inherit' });
+                } catch(e) {}
+                setTimeout(() => skillMenu(skillName), 1000);
+                break;
+            case '3':
+                rl.question("Commit message: ", (msg) => {
+                    if(msg) {
+                        try {
+                            execSync('git add .', { cwd: skillDir, stdio: 'inherit' });
+                            execSync(`git commit -m "${msg}"`, { cwd: skillDir, stdio: 'inherit' });
+                            execSync('git push', { cwd: skillDir, stdio: 'inherit' });
+                        } catch(e) {}
+                    }
+                    skillMenu(skillName);
+                });
+                break;
+            case '4':
+                if (hasPackageJson) {
+                    try {
+                        console.log("Running npm install...");
+                        execSync('npm install', { cwd: skillDir, stdio: 'inherit' });
+                    } catch(e) {}
+                }
+                setTimeout(() => skillMenu(skillName), 1000);
+                break;
+            case 'b':
+                mainMenu();
+                break;
+            default:
+                skillMenu(skillName);
+        }
+    });
 }
 
 function createSkill() {
     showHeader();
     rl.question("Enter name for new skill: ", (name) => {
         if (!name) return mainMenu();
-        
         try {
-            console.log(`\nInitializing ${name}...`);
             const scriptPath = path.join(__dirname, 'create_skill.cjs');
             execSync(`node "${scriptPath}" "${name}"`, { stdio: 'inherit' });
             console.log("\n(Press Enter to return)");
             rl.question("", () => mainMenu());
         } catch (e) {
-            console.error("Error creating skill.");
             setTimeout(mainMenu, 2000);
         }
     });
@@ -133,28 +187,19 @@ function createSkill() {
 
 function syncAll() {
     console.log("\nPulling latest changes...");
-    try {
-        execSync('git pull', { stdio: 'inherit' });
-    } catch (e) {
-        console.error("Git pull failed.");
-    }
+    try { execSync('git pull', { stdio: 'inherit' }); } catch (e) {}
     setTimeout(mainMenu, 2000);
 }
 
 function pushAll() {
     console.log("\nPushing changes...");
     rl.question("Enter commit message: ", (msg) => {
-        if (!msg) {
-            console.log("Cancelled.");
-            return mainMenu();
-        }
-        try {
-            execSync('git add .', { stdio: 'inherit' });
-            execSync(`git commit -m "${msg}"`, { stdio: 'inherit' });
-            execSync('git push', { stdio: 'inherit' });
-            console.log("Success!");
-        } catch (e) {
-            console.error("Git push failed.");
+        if (msg) {
+            try {
+                execSync('git add .', { stdio: 'inherit' });
+                execSync(`git commit -m "${msg}"`, { stdio: 'inherit' });
+                execSync('git push', { stdio: 'inherit' });
+            } catch (e) {}
         }
         setTimeout(mainMenu, 2000);
     });
