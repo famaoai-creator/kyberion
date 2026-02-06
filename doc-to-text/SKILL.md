@@ -11,7 +11,7 @@ This skill acts as a universal converter to extract plain text and structured da
 ## Capabilities
 
 ### 1. Document Extraction
-- **PDF** (`.pdf`): Hybrid text extraction (Text Layer + OCR for scanned pages).
+- **PDF** (`.pdf`): Extracts plain text.
 - **Excel** (`.xlsx`): Converts sheets to CSV and performs OCR on embedded images.
 - **Word** (`.docx`): Extracts text and performs OCR on embedded images.
 - **PowerPoint** (`.pptx`): Extracts slide text and performs OCR on embedded images.

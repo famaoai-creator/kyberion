@@ -1,0 +1,12 @@
+{
+  "name": "schema-validator",
+  "version": "0.1.0",
+  "description": "Validate JSON against schemas and identify best match.",
+  "main": "scripts/validate.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yargs": "^18.0.0"
+  }
+}

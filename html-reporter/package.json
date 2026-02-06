@@ -1,0 +1,12 @@
+{
+  "name": "html-reporter",
+  "version": "0.1.0",
+  "description": "Generate standalone HTML reports from JSON/Markdown.",
+  "main": "scripts/report.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "marked": "^17.0.1",
+    "yargs": "^18.0.0"
+  }
+}

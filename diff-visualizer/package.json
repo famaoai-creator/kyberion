@@ -1,0 +1,12 @@
+{
+  "name": "diff-visualizer",
+  "version": "0.1.0",
+  "description": "Generate a visual difference report between two texts.",
+  "main": "scripts/diff.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "diff": "^8.0.3",
+    "yargs": "^18.0.0"
+  }
+}

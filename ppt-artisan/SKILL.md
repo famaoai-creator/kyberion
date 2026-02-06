@@ -56,6 +56,5 @@ node <path-to-skill>/scripts/convert.cjs ./my-presentation.md pdf
 
 ## Tips
 
--   **Editable PPTX**: PPTX files are generated with the `--pptx-editable` flag, allowing you to edit text and shapes directly in PowerPoint.
 -   **Images**: Place images in the same directory as the Markdown file or a subdirectory (e.g., `./images/`).
 -   **Preview**: There is no live preview in the CLI. Users should convert to PDF for a quick check if they don't have PowerPoint installed, or use a Marp extension in their editor if available.

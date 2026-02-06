@@ -1,0 +1,9 @@
+{
+  "name": "quality-scorer",
+  "version": "0.1.0",
+  "description": "Score text quality (readability, length).",
+  "main": "scripts/score.cjs",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

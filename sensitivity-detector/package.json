@@ -1,0 +1,11 @@
+{
+  "name": "sensitivity-detector",
+  "version": "0.1.0",
+  "description": "Detect PII and sensitive information in text.",
+  "main": "scripts/scan.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

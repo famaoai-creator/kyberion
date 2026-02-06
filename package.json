@@ -1,6 +1,14 @@
 {
   "dependencies": {
     "js-yaml": "^4.1.1",
+    "sqlite3": "^5.1.7",
+    "xlsx": "^0.18.5",
+    "yargs": "^18.0.0"
+  }
+}
+{
+  "dependencies": {
+    "js-yaml": "^4.1.1",
     "xlsx": "^0.18.5"
   }
 }

@@ -1,0 +1,80 @@
+{
+  "RPO": {
+    "en": "Recovery Point Objective",
+    "ja": "目標復旧地点",
+    "description": "障害発生時にどの時点までのデータを復旧させるかの目標。バックアップ頻度に影響する。"
+  },
+  "RTO": {
+    "en": "Recovery Time Objective",
+    "ja": "目標復旧時間",
+    "description": "障害発生からシステム復旧までの目標時間。"
+  },
+  "RLO": {
+    "en": "Recovery Level Objective",
+    "ja": "目標復旧レベル",
+    "description": "復旧時にどの程度の機能・性能を回復させるかの目標。"
+  },
+  "SLA": {
+    "en": "Service Level Agreement",
+    "ja": "サービスレベル合意",
+    "description": "サービス提供者と利用者間で合意するサービス品質の基準。"
+  },
+  "SLO": {
+    "en": "Service Level Objective",
+    "ja": "サービスレベル目標",
+    "description": "SLA達成のために設定する内部的な品質目標。"
+  },
+  "MTBF": {
+    "en": "Mean Time Between Failures",
+    "ja": "平均故障間隔",
+    "description": "システムが故障せずに稼働する平均時間。信頼性の指標。"
+  },
+  "MTTR": {
+    "en": "Mean Time To Repair",
+    "ja": "平均修復時間",
+    "description": "故障発生から復旧完了までの平均時間。保守性の指標。"
+  },
+  "可用性": {
+    "en": "Availability",
+    "description": "システムが利用可能な状態にある割合。99.9%（スリーナイン）など。"
+  },
+  "冗長化": {
+    "en": "Redundancy",
+    "description": "障害時に備えてシステム構成要素を多重化すること。"
+  },
+  "フェイルオーバー": {
+    "en": "Failover",
+    "description": "障害発生時に自動的に待機系に切り替わる仕組み。"
+  },
+  "スケールアウト": {
+    "en": "Scale Out",
+    "description": "サーバ台数を増やして処理能力を向上させる方式。"
+  },
+  "スケールアップ": {
+    "en": "Scale Up",
+    "description": "サーバのスペック（CPU、メモリ等）を増強して処理能力を向上させる方式。"
+  },
+  "スループット": {
+    "en": "Throughput",
+    "description": "単位時間あたりに処理できるトランザクション数やデータ量。"
+  },
+  "レイテンシ": {
+    "en": "Latency",
+    "ja": "遅延時間",
+    "description": "リクエストを送信してからレスポンスを受け取るまでの時間。"
+  },
+  "IaC": {
+    "en": "Infrastructure as Code",
+    "description": "インフラ構成をコードで定義・管理する手法。Terraform、CloudFormation等。"
+  },
+  "DR": {
+    "en": "Disaster Recovery",
+    "ja": "災害復旧",
+    "description": "災害発生時にシステムを復旧させるための計画・手順。"
+  },
+  "BCP": {
+    "en": "Business Continuity Plan",
+    "ja": "事業継続計画",
+    "description": "災害や障害発生時に事業を継続するための計画。"
+  }
+}

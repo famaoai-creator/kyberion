@@ -1,0 +1,9 @@
+{
+  "name": "intent-classifier",
+  "version": "0.1.0",
+  "description": "Classify intent of text (request, question, report).",
+  "main": "scripts/classify.cjs",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

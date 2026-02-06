@@ -1,0 +1,11 @@
+{
+  "name": "dependency-grapher",
+  "version": "0.1.0",
+  "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
+  "main": "scripts/graph.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "api-doc-generator",
+  "version": "0.1.0",
+  "description": "Generate API documentation from OpenAPI specs or code.",
+  "main": "scripts/generate.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "widdershins": "^4.0.1",
+    "yargs": "^18.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "pdf-composer",
+  "version": "0.1.0",
+  "description": "Generate PDF documents from Markdown with headers/footers.",
+  "main": "scripts/compose.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "markdown-pdf": "^11.0.0",
+    "yargs": "^18.0.0"
+  }
+}

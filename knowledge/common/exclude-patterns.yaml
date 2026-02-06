@@ -1,0 +1,114 @@
+# 共通除外パターン
+# 各スキルで共有される除外対象のディレクトリ・ファイル
+
+# 除外ディレクトリ
+directories:
+  # パッケージマネージャ
+  - node_modules
+  - vendor
+  - .pnpm
+  - bower_components
+
+  # バージョン管理
+  - .git
+  - .svn
+  - .hg
+
+  # ビルド出力
+  - dist
+  - build
+  - out
+  - target
+  - bin
+  - obj
+
+  # テスト・カバレッジ
+  - coverage
+  - .nyc_output
+  - __pycache__
+  - .pytest_cache
+
+  # IDE・エディタ
+  - .idea
+  - .vscode
+  - .vs
+
+  # キャッシュ
+  - .cache
+  - .parcel-cache
+  - .next
+  - .nuxt
+
+  # Terraform
+  - .terraform
+
+  # その他
+  - .DS_Store
+  - tmp
+  - temp
+
+# 除外ファイル拡張子
+extensions:
+  # バイナリ・画像
+  - .png
+  - .jpg
+  - .jpeg
+  - .gif
+  - .ico
+  - .svg
+  - .webp
+  - .bmp
+  - .tiff
+
+  # 圧縮・アーカイブ
+  - .zip
+  - .tar
+  - .gz
+  - .rar
+  - .7z
+
+  # ドキュメント（バイナリ）
+  - .pdf
+  - .doc
+  - .docx
+  - .xls
+  - .xlsx
+  - .ppt
+  - .pptx
+
+  # フォント
+  - .ttf
+  - .otf
+  - .woff
+  - .woff2
+  - .eot
+
+  # 音声・動画
+  - .mp3
+  - .mp4
+  - .wav
+  - .avi
+  - .mov
+
+  # その他
+  - .exe
+  - .dll
+  - .so
+  - .dylib
+
+# 除外ファイル名パターン
+file_patterns:
+  # ロックファイル
+  - "*.lock"
+  - "*-lock.json"
+  - "*-lock.yaml"
+
+  # ミニファイ済みファイル
+  - "*.min.js"
+  - "*.min.css"
+
+  # ソースマップ
+  - "*.map"
+
+  # 環境変数（読み込み対象外）
+  - ".env*"

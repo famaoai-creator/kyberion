@@ -1,0 +1,154 @@
+# テストランナー検出設定
+# test-genie スキルで使用
+
+# テストランナー定義（優先度順）
+runners:
+  # Node.js / JavaScript / TypeScript
+  - name: npm test
+    detection:
+      - type: package_json_script
+        script: test
+    command: npm test
+    language: javascript
+    description: package.json の test スクリプトを実行
+
+  - name: Vitest
+    detection:
+      - type: file_exists
+        path: vitest.config.ts
+      - type: file_exists
+        path: vitest.config.js
+      - type: package_json_dep
+        dependency: vitest
+    command: npx vitest run
+    language: javascript
+    description: Vitest テストランナー
+
+  - name: Jest
+    detection:
+      - type: file_exists
+        path: jest.config.js
+      - type: file_exists
+        path: jest.config.ts
+      - type: package_json_dep
+        dependency: jest
+    command: npx jest
+    language: javascript
+    description: Jest テストランナー
+
+  # Python
+  - name: pytest
+    detection:
+      - type: file_exists
+        path: pytest.ini
+      - type: file_exists
+        path: pyproject.toml
+      - type: file_exists
+        path: setup.cfg
+    command: pytest
+    language: python
+    description: pytest テストランナー
+
+  - name: Django Test
+    detection:
+      - type: file_exists
+        path: manage.py
+    command: python manage.py test
+    language: python
+    description: Django テストランナー
+
+  - name: unittest
+    detection:
+      - type: directory_exists
+        path: tests
+      - type: file_pattern
+        pattern: "test_*.py"
+    command: python -m unittest discover
+    language: python
+    description: Python unittest
+
+  # Ruby
+  - name: RSpec
+    detection:
+      - type: file_exists
+        path: .rspec
+      - type: directory_exists
+        path: spec
+    command: bundle exec rspec
+    language: ruby
+    description: RSpec テストランナー
+
+  - name: Rails Test
+    detection:
+      - type: file_exists
+        path: bin/rails
+      - type: directory_exists
+        path: test
+    command: bundle exec rails test
+    language: ruby
+    description: Rails テストランナー
+
+  # Go
+  - name: Go Test
+    detection:
+      - type: file_exists
+        path: go.mod
+    command: go test ./...
+    language: go
+    description: Go テストランナー
+
+  # Rust
+  - name: Cargo Test
+    detection:
+      - type: file_exists
+        path: Cargo.toml
+    command: cargo test
+    language: rust
+    description: Rust Cargo テストランナー
+
+  # Java
+  - name: Maven Test
+    detection:
+      - type: file_exists
+        path: pom.xml
+    command: mvn test
+    language: java
+    description: Maven テストランナー
+
+  - name: Gradle Test
+    detection:
+      - type: file_exists
+        path: build.gradle
+      - type: file_exists
+        path: build.gradle.kts
+    command: ./gradlew test
+    language: java
+    description: Gradle テストランナー
+
+  # .NET
+  - name: dotnet test
+    detection:
+      - type: file_pattern
+        pattern: "*.csproj"
+      - type: file_pattern
+        pattern: "*.sln"
+    command: dotnet test
+    language: csharp
+    description: .NET テストランナー
+
+  # PHP
+  - name: PHPUnit
+    detection:
+      - type: file_exists
+        path: phpunit.xml
+      - type: file_exists
+        path: phpunit.xml.dist
+    command: ./vendor/bin/phpunit
+    language: php
+    description: PHPUnit テストランナー
+
+# 実行設定
+execution:
+  max_buffer: 5242880  # 5MB
+  timeout: 300000      # 5 minutes
+  encoding: utf8

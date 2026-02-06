@@ -16,7 +16,7 @@ An interactive TUI dashboard to manage the lifecycle of Gemini skills.
 A powerful text extraction engine that supports various file formats, including OCR for embedded images.
 - **Capabilities:**
   - **Office Documents:** Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`) - *Includes OCR for embedded images.*
-  - **PDF:** Hybrid text extraction (Text Layer + OCR for scanned pages).
+  - **PDF:** Plain text extraction.
   - **Images:** OCR for `.png`, `.jpg`, `.webp`, etc. (Supports English & Japanese).
   - **Archives:** Text extraction from `.zip` files.
   - **Emails:** Parsing `.eml` files.

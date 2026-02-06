@@ -1,0 +1,9 @@
+{
+  "name": "doc-type-classifier",
+  "version": "0.1.0",
+  "description": "Classify document type (meeting-notes, spec, etc).",
+  "main": "scripts/classify.cjs",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

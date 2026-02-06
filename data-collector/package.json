@@ -1,0 +1,16 @@
+{
+  "name": "data-collector",
+  "version": "1.0.0",
+  "description": "Skill to collect data from various sources with metadata tracking",
+  "main": "scripts/collect.cjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "mime-types": "^2.1.35",
+    "yargs": "^17.7.0"
+  },
+  "author": "Gemini Agent",
+  "license": "ISC"
+}

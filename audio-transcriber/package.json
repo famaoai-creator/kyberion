@@ -1,0 +1,13 @@
+{
+  "name": "audio-transcriber",
+  "version": "0.1.0",
+  "description": "Transcribe audio/video files to text using OpenAI Whisper.",
+  "main": "scripts/transcribe.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.4",
+    "form-data": "^4.0.5",
+    "yargs": "^18.0.0"
+  }
+}

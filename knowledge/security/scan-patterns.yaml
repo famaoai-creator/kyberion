@@ -1,0 +1,150 @@
+# セキュリティスキャンパターン定義
+# security-scanner スキルで使用
+
+# シークレット検出パターン
+secret_patterns:
+  - name: AWS Access Key ID
+    regex: "\\bAKIA[0-9A-Z]{16}\\b"
+    severity: critical
+    description: AWS IAMアクセスキーID
+
+  - name: AWS Secret Access Key
+    regex: "\\b[0-9a-zA-Z/+]{40}\\b"
+    context:
+      - aws
+      - secret
+      - key
+    severity: critical
+    description: AWSシークレットアクセスキー（コンテキスト必須で誤検知を軽減）
+
+  - name: GitHub Personal Access Token
+    regex: "ghp_[0-9a-zA-Z]{36}"
+    severity: critical
+    description: GitHubパーソナルアクセストークン
+
+  - name: GitHub OAuth Token
+    regex: "gho_[0-9a-zA-Z]{36}"
+    severity: critical
+    description: GitHub OAuthトークン
+
+  - name: GitHub App Token
+    regex: "ghu_[0-9a-zA-Z]{36}"
+    severity: critical
+    description: GitHub Appユーザートークン
+
+  - name: GitHub App Installation Token
+    regex: "ghs_[0-9a-zA-Z]{36}"
+    severity: critical
+    description: GitHub Appインストールトークン
+
+  - name: Google API Key
+    regex: "AIza[0-9A-Za-z\\-_]{35}"
+    severity: critical
+    description: Google APIキー
+
+  - name: Slack Webhook URL
+    regex: "https://hooks\\.slack\\.com/services/T[a-zA-Z0-9_]+/B[a-zA-Z0-9_]+/[a-zA-Z0-9_]+"
+    severity: high
+    description: Slack Webhook URL
+
+  - name: Slack Bot Token
+    regex: "xoxb-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}"
+    severity: critical
+    description: Slack Botトークン
+
+  - name: RSA Private Key
+    regex: "-----BEGIN RSA PRIVATE KEY-----"
+    severity: critical
+    description: RSA秘密鍵
+
+  - name: SSH Private Key
+    regex: "-----BEGIN OPENSSH PRIVATE KEY-----"
+    severity: critical
+    description: SSH秘密鍵
+
+  - name: PGP Private Key
+    regex: "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+    severity: critical
+    description: PGP秘密鍵
+
+  - name: Generic Password Assignment
+    regex: "(password|passwd|pwd|secret|token|api_key)[\\s]*[=:]+[\\s]*['\"][a-zA-Z0-9@#$%^&+=]{8,}['\"]"
+    flags: i
+    severity: high
+    description: パスワード・シークレットのハードコード
+
+  - name: Bearer Token
+    regex: "bearer\\s+[a-zA-Z0-9\\-_\\.]+\\.[a-zA-Z0-9\\-_\\.]+\\.[a-zA-Z0-9\\-_\\.]+"
+    flags: i
+    severity: high
+    description: BearerトークンJWTパターン
+
+  - name: Stripe API Key
+    regex: "sk_live_[0-9a-zA-Z]{24,}"
+    severity: critical
+    description: Stripe本番APIキー
+
+  - name: Stripe Test API Key
+    regex: "sk_test_[0-9a-zA-Z]{24,}"
+    severity: medium
+    description: StripeテストAPIキー
+
+# 危険なコードパターン
+dangerous_patterns:
+  - name: Eval Usage (Code Execution)
+    regex: "\\beval\\s*\\("
+    severity: high
+    description: eval関数の使用。コードインジェクションのリスクあり
+    recommendation: 可能な限りevalの使用を避け、JSON.parseなど安全な代替手段を使用
+
+  - name: Dangerous InnerHTML (XSS)
+    regex: "dangerouslySetInnerHTML"
+    severity: high
+    description: ReactのdangerouslySetInnerHTML。XSS脆弱性のリスクあり
+    recommendation: ユーザー入力をサニタイズするか、DOMPurifyなどのライブラリを使用
+
+  - name: Shell Execution (Command Injection)
+    regex: "(child_process|exec|spawn|system)\\s*\\(.*[$+\\w].*\\)"
+    severity: high
+    description: シェルコマンド実行。コマンドインジェクションのリスクあり
+    recommendation: ユーザー入力を直接渡さない。execFilやspawnの配列引数を使用
+
+  - name: Hardcoded IP Address
+    regex: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b"
+    severity: low
+    description: ハードコードされたIPアドレス
+    whitelist:
+      - "127.0.0.1"
+      - "0.0.0.0"
+      - "255.255.255.255"
+    recommendation: 環境変数や設定ファイルでIPアドレスを管理
+
+  - name: Insecure HTTP Link
+    regex: "http://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    severity: low
+    description: HTTPSではなくHTTPを使用
+    whitelist_patterns:
+      - "xmlns"
+      - "w3.org"
+      - "schemas.microsoft"
+      - "localhost"
+    recommendation: 可能な限りHTTPSを使用
+
+  - name: SQL Injection Risk
+    regex: "(SELECT|INSERT|UPDATE|DELETE).*\\+.*\\$|\\$\\{.*\\}.*FROM"
+    flags: i
+    severity: high
+    description: SQLクエリ内での文字列結合。SQLインジェクションのリスクあり
+    recommendation: プリペアドステートメントまたはORMを使用
+
+  - name: Hardcoded Credentials in URL
+    regex: "://[^:]+:[^@]+@"
+    severity: high
+    description: URLに埋め込まれた認証情報
+    recommendation: 環境変数で認証情報を管理
+
+# スキャン設定
+scan_config:
+  max_line_length: 500
+  skip_minified: true
+  skip_lock_files: true

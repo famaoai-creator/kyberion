@@ -1,0 +1,11 @@
+{
+  "name": "completeness-scorer",
+  "version": "0.1.0",
+  "description": "Evaluate text completeness based on criteria.",
+  "main": "scripts/score.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

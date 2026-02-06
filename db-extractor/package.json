@@ -1,0 +1,12 @@
+{
+  "name": "db-extractor",
+  "version": "0.1.0",
+  "description": "Extract schema and sample data from databases for analysis.",
+  "main": "scripts/extract.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "sqlite3": "^5.1.7",
+    "yargs": "^18.0.0"
+  }
+}

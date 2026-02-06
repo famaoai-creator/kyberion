@@ -1,0 +1,11 @@
+{
+  "name": "sequence-mapper",
+  "version": "0.1.0",
+  "description": "Generate Mermaid sequence diagrams from source code function calls.",
+  "main": "scripts/map.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

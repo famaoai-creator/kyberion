@@ -1,0 +1,112 @@
+# スキーマ検出パターン定義
+# schema-inspector スキルで使用
+
+# スキーマファイル検出パターン
+patterns:
+  # SQL
+  - glob: "**/*.sql"
+    type: sql
+    description: SQLスキーマ定義ファイル
+
+  # Prisma
+  - glob: "**/schema.prisma"
+    type: prisma
+    description: Prisma ORMスキーマ
+
+  # OpenAPI/Swagger
+  - glob: "**/swagger.json"
+    type: openapi
+    description: Swagger API仕様
+  - glob: "**/swagger.yaml"
+    type: openapi
+    description: Swagger API仕様 (YAML)
+  - glob: "**/openapi.json"
+    type: openapi
+    description: OpenAPI仕様 (JSON)
+  - glob: "**/openapi.yaml"
+    type: openapi
+    description: OpenAPI仕様 (YAML)
+  - glob: "**/openapi.yml"
+    type: openapi
+    description: OpenAPI仕様 (YML)
+  - glob: "**/api.yaml"
+    type: openapi
+    description: API定義 (YAML)
+
+  # GraphQL
+  - glob: "**/*.graphql"
+    type: graphql
+    description: GraphQLスキーマ
+  - glob: "**/schema.graphql"
+    type: graphql
+    description: GraphQLスキーマ
+  - glob: "**/*.gql"
+    type: graphql
+    description: GraphQLスキーマ
+
+  # Python ORM
+  - glob: "**/models.py"
+    type: django
+    description: Django/SQLAlchemyモデル定義
+
+  # JavaScript/TypeScript ORM
+  - glob: "**/Schema.js"
+    type: mongoose
+    description: Mongooseスキーマ
+  - glob: "**/schema.js"
+    type: mongoose
+    description: Mongooseスキーマ
+  - glob: "**/entity/*.ts"
+    type: typeorm
+    description: TypeORMエンティティ
+  - glob: "**/entities/*.ts"
+    type: typeorm
+    description: TypeORMエンティティ
+  - glob: "**/models/*.ts"
+    type: sequelize
+    description: Sequelizeモデル
+
+  # Protocol Buffers
+  - glob: "**/*.proto"
+    type: protobuf
+    description: Protocol Buffers定義
+
+  # JSON Schema
+  - glob: "**/*.schema.json"
+    type: jsonschema
+    description: JSONスキーマ
+
+  # Avro
+  - glob: "**/*.avsc"
+    type: avro
+    description: Avroスキーマ
+
+  # Database migrations
+  - glob: "**/migrations/*.sql"
+    type: migration
+    description: SQLマイグレーション
+  - glob: "**/migrations/*.py"
+    type: migration
+    description: Pythonマイグレーション
+  - glob: "**/db/migrate/*.rb"
+    type: migration
+    description: Railsマイグレーション
+
+# 除外パターン（共通設定と併用）
+exclude:
+  directories:
+    - node_modules
+    - dist
+    - build
+    - coverage
+    - .git
+    - vendor
+    - __pycache__
+  patterns:
+    - "**/*.min.js"
+    - "**/*.d.ts"
+
+# 表示設定
+display:
+  max_content_length: 20000
+  truncate_message: "... (Truncated)"

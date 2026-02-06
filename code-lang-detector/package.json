@@ -1,0 +1,9 @@
+{
+  "name": "code-lang-detector",
+  "version": "0.1.0",
+  "description": "Detect programming language of source code.",
+  "main": "scripts/detect.cjs",
+  "dependencies": {
+    "yargs": "^18.0.0"
+  }
+}

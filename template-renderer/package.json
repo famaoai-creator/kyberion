@@ -1,0 +1,12 @@
+{
+  "name": "template-renderer",
+  "version": "0.1.0",
+  "description": "Render text from templates (Mustache/EJS) and data.",
+  "main": "scripts/render.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "mustache": "^4.2.0",
+    "yargs": "^18.0.0"
+  }
+}

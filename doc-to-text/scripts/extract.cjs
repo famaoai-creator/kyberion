@@ -115,27 +115,17 @@ async function processPdf(file) {
 async function processExcel(file) {
     console.log("--- EXCEL CONTENT START ---");
     
+    // 1. Text Data
+    console.log("[Text Layer]");
     const workbook = xlsx.readFile(file);
     workbook.SheetNames.forEach(sheetName => {
         console.log(`\n## Sheet: ${sheetName}`);
         const worksheet = workbook.Sheets[sheetName];
-        
-        // 1. CSV Output (Data view)
-        console.log("[Data View (CSV)]");
         const csv = xlsx.utils.sheet_to_csv(worksheet);
         console.log(csv);
-
-        // 2. HTML Output (Layout view)
-        console.log("\n[Layout View (HTML Structure)]");
-        // Generate simple HTML table with merged cells preserved
-        const html = xlsx.utils.sheet_to_html(worksheet, { 
-            id: "sheet",
-            editable: false 
-        });
-        console.log(html);
     });
 
-    // 3. Images (OCR) - only for .xlsx (zip based)
+    // 2. Images (OCR) - only for .xlsx (zip based)
     if (path.extname(file).toLowerCase() === '.xlsx') {
         await extractAndOcrImages(file, 'xl/media/');
     }

@@ -1,0 +1,39 @@
+name: IPA 非機能要求グレード 2018
+version: "2018"
+source: 独立行政法人情報処理推進機構（IPA）
+url: https://www.ipa.go.jp/archive/digital/iot-en-ci/jyouryuu/hikinou/ent03-b-1.html
+license: |
+  本データはIPA「非機能要求グレード2018」を基に作成しています。
+  ご利用にあたっては、上記URLの使用条件を必ずご確認ください。
+last_updated: "2025-01-01"
+
+categories:
+  - file: availability.yaml
+    name: 可用性
+    description: システムの稼働時間、障害対応、復旧目標に関する要件
+  - file: performance.yaml
+    name: 性能・拡張性
+    description: レスポンス時間、スループット、スケーラビリティに関する要件
+  - file: operation.yaml
+    name: 運用・保守性
+    description: 監視、バックアップ、障害対応、変更管理に関する要件
+  - file: migration.yaml
+    name: 移行性
+    description: システム移行、データ移行に関する要件
+  - file: security.yaml
+    name: セキュリティ
+    description: 認証、アクセス制御、暗号化、監査に関する要件
+  - file: environment.yaml
+    name: システム環境・エコロジー
+    description: 適合規格、機材設置環境、環境マネジメントに関する要件
+
+model_cases:
+  low_impact:
+    name: 低影響
+    description: 内部向け・部門システム、社会的影響が軽微
+  mid_impact:
+    name: 中影響
+    description: 標準的な企業システム、社会的影響が限定的
+  high_impact:
+    name: 高影響
+    description: 社会インフラ・公共システム、社会的影響が大きい

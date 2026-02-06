@@ -1,0 +1,12 @@
+{
+  "name": "api-fetcher",
+  "version": "0.1.0",
+  "description": "Fetch data from REST/GraphQL APIs securely.",
+  "main": "scripts/fetch.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.4",
+    "yargs": "^18.0.0"
+  }
+}

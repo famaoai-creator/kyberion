@@ -1,0 +1,201 @@
+# プロジェクト健全性チェック設定
+# project-health-check スキルで使用
+
+# チェック項目定義
+checks:
+  ci:
+    name: CI/CD Pipelines
+    description: 自動化されたパイプラインによりコードの統合とデプロイの安全性を確保
+    weight: 25
+    patterns:
+      # GitHub Actions
+      - ".github/workflows"
+      # GitLab CI
+      - ".gitlab-ci.yml"
+      # CircleCI
+      - ".circleci/config.yml"
+      # Azure DevOps
+      - "azure-pipelines.yml"
+      # Bitbucket
+      - "bitbucket-pipelines.yml"
+      # Jenkins
+      - "Jenkinsfile"
+      # AWS CodeBuild
+      - "buildspec.yml"
+      # Google Cloud Build
+      - "cloudbuild.yaml"
+      # Drone CI
+      - ".drone.yml"
+      # Travis CI
+      - ".travis.yml"
+    suggestion: "CI/CDパイプラインを設定して、ビルド・テスト・デプロイを自動化しましょう"
+
+  test:
+    name: Testing Framework
+    description: テストによりリグレッションを防止し、リファクタリングへの自信を高める
+    weight: 25
+    patterns:
+      # JavaScript/TypeScript
+      - "jest.config.*"
+      - "vitest.config.*"
+      - ".mocharc.*"
+      # Python
+      - "pytest.ini"
+      - "pyproject.toml"
+      - "setup.cfg"
+      - "tox.ini"
+      # Ruby
+      - ".rspec"
+      - "spec/"
+      # Java
+      - "pom.xml"
+      - "build.gradle*"
+      # Go
+      - "go.mod"
+      - "*_test.go"
+      # Rust
+      - "Cargo.toml"
+      # .NET
+      - "*.csproj"
+      # Generic
+      - "tests/"
+      - "test/"
+      - "__tests__/"
+    package_json_check:
+      dependencies:
+        - jest
+        - mocha
+        - vitest
+        - ava
+        - jasmine
+        - karma
+        - cypress
+        - playwright
+      scripts:
+        - test
+    suggestion: "テストフレームワークを導入して、コードの品質を担保しましょう"
+
+  lint:
+    name: Linting & Formatting
+    description: 一貫したコードスタイルと静的解析によりバグと認知負荷を軽減
+    weight: 15
+    patterns:
+      # JavaScript/TypeScript
+      - ".eslintrc*"
+      - "eslint.config.*"
+      - ".prettierrc*"
+      - "prettier.config.*"
+      - "biome.json"
+      # Python
+      - ".flake8"
+      - ".pylintrc"
+      - "ruff.toml"
+      # Ruby
+      - ".rubocop.yml"
+      # Java
+      - "checkstyle.xml"
+      - "pmd.xml"
+      # Go
+      - ".golangci.yml"
+      # Rust
+      - "rustfmt.toml"
+      - "clippy.toml"
+      # General
+      - ".editorconfig"
+    package_json_check:
+      dependencies:
+        - eslint
+        - prettier
+        - stylelint
+        - tslint
+        - biome
+      scripts:
+        - lint
+        - format
+    suggestion: "Linter/Formatterを設定して、コードスタイルを統一しましょう"
+
+  iac:
+    name: Containerization & IaC
+    description: コードとしてのインフラとコンテナ化により再現可能な環境を確保
+    weight: 20
+    patterns:
+      # Docker
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "docker-compose.yaml"
+      - "compose.yml"
+      - "compose.yaml"
+      # Kubernetes
+      - "k8s/"
+      - "kubernetes/"
+      - "helm/"
+      - "kustomization.yaml"
+      # Terraform
+      - "terraform/"
+      - "main.tf"
+      - "*.tf"
+      # Pulumi
+      - "Pulumi.yaml"
+      # CloudFormation
+      - "template.yaml"
+      - "cloudformation/"
+      # Serverless
+      - "serverless.yml"
+      - "serverless.yaml"
+      # Ansible
+      - "ansible/"
+      - "playbook.yml"
+    suggestion: "Dockerfileやterraformを使って、インフラをコード化しましょう"
+
+  docs:
+    name: Documentation
+    description: 良いドキュメントはオンボーディングコストを下げ「なぜ」を説明する
+    weight: 15
+    patterns:
+      - "README.md"
+      - "README.rst"
+      - "CONTRIBUTING.md"
+      - "CHANGELOG.md"
+      - "docs/"
+      - "doc/"
+      - "documentation/"
+      - "wiki/"
+      - "API.md"
+    suggestion: "README.mdを充実させ、プロジェクトの目的と使い方を説明しましょう"
+
+  security:
+    name: Security Configuration
+    description: セキュリティ設定により脆弱性を早期に検出
+    weight: 0  # オプション（重みを0にすることで総合スコアに影響しない）
+    optional: true
+    patterns:
+      - ".snyk"
+      - "security.txt"
+      - ".trivyignore"
+      - "SECURITY.md"
+      - "dependabot.yml"
+      - ".github/dependabot.yml"
+    suggestion: "Dependabotやセキュリティポリシーを設定しましょう"
+
+# 採点基準
+grading:
+  A:
+    min_percentage: 90
+    color: green
+    description: 優秀
+  B:
+    min_percentage: 80
+    color: blue
+    description: 良好
+  C:
+    min_percentage: 60
+    color: yellow
+    description: 普通
+  D:
+    min_percentage: 40
+    color: magenta
+    description: 要改善
+  F:
+    min_percentage: 0
+    color: red
+    description: 不十分
