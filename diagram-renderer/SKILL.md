@@ -10,9 +10,11 @@ This skill acts as a rendering engine for text-based diagrams. It takes code (li
 
 ## Capabilities
 
-1.  **Mermaid to Image**:
-    - Converts `.mmd` files or text input to `.png` or `.svg`.
-    - Uses `@mermaid-js/mermaid-cli` (Chromium-based).
+### 1. Brand-Themed Rendering
+- **Palette Awareness**: Automatically looks up `knowledge/templates/themes/palettes/` for brand-specific colors.
+- **Dynamic Styling**: Injects Mermaid `%%{init: ...}%%` directives to match the chart's colors with the overall project theme defined in `visual_harmony_guide.md`.
+
+### 2. Multi-Format Output
 
 2.  **PlantUML to Image** (Planned):
     - Future support for `.puml` files.
