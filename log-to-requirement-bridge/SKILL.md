@@ -1,0 +1,22 @@
+---
+name: log-to-requirement-bridge
+description: Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Operations and Development.
+---
+
+# Log-to-Requirement Bridge
+
+This skill turns "problems" found in logs into "tasks" for developers. It analyzes recurring issues and suggests requirement updates.
+
+## Capabilities
+
+### 1. Error Correlation
+- Aggregates similar log errors.
+- Identifies root causes (e.g., "Frequent timeouts at API X").
+
+### 2. Requirement Drafting
+- Automatically drafts "Improvement Requirements" using the `requirements-wizard` format.
+- Links logs as evidence for new requirements.
+
+## Usage
+- "Analyze the last 1000 lines of `app.log` and draft a requirement to fix the most frequent issue."
+- "Bridge the gap: based on these error logs, what should we add to our Non-Functional Requirements?"
