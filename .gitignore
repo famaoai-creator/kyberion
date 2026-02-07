@@ -5,3 +5,4 @@ tmp/
 node_modules/
 *.traineddata
 work/
+\n# Confidential Knowledge\nknowledge/confidential/
