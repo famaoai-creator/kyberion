@@ -20,6 +20,8 @@ This is the "Brain" of the Gemini Skills ecosystem. It knows how to combine 100+
     - **Professional Proposal Pipeline**: See `knowledge/orchestration/proposal-pipeline.md` for the full research-to-production sequence.
     - **Production Readiness Audit**: Coordinates `security-scanner` -> `ux-auditor` -> `license-auditor` -> `project-health-check`.
     - **Enterprise Quality Cycle**: Follows `knowledge/orchestration/quality-management-flow.md` to review, report, and improve artifacts.
+    - **Self-Healing Loop**: Applies `knowledge/orchestration/autonomous-debug-loop.md` to automatically recover from execution failures.
+    - **Knowledge Integrity Audit**: Periodically triggers `knowledge-auditor` to maintain consistency across 3 tiers.
     - **Autonomous Troubleshooting**: Links `log-analyst` -> `crisis-manager` -> `self-healing-orchestrator`.
 
 ### 2. Executive Reporting
