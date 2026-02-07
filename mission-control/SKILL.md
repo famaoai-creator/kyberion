@@ -10,7 +10,8 @@ This is the "Brain" of the Gemini Skills ecosystem. It knows how to combine 100+
 ## Capabilities
 
 ### 1. Workflow Orchestration
-- **Dynamic Workflow Execution**: Refers to patterns in `knowledge/orchestration/` to execute complex multi-step tasks.
+- **Global Skill Lookup**: Prioritizes `knowledge/orchestration/global_skill_index.json` to instantly identify the best skills for a task without reading all definition files.
+- **Parallel Audit Pipeline**: Can trigger `security-scanner`, `ux-auditor`, and `license-auditor` in parallel, aggregating results for a 3x speedup in quality gates.
 - **3-Tier Sovereign Protocol**: Orchestrates all skills to use Public, Confidential (Skill/Client-specific), and Personal knowledge tiers.
 - **Client Context Switching**: Can set a specific client context (e.g., "Act as lead for Client A") to prioritize `knowledge/confidential/clients/ClientA/`.
 - **Key Patterns**:

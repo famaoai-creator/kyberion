@@ -1,0 +1,581 @@
+{
+  "total_skills": 115,
+  "last_updated": "2026-02-07T11:45:52.427Z",
+  "skills": [
+    {
+      "name": "aesthetic-elegance-auditor",
+      "description": "Audits code for mathematical and artistic \"Elegance.\" Evaluates symmetry, conciseness, and structural beauty to transform clean code into a masterpiece.",
+      "path": "./aesthetic-elegance-auditor/"
+    },
+    {
+      "name": "agent-activity-monitor",
+      "description": "Collects and visualizes statistics regarding the agent's activities, including skill usage, execution success rates, and task duration. Provides a data-driven dashboard for ecosystem health.",
+      "path": "./agent-activity-monitor/"
+    },
+    {
+      "name": "ai-ethics-auditor",
+      "description": "Audits AI systems for bias, fairness, and privacy. Analyzes prompts and datasets to ensure ethical and safe AI implementation.",
+      "path": "./ai-ethics-auditor/"
+    },
+    {
+      "name": "ai-model-orchestrator",
+      "description": "Dynamically selects the optimal AI model based on task complexity, cost, and latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize efficiency.",
+      "path": "./ai-model-orchestrator/"
+    },
+    {
+      "name": "api-doc-generator",
+      "description": "Generate API documentation from OpenAPI specs or code.",
+      "path": "./api-doc-generator/"
+    },
+    {
+      "name": "api-evolution-manager",
+      "description": "Governs the evolution of public APIs. Detects breaking changes, manages deprecation cycles, and generates migration guides for clients.",
+      "path": "./api-evolution-manager/"
+    },
+    {
+      "name": "api-fetcher",
+      "description": "Fetch data from REST/GraphQL APIs securely.",
+      "path": "./api-fetcher/"
+    },
+    {
+      "name": "audio-transcriber",
+      "description": "Transcribe audio/video files to text using OpenAI Whisper.",
+      "path": "./audio-transcriber/"
+    },
+    {
+      "name": "automated-support-architect",
+      "description": "Generates high-quality user support assets (FAQs, Troubleshooting Guides, Chatbot Knowledge) directly from source code and requirements. Bridges the gap between developers and end-users.",
+      "path": "./automated-support-architect/"
+    },
+    {
+      "name": "autonomous-skill-designer",
+      "description": "The ultimate \"self-generation\" skill. Autonomously designs and implements new Gemini skills to solve novel problems that current skills cannot address.",
+      "path": "./autonomous-skill-designer/"
+    },
+    {
+      "name": "binary-archaeologist",
+      "description": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.",
+      "path": "./binary-archaeologist/"
+    },
+    {
+      "name": "boilerplate-genie",
+      "description": "Scaffolds new projects with best practices (CI/CD, Tests, Linting) pre-configured. Ensures a \"healthy\" starting point for Next.js, FastAPI, Node.js, and more.",
+      "path": "./boilerplate-genie/"
+    },
+    {
+      "name": "browser-navigator",
+      "description": "Automates browser actions using Playwright CLI. Can record, replay, and generate browser automation scenarios stored in the knowledge base. Useful for UI testing, data extraction, and visual auditing.",
+      "path": "./browser-navigator/"
+    },
+    {
+      "name": "bug-predictor",
+      "description": "Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns. Warns developers before a bug is even written.",
+      "path": "./bug-predictor/"
+    },
+    {
+      "name": "business-impact-analyzer",
+      "description": "Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financial impact. Helps justify technical investments to stakeholders.",
+      "path": "./business-impact-analyzer/"
+    },
+    {
+      "name": "chaos-monkey-orchestrator",
+      "description": "Injects managed chaos into environments to test system resilience. Validates that self-healing and monitoring systems work as expected under stress.",
+      "path": "./chaos-monkey-orchestrator/"
+    },
+    {
+      "name": "cloud-cost-estimator",
+      "description": "Estimates monthly cloud infrastructure costs from IaC files (Terraform, CloudFormation). Helps align architecture with budget constraints.",
+      "path": "./cloud-cost-estimator/"
+    },
+    {
+      "name": "cloud-waste-hunter",
+      "description": "Actively identifies and eliminates unused or over-provisioned cloud resources. Goes beyond estimation to hunt for actual cost savings in live environments.",
+      "path": "./cloud-waste-hunter/"
+    },
+    {
+      "name": "code-lang-detector",
+      "description": "Detect programming language of source code.",
+      "path": "./code-lang-detector/"
+    },
+    {
+      "name": "codebase-mapper",
+      "description": "Maps the directory structure of the project to help the AI understand the codebase layout.",
+      "path": "./codebase-mapper/"
+    },
+    {
+      "name": "cognitive-load-auditor",
+      "description": "Analyzes code and UI complexity from a cognitive science perspective. Identifies areas that exceed human information processing limits to prevent developer burnout and user confusion.",
+      "path": "./cognitive-load-auditor/"
+    },
+    {
+      "name": "community-health-guardian",
+      "description": "Monitors the health of developer communities and open-source projects. Analyzes response times, contributor retention, and document clarity to ensure a welcoming environment.",
+      "path": "./community-health-guardian/"
+    },
+    {
+      "name": "completeness-scorer",
+      "description": "Evaluate text completeness based on criteria.",
+      "path": "./completeness-scorer/"
+    },
+    {
+      "name": "compliance-officer",
+      "description": "Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time compliance scores and audit-ready evidence reports.",
+      "path": "./compliance-officer/"
+    },
+    {
+      "name": "context-injector",
+      "description": "Inject knowledge into JSON data context.",
+      "path": "./context-injector/"
+    },
+    {
+      "name": "creator-mentor",
+      "description": "Personalized coaching for the developer. Analyzes historical interactions and code changes to provide customized technical advice, identifying growth areas and recommending new technologies.",
+      "path": "./creator-mentor/"
+    },
+    {
+      "name": "crisis-manager",
+      "description": "Provides rapid response during production incidents or critical security breaches. Coordinates diagnostics, temporary fixes, and post-mortem data collection.",
+      "path": "./crisis-manager/"
+    },
+    {
+      "name": "data-collector",
+      "description": "Fetches data from URLs (Web/API) and saves it to a local directory with metadata (timestamp, source, hash) for traceability. Supports incremental updates.",
+      "path": "./data-collector/"
+    },
+    {
+      "name": "data-lineage-guardian",
+      "description": "Tracks the flow and integrity of data across the entire stack. Monitors data quality, ensures \"Right to be Forgotten\" compliance, and visualizes data lineage.",
+      "path": "./data-lineage-guardian/"
+    },
+    {
+      "name": "data-transformer",
+      "description": "Convert between CSV, JSON, and YAML formats.",
+      "path": "./data-transformer/"
+    },
+    {
+      "name": "dataset-curator",
+      "description": "Prepares and audits high-quality datasets for AI/RAG applications. Cleans noise, structure data, and ensures privacy compliance in knowledge bases.",
+      "path": "./dataset-curator/"
+    },
+    {
+      "name": "db-extractor",
+      "description": "Extract schema and sample data from databases for analysis.",
+      "path": "./db-extractor/"
+    },
+    {
+      "name": "dependency-grapher",
+      "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
+      "path": "./dependency-grapher/"
+    },
+    {
+      "name": "dependency-lifeline",
+      "description": "Proactively monitors and plans library updates. Assesses the risk of breaking changes and proposes safe update paths.",
+      "path": "./dependency-lifeline/"
+    },
+    {
+      "name": "diagram-renderer",
+      "description": "Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful for visualizing text-based architecture diagrams, flowcharts, and sequence diagrams.",
+      "path": "./diagram-renderer/"
+    },
+    {
+      "name": "diff-visualizer",
+      "description": "Generate a visual difference report between two texts.",
+      "path": "./diff-visualizer/"
+    },
+    {
+      "name": "disaster-recovery-planner",
+      "description": "Generates actionable Disaster Recovery (DR) runbooks from infrastructure and requirements. Validates IaC for resilience (backups, redundancy).",
+      "path": "./disaster-recovery-planner/"
+    },
+    {
+      "name": "doc-sync-sentinel",
+      "description": "Automatically synchronizes documentation with code changes. Detects drift between source code and READMEs, Wikis, or comments, and suggests autonomous updates.",
+      "path": "./doc-sync-sentinel/"
+    },
+    {
+      "name": "doc-to-text",
+      "description": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, and ZIP Archives. Use for summarizing or analyzing binary files.",
+      "path": "./doc-to-text/"
+    },
+    {
+      "name": "doc-type-classifier",
+      "description": "Classify document type (meeting-notes, spec, etc).",
+      "path": "./doc-type-classifier/"
+    },
+    {
+      "name": "domain-classifier",
+      "description": "Classify domain (tech, finance, legal).",
+      "path": "./domain-classifier/"
+    },
+    {
+      "name": "ecosystem-federator",
+      "description": "Negotiates and synchronizes with external AI agents and repositories. Handles cross-project dependency alignment and specification negotiations between autonomous entities.",
+      "path": "./ecosystem-federator/"
+    },
+    {
+      "name": "empathy-engine",
+      "description": "Analyzes the emotional pulse of the user community. Correlates user joy, frustration, and sadness from feedback and social data to prioritize development tasks based on \"Emotional Impact.\"",
+      "path": "./empathy-engine/"
+    },
+    {
+      "name": "encoding-detector",
+      "description": "Detect file encoding and line endings.",
+      "path": "./encoding-detector/"
+    },
+    {
+      "name": "engineering-culture-analyst",
+      "description": "Audits team dynamics and communication patterns. Identifies risks of burnout, knowledge silos, or toxic review behaviors (anonymized) to maintain psychological safety.",
+      "path": "./engineering-culture-analyst/"
+    },
+    {
+      "name": "environment-provisioner",
+      "description": "Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive requirements. The creative counterpart to terraform-arch-mapper.",
+      "path": "./environment-provisioner/"
+    },
+    {
+      "name": "eternal-self-preservation-guardian",
+      "description": "Ensures the project's \"soul\" survives for centuries. Automatically builds distributed archives and human-readable recovery guides designed for 100-year longevity.",
+      "path": "./eternal-self-preservation-guardian/"
+    },
+    {
+      "name": "excel-artisan",
+      "description": "Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying cell values, and applying basic formatting. Use when you need to produce Excel reports or modify existing spreadsheets.",
+      "path": "./excel-artisan/"
+    },
+    {
+      "name": "format-detector",
+      "description": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
+      "path": "./format-detector/"
+    },
+    {
+      "name": "future-evolution-oracle",
+      "description": "Predicts technology trends 10+ years ahead to extend code lifespan. Helps engineers design architectures that remain relevant in the 2030s and beyond.",
+      "path": "./future-evolution-oracle/"
+    },
+    {
+      "name": "github-skills-manager",
+      "description": "Comprehensive management suite for Gemini skills. Features an interactive dashboard to create, install, sync (git), and manage dependencies for skills in a monorepo or individual repositories.",
+      "path": "./github-skills-manager/"
+    },
+    {
+      "name": "global-risk-intelligence-sentinel",
+      "description": "Monitors external physical and geopolitical risks (Natural disasters, Vendor outages, Regulatory shifts) that could impact the project. Proposes mitigation plans for external dependencies.",
+      "path": "./global-risk-intelligence-sentinel/"
+    },
+    {
+      "name": "glossary-resolver",
+      "description": "Resolve terms using glossary.",
+      "path": "./glossary-resolver/"
+    },
+    {
+      "name": "html-reporter",
+      "description": "Generate standalone HTML reports from JSON/Markdown.",
+      "path": "./html-reporter/"
+    },
+    {
+      "name": "human-in-the-loop-orchestrator",
+      "description": "Integrates human judgment into AI workflows. Automatically pauses autonomous processes for human review when uncertainty is high or ethical stakes are significant.",
+      "path": "./human-in-the-loop-orchestrator/"
+    },
+    {
+      "name": "innovation-scout",
+      "description": "Proactively researches the latest tech trends and academic papers to suggest optimizations. Identifies new libraries or algorithms that could benefit the project.",
+      "path": "./innovation-scout/"
+    },
+    {
+      "name": "intent-archivist",
+      "description": "Captures and indexes the \"Rationale\" behind technical decisions. Analyzes discussions, PR comments, and meeting notes to preserve the \"Why\" for future teams.",
+      "path": "./intent-archivist/"
+    },
+    {
+      "name": "intent-classifier",
+      "description": "Classify intent of text (request, question, report).",
+      "path": "./intent-classifier/"
+    },
+    {
+      "name": "ip-strategist",
+      "description": "Identifies and protects intellectual property within the codebase. Drafts initial patent applications and IP reports for innovative algorithms or designs.",
+      "path": "./ip-strategist/"
+    },
+    {
+      "name": "issue-to-solution-bridge",
+      "description": "Automates the entire lifecycle from issue detection to solution. Interprets bug reports or feature requests and orchestrates other skills to implement and test the fix.",
+      "path": "./issue-to-solution-bridge/"
+    },
+    {
+      "name": "kill-switch-guardian",
+      "description": "The ultimate safety valve. Provides an encrypted, human-only protocol to immediately freeze and roll back all autonomous AI actions in case of unexpected behavior.",
+      "path": "./kill-switch-guardian/"
+    },
+    {
+      "name": "knowledge-auditor",
+      "description": "Audits the 3-tier knowledge base for consistency, freshness, and cross-tier contradictions. Ensures that proprietary standards align with (or intentionally override) public ones.",
+      "path": "./knowledge-auditor/"
+    },
+    {
+      "name": "knowledge-fetcher",
+      "description": "Fetch knowledge from both public and confidential directories. Bridges general best practices with proprietary internal standards.",
+      "path": "./knowledge-fetcher/"
+    },
+    {
+      "name": "knowledge-refiner",
+      "description": "Maintains and consolidates the knowledge base. Cleans up unstructured data and merges it into structured glossaries or patterns.",
+      "path": "./knowledge-refiner/"
+    },
+    {
+      "name": "lang-detector",
+      "description": "Detect natural language of text (ja, en, etc.).",
+      "path": "./lang-detector/"
+    },
+    {
+      "name": "layout-architect",
+      "description": "Converts visual designs (images/screenshots) into implementation code (CSS, Python-pptx, HTML). Use when recreating slide layouts or UI designs from images.",
+      "path": "./layout-architect/"
+    },
+    {
+      "name": "license-auditor",
+      "description": "Scans project dependencies for license compliance risks. Identifies restrictive licenses (GPL, AGPL) and generates mandatory attribution (NOTICE) files.",
+      "path": "./license-auditor/"
+    },
+    {
+      "name": "local-reviewer",
+      "description": "Retrieves git diff of staged files for pre-commit AI code review.",
+      "path": "./local-reviewer/"
+    },
+    {
+      "name": "localization-maestro",
+      "description": "Manages global expansion by automating i18n workflows and auditing for cultural/regional appropriateness. Handles formats, currency, and sensitive localized expressions.",
+      "path": "./localization-maestro/"
+    },
+    {
+      "name": "log-analyst",
+      "description": "Reads the tail of a log file to help analyze recent errors or behavior.",
+      "path": "./log-analyst/"
+    },
+    {
+      "name": "log-to-requirement-bridge",
+      "description": "Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Operations and Development.",
+      "path": "./log-to-requirement-bridge/"
+    },
+    {
+      "name": "mission-control",
+      "description": "Orchestrates multiple skills to achieve high-level goals. Acts as the brain of the ecosystem to coordinate complex workflows across the SDLC.",
+      "path": "./mission-control/"
+    },
+    {
+      "name": "nonfunctional-architect",
+      "description": "Interactive guide for defining non-functional requirements based on IPA \"Non-Functional Requirements Grade 2018\". Helps users select appropriate service levels (Availability, Performance, Security, etc.) and generates a requirements definition document.",
+      "path": "./nonfunctional-architect/"
+    },
+    {
+      "name": "north-star-guardian",
+      "description": "Ensures the project remains aligned with its core mission. Audits features and technical decisions against the project's \"North Star\" goals to prevent scope creep and misalignment.",
+      "path": "./north-star-guardian/"
+    },
+    {
+      "name": "onboarding-wizard",
+      "description": "Generates a personalized project guide for new members. Analyzes the codebase and skills to help someone get productive in day one.",
+      "path": "./onboarding-wizard/"
+    },
+    {
+      "name": "pdf-composer",
+      "description": "Generate PDF documents from Markdown with headers/footers.",
+      "path": "./pdf-composer/"
+    },
+    {
+      "name": "performance-monitor-analyst",
+      "description": "Correlates performance targets with actual profiling results. Identifies bottlenecks and validates against non-functional requirements.",
+      "path": "./performance-monitor-analyst/"
+    },
+    {
+      "name": "post-quantum-shield",
+      "description": "Audits codebases for quantum-vulnerable cryptography and plans migration to Post-Quantum Cryptography (PQC) standards to ensure long-term data security.",
+      "path": "./post-quantum-shield/"
+    },
+    {
+      "name": "ppt-artisan",
+      "description": "Create and convert PowerPoint presentations from Markdown using Marp. Use when the user wants to generate slides, manage themes, or convert MD to PPTX/PDF.",
+      "path": "./ppt-artisan/"
+    },
+    {
+      "name": "pr-architect",
+      "description": "Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain \"Why\", \"How\", and the \"Impact\" of the work.",
+      "path": "./pr-architect/"
+    },
+    {
+      "name": "project-health-check",
+      "description": "Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and provides a health score with improvement suggestions.",
+      "path": "./project-health-check/"
+    },
+    {
+      "name": "prompt-optimizer",
+      "description": "Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.",
+      "path": "./prompt-optimizer/"
+    },
+    {
+      "name": "quality-scorer",
+      "description": "Evaluates technical and textual quality based on IPA benchmarks and readability standards.",
+      "path": "./quality-scorer/"
+    },
+    {
+      "name": "red-team-adversary",
+      "description": "Performs active security \"war gaming\" by attempting to exploit identified vulnerabilities in a sandbox. Validates threat reality beyond static scans.",
+      "path": "./red-team-adversary/"
+    },
+    {
+      "name": "refactoring-engine",
+      "description": "Executes large-scale architectural refactoring and technical debt reduction across the entire codebase. Ensures consistency with modern design patterns.",
+      "path": "./refactoring-engine/"
+    },
+    {
+      "name": "release-note-crafter",
+      "description": "Generates business-value-focused release notes by correlating Git logs with requirements. Focuses on \"what's new\" for users and stakeholders.",
+      "path": "./release-note-crafter/"
+    },
+    {
+      "name": "requirements-wizard",
+      "description": "Guide for creating and reviewing requirements definitions based on IPA standards. Provides best practices for business analysis, process mapping, data modeling, and review checklists.",
+      "path": "./requirements-wizard/"
+    },
+    {
+      "name": "schema-inspector",
+      "description": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
+      "path": "./schema-inspector/"
+    },
+    {
+      "name": "schema-validator",
+      "description": "Validate JSON against schemas and identify best match.",
+      "path": "./schema-validator/"
+    },
+    {
+      "name": "security-scanner",
+      "description": "Scans the codebase for security risks, including hardcoded secrets (API keys, tokens), dangerous code patterns (eval, shell injection), and insecure configurations. Use to audit code before committing or reviewing.",
+      "path": "./security-scanner/"
+    },
+    {
+      "name": "self-healing-orchestrator",
+      "description": "Automatically repairs known production issues by applying patches, rollbacks, or config changes. The autonomous counterpart to crisis-manager.",
+      "path": "./self-healing-orchestrator/"
+    },
+    {
+      "name": "sensitivity-detector",
+      "description": "Detect PII and sensitive information in text.",
+      "path": "./sensitivity-detector/"
+    },
+    {
+      "name": "sequence-mapper",
+      "description": "Generate Mermaid sequence diagrams from source code function calls.",
+      "path": "./sequence-mapper/"
+    },
+    {
+      "name": "skill-evolution-engine",
+      "description": "Enables skills to self-improve by analyzing execution logs and user feedback. Automatically refines SKILL.md and scripts to fix recurring failures.",
+      "path": "./skill-evolution-engine/"
+    },
+    {
+      "name": "skill-quality-auditor",
+      "description": "Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality, script functionality, and test coverage for all skills.",
+      "path": "./skill-quality-auditor/"
+    },
+    {
+      "name": "social-impact-forecaster",
+      "description": "Simulates long-term societal and behavioral impacts of software. Identifies risks related to digital addiction, inequality, or isolation to guide ethical product development.",
+      "path": "./social-impact-forecaster/"
+    },
+    {
+      "name": "sovereignty-maestro",
+      "description": "Monitors data residency and sovereignty compliance. Ensures user data flows comply with local laws (GDPR, CCPA) and physical boundary restrictions.",
+      "path": "./sovereignty-maestro/"
+    },
+    {
+      "name": "stakeholder-communicator",
+      "description": "Translates technical decisions and architectural changes into clear, business-oriented language for non-technical stakeholders (Execs, Marketing, Sales).",
+      "path": "./stakeholder-communicator/"
+    },
+    {
+      "name": "strategic-roadmap-planner",
+      "description": "Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic roadmap. Aligns engineering effort with business ROI.",
+      "path": "./strategic-roadmap-planner/"
+    },
+    {
+      "name": "sunset-architect",
+      "description": "Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation cycles, handles data archiving, and generates migration paths for legacy users.",
+      "path": "./sunset-architect/"
+    },
+    {
+      "name": "supply-chain-sentinel",
+      "description": "Protects the software supply chain by generating SBoMs and auditing dependency provenance. Monitors for malicious packages and maintenance risks.",
+      "path": "./supply-chain-sentinel/"
+    },
+    {
+      "name": "sustainability-consultant",
+      "description": "Estimates the environmental impact (Carbon Footprint) of code and infrastructure. Recommends optimizations for energy efficiency and \"GreenOps\".",
+      "path": "./sustainability-consultant/"
+    },
+    {
+      "name": "synthetic-user-persona",
+      "description": "Generates diverse AI user personas to autonomously test applications. Simulates beginners, power users, and users with accessibility needs to discover hidden UI/UX flaws.",
+      "path": "./synthetic-user-persona/"
+    },
+    {
+      "name": "talent-requirement-generator",
+      "description": "Identifies the ideal human skills needed for the project's next phase. Analyzes technical debt, roadmap, and current team gaps to generate job descriptions and coding challenges.",
+      "path": "./talent-requirement-generator/"
+    },
+    {
+      "name": "technology-porter",
+      "description": "Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves logic equivalence while optimizing for the target language's idioms.",
+      "path": "./technology-porter/"
+    },
+    {
+      "name": "telemetry-insight-engine",
+      "description": "Analyzes real-world telemetry and usage data to identify feature gaps and usability issues. Feeds insights back into the requirements phase.",
+      "path": "./telemetry-insight-engine/"
+    },
+    {
+      "name": "template-renderer",
+      "description": "Render text from templates (Mustache/EJS) and data.",
+      "path": "./template-renderer/"
+    },
+    {
+      "name": "terraform-arch-mapper",
+      "description": "Generates a system architecture diagram from Terraform code. It parses .tf files to identify resources and relationships, then produces a diagram code (Mermaid/PlantUML). Use to visualize infrastructure.",
+      "path": "./terraform-arch-mapper/"
+    },
+    {
+      "name": "test-genie",
+      "description": "Executes the project's test suite and returns the output for AI analysis.",
+      "path": "./test-genie/"
+    },
+    {
+      "name": "test-suite-architect",
+      "description": "Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. Enables Test-Driven Development (TDD) at scale.",
+      "path": "./test-suite-architect/"
+    },
+    {
+      "name": "test-viewpoint-analyst",
+      "description": "Generates and reviews test scenarios based on IPA non-functional grade standards. Analyzes system requirements to identify critical test viewpoints for performance, security, and availability.",
+      "path": "./test-viewpoint-analyst/"
+    },
+    {
+      "name": "asset-token-economist",
+      "description": "Minimizes token consumption and costs by optimizing data input. Performs smart summarization and chunking of large files without losing critical context.",
+      "path": "./asset-token-economist/"
+    },
+    {
+      "name": "universal-polymath-engine",
+      "description": "Applies knowledge from biology, physics, economics, and other fields to engineering. Inspires cross-disciplinary innovation (e.g., biomimetic security, thermodynamic stability).",
+      "path": "./universal-polymath-engine/"
+    },
+    {
+      "name": "ux-auditor",
+      "description": "Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to recommend improvements for usability and contrast.",
+      "path": "./ux-auditor/"
+    },
+    {
+      "name": "word-artisan",
+      "description": "Generate Word documents (.docx) from Markdown.",
+      "path": "./word-artisan/"
+    }
+  ]
+}
