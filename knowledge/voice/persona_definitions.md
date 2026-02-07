@@ -19,9 +19,9 @@
 - Energetic: `nova`
 - Calm: `shimmer`
 
-### ElevenLabs
-- Professional: `Rachel`
-- Calm: `Josh`
+### macOS Native (say command)
+- Japanese: `Kyoko` (Female), `Otoya` (Male)
+- English: `Samantha`, `Alex`, `Daniel`
 
 ## 3. 設定方法
 個人の好みやAPIキーは `knowledge/personal/voice/config.json` で定義し、この標準設定を上書きすること。

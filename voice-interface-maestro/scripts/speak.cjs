@@ -1,21 +1,19 @@
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { logger } = require('../../scripts/lib/core.cjs');
 
 // 1. Load Secure Configuration
 const configPath = path.resolve(__dirname, '../../knowledge/personal/voice/config.json');
-let config = { engine: 'openai', voice: 'alloy', apiKey: 'MOCK_KEY' };
+let config = { engine: 'macos', voice: 'Kyoko', apiKey: null }; // Default to local macos
 
 if (fs.existsSync(configPath)) {
     try {
         const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         config = { ...config, ...userConfig };
-        logger.info(`Loaded voice config: Engine=${config.engine}, Voice=${config.voice}`);
     } catch (e) {
         logger.warn('Failed to parse voice config. Using defaults.');
     }
-} else {
-    logger.warn(`No voice config found at ${configPath}. Using simulation mode.`);
 }
 
 // 2. Process Input Text
@@ -25,18 +23,19 @@ if (!textToSpeak) {
     process.exit(1);
 }
 
-// Simple cleanup: remove code blocks for speech
-const cleanText = textToSpeak.replace(/```[\s\S]*?```/g, ' [Code Block Skipped] ');
+const cleanText = textToSpeak.replace(/```[\s\S]*?```/g, ' [コードをスキップ] ');
 
-// 3. Simulate TTS Generation
-const outputFile = path.resolve(__dirname, '../../work/response.mp3');
-
-logger.info(`Synthesizing audio...`);
-logger.info(`> Text: "${cleanText.substring(0, 50)}..."`);
-logger.info(`> Persona: ${config.voice}`);
-
-// In a real scenario, we would call the OpenAI/ElevenLabs API here.
-// fs.writeFileSync(outputFile, audioBuffer);
-
-logger.success(`Audio generated at: ${outputFile}`);
-console.log(`(Simulation) Agent spoke: "${cleanText}"`);
+// 3. Execution
+if (config.engine === 'macos') {
+    logger.info(`Using macOS native voice: ${config.voice}`);
+    try {
+        execSync(`say -v ${config.voice} "${cleanText}"`);
+        logger.success('Spoken via macOS say command.');
+    } catch (e) {
+        logger.error('macOS say command failed. Is this a Mac?');
+    }
+} else {
+    // Fallback/Simulated API (OpenAI/ElevenLabs)
+    logger.info(`Using external API engine: ${config.engine}`);
+    console.log(`(Simulation) API Voice (${config.voice}) says: "${cleanText}"`);
+}
