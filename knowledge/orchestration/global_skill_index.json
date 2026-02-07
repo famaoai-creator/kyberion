@@ -1,6 +1,6 @@
 {
-  "total_skills": 129,
-  "last_updated": "2026-02-07T12:51:08.200Z",
+  "total_skills": 132,
+  "last_updated": "2026-02-07T12:54:47.492Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -41,6 +41,11 @@
       "name": "audio-transcriber",
       "description": "Transcribe audio/video files to text using OpenAI Whisper.",
       "path": "./audio-transcriber/"
+    },
+    {
+      "name": "auto-context-mapper",
+      "description": "Intelligently links related knowledge assets across tiers. Automatically fetches prerequisite data and high-level mission context for any task.",
+      "path": "./auto-context-mapper/"
     },
     {
       "name": "automated-support-architect",
@@ -498,6 +503,11 @@
       "path": "./requirements-wizard/"
     },
     {
+      "name": "scenario-multiverse-orchestrator",
+      "description": "Simulates multiple business and technical scenarios simultaneously. Provides comparative reports on Growth, Stability, and Hybrid paths for executive decision-making.",
+      "path": "./scenario-multiverse-orchestrator/"
+    },
+    {
       "name": "schema-inspector",
       "description": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
       "path": "./schema-inspector/"
@@ -526,6 +536,11 @@
       "name": "sequence-mapper",
       "description": "Generate Mermaid sequence diagrams from source code function calls.",
       "path": "./sequence-mapper/"
+    },
+    {
+      "name": "skill-bundle-packager",
+      "description": "Dynamically bundles mission-specific skills into specialized subsets. Optimizes agent performance by focusing on relevant tools for specific high-level tasks.",
+      "path": "./skill-bundle-packager/"
     },
     {
       "name": "skill-evolution-engine",
