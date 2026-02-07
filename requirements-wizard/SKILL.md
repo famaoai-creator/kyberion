@@ -18,15 +18,16 @@ Consult the IPA-aligned knowledge base for advice on:
 - **Non-Functional Requirements**: Using IPA grades and defining metrics.
 
 ### 2. Document Review
-The skill uses a structured checklist to audit requirements documents for:
-- Completeness of exception handling.
-- Traceability from business goals to system functions.
-- Consistency between data and functions (CRUD).
-- Clarity of non-functional metrics.
+The skill uses structured checklists to audit requirements documents:
+- **IPA Standard**: Refer to `knowledge/requirements-guide/` for general RD quality.
+- **AI-Native Standard**: Refer to `knowledge/ai-engineering/` for projects involving Generative AI or autonomous features.
 
 ## Knowledge Base Locations
-- **Best Practices**: `knowledge/requirements-guide/ipa_best_practices.md`
-- **Review Checklist**: `knowledge/requirements-guide/review_checklist.md`
+- **IPA Best Practices**: `knowledge/requirements-guide/ipa_best_practices.md`
+- **AI Best Practices**: `knowledge/ai-engineering/best_practices.md`
+- **Review Checklists**: 
+    - General: `knowledge/requirements-guide/review_checklist.md`
+    - AI-Specific: `knowledge/ai-engineering/review_checklist.md`
 
 ## Usage Examples
 
