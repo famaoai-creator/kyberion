@@ -1,12 +1,23 @@
 --- 
 name: quality-scorer
-description: Score text quality (readability, length).
+description: Evaluates technical and textual quality based on IPA benchmarks and readability standards.
 --- 
-# quality-scorer
-Score text quality (readability, length).
+# Quality Scorer
+
+This skill provides a multi-dimensional quality assessment of software projects and documentation.
+
+## Capabilities
+
+### 1. Technical Metrics Audit
+- **Waterfall Benchmarks**: Evaluates bug and test densities against the IPA standards defined in `knowledge/quality-management/metrics_standards.md`.
+- **Integrity Check**: Flags potential quality risks (e.g., high test density but zero bugs found, suggesting weak test items).
+
+### 2. Textual Analysis
+- **Readability & Style**: Scores text based on complexity, length, and adherence to professional standards.
+
 ## Usage
 ```bash
-node quality-scorer/scripts/score.cjs --input <file>
+node quality-scorer/scripts/score.cjs --input <file_or_dir>
 ```
 
 ## Knowledge Protocol
