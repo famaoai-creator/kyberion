@@ -134,7 +134,11 @@ Structured `knowledge/` directory:
 
 ## License
 
-Custom - See individual skill directories for specific usage terms (e.g., IPA, TIS).
+[MIT License](./LICENSE) - Copyright (c) 2026 famaoai.
+
+*Note: Certain industry standards in `knowledge/` are subject to their respective creators' rights. See [knowledge/README.md](./knowledge/README.md) for details.*
+
+
 
 
 
