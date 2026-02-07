@@ -10,7 +10,14 @@ Excel Artisan is a specialized skill for **creating and modifying Excel files**.
 
 ## Capabilities
 
-1.  **JSON/CSV to Excel**: Converts structured data into a formatted Excel sheet.
+### 1. Visual Excel Generation
+- **Theme Awareness**: Automatically applies layout patterns defined in `knowledge/templates/themes/excel_design_guide.md`.
+- **Metadata Injection**: Automatically populates project headers (System Name, Phase, etc.).
+- **Grid Optimization**: Formats tables with consistent borders, alternating row colors, and professional fonts.
+
+### 2. Data Conversion
+
+
 2.  **HTML to Excel**: Scrapes an HTML table and saves it as an Excel file (preserving layout like merged cells).
 3.  **Edit Spreadsheet**: Loads an existing `.xlsx`, updates specific cells, and saves the result.
 
