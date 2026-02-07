@@ -34,6 +34,9 @@ This skill creates high-impact, boardroom-ready presentations. It goes beyond si
 ```bash
 # Convert to PPTX with custom theme lookup
 node ppt-artisan/scripts/convert.cjs ./my-presentation.md pptx --theme custom-brand
+
+# Convert to EDITABLE PPTX (Native shapes and text)
+node ppt-artisan/scripts/convert.cjs ./my-presentation.md pptx --editable-pptx
 ```
 
 ## Best Practices
