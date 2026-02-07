@@ -133,4 +133,13 @@ Structured `knowledge/` directory:
 - **`ceo/`**: Mission, Strategy, Finance.
 
 ## License
+
 Custom - See individual skill directories for specific usage terms (e.g., IPA, TIS).
+
+
+
+## Acknowledgements & External Licenses
+
+This ecosystem includes knowledge harvested from open-source projects to enhance its capabilities.
+
+- **Everything Claude Code**: Selected rules and agent definitions in `knowledge/external-wisdom/everything-claude/` are derived from [everything-claude-code](https://github.com/affaan-m/everything-claude-code) by Affaan, used under the [MIT License](./knowledge/external-wisdom/everything-claude/LICENSE).
