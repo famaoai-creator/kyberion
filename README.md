@@ -129,6 +129,9 @@ To install these skills into your Gemini CLI workspace:
    gemini skills install <skill-directory-name> --scope workspace
    ```
 
+## Usage Scenarios
+For comprehensive examples of how to combine these skills for real-world tasks (e.g., automated UI auditing, security pipelines), see [SCENARIOS.md](./SCENARIOS.md).
+
 ## 📂 Project Structure
 
 ```text
