@@ -1,6 +1,6 @@
 {
-  "total_skills": 139,
-  "last_updated": "2026-02-07T14:12:41.990Z",
+  "total_skills": 142,
+  "last_updated": "2026-02-07T14:17:33.190Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -193,6 +193,11 @@
       "path": "./db-extractor/"
     },
     {
+      "name": "deep-archive-librarian",
+      "description": "Manages the lifecycle of long-term knowledge. Archives stale logs and documents while maintaining a high-speed search index of their existence.",
+      "path": "./deep-archive-librarian/"
+    },
+    {
       "name": "dependency-grapher",
       "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
       "path": "./dependency-grapher/"
@@ -373,6 +378,11 @@
       "path": "./jira-agile-assistant/"
     },
     {
+      "name": "kernel-compiler",
+      "description": "Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensures the ecosystem's \"Self-Bootstrapping\" capability.",
+      "path": "./kernel-compiler/"
+    },
+    {
       "name": "kill-switch-guardian",
       "description": "The ultimate safety valve. Provides an encrypted, human-only protocol to immediately freeze and roll back all autonomous AI actions in case of unexpected behavior.",
       "path": "./kill-switch-guardian/"
@@ -466,6 +476,11 @@
       "name": "performance-monitor-analyst",
       "description": "Correlates performance targets with actual profiling results. Identifies bottlenecks and validates against non-functional requirements.",
       "path": "./performance-monitor-analyst/"
+    },
+    {
+      "name": "persona-matrix-switcher",
+      "description": "Dynamically switches the agent's persona and perspective. Simulates multi-stakeholder debates (e.g., Auditor vs. Inventor) to reach deeper conclusions.",
+      "path": "./persona-matrix-switcher/"
     },
     {
       "name": "pmo-governance-lead",
