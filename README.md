@@ -102,7 +102,13 @@ See **[SCENARIOS.md](./SCENARIOS.md)** for how to combine these skills for autom
 ## Operational Excellence & Token Economy
 This monorepo is optimized for high-throughput, low-cost AI engineering:
 - **Global Skill Index**: O(1) discovery of 130+ skills.
-- **Mission-Specific Bundling**: Dynamically activates only the required tools per task.
+- **Mission-Specific Bundling**: Dynamically activates only the required tools per task to save tokens.
+    - **How to use**:
+      ```bash
+      # Create a "Security Audit" bundle
+      node skill-bundle-packager/scripts/bundle.cjs security-audit security-scanner license-auditor ux-auditor
+      ```
+    - Then instruct Gemini: **"Load mission bundle security-audit and perform the scan."**
 - **Lean Context Protocol**: Integrated use of `asset-token-economist` to prune non-essential data.
 
 ## Knowledge Base

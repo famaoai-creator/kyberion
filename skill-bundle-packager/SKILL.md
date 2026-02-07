@@ -20,5 +20,12 @@ This skill optimizes operational focus by creating specialized "Strike Teams" of
 - "Bundle all skills necessary for a 'Production Hand-off' mission."
 - "Package a 'Security Strike Team' for our legacy binary audit."
 
+## Commands
+
+```bash
+# Create a bundle for a specific mission
+node skill-bundle-packager/scripts/bundle.cjs <mission-name> <skill-1> <skill-2> ...
+```
+
 ## Knowledge Protocol
 - Adheres to `knowledge/orchestration/optimization-standards.md`.
