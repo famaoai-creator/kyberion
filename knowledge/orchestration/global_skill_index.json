@@ -1,6 +1,6 @@
 {
-  "total_skills": 144,
-  "last_updated": "2026-02-07T15:30:19.257Z",
+  "total_skills": 147,
+  "last_updated": "2026-02-07T15:35:27.840Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -61,6 +61,11 @@
       "name": "binary-archaeologist",
       "description": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.",
       "path": "./binary-archaeologist/"
+    },
+    {
+      "name": "biometric-context-adapter",
+      "description": "Infers user stress/energy levels from interaction patterns (typing speed, error rate). Adjusts response verbosity and visualizes mood via a \"Niko-Niko Calendar.\"",
+      "path": "./biometric-context-adapter/"
     },
     {
       "name": "boilerplate-genie",
@@ -323,6 +328,11 @@
       "path": "./google-workspace-integrator/"
     },
     {
+      "name": "hive-mind-sync",
+      "description": "Synchronizes anonymized learning patterns (successful prompts, error fixes) across a federated network of Gemini agents. Enables collective intelligence evolution.",
+      "path": "./hive-mind-sync/"
+    },
+    {
       "name": "html-reporter",
       "description": "Generate standalone HTML reports from JSON/Markdown.",
       "path": "./html-reporter/"
@@ -581,6 +591,11 @@
       "name": "sequence-mapper",
       "description": "Generate Mermaid sequence diagrams from source code function calls.",
       "path": "./sequence-mapper/"
+    },
+    {
+      "name": "shadow-counselor",
+      "description": "A background thinking process that re-evaluates past decisions during idle time. Simulates 100+ \"What If\" scenarios to find hidden risks or better alternatives.",
+      "path": "./shadow-counselor/"
     },
     {
       "name": "skill-bundle-packager",
