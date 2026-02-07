@@ -1,47 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770462058781" clover="3.2.0">
-  <project timestamp="1770462058781" name="All files">
-    <metrics statements="29" coveredstatements="15" conditionals="11" coveredconditionals="3" methods="10" coveredmethods="3" elements="50" coveredelements="21" complexity="0" loc="29" ncloc="29" packages="2" files="2" classes="2"/>
-    <package name="evidence.simulations.master-sim-1.src">
-      <metrics statements="9" coveredstatements="7" conditionals="4" coveredconditionals="3" methods="2" coveredmethods="2"/>
-      <file name="OrderValidator.js" path="/Users/famaoai/gemini/skills/github/evidence/simulations/master-sim-1/src/OrderValidator.js">
-        <metrics statements="9" coveredstatements="7" conditionals="4" coveredconditionals="3" methods="2" coveredmethods="2"/>
-        <line num="1" count="1" type="stmt"/>
-        <line num="9" count="2" type="stmt"/>
-        <line num="13" count="1" type="stmt"/>
-        <line num="14" count="1" type="cond" truecount="3" falsecount="1"/>
-        <line num="15" count="0" type="stmt"/>
-        <line num="19" count="1" type="stmt"/>
-        <line num="21" count="1" type="stmt"/>
-        <line num="27" count="0" type="stmt"/>
-        <line num="32" count="1" type="stmt"/>
-      </file>
-    </package>
-    <package name="scripts.lib">
-      <metrics statements="20" coveredstatements="8" conditionals="7" coveredconditionals="0" methods="8" coveredmethods="1"/>
-      <file name="core.cjs" path="/Users/famaoai/gemini/skills/github/scripts/lib/core.cjs">
-        <metrics statements="20" coveredstatements="8" conditionals="7" coveredconditionals="0" methods="8" coveredmethods="1"/>
-        <line num="1" count="1" type="stmt"/>
-        <line num="2" count="1" type="stmt"/>
-        <line num="3" count="1" type="stmt"/>
-        <line num="10" count="1" type="stmt"/>
-        <line num="11" count="3" type="stmt"/>
-        <line num="12" count="0" type="stmt"/>
-        <line num="13" count="0" type="stmt"/>
-        <line num="14" count="0" type="stmt"/>
-        <line num="17" count="1" type="stmt"/>
-        <line num="19" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="20" count="0" type="stmt"/>
-        <line num="24" count="0" type="stmt"/>
-        <line num="25" count="0" type="stmt"/>
-        <line num="27" count="0" type="stmt"/>
-        <line num="31" count="0" type="stmt"/>
-        <line num="35" count="1" type="cond" truecount="0" falsecount="1"/>
-        <line num="36" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="37" count="0" type="cond" truecount="0" falsecount="2"/>
-        <line num="38" count="0" type="stmt"/>
-        <line num="41" count="1" type="stmt"/>
-      </file>
-    </package>
+<coverage generated="1770463756544" clover="3.2.0">
+  <project timestamp="1770463756544" name="All files">
+    <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1" elements="8" coveredelements="8" complexity="0" loc="5" ncloc="5" packages="1" files="1" classes="1"/>
+    <file name="InventoryManager.js" path="/Users/famaoai/gemini/skills/github/evidence/simulations/webapp-sim12/src/InventoryManager.js">
+      <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+      <line num="5" count="3" type="stmt"/>
+      <line num="6" count="3" type="cond" truecount="2" falsecount="0"/>
+      <line num="7" count="1" type="stmt"/>
+      <line num="9" count="2" type="stmt"/>
+      <line num="12" count="1" type="stmt"/>
+    </file>
   </project>
 </coverage>
