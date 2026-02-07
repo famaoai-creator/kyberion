@@ -1,6 +1,6 @@
 {
-  "total_skills": 135,
-  "last_updated": "2026-02-07T13:49:41.313Z",
+  "total_skills": 138,
+  "last_updated": "2026-02-07T14:05:50.814Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -308,6 +308,11 @@
       "path": "./glossary-resolver/"
     },
     {
+      "name": "google-workspace-integrator",
+      "description": "Automates Google Docs, Sheets, and Mail. Generates reports, tracks KPIs in spreadsheets, and drafts professional emails for stakeholders.",
+      "path": "./google-workspace-integrator/"
+    },
+    {
       "name": "html-reporter",
       "description": "Generate standalone HTML reports from JSON/Markdown.",
       "path": "./html-reporter/"
@@ -356,6 +361,11 @@
       "name": "issue-to-solution-bridge",
       "description": "Automates the entire lifecycle from issue detection to solution. Interprets bug reports or feature requests and orchestrates other skills to implement and test the fix.",
       "path": "./issue-to-solution-bridge/"
+    },
+    {
+      "name": "jira-agile-assistant",
+      "description": "Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints, and synchronizes the backlog with the technical roadmap.",
+      "path": "./jira-agile-assistant/"
     },
     {
       "name": "kill-switch-guardian",
@@ -561,6 +571,11 @@
       "name": "skill-quality-auditor",
       "description": "Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality, script functionality, and test coverage for all skills.",
       "path": "./skill-quality-auditor/"
+    },
+    {
+      "name": "slack-communicator-pro",
+      "description": "Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, alerts, and strategic announcements.",
+      "path": "./slack-communicator-pro/"
     },
     {
       "name": "social-impact-forecaster",
