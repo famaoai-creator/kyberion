@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1770454490349" clover="3.2.0">
-  <project timestamp="1770454490349" name="All files">
-    <metrics statements="10" coveredstatements="9" conditionals="6" coveredconditionals="5" methods="3" coveredmethods="3" elements="19" coveredelements="17" complexity="0" loc="10" ncloc="10" packages="1" files="1" classes="1"/>
-    <file name="messy_logic.js" path="/Users/famaoai/gemini/skills/github/work/webapp-sim5/src/messy_logic.js">
-      <metrics statements="10" coveredstatements="9" conditionals="6" coveredconditionals="5" methods="3" coveredmethods="3"/>
+<coverage generated="1770455129473" clover="3.2.0">
+  <project timestamp="1770455129473" name="All files">
+    <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1" elements="9" coveredelements="9" complexity="0" loc="4" ncloc="4" packages="1" files="1" classes="1"/>
+    <file name="notifier.js" path="/Users/famaoai/gemini/skills/github/work/webapp-sim11/src/notifier.js">
+      <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+      <line num="5" count="2" type="cond" truecount="4" falsecount="0"/>
       <line num="6" count="1" type="stmt"/>
-      <line num="11" count="1" type="stmt"/>
-      <line num="19" count="2" type="cond" truecount="2" falsecount="0"/>
-      <line num="20" count="1" type="stmt"/>
-      <line num="24" count="1" type="stmt"/>
-      <line num="28" count="2" type="cond" truecount="2" falsecount="0"/>
-      <line num="32" count="1" type="cond" truecount="1" falsecount="1"/>
-      <line num="33" count="1" type="stmt"/>
-      <line num="35" count="0" type="stmt"/>
-      <line num="38" count="1" type="stmt"/>
+      <line num="10" count="1" type="stmt"/>
+      <line num="13" count="1" type="stmt"/>
     </file>
   </project>
 </coverage>

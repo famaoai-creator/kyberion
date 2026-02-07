@@ -13,6 +13,7 @@ This is the "Brain" of the Gemini Skills ecosystem. It knows how to combine 100+
 - **Dynamic Workflow Execution**: Refers to patterns in `knowledge/orchestration/` to execute complex multi-step tasks.
 - **Key Patterns**:
     - **Hybrid AI-Native Flow**: Optimal balance of TDD for core logic and AI-direct generation for speed. Target 90%+ coverage. See `knowledge/orchestration/hybrid-development-flow.md`.
+    - **Safe Git Flow**: Enforces "Branch -> PR -> Review" sequence. Direct push to main is prohibited. See `knowledge/orchestration/git-flow-standards.md`.
     - **Advanced Development Flow**: The gold standard for autonomous engineering (Full TDD). See `knowledge/orchestration/advanced-development-flow.md`.
     - **Professional Proposal Pipeline**: See `knowledge/orchestration/proposal-pipeline.md` for the full research-to-production sequence.
     - **Production Readiness Audit**: Coordinates `security-scanner` -> `ux-auditor` -> `license-auditor` -> `project-health-check`.

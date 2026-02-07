@@ -9,7 +9,11 @@ This skill automates the creation of professional and informative Pull Requests.
 
 ## Capabilities
 
-### 1. Narrative Generation
+### 1. Git Workflow Management
+- **Branch Strategy**: Suggests descriptive branch names (e.g., `feat/add-login-validation`).
+- **Autonomous Delivery**: Executes or suggests `git checkout -b`, `git add`, `git commit`, and `git push` commands to prepare for a PR.
+
+### 2. Narrative Generation
 - Explains the purpose of the changes (correlating with requirements).
 - Describes the implementation details in a reviewer-friendly way.
 
