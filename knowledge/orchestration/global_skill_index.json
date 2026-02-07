@@ -1,6 +1,6 @@
 {
-  "total_skills": 138,
-  "last_updated": "2026-02-07T14:05:50.814Z",
+  "total_skills": 139,
+  "last_updated": "2026-02-07T14:12:41.990Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -146,6 +146,11 @@
       "name": "compliance-officer",
       "description": "Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time compliance scores and audit-ready evidence reports.",
       "path": "./compliance-officer/"
+    },
+    {
+      "name": "connection-manager",
+      "description": "Manages secure connections to external tools (AWS, Slack, Jira, Box). Validates credentials in the Personal Tier and injects them into the execution context.",
+      "path": "./connection-manager/"
     },
     {
       "name": "context-injector",
