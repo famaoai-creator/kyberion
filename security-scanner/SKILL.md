@@ -31,5 +31,7 @@ node scripts/scan.cjs
 ```
 
 ## Configuration
-- **Trivy**: Uses default settings. You can customize behavior by adding a `trivy.yaml` to your project root.
-- **Internal Scanner**: Automatically ignores files listed in `.gitignore` and common binary/vendor directories.
+- **Trivy**: Uses default settings.
+- **Internal Scanner**:
+    - **Proprietary Patterns**: Automatically checks `knowledge/confidential/skills/security-scanner/` for internal regex rules. These rules are prioritized over general ones to detect company-specific security risks.
+    - **General Patterns**: Uses `knowledge/security/scan-patterns.yaml`.
