@@ -1,6 +1,6 @@
 {
-  "total_skills": 119,
-  "last_updated": "2026-02-07T12:41:17.491Z",
+  "total_skills": 124,
+  "last_updated": "2026-02-07T12:45:35.973Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -111,6 +111,11 @@
       "name": "community-health-guardian",
       "description": "Monitors the health of developer communities and open-source projects. Analyzes response times, contributor retention, and document clarity to ensure a welcoming environment.",
       "path": "./community-health-guardian/"
+    },
+    {
+      "name": "competitive-intel-strategist",
+      "description": "Analyzes competitor releases and market trends to propose technical differentiation strategies. Ensures our products stay ahead by leveraging our unique code assets.",
+      "path": "./competitive-intel-strategist/"
     },
     {
       "name": "completeness-scorer",
@@ -278,6 +283,11 @@
       "path": "./html-reporter/"
     },
     {
+      "name": "human-capital-portfolio-analyst",
+      "description": "Maps current team skills against the future roadmap to optimize organization design. Proposes hiring, reskilling, and team restructuring strategies.",
+      "path": "./human-capital-portfolio-analyst/"
+    },
+    {
       "name": "human-in-the-loop-orchestrator",
       "description": "Integrates human judgment into AI workflows. Automatically pauses autonomous processes for human review when uncertainty is high or ethical stakes are significant.",
       "path": "./human-in-the-loop-orchestrator/"
@@ -296,6 +306,11 @@
       "name": "intent-classifier",
       "description": "Classify intent of text (request, question, report).",
       "path": "./intent-classifier/"
+    },
+    {
+      "name": "ip-profitability-architect",
+      "description": "Designs business and licensing models for internal intellectual property. Transforms IP from a protection cost into a revenue-generating asset.",
+      "path": "./ip-profitability-architect/"
     },
     {
       "name": "ip-strategist",
@@ -431,6 +446,11 @@
       "name": "prompt-optimizer",
       "description": "Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.",
       "path": "./prompt-optimizer/"
+    },
+    {
+      "name": "public-relations-shield",
+      "description": "Manages crisis communication and brand defense. Translates technical incidents into empathetic, trust-building public statements and prevent brand damage.",
+      "path": "./public-relations-shield/"
     },
     {
       "name": "quality-scorer",
@@ -591,6 +611,11 @@
       "name": "ux-auditor",
       "description": "Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to recommend improvements for usability and contrast.",
       "path": "./ux-auditor/"
+    },
+    {
+      "name": "visionary-ethos-keeper",
+      "description": "Preserves the company's mission and \"soul.\" Audits high-level decisions against the core purpose and values defined by the CEO.",
+      "path": "./visionary-ethos-keeper/"
     },
     {
       "name": "word-artisan",
