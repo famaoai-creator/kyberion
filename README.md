@@ -1,6 +1,6 @@
-# Gemini Skills Monorepo
+# Gemini Skills Monorepo (Final Form)
 
-A collection of 60+ specialized AI skills for the Gemini CLI, designed to automate the entire software development lifecycle (SDLC), business operations, and strategic management.
+A comprehensive ecosystem of 70+ specialized AI skills for the Gemini CLI, designed to automate the entire software engineering lifecycle, business strategy, and self-evolutionary engineering.
 
 ## Table of Contents
 - [Quick Start](#quick-start)
@@ -17,66 +17,56 @@ A collection of 60+ specialized AI skills for the Gemini CLI, designed to automa
 ## Available Skills
 
 ### 🧠 Strategic Orchestration (The Brain)
-- **`mission-control`**: The ecosystem orchestrator. Coordinates 60+ skills for high-level goals like "Production Readiness".
+- **`mission-control`**: The ecosystem orchestrator. Coordinates 70+ skills for high-level goals.
+- **`strategic-roadmap-planner`**: Analyzes technical debt and trends to propose prioritized 3-month roadmaps.
+- **`stakeholder-communicator`**: Translates technical decisions into clear business value for non-tech leaders.
 
-### 🚀 Scaffolding & Infrastructure
-- **`boilerplate-genie`**: Scaffolds new projects with CI/CD and testing best practices.
-- **`environment-provisioner`**: Generates IaC (Terraform, Docker, K8s) from requirements.
-- **`cloud-cost-estimator`**: Estimates monthly cloud costs from IaC files.
+### 🔄 Self-Evolution & Mastery
+- **`skill-evolution-engine`**: Analyzes performance to self-patch SKILL.md and scripts.
+- **`prompt-optimizer`**: Refines agent instructions and context handling.
+- **`skill-quality-auditor`**: Self-audit for monorepo integrity and documentation.
+- **`knowledge-refiner`**: Consolidates and structures the shared knowledge base.
+
+### 🚀 Advanced Scaffolding & Engineering
+- **`boilerplate-genie`**: Scaffolds "healthy" projects with full CI/CD and testing setup.
+- **`environment-provisioner`**: Generates multi-cloud IaC (Terraform, K8s) from requirements.
+- **`test-suite-architect`**: Generates comprehensive test code (Jest, Pytest, Cypress) from RD.
+- **`refactoring-engine`**: Executes large-scale architectural migrations across the codebase.
+
+### 🛡️ Security, Resilience & Legal
+- **`red-team-adversary`**: Active security "war gaming" to exploit and verify vulnerabilities.
+- **`crisis-manager`**: Rapid response and diagnostics during production incidents.
 - **`disaster-recovery-planner`**: Generates DR runbooks and audits infrastructure resilience.
-- **`terraform-arch-mapper`**: Visualizes IaC as Mermaid diagrams.
+- **`security-scanner`**: Trivy-integrated vulnerability and secret scan.
+- **`license-auditor`**: Audits dependencies for legal risks and generates NOTICE files.
 
-### 🤖 AI-Native Engineering
-- **`prompt-optimizer`**: Self-improves agent instructions and context handling.
-- **`asset-token-economist`**: Smart summarization and chunking to minimize LLM costs.
-- **`dataset-curator`**: Prepares and audits high-quality, PII-free datasets for AI/RAG.
-- **`codebase-mapper`**: Maps directory structure for AI context.
-
-### 📝 Requirements & Documentation
+### 📝 Requirements & Data Quality
 - **`requirements-wizard`**: (IPA-Standard) RD guide and review checklist.
 - **`nonfunctional-architect`**: (IPA-Standard) Interactive NFR grade wizard.
-- **`release-note-crafter`**: Generates business-value-focused release notes.
-- **`doc-to-text`**: Universal extractor (PDF, Excel, Word, OCR, ZIP).
-- **`ppt-artisan`**: Markdown to PowerPoint (Marp-based).
+- **`dataset-curator`**: Prepares and audits PII-free, high-quality datasets for AI/RAG.
+- **`telemetry-insight-engine`**: Correlates production usage with requirement enhancements.
+- **`doc-to-text`**: Universal document extractor with OCR.
 
-### 🛡️ Quality, Security & Legal
-- **`security-scanner`**: Trivy-integrated vulnerability and secret scan.
-- **`license-auditor`**: Scans dependencies for license compliance and generates NOTICE files.
-- **`ux-auditor`**: Performs visual UX and accessibility audits on screenshots.
-- **`project-health-check`**: Audits CI/CD, Tests, and Linting status.
-- **`test-viewpoint-analyst`**: (IPA/TIS-Standard) Generates test scenarios.
-- **`dependency-lifeline`**: Proactively monitors and plans library updates.
+### 🎨 UX & Globalization
+- **`ux-auditor`**: Performs visual UX and accessibility audits on interfaces.
+- **`localization-maestro`**: Automates i18n and audits for cultural appropriateness.
+- **`ai-ethics-auditor`**: Audits AI implementations for bias, fairness, and privacy.
 
-### 🤝 Team & Collaboration
-- **`pr-architect`**: Crafts high-quality, descriptive Pull Request bodies.
-- **`onboarding-wizard`**: Generates personalized project guides for new members.
-- **`local-reviewer`**: Pre-commit AI code review.
-
-### ⚙️ Operations & Feedback
-- **`log-to-requirement-bridge`**: Drafts improvement requirements from runtime logs.
-- **`performance-monitor-analyst`**: Correlates profiling results with NFR targets.
-- **`log-analyst`**: Analyzes errors from log tails.
-- **`db-extractor`**: Extracts schema/samples from live databases.
-
-### 🌐 Browser & Web
+### 📂 Core Analysis & Utilities
+- **`codebase-mapper`**: Maps directory structure for AI context.
+- **`dependency-grapher`**: Generates Mermaid/DOT dependency graphs.
+- **`terraform-arch-mapper`**: Visualizes IaC as Mermaid diagrams.
+- **`schema-inspector`**: Locates and displays SQL/Prisma schemas.
 - **`browser-navigator`**: Playwright-based browser automation.
-- **`api-fetcher`**: Secure REST/GraphQL data fetching.
-- **`data-collector`**: Traceable web data harvesting with metadata.
-
-### 🛠️ Utilities
-- **`github-skills-manager`**: Monorepo skill management dashboard.
-- **`skill-quality-auditor`**: Self-audit for SKILL.md and script integrity.
-- **`knowledge-refiner`**: Consolidates and cleans the knowledge base.
-- **`diagram-renderer`**: Text-to-Image (Mermaid/PlantUML -> PNG).
-- **`audio-transcriber`**: Whisper-based audio transcription.
+- **`cloud-cost-estimator`**: Estimates monthly cloud costs from IaC.
 
 ## Usage Scenarios
-For real-world examples (e.g., automated UI auditing, security pipelines), see **[SCENARIOS.md](./SCENARIOS.md)**.
+See **[SCENARIOS.md](./SCENARIOS.md)** for how to combine these skills for automated UI auditing, security pipelines, and strategic planning.
 
 ## Knowledge Base
-This monorepo includes a structured `knowledge/` directory shared across skills:
-- `nonfunctional/`: IPA Non-Functional Grade 2018 definitions.
-- `testing/`: TIS Test Viewpoint Catalog v1.6.
+Structured `knowledge/` directory:
+- `nonfunctional/`: IPA Grade 2018 definitions.
+- `testing/`: TIS Catalog v1.6.
 - `requirements-guide/`: IPA RD best practices.
 - `browser-scenarios/`: Reusable Playwright scripts.
 
