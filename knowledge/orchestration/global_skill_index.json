@@ -1,6 +1,6 @@
 {
-  "total_skills": 124,
-  "last_updated": "2026-02-07T12:45:35.973Z",
+  "total_skills": 129,
+  "last_updated": "2026-02-07T12:51:08.200Z",
   "skills": [
     {
       "name": "aesthetic-elegance-auditor",
@@ -68,9 +68,19 @@
       "path": "./browser-navigator/"
     },
     {
+      "name": "budget-variance-tracker",
+      "description": "Compares actual spend and revenue against forecasts. Provides variance analysis and corrective insights to ensure financial discipline.",
+      "path": "./budget-variance-tracker/"
+    },
+    {
       "name": "bug-predictor",
       "description": "Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns. Warns developers before a bug is even written.",
       "path": "./bug-predictor/"
+    },
+    {
+      "name": "business-growth-planner",
+      "description": "Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.",
+      "path": "./business-growth-planner/"
     },
     {
       "name": "business-impact-analyzer",
@@ -253,6 +263,11 @@
       "path": "./executive-reporting-maestro/"
     },
     {
+      "name": "financial-modeling-maestro",
+      "description": "Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms business assumptions into multi-year financial statements.",
+      "path": "./financial-modeling-maestro/"
+    },
+    {
       "name": "format-detector",
       "description": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
       "path": "./format-detector/"
@@ -306,6 +321,11 @@
       "name": "intent-classifier",
       "description": "Classify intent of text (request, question, report).",
       "path": "./intent-classifier/"
+    },
+    {
+      "name": "investor-readiness-audit",
+      "description": "Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, and compliance data is boardroom-ready.",
+      "path": "./investor-readiness-audit/"
     },
     {
       "name": "ip-profitability-architect",
@@ -601,6 +621,11 @@
       "name": "asset-token-economist",
       "description": "Minimizes token consumption and costs by optimizing data input. Performs smart summarization and chunking of large files without losing critical context.",
       "path": "./asset-token-economist/"
+    },
+    {
+      "name": "unit-economics-optimizer",
+      "description": "Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer retention strategies to maximize unit margins.",
+      "path": "./unit-economics-optimizer/"
     },
     {
       "name": "universal-polymath-engine",
