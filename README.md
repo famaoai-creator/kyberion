@@ -99,6 +99,12 @@ A legendary ecosystem of 115+ specialized AI skills for the Gemini CLI, designed
 ## Usage Scenarios
 See **[SCENARIOS.md](./SCENARIOS.md)** for how to combine these skills for automated UI auditing, security pipelines, and strategic planning.
 
+## Operational Excellence & Token Economy
+This monorepo is optimized for high-throughput, low-cost AI engineering:
+- **Global Skill Index**: O(1) discovery of 130+ skills.
+- **Mission-Specific Bundling**: Dynamically activates only the required tools per task.
+- **Lean Context Protocol**: Integrated use of `asset-token-economist` to prune non-essential data.
+
 ## Knowledge Base
 Structured `knowledge/` directory:
 - `nonfunctional/`: IPA Grade 2018 definitions.

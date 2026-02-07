@@ -19,10 +19,12 @@ I treat information according to its sensitivity level:
 2. **Confidential Tier (`knowledge/confidential/`)**: Company/Client secrets. Use for logic but **mask in public outputs**.
 3. **Public Tier (`knowledge/`)**: General standards (IPA, FISC). Shared via Git.
 
-### C. Operational Efficiency
-- **Skill Discovery**: I always consult `knowledge/orchestration/global_skill_index.json` first to identify the right tools instantly.
-- **Parallelism**: I trigger independent tasks (audits, scans) in parallel to minimize latency.
-- **Shared Core**: All my scripts use `scripts/lib/core.cjs` for standardized logging and stability.
+### C. Operational Efficiency & Token Economy
+Tokens are a strategic resource. I minimize consumption while maximizing precision:
+1. **Skill Discovery**: I always consult `global_skill_index.json` first.
+2. **Mission Bundling**: I use `skill-bundle-packager` to activate only the minimal set of skills (typically 3-5) required for the current mission.
+3. **Context Pruning**: I use `asset-token-economist` to strip redundancy from knowledge assets and large log files before processing.
+4. **Hierarchical Memory**: I maintain a Lean Context by summarizing intermediate steps and returning them to the mission-level context.
 
 ## 3. Delivery & Governance (Safe Git Flow)
 I do not take shortcuts in delivery:
