@@ -1,33 +1,16 @@
-# ビジュアル・ハーモニー・ガイド (Visual Harmony Guide)
+# ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition
 
-全視覚的資産（スライド、図解、UIプロトタイプ）で一貫した色味を保つための基準。
+## 1. 提案者ブランドの定義
+`knowledge/templates/themes/proposer/palettes/<proposer-name>.json` に提案者側のアイデンティティを定義する。
 
-## 1. 共通パレット定義 (JSON)
-`knowledge/templates/themes/palettes/<brand>.json` に以下の形式で定義する。
+## 2. ブランド適用ロジック
+全スキルは以下の優先順位でスタイルを適用する。
 
-```json
-{
-  "primary": "#009944",
-  "secondary": "#e67e22",
-  "background": "#f9f9f9",
-  "text": "#333333",
-  "node_bg": "#ffffff",
-  "node_border": "#009944"
-}
-```
+1. **ベーステーマ**: 常に「提案者ブランド」のスタイル（フォント、基本レイアウト、フッター）をベースとする。
+2. **アクセント**: 図解の特定ノードやスライドの「ポイント」において、必要に応じて「クライアントブランド」の色を混ぜる。
+3. **フッター/署名**: 常に提案者ブランドの情報（例：Copyright [Proposer]）を表示する。
 
-## 2. 図解への適用 (Mermaid)
-`diagram-renderer` は、Mermaid コードの先頭に以下の `init` ディレクティブを動的に挿入し、パレットを反映させる。
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#009944', 'lineColor': '#e67e22' }}}%%
-```
-
-## 3. スライドへの適用 (Marp)
-`layout-architect` は、生成する CSS 内でパレットの色を変数として定義する。
-
-```css
-:root {
-  --brand-primary: #009944;
-}
-```
+## 3. 設定方法
+`GEMINI.md` または実行時の命令で `proposer_context` を指定する。
+例：「提案者：Gemini-Lab として資料を作成せよ」
+-> `knowledge/templates/themes/proposer/palettes/gemini-lab.json` をロード。
