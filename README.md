@@ -1,6 +1,6 @@
 # Gemini Skills Monorepo
 
-A collection of 50+ specialized AI skills for the Gemini CLI, designed to automate the entire software development lifecycle (SDLC) from scaffolding to operations.
+A collection of 50+ specialized AI skills for the Gemini CLI, designed to automate the entire software development lifecycle (SDLC) and business operations.
 
 ## Table of Contents
 - [Quick Start](#quick-start)
@@ -19,31 +19,32 @@ A collection of 50+ specialized AI skills for the Gemini CLI, designed to automa
 ### 🚀 Scaffolding & Infrastructure
 - **`boilerplate-genie`**: Scaffolds new projects with CI/CD and testing best practices.
 - **`environment-provisioner`**: Generates IaC (Terraform, Docker, K8s) from requirements.
+- **`cloud-cost-estimator`**: Estimates monthly cloud costs from IaC files.
 - **`terraform-arch-mapper`**: Visualizes IaC as Mermaid diagrams.
 
-### 📂 Analysis & Mapping
+### 🧠 AI-Native Engineering
+- **`prompt-optimizer`**: Self-improves agent instructions and context handling.
+- **`asset-token-economist`**: Smart summarization and chunking to minimize LLM costs.
 - **`codebase-mapper`**: Maps directory structure for AI context.
-- **`dependency-grapher`**: Generates Mermaid/DOT dependency graphs.
-- **`sequence-mapper`**: Generates sequence diagrams from function calls.
-- **`schema-inspector`**: Locates and displays SQL/Prisma schemas.
-- **`code-lang-detector`**: Identifies source code languages.
 
 ### 📝 Requirements & Documentation
 - **`requirements-wizard`**: (IPA-Standard) RD guide and review checklist.
 - **`nonfunctional-architect`**: (IPA-Standard) Interactive NFR grade wizard.
-- **`api-doc-generator`**: Generates API docs from OpenAPI/code.
+- **`release-note-crafter`**: Generates business-value-focused release notes.
 - **`doc-to-text`**: Universal extractor (PDF, Excel, Word, OCR, ZIP).
 - **`ppt-artisan`**: Markdown to PowerPoint (Marp-based).
-- **`excel-artisan`**: JSON/HTML to Excel converter.
-- **`word-artisan`**: Markdown to Word converter.
 
 ### 🛡️ Quality & Security
 - **`security-scanner`**: Trivy-integrated vulnerability and secret scan.
 - **`project-health-check`**: Audits CI/CD, Tests, and Linting status.
 - **`test-viewpoint-analyst`**: (IPA/TIS-Standard) Generates test scenarios.
-- **`test-genie`**: Executes test suites and analyzes output.
-- **`local-reviewer`**: Pre-commit AI code review.
+- **`dependency-lifeline`**: Proactively monitors and plans library updates.
 - **`sensitivity-detector`**: Detects PII and sensitive data.
+
+### 🤝 Team & Collaboration
+- **`pr-architect`**: Crafts high-quality, descriptive Pull Request bodies.
+- **`onboarding-wizard`**: Generates personalized project guides for new members.
+- **`local-reviewer`**: Pre-commit AI code review.
 
 ### ⚙️ Operations & Feedback
 - **`log-to-requirement-bridge`**: Drafts improvement requirements from runtime logs.
@@ -56,13 +57,12 @@ A collection of 50+ specialized AI skills for the Gemini CLI, designed to automa
 - **`api-fetcher`**: Secure REST/GraphQL data fetching.
 - **`data-collector`**: Traceable web data harvesting with metadata.
 
-### 🛠️ Governance & Utilities
+### 🛠️ Utilities
 - **`github-skills-manager`**: Monorepo skill management dashboard.
 - **`skill-quality-auditor`**: Self-audit for SKILL.md and script integrity.
 - **`knowledge-refiner`**: Consolidates and cleans the knowledge base.
 - **`diagram-renderer`**: Text-to-Image (Mermaid/PlantUML -> PNG).
 - **`audio-transcriber`**: Whisper-based audio transcription.
-- **`data-transformer`**: CSV/JSON/YAML format converter.
 
 ## Usage Scenarios
 For real-world examples (e.g., automated UI auditing, security pipelines), see **[SCENARIOS.md](./SCENARIOS.md)**.
@@ -73,7 +73,6 @@ This monorepo includes a structured `knowledge/` directory shared across skills:
 - `testing/`: TIS Test Viewpoint Catalog v1.6.
 - `requirements-guide/`: IPA RD best practices.
 - `browser-scenarios/`: Reusable Playwright scripts.
-- `templates/`: Boilerplates and report templates.
 
 ## License
 Custom - See individual skill directories for specific usage terms (e.g., IPA, TIS).
