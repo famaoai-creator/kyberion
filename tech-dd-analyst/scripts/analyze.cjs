@@ -17,7 +17,8 @@ const argv = yargs(hideBin(process.argv))
   .help().argv;
 
 function assessCodeQuality(dir) {
-  let totalFiles = 0, totalLines = 0, languages = {};
+  let totalFiles = 0, totalLines = 0;
+  const languages = {};
   function walk(d, depth) {
     if (depth > 5) return;
     try {

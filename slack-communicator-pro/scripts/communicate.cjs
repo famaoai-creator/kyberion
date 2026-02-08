@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const fs = require('fs'); const path = require('path');
+const fs = require('fs'); const _path = require('path');
 const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const argv = yargs(hideBin(process.argv))
@@ -19,7 +19,7 @@ function checkWebhook() {
 }
 
 function formatMessage(action, input, channel) {
-  let message = { channel, blocks: [] };
+  const message = { channel, blocks: [] };
   if (action === 'alert') {
     const data = input && fs.existsSync(input) ? JSON.parse(fs.readFileSync(input, 'utf8')) : { level: 'warning', message: input || 'Alert' };
     const emoji = data.level === 'critical' ? ':rotating_light:' : data.level === 'warning' ? ':warning:' : ':information_source:';

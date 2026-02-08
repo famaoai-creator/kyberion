@@ -98,8 +98,7 @@ function simpleGlob(dir, pattern) {
   }
 }
 
-function searchRecursive(dir, filePattern, maxDepth, depth) {
-  if (depth === undefined) depth = 0;
+function searchRecursive(dir, filePattern, maxDepth, depth = 0) {
   if (depth > maxDepth) return [];
   const results = [];
   const regex = new RegExp('^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');

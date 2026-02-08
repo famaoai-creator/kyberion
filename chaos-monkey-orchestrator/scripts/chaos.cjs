@@ -52,7 +52,7 @@ function generateChaosReport(scenarios, readiness) {
     ...s,
     feasible: true,
     riskAssessment: s.intensity === 'high' ? 'Requires isolated environment' : s.intensity === 'medium' ? 'Monitor closely during execution' : 'Safe for staging',
-    prerequisitesMet: s.validates.some(v => readiness.checks.hasSelfHealing || readiness.checks.hasMonitoring),
+    prerequisitesMet: s.validates.some(_v => readiness.checks.hasSelfHealing || readiness.checks.hasMonitoring),
   }));
 }
 

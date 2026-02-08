@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const fs = require('fs'); const path = require('path');
+const fs = require('fs'); const _path = require('path');
 const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const argv = yargs(hideBin(process.argv))

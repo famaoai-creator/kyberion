@@ -9,6 +9,7 @@ module.exports = [
       "work/",
       "**/*.ts",
       "scripts/_archive/",
+      ".gemini/",
     ],
   },
   {

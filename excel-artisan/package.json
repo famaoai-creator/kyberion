@@ -1,14 +1,14 @@
 {
   "name": "excel-artisan",
-  "version": "1.0.0",
-  "description": "Excel generator and editor",
-  "main": "scripts/generate.cjs",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "version": "0.1.0",
+  "description": "Generate Excel files from HTML tables.",
+  "main": "scripts/html_to_excel.cjs",
+  "author": "Gemini Agent",
+  "license": "ISC",
   "dependencies": {
-    "xlsx": "^0.18.5",
-    "jsdom": "^22.1.0",
-    "chalk": "^4.1.2"
+    "chalk": "^4.1.2",
+    "exceljs": "^4.4.0",
+    "jsdom": "^24.0.0",
+    "yargs": "^18.0.0"
   }
 }

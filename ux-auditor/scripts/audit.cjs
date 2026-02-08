@@ -160,9 +160,9 @@ function calculateScore(allFindings) {
     const warnings = categoryFindings.filter(f => f.severity === 'warning').length;
     const passes = categoryFindings.filter(f => f.severity === 'pass').length;
 
-    let deduction = errors * 0.3 + warnings * 0.1;
-    let bonus = passes * 0.1;
-    let score = Math.max(0, Math.min(1, 1 - deduction + bonus));
+    const deduction = errors * 0.3 + warnings * 0.1;
+    const bonus = passes * 0.1;
+    const score = Math.max(0, Math.min(1, 1 - deduction + bonus));
     earnedWeight += config.weight * score;
   }
 

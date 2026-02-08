@@ -1,8 +1,8 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect: _expect } = require('@playwright/test');
 
 test.setTimeout(120000);
 
-test('JSM President Approval on Seikyu QUICK', async ({ page, context }) => {
+test('JSM President Approval on Seikyu QUICK', async ({ page, context: _context }) => {
   const USER_ID = process.env.SEIKYU_USER_ID;
   const PASSWORD = process.env.SEIKYU_PASSWORD;
   const TARGET_COMPANY = 'SBI JIG-SAW';

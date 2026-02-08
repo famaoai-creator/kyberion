@@ -29,7 +29,7 @@ skillDirs.forEach(dir => {
         console.log(`\n[${dir.name}]`);
         try {
             execSync(`node ${doctorPath}`, { stdio: 'inherit' });
-        } catch (e) {
+        } catch (_e) {
             console.log(`   ❌ Diagnosis failed`);
         }
     }

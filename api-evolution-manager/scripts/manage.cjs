@@ -27,10 +27,10 @@ function parseSpec(filePath) {
 function extractEndpoints(spec) {
   const endpoints = [];
   const paths = spec.paths || {};
-  for (const [path, methods] of Object.entries(paths)) {
+  for (const [p, methods] of Object.entries(paths)) {
     for (const [method, config] of Object.entries(methods)) {
       if (['get','post','put','delete','patch','options','head'].includes(method)) {
-        endpoints.push({ path, method: method.toUpperCase(), summary: config.summary || '', deprecated: config.deprecated || false, parameters: (config.parameters || []).length });
+        endpoints.push({ path: p, method: method.toUpperCase(), summary: config.summary || '', deprecated: config.deprecated || false, parameters: (config.parameters || []).length });
       }
     }
   }

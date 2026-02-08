@@ -81,7 +81,7 @@ function translateContent(content) {
 
 function extractKeyPoints(content) {
   const points = [];
-  const lines = content.split('\n').filter(l => l.trim().length > 10);
+  const _lines = content.split('\n').filter(l => l.trim().length > 10);
 
   // Look for metrics/numbers
   const metrics = content.match(/\d+\.?\d*\s*(%|percent|users|customers|hours|days|ms|seconds)/gi);

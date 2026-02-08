@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const pdf = require('pdf-parse');
-const xlsx = require('xlsx');
+const ExcelJS = require('exceljs');
 const mammoth = require('mammoth');
 const Tesseract = require('tesseract.js');
 const { logger } = require('../../scripts/lib/core.cjs');
@@ -15,7 +15,7 @@ if (!filePath) {
 }
 
 if (!fs.existsSync(filePath)) {
-    errorHandler(new Error(`File not found: ${filePath}`));
+    throw new Error(`File not found: ${filePath}`);
 }
 
 runAsyncSkill('doc-to-text', async () => {
@@ -29,12 +29,18 @@ runAsyncSkill('doc-to-text', async () => {
         const data = await pdf(dataBuffer);
         text = data.text;
     } else if (ext === '.xlsx' || ext === '.xls') {
-        const workbook = xlsx.readFile(filePath);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(filePath);
         const parts = [];
-        workbook.SheetNames.forEach(sheetName => {
-            parts.push(`--- Sheet: ${sheetName} ---`);
-            const csv = xlsx.utils.sheet_to_csv(workbook.Sheets[sheetName]);
-            parts.push(csv);
+        workbook.eachSheet((worksheet, _sheetId) => {
+            parts.push(`--- Sheet: ${worksheet.name} ---`);
+            worksheet.eachRow((row, _rowNumber) => {
+                // Join cell values with comma to simulate CSV
+                const rowValues = row.values;
+                // row.values is 1-based array, so index 0 is undefined. filter it out.
+                const line = Array.isArray(rowValues) ? rowValues.slice(1).join(',') : '';
+                parts.push(line);
+            });
         });
         text = parts.join('\n');
     } else if (ext === '.docx') {

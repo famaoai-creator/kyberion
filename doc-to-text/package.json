@@ -1,18 +1,14 @@
 {
   "name": "doc-to-text",
-  "version": "1.1.0",
-  "description": "Extract structured text from PDF, Excel, Word, PowerPoint, Images (OCR), Email, and Archives.",
+  "version": "0.1.0",
+  "description": "Extract text from PDF, Excel, Word, and Images.",
   "main": "scripts/extract.cjs",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "author": "Gemini Agent",
+  "license": "ISC",
   "dependencies": {
-    "pdf-parse": "^1.1.1",
-    "xlsx": "^0.18.5",
+    "exceljs": "^4.4.0",
     "mammoth": "^1.6.0",
-    "tesseract.js": "^5.0.0",
-    "mailparser": "^3.6.0",
-    "adm-zip": "^0.5.10",
-    "officeparser": "^4.0.0"
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^5.0.0"
   }
 }

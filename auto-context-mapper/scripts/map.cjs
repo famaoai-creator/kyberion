@@ -51,7 +51,7 @@ function buildContextMap(tiers, skills) {
   return links;
 }
 
-function resolveQuery(query, tiers, links) {
+function resolveQuery(query, tiers, _links) {
   if (!query) return null;
   const lower = query.toLowerCase();
   const relevant = [];

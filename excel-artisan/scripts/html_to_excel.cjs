@@ -3,7 +3,7 @@ const ExcelJS = require('exceljs');
 const chalk = require('chalk');
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
 const inputFile = process.argv[2];
@@ -16,7 +16,7 @@ if (!inputFile || !outputFile) {
 
 validateFilePath(inputFile, 'input HTML');
 
-runSkill('excel-artisan', () => {
+runAsyncSkill('excel-artisan', async () => {
     const htmlContent = fs.readFileSync(inputFile, 'utf8');
 
     // Parse HTML using jsdom
@@ -47,7 +47,7 @@ runSkill('excel-artisan', () => {
         worksheet.addRow(row);
     }
 
-    workbook.xlsx.writeFile(outputFile);
+    await workbook.xlsx.writeFile(outputFile);
 
     return { input: inputFile, output: outputFile, rows: rows.length };
 });

@@ -15,7 +15,7 @@ if (fs.existsSync(configPath)) {
     try {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         if (config.dictationKeycode) dictationKeycode = config.dictationKeycode;
-    } catch (e) {
+    } catch (_e) {
         logger.warn('Failed to parse voice config. Using default F5 keycode.');
     }
 }

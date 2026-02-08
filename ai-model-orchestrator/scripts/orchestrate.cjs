@@ -44,7 +44,7 @@ const MODEL_CATALOG = [
 ];
 
 function analyzeTaskComplexity(content) {
-  const lower = content.toLowerCase();
+  const _lower = content.toLowerCase();
   const wordCount = content.split(/\s+/).length;
 
   const complexitySignals = {

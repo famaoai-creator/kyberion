@@ -18,13 +18,13 @@ function generateOKRs(goals) {
   }));
 }
 
-function analyzeMarketEntry(input) {
+function analyzeMarketEntry(_input) {
   const strategies = [];
-  const market = input.target_market || {};
+  const market = _input.target_market || {};
   if (market.size === 'large' || market.tam > 1000000000) strategies.push({ strategy: 'Land & Expand', description: 'Start with SMB segment, expand to enterprise', risk: 'medium' });
   else strategies.push({ strategy: 'Niche Focus', description: 'Dominate a specific vertical before expanding', risk: 'low' });
-  if (input.competitive_landscape === 'fragmented') strategies.push({ strategy: 'Consolidation Play', description: 'Acquire smaller competitors to gain market share', risk: 'high' });
-  if (input.product_readiness === 'mvp') strategies.push({ strategy: 'Product-Led Growth', description: 'Offer freemium tier to drive adoption', risk: 'low' });
+  if (_input.competitive_landscape === 'fragmented') strategies.push({ strategy: 'Consolidation Play', description: 'Acquire smaller competitors to gain market share', risk: 'high' });
+  if (_input.product_readiness === 'mvp') strategies.push({ strategy: 'Product-Led Growth', description: 'Offer freemium tier to drive adoption', risk: 'low' });
   return strategies;
 }
 
@@ -40,7 +40,7 @@ function defineRevenueStreams(input) {
   return streams;
 }
 
-function createGrowthPillars(input) {
+function createGrowthPillars(_input) {
   return [
     { pillar: 'Product Excellence', initiatives: ['Feature parity with top competitor', 'UX/accessibility improvements', 'Performance optimization'] },
     { pillar: 'Market Expansion', initiatives: ['Enter new geographic market', 'Launch partner program', 'Industry-specific solutions'] },

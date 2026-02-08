@@ -11,7 +11,7 @@ const doctor = {
       execSync(`${cmd} --version`, { stdio: 'ignore' });
       console.log(`✅ ${name || cmd}: Installed`);
       return true;
-    } catch (e) {
+    } catch (_e) {
       console.log(`❌ ${name || cmd}: Not Found`);
       return false;
     }
@@ -32,7 +32,7 @@ const doctor = {
       execSync('osascript -e "tell application \"System Events\" to get name"', { stdio: 'ignore' });
       console.log('✅ Accessibility: OK');
       return true;
-    } catch (e) {
+    } catch (_e) {
       console.log('❌ Accessibility: FAILED');
       return false;
     }

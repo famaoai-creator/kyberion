@@ -182,7 +182,7 @@ runSkill('self-healing-orchestrator', () => {
     errorsAnalyzed: errors.length,
     matchedRules: healingPlan.length,
     healingPlan,
-    unmatchedErrors: errors.length - healingPlan.reduce((s, h) => s + 1, 0),
+    unmatchedErrors: errors.length - healingPlan.reduce((s, _h) => s + 1, 0),
     summary: healingPlan.length > 0
       ? `Found ${healingPlan.length} actionable patterns. Top issue: ${healingPlan[0].diagnosis}`
       : 'No known error patterns matched. Manual investigation recommended.',

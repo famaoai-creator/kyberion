@@ -99,8 +99,7 @@ function generatePnL(assumptions, years) {
   return { monthly, yearly };
 }
 
-function analyzeRunway(monthly, initialCash) {
-  let cash = initialCash;
+function analyzeRunway(monthly, _initialCash) {
   for (let i = 0; i < monthly.length; i++) {
     if (monthly[i].cashBalance <= 0) {
       return { runwayMonths: i + 1, breakevenMonth: null };

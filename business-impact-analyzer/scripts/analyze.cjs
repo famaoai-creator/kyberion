@@ -48,7 +48,7 @@ const argv = yargs(hideBin(process.argv))
  */
 
 // DORA benchmarks (per Google's Accelerate research)
-const DORA_BENCHMARKS = {
+const _DORA_BENCHMARKS = {
   elite: { deployment_freq: 7, lead_time: 1, failure_rate: 0.05, mttr: 1 },
   high: { deployment_freq: 3, lead_time: 24, failure_rate: 0.10, mttr: 4 },
   medium: { deployment_freq: 1, lead_time: 168, failure_rate: 0.15, mttr: 24 },
@@ -93,7 +93,7 @@ function classifyDORA(dora) {
 function calculateBusinessImpact(dora, quality, business) {
   const hourlyRevenue = business.hourly_revenue || 0;
   const devCost = business.developer_hourly_cost || 80;
-  const teamSize = business.team_size || 1;
+  const _teamSize = business.team_size || 1;
 
   // Downtime cost
   const cfr = dora.change_failure_rate || 0;
