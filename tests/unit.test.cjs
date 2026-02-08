@@ -3113,7 +3113,10 @@ test('ecosystem-integration-test handles empty directory', () => {
 // ========================================
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
-console.log(`\n${'='.repeat(50)}`);
+// Run coverage boost tests
+try { require('./coverage-boost.test.cjs'); } catch (e) { console.error(e); failed++; }
+
+console.log(`\n==================================================`);
 console.log(`Results: ${passed} passed, ${failed} failed`);
 if (failures.length > 0) {
   console.log(`Failed: ${failures.join(', ')}`);
