@@ -18,7 +18,7 @@ function capture(fn) {
   let stdout = '';
   let stderr = '';
   let exitCode = null;
-  let logs = [];
+  const logs = [];
 
   process.stdout.write = (chunk) => { stdout += chunk; return true; };
   process.stderr.write = (chunk) => { stderr += chunk; return true; };
@@ -83,8 +83,6 @@ console.log('--- Coverage Boost: Skill Wrapper Help ---');
   const originalReaddir = fs.readdirSync;
 
   const MOCK_SKILL = 'mock-skill';
-  const MOCK_ROOT = path.resolve(__dirname, '..');
-  const MOCK_MD_PATH = path.join(MOCK_ROOT, '..', MOCK_SKILL, 'SKILL.md'); // Adjust for ../.. in wrapper
   
   // Monkey patch FS
   fs.existsSync = (p) => {
