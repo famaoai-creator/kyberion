@@ -13,6 +13,7 @@ This skill assists in the **Non-Functional Requirements Definition** phase of sy
 
 1.  **Model-Based Assessment**:
     - Recommends requirement levels based on system impact (Low/Mid/High).
+    - Utilizes [Availability Best Practices](../knowledge/operations/availability_best_practices.md) for tier classification.
 2.  **Interactive Selection**:
     - Guides the user through key categories (Availability, Performance, Security, etc.) to select specific levels.
 3.  **Document Generation**:
@@ -30,3 +31,4 @@ node scripts/assess.cjs
 
 ## Knowledge Protocol
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+- References [Availability Best Practices](../knowledge/operations/availability_best_practices.md) for standardizing availability levels and disaster recovery goals.
