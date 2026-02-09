@@ -6,7 +6,15 @@ status: implemented
 
 # Word Artisan
 
-Generate Word documents (.docx) from Markdown.
+Generate professional, comprehensive Word documents (.docx) from Markdown.
+
+## High-Fidelity Documentation Workflow
+
+When creating complex documents (e.g., NFR Definitions, System Designs):
+
+1.  **Structure Definition**: Align with industry standards (e.g., IPA Non-Functional Requirements Grade).
+2.  **Detail-Oriented Writing**: Expand each section with specific technical parameters, configurations, and checklists. Ensure the document provides enough depth for executive and technical review.
+3.  **Visual Styling**: Utilize professional styling (fonts like MS Mincho, corporate colors, structured tables) via the conversion engine to ensure the output is boardroom-ready.
 
 ## Usage
 
