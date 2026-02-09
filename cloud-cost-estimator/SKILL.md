@@ -17,6 +17,7 @@ This skill adds financial awareness to infrastructure design by estimating costs
 ### 2. Efficiency Recommendations
 - Suggests cost-saving alternatives (e.g., "Use Spot instances for this worker group").
 - Identifies "expensive" architectural choices.
+- Validates if the projected infrastructure cost is within the typical range (e.g., 5-8% of ARR for SaaS) defined in [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md).
 
 ## Usage
 - "How much will this Terraform configuration cost per month on AWS?"
@@ -24,3 +25,4 @@ This skill adds financial awareness to infrastructure design by estimating costs
 
 ## Knowledge Protocol
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+- References [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md) for infrastructure spending standards relative to company size.

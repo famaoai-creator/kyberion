@@ -12,7 +12,7 @@ This skill ensures that the CEO's plans stay on track by monitoring the "Actuals
 
 ### 1. Variance Analysis
 - Imports actual financial data and compares it against `financial-modeling-maestro` forecasts.
-- Highlights "Negative Variances" (e.g., higher than expected AWS costs).
+- Highlights "Negative Variances" (e.g., higher than expected AWS costs) and deviations from [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md).
 
 ### 2. Root Cause Insight
 - Connects with `cloud-waste-hunter` and `agent-activity-monitor` to explain *why* costs deviated.
@@ -23,3 +23,4 @@ This skill ensures that the CEO's plans stay on track by monitoring the "Actuals
 
 ## Knowledge Protocol
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.
+- References [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md) for assessing budget health relative to company size and sector.

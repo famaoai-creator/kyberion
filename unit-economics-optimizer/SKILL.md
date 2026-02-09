@@ -22,6 +22,7 @@ This skill ensures that the company's core business model is fundamentally sound
 
 ### 1. LTV/CAC Modeling
 - Calculates the Lifetime Value (LTV) of customers vs. Acquisition Cost (CAC).
+- Compares Research & Development (R&D) and Sales & Marketing (S&M) spending against [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md).
 - Identifies "Unprofitable Segments" that are draining resources.
 
 ### 2. Pricing & Churn Strategy
@@ -33,3 +34,4 @@ This skill ensures that the company's core business model is fundamentally sound
 
 ## Knowledge Protocol
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.
+- References [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md) for SaaS/Software sector spending standards.
