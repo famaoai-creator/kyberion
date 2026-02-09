@@ -45,3 +45,4 @@ This skill is for high-stakes, time-sensitive situations where rapid recovery is
 ## Knowledge Protocol
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
 - Integrates [PagerDuty Best Practices](../knowledge/operations/pagerduty_best_practices.md) for incident roles (e.g., Incident Commander) and resolution workflows.
+- References [Runbook Best Practices](../knowledge/operations/runbook_best_practices.md) for executing machine-readable diagnostic and remediation steps.

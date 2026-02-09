@@ -26,10 +26,11 @@ This skill acts as an autonomous first-responder to production alerts.
 
 ### 1. Pattern-Based Repair
 - Matches incoming error patterns with established "Healing Runbooks."
-- Can automatically restart services, scale resources, or rollback a specific deployment.
+- Can automatically restart services, scale resources, or rollback a specific deployment, ensuring **idempotency** as defined in [Runbook Best Practices](../knowledge/operations/runbook_best_practices.md).
 
 ### 2. Autonomous Patching
 - For known minor bugs (e.g., edge-case NULL pointers), it can generate, test, and deploy a temporary hotfix.
+- Follows strict **Safety & Error Handling** (e.g., Dry Run, Human-in-the-loop) protocols.
 
 ## Usage
 - "Automate the response to 'Database Connection Timeout' alerts using `self-healing-orchestrator`."
@@ -37,3 +38,4 @@ This skill acts as an autonomous first-responder to production alerts.
 
 ## Knowledge Protocol
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+- References [Runbook Best Practices](../knowledge/operations/runbook_best_practices.md) for executing machine-readable procedures safely and autonomously.
