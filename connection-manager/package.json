@@ -1,9 +1,12 @@
 {
   "name": "connection-manager",
-  "version": "0.1.0",
-  "description": "Manages secure connections to external tools.",
-  "main": "scripts/diagnose.cjs",
-  "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "version": "1.0.0",
+  "private": true,
+  "description": "Manages secure connections to external tools (AWS, Slack, Jira, Box).",
+  "scripts": {
+    "diagnose": "node scripts/diagnose.cjs"
+  },
+  "dependencies": {
+    "@gemini/core": "workspace:*"
+  }
 }

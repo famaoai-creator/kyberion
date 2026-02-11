@@ -1,60 +1,40 @@
-const fs = require('fs');
-const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-
+#!/usr/bin/env node
 /**
- * Connection Diagnostics Tool
- * Scans Personal Tier for configs and reports status.
+ * connection-manager/scripts/diagnose.cjs
+ * Standardized Connectivity Diagnostic
  */
 
-const PERSONAL_CONN_DIR = path.resolve(__dirname, '../../knowledge/personal/connections');
-
-const SERVICES = ['aws', 'slack', 'jira', 'box', 'github'];
-
-const MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config file
+const { runSkill } = require('@gemini/core');
+const { requireArgs } = require('@gemini/core/validators');
+const fs = require('fs');
+const path = require('path');
 
 runSkill('connection-manager', () => {
-    const results = [];
+    const args = requireArgs(['system']);
+    const system = args.system.toLowerCase();
 
-    if (!fs.existsSync(PERSONAL_CONN_DIR)) {
-        return { warning: `Personal connections directory not found: ${PERSONAL_CONN_DIR}`, services: [], total: 0, valid: 0 };
+    // 1. Check Inventory
+    const inventoryPath = path.resolve(__dirname, '../../knowledge/confidential/connections/inventory.json');
+    if (!fs.existsSync(inventoryPath)) {
+        throw new Error(`Inventory not found at ${inventoryPath}`);
     }
 
-    SERVICES.forEach(service => {
-        const configPath = path.join(PERSONAL_CONN_DIR, `${service}.json`);
-        if (fs.existsSync(configPath)) {
-            try {
-                const stat = fs.statSync(configPath);
-                if (!stat.isFile()) {
-                    results.push({ service: service.toUpperCase(), status: 'not_a_file', configPath });
-                    return;
-                }
-                if (stat.size > MAX_CONFIG_SIZE) {
-                    results.push({ service: service.toUpperCase(), status: 'file_too_large', size: stat.size, configPath });
-                    return;
-                }
-                if (stat.size === 0) {
-                    results.push({ service: service.toUpperCase(), status: 'empty_config', configPath });
-                    return;
-                }
-                const content = fs.readFileSync(configPath, 'utf8');
-                const config = JSON.parse(content);
-                const hasKeys = Object.keys(config).length > 0;
-                results.push({ service: service.toUpperCase(), status: hasKeys ? 'valid' : 'empty_object', configPath });
-            } catch (_err) {
-                if (err.code === 'EACCES') {
-                    results.push({ service: service.toUpperCase(), status: 'permission_denied', configPath });
-                } else if (err instanceof SyntaxError) {
-                    results.push({ service: service.toUpperCase(), status: 'invalid_json', configPath });
-                } else {
-                    results.push({ service: service.toUpperCase(), status: 'read_error', error: err.message, configPath });
-                }
-            }
-        } else {
-            results.push({ service: service.toUpperCase(), status: 'missing' });
-        }
-    });
+    const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+    const config = inventory.systems[system];
 
-    const validCount = results.filter(r => r.status === 'valid').length;
-    return { services: results, total: results.length, valid: validCount };
+    if (!config) {
+        throw new Error(`System '${system}' not defined in inventory.`);
+    }
+
+    // 2. Check Personal Credentials
+    const secretPath = path.resolve(__dirname, '../../', config.credential_ref);
+    const hasSecret = fs.existsSync(secretPath);
+
+    return {
+        system,
+        config_status: 'valid',
+        credential_status: hasSecret ? 'found' : 'missing',
+        credential_path: config.credential_ref,
+        ready: hasSecret
+    };
 });
