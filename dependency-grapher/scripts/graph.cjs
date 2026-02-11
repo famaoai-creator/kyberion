@@ -2,34 +2,56 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-
-const argv = createStandardYargs()
-    .option('dir', { alias: 'd', type: 'string', demandOption: true })
-    .option('out', { alias: 'o', type: 'string' })
-    .argv;
+const { requireArgs } = require('../../scripts/lib/validators.cjs');
 
 runSkill('dependency-grapher', () => {
-    const pkgPath = path.join(argv.dir, 'package.json');
-    if (!fs.existsSync(pkgPath)) {
-        throw new Error("No package.json found in directory");
-    }
+    const args = requireArgs(['dir']);
+    const rootDir = path.resolve(args.dir);
+    const output = args.out || 'evidence/dependency-map.mmd';
 
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const items = fs.readdirSync(rootDir);
     let mermaid = 'graph TD\n';
+    mermaid += '    subgraph Shared_Library\n';
+    mermaid += '        Lib[scripts/lib/]\n';
+    mermaid += '    end\n\n';
 
-    mermaid += `    Root[${pkg.name}]\n`;
+    let skillCount = 0;
 
-    if (pkg.dependencies) {
-        Object.keys(pkg.dependencies).forEach(dep => {
-            mermaid += `    Root --> ${dep.replace(/@|\/|\./g, '_')}[${dep}]\n`;
-        });
+    for (const item of items) {
+        const fullPath = path.join(rootDir, item);
+        try {
+            if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'SKILL.md'))) {
+                skillCount++;
+                const skillId = item.replace(/-/g, '_');
+                mermaid += `    ${skillId}[${item}]\n`;
+
+                const scriptsDir = path.join(fullPath, 'scripts');
+                if (fs.existsSync(scriptsDir)) {
+                    const files = fs.readdirSync(scriptsDir);
+                    let usesLib = false;
+                    for (const file of files) {
+                        if (file.endsWith('.cjs') || file.endsWith('.ts')) {
+                            const content = fs.readFileSync(path.join(scriptsDir, file), 'utf8');
+                            if (content.includes('../../scripts/lib/')) {
+                                usesLib = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (usesLib) {
+                        mermaid += `    ${skillId} --> Lib\n`;
+                    }
+                }
+            }
+        } catch (e) {
+            // Skip non-accessible files
+        }
     }
 
-    if (argv.out) {
-        fs.writeFileSync(argv.out, mermaid);
-        return { output: argv.out, nodeCount: Object.keys(pkg.dependencies || {}).length + 1 };
-    } else {
-        return { content: mermaid, nodeCount: Object.keys(pkg.dependencies || {}).length + 1 };
-    }
+    fs.writeFileSync(output, mermaid);
+    return { 
+        status: 'success', 
+        skillsScanned: skillCount, 
+        outputPath: output 
+    };
 });

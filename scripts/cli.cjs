@@ -53,7 +53,7 @@ function runCommand() {
   try {
     const output = execSync(cmd, { encoding: 'utf8', cwd: rootDir, stdio: 'pipe' });
     process.stdout.write(output);
-  } catch (_err) {
+  } catch (err) {
     if (err.stdout) process.stdout.write(err.stdout);
     if (err.stderr) process.stderr.write(err.stderr);
     process.exit(err.status || 1);

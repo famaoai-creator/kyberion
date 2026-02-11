@@ -85,15 +85,31 @@ function readJsonFile(filePath, label = 'JSON file') {
 
 /**
  * Validate that required arguments are present.
- * @param {Object} argv - Arguments object (typically from yargs)
- * @param {string[]} required - List of required argument names
+ * @param {Object|string[]} argvOrRequired - Arguments object or list of required names
+ * @param {string[]} [requiredList] - List of required argument names (if argv provided first)
  * @throws {Error} If any required argument is missing
  */
-function requireArgs(argv, required) {
+function requireArgs(argvOrRequired, requiredList) {
+  let argv, required;
+  
+  if (Array.isArray(argvOrRequired)) {
+    // Legacy support: fetch argv automatically if not provided
+    const yargs = require('yargs/yargs')(process.argv.slice(2));
+    argv = yargs.argv;
+    required = argvOrRequired;
+  } else {
+    argv = argvOrRequired;
+    required = requiredList || [];
+  }
+
+  if (!argv) throw new Error('Arguments object (argv) is undefined.');
+  if (!Array.isArray(required)) throw new Error('Required arguments list must be an array.');
+
   const missing = required.filter(name => argv[name] === undefined || argv[name] === null);
   if (missing.length > 0) {
     throw new Error(`Missing required argument(s): ${missing.join(', ')}`);
   }
+  return argv;
 }
 
 module.exports = { validateFilePath, validateDirPath, safeJsonParse, readJsonFile, requireArgs };
