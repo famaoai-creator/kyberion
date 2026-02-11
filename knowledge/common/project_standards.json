@@ -1,0 +1,40 @@
+{
+  "ignore_dirs": [
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    ".next",
+    ".nuxt",
+    "vendor",
+    "bin",
+    "obj",
+    ".idea",
+    ".vscode",
+    ".DS_Store",
+    "tmp",
+    "temp",
+    ".gemini"
+  ],
+  "ignore_extensions": [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".mp4",
+    ".mp3",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".lock",
+    ".bin"
+  ]
+}

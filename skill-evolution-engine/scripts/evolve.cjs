@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 const fs = require('fs'); const path = require('path');
-const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const argv = yargs(hideBin(process.argv))
+ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const argv = createStandardYargs()
   .option('skill', { alias: 's', type: 'string', demandOption: true, description: 'Skill name to analyze for evolution' })
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project root' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })

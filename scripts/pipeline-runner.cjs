@@ -23,10 +23,8 @@ const rootDir = path.resolve(__dirname, '..');
 // ---------------------------------------------------------------------------
 // Parse CLI arguments with yargs
 // ---------------------------------------------------------------------------
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('pipeline', {
     alias: 'p',
     type: 'string',

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs'); const path = require('path');
-const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const argv = yargs(hideBin(process.argv))
+ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true, description: 'Path to JSON with IP portfolio data' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
   .help().argv;

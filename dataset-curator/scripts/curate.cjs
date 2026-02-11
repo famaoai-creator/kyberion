@@ -7,7 +7,7 @@ const { hideBin } = require("yargs/helpers");
 const { runSkill } = require("../../scripts/lib/skill-wrapper.cjs");
 const { validateFilePath, requireArgs } = require("../../scripts/lib/validators.cjs");
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option("input", { alias: "i", type: "string", describe: "Path to data file (JSON/CSV/text)", demandOption: true })
   .option("out", { alias: "o", type: "string", describe: "Output file path" })
   .option("format", { alias: "f", type: "string", describe: "Data format", choices: ["json", "csv", "text"] })

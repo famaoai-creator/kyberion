@@ -2,10 +2,9 @@
 const { execSync } = require('child_process');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Git repository directory' })
     .argv;
 

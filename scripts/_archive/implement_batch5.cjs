@@ -61,10 +61,8 @@ console.log("=== Implementing Batch 5: Classifiers ===\n");
 // 1. code-lang-detector
 scaffoldSkill('code-lang-detector', 'Detect programming language of source code.', 'detect.cjs', `
 const fs = require('fs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 
-const argv = yargs(hideBin(process.argv)).option('input', { alias: 'i', type: 'string' }).argv;
+const argv = createStandardYargs().option('input', { alias: 'i', type: 'string' }).argv;
 
 const EXT_MAP = {
     '.js': 'javascript', '.ts': 'typescript', '.py': 'python', '.java': 'java', 

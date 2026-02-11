@@ -3,10 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('url', { alias: 'u', type: 'string', description: 'URL to navigate to' })
     .option('scenario', { alias: 's', type: 'string', description: 'Path to Playwright spec file' })
     .option('screenshot', { type: 'boolean', default: false, description: 'Take a screenshot' })

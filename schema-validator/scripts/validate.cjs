@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 const Ajv = require('ajv');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { readJsonFile } = require('../../scripts/lib/validators.cjs');
 
 const ajv = new Ajv();
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('input', { alias: 'i', type: 'string', demandOption: true })
     .option('schema', { alias: 's', type: 'string', demandOption: true })
     .argv;

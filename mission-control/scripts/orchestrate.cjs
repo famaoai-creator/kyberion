@@ -4,13 +4,12 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { runPipeline, runParallel } = require('../../scripts/lib/orchestrator.cjs');
 const { MetricsCollector } = require('../../scripts/lib/metrics.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('pipeline', {
     alias: 'p',
     type: 'string',

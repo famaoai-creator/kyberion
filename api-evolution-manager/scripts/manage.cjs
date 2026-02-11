@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs'); const path = require('path');
-const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const argv = yargs(hideBin(process.argv))
+ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const argv = createStandardYargs()
   .option('current', { alias: 'c', type: 'string', demandOption: true, description: 'Path to current API spec (OpenAPI JSON/YAML)' })
   .option('previous', { alias: 'p', type: 'string', description: 'Path to previous API spec for diff' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })

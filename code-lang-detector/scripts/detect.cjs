@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath: _validateFilePath } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv)).option('input', { alias: 'i', type: 'string' }).argv;
+const argv = createStandardYargs().option('input', { alias: 'i', type: 'string' }).argv;
 
 const EXT_MAP = {
     '.js': 'javascript', '.ts': 'typescript', '.py': 'python', '.java': 'java',

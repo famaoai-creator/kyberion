@@ -10,12 +10,19 @@ console.log('=== 🏥 Gemini Skills Ecosystem: Global Doctor ===\n');
 // 1. 全システム共通の基盤チェック
 doctorCore.checkAccessibility();
 doctorCore.checkCommand('node', 'Node.js');
-doctorCore.checkCommand('gemini', 'Gemini CLI');
+doctorCore.checkCommand('npm', 'npm');
+doctorCore.checkKnowledgeTiers(rootDir);
+doctorCore.checkOperationalMemory(rootDir);
+
 console.log('--------------------------------------------------');
 
 // 2. 各スキルのスキャン
 const items = fs.readdirSync(rootDir, { withFileTypes: true });
-const skillDirs = items.filter(item => item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules' && item.name !== 'scripts');
+const skillDirs = items.filter(item => 
+    item.isDirectory() && 
+    !item.name.startsWith('.') && 
+    !['node_modules', 'scripts', 'knowledge', 'work', 'dist', 'coverage', 'evidence'].includes(item.name)
+);
 
 let total = 0;
 let withDoctor = 0;

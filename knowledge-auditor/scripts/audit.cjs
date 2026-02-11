@@ -3,26 +3,17 @@
 
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const { scanForConfidentialMarkers, detectTier } = require('../../scripts/lib/tier-guard.cjs');
 
 const MAX_DEPTH = 5;
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
-const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2',
-  '.ttf', '.eot', '.mp4', '.mp3', '.pdf', '.zip', '.gz', '.tar',
-  '.lock', '.bin', '.exe', '.dll', '.so', '.dylib',
-]);
 
-const IGNORE_DIRS = new Set([
-  '.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.nuxt',
-  'vendor', 'tmp', 'temp', '__pycache__',
-]);
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('dir', {
     alias: 'd',
     type: 'string',

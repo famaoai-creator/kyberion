@@ -2,12 +2,11 @@
 const fs = require('fs');
 const yaml = require('js-yaml');
 const Papa = require('papaparse');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('input', { alias: 'i', type: 'string', demandOption: true })
     .option('to', { alias: 't', type: 'string', choices: ['json', 'yaml', 'csv'], demandOption: true })
     .option('out', { alias: 'o', type: 'string' })

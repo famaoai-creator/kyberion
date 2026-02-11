@@ -3,15 +3,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
-const IGNORE_DIRS = new Set([
-  '.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.nuxt',
-  'vendor', 'tmp', 'temp', '__pycache__', '.tox', '.pytest_cache',
-  '.mypy_cache', 'venv', 'env', '.venv',
-]);
 
 const SOURCE_EXTENSIONS = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.cjs', '.mjs',
@@ -101,7 +96,7 @@ const FRAMEWORK_DETECTORS = [
   },
 ];
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('dir', {
     alias: 'd',
     type: 'string',

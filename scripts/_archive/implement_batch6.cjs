@@ -56,10 +56,8 @@ console.log("✅ Knowledge directory structure created.");
 scaffoldSkill('knowledge-fetcher', 'Fetch knowledge from local repository.', 'fetch.cjs', `
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('query', { alias: 'q', type: 'string', demandOption: true })
     .option('type', { alias: 't', type: 'string', default: 'all' }) // schemas, templates, etc.
     .argv;

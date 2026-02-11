@@ -6,11 +6,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('intensity', { alias: 'n', type: 'string', default: 'low', choices: ['low', 'medium', 'high'], description: 'Chaos intensity level' })
   .option('dry-run', { type: 'boolean', default: true, description: 'Only simulate, do not execute' })

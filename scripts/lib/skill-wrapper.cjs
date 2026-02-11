@@ -13,6 +13,7 @@
 // --- Plugin Hook System & Metrics ---
 const path = require('path');
 const fs = require('fs');
+const { logger } = require('./core.cjs');
 
 // Lazy-load metrics to avoid circular deps
 let _metrics = null;
@@ -253,6 +254,28 @@ function _isHumanFormat() {
   return process.env.GEMINI_FORMAT === 'human' || process.argv.includes('--format=human');
 }
 
+// Lazy-load Ajv for validation
+let _ajv = null;
+let _schema = null;
+function _validateOutput(output) {
+  try {
+    if (_ajv === null) {
+      const Ajv = require('ajv');
+      _ajv = new Ajv({ allErrors: true });
+      _schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../../schemas/skill-output.schema.json'), 'utf8'));
+    }
+    const validate = _ajv.compile(_schema);
+    if (!validate(output)) {
+      logger.warn(`[${output.skill}] Output schema validation failed: ${JSON.stringify(validate.errors)}`);
+      return false;
+    }
+    return true;
+  } catch (_) {
+    // If Ajv or schema is not available, skip validation gracefully
+    return true;
+  }
+}
+
 /**
  * Build a standard output envelope.
  * @param {string} skillName - Name of the skill
@@ -278,7 +301,12 @@ function buildOutput(skillName, status, dataOrError, startTime) {
       message: dataOrError.message || String(dataOrError),
     };
     _addSuggestion(base.error, skillName);
+    logger.error(`[${skillName}] ${base.error.message}`);
   }
+
+  // Validate output against schema
+  _validateOutput(base);
+
   return base;
 }
 

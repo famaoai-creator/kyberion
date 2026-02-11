@@ -2,12 +2,11 @@
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { marked } = require('marked');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('input', { alias: 'i', type: 'string', demandOption: true })
     .option('out', { alias: 'o', type: 'string', demandOption: true })
     .argv;

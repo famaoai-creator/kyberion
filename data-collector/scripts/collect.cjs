@@ -3,11 +3,10 @@ const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios');
 const mime = require('mime-types');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('url', {
         alias: 'u',
         type: 'string',

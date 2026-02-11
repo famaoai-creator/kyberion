@@ -2,12 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateDirPath, requireArgs } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', describe: 'Git repository path', demandOption: true })
   .option('since', { alias: 's', type: 'string', describe: 'Date or tag to start from', demandOption: true })
   .option('out', { alias: 'o', type: 'string', describe: 'Output file path for release notes' })

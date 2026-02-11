@@ -1,6 +1,6 @@
 {
-  "total_skills": 123,
-  "last_updated": "2026-02-07T19:06:24.516Z",
+  "total_skills": 130,
+  "last_updated": "2026-02-10T11:52:46.496Z",
   "skills": [
     {
       "name": "agent-activity-monitor",
@@ -51,6 +51,11 @@
       "name": "autonomous-skill-designer",
       "description": "The ultimate \"self-generation\" skill. Autonomously designs and implements new Gemini skills to solve novel problems that current skills cannot address.",
       "path": "./autonomous-skill-designer/"
+    },
+    {
+      "name": "backlog-connector",
+      "description": "Specialized connector for Nulab Backlog API. Automatically resolves Project IDs and handles pagination for fetching issues and wikis.",
+      "path": "./backlog-connector/"
     },
     {
       "name": "binary-archaeologist",
@@ -218,6 +223,11 @@
       "path": "./doc-type-classifier/"
     },
     {
+      "name": "document-generator",
+      "description": "Unified gateway for all document generation tasks. Automatically routes to specialized artisan skills based on the requested format (PDF, DOCX, XLSX, PPTX, HTML).",
+      "path": "./document-generator/"
+    },
+    {
       "name": "domain-classifier",
       "description": "Classify domain (tech, finance, legal).",
       "path": "./domain-classifier/"
@@ -256,6 +266,11 @@
       "name": "format-detector",
       "description": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
       "path": "./format-detector/"
+    },
+    {
+      "name": "github-repo-auditor",
+      "description": "Audits and classifies GitHub repositories into business solutions.",
+      "path": "./github-repo-auditor/"
     },
     {
       "name": "github-skills-manager",
@@ -458,6 +473,11 @@
       "path": "./requirements-wizard/"
     },
     {
+      "name": "scenario-multiverse-orchestrator",
+      "description": "Generates multiple business scenarios (Growth/Stability/Hybrid) from financial and strategic assumptions for executive decision-making.",
+      "path": "./scenario-multiverse-orchestrator/"
+    },
+    {
       "name": "schema-inspector",
       "description": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
       "path": "./schema-inspector/"
@@ -506,6 +526,16 @@
       "name": "slack-communicator-pro",
       "description": "Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, alerts, and strategic announcements.",
       "path": "./slack-communicator-pro/"
+    },
+    {
+      "name": "sovereign-memory",
+      "description": "Multi-tier, persistent memory hub. Manages facts across Personal, Confidential, and Public tiers in accordance with the Sovereign Knowledge Protocol.",
+      "path": "./sovereign-memory/"
+    },
+    {
+      "name": "sovereign-sync",
+      "description": "Syncs specific knowledge tiers with external private repositories.",
+      "path": "./sovereign-sync/"
     },
     {
       "name": "stakeholder-communicator",
@@ -601,6 +631,11 @@
       "name": "ux-auditor",
       "description": "Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to recommend improvements for usability and contrast.",
       "path": "./ux-auditor/"
+    },
+    {
+      "name": "visionary-ethos-keeper",
+      "description": "Ensures decisions and proposals align with company mission, values, and ethical guidelines. Checks for bias, privacy, and fairness concerns.",
+      "path": "./visionary-ethos-keeper/"
     },
     {
       "name": "voice-command-listener",
