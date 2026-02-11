@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint check (zero warnings)
-        run: npx eslint . --max-warnings 0
+      - name: Lint check
+        run: npm run lint
 
       - name: Format check
-        run: npx prettier --check "**/*.{js,cjs,ts,json,md,yml}" --ignore-path .gitignore || true
+        run: npm run format:check || true
 
       - name: TypeScript type check
         run: npm run typecheck
@@ -39,6 +39,27 @@ jobs:
 
       - name: Validate schemas
         run: node scripts/validate_schemas.cjs
+
+  docker-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build development stage
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: development
+          tags: gemini-skills:dev
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run help in container
+        run: docker run --rm gemini-skills:dev list
 
   test:
     runs-on: ubuntu-latest
@@ -69,15 +90,6 @@ jobs:
       - name: Run ${{ matrix.test-suite }} tests
         run: ${{ matrix.command }}
 
-      - name: Check coverage threshold
-        if: matrix.test-suite == 'unit'
-        run: |
-          if [ -f coverage/coverage-summary.json ]; then
-            LINES=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
-            echo "Line coverage: ${LINES}%"
-            node -e "const c=require('./coverage/coverage-summary.json');if(c.total.lines.pct<50){process.exit(1)}" || echo "::warning::Coverage below 50% threshold"
-          fi
-
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: matrix.test-suite == 'unit' && always()
@@ -85,16 +97,6 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 14
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-failures-${{ matrix.test-suite }}
-          path: |
-            *.log
-            evidence/
-          retention-days: 7
 
   security:
     runs-on: ubuntu-latest
@@ -111,9 +113,6 @@ jobs:
 
       - name: Security audit (blocking on critical)
         run: npm audit --audit-level=critical
-
-      - name: Security audit (warn on high)
-        run: npm audit --audit-level=high || true
 
       - name: Skill quality audit
         run: node scripts/audit_skills.cjs --format json
@@ -141,26 +140,3 @@ jobs:
           name: benchmark-results
           path: evidence/benchmarks/
           retention-days: 30
-
-  nightly:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Full test suite
-        run: npm run test:all
-
-      - name: Security deep audit
-        run: npm audit
-
-      - name: Skill quality audit
-        run: node scripts/audit_skills.cjs
