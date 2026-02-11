@@ -22,9 +22,11 @@ try {
         if (fs.existsSync(skillPath)) {
             const content = fs.readFileSync(skillPath, 'utf8');
             const description = content.match(/description: (.*)/)?.[1] || '';
+            const statusMatch = content.match(/status:\s*(\w+)/);
             skills.push({
                 name: dir,
                 description: description.trim(),
+                status: statusMatch ? statusMatch[1] : 'unknown',
                 path: `./${dir}/`
             });
         }
@@ -37,6 +39,6 @@ try {
     });
 
     logger.success(`Global Skill Index generated with ${skills.length} skills at ${indexFile}`);
-} catch (_err) {
+} catch (err) {
     errorHandler(err, 'Skill Index Generation Failed');
 }
