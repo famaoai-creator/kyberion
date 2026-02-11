@@ -8,13 +8,16 @@ status: implemented
 
 Generate professional, comprehensive Word documents (.docx) from Markdown.
 
+## Documentation Fidelity Modes
+
+1.  **Executive Summary**: Focus on high-level goals, budget, and impact.
+2.  **Standard Specification**: Balanced view of functional and non-functional requirements.
+3.  **Comprehensive Deep-Dive**: Exhaustive technical documentation including every parameter, CLI command, and edge case. Essential for NFR definitions and security audits.
+
 ## High-Fidelity Documentation Workflow
-
-When creating complex documents (e.g., NFR Definitions, System Designs):
-
-1.  **Structure Definition**: Align with industry standards (e.g., IPA Non-Functional Requirements Grade).
-2.  **Detail-Oriented Writing**: Expand each section with specific technical parameters, configurations, and checklists. Ensure the document provides enough depth for executive and technical review.
-3.  **Visual Styling**: Utilize professional styling (fonts like MS Mincho, corporate colors, structured tables) via the conversion engine to ensure the output is boardroom-ready.
+1.  **Standard Alignment**: Choose the appropriate standard (e.g., IPA Grade) based on the target fidelity.
+2.  **Detail-Oriented Writing**: For Deep-Dive mode, expand sections with specific technical configurations.
+3.  **Visual Styling**: Apply professional templates consistently.
 
 ## Usage
 

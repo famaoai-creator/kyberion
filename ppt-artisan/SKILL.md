@@ -19,19 +19,24 @@ This skill creates high-impact, boardroom-ready presentations. It goes beyond si
 - **PPTX**: Default format for editable presentations.
 - **PDF/HTML**: Formats for quick preview and digital distribution.
 
-## High-Fidelity Authoring Workflow (Anti-Summarization)
+## Fidelity Modes (Audience-Driven Density)
 
-To ensure technical depth and prevent information loss, follow this "Deep Dive" standard:
+Adjust the information density based on the target audience:
 
-1.  **Storyboard Strategy**: Define a target slide count for each chapter (e.g., "Architecture: 10 slides"). Do not aim for a single overview slide.
-2.  **Granular Expansion**:
-    - Break each sub-topic into its own slide (e.g., Security -> VPC, Security -> IAM, Security -> KMS).
-    - If a sub-topic is complex, use multiple sequential slides (Part 1, Part 2).
-3.  **Mandatory Evidence**: Every technical claim must include:
-    - **Configuration Tables**: Specific parameters and values.
-    - **Implementation Snippets**: Code blocks with CLI commands or YAML manifests.
-    - **Verification Assertions**: How to verify the state (Assert).
-4.  **Synthesis**: Combine detailed sections with explicit page breaks (`---`).
+1.  **Executive Mode (High Summary)**:
+    - **Goal**: Rapid decision-making and high-level vision.
+    - **Design**: "1-Slide-1-Message." Focus on ROI, major milestones, and business risks. Max 10-15 slides.
+2.  **Standard Mode (Balanced)**:
+    - **Goal**: Operational alignment and project management.
+    - **Design**: Structured overview with key technical metrics. Good for kick-offs and monthly reviews.
+3.  **Deep Dive Mode (Technical Exhaustiveness)**:
+    - **Goal**: Implementation, auditing, and knowledge transfer.
+    - **Design**: "Anti-Summarization." Mandatory tables, code evidence, and granular sub-topic separation. No slide limit (e.g., 40+ slides).
+
+## High-Fidelity Authoring Workflow
+1.  **Audience Identification**: Confirm the density mode before drafting.
+2.  **Storyboard Strategy**: Define slide count targets per chapter based on the selected mode.
+3.  **Synthesis**: Combine sections with professional templates.
 
 ## Best Practices
 - **Topic-Per-Slide (Deep Dive)**: Instead of brief bullets, provide detailed technical specs. A professional system design should naturally exceed 40 slides.
