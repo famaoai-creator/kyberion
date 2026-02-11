@@ -5,6 +5,11 @@ const API_KEY = process.env.GEMINI_INCIDENT_API_KEY;
 const SPACE_URL = process.env.GEMINI_INCIDENT_SPACE_URL;
 const PROJECT_ID = process.env.GEMINI_INCIDENT_PROJECT_ID; // NBS_INCIDENT
 
+if (!API_KEY) {
+    console.error('ERROR: GEMINI_INCIDENT_API_KEY environment variable is not set.');
+    process.exit(1);
+}
+
 async function fetchAllIssues() {
     const allIssues = [];
     let offset = 0;
