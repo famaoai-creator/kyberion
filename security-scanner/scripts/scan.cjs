@@ -1,36 +1,24 @@
+#!/usr/bin/env node
 const path = require('path');
 const isBinaryPath = require('is-binary-path');
 const { logger } = require('../../scripts/lib/core.cjs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { loadProjectStandards } = require('../../scripts/lib/config-loader.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
-const projectRoot = process.cwd();
+const argv = createStandardYargs().argv;
+const standards = loadProjectStandards();
 
-// --- Configuration ---
-const IGNORE_DIRS = [
-  '.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.nuxt',
-  'vendor', 'bin', 'obj', '.idea', '.vscode', '.DS_Store', 'tmp', 'temp'
-];
-
-const IGNORE_EXTENSIONS = [
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2',
-  '.ttf', '.eot', '.mp4', '.mp3', '.pdf', '.zip', '.gz', '.tar', '.lock'
-];
-
-/**
- * Security Scanner Core Logic
- */
-function _scanFile(filePath) {
+function _scanFile(filePath, projectRoot) {
   if (isBinaryPath(filePath)) return null;
   return { file: path.relative(projectRoot, filePath), scanned: true };
 }
 
 runSkill('security-scanner', () => {
-    logger.success('Security Scan Started');
+    const projectRoot = path.resolve(argv.input || '.');
+    const files = getAllFiles(projectRoot);
+    const results = files.map(f => _scanFile(f, projectRoot)).filter(Boolean);
 
-    return {
-        projectRoot,
-        ignoreDirs: IGNORE_DIRS,
-        ignoreExtensions: IGNORE_EXTENSIONS,
-        status: 'scan_complete'
-    };
+    return { projectRoot, fileCount: results.length, status: 'scan_complete' };
 });

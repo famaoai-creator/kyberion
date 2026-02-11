@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const axios = require('axios');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { safeJsonParse } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('url', { alias: 'u', type: 'string', demandOption: true })
     .option('method', { alias: 'm', type: 'string', default: 'GET' })
     .option('headers', { alias: 'H', type: 'string', description: 'JSON string of headers' })

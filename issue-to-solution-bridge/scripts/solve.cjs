@@ -2,10 +2,9 @@
 const { execSync } = require('child_process');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('issue', { alias: 'i', type: 'string', description: 'GitHub issue number or URL' })
     .option('description', { alias: 'd', type: 'string', description: 'Issue description text' })
     .option('repo', { alias: 'r', type: 'string', description: 'Repository (owner/repo)' })

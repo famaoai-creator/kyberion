@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { requireArgs } = require('../../scripts/lib/validators.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option('name', { alias: 'n', type: 'string', describe: 'Project name', demandOption: true })
   .option('type', { alias: 't', type: 'string', choices: ['node', 'python', 'generic'], describe: 'Project type', demandOption: true })
   .option('out', { alias: 'o', type: 'string', describe: 'Output directory (defaults to ./<name>)' })

@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('dir', { alias: 'd', type: 'string', default: process.cwd(), describe: 'Project root directory' })
     .option('skill', { alias: 's', type: 'string', describe: 'Audit a single skill by name' })
     .option('min-score', { type: 'number', default: 0, describe: 'Minimum passing score (0-12)' })

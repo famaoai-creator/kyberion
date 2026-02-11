@@ -3,10 +3,9 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Repository directory' })
     .option('top', { alias: 'n', type: 'number', default: 10, description: 'Number of hotspots to show' })
     .option('since', { alias: 's', type: 'string', default: '3 months ago', description: 'Analyze since' })

@@ -7,7 +7,7 @@ const { hideBin } = require("yargs/helpers");
 const { runSkill } = require("../../scripts/lib/skill-wrapper.cjs");
 const { validateDirPath, requireArgs } = require("../../scripts/lib/validators.cjs");
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option("dir", { alias: "d", type: "string", describe: "Project directory to audit", demandOption: true })
   .option("out", { alias: "o", type: "string", describe: "Output file path" })
   .argv;

@@ -50,6 +50,27 @@ for (const dir of dirs) {
       errors++;
     }
   }
+
+  // --- Architectural Integrity Checks ---
+  const scriptDir = path.join(rootDir, dir, 'scripts');
+  if (fs.existsSync(scriptDir)) {
+    const scripts = fs.readdirSync(scriptDir).filter(f => f.endsWith('.cjs'));
+    for (const script of scripts) {
+      const content = fs.readFileSync(path.join(scriptDir, script), 'utf8');
+      
+      // Enforce common ignore lists
+      if (content.includes('const IGNORE_DIRS =') || content.includes('const ignorePatterns =')) {
+        logger.error(`${dir}: Hardcoded ignore lists found in ${script}. Migrate to config-loader.cjs`);
+        errors++;
+      }
+
+      // Enforce common CLI utils
+      if (content.includes('yargs(hideBin(process.argv))')) {
+        logger.error(`${dir}: Legacy yargs setup found in ${script}. Migrate to cli-utils.cjs`);
+        errors++;
+      }
+    }
+  }
 }
 
 logger.info(`Checked ${checked} skills`);

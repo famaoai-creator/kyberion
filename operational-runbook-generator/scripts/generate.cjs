@@ -7,7 +7,7 @@ const { hideBin } = require("yargs/helpers");
 const { runSkill } = require("../../scripts/lib/skill-wrapper.cjs");
 const { requireArgs } = require("../../scripts/lib/validators.cjs");
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
   .option("service", { alias: "s", type: "string", describe: "Service name", demandOption: true })
   .option("type", { alias: "t", type: "string", describe: "Runbook type", choices: ["deploy", "rollback", "incident", "scaling"], default: "deploy" })
   .option("out", { alias: "o", type: "string", describe: "Output file path" })

@@ -3,11 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = createStandardYargs()
     .option('file', { alias: 'f', type: 'string', demandOption: true })
     .option('key', { alias: 'k', type: 'string', description: 'OpenAI API Key' })
     .option('out', { alias: 'o', type: 'string' })

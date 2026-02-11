@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs'); const _path = require('path');
-const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const argv = yargs(hideBin(process.argv))
+ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const argv = createStandardYargs()
   .option('action', { alias: 'a', type: 'string', default: 'status', choices: ['status', 'list', 'download', 'search'], description: 'Action to perform' })
   .option('folder', { alias: 'f', type: 'string', default: '0', description: 'Box folder ID' })
   .option('query', { alias: 'q', type: 'string', description: 'Search query' })

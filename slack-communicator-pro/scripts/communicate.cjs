@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs'); const _path = require('path');
-const yargs = require('yargs/yargs'); const { hideBin } = require('yargs/helpers');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const argv = yargs(hideBin(process.argv))
+ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const argv = createStandardYargs()
   .option('action', { alias: 'a', type: 'string', default: 'status', choices: ['status', 'send', 'summary', 'alert'], description: 'Action' })
   .option('channel', { alias: 'c', type: 'string', default: '#general', description: 'Slack channel' })
   .option('input', { alias: 'i', type: 'string', description: 'Input message or JSON file' })
