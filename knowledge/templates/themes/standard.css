@@ -1,0 +1,15 @@
+/* standard.css - Gemini Pro Theme */
+body { 
+    font-family: 'Helvetica', 'Arial', sans-serif; 
+    padding: 50px; 
+    line-height: 1.8; 
+    color: #2c3e50; 
+}
+h1 { color: #2980b9; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+h2 { color: #2c3e50; margin-top: 30px; }
+code { background: #ecf0f1; padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
+pre { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 8px; font-family: 'Menlo', monospace; }
+table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+th, td { border: 1px solid #bdc3c7; padding: 12px; text-align: left; }
+th { background-color: #f8f9fa; }
+.executive-summary { border: 2px solid #2980b9; padding: 20px; background: #ebf5fb; border-radius: 10px; }

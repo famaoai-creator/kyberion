@@ -1,52 +1,57 @@
 #!/usr/bin/env node
+/**
+ * pdf-composer/scripts/compose.cjs
+ * Modernized PDF Composer using themes and @gemini/core.
+ */
+
 const fs = require('fs');
+const path = require('path');
 const puppeteer = require('puppeteer');
 const { marked } = require('marked');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath } = require('../../scripts/lib/validators.cjs');
+const { runSkillAsync } = require('@gemini/core');
+const { requireArgs, validateFilePath } = require('@gemini/core/validators');
 
-const argv = createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', demandOption: true })
-    .option('out', { alias: 'o', type: 'string', demandOption: true })
-    .argv;
+runSkillAsync('pdf-composer', async () => {
+    const args = requireArgs(['input', 'out']);
+    validateFilePath(args.input, 'input markdown');
 
-const CSS_STYLE = `
-<style>
-    body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 40px; line-height: 1.6; }
-    h1, h2, h3 { color: #333; }
-    code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; font-family: 'Courier New', monospace; }
-    pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
-    blockquote { border-left: 4px solid #ddd; padding-left: 15px; color: #666; }
-    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #f8f8f8; }
-</style>
-`;
+    const md = fs.readFileSync(args.input, 'utf8');
+    const htmlBody = marked.parse(md);
 
-runAsyncSkill('pdf-composer', async () => {
-    validateFilePath(argv.input, 'input markdown');
-    const mdContent = fs.readFileSync(argv.input, 'utf8');
+    // Load External Theme
+    const themePath = path.resolve(__dirname, '../../knowledge/templates/themes/standard.css');
+    const cssStyle = fs.existsSync(themePath) ? fs.readFileSync(themePath, 'utf8') : '';
+
     const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8">${CSS_STYLE}</head>
-    <body>
-        ${marked.parse(mdContent)}
-    </body>
-    </html>
-    `;
+<!DOCTYPE html>
+<html>
+<head>
+    <style>${cssStyle}</style>
+</head>
+<body>
+    ${htmlBody}
+</body>
+</html>`;
 
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+    console.log('[PDF] Launching browser...');
+    const browser = await puppeteer.launch({ headless: 'new' });
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    
     await page.pdf({
-        path: argv.out,
+        path: args.out,
         format: 'A4',
-        printBackground: true,
-        margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' }
+        margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' },
+        printBackground: true
     });
 
     await browser.close();
-    return { output: argv.out };
+    console.log(`[PDF] Success: ${args.out}`);
+
+    return { 
+        status: 'success', 
+        input: args.input, 
+        output: args.out,
+        theme: 'standard'
+    };
 });
