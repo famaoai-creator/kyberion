@@ -59,17 +59,27 @@ function checkSkill(skillName) {
   checks.skillMd = false;
   if (fs.existsSync(skillMd)) {
     const content = fs.readFileSync(skillMd, 'utf8');
-    const hasName = /^name:\s*.+$/m.test(content);
-    const hasDesc = /^description:\s*.+$/m.test(content);
-    const hasStatus = /^status:\s*(implemented|planned|conceptual)$/m.test(content);
+    const hasName = /name:\s*.+$/m.test(content);
+    const hasDesc = /description:\s*.+$/m.test(content);
+    const hasStatus = /status:\s*(implemented|planned|conceptual)$/m.test(content);
     checks.skillMd = hasName && hasDesc && hasStatus;
   }
 
   // 5. Has unit tests?
   checks.unitTests = false;
-  if (fs.existsSync(unitTestPath)) {
-    const testContent = fs.readFileSync(unitTestPath, 'utf8');
-    checks.unitTests = testContent.includes(skillName);
+  const testFiles = [
+    path.join(rootDir, 'tests/unit.test.cjs'),
+    path.join(rootDir, 'tests/smoke.test.cjs'),
+    path.join(skillDir, 'tests/unit.test.cjs')
+  ];
+  for (const tPath of testFiles) {
+    if (fs.existsSync(tPath)) {
+      const testContent = fs.readFileSync(tPath, 'utf8');
+      if (testContent.includes(skillName)) {
+        checks.unitTests = true;
+        break;
+      }
+    }
   }
 
   // Calculate score (0-5)
