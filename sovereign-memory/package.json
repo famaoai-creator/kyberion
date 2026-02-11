@@ -1,0 +1,13 @@
+{
+  "name": "sovereign-memory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-tier, persistent memory hub for sovereign knowledge.",
+  "scripts": {
+    "save": "node scripts/save.cjs",
+    "search": "node scripts/search.cjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  }
+}

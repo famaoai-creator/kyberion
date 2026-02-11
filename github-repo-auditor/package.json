@@ -1,0 +1,12 @@
+{
+  "name": "github-repo-auditor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Audits and classifies GitHub repositories into business solutions.",
+  "scripts": {
+    "audit": "node scripts/audit_repos.cjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  }
+}

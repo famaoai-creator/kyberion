@@ -34,7 +34,7 @@ function checkSkill(skillName) {
     const scripts = fs.readdirSync(scriptsDir).filter(f => /\.(cjs|js|mjs)$/.test(f));
     for (const script of scripts) {
       const content = fs.readFileSync(path.join(scriptsDir, script), 'utf8');
-      if (content.includes('runSkill') || content.includes('runSkillAsync')) {
+      if (content.includes('runSkill') || content.includes('runSkillAsync') || content.includes('runAsyncSkill')) {
         checks.skillWrapper = true;
         break;
       }
