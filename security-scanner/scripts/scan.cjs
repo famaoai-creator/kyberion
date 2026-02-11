@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * security-scanner/scripts/scan.cjs
- * Compliance-Aware Vulnerability Hunter
+ * Pure Engine - Decoupled from patterns and standards.
  */
 
 const fs = require('fs');
@@ -11,21 +11,28 @@ const { runSkill } = require('@gemini/core');
 const { requireArgs } = require('@gemini/core/validators');
 const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
-const DANGEROUS_PATTERNS = [
-    { name: 'eval_usage', regex: /eval\(.*\)/g, severity: 'high' },
-    { name: 'hardcoded_secret', regex: /(API_KEY|TOKEN|SECRET|PASSWORD)\s*[:=]\s*["'][A-Za-z0-9\-_]{16,}["']/gi, severity: 'critical' }
-];
-
 runSkill('security-scanner', () => {
     const argv = requireArgs(['dir']);
     const projectRoot = path.resolve(argv.dir);
-    const compliancePath = argv.compliance ? path.resolve(argv.compliance) : null;
+    const complianceTarget = argv.compliance; // e.g. 'fisc'
+
+    // 1. Load Knowledge (Patterns)
+    const patternsPath = path.resolve(__dirname, '../../knowledge/skills/security-scanner/vulnerability-patterns.json');
+    const patterns = JSON.parse(fs.readFileSync(patternsPath, 'utf8')).map(p => ({
+        ...p,
+        regex: new RegExp(p.regex, 'gi')
+    }));
+
+    // 2. Load Compliance Mapping
+    const mappingPath = path.resolve(__dirname, '../../knowledge/skills/security-scanner/compliance-mapping.json');
+    const mappings = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
 
     const files = getAllFiles(projectRoot);
     let allFindings = [];
     let scannedCount = 0;
     let fullContentText = "";
 
+    // 3. Main Scanning Loop
     files.forEach(file => {
         if (isBinaryPath(file) || file.includes('node_modules') || file.includes('.git') || file.includes('work/archive')) return;
         
@@ -34,14 +41,15 @@ runSkill('security-scanner', () => {
             fullContentText += content + "\n";
             const relativePath = path.relative(projectRoot, file);
             
-            DANGEROUS_PATTERNS.forEach(pattern => {
-                pattern.regex.lastIndex = 0;
-                const matches = content.matchAll(pattern.regex);
+            patterns.forEach(p => {
+                p.regex.lastIndex = 0;
+                const matches = content.matchAll(p.regex);
                 for (const _ of matches) {
                     allFindings.push({
                         file: relativePath,
-                        pattern: pattern.name,
-                        severity: pattern.severity
+                        pattern: p.name,
+                        severity: p.severity,
+                        suggestion: p.suggestion
                     });
                 }
             });
@@ -49,23 +57,16 @@ runSkill('security-scanner', () => {
         } catch (e) { }
     });
 
-    // --- Compliance Audit (FISC) ---
-    if (compliancePath && fs.existsSync(compliancePath)) {
-        const standard = fs.readFileSync(compliancePath, 'utf8');
-        const controls = [
-            { name: 'Encryption at Rest', keywords: ['kms', 'encrypt', 'encrypted', 'vault'], severity: 'high' },
-            { name: 'Log Management', keywords: ['log', 'logger', 'winston', 'cloudtrail'], severity: 'medium' },
-            { name: 'MFA/IAM', keywords: ['mfa', 'iam', 'auth'], severity: 'high' }
-        ];
-
-        controls.forEach(ctrl => {
+    // 4. Compliance Logic (Data-Driven)
+    if (complianceTarget && mappings[complianceTarget]) {
+        mappings[complianceTarget].forEach(ctrl => {
             const found = ctrl.keywords.some(k => fullContentText.toLowerCase().includes(k));
             if (!found) {
                 allFindings.push({
-                    file: 'Project Architecture/Code',
+                    file: 'Project-wide',
                     pattern: `Missing Compliance Control: ${ctrl.name}`,
                     severity: ctrl.severity,
-                    suggestion: `FISC standard requires ${ctrl.name}. Please implement corresponding logic/infra.`
+                    suggestion: `${complianceTarget.toUpperCase()} standard requires ${ctrl.name}.`
                 });
             }
         });

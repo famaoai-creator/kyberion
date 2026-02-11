@@ -1,0 +1,8 @@
+{
+  "scoring_rules": {
+    "min_length": { "threshold": 50, "penalty": 20, "message": "Content is too short for high-fidelity analysis." },
+    "max_length": { "threshold": 10000, "penalty": 10, "message": "Content is very long, consider breaking it down." },
+    "avg_sentence_length": { "threshold": 100, "penalty": 10, "message": "Sentences are too long, reducing readability." }
+  },
+  "standard": "IPA Readability Level 2"
+}

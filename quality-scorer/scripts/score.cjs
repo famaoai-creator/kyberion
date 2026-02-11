@@ -1,31 +1,41 @@
 #!/usr/bin/env node
-
 const fs = require('fs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath } = require('../../scripts/lib/validators.cjs');
-
-const argv = createStandardYargs().option('input', { alias: 'i', type: 'string' }).argv;
+const path = require('path');
+const { runSkill } = require('@gemini/core');
+const { requireArgs, validateFilePath } = require('@gemini/core/validators');
 
 runSkill('quality-scorer', () => {
+    const argv = requireArgs(['input']);
     const inputPath = validateFilePath(argv.input, 'input');
     const content = fs.readFileSync(inputPath, 'utf8');
 
-    // Metrics
-    const charCount = content.length;
-    const lines = content.split('\n').length;
-    const sentences = content.split(/[.?!。？！]/).length;
+    // Load Knowledge
+    const rulesPath = path.resolve(__dirname, '../../knowledge/skills/quality-scorer/rules.json');
+    const { scoring_rules } = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
 
-    // Heuristic scoring (0-100)
+    const charCount = content.length;
+    const sentences = content.split(/[.?!。？！]/).filter(Boolean).length;
+    const avgLen = sentences > 0 ? charCount / sentences : 0;
+
     let score = 100;
     const issues = [];
 
-    if (charCount < 50) { score -= 20; issues.push('Too short'); }
-    if (charCount > 10000) { score -= 10; issues.push('Very long'); }
+    if (charCount < scoring_rules.min_length.threshold) {
+        score -= scoring_rules.min_length.penalty;
+        issues.push(scoring_rules.min_length.message);
+    }
+    if (charCount > scoring_rules.max_length.threshold) {
+        score -= scoring_rules.max_length.penalty;
+        issues.push(scoring_rules.max_length.message);
+    }
+    if (avgLen > scoring_rules.avg_sentence_length.threshold) {
+        score -= scoring_rules.avg_sentence_length.penalty;
+        issues.push(scoring_rules.avg_sentence_length.message);
+    }
 
-    // Avg sentence length
-    const avgLen = charCount / sentences;
-    if (avgLen > 100) { score -= 10; issues.push('Sentences are too long on average'); }
-
-    return { score, metrics: { charCount, lines, avgLen }, issues };
+    return { 
+        score: Math.max(0, score), 
+        metrics: { charCount, sentences, avgLen }, 
+        issues 
+    };
 });

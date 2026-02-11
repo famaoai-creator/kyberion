@@ -1,0 +1,8 @@
+{
+  "system_id": "backlog",
+  "api_version": "v2",
+  "endpoints": {
+    "issues": "/api/v2/issues"
+  },
+  "credential_pattern": "API Key`: `([^`]+)`"
+}
