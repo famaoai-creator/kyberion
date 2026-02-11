@@ -278,6 +278,6 @@ try {
   logger.success(`Generated ${manifestFile}`);
 
   logger.info('Knowledge index generation complete.');
-} catch (err) {
+} catch (_err) {
   errorHandler(err, 'Knowledge Index Generation Failed');
 }

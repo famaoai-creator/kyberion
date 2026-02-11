@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project root directory' })
   .option('query', { alias: 'q', type: 'string', description: 'Context query to resolve' })
@@ -13,26 +13,20 @@ function scanKnowledgeTiers(dir) {
   const tiers = { public: [], confidential: [], personal: [] };
   const knowledgeDir = path.join(dir, 'knowledge');
   if (!fs.existsSync(knowledgeDir)) return tiers;
-  function walk(d, tier, depth) {
-    if (depth > 4) return;
-    try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.')) continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) {
-          let t = tier;
-          if (e.name === 'personal') t = 'personal';
-          else if (e.name === 'confidential' || e.name === 'company' || e.name === 'client') t = 'confidential';
-          walk(full, t, depth + 1);
-          continue;
-        }
-        if (['.md','.json','.yaml','.yml'].includes(path.extname(e.name))) {
-          tiers[tier].push({ path: path.relative(dir, full), name: e.name, tier });
-        }
-      }
-    } catch(_e){}
+
+  const allFiles = getAllFiles(knowledgeDir, { maxDepth: 4 });
+  for (const full of allFiles) {
+    const relativeToKnowledge = path.relative(knowledgeDir, full);
+    const parts = relativeToKnowledge.split(path.sep);
+    
+    let tier = 'public';
+    if (parts.includes('personal')) tier = 'personal';
+    else if (parts.some(p => ['confidential', 'company', 'client'].includes(p))) tier = 'confidential';
+
+    if (['.md', '.json', '.yaml', '.yml'].includes(path.extname(full))) {
+      tiers[tier].push({ path: path.relative(dir, full), name: path.basename(full), tier });
+    }
   }
-  walk(knowledgeDir, 'public', 0);
   return tiers;
 }
 

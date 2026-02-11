@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
@@ -66,26 +66,18 @@ function checkProvenance(components) {
 
 function scanForMalicious(dir) {
   const findings = [];
-  function walk(d, depth) {
-    if (depth > 3) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 3 });
+  for (const full of allFiles) {
+    if (!['.js', '.cjs', '.mjs', '.sh'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth+1); continue; }
-        if (!['.js','.cjs','.mjs','.sh'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          for (const rule of SUSPICIOUS_PATTERNS) {
-            if (rule.pattern.test(content)) {
-              findings.push({ file: path.relative(dir, full), risk: rule.risk, severity: rule.severity });
-            }
-          }
-        } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      for (const rule of SUSPICIOUS_PATTERNS) {
+        if (rule.pattern.test(content)) {
+          findings.push({ file: path.relative(dir, full), risk: rule.risk, severity: rule.severity });
+        }
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return findings;
 }
 

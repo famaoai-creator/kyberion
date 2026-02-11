@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('skill', { alias: 's', type: 'string', demandOption: true, description: 'Skill name to analyze for evolution' })
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project root' })
@@ -41,21 +41,14 @@ function checkWorkLogs(dir, skillName) {
   const workDir = path.join(dir, 'work');
   const logs = [];
   if (fs.existsSync(workDir)) {
-    function walk(d, depth) {
-      if (depth > 2) return;
+    const allFiles = getAllFiles(workDir, { maxDepth: 2 });
+    for (const full of allFiles) {
+      if (!full.endsWith('.json')) continue;
       try {
-        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-          const full = path.join(d, e.name);
-          if (e.isDirectory()) { walk(full, depth + 1); continue; }
-          if (!e.name.endsWith('.json')) continue;
-          try {
-            const data = JSON.parse(fs.readFileSync(full, 'utf8'));
-            if (data.skill === skillName) logs.push({ file: path.relative(dir, full), status: data.status, timestamp: data.metadata?.timestamp });
-          } catch(_e){}
-        }
-      } catch(_e){}
+        const data = JSON.parse(fs.readFileSync(full, 'utf8'));
+        if (data.skill === skillName) logs.push({ file: path.relative(dir, full), status: data.status, timestamp: data.metadata?.timestamp });
+      } catch (_e) {}
     }
-    walk(workDir, 0);
   }
   return logs;
 }

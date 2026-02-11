@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
@@ -35,20 +35,14 @@ function assessInfraEnergy(dir) {
 
 function findWaste(dir) {
   const waste = [];
-  function walk(d, depth) {
-    if (depth > 3) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 3 });
+  for (const full of allFiles) {
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name === 'node_modules' || e.name === '.git') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        const stat = fs.statSync(full);
-        if (stat.size > 10 * 1024 * 1024) waste.push({ file: path.relative(dir, full), size: stat.size, issue: 'Large file (>10MB) - consider compression or external storage' });
-        if (/\.(log|tmp|bak|old|orig)$/.test(e.name)) waste.push({ file: path.relative(dir, full), size: stat.size, issue: 'Temporary/log file in repository' });
-      }
-    } catch(_e){}
+      const stat = fs.statSync(full);
+      if (stat.size > 10 * 1024 * 1024) waste.push({ file: path.relative(dir, full), size: stat.size, issue: 'Large file (>10MB) - consider compression or external storage' });
+      if (/\.(log|tmp|bak|old|orig)$/.test(path.basename(full))) waste.push({ file: path.relative(dir, full), size: stat.size, issue: 'Temporary/log file in repository' });
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return waste;
 }
 

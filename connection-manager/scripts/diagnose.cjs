@@ -41,7 +41,7 @@ runSkill('connection-manager', () => {
                 const config = JSON.parse(content);
                 const hasKeys = Object.keys(config).length > 0;
                 results.push({ service: service.toUpperCase(), status: hasKeys ? 'valid' : 'empty_object', configPath });
-            } catch (err) {
+            } catch (_err) {
                 if (err.code === 'EACCES') {
                     results.push({ service: service.toUpperCase(), status: 'permission_denied', configPath });
                 } else if (err instanceof SyntaxError) {

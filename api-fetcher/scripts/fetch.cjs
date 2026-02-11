@@ -33,7 +33,7 @@ runAsyncSkill('api-fetcher', async () => {
     let response;
     try {
         response = await axios(config);
-    } catch (err) {
+    } catch (_err) {
         if (err.code === 'ECONNABORTED') {
             throw new Error(`Request timed out after 30s: ${argv.url}`);
         }

@@ -43,7 +43,6 @@ function audit() {
       const lastPush = new Date(repo.pushedAt);
       
       // Classify
-      const classified = false;
       if (name.includes('project_a-') || name.includes('project_b_') || name.includes('generic_whitelabel') || name.includes('generic_banking_api')) {
         mapping['Customer Portal (CP)'].push(repo);
       } else if (name.includes('auth_sys')) {
@@ -86,8 +85,8 @@ function audit() {
     fs.writeFileSync('work/github_audit_report.json', JSON.stringify(result, null, 2));
     console.log('\nDetailed report updated in work/github_audit_report.json');
 
-  } catch (error) {
-    console.error('Error during audit:', error.message);
+  } catch (_error) {
+    console.error('Error during audit:', _error.message);
     process.exit(1);
   }
 }

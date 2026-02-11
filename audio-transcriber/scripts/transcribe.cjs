@@ -51,7 +51,7 @@ runAsyncSkill('audio-transcriber', async () => {
             timeout: 120000, // 2 minute timeout for transcription
             maxContentLength: 50 * 1024 * 1024,
         });
-    } catch (err) {
+    } catch (_err) {
         if (err.code === 'ECONNABORTED') {
             throw new Error('Transcription request timed out after 120s');
         }

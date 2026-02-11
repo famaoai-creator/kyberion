@@ -56,7 +56,7 @@ runSkill('release-note-crafter', () => {
   let logOutput;
   try {
     logOutput = execSync(gitCmd, { cwd: repoDir, encoding: 'utf8', timeout: 30000 });
-  } catch (err) {
+  } catch (_err) {
     throw new Error(`Failed to run git log: ${err.message}`);
   }
 

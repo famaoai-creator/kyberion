@@ -56,16 +56,16 @@ for (const dir of dirs) {
   if (fs.existsSync(scriptDir)) {
     const scripts = fs.readdirSync(scriptDir).filter(f => f.endsWith('.cjs'));
     for (const script of scripts) {
-      const content = fs.readFileSync(path.join(scriptDir, script), 'utf8');
+      const scriptContent = fs.readFileSync(path.join(scriptDir, script), 'utf8');
       
       // Enforce common ignore lists
-      if (content.includes('const IGNORE_DIRS =') || content.includes('const ignorePatterns =')) {
+      if (scriptContent.includes('const IGNORE_DIRS =') || scriptContent.includes('const ignorePatterns =')) {
         logger.error(`${dir}: Hardcoded ignore lists found in ${script}. Migrate to config-loader.cjs`);
         errors++;
       }
 
       // Enforce common CLI utils
-      if (content.includes('yargs(hideBin(process.argv))')) {
+      if (scriptContent.includes('yargs(hideBin(process.argv))')) {
         logger.error(`${dir}: Legacy yargs setup found in ${script}. Migrate to cli-utils.cjs`);
         errors++;
       }

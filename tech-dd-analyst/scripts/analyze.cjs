@@ -9,7 +9,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory to analyze' })
@@ -19,22 +19,18 @@ const argv = createStandardYargs()
 function assessCodeQuality(dir) {
   let totalFiles = 0, totalLines = 0;
   const languages = {};
-  function walk(d, depth) {
-    if (depth > 5) return;
-    try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        const ext = path.extname(e.name).toLowerCase();
-        if (['.js','.cjs','.ts','.tsx','.py','.go','.rs','.java','.rb'].includes(ext)) {
-          try { totalLines += fs.readFileSync(full,'utf8').split('\n').length; totalFiles++; languages[ext] = (languages[ext]||0)+1; } catch(_e){}
-        }
-      }
-    } catch(_e){}
+  const allFiles = getAllFiles(dir, { maxDepth: 5 });
+  for (const full of allFiles) {
+    const ext = path.extname(full).toLowerCase();
+    if (['.js', '.cjs', '.ts', '.tsx', '.py', '.go', '.rs', '.java', '.rb'].includes(ext)) {
+      try {
+        totalLines += fs.readFileSync(full, 'utf8').split('\n').length;
+        totalFiles++;
+        languages[ext] = (languages[ext] || 0) + 1;
+      } catch (_e) {}
+    }
   }
-  walk(dir, 0);
-  return { totalFiles, totalLines, avgFileSize: totalFiles > 0 ? Math.round(totalLines/totalFiles) : 0, languages };
+  return { totalFiles, totalLines, avgFileSize: totalFiles > 0 ? Math.round(totalLines / totalFiles) : 0, languages };
 }
 
 function assessTeamMaturity(dir) {

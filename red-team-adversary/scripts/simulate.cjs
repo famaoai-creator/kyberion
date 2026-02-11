@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('scope', { alias: 's', type: 'string', default: 'recon', choices: ['recon', 'static', 'full'], description: 'Assessment scope' })
@@ -22,45 +22,30 @@ const ATTACK_VECTORS = [
 
 function performRecon(dir) {
   const recon = { publicEndpoints: [], configFiles: [], sensitiveFiles: [] };
-  function walk(d, depth) {
-    if (depth > 3) return;
-    try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name === 'node_modules' || e.name === '.git') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        const rel = path.relative(dir, full);
-        if (/\.env|credentials|secrets|\.pem|\.key$/i.test(e.name)) recon.sensitiveFiles.push(rel);
-        if (/config|setting/i.test(e.name) && /\.(json|yml|yaml|toml)$/.test(e.name)) recon.configFiles.push(rel);
-        if (/routes|controller|handler|endpoint/i.test(e.name)) recon.publicEndpoints.push(rel);
-      }
-    } catch(_e){}
+  const allFiles = getAllFiles(dir, { maxDepth: 3 });
+  for (const full of allFiles) {
+    const rel = path.relative(dir, full);
+    const name = path.basename(full);
+    if (/\.env|credentials|secrets|\.pem|\.key$/i.test(name)) recon.sensitiveFiles.push(rel);
+    if (/config|setting/i.test(name) && /\.(json|yml|yaml|toml)$/.test(name)) recon.configFiles.push(rel);
+    if (/routes|controller|handler|endpoint/i.test(name)) recon.publicEndpoints.push(rel);
   }
-  walk(dir, 0);
   return recon;
 }
 
 function staticAnalysis(dir) {
   const vulnerabilities = [];
-  function walk(d, depth) {
-    if (depth > 4) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 4 });
+  for (const full of allFiles) {
+    if (!['.js', '.cjs', '.ts', '.tsx', '.jsx'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (!['.js','.cjs','.ts','.tsx','.jsx'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          for (const vector of ATTACK_VECTORS) {
-            const matches = content.match(vector.pattern);
-            if (matches) vulnerabilities.push({ file: path.relative(dir, full), vector: vector.id, category: vector.category, severity: vector.severity, occurrences: matches.length });
-          }
-        } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      for (const vector of ATTACK_VECTORS) {
+        const matches = content.match(vector.pattern);
+        if (matches) vulnerabilities.push({ file: path.relative(dir, full), vector: vector.id, category: vector.category, severity: vector.severity, occurrences: matches.length });
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return vulnerabilities;
 }
 

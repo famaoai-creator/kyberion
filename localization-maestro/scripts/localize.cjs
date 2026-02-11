@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('locale', { alias: 'l', type: 'string', description: 'Target locale (e.g., ja, fr, de)' })
@@ -20,35 +20,34 @@ function scanForI18n(dir) {
         const files = fs.readdirSync(path.join(dir, localeDir));
         findings.localeFiles = files;
         findings.supportedLocales = files.map(f => path.basename(f, path.extname(f))).filter(n => /^[a-z]{2}(-[A-Z]{2})?$/.test(n));
-      } catch(_e){}
+      } catch (_e) {}
     }
   }
   // Check for i18n libraries
   const pkgPath = path.join(dir, 'package.json');
   if (exists('package.json')) {
     try {
-      const deps = Object.keys({ ...JSON.parse(fs.readFileSync(pkgPath, 'utf8')).dependencies || {} });
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      const deps = Object.keys({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) });
       if (deps.some(d => /i18next|react-intl|vue-i18n|next-intl|formatjs/i.test(d))) { findings.framework = deps.find(d => /i18n/i.test(d)); findings.i18nReady = true; }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  // Scan for hardcoded strings in source
-  function walk(d, depth) {
-    if (depth > 3) return;
+  // Scan for hardcoded strings in source using common getAllFiles
+  const allFiles = getAllFiles(dir, { maxDepth: 3 });
+  for (const full of allFiles) {
+    if (!['.jsx', '.tsx', '.vue', '.svelte'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (!['.jsx','.tsx','.vue','.svelte'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          const matches = content.match(/>[\s]*[A-Z][a-z][\w\s]{5,50}[\s]*</g);
-          if (matches) findings.hardcodedStrings.push({ file: path.relative(dir, full), count: matches.length, samples: matches.slice(0, 3).map(m => m.replace(/[<>]/g, '').trim()) });
-        } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      const matches = content.match(/>[\s]*[A-Z][a-z][\w\s]{5,50}[\s]*</g);
+      if (matches) {
+        findings.hardcodedStrings.push({
+          file: path.relative(dir, full),
+          count: matches.length,
+          samples: matches.slice(0, 3).map(m => m.replace(/[<>]/g, '').trim())
+        });
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return findings;
 }
 

@@ -193,7 +193,7 @@ runSkill('dependency-lifeline', () => {
   let pkgJson;
   try {
     pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-  } catch (err) {
+  } catch (_err) {
     throw new Error(`Failed to parse package.json: ${err.message}`);
   }
 

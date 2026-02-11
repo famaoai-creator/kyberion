@@ -31,7 +31,7 @@ function installPlugin(packageName) {
 
   try {
     execSync(`npm install ${packageName}`, { cwd: rootDir, stdio: 'pipe' });
-  } catch (err) {
+  } catch (_err) {
     logger.error(`Failed to install ${packageName}: ${err.message}`);
     process.exit(1);
   }

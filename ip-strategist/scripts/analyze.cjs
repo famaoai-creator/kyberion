@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory to analyze' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
@@ -18,27 +18,19 @@ const IP_INDICATORS = [
 
 function scanForIP(dir) {
   const findings = [];
-  function walk(d, depth) {
-    if (depth > 4) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 4 });
+  for (const full of allFiles) {
+    if (!['.js', '.cjs', '.ts', '.py', '.go', '.rs', '.java', '.md'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (!['.js','.cjs','.ts','.py','.go','.rs','.java','.md'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          for (const indicator of IP_INDICATORS) {
-            const matches = content.match(indicator.pattern);
-            if (matches && matches.length > 0) {
-              findings.push({ file: path.relative(dir, full), category: indicator.category, patentable: indicator.patentable, matchCount: matches.length, samples: [...new Set(matches)].slice(0, 3) });
-            }
-          }
-        } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      for (const indicator of IP_INDICATORS) {
+        const matches = content.match(indicator.pattern);
+        if (matches && matches.length > 0) {
+          findings.push({ file: path.relative(dir, full), category: indicator.category, patentable: indicator.patentable, matchCount: matches.length, samples: [...new Set(matches)].slice(0, 3) });
+        }
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return findings;
 }
 

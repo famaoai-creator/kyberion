@@ -9,7 +9,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
   .option('dir', {
@@ -34,28 +34,19 @@ const argv = createStandardYargs()
 
 function analyzeCodeComplexity(dir) {
   const stats = { totalFiles: 0, totalLines: 0, avgFileSize: 0, largeFiles: [], languages: {} };
-  function walk(d, depth) {
-    if (depth > 5) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 5 });
+  for (const full of allFiles) {
+    const ext = path.extname(full).toLowerCase();
+    if (!['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.rs', '.java', '.rb', '.php'].includes(ext)) continue;
     try {
-      const entries = fs.readdirSync(d, { withFileTypes: true });
-      for (const e of entries) {
-        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist' || e.name === 'build') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        const ext = path.extname(e.name).toLowerCase();
-        if (!['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.rs', '.java', '.rb', '.php'].includes(ext)) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          const lines = content.split('\n').length;
-          stats.totalFiles++;
-          stats.totalLines += lines;
-          stats.languages[ext] = (stats.languages[ext] || 0) + 1;
-          if (lines > 300) stats.largeFiles.push({ file: path.relative(dir, full), lines });
-        } catch (_e) { /* skip */ }
-      }
+      const content = fs.readFileSync(full, 'utf8');
+      const lines = content.split('\n').length;
+      stats.totalFiles++;
+      stats.totalLines += lines;
+      stats.languages[ext] = (stats.languages[ext] || 0) + 1;
+      if (lines > 300) stats.largeFiles.push({ file: path.relative(dir, full), lines });
     } catch (_e) { /* skip */ }
   }
-  walk(dir, 0);
   stats.avgFileSize = stats.totalFiles > 0 ? Math.round(stats.totalLines / stats.totalFiles) : 0;
   stats.largeFiles.sort((a, b) => b.lines - a.lines);
   stats.largeFiles = stats.largeFiles.slice(0, 10);
@@ -75,21 +66,12 @@ function detectTechDebt(dir) {
       indicators.push({ file: rel, todos: todoCount, hacks: hackCount, fixmes: fixmeCount, deprecated: deprecatedCount });
     }
   }
-  function walk(d, depth) {
-    if (depth > 5) return;
-    try {
-      const entries = fs.readdirSync(d, { withFileTypes: true });
-      for (const e of entries) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (e.name.match(/\.(js|cjs|mjs|ts|tsx|py|go|rs|java)$/)) {
-          try { scanFile(full, fs.readFileSync(full, 'utf8')); } catch (_e) { /* skip */ }
-        }
-      }
-    } catch (_e) { /* skip */ }
+  const allFiles = getAllFiles(dir, { maxDepth: 5 });
+  for (const full of allFiles) {
+    if (path.basename(full).match(/\.(js|cjs|mjs|ts|tsx|py|go|rs|java)$/)) {
+      try { scanFile(full, fs.readFileSync(full, 'utf8')); } catch (_e) { /* skip */ }
+    }
   }
-  walk(dir, 0);
   const totalTodos = indicators.reduce((s, i) => s + i.todos, 0);
   const totalHacks = indicators.reduce((s, i) => s + i.hacks, 0);
   const totalFixmes = indicators.reduce((s, i) => s + i.fixmes, 0);

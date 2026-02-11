@@ -31,7 +31,7 @@ tiers.forEach(tier => {
       const result = execSync(`grep -rEi "${query}" "${tier.path}"`, { encoding: 'utf8' });
       console.log(`\n[${tier.name.toUpperCase()} Tier]`);
       console.log(result);
-    } catch (error) {
+    } catch (_error) {
       // Not found
     }
   }

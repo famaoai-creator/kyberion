@@ -105,7 +105,7 @@ try {
     
     console.log(JSON.stringify({ lang: bestLang, confidence: maxScore > 0 ? 0.8 : 0, method: 'keyword' }));
 
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // 2. doc-type-classifier
@@ -138,7 +138,7 @@ try {
     }
 
     console.log(JSON.stringify({ type: bestType, confidence: maxScore / 5, matches: maxScore }));
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // 3. intent-classifier
@@ -166,7 +166,7 @@ try {
         if (score > maxScore) { maxScore = score; bestIntent = intent; }
     }
     console.log(JSON.stringify({ intent: bestIntent, confidence: maxScore > 0 ? 0.7 : 0 }));
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // 4. domain-classifier
@@ -194,7 +194,7 @@ try {
         if (score > maxScore) { maxScore = score; bestDomain = domain; }
     }
     console.log(JSON.stringify({ domain: bestDomain, confidence: maxScore > 0 ? 0.6 : 0 }));
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // 5. quality-scorer
@@ -224,5 +224,5 @@ try {
     if (avgLen > 100) { score -= 10; issues.push('Sentences are too long on average'); }
 
     console.log(JSON.stringify({ score, metrics: { charCount, lines, avgLen }, issues }));
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);

@@ -87,7 +87,7 @@ try {
     const hits = searchFiles(targetDir, argv.query);
     console.log(JSON.stringify(hits, null, 2));
 
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // context-injector
@@ -117,7 +117,7 @@ try {
     } else {
         console.log(output);
     }
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);
 
 // glossary-resolver
@@ -150,5 +150,5 @@ try {
     } else {
         console.log(content);
     }
-} catch (e) { console.error(JSON.stringify({ error: e.message })); }
+} catch (_e) { console.error(JSON.stringify({ error: e.message })); }
 `);

@@ -19,7 +19,7 @@ const tierPath = path.join(process.cwd(), 'knowledge', tier);
 function runGit(cmd, cwd) {
   try {
     return execSync(`git ${cmd}`, { cwd, encoding: 'utf8' });
-  } catch (e) {
+  } catch (_e) {
     console.error(`Git error in ${cwd}:`, e.message);
     process.exit(1);
   }

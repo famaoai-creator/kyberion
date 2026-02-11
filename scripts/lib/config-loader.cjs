@@ -9,7 +9,7 @@ function loadProjectStandards() {
   try {
     const data = fs.readFileSync(configPath, 'utf8');
     return JSON.parse(data);
-  } catch (e) {
+  } catch (_e) {
     // Fallback defaults if config is missing
     return {
       ignore_dirs: ['.git', 'node_modules', '.DS_Store'],

@@ -6,7 +6,7 @@ const { walk } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs().argv;
 
-function buildTreeLines(dir, depth = 0) {
+function buildTreeLines(dir, _depth = 0) {
     const lines = [];
     const files = walk(dir, { maxDepth: parseInt(process.argv[3] || '3', 10) });
 

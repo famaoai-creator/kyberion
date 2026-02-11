@@ -39,7 +39,7 @@ for (const skill of IMPLEMENTED_SKILLS) {
     execSync(`node --check "${scriptPath}"`, { timeout: 5000, stdio: 'pipe' });
     console.log(`  pass  ${skill.name}/${skill.script}`);
     passed++;
-  } catch (err) {
+  } catch (_err) {
     console.error(`  FAIL  ${skill.name}/${skill.script}: ${err.message.split('\n')[0]}`);
     failures.push(skill.name);
     failed++;

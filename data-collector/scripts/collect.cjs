@@ -84,7 +84,7 @@ runAsyncSkill('data-collector', async () => {
                 timeout: 60000,
                 maxContentLength: 100 * 1024 * 1024, // 100MB limit
             });
-        } catch (err) {
+        } catch (_err) {
             if (err.code === 'ECONNABORTED') {
                 throw new Error(`Download timed out after 60s: ${url}`);
             }

@@ -25,7 +25,7 @@ async function fetchAllIssues() {
             
             if (issues.length < count) break;
             offset += count;
-        } catch (e) {
+        } catch (_e) {
             console.error('Fetch failed:', e.message);
             break;
         }

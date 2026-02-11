@@ -26,7 +26,7 @@ function test(name, fn) {
     fn();
     console.log(`  pass  ${name}`);
     passed++;
-  } catch (err) {
+  } catch (_err) {
     console.error(`  FAIL  ${name}: ${err.message}`);
     failures.push(name);
     failed++;
@@ -1007,7 +1007,7 @@ test('format-detector on nonexistent file produces parseable error envelope', ()
     const cmd = `node "${path.join(rootDir, 'format-detector/scripts/detect.cjs')}" -i "${nonexistentFile}"`;
     execSync(cmd, { encoding: 'utf8', cwd: rootDir, timeout: 15000, stdio: 'pipe' });
     assert(false, 'Expected the command to throw on nonexistent file');
-  } catch (err) {
+  } catch (_err) {
     // execSync throws on non-zero exit code; stdout contains the JSON envelope
     errorOutput = err.stdout || err.stderr || '';
   }
@@ -1033,7 +1033,7 @@ test('quality-scorer on nonexistent file produces parseable error envelope', () 
     const cmd = `node "${path.join(rootDir, 'quality-scorer/scripts/score.cjs')}" -i "${nonexistentFile}"`;
     execSync(cmd, { encoding: 'utf8', cwd: rootDir, timeout: 15000, stdio: 'pipe' });
     assert(false, 'Expected the command to throw on nonexistent file');
-  } catch (err) {
+  } catch (_err) {
     errorOutput = err.stdout || err.stderr || '';
   }
 
@@ -1054,7 +1054,7 @@ test('error propagation: error from format-detector does not crash quality-score
   try {
     const cmd = `node "${path.join(rootDir, 'format-detector/scripts/detect.cjs')}" -i "${nonexistentFile}"`;
     execSync(cmd, { encoding: 'utf8', cwd: rootDir, timeout: 15000, stdio: 'pipe' });
-  } catch (err) {
+  } catch (_err) {
     const output = err.stdout || '';
     if (output) formatError = JSON.parse(output);
   }

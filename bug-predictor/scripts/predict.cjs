@@ -26,7 +26,7 @@ function getChurnData(dir, since) {
             churn[file] = (churn[file] || 0) + 1;
         }
         return churn;
-    } catch (err) {
+    } catch (_err) {
         throw new Error(`Git analysis failed: ${err.message}. Is this a git repository?`);
     }
 }

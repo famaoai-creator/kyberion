@@ -52,7 +52,7 @@ runAsyncSkill('document-generator', async () => {
 
     try {
         return JSON.parse(result).data;
-    } catch (e) {
+    } catch (_e) {
         return { message: `Document generated successfully at ${argv.out}`, raw: result };
     }
 });

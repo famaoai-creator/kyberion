@@ -5,13 +5,11 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const { scanForConfidentialMarkers, detectTier } = require('../../scripts/lib/tier-guard.cjs');
 
 const MAX_DEPTH = 5;
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
-
-
 
 const argv = createStandardYargs()
   .option('dir', {
@@ -33,54 +31,6 @@ const argv = createStandardYargs()
   .strict()
   .help()
   .argv;
-
-/**
- * Recursively scan directory for files up to maxDepth.
- */
-function scanDirectory(dirPath, currentDepth) {
-  const files = [];
-  if (currentDepth > MAX_DEPTH) {
-    return files;
-  }
-
-  let entries;
-  try {
-    entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  } catch (_err) {
-    return files;
-  }
-
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-
-    if (entry.isDirectory()) {
-      if (!IGNORE_DIRS.has(entry.name)) {
-        const subFiles = scanDirectory(fullPath, currentDepth + 1);
-        files.push(...subFiles);
-      }
-    } else if (entry.isFile()) {
-      const ext = path.extname(entry.name).toLowerCase();
-      if (BINARY_EXTENSIONS.has(ext)) {
-        continue;
-      }
-
-      let stat;
-      try {
-        stat = fs.statSync(fullPath);
-      } catch (_err) {
-        continue;
-      }
-
-      if (stat.size > MAX_FILE_SIZE) {
-        continue;
-      }
-
-      files.push(fullPath);
-    }
-  }
-
-  return files;
-}
 
 /**
  * Classify a file by knowledge tier and detect markers.
@@ -174,9 +124,15 @@ function generateRecommendations(tiers, violations) {
 
 runSkill('knowledge-auditor', () => {
   const targetDir = path.resolve(argv.dir);
-  const files = scanDirectory(targetDir, 0);
+  const files = getAllFiles(targetDir, { maxDepth: MAX_DEPTH });
 
-  const classifications = files.map(f => classifyFile(f));
+  const classifications = files
+    .filter(f => {
+      try {
+        return fs.statSync(f).size <= MAX_FILE_SIZE;
+      } catch (_e) { return false; }
+    })
+    .map(f => classifyFile(f));
 
   const tiers = { public: 0, internal: 0, confidential: 0, personal: 0 };
   for (const item of classifications) {
@@ -185,8 +141,6 @@ runSkill('knowledge-auditor', () => {
     } else if (item.tier === 'confidential') {
       tiers.confidential++;
     } else {
-      // tier-guard returns 'public' for anything not in personal/confidential paths
-      // We treat it as 'internal' if it's under a recognizable internal path
       const rel = path.relative(targetDir, item.filePath);
       if (rel.includes('internal') || rel.includes('private')) {
         tiers.internal++;

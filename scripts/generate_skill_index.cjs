@@ -37,6 +37,6 @@ try {
     });
 
     logger.success(`Global Skill Index generated with ${skills.length} skills at ${indexFile}`);
-} catch (err) {
+} catch (_err) {
     errorHandler(err, 'Skill Index Generation Failed');
 }

@@ -32,7 +32,7 @@ function runTest(name, command, checkFile = null, expectError = false) {
         
         console.log(`✅ PASS`);
         passed++;
-    } catch (e) {
+    } catch (_e) {
         if (expectError) {
             // エラーが出た＝正常動作（APIキー無し等で正しくハンドリングされた）とみなす場合
             // ただし、SyntaxErrorなどのクリティカルなものでないか確認したいが、

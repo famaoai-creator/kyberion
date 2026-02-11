@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
@@ -10,29 +10,21 @@ const argv = createStandardYargs()
 
 function findDataSources(dir) {
   const sources = [];
-  function walk(d, depth) {
-    if (depth > 4) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 4 });
+  for (const full of allFiles) {
+    if (!['.js', '.cjs', '.ts', '.py', '.go', '.java'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (!['.js','.cjs','.ts','.py','.go','.java'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          const rel = path.relative(dir, full);
-          if (/(?:readFile|createReadStream|fs\.read|open\()/i.test(content)) sources.push({ file: rel, type: 'file_read', flow: 'input' });
-          if (/(?:writeFile|createWriteStream|fs\.write)/i.test(content)) sources.push({ file: rel, type: 'file_write', flow: 'output' });
-          if (/(?:SELECT|INSERT|UPDATE|DELETE|CREATE TABLE)/i.test(content)) sources.push({ file: rel, type: 'database', flow: 'bidirectional' });
-          if (/(?:fetch|axios|http\.get|request\()/i.test(content)) sources.push({ file: rel, type: 'api_call', flow: 'input' });
-          if (/(?:res\.json|res\.send|response\.write)/i.test(content)) sources.push({ file: rel, type: 'api_response', flow: 'output' });
-          if (/(?:localStorage|sessionStorage|cookie)/i.test(content)) sources.push({ file: rel, type: 'browser_storage', flow: 'bidirectional' });
-          if (/(?:process\.env|dotenv)/i.test(content)) sources.push({ file: rel, type: 'environment', flow: 'input' });
-        } catch(_e){}
-      }
-    } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      const rel = path.relative(dir, full);
+      if (/(?:readFile|createReadStream|fs\.read|open\()/i.test(content)) sources.push({ file: rel, type: 'file_read', flow: 'input' });
+      if (/(?:writeFile|createWriteStream|fs\.write)/i.test(content)) sources.push({ file: rel, type: 'file_write', flow: 'output' });
+      if (/(?:SELECT|INSERT|UPDATE|DELETE|CREATE TABLE)/i.test(content)) sources.push({ file: rel, type: 'database', flow: 'bidirectional' });
+      if (/(?:fetch|axios|http\.get|request\()/i.test(content)) sources.push({ file: rel, type: 'api_call', flow: 'input' });
+      if (/(?:res\.json|res\.send|response\.write)/i.test(content)) sources.push({ file: rel, type: 'api_response', flow: 'output' });
+      if (/(?:localStorage|sessionStorage|cookie)/i.test(content)) sources.push({ file: rel, type: 'browser_storage', flow: 'bidirectional' });
+      if (/(?:process\.env|dotenv)/i.test(content)) sources.push({ file: rel, type: 'environment', flow: 'input' });
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return sources;
 }
 

@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: 'knowledge', description: 'Knowledge base directory' })
@@ -18,24 +18,23 @@ const argv = createStandardYargs()
 
 function scanKnowledge(dir) {
   const files = [];
-  function walk(d, depth) {
-    if (depth > 5) return;
-    try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (['.md','.json','.yaml','.yml','.txt'].includes(path.extname(e.name).toLowerCase())) {
-          try {
-            const stat = fs.statSync(full);
-            const content = fs.readFileSync(full, 'utf8');
-            files.push({ path: path.relative(dir, full), size: stat.size, lines: content.split('\n').length, words: content.split(/\s+/).length, modified: stat.mtime.toISOString(), content });
-          } catch(_e){}
-        }
-      }
-    } catch(_e){}
+  const allFiles = getAllFiles(dir, { maxDepth: 5 });
+  for (const full of allFiles) {
+    if (['.md', '.json', '.yaml', '.yml', '.txt'].includes(path.extname(full).toLowerCase())) {
+      try {
+        const stat = fs.statSync(full);
+        const content = fs.readFileSync(full, 'utf8');
+        files.push({
+          path: path.relative(dir, full),
+          size: stat.size,
+          lines: content.split('\n').length,
+          words: content.split(/\s+/).length,
+          modified: stat.mtime.toISOString(),
+          content
+        });
+      } catch (_e) {}
+    }
   }
-  walk(dir, 0);
   return files;
 }
 

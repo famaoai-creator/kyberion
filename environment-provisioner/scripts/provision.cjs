@@ -119,14 +119,14 @@ function parseConfig(filePath) {
   if (ext === '.json') {
     try {
       return JSON.parse(content);
-    } catch (err) {
+    } catch (_err) {
       throw new Error(`Invalid JSON in ${filePath}: ${err.message}`);
     }
   }
 
   try {
     return yaml.load(content);
-  } catch (err) {
+  } catch (_err) {
     throw new Error(`Invalid YAML in ${filePath}: ${err.message}`);
   }
 }

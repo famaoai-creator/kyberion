@@ -27,7 +27,7 @@ function capture(fn) {
 
   try {
     fn();
-  } catch (e) {
+  } catch (_e) {
     if (!e.message.startsWith('ProcessExit')) throw e;
   } finally {
     process.stdout.write = originalStdout;
@@ -151,7 +151,7 @@ console.log('--- Coverage Boost: Skill Wrapper Help ---');
     assert.strictEqual(parsed.status, 'error');
     assert.ok(parsed.error.suggestion, 'Should have suggestion for missing module');
     assert.ok(parsed.error.suggestion.includes('npm install'), 'Suggestion should verify npm install');
-  } catch (e) {
+  } catch (_e) {
     console.error('Failed to parse JSON output:', jsonOutput);
     throw e;
   }

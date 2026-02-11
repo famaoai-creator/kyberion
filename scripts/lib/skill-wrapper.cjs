@@ -322,7 +322,7 @@ function wrapSkill(skillName, fn) {
   try {
     const output = buildOutput(skillName, 'success', fn(), startTime);
     return _runAfterHooks(skillName, output);
-  } catch (err) {
+  } catch (_err) {
     const output = buildOutput(skillName, 'error', err, startTime);
     return _runAfterHooks(skillName, output);
   }
@@ -340,7 +340,7 @@ async function wrapSkillAsync(skillName, fn) {
   try {
     const output = buildOutput(skillName, 'success', await fn(), startTime);
     return _runAfterHooks(skillName, output);
-  } catch (err) {
+  } catch (_err) {
     const output = buildOutput(skillName, 'error', err, startTime);
     return _runAfterHooks(skillName, output);
   }

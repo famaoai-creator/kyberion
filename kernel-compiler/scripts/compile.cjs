@@ -3,7 +3,7 @@ const fs = require('fs'); const path = require('path');
 const { execSync } = require('child_process');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('target', { alias: 't', type: 'string', default: 'node', choices: ['node', 'go', 'rust', 'docker'], description: 'Compilation target' })
@@ -21,18 +21,14 @@ function analyzeProject(dir) {
     analysis.dependencies = Object.keys(pkg.dependencies || {}).length;
     analysis.scripts = Object.keys(pkg.scripts || {});
   }
-  function walk(d, depth) {
-    if (depth > 3) return;
-    try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-        if (e.isDirectory()) { walk(path.join(d, e.name), depth + 1); continue; }
-        const ext = path.extname(e.name);
-        if (['.js','.cjs','.ts','.go','.rs','.py'].includes(ext)) analysis.languages[ext] = (analysis.languages[ext] || 0) + 1;
-      }
-    } catch(_e){}
+
+  const allFiles = getAllFiles(dir, { maxDepth: 3 });
+  for (const full of allFiles) {
+    const ext = path.extname(full);
+    if (['.js', '.cjs', '.ts', '.go', '.rs', '.py'].includes(ext)) {
+      analysis.languages[ext] = (analysis.languages[ext] || 0) + 1;
+    }
   }
-  walk(dir, 0);
   return analysis;
 }
 

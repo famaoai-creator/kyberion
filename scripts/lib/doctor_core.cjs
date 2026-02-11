@@ -64,7 +64,7 @@ const doctor = {
       } else {
         console.log(`⚠️  Confidential Tier: Not a symlink (Local directory mode)`);
       }
-    } catch (e) {
+    } catch (_e) {
       console.log(`❌ Confidential Tier: Missing (Run setup_ecosystem.sh)`);
     }
 
@@ -87,7 +87,7 @@ const doctor = {
           console.log(`❌ Security: ${item} is NOT in .gitignore! CRITICAL RISK.`);
         }
       });
-    } catch (e) {
+    } catch (_e) {
       console.log(`❌ Security: .gitignore not found at root`);
     }
   },
@@ -113,7 +113,7 @@ const doctor = {
         } else {
           console.log(`⚠️  Inventory is empty.`);
         }
-      } catch (e) {
+      } catch (_e) {
         console.log(`❌ Failed to parse connection inventory.`);
       }
     } else {

@@ -296,7 +296,7 @@ runSkill('performance-monitor-analyst', () => {
   let data;
   try {
     data = JSON.parse(fs.readFileSync(resolved, 'utf8'));
-  } catch (err) {
+  } catch (_err) {
     throw new Error(`Failed to parse JSON: ${err.message}`);
   }
 

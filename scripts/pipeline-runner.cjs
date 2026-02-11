@@ -128,7 +128,7 @@ function executeStep(step, vars) {
       data,
       duration_ms,
     };
-  } catch (err) {
+  } catch (_err) {
     const duration_ms = Date.now() - startTime;
 
     // Try to extract JSON from stderr/stdout even on failure

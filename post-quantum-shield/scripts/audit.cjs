@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
@@ -20,25 +20,17 @@ const VULNERABLE_CRYPTO = [
 
 function scanCrypto(dir) {
   const findings = [];
-  function walk(d, depth) {
-    if (depth > 5) return;
+  const allFiles = getAllFiles(dir, { maxDepth: 5 });
+  for (const full of allFiles) {
+    if (!['.js', '.cjs', '.ts', '.py', '.go', '.rs', '.java', '.rb', '.yml', '.yaml', '.json', '.toml', '.cfg'].includes(path.extname(full))) continue;
     try {
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist') continue;
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) { walk(full, depth + 1); continue; }
-        if (!['.js','.cjs','.ts','.py','.go','.rs','.java','.rb','.yml','.yaml','.json','.toml','.cfg'].includes(path.extname(e.name))) continue;
-        try {
-          const content = fs.readFileSync(full, 'utf8');
-          for (const vuln of VULNERABLE_CRYPTO) {
-            const matches = content.match(vuln.pattern);
-            if (matches) findings.push({ file: path.relative(dir, full), algorithm: vuln.algorithm, risk: vuln.risk, pqcReplacement: vuln.replacement, occurrences: matches.length });
-          }
-        } catch(_e){}
+      const content = fs.readFileSync(full, 'utf8');
+      for (const vuln of VULNERABLE_CRYPTO) {
+        const matches = content.match(vuln.pattern);
+        if (matches) findings.push({ file: path.relative(dir, full), algorithm: vuln.algorithm, risk: vuln.risk, pqcReplacement: vuln.replacement, occurrences: matches.length });
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
-  walk(dir, 0);
   return findings;
 }
 

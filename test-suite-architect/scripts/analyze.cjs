@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 
 const SOURCE_EXTENSIONS = new Set([
@@ -116,38 +116,6 @@ const argv = createStandardYargs()
   .strict()
   .help()
   .argv;
-
-/**
- * Recursively collect files from a directory.
- */
-function collectFiles(dirPath, currentDepth, maxDepth) {
-  const files = [];
-  if (currentDepth > maxDepth) {
-    return files;
-  }
-
-  let entries;
-  try {
-    entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  } catch (_err) {
-    return files;
-  }
-
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-
-    if (entry.isDirectory()) {
-      if (!IGNORE_DIRS.has(entry.name)) {
-        const subFiles = collectFiles(fullPath, currentDepth + 1, maxDepth);
-        files.push(...subFiles);
-      }
-    } else if (entry.isFile()) {
-      files.push(fullPath);
-    }
-  }
-
-  return files;
-}
 
 /**
  * Check if a file is a test file based on name patterns and directory.
@@ -346,7 +314,7 @@ function generateStrategy(frameworks, testRatio, untested, sourceFiles, testFile
 
 runSkill('test-suite-architect', () => {
   const projectDir = path.resolve(argv.dir);
-  const allFiles = collectFiles(projectDir, 0, 10);
+  const allFiles = getAllFiles(projectDir, { maxDepth: 10 });
 
   const testFiles = allFiles.filter(f => isTestFile(f));
   const sourceFiles = allFiles.filter(f => isSourceFile(f));

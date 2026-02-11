@@ -2,15 +2,12 @@
 const fs = require('fs');
 const path = require('path');
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { loadProjectStandards } = require('../../scripts/lib/config-loader.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { logger } = require('../../scripts/lib/core.cjs');
 
 const argv = createStandardYargs()
     .option('input', { alias: 'i', type: 'string', demandOption: true, description: 'Input file' })
     .argv;
-
-const standards = loadProjectStandards();
 
 runAsyncSkill('{{SKILL_NAME}}', async () => {
     const inputPath = path.resolve(argv.input);
@@ -37,8 +34,8 @@ runAsyncSkill('{{SKILL_NAME}}', async () => {
         }
 
         return result;
-    } catch (error) {
-        logger.error(`{{SKILL_NAME}} failed: ${error.message}`);
-        throw error;
+    } catch (_error) {
+        logger.error(`{{SKILL_NAME}} failed: ${_error.message}`);
+        throw _error;
     }
 });

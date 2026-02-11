@@ -52,7 +52,7 @@ try {
     fs.appendFileSync(filePath, entry);
   }
   console.log(`Success: Memorized in ${tier} tier: "${fact}"`);
-} catch (error) {
+} catch (_error) {
   console.error('Error saving memory:', error.message);
   process.exit(1);
 }

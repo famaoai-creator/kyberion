@@ -26,7 +26,7 @@ for (const file of files) {
     }
 
     logger.success(`${file}: Valid JSON Schema`);
-  } catch (err) {
+  } catch (_err) {
     logger.error(`${file}: ${err.message}`);
     errors++;
   }

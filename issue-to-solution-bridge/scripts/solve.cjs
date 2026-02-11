@@ -26,7 +26,7 @@ function fetchIssue(issueRef, repo) {
             stdio: 'pipe',
         });
         return JSON.parse(output);
-    } catch (err) {
+    } catch (_err) {
         throw new Error(`Failed to fetch issue: ${err.message}. Is 'gh' CLI installed and authenticated?`);
     }
 }

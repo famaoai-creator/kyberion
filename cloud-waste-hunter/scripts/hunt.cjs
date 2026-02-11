@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
     .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Directory with cloud configs' })
@@ -24,31 +24,6 @@ const OVERSIZED_INSTANCE_PATTERNS = [
     /\bn1-standard-(16|32|64|96)\b/,
     /\bn1-highmem-(16|32|64|96)\b/,
 ];
-
-function findFilesRecursive(dir, maxDepth, currentDepth) {
-    if (currentDepth > maxDepth) return [];
-    const results = [];
-
-    try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                // Skip common non-config directories
-                if (/^(node_modules|\.git|\.terraform|vendor|dist|build)$/.test(entry.name)) {
-                    continue;
-                }
-                results.push(...findFilesRecursive(fullPath, maxDepth, currentDepth + 1));
-            } else if (entry.isFile()) {
-                results.push(fullPath);
-            }
-        }
-    } catch (_err) {
-        // Permission errors or missing dirs are non-fatal
-    }
-
-    return results;
-}
 
 function isTerraformFile(filePath) {
     return /\.tf$/.test(filePath);
@@ -218,7 +193,7 @@ runSkill('cloud-waste-hunter', () => {
         throw new Error(`Directory does not exist: ${scanDir}`);
     }
 
-    const allFiles = findFilesRecursive(scanDir, 10, 0);
+    const allFiles = getAllFiles(scanDir, { maxDepth: 10 });
     const findings = [];
     let totalFiles = 0;
 

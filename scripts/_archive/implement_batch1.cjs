@@ -17,7 +17,7 @@ function installDeps(skillName, packages) {
     console.log(`Installing deps for ${skillName}: ${packages}`);
     try {
         execSync(`npm install ${packages}`, { cwd: skillDir, stdio: 'inherit' });
-    } catch (e) {
+    } catch (_e) {
         console.error(`Failed to install deps for ${skillName}`);
     }
 }
@@ -59,7 +59,7 @@ try {
     } else {
         console.log(output);
     }
-} catch (e) {
+} catch (_e) {
     console.error("Error:", e.message);
     process.exit(1);
 }
@@ -93,7 +93,7 @@ try {
     } else {
         console.log(output);
     }
-} catch (e) {
+} catch (_e) {
     console.error("Error:", e.message);
     process.exit(1);
 }
@@ -131,7 +131,7 @@ const argv = yargs(hideBin(process.argv))
 
         fs.writeFileSync(argv.out, fileBuffer);
         console.log(`Generated Word Doc: ${argv.out}`);
-    } catch (e) {
+    } catch (_e) {
         console.error("Error:", e.message);
         process.exit(1);
     }
@@ -158,7 +158,7 @@ try {
         .to(argv.out, function () {
             console.log(`Generated PDF: ${argv.out}`);
         });
-} catch (e) {
+} catch (_e) {
     console.error("Error:", e.message);
     process.exit(1);
 }
@@ -207,7 +207,7 @@ try {
 
     fs.writeFileSync(argv.out, html);
     console.log(`Generated HTML Report: ${argv.out}`);
-} catch (e) {
+} catch (_e) {
     console.error("Error:", e.message);
     process.exit(1);
 }

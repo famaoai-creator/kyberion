@@ -29,7 +29,7 @@ function getRecentCommits(dir) {
                     message: line.substring(spaceIdx + 1).trim(),
                 };
             });
-    } catch (err) {
+    } catch (_err) {
         throw new Error(`Failed to read git log: ${err.message}. Is this a git repository?`);
     }
 }

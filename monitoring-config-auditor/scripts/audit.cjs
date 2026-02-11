@@ -2,7 +2,7 @@
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
@@ -32,23 +32,21 @@ function auditMonitoring(dir) {
     }
     // Search in source code
     if (!found) {
-      function walk(d, depth) {
-        if (depth > 3 || found) return;
+      const allFiles = getAllFiles(dir, { maxDepth: 3 });
+      for (const full of allFiles) {
+        if (!['.js', '.cjs', '.ts', '.yml', '.yaml', '.json'].includes(path.extname(full))) continue;
         try {
-          for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-            if (found) return;
-            if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-            const full = path.join(d, e.name);
-            if (e.isDirectory()) { walk(full, depth + 1); continue; }
-            if (!['.js','.cjs','.ts','.yml','.yaml','.json'].includes(path.extname(e.name))) continue;
-            try {
-              const content = fs.readFileSync(full, 'utf8').toLowerCase();
-              for (const p of check.patterns) { if (content.includes(p.toLowerCase())) { found = true; evidence = path.relative(dir, full); break; } }
-            } catch(_e){}
+          const content = fs.readFileSync(full, 'utf8').toLowerCase();
+          for (const p of check.patterns) {
+            if (content.includes(p.toLowerCase())) {
+              found = true;
+              evidence = path.relative(dir, full);
+              break;
+            }
           }
-        } catch(_e){}
+        } catch (_e) {}
+        if (found) break;
       }
-      walk(dir, 0);
     }
     results.push({ id: check.id, label: check.label, status: found ? 'configured' : 'missing', evidence });
   }

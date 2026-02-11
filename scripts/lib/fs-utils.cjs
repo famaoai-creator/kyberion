@@ -18,7 +18,7 @@ function* walk(dir, options = {}) {
     let entries;
     try {
         entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch (e) {
+    } catch (_e) {
         return; // Skip inaccessible directories
     }
 

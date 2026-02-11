@@ -17,7 +17,7 @@ function test(name, fn) {
     fn();
     console.log(`  pass  ${name}`);
     passed++;
-  } catch (err) {
+  } catch (_err) {
     console.error(`  FAIL  ${name}: ${err.message}`);
     failures.push(name);
     failed++;
@@ -437,7 +437,7 @@ test('inject rejects confidential markers in public output', () => {
     run('context-injector/scripts/inject.cjs',
       `--data "${dataFile}" --knowledge "${knowledgeFile}" --output-tier public`);
     assert(false, 'Should have thrown due to confidential markers');
-  } catch (err) {
+  } catch (_err) {
     // Script exits with code 1 on confidential marker detection
     assert(err.message.includes('exit') || err.status === 1, 'Should fail with exit code 1');
   }
@@ -578,7 +578,7 @@ test('inspect skill uses runSkill wrapper and returns envelope', () => {
   let raw;
   try {
     raw = execSync(cmd, { encoding: 'utf8', cwd: rootDir, timeout: 10000 }).trim();
-  } catch (err) {
+  } catch (_err) {
     raw = (err.stdout || '').trim();
   }
   assert(raw.length > 0, 'Should produce output');
@@ -607,7 +607,7 @@ test('inspect reports error for multi-pattern glob (known limitation)', () => {
       assert(envelope.status === 'error', 'Should report error status');
       assert(envelope.error.message.includes('invalid pattern'), 'Error should mention invalid pattern');
     }
-  } catch (err) {
+  } catch (_err) {
     // If the process exits non-zero, the error output should be JSON with error status
     assert(err.stdout || err.stderr, 'Should have output on failure');
     const output = (err.stdout || '').trim();
@@ -731,7 +731,7 @@ test('data-transformer rejects missing input file', () => {
   try {
     run('data-transformer/scripts/transform.cjs', '-i "nonexistent_file_that_does_not_exist.json" -t yaml');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -746,7 +746,7 @@ test('data-transformer rejects unsupported format', () => {
   try {
     run('data-transformer/scripts/transform.cjs', `-i "${input}" -t yaml`);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -763,7 +763,7 @@ test('schema-validator rejects non-JSON input', () => {
   try {
     run('schema-validator/scripts/validate.cjs', `-i "${input}" -s "${schema}"`);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -778,7 +778,7 @@ test('schema-validator rejects non-existent schema', () => {
   try {
     run('schema-validator/scripts/validate.cjs', `-i "${data}" -s "/tmp/nonexistent_schema_abc123.json"`);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -794,7 +794,7 @@ test('context-injector rejects missing data file', () => {
     run('context-injector/scripts/inject.cjs',
       '--data "/tmp/nonexistent_data_file_xyz.json" --knowledge "' + knowledgeFile + '" --output-tier public');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -832,7 +832,7 @@ test('dependency-grapher rejects dir without package.json', () => {
   try {
     run('dependency-grapher/scripts/graph.cjs', `-d "${emptyDir}"`);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -848,7 +848,7 @@ test('html-reporter handles missing input gracefully', () => {
   try {
     run('html-reporter/scripts/report.cjs', '-i "/tmp/nonexistent_report_input.md" -o "' + outFile + '"');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -890,7 +890,7 @@ test('release-note-crafter error on non-git directory', () => {
     run('release-note-crafter/scripts/main.cjs',
       `--dir "${nonGitDir}" --since "2025-01-01"`);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.status === 1 || err.message.includes('exit'), 'Should exit with error');
     const stdout = (err.stdout || '').trim();
     if (stdout.startsWith('{')) {
@@ -1215,7 +1215,7 @@ test('validateFileSize throws for oversized file', () => {
   try {
     validateFileSize(smallFile, 0.00001); // Tiny limit: ~10 bytes
     assert(false, 'Should have thrown for oversized file');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('File too large'), 'Error should mention file too large');
   }
 });
@@ -1232,7 +1232,7 @@ test('safeReadFile throws for missing file', () => {
   try {
     safeReadFile('/tmp/nonexistent_file_secure_io_test_xyz.txt');
     assert(false, 'Should have thrown for missing file');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('File not found'), 'Error should mention file not found');
   }
 });
@@ -1242,7 +1242,7 @@ test('safeReadFile throws for null path', () => {
   try {
     safeReadFile(null);
     assert(false, 'Should have thrown for null path');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Missing required'), 'Error should mention missing path');
   }
 });
@@ -1275,7 +1275,7 @@ test('validateUrl blocks localhost', () => {
   try {
     validateUrl('http://localhost:3000/secret');
     assert(false, 'Should have thrown for localhost');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Blocked URL'), 'Should mention blocked URL');
   }
 });
@@ -1292,7 +1292,7 @@ test('validateUrl blocks private IP addresses', () => {
     try {
       validateUrl(ip);
       assert(false, `Should have blocked ${ip}`);
-    } catch (err) {
+    } catch (_err) {
       assert(err.message.includes('Blocked URL'), `Should block ${ip}`);
     }
   }
@@ -1303,7 +1303,7 @@ test('validateUrl rejects non-HTTP protocols', () => {
   try {
     validateUrl('ftp://example.com/file');
     assert(false, 'Should have thrown for ftp protocol');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Unsupported protocol'), 'Should mention unsupported protocol');
   }
 });
@@ -1313,7 +1313,7 @@ test('validateUrl rejects invalid URLs', () => {
   try {
     validateUrl('not-a-url');
     assert(false, 'Should have thrown for invalid URL');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Invalid URL'), 'Should mention invalid URL');
   }
 });
@@ -1323,7 +1323,7 @@ test('validateUrl rejects empty input', () => {
   try {
     validateUrl('');
     assert(false, 'Should have thrown for empty URL');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Missing or invalid URL'), 'Should mention missing URL');
   }
 });
@@ -1643,7 +1643,7 @@ test('api-doc-generator generates docs from OpenAPI (slow)', () => {
     assert(match, 'Should produce JSON output');
     const envelope = JSON.parse(match[0]);
     assert(envelope.status === 'success', 'Should succeed');
-  } catch (err) {
+  } catch (_err) {
     // On non-zero exit, parse stderr/stdout for envelope
     const raw = (err.stdout || '') + (err.stderr || '');
     const match = raw.match(/\{[\s\S]*\}/);
@@ -1662,7 +1662,7 @@ test('api-doc-generator rejects invalid input', () => {
   try {
     const cmd = `node "${path.join(rootDir, 'api-doc-generator/scripts/generate.cjs')}" --input "${badFile}" --out "${outFile}"`;
     raw = execSync(cmd, { encoding: 'utf8', cwd: rootDir, timeout: 30000 });
-  } catch (err) {
+  } catch (_err) {
     raw = (err.stdout || err.message || '').toString();
   }
   const match = raw.match(/\{[\s\S]*\}/);
@@ -1680,7 +1680,7 @@ test('knowledge-fetcher returns envelope for query', () => {
   let raw = '';
   try {
     raw = run('knowledge-fetcher/scripts/fetch.cjs', '--query "nonexistent-topic"');
-  } catch (err) {
+  } catch (_err) {
     raw = (err.stdout || err.message || '').toString();
   }
   const match = raw.match(/\{[\s\S]*\}/);
@@ -2024,7 +2024,7 @@ test('nonfunctional-architect runs assessment', () => {
   try {
     const raw = run('nonfunctional-architect/scripts/assess.cjs', '--help');
     assert(raw.includes('Non-Functional') || raw.includes('非機能'), 'Should show help text');
-  } catch (err) {
+  } catch (_err) {
     // --help may exit 0 or non-zero; check stderr/stdout contains expected text
     const output = err.stdout || err.stderr || err.message;
     assert(output.includes('Non-Functional') || output.includes('非機能') || output.includes('IPA'), 'Should mention NFR/IPA');
@@ -2164,7 +2164,7 @@ test('validateFilePath throws for missing file', () => {
   try {
     validateFilePath('/nonexistent/file_xyz_404.txt', 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('not found') || err.message.includes('Not found'), 'Should say file not found');
   }
 });
@@ -2174,7 +2174,7 @@ test('validateFilePath throws for null path', () => {
   try {
     validateFilePath(null, 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Missing') || err.message.includes('required'), 'Should say missing');
   }
 });
@@ -2190,7 +2190,7 @@ test('validateDirPath throws for missing directory', () => {
   try {
     validateDirPath('/nonexistent/dir_xyz_404', 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('not found') || err.message.includes('Not found'), 'Should mention not found');
   }
 });
@@ -2206,7 +2206,7 @@ test('safeJsonParse throws for invalid JSON', () => {
   try {
     safeJsonParse('not json', 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Invalid') || err.message.includes('invalid'), 'Should mention invalid');
   }
 });
@@ -2229,7 +2229,7 @@ test('requireArgs throws for missing args', () => {
   try {
     requireArgs({ input: 'test' }, ['input', 'output']);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('output'), 'Should mention missing arg name');
   }
 });
@@ -2445,7 +2445,7 @@ test('validators validateFilePath rejects directory as file', () => {
   try {
     validateFilePath(tmpDir, 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Not a file') || err.message.includes('not a file'), 'Should say not a file');
   }
 });
@@ -2456,7 +2456,7 @@ test('validators validateDirPath rejects file as directory', () => {
   try {
     validateDirPath(tmpFile, 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Not a directory') || err.message.includes('not a directory'), 'Should say not a directory');
   }
 });
@@ -2467,7 +2467,7 @@ test('validators readJsonFile rejects non-JSON content', () => {
   try {
     readJsonFile(tmpFile, 'test');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('Invalid') || err.message.includes('invalid'), 'Should mention invalid');
   }
 });
@@ -2612,7 +2612,7 @@ test('orchestrator runPipeline handles missing skill gracefully', () => {
   try {
     runPipeline([{ skill: 'nonexistent-skill-xyz-404', params: {} }]);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('not found'), 'Should mention skill not found');
   }
 });
@@ -2622,7 +2622,7 @@ test('orchestrator resolveSkillScript throws for unknown skill', () => {
   try {
     resolveSkillScript('totally-fake-skill-999');
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('not found'), 'Should say skill not found');
   }
 });
@@ -2782,7 +2782,7 @@ test('validators requireArgs with null value throws', () => {
   try {
     requireArgs({ input: null }, ['input']);
     assert(false, 'Should have thrown');
-  } catch (err) {
+  } catch (_err) {
     assert(err.message.includes('input'), 'Should mention missing arg');
   }
 });
@@ -3114,7 +3114,7 @@ test('ecosystem-integration-test handles empty directory', () => {
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
 // Run coverage boost tests
-try { require('./coverage-boost.test.cjs'); } catch (e) { console.error(e); failed++; }
+try { require('./coverage-boost.test.cjs'); } catch (_e) { console.error(e); failed++; }
 
 console.log(`\n==================================================`);
 console.log(`Results: ${passed} passed, ${failed} failed`);

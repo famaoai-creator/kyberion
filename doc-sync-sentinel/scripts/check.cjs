@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs()
     .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Directory to check' })
@@ -28,27 +28,8 @@ function getRecentChanges(dir, since) {
 }
 
 function findDocFiles(dir) {
-    const docFiles = [];
-    const _patterns = ['README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'docs'];
-
-    function walk(d, depth) {
-        if (depth > 3) return;
-        try {
-            const entries = fs.readdirSync(d, { withFileTypes: true });
-            for (const entry of entries) {
-                if (entry.name === 'node_modules' || entry.name === '.git') continue;
-                const fullPath = path.join(d, entry.name);
-                if (entry.isFile() && /\.(md|txt|rst)$/i.test(entry.name)) {
-                    docFiles.push(fullPath);
-                } else if (entry.isDirectory() && depth < 3) {
-                    walk(fullPath, depth + 1);
-                }
-            }
-        } catch (_e) { /* ignore permission errors */ }
-    }
-
-    walk(dir, 0);
-    return docFiles;
+    const docFiles = getAllFiles(dir, { maxDepth: 3 });
+    return docFiles.filter(f => /\.(md|txt|rst)$/i.test(f));
 }
 
 function checkDrift(changedSourceFiles, docFiles, dir) {
