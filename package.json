@@ -65,7 +65,8 @@
     "refactoring-engine",
     "license-auditor",
     "operational-runbook-generator",
-    "dataset-curator"
+    "dataset-curator",
+    "scripts/lib"
   ],
   "scripts": {
     "test": "node tests/smoke.test.cjs",

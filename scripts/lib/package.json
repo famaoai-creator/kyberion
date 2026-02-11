@@ -1,0 +1,18 @@
+{
+  "name": "@gemini/core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Core utilities and wrappers for Gemini Skills.",
+  "main": "skill-wrapper.cjs",
+  "types": "skill-wrapper.d.cts",
+  "exports": {
+    ".": "./skill-wrapper.cjs",
+    "./validators": "./validators.cjs",
+    "./core": "./core.cjs",
+    "./logger": "./logger.cjs"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "yargs": "^18.0.0"
+  }
+}
