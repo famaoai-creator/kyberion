@@ -1,12 +1,13 @@
 {
   "name": "project-health-check",
   "version": "1.0.0",
-  "description": "Audits project for modern standards",
-  "main": "scripts/audit.cjs",
+  "private": true,
+  "description": "Audits project health (CI/CD, Tests, Lint, IaC, Docs).",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "audit": "node dist/audit.js"
   },
   "dependencies": {
-    "chalk": "^4.1.2"
+    "yargs": "^18.0.0"
   }
 }
