@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkillAsync } = require('@agent/core');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk } = require('../../scripts/lib/fs-utils.cjs');
+const { walkAsync } = require('../../scripts/lib/fs-utils.cjs');
 
 const argv = createStandardYargs().argv;
 
-function buildTreeLines(dir, _depth = 0) {
+async function buildTreeLinesAsync(dir) {
     const lines = [];
-    const files = walk(dir, { maxDepth: parseInt(process.argv[3] || '3', 10) });
-
-    for (const file of files) {
+    const maxDepth = parseInt(process.argv[3] || '3', 10);
+    
+    for await (const file of walkAsync(dir, { maxDepth })) {
         const relative = path.relative(dir, file);
         const parts = relative.split(path.sep);
         const indent = '│   '.repeat(parts.length - 1);
@@ -19,8 +19,8 @@ function buildTreeLines(dir, _depth = 0) {
     return lines;
 }
 
-runSkill('codebase-mapper', () => {
+runSkillAsync('codebase-mapper', async () => {
     const rootDir = path.resolve(argv.input || '.');
-    const tree = buildTreeLines(rootDir);
+    const tree = await buildTreeLinesAsync(rootDir);
     return { root: rootDir, tree };
 });

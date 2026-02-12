@@ -7,11 +7,11 @@
 const fs = require('fs');
 const path = require('path');
 const isBinaryPath = require('is-binary-path');
-const { runSkill } = require('@agent/core');
+const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
-const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { getAllFilesAsync } = require('../../scripts/lib/fs-utils.cjs');
 
-runSkill('security-scanner', () => {
+runSkillAsync('security-scanner', async () => {
     const argv = requireArgs(['dir']);
     const projectRoot = path.resolve(argv.dir);
     const complianceTarget = argv.compliance; // e.g. 'fisc'
@@ -27,25 +27,25 @@ runSkill('security-scanner', () => {
     const mappingPath = path.resolve(__dirname, '../../knowledge/skills/security-scanner/compliance-mapping.json');
     const mappings = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
 
-    const files = getAllFiles(projectRoot);
+    const files = await getAllFilesAsync(projectRoot);
     const allFindings = [];
     let scannedCount = 0;
     let fullContentText = "";
 
-    // 3. Main Scanning Loop
-    files.forEach(file => {
+    // 3. Parallel Scanning
+    const scanTasks = files.map(async (file) => {
         if (isBinaryPath(file) || file.includes('node_modules') || file.includes('.git') || file.includes('work/archive')) return;
         
         try {
-            const content = fs.readFileSync(file, 'utf8');
-            fullContentText += content + "\n";
+            const content = await fs.promises.readFile(file, 'utf8');
             const relativePath = path.relative(projectRoot, file);
+            const localFindings = [];
             
             patterns.forEach(p => {
                 p.regex.lastIndex = 0;
                 const matches = content.matchAll(p.regex);
                 for (const _ of matches) {
-                    allFindings.push({
+                    localFindings.push({
                         file: relativePath,
                         pattern: p.name,
                         severity: p.severity,
@@ -53,8 +53,16 @@ runSkill('security-scanner', () => {
                     });
                 }
             });
-            scannedCount++;
-        } catch (e) { }
+            return { content, findings: localFindings };
+        } catch (e) { return null; }
+    });
+
+    const results = await Promise.all(scanTasks);
+    results.forEach(res => {
+        if (!res) return;
+        allFindings.push(...res.findings);
+        fullContentText += res.content + "\n";
+        scannedCount++;
     });
 
     // 4. Compliance Logic (Data-Driven)

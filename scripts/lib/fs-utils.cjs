@@ -44,7 +44,50 @@ function getAllFiles(dir, options = {}) {
     return Array.from(walk(dir, options));
 }
 
+/**
+ * Asynchronously walk through a directory and yield file paths.
+ * 
+ * @param {string} dir - Directory to scan
+ * @param {Object} options - Scan options
+ */
+async function* walkAsync(dir, options = {}) {
+    const { maxDepth = Infinity, currentDepth = 0 } = options;
+    if (currentDepth > maxDepth) return;
+
+    let entries;
+    try {
+        entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch (_e) {
+        return;
+    }
+
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (standards.ignore_dirs.includes(entry.name)) continue;
+            yield* walkAsync(fullPath, { ...options, currentDepth: currentDepth + 1 });
+        } else {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (standards.ignore_extensions.includes(ext)) continue;
+            yield fullPath;
+        }
+    }
+}
+
+/**
+ * Get all files asynchronously.
+ */
+async function getAllFilesAsync(dir, options = {}) {
+    const files = [];
+    for await (const file of walkAsync(dir, options)) {
+        files.push(file);
+    }
+    return files;
+}
+
 module.exports = {
     walk,
-    getAllFiles
+    getAllFiles,
+    walkAsync,
+    getAllFilesAsync
 };
