@@ -1,0 +1,9 @@
+{
+  "categories": [
+    { "name": "Logic Layer", "keywords": ["function", "async", "await", "logic", "algorithm", "process"], "extensions": [".ts", ".cjs", ".js"] },
+    { "name": "Infrastructure Layer", "keywords": ["docker", "terraform", "vpc", "subnet", "aws_", "azurerm_", "google_"], "extensions": [".tf", ".yml", ".yaml", "Dockerfile"] },
+    { "name": "Knowledge/Design Layer", "keywords": ["schema", "adf", "design", "standard", "specs"], "extensions": [".json", ".md"] },
+    { "name": "Safety/Audit Layer", "keywords": ["security", "audit", "compliance", "finding", "vulnerability"], "extensions": [".json", ".md"] }
+  ],
+  "resultKey": "scap_layer"
+}

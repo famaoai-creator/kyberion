@@ -1,47 +1,54 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const converter = require('widdershins');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+/**
+ * api-doc-generator/scripts/generate.cjs
+ * Pure Engine: Decoupled Reverse Design
+ */
 
-const argv = createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', demandOption: true })
-    .option('out', { alias: 'o', type: 'string', demandOption: true })
-    .argv;
+const fs = require('fs');
+const path = require('path');
+const { runSkill } = require('@gemini/core');
+const { requireArgs } = require('@gemini/core/validators');
 
 runSkill('api-doc-generator', () => {
-    const openApiStr = fs.readFileSync(argv.input, 'utf8');
-    const openApiObj = JSON.parse(openApiStr);
+    const argv = requireArgs(['dir', 'out']);
+    const targetDir = path.resolve(argv.dir);
+    const outputPath = path.resolve(argv.out);
 
-    const options = {
-        codeSamples: true,
-        httpsnippet: false
+    // 1. Load Knowledge (Externalized Patterns)
+    const patternsPath = path.resolve(__dirname, '../../knowledge/skills/api-doc-generator/patterns.json');
+    const { frameworks } = JSON.parse(fs.readFileSync(patternsPath, 'utf8'));
+    const expressPattern = new RegExp(frameworks.express.route_regex, 'g');
+
+    const apiSpecs = {};
+    const files = fs.readdirSync(targetDir).filter(f => f.endsWith('.js') || f.endsWith('.cjs'));
+    
+    // 2. Systematic Extraction (RDP Implementation)
+    files.forEach(file => {
+        const content = fs.readFileSync(path.join(targetDir, file), 'utf8');
+        const matches = content.matchAll(expressPattern);
+        for (const match of matches) {
+            const method = match[frameworks.express.method_group].toUpperCase();
+            const route = match[frameworks.express.path_group];
+            apiSpecs[`${method} ${route}`] = {
+                defined_in: file,
+                source_of_truth: 'Reverse Engineered via SCAP/RDP'
+            };
+        }
+    });
+
+    // 3. Output as Source of Truth (Text-First)
+    const adf = {
+        title: "Substantive API Specification",
+        generated_at: new Date().toISOString(),
+        endpoints: apiSpecs
     };
 
-    // Note: converter.convert returns a Promise; using synchronous conversion via deasync-style
-    // For now, we write synchronously by blocking on the promise
-    let result = null;
-    let error = null;
-    let done = false;
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(adf, null, 2));
 
-    converter.convert(openApiObj, options)
-        .then(str => {
-            fs.writeFileSync(argv.out, str);
-            result = { output: argv.out, size: str.length };
-            done = true;
-        })
-        .catch(err => {
-            error = err;
-            done = true;
-        });
-
-    // Busy-wait for the promise to resolve (simple approach for CJS compatibility)
-    const start = Date.now();
-    while (!done && Date.now() - start < 30000) {
-        require('child_process').spawnSync('sleep', ['0.01']);
-    }
-
-    if (error) throw error;
-    if (!done) throw new Error('Conversion timed out');
-    return result;
+    return {
+        status: 'success',
+        extracted_endpoints: Object.keys(apiSpecs).length,
+        output: outputPath
+    };
 });

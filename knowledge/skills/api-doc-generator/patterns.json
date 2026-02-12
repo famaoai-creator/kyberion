@@ -1,0 +1,10 @@
+{
+  "frameworks": {
+    "express": {
+      "route_regex": "app\\.(get|post|put|delete)\\(['\"]([^'\" ]+)['\"]",
+      "method_group": 1,
+      "path_group": 2
+    }
+  },
+  "default_out": "work/api-spec.adf.json"
+}
