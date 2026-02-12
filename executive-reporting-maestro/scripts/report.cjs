@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * executive-reporting-maestro: Synthesizes multiple skill outputs into executive reports.
  * Accepts a directory of JSON result files and produces a consolidated summary.
@@ -177,9 +178,9 @@ runSkill('executive-reporting-maestro', () => {
 
   if (argv.out) {
     if (argv.out.endsWith('.md')) {
-      fs.writeFileSync(argv.out, generateMarkdown(argv.title, report));
+      safeWriteFile(argv.out, generateMarkdown(argv.title, report));
     } else {
-      fs.writeFileSync(argv.out, JSON.stringify(report, null, 2));
+      safeWriteFile(argv.out, JSON.stringify(report, null, 2));
     }
   }
 

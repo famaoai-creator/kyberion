@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * self-healing-orchestrator: Pattern-based automatic repair for known issues.
  * Matches error patterns against healing runbooks and proposes/applies fixes.
@@ -188,7 +189,7 @@ runSkill('self-healing-orchestrator', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

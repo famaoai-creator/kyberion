@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const { runSkillAsync } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs, safeJsonParse } = require('@agent/core/validators');
 const { secureFetch } = require('@agent/core/network');
 
@@ -24,7 +25,7 @@ runSkillAsync('api-fetcher', async () => {
     const jsonStr = JSON.stringify(data, null, 2);
 
     if (args.out) {
-        fs.writeFileSync(args.out, jsonStr);
+        safeWriteFile(args.out, jsonStr);
         return { output: args.out, size: jsonStr.length };
     }
 

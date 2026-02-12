@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const { marked } = require('marked');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -35,6 +36,6 @@ runSkill('html-reporter', () => {
 </body>
 </html>`;
 
-    fs.writeFileSync(argv.out, html);
+    safeWriteFile(argv.out, html);
     return { output: argv.out, title: argv.title, size: html.length };
 });

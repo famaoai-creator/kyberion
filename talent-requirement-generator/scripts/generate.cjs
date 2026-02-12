@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -54,6 +55,6 @@ runSkill('talent-requirement-generator', () => {
       stack.languages.length === 0 ? 'Could not detect languages - provide more context' : `Key skills: ${jd.skills.join(', ')}`,
     ],
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

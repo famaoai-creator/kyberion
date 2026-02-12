@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -32,7 +33,7 @@ runSkill('sequence-mapper', () => {
     });
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, mermaid);
+        safeWriteFile(argv.out, mermaid);
         return { output: argv.out, size: mermaid.length };
     } else {
         return { content: mermaid };

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
@@ -235,7 +236,7 @@ runSkill('operational-runbook-generator', () => {
   // Write output if --out provided
   if (argv.out) {
     const outPath = path.resolve(argv.out);
-    fs.writeFileSync(outPath, markdown, 'utf8');
+    safeWriteFile(outPath, markdown, 'utf8');
     result.outputPath = outPath;
   }
 

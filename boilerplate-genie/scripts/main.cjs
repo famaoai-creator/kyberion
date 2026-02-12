@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { requireArgs } = require('../../scripts/lib/validators.cjs');
 
@@ -36,7 +37,7 @@ function validateDirPath(dirPath, label = 'directory') {
  */
 function writeFile(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, content, 'utf8');
+  safeWriteFile(filePath, content, 'utf8');
 }
 
 // --- Template generators ---

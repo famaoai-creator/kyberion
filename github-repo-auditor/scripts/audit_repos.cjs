@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 /**
  * github-repo-auditor/scripts/audit_repos.cjs
@@ -82,7 +83,7 @@ function audit() {
     console.log(`\n- **Stale Repositories (No push > 1yr)**: ${staleRepos.length} repos`);
     
     const result = { mapping, staleRepos, timestamp: new Date().toISOString() };
-    fs.writeFileSync('work/github_audit_report.json', JSON.stringify(result, null, 2));
+    safeWriteFile('work/github_audit_report.json', JSON.stringify(result, null, 2));
     console.log('\nDetailed report updated in work/github_audit_report.json');
 
   } catch (_error) {

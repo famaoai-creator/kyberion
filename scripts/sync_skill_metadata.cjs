@@ -62,7 +62,7 @@ skillDirs.forEach(dir => {
     const codeArgs = extractArgsFromCode(mainScript);
     if (codeArgs.length === 0) return;
 
-    let content = fs.readFileSync(skillMdPath, 'utf8');
+    const content = fs.readFileSync(skillMdPath, 'utf8');
     const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
     if (!fmMatch) return;
 

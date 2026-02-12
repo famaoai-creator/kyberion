@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -244,7 +245,7 @@ runSkill('prompt-optimizer', () => {
     };
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+        safeWriteFile(argv.out, JSON.stringify(result, null, 2));
     }
 
     return result;

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * tech-dd-analyst: Technical due diligence analysis on project directories.
  * Evaluates code quality, architecture, team maturity, and technical risk.
@@ -101,6 +102,6 @@ runSkill('tech-dd-analyst', () => {
     recommendations: risks.map(r => `[${r.severity}] ${r.area}: ${r.detail}`),
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

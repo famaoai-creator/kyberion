@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * stakeholder-communicator: Translates technical content into business-oriented
  * language for non-technical stakeholders.
@@ -163,9 +164,9 @@ runSkill('stakeholder-communicator', () => {
   if (argv.out) {
     if (argv.out.endsWith('.md')) {
       const md = [`# ${output.headline}`, '', output.summary, '', '## Key Points', ...keyPoints.map(p => `- ${p.value}`), ''].join('\n');
-      fs.writeFileSync(argv.out, md);
+      safeWriteFile(argv.out, md);
     } else {
-      fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+      safeWriteFile(argv.out, JSON.stringify(result, null, 2));
     }
   }
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -49,6 +50,6 @@ runSkill('ip-profitability-architect', () => {
     portfolio: { totalInvestment: totalCost, totalPotentialRevenue: totalPotential, portfolioROI: totalCost > 0 ? Math.round(((totalPotential - totalCost) / totalCost) * 100) : 0 },
     recommendations: assets.filter(a => a.profitability === 'high').map(a => `[high] ${a.name}: ROI ${a.roi}% - prioritize commercialization`),
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

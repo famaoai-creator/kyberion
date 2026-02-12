@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const { validateInjection, scanForConfidentialMarkers } = require('../../scripts/lib/tier-guard.cjs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -41,7 +42,7 @@ runSkill('context-injector', () => {
 
     const output = JSON.stringify(data, null, 2);
     if (argv.out) {
-        fs.writeFileSync(argv.out, output);
+        safeWriteFile(argv.out, output);
     }
 
     return { injected: true, sourceTier: tierCheck.sourceTier, outputTier };

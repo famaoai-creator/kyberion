@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * crisis-manager: Rapid incident diagnostic and post-mortem preparation.
  * Correlates logs, recent commits, and system state to find root causes.
@@ -186,7 +187,7 @@ runSkill('crisis-manager', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

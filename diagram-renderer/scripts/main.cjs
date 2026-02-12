@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs } = require('@agent/core/validators');
 
 /**
@@ -50,7 +51,7 @@ runSkill('diagram-renderer', () => {
 
     // 3. Generate Mermaid Text
     const mmdContent = adfToMermaid(adf, iconMap);
-    fs.writeFileSync(mmdPath, mmdContent);
+    safeWriteFile(mmdPath, mmdContent);
 
     // 4. Render SVG
     try {

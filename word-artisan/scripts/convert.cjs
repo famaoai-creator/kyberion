@@ -9,6 +9,7 @@ const path = require('path');
 const { marked } = require('marked');
 const HTMLtoDOCX = require('html-to-docx');
 const { runSkillAsync } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs, validateFilePath } = require('@agent/core/validators');
 
 runSkillAsync('word-artisan', async () => {
@@ -46,7 +47,7 @@ runSkillAsync('word-artisan', async () => {
         fontSize: t.body.size * 2
     });
 
-    fs.writeFileSync(argv.out, fileBuffer);
+    safeWriteFile(argv.out, fileBuffer);
     console.log(`[Word] Rendered with Master '${specs.master_name}' to ${argv.out}`);
 
     return { status: 'success', output: argv.out, master: specs.master_name };

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const Mustache = require('mustache');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -19,7 +20,7 @@ runSkill('template-renderer', () => {
     const output = Mustache.render(template, data);
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, output);
+        safeWriteFile(argv.out, output);
         return { output: argv.out, size: output.length };
     } else {
         return { content: output };

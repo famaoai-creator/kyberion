@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -65,7 +66,7 @@ runAsyncSkill('audio-transcriber', async () => {
     const text = response.data.text;
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, text);
+        safeWriteFile(argv.out, text);
         return { output: argv.out, textLength: text.length };
     } else {
         return { text };

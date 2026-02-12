@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs } = require('@agent/core/validators');
 
 function createSkillFiles(targetDir, name, description) {
@@ -29,7 +30,7 @@ function createSkillFiles(targetDir, name, description) {
         dependencies: { "@agent/core": "workspace:*" },
         devDependencies: { "typescript": "^5.0.0" }
     };
-    fs.writeFileSync(path.join(skillPath, 'package.json'), JSON.stringify(pkg, null, 2));
+    safeWriteFile(path.join(skillPath, 'package.json'), JSON.stringify(pkg, null, 2));
 
     // 3. Generate SKILL.md
     const md = `name: ${name}
@@ -39,7 +40,7 @@ status: implemented
 # ${name.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')}
 ${description}
 `;
-    fs.writeFileSync(path.join(skillPath, 'SKILL.md'), md);
+    safeWriteFile(path.join(skillPath, 'SKILL.md'), md);
 
     // 4. Generate TypeScript Script (with Self-Healing Pattern)
     const tsCode = `import { runSkill } from '@agent/core';
@@ -51,7 +52,7 @@ runSkill('${name}', () => {
     return { status: 'success', input: args.input };
 });
 `;
-    fs.writeFileSync(path.join(skillPath, 'scripts/main.ts'), tsCode);
+    safeWriteFile(path.join(skillPath, 'scripts/main.ts'), tsCode);
 
     // 5. Generate Unit Test
     const testCode = `const { describe, it, assert } = require('../../scripts/lib/test-utils.cjs');
@@ -64,7 +65,7 @@ describe('${name} Skill', () => {
     });
 });
 `;
-    fs.writeFileSync(path.join(skillPath, 'tests/unit.test.cjs'), testCode);
+    safeWriteFile(path.join(skillPath, 'tests/unit.test.cjs'), testCode);
 
     return skillPath;
 }

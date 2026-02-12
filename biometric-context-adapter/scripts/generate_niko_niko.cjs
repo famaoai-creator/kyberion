@@ -1,3 +1,4 @@
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const { logger } = require('../../scripts/lib/core.cjs');
@@ -36,7 +37,7 @@ Analysis of your interaction patterns to visualize energy and stress levels.
 - **Warning**: "Fatigue" detected after consecutive late-night sessions. Consider enabling 'Brief Mode' tonight.
 `;
 
-    fs.writeFileSync(reportPath, markdown);
+    safeWriteFile(reportPath, markdown);
     logger.success(`Niko-Niko Calendar generated at: ${reportPath}`);
 
     return { output: reportPath, sessions: mockSessions.length };

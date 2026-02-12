@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * environment-provisioner: Generates Infrastructure as Code from a service
  * definition file. Supports Terraform, Docker, and Kubernetes output formats
@@ -987,7 +988,7 @@ runSkill('environment-provisioner', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(report, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(report, null, 2));
   }
 
   return report;

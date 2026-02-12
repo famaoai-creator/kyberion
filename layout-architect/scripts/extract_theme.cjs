@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { runSkillAsync } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
 const argv = createStandardYargs()
@@ -42,7 +43,7 @@ runSkillAsync('layout-architect', async () => {
     const css = `/* @theme ${themeName} */\n@import 'default';\nsection { background-color: ${bgColor}; color: ${textColor}; padding: 50px; }\nh1 { color: ${accentColor}; border-bottom: 2px solid ${accentColor}; }\nfooter { color: ${accentColor}; }`;
 
     const outputPath = path.resolve(__dirname, `../../knowledge/templates/themes/${themeName}.css`);
-    fs.writeFileSync(outputPath, css);
+    safeWriteFile(outputPath, css);
     fs.rmSync(tmpDir, { recursive: true });
 
     return { status: 'learned', themePath: outputPath };

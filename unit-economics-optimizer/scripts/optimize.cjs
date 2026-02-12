@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * unit-economics-optimizer: Analyzes LTV, CAC, and churn to evaluate product profitability.
  * Proposes pricing and retention strategies based on unit economics data.
@@ -162,7 +163,7 @@ runSkill('unit-economics-optimizer', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

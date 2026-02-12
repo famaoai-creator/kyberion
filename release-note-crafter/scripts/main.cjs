@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -108,7 +109,7 @@ runSkill('release-note-crafter', () => {
   if (argv.out) {
     const outPath = path.resolve(argv.out);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, markdown, 'utf8');
+    safeWriteFile(outPath, markdown, 'utf8');
   }
 
   return {

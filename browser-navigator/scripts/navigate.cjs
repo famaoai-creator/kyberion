@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -75,7 +76,7 @@ test('navigate', async ({ page }) => {
 `;
 
     const tmpSpec = path.join(rootDir, 'work', '_tmp_navigate.spec.cjs');
-    fs.writeFileSync(tmpSpec, scriptContent);
+    safeWriteFile(tmpSpec, scriptContent);
 
     try {
         const _output = execSync(`npx playwright test "${tmpSpec}" --reporter=line`, {
@@ -100,6 +101,6 @@ test('navigate', async ({ page }) => {
             error: err.stderr || err.message,
         };
     } finally {
-        if (fs.existsSync(tmpSpec)) fs.unlinkSync(tmpSpec);
+        if (fs.existsSync(tmpSpec)) require("../../scripts/lib/secure-io.cjs").safeUnlinkSync(tmpSpec);
     }
 });

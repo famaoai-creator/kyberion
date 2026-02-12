@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -66,6 +67,6 @@ runSkill('sustainability-consultant', () => {
     greenScore: Math.max(0, 100 - energy.estimatedMonthlyKwh / 5 - waste.length * 2),
     recommendations,
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

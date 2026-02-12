@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * financial-modeling-maestro: Generates financial models from JSON assumption files.
  * Produces P&L, cash flow projections, and scenario analysis.
@@ -174,7 +175,7 @@ runSkill('financial-modeling-maestro', () => {
   }
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

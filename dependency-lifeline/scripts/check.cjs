@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * dependency-lifeline: Analyzes project dependencies for update availability,
  * risk assessment, and overall health scoring.
@@ -307,7 +308,7 @@ runSkill('dependency-lifeline', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(report, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(report, null, 2));
   }
 
   return report;

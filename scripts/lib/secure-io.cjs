@@ -112,6 +112,28 @@ function safeWriteFile(filePath, data, options = {}) {
 }
 
 /**
+ * Append to a file safely with role-based write control.
+ */
+function safeAppendFileSync(filePath, data, encoding = 'utf8') {
+  const resolved = path.resolve(filePath);
+  const { validateWritePermission } = require('./tier-guard.cjs');
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  fs.appendFileSync(resolved, data, encoding);
+}
+
+/**
+ * Unlink a file safely with role-based write control.
+ */
+function safeUnlinkSync(filePath) {
+  const resolved = path.resolve(filePath);
+  const { validateWritePermission } = require('./tier-guard.cjs');
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+}
+
+/**
  * Execute a command safely using execFileSync (no shell interpolation).
  * Uses execFileSync instead of execSync to prevent shell injection.
  * @param {string} command - The command to run (no shell expansion)
@@ -239,6 +261,8 @@ module.exports = {
   validateFileSize,
   safeReadFile,
   safeWriteFile,
+  safeAppendFileSync,
+  safeUnlinkSync,
   safeExec,
   safeSpawn,
   sanitizePath,

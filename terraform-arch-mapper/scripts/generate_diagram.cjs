@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const ICON_MAP = {
     'aws_vpc': 'https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v18.0/dist/Groups/VPC.png',
@@ -101,7 +102,7 @@ runSkill('terraform-arch-mapper', () => {
     });
 
     const svgContent = generateSVG(resources);
-    fs.writeFileSync(outPath, svgContent);
+    safeWriteFile(outPath, svgContent);
 
     return { status: 'success', resourceCount: resources.length, output: outPath };
 });

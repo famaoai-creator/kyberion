@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const _path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -52,6 +53,6 @@ runSkill('synthetic-user-persona', () => {
       accessibilityPersonas.length > 0 ? `${accessibilityPersonas.length} accessibility persona(s) - prioritize their test scenarios` : 'Consider adding accessibility personas for inclusive testing',
     ],
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

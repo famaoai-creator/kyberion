@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * knowledge-refiner: Maintains and consolidates the knowledge base.
  * Cleans up duplicates, merges data, and extracts reusable patterns.
@@ -114,6 +115,6 @@ runSkill('knowledge-refiner', () => {
   if (duplicates.length > 0) result.recommendations.push(`${duplicates.length} duplicate(s) found - consider merging`);
   if (quality.filter(q => q.severity === 'high').length > 0) result.recommendations.push('Empty files detected - remove or populate');
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

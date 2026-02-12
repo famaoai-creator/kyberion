@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * competitive-intel-strategist: Analyzes competitive landscape from a JSON data file.
  * Performs gap analysis, identifies differentiation opportunities, and generates strategy.
@@ -181,7 +182,7 @@ runSkill('competitive-intel-strategist', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

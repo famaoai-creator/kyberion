@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * ux-auditor: Performs structural UX/Accessibility audits on web projects.
  * Analyzes HTML files for accessibility issues, consistency, and usability heuristics.
@@ -216,7 +217,7 @@ runSkill('ux-auditor', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

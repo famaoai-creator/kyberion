@@ -1,3 +1,4 @@
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -51,7 +52,7 @@ function getManifest(outDir) {
 }
 
 function saveManifest(outDir, manifest) {
-    fs.writeFileSync(path.join(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2));
+    safeWriteFile(path.join(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2));
 }
 
 runAsyncSkill('data-collector', async () => {
@@ -138,7 +139,7 @@ runAsyncSkill('data-collector', async () => {
     }
 
     const savePath = path.join(out, filename);
-    fs.writeFileSync(savePath, data);
+    safeWriteFile(savePath, data);
 
     // Update Manifest
     const newEntry = {

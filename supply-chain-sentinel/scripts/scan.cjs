@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * supply-chain-sentinel: Software supply chain security - SBoM generation,
  * dependency provenance, and malicious package detection.
@@ -126,6 +127,6 @@ runSkill('supply-chain-sentinel', () => {
     ],
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

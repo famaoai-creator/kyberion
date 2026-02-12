@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 /**
  * sovereign-memory/scripts/save.cjs
@@ -39,9 +40,9 @@ runSkill('sovereign-memory', () => {
   const entry = `- [${timestamp}] ${fact}\n`;
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, `# ${category.toUpperCase()} Memories (${tier.toUpperCase()})\n\n${entry}`);
+    safeWriteFile(filePath, `# ${category.toUpperCase()} Memories (${tier.toUpperCase()})\n\n${entry}`);
   } else {
-    fs.appendFileSync(filePath, entry);
+    require("../../scripts/lib/secure-io.cjs").safeAppendFileSync(filePath, entry);
   }
 
   return {

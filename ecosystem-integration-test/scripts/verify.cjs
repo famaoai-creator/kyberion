@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * ecosystem-integration-test: Validates interoperability between skills.
  * Checks output format compliance, wrapper usage, and knowledge protocol adherence.
@@ -169,7 +170,7 @@ runSkill('ecosystem-integration-test', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

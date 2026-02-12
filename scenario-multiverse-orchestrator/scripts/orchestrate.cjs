@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * scenario-multiverse-orchestrator: Generates multiple business scenarios
  * (Growth/Stability/Hybrid) from financial and strategic assumptions.
@@ -196,6 +197,6 @@ runSkill('scenario-multiverse-orchestrator', () => {
     comparison,
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

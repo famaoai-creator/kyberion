@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -25,7 +26,7 @@ runAsyncSkill('db-extractor', async () => {
 
                 if (argv.out) {
                     const output = JSON.stringify(rows, null, 2);
-                    fs.writeFileSync(argv.out, output);
+                    safeWriteFile(argv.out, output);
                     resolve({ output: argv.out, rowCount: rows.length });
                 } else {
                     resolve({ rows, rowCount: rows.length });

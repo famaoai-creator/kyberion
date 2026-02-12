@@ -1,3 +1,4 @@
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
@@ -215,7 +216,7 @@ function generateReport(decisions, model) {
     `;
 
     const markdown = ejs.render(template, { processedDecisions, model });
-    fs.writeFileSync(OUTPUT_FILE, markdown.trim());
+    safeWriteFile(OUTPUT_FILE, markdown.trim());
     console.log(chalk.green(`\n✔ Report saved to: ${process.cwd()}/${OUTPUT_FILE}`));
 }
 

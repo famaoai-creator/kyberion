@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * chaos-monkey-orchestrator: Simulates managed chaos to test system resilience.
  * Generates chaos scenarios and validates healing/monitoring responses.
@@ -74,6 +75,6 @@ runSkill('chaos-monkey-orchestrator', () => {
   if (!readiness.checks.hasSelfHealing) result.recommendations.push('No self-healing-orchestrator detected - chaos tests may cause extended outages');
   if (argv.intensity === 'high' && !argv['dry-run']) result.recommendations.push('HIGH intensity chaos should only run in isolated staging environments');
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

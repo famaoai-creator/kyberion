@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * ai-model-orchestrator: Analyzes task complexity and selects optimal AI model.
  * Routes to appropriate model based on cost, latency, and capability requirements.
@@ -137,6 +138,6 @@ runSkill('ai-model-orchestrator', () => {
     availableModels: MODEL_CATALOG.length,
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

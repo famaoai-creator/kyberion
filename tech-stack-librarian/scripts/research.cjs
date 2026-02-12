@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -78,6 +79,6 @@ runSkill('tech-stack-librarian', () => {
     totalPractices: adherence.reduce((s, a) => s + a.practices.length, 0),
     recommendations: stack.flatMap(s => s.practices.slice(0, 2).map(p => `[${s.name}] ${p}`)).slice(0, 10),
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

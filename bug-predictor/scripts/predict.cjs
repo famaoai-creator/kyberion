@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -97,7 +98,7 @@ runSkill('bug-predictor', () => {
     };
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, JSON.stringify(report, null, 2));
+        safeWriteFile(argv.out, JSON.stringify(report, null, 2));
     }
 
     return report;

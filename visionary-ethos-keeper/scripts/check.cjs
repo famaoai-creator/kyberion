@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * visionary-ethos-keeper: Ensures decisions and proposals align with
  * company mission, values, and ethical guidelines.
@@ -151,6 +152,6 @@ runSkill('visionary-ethos-keeper', () => {
     recommendations,
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

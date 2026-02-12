@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -24,7 +25,7 @@ runSkill('glossary-resolver', () => {
     }
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, content);
+        safeWriteFile(argv.out, content);
         return { output: argv.out, resolvedTerms: resolvedCount };
     } else {
         return { content, resolvedTerms: resolvedCount };

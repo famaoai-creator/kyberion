@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * strategic-roadmap-planner: Analyzes code complexity, technical debt,
  * and project state to propose a 3-month strategic roadmap.
@@ -169,6 +170,6 @@ runSkill('strategic-roadmap-planner', () => {
     priorities: roadmap.priorities,
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

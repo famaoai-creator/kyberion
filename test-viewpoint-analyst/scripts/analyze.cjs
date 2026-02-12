@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs } = require('@agent/core/validators');
 
 runSkill('test-viewpoint-analyst', () => {
@@ -42,7 +43,7 @@ runSkill('test-viewpoint-analyst', () => {
     };
 
     fs.mkdirSync(path.dirname(argv.out), { recursive: true });
-    fs.writeFileSync(path.resolve(argv.out), JSON.stringify(testAdf, null, 2));
+    safeWriteFile(path.resolve(argv.out), JSON.stringify(testAdf, null, 2));
 
     return { status: 'success', testCaseCount: testCases.length, output: argv.out };
 });

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -48,7 +49,7 @@ runSkill('dependency-grapher', () => {
         }
     }
 
-    fs.writeFileSync(output, mermaid);
+    safeWriteFile(output, mermaid);
     return { 
         status: 'success', 
         skillsScanned: skillCount, 

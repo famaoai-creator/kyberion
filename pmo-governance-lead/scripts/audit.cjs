@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * pmo-governance-lead: Performs PMO governance audits on project directories.
  * Checks quality gates, required evidence, and phase readiness.
@@ -209,7 +210,7 @@ runSkill('pmo-governance-lead', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

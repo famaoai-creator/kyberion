@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * compliance-officer: Maps project state to regulatory standards (SOC2, ISO27001, HIPAA).
  * Generates compliance scores and audit-ready evidence.
@@ -143,6 +144,6 @@ runSkill('compliance-officer', () => {
     recommendations: gaps.slice(0, 5).map(g => `[${g.standard}] ${g.control}: Implement ${g.label}`),
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

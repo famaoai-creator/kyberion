@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs'); const path = require('path');
  const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -60,6 +61,6 @@ runSkill('post-quantum-shield', () => {
     migrationPlan: migration,
     recommendations: migration.slice(0, 5).map(m => `[${m.risk}] Replace ${m.algorithm} with ${m.replacement} (${m.files} files, effort: ${m.estimatedEffort})`),
   };
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 runSkill('terraform-arch-mapper', () => {
     const dirIdx = process.argv.indexOf('--dir');
@@ -39,7 +40,7 @@ runSkill('terraform-arch-mapper', () => {
 
     const adf = { nodes, edges };
     const outPath = 'work/infrastructure.adf.json';
-    fs.writeFileSync(outPath, JSON.stringify(adf, null, 2));
+    safeWriteFile(outPath, JSON.stringify(adf, null, 2));
 
     return { 
         status: 'success', 

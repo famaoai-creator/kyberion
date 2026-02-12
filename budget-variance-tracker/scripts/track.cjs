@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * budget-variance-tracker: Compares actual spend/revenue against forecasts.
  * Provides variance analysis and corrective insights.
@@ -124,6 +125,6 @@ runSkill('budget-variance-tracker', () => {
     overallHealth: insights.filter(i => i.severity === 'critical').length > 0 ? 'at_risk' : insights.filter(i => i.severity === 'warning').length > 0 ? 'needs_attention' : 'healthy',
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

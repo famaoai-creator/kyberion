@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
@@ -268,7 +269,7 @@ runSkill('dataset-curator', () => {
     } else {
       outputContent = curateResult.records.join('\n') + '\n';
     }
-    fs.writeFileSync(outPath, outputContent, 'utf8');
+    safeWriteFile(outPath, outputContent, 'utf8');
     result.outputPath = outPath;
   }
 

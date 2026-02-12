@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * investor-readiness-audit: Audits project readiness for fundraising, board meetings, or IPO.
  * Validates documentation, financial data, technical health, and compliance.
@@ -160,6 +161,6 @@ runSkill('investor-readiness-audit', () => {
     risks,
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

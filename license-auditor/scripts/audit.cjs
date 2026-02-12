@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
@@ -104,7 +105,7 @@ runSkill('license-auditor', () => {
   // Write output if --out provided
   if (argv.out) {
     const outPath = path.resolve(argv.out);
-    fs.writeFileSync(outPath, JSON.stringify(result, null, 2), 'utf8');
+    safeWriteFile(outPath, JSON.stringify(result, null, 2), 'utf8');
     result.outputPath = outPath;
   }
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * performance-monitor-analyst: Analyzes performance metrics from profiling
  * outputs. Compares against configurable thresholds, identifies bottlenecks,
@@ -393,7 +394,7 @@ runSkill('performance-monitor-analyst', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(report, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(report, null, 2));
   }
 
   return report;

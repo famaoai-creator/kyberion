@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs } = require('@agent/core/validators');
 
 runSkill('cloud-cost-estimator', () => {
@@ -55,7 +56,7 @@ runSkill('cloud-cost-estimator', () => {
     };
 
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
+    safeWriteFile(outputPath, JSON.stringify(report, null, 2));
 
     return { status: 'success', total_cost: totalMonthlyCost, finding_count: findings.length, output: outputPath };
 });

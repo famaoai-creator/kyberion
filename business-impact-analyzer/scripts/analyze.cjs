@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * business-impact-analyzer: Translates engineering metrics into business KPIs.
  * Analyzes DORA metrics, error rates, and technical debt to quantify business impact.
@@ -185,7 +186,7 @@ runSkill('business-impact-analyzer', () => {
   };
 
   if (argv.out) {
-    fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+    safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   }
 
   return result;

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 /**
  * disaster-recovery-planner: Generates DR runbooks from infrastructure and requirements.
  * Validates IaC for resilience (backups, redundancy).
@@ -127,6 +128,6 @@ runSkill('disaster-recovery-planner', () => {
     recommendations: gaps.map(g => `[${g.severity}] ${g.area}: ${g.detail}`),
   };
 
-  if (argv.out) fs.writeFileSync(argv.out, JSON.stringify(result, null, 2));
+  if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));
   return result;
 });

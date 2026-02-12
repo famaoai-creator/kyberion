@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 runSkill('layout-architect', () => {
     const specsPath = path.resolve(__dirname, '../../knowledge/standards/design/master-slide-specs.json');
@@ -78,7 +79,7 @@ footer {
 `;
 
     const outPath = path.resolve(__dirname, `../../knowledge/templates/themes/${specs.master_name.toLowerCase()}.css`);
-    fs.writeFileSync(outPath, css);
+    safeWriteFile(outPath, css);
 
     return { 
         status: 'theme_generated', 

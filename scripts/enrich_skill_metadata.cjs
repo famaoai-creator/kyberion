@@ -30,7 +30,7 @@ console.log(`Enriching metadata for ${skillDirs.length} skills...`);
 
 skillDirs.forEach(dir => {
     const skillMdPath = path.join(rootDir, dir, 'SKILL.md');
-    let content = fs.readFileSync(skillMdPath, 'utf8');
+    const content = fs.readFileSync(skillMdPath, 'utf8');
     // Use multi-line flag and safer matching
     const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
     if (!fmMatch) return;

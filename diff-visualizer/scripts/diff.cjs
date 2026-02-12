@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const Diff = require('diff');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
@@ -27,7 +28,7 @@ runSkill('diff-visualizer', () => {
     );
 
     if (argv.out) {
-        fs.writeFileSync(argv.out, diff);
+        safeWriteFile(argv.out, diff);
         return { output: argv.out, size: diff.length };
     } else {
         return { content: diff };
