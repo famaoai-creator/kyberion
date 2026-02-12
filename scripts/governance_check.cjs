@@ -23,10 +23,49 @@ async function runStep(name, command) {
   }
 }
 
+async function runStaticAudit() {
+  process.stdout.write(chalk.cyan(`[Governance] Running Static API Audit... `));
+  const start = Date.now();
+  const violations = [];
+  const rootDir = path.resolve(__dirname, '..');
+  
+  // Restricted APIs that bypass Sovereign Shield
+  const RESTRICTED = ['fs.writeFileSync', 'fs.appendFileSync', 'fs.unlinkSync', 'fs.renameSync'];
+  
+  const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  const skillDirs = entries.filter(e => e.isDirectory() && !e.name.startsWith('.') && !['node_modules', 'scripts', 'knowledge', 'work', 'templates'].includes(e.name));
+
+  for (const dir of skillDirs) {
+    const scriptsPath = path.join(rootDir, dir.name, 'scripts');
+    if (!fs.existsSync(scriptsPath)) continue;
+    
+    const files = fs.readdirSync(scriptsPath).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(scriptsPath, file), 'utf8');
+      RESTRICTED.forEach(api => {
+        if (content.includes(api)) {
+          violations.push(`${dir.name}/${file}: uses restricted API '${api}'`);
+        }
+      });
+    }
+  }
+
+  const duration = ((Date.now() - start) / 1000).toFixed(1);
+  if (violations.length > 0) {
+    console.log(chalk.red(`FAILED (${violations.length} violations)`));
+    violations.forEach(v => console.log(chalk.dim(`  - ${v}`)));
+    return { name: 'Static API Audit', status: 'failed', violations, duration };
+  } else {
+    console.log(chalk.green(`PASSED (${duration}s)`));
+    return { name: 'Static API Audit', status: 'passed', duration };
+  }
+}
+
 async function main() {
   console.log(chalk.bold('\n=== Gemini Ecosystem Governance Check ===\n'));
 
   const results = [];
+  results.push(await runStaticAudit());
   results.push(await runStep('Static Analysis (Lint)', 'npm run lint'));
   results.push(await runStep('Type Check', 'npm run typecheck'));
   results.push(await runStep('Unit Tests', 'npm run test:unit'));
