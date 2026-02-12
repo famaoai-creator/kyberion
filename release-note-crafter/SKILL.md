@@ -19,6 +19,7 @@ arguments:
     short: o
     type: string
     description: Output file path for release notes
+category: Utilities
 ---
 
 # Release Note Crafter

@@ -14,6 +14,7 @@ arguments:
     short: o
     type: string
     description: Optional output file path
+category: Engineering & DevOps
 ---
 
 # Refactoring Engine

@@ -20,6 +20,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Utilities
 ---
 
 # Kernel Compiler

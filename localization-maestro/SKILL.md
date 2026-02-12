@@ -18,6 +18,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Strategy & Leadership
 ---
 
 # Localization Maestro

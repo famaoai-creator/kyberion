@@ -1,6 +1,8 @@
 ---
 name: backlog-connector
-description: Specialized connector for Nulab Backlog API. Automatically resolves Project IDs and handles pagination for fetching issues and wikis.
+description: >-
+  Specialized connector for Nulab Backlog API. Automatically resolves Project
+  IDs and handles pagination for fetching issues and wikis.
 status: implemented
 arguments:
   - name: project
@@ -12,13 +14,17 @@ arguments:
     short: a
     type: string
     default: fetch-issues
-    choices: [fetch-issues, get-project-info, list-users]
+    choices:
+      - fetch-issues
+      - get-project-info
+      - list-users
   - name: count
     type: number
     default: 100
   - name: out
     short: o
     type: string
+category: Integration & API
 ---
 
 # Backlog Connector

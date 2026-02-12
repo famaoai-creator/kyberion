@@ -21,6 +21,7 @@ arguments:
     short: o
     type: string
     description: Output file
+category: Engineering & DevOps
 ---
 
 # Bug Predictor

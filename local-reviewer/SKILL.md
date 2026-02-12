@@ -2,6 +2,7 @@
 name: local-reviewer
 description: Retrieves git diff of staged files for pre-commit AI code review.
 status: implemented
+category: Utilities
 ---
 
 # Local Reviewer Skill

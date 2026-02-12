@@ -7,6 +7,7 @@ arguments:
     short: i
     type: string
     required: true
+category: Utilities
 ---
 
 # Sensitivity Detector

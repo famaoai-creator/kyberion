@@ -17,6 +17,7 @@ arguments:
     short: o
     type: string
     description: Output file path (optional)
+category: Data & Content
 ---
 
 # Data Transformer

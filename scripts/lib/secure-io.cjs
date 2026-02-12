@@ -90,14 +90,20 @@ function safeWriteFile(filePath, data, options = {}) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  // Atomic Write Strategy
+  // Atomic Write Strategy with Durability (fsync)
   const tempPath = `${resolved}.tmp.${Date.now()}.${Math.random().toString(36).substring(2)}`;
   
+  let fd;
   try {
-    fs.writeFileSync(tempPath, data, encoding);
+    fd = fs.openSync(tempPath, 'w');
+    fs.writeFileSync(fd, data, encoding);
+    fs.fsyncSync(fd); // Force OS to sync to disk
+    fs.closeSync(fd);
+    fd = null;
     fs.renameSync(tempPath, resolved);
   } catch (err) {
-    // Cleanup temp file on failure
+    // Cleanup
+    if (fd) try { fs.closeSync(fd); } catch (_) {}
     if (fs.existsSync(tempPath)) {
       try { fs.unlinkSync(tempPath); } catch (_) {}
     }

@@ -11,6 +11,7 @@ arguments:
     type: string
     required: true
     description: Git repository URL
+category: Utilities
 ---
 
 # Knowledge Harvester

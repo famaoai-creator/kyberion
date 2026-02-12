@@ -10,6 +10,7 @@ arguments:
     short: f
     type: string
     required: true
+category: Utilities
 ---
 
 # Document Generator (Gateway)

@@ -9,6 +9,7 @@ arguments:
     short: d
     type: string
     description: Project directory
+category: Engineering & DevOps
 ---
 
 # Onboarding Wizard

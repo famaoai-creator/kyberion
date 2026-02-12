@@ -18,6 +18,7 @@ arguments:
     short: f
     type: string
     description: Data format
+category: Data & Content
 ---
 
 # Dataset Curator

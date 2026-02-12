@@ -21,6 +21,7 @@ arguments:
   - name: dry-run
     type: boolean
     description: Analysis only, no changes
+category: Utilities
 ---
 
 # Issue-to-Solution Bridge

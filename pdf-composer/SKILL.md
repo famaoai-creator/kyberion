@@ -2,6 +2,7 @@
 name: pdf-composer
 description: Generate PDF documents from Markdown with headers/footers.
 status: implemented
+category: Data & Content
 ---
 
 # Pdf Composer

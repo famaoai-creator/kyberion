@@ -9,6 +9,7 @@ arguments:
     short: d
     type: string
     description: Git repository directory
+category: Strategy & Leadership
 ---
 
 # PR Architect

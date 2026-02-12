@@ -9,6 +9,7 @@ arguments:
     short: d
     type: string
     description: Directory with cloud configs
+category: Utilities
 ---
 
 # Cloud Waste Hunter

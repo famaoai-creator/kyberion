@@ -14,6 +14,7 @@ arguments:
   - name: out
     short: o
     type: string
+category: Utilities
 ---
 
 # Diff Visualizer

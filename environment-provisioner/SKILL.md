@@ -22,6 +22,7 @@ arguments:
     short: o
     type: string
     description: Output file path for the report
+category: Utilities
 ---
 
 # Environment Provisioner

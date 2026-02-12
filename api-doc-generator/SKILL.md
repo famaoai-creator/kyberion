@@ -2,6 +2,7 @@
 name: api-doc-generator
 description: Generate API documentation from OpenAPI specs or code.
 status: implemented
+category: Utilities
 ---
 
 # Api Doc Generator

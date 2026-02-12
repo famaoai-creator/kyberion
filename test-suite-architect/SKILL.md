@@ -10,6 +10,7 @@ arguments:
     type: string
     required: true
     description: Path to project directory to analyze
+category: Strategy & Leadership
 ---
 
 # Test Suite Architect

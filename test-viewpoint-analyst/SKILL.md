@@ -1,7 +1,11 @@
 ---
 name: test-viewpoint-analyst
-description: Generates and reviews test scenarios based on IPA non-functional grade standards. Analyzes system requirements to identify critical test viewpoints for performance, security, and availability.
+description: >-
+  Generates and reviews test scenarios based on IPA non-functional grade
+  standards. Analyzes system requirements to identify critical test viewpoints
+  for performance, security, and availability.
 status: implemented
+category: Utilities
 ---
 
 # Test Viewpoint Analyst (IPA-Standard)

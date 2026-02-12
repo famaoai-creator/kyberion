@@ -13,6 +13,7 @@ arguments:
     positional: true
     default: 100
     description: Number of lines to read
+category: Utilities
 ---
 
 # Log Analyst Skill

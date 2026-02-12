@@ -11,6 +11,7 @@ arguments:
     short: c
     type: string
     description: JSON file with required keywords
+category: Engineering & DevOps
 ---
 
 # Completeness Scorer

@@ -6,6 +6,7 @@ arguments:
   - name: title
     short: title
     type: string
+category: Utilities
 ---
 
 # Html Reporter

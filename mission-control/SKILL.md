@@ -14,6 +14,7 @@ arguments:
   - name: dir
     short: d
     type: string
+category: Utilities
 ---
 
 # Mission Control (Orchestrator)

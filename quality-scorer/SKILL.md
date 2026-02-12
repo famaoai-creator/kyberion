@@ -1,12 +1,15 @@
 ---
 name: quality-scorer
-description: Evaluates technical and textual quality based on IPA benchmarks and readability standards.
+description: >-
+  Evaluates technical and textual quality based on IPA benchmarks and
+  readability standards.
 status: implemented
 arguments:
   - name: input
     short: i
     type: string
     description: Input file or directory path
+category: Engineering & DevOps
 ---
 # Quality Scorer
 

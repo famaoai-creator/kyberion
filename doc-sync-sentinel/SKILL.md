@@ -18,6 +18,7 @@ arguments:
     short: o
     type: string
     description: Output report file
+category: Governance & Security
 ---
 
 # Doc-Sync Sentinel

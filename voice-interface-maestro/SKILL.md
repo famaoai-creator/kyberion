@@ -1,7 +1,11 @@
 ---
 name: voice-interface-maestro
-description: Converts text responses into spoken audio (TTS). Supports multiple voice personas (Professional, Energetic, Calm) and secure configuration via the Personal Tier.
+description: >-
+  Converts text responses into spoken audio (TTS). Supports multiple voice
+  personas (Professional, Energetic, Calm) and secure configuration via the
+  Personal Tier.
 status: implemented
+category: Strategy & Leadership
 ---
 
 # Voice Interface Maestro

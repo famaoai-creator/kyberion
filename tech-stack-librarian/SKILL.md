@@ -13,6 +13,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Utilities
 ---
 
 # Tech Stack Librarian

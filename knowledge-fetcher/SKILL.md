@@ -12,6 +12,7 @@ arguments:
   - name: type
     short: t
     type: string
+category: Integration & API
 ---
 
 # Knowledge Fetcher (Hybrid Bridge)

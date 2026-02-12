@@ -24,6 +24,7 @@ arguments:
     short: f
     type: boolean
     description: Force download ignoring cache/manifest
+category: Utilities
 ---
 
 # Data Collector

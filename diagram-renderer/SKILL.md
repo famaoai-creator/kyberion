@@ -1,7 +1,11 @@
 ---
 name: diagram-renderer
-description: Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful for visualizing text-based architecture diagrams, flowcharts, and sequence diagrams.
+description: >-
+  Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful
+  for visualizing text-based architecture diagrams, flowcharts, and sequence
+  diagrams.
 status: implemented
+category: Data & Content
 ---
 
 # Diagram Renderer
