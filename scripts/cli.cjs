@@ -96,21 +96,46 @@ function listCommand() {
 
   let skills = index.skills;
   if (filter && ['implemented', 'planned', 'conceptual'].includes(filter)) {
-    skills = skills.filter(s => {
-      const skillMd = path.join(rootDir, s.name, 'SKILL.md');
-      if (!fs.existsSync(skillMd)) return false;
-      const content = fs.readFileSync(skillMd, 'utf8');
-      const statusMatch = content.match(/^status:\s*(.+)$/m);
-      return statusMatch && statusMatch[1].trim() === filter;
-    });
+    skills = skills.filter(s => s.status === filter);
   }
 
-  console.log(`\n${skills.length} skills${filter ? ` (${filter})` : ''}:\n`);
-  for (const s of skills) {
-    const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
-    console.log(`  [${hasScript}] ${s.name.padEnd(35)} ${s.description.substring(0, 60)}`);
-  }
-  console.log(`\n  [+] = has runnable scripts\n`);
+  // Load metrics for scores
+  const { metrics } = require('./lib/metrics.cjs');
+  const history = metrics.reportFromHistory();
+  const scores = new Map();
+  history.skills.forEach(s => scores.set(s.skill, s.efficiencyScore));
+
+  // Group by "Domain/Category" (simulated by path prefix or first tag)
+  const groups = {};
+  skills.forEach(s => {
+    // Try to find category from SKILL.md frontmatter or fallback to 'General'
+    const skillMd = path.join(rootDir, s.name, 'SKILL.md');
+    let category = 'General';
+    if (fs.existsSync(skillMd)) {
+      const content = fs.readFileSync(skillMd, 'utf8');
+      const fm = parseFrontmatter(content);
+      if (fm.category) category = fm.category;
+    }
+    
+    if (!groups[category]) groups[category] = [];
+    groups[category].push(s);
+  });
+
+  console.log(`\n${skills.length} skills${filter ? ` (${filter})` : ''} available:\n`);
+
+  Object.keys(groups).sort().forEach(cat => {
+    console.log(chalk.bold.underline(`${cat}:`));
+    groups[cat].sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
+      const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
+      const score = scores.get(s.name) || '--';
+      const scoreColor = score !== '--' && score < 70 ? chalk.yellow : chalk.green;
+      
+      console.log(`  [${hasScript}] ${s.name.padEnd(30)} ${scoreColor(String(score).padStart(3))} | ${s.description.substring(0, 50)}`);
+    });
+    console.log('');
+  });
+
+  console.log(`  [+] = runnable | Score: Efficiency (0-100)\n`);
 }
 
 function parseFrontmatter(content) {

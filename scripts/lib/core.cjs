@@ -47,65 +47,94 @@ const logger = {
 class Cache {
   /**
    * @param {number} [maxSize=100] - Maximum number of entries in the cache
-   * @param {number} [ttlMs=3600000] - Time-to-live in milliseconds (default 1 hour)
+   * @param {number} [ttlMs=3600000] - Time-to-live in milliseconds
+   * @param {string} [persistenceDir] - Directory to store persisted cache entries
    */
-  constructor(maxSize = 100, ttlMs = 3600000) {
+  constructor(maxSize = 100, ttlMs = 3600000, persistenceDir) {
     this._maxSize = maxSize;
     this._ttlMs = ttlMs;
-    /** @type {Map<string, {value: *, timestamp: number}>} */
+    this._persistenceDir = persistenceDir || path.join(process.cwd(), 'work/cache');
+    /** @type {Map<string, {value: *, timestamp: number, ttl: number, persistent: boolean}>} */
     this._map = new Map();
   }
 
   /**
    * Get a cached value. Returns undefined if the key is missing or expired.
-   * Promotes the key to most-recently-used on access.
+   * Checks disk if not found in memory and persistence is enabled.
    * @param {string} key
    * @returns {*|undefined}
    */
   get(key) {
     const entry = this._map.get(key);
-    if (!entry) return undefined;
+    
+    if (!entry) {
+      // Check disk if enabled
+      const diskPath = this._getDiskPath(key);
+      if (fs.existsSync(diskPath)) {
+        try {
+          const diskEntry = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
+          if (Date.now() - diskEntry.timestamp < diskEntry.ttl) {
+            this.set(key, diskEntry.value, diskEntry.ttl, false); // Reload to memory
+            return diskEntry.value;
+          } else {
+            fs.unlinkSync(diskPath); // Expired
+          }
+        } catch (_) { /* ignore corrupt disk cache */ }
+      }
+      return undefined;
+    }
+
     if (Date.now() - entry.timestamp > entry.ttl) {
       this._map.delete(key);
       return undefined;
     }
-    // Promote to most-recently-used by re-inserting
+    // Promote to most-recently-used
     this._map.delete(key);
     this._map.set(key, entry);
     return entry.value;
   }
 
   /**
-   * Store a value in the cache. Evicts the least-recently-used entry if full or memory is low.
+   * Store a value in the cache.
    * @param {string} key
    * @param {*} value
-   * @param {number} [customTtlMs] - Optional custom TTL for this entry
+   * @param {number} [customTtlMs] - Optional custom TTL
+   * @param {boolean} [persist=false] - Whether to write to disk
    */
-  set(key, value, customTtlMs) {
+  set(key, value, customTtlMs, persist = false) {
+    const ttl = customTtlMs || this._ttlMs;
+    const timestamp = Date.now();
+
     // 1. Memory Check: If heap is over 80% used, clear some entries
-    // Skip in test environment to ensure deterministic behavior
     if (process.env.NODE_ENV !== 'test') {
       const mem = process.memoryUsage();
       if (mem.heapUsed / mem.heapTotal > 0.8) {
-        const { logger } = require('./core.cjs');
-        logger.warn('[Cache] High memory usage detected, purging half of the cache entries.');
-        const keysToKeep = Array.from(this._map.keys()).slice(Math.floor(this._map.size / 2));
-        const newMap = new Map();
-        keysToKeep.forEach(k => newMap.set(k, this._map.get(k)));
-        this._map = newMap;
+        this.clear(); // Emergency purge
       }
     }
 
-    // 2. Standard LRU Logic
-    if (this._map.has(key)) {
-      this._map.delete(key);
-    }
-    // Evict LRU (first entry in Map iteration order) if at capacity
+    // 2. Memory Storage
+    if (this._map.has(key)) this._map.delete(key);
     if (this._map.size >= this._maxSize) {
       const lruKey = this._map.keys().next().value;
       this._map.delete(lruKey);
     }
-    this._map.set(key, { value, timestamp: Date.now(), ttl: customTtlMs || this._ttlMs });
+    this._map.set(key, { value, timestamp, ttl, persistent: persist });
+
+    // 3. Disk Storage
+    if (persist) {
+      const diskPath = this._getDiskPath(key);
+      try {
+        if (!fs.existsSync(this._persistenceDir)) fs.mkdirSync(this._persistenceDir, { recursive: true });
+        fs.writeFileSync(diskPath, JSON.stringify({ value, timestamp, ttl }), 'utf8');
+      } catch (_) { /* ignore write errors */ }
+    }
+  }
+
+  /** @private */
+  _getDiskPath(key) {
+    const safeKey = key.replace(/[^a-z0-9]/gi, '_').substring(0, 100);
+    return path.join(this._persistenceDir, `${safeKey}.cache.json`);
   }
 
   /**
@@ -202,7 +231,9 @@ const fileUtils = {
 
       // Cache optimization: Only cache files smaller than 5MB
       if (stat.size < 5 * 1024 * 1024) {
-        _fileCache.set(resolved, { mtimeMs, data });
+        // Persist critical index files to disk for cold-start performance
+        const isIndex = resolved.includes('global_skill_index.json');
+        _fileCache.set(resolved, { mtimeMs, data }, null, isIndex);
       }
       
       return data;
