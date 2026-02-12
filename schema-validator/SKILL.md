@@ -2,6 +2,17 @@
 name: schema-validator
 description: Validate JSON against schemas and identify best match.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: JSON data to validate
+  - name: schema
+    short: s
+    type: string
+    required: true
+    description: JSON Schema file path
 ---
 
 # Schema Validator

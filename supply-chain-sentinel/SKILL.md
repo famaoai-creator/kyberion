@@ -1,7 +1,22 @@
 ---
 name: supply-chain-sentinel
-description: Protects the software supply chain by generating SBoMs and auditing dependency provenance. Monitors for malicious packages and maintenance risks.
+description: >-
+  Protects the software supply chain by generating SBoMs and auditing dependency
+  provenance. Monitors for malicious packages and maintenance risks.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: format
+    short: f
+    type: string
+    description: SBoM output format
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Supply Chain Sentinel

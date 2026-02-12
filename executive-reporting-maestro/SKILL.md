@@ -1,6 +1,8 @@
 ---
 name: executive-reporting-maestro
-description: Synthesizes technical data into professional external reports for PMOs and stakeholders. Focuses on ROI, milestones, and high-level project health.
+description: >-
+  Synthesizes technical data into professional external reports for PMOs and
+  stakeholders. Focuses on ROI, milestones, and high-level project health.
 status: implemented
 arguments:
   - name: input
@@ -11,7 +13,6 @@ arguments:
   - name: title
     short: t
     type: string
-    default: Executive Status Report
     description: Report title
   - name: out
     short: o

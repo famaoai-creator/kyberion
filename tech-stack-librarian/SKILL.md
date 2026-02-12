@@ -1,7 +1,18 @@
 ---
 name: tech-stack-librarian
-description: Autonomously researches and compiles best practices for specific tools (SaaS/OSS). Fetches official docs and structures them into the knowledge base.
+description: >-
+  Autonomously researches and compiles best practices for specific tools
+  (SaaS/OSS). Fetches official docs and structures them into the knowledge base.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Tech Stack Librarian

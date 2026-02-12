@@ -1,7 +1,22 @@
 ---
 name: compliance-officer
-description: Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time compliance scores and audit-ready evidence reports.
+description: >-
+  Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates
+  real-time compliance scores and audit-ready evidence reports.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: standard
+    short: s
+    type: string
+    description: Compliance standard
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Compliance Officer

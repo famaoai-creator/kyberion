@@ -1,7 +1,33 @@
 ---
 name: box-connector
-description: Securely connects to Box using the Node.js SDK (JWT). downloads files, searches content, and manages folder structures.
+description: >-
+  Securely connects to Box using the Node.js SDK (JWT). downloads files,
+  searches content, and manages folder structures.
 status: implemented
+arguments:
+  - name: action
+    short: a
+    type: string
+    description: Action to perform
+  - name: folder
+    short: f
+    type: string
+    description: Box folder ID
+  - name: query
+    short: q
+    type: string
+    description: Search query
+  - name: config
+    short: c
+    type: string
+    description: Path to Box JWT config
+  - name: dry-run
+    type: boolean
+    description: Simulate without API calls
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Box Connector

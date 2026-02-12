@@ -2,6 +2,10 @@
 name: code-lang-detector
 description: Detect programming language of source code.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
 ---
 # code-lang-detector
 Detect programming language of source code.

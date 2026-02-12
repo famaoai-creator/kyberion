@@ -1,7 +1,17 @@
 ---
 name: knowledge-fetcher
-description: Fetch knowledge from both public and confidential directories. Bridges general best practices with proprietary internal standards.
+description: >-
+  Fetch knowledge from both public and confidential directories. Bridges general
+  best practices with proprietary internal standards.
 status: implemented
+arguments:
+  - name: query
+    short: q
+    type: string
+    required: true
+  - name: type
+    short: t
+    type: string
 ---
 
 # Knowledge Fetcher (Hybrid Bridge)

@@ -2,6 +2,14 @@
 name: sequence-mapper
 description: Generate Mermaid sequence diagrams from source code function calls.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+  - name: out
+    short: o
+    type: string
 ---
 
 # Sequence Mapper

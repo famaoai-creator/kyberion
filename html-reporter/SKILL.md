@@ -3,21 +3,9 @@ name: html-reporter
 description: Generate standalone HTML reports from JSON/Markdown.
 status: implemented
 arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Input markdown file path
   - name: title
-    short: t
+    short: title
     type: string
-    default: Report
-    description: Report title
-  - name: out
-    short: o
-    type: string
-    required: true
-    description: Output HTML file path
 ---
 
 # Html Reporter

@@ -1,6 +1,8 @@
 ---
 name: performance-monitor-analyst
-description: Correlates performance targets with actual profiling results. Identifies bottlenecks and validates against non-functional requirements.
+description: >-
+  Correlates performance targets with actual profiling results. Identifies
+  bottlenecks and validates against non-functional requirements.
 status: implemented
 arguments:
   - name: input

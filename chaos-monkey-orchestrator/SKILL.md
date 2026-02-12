@@ -1,7 +1,25 @@
 ---
 name: chaos-monkey-orchestrator
-description: Injects managed chaos into environments to test system resilience. Validates that self-healing and monitoring systems work as expected under stress.
+description: >-
+  Injects managed chaos into environments to test system resilience. Validates
+  that self-healing and monitoring systems work as expected under stress.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: intensity
+    short: 'n'
+    type: string
+    description: Chaos intensity level
+  - name: dry-run
+    type: boolean
+    description: Only simulate, do not execute
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Chaos Monkey Orchestrator

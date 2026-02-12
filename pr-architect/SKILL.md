@@ -1,7 +1,14 @@
 ---
 name: pr-architect
-description: Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain "Why", "How", and the "Impact" of the work.
+description: >-
+  Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes
+  to explain "Why", "How", and the "Impact" of the work.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Git repository directory
 ---
 
 # PR Architect

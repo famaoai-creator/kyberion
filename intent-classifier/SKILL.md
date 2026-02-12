@@ -2,6 +2,11 @@
 name: intent-classifier
 description: Classify intent of text (request, question, report).
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
 ---
 # intent-classifier
 Classify intent of text (request, question, report).

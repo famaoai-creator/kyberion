@@ -2,6 +2,18 @@
 name: glossary-resolver
 description: Resolve terms using glossary.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+  - name: glossary
+    short: g
+    type: string
+    required: true
+  - name: out
+    short: o
+    type: string
 ---
 # glossary-resolver
 Resolve terms using glossary.

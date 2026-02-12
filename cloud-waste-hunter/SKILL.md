@@ -1,7 +1,14 @@
 ---
 name: cloud-waste-hunter
-description: Actively identifies and eliminates unused or over-provisioned cloud resources. Goes beyond estimation to hunt for actual cost savings in live environments.
+description: >-
+  Actively identifies and eliminates unused or over-provisioned cloud resources.
+  Goes beyond estimation to hunt for actual cost savings in live environments.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Directory with cloud configs
 ---
 
 # Cloud Waste Hunter

@@ -1,7 +1,15 @@
 ---
 name: test-suite-architect
-description: Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. Enables Test-Driven Development (TDD) at scale.
+description: >-
+  Generates comprehensive test code (Jest, Pytest, Cypress) from requirements
+  and test viewpoints. Enables Test-Driven Development (TDD) at scale.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    required: true
+    description: Path to project directory to analyze
 ---
 
 # Test Suite Architect

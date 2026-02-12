@@ -2,6 +2,11 @@
 name: format-detector
 description: Detect text format (JSON, YAML, CSV, etc.) and confidence.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
 ---
 
 # Format Detector

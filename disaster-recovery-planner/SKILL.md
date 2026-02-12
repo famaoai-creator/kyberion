@@ -1,7 +1,24 @@
 ---
 name: disaster-recovery-planner
-description: Generates actionable Disaster Recovery (DR) runbooks from infrastructure and requirements. Validates IaC for resilience (backups, redundancy).
+description: >-
+  Generates actionable Disaster Recovery (DR) runbooks from infrastructure and
+  requirements. Validates IaC for resilience (backups, redundancy).
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: rto
+    type: number
+    description: Recovery Time Objective in hours
+  - name: rpo
+    type: number
+    description: Recovery Point Objective in hours
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Disaster Recovery Planner

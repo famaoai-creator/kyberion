@@ -2,6 +2,18 @@
 name: diff-visualizer
 description: Generate a visual difference report between two texts.
 status: implemented
+arguments:
+  - name: old
+    short: a
+    type: string
+    required: true
+  - name: new
+    short: b
+    type: string
+    required: true
+  - name: out
+    short: o
+    type: string
 ---
 
 # Diff Visualizer

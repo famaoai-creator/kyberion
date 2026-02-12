@@ -1,7 +1,24 @@
 ---
 name: operational-runbook-generator
-description: Generates detailed, step-by-step operational runbooks for day-to-day tasks (scaling, patching, updates). Ensures consistency and safety with built-in rollback procedures.
+description: >-
+  Generates detailed, step-by-step operational runbooks for day-to-day tasks
+  (scaling, patching, updates). Ensures consistency and safety with built-in
+  rollback procedures.
 status: implemented
+arguments:
+  - name: service
+    short: s
+    type: string
+    required: true
+    description: Service name
+  - name: type
+    short: t
+    type: string
+    description: Runbook type
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Operational Runbook Generator

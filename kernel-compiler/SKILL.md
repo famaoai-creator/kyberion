@@ -1,7 +1,25 @@
 ---
 name: kernel-compiler
-description: Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensures the ecosystem's "Self-Bootstrapping" capability.
+description: >-
+  Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime
+  dependencies. Ensures the ecosystem's "Self-Bootstrapping" capability.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: target
+    short: t
+    type: string
+    description: Compilation target
+  - name: dry-run
+    type: boolean
+    description: Analyze without compiling
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Kernel Compiler

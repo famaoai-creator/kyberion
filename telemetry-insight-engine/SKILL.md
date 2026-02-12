@@ -1,7 +1,19 @@
 ---
 name: telemetry-insight-engine
-description: Analyzes real-world telemetry and usage data to identify feature gaps and usability issues. Feeds insights back into the requirements phase.
+description: >-
+  Analyzes real-world telemetry and usage data to identify feature gaps and
+  usability issues. Feeds insights back into the requirements phase.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to telemetry data (JSON)
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Telemetry Insight Engine

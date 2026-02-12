@@ -1,7 +1,23 @@
 ---
 name: localization-maestro
-description: Manages global expansion by automating i18n workflows and auditing for cultural/regional appropriateness. Handles formats, currency, and sensitive localized expressions.
+description: >-
+  Manages global expansion by automating i18n workflows and auditing for
+  cultural/regional appropriateness. Handles formats, currency, and sensitive
+  localized expressions.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: locale
+    short: l
+    type: string
+    description: Target locale (e.g., ja, fr, de)
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Localization Maestro

@@ -1,6 +1,8 @@
 ---
 name: scenario-multiverse-orchestrator
-description: Generates multiple business scenarios (Growth/Stability/Hybrid) from financial and strategic assumptions for executive decision-making.
+description: >-
+  Generates multiple business scenarios (Growth/Stability/Hybrid) from financial
+  and strategic assumptions for executive decision-making.
 status: implemented
 arguments:
   - name: input
@@ -11,7 +13,6 @@ arguments:
   - name: scenarios
     short: s
     type: number
-    default: 3
     description: Number of scenarios to generate
   - name: out
     short: o

@@ -1,7 +1,18 @@
 ---
 name: sustainability-consultant
-description: Estimates the environmental impact (Carbon Footprint) of code and infrastructure. Recommends optimizations for energy efficiency and "GreenOps".
+description: >-
+  Estimates the environmental impact (Carbon Footprint) of code and
+  infrastructure. Recommends optimizations for energy efficiency and "GreenOps".
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Sustainability Consultant (GreenOps)

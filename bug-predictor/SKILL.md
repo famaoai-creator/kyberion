@@ -1,23 +1,22 @@
 ---
 name: bug-predictor
-description: Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns. Warns developers before a bug is even written.
+description: >-
+  Predicts future bug hotspots by analyzing code complexity, churn, and
+  historical defect patterns. Warns developers before a bug is even written.
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
-    default: "."
     description: Repository directory
   - name: top
-    short: n
+    short: 'n'
     type: number
-    default: 10
     description: Number of hotspots to show
   - name: since
     short: s
     type: string
-    default: 3 months ago
-    description: Analyze commits since this date
+    description: Analyze since
   - name: out
     short: o
     type: string

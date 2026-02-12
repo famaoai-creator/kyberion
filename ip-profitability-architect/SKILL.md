@@ -1,7 +1,19 @@
 ---
 name: ip-profitability-architect
-description: Designs business and licensing models for internal intellectual property. Transforms IP from a protection cost into a revenue-generating asset.
+description: >-
+  Designs business and licensing models for internal intellectual property.
+  Transforms IP from a protection cost into a revenue-generating asset.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to JSON with IP portfolio data
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # IP Profitability Architect

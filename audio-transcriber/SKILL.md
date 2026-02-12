@@ -2,6 +2,18 @@
 name: audio-transcriber
 description: Transcribe audio/video files to text using OpenAI Whisper.
 status: implemented
+arguments:
+  - name: file
+    short: f
+    type: string
+    required: true
+  - name: key
+    short: k
+    type: string
+    description: OpenAI API Key
+  - name: out
+    short: o
+    type: string
 ---
 
 # Audio Transcriber

@@ -1,7 +1,23 @@
 ---
 name: budget-variance-tracker
-description: Compares actual spend and revenue against forecasts. Provides variance analysis and corrective insights to ensure financial discipline.
+description: >-
+  Compares actual spend and revenue against forecasts. Provides variance
+  analysis and corrective insights to ensure financial discipline.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to JSON with actual vs forecast data
+  - name: threshold
+    short: t
+    type: number
+    description: Variance threshold percentage to flag
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Budget Variance Tracker

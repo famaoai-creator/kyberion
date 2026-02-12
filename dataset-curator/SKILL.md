@@ -1,7 +1,23 @@
 ---
 name: dataset-curator
-description: Prepares and audits high-quality datasets for AI/RAG applications. Cleans noise, structure data, and ensures privacy compliance in knowledge bases.
+description: >-
+  Prepares and audits high-quality datasets for AI/RAG applications. Cleans
+  noise, structure data, and ensures privacy compliance in knowledge bases.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to data file (JSON/CSV/text)
+  - name: out
+    short: o
+    type: string
+    description: Output file path
+  - name: format
+    short: f
+    type: string
+    description: Data format
 ---
 
 # Dataset Curator

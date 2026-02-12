@@ -1,7 +1,16 @@
 ---
 name: knowledge-harvester
-description: Clones external Git repositories and analyzes them to extract valuable knowledge. Converts discovered prompts, rules, and patterns into local knowledge assets.
+description: >-
+  Clones external Git repositories and analyzes them to extract valuable
+  knowledge. Converts discovered prompts, rules, and patterns into local
+  knowledge assets.
 status: implemented
+arguments:
+  - name: repo
+    short: r
+    type: string
+    required: true
+    description: Git repository URL
 ---
 
 # Knowledge Harvester

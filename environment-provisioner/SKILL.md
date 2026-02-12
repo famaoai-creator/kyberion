@@ -1,7 +1,27 @@
 ---
 name: environment-provisioner
-description: Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive requirements. The creative counterpart to terraform-arch-mapper.
+description: >-
+  Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive
+  requirements. The creative counterpart to terraform-arch-mapper.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to a YAML or JSON service definition file
+  - name: provider
+    short: p
+    type: string
+    description: Cloud provider (aws, azure, gcp)
+  - name: format
+    short: f
+    type: string
+    description: Output format (terraform, docker, k8s)
+  - name: out
+    short: o
+    type: string
+    description: Output file path for the report
 ---
 
 # Environment Provisioner

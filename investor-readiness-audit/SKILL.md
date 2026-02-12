@@ -1,7 +1,22 @@
 ---
 name: investor-readiness-audit
-description: Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, and compliance data is boardroom-ready.
+description: >-
+  Prepares documents and audits for fundraising or board meetings. Ensures
+  financial, technical, and compliance data is boardroom-ready.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory to audit
+  - name: stage
+    short: s
+    type: string
+    description: Fundraising stage
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Investor Readiness Audit

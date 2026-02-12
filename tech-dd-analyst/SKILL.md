@@ -1,7 +1,19 @@
 ---
 name: tech-dd-analyst
-description: Performs Technical Due Diligence on startups. Analyzes code (if available) or evaluates public signals (hiring, blogs) to assess technical risk and team maturity.
+description: >-
+  Performs Technical Due Diligence on startups. Analyzes code (if available) or
+  evaluates public signals (hiring, blogs) to assess technical risk and team
+  maturity.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory to analyze
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Tech DD Analyst

@@ -1,7 +1,29 @@
 ---
 name: slack-communicator-pro
-description: Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, alerts, and strategic announcements.
+description: >-
+  Manages high-fidelity notifications and team engagement on Slack. Sends
+  automated summaries, alerts, and strategic announcements.
 status: implemented
+arguments:
+  - name: action
+    short: a
+    type: string
+    description: Action
+  - name: channel
+    short: c
+    type: string
+    description: Slack channel
+  - name: input
+    short: i
+    type: string
+    description: Input message or JSON file
+  - name: dry-run
+    type: boolean
+    description: Simulate without sending
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 --- 
 
 # Slack Communicator Pro

@@ -1,12 +1,13 @@
 ---
 name: onboarding-wizard
-description: Generates a personalized project guide for new members. Analyzes the codebase and skills to help someone get productive in day one.
+description: >-
+  Generates a personalized project guide for new members. Analyzes the codebase
+  and skills to help someone get productive in day one.
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
-    default: "."
     description: Project directory
 ---
 

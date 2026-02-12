@@ -1,7 +1,23 @@
 ---
 name: api-evolution-manager
-description: Governs the evolution of public APIs. Detects breaking changes, manages deprecation cycles, and generates migration guides for clients.
+description: >-
+  Governs the evolution of public APIs. Detects breaking changes, manages
+  deprecation cycles, and generates migration guides for clients.
 status: implemented
+arguments:
+  - name: current
+    short: c
+    type: string
+    required: true
+    description: Path to current API spec (OpenAPI JSON/YAML)
+  - name: previous
+    short: p
+    type: string
+    description: Path to previous API spec for diff
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # API Evolution Manager

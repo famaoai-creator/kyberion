@@ -1,7 +1,21 @@
 ---
 name: skill-quality-auditor
-description: Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality, script functionality, and test coverage for all skills.
+description: >-
+  Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality,
+  script functionality, and test coverage for all skills.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project root directory
+  - name: skill
+    short: s
+    type: string
+    description: Audit a single skill by name
+  - name: min-score
+    type: number
+    description: Minimum passing score (0-12)
 ---
 
 # Skill Quality Auditor

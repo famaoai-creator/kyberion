@@ -1,7 +1,22 @@
 ---
 name: red-team-adversary
-description: Performs active security "war gaming" by attempting to exploit identified vulnerabilities in a sandbox. Validates threat reality beyond static scans.
+description: >-
+  Performs active security "war gaming" by attempting to exploit identified
+  vulnerabilities in a sandbox. Validates threat reality beyond static scans.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: scope
+    short: s
+    type: string
+    description: Assessment scope
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Red-Team Adversary

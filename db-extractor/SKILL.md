@@ -2,6 +2,17 @@
 name: db-extractor
 description: Extract schema and sample data from databases for analysis.
 status: implemented
+arguments:
+  - name: db
+    short: d
+    type: string
+    required: true
+  - name: query
+    short: q
+    type: string
+  - name: out
+    short: o
+    type: string
 ---
 
 # Db Extractor

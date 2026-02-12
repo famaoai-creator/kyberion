@@ -7,17 +7,16 @@ arguments:
     short: i
     type: string
     required: true
-    description: Input file path
+    description: Input file path (.json, .yaml, .csv)
   - name: to
-    short: t
+    short: F
     type: string
     required: true
-    choices: [json, yaml, csv]
-    description: Output format
+    description: Target format
   - name: out
     short: o
     type: string
-    description: Output file path
+    description: Output file path (optional)
 ---
 
 # Data Transformer

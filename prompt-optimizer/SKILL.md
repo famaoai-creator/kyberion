@@ -1,7 +1,19 @@
 ---
 name: prompt-optimizer
-description: Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.
+description: >-
+  Self-improves agent instructions and context handling. Analyzes failed or
+  suboptimal responses to refine system prompts and prompt templates.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to SKILL.md file to analyze
+  - name: out
+    short: o
+    type: string
+    description: Optional output file path
 ---
 
 # Prompt Optimizer

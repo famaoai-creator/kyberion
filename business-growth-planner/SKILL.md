@@ -1,7 +1,19 @@
 ---
 name: business-growth-planner
-description: Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.
+description: >-
+  Helps define long-term business goals, market entry strategies, and revenue
+  streams. Translates CEO vision into structured OKRs and growth pillars.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to JSON with business goals and context
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Business Growth Planner

@@ -2,6 +2,11 @@
 name: lang-detector
 description: Detect natural language of text (ja, en, etc.).
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
 ---
 
 # Lang Detector

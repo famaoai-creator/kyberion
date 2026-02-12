@@ -1,7 +1,19 @@
 ---
 name: data-lineage-guardian
-description: Tracks the flow and integrity of data across the entire stack. Monitors data quality, ensures "Right to be Forgotten" compliance, and visualizes data lineage.
+description: >-
+  Tracks the flow and integrity of data across the entire stack. Monitors data
+  quality, ensures "Right to be Forgotten" compliance, and visualizes data
+  lineage.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Data Lineage Guardian

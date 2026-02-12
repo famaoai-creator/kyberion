@@ -1,7 +1,28 @@
 ---
 name: stakeholder-communicator
-description: Translates technical decisions and architectural changes into clear, business-oriented language for non-technical stakeholders (Execs, Marketing, Sales).
+description: >-
+  Translates technical decisions and architectural changes into clear,
+  business-oriented language for non-technical stakeholders (Execs, Marketing,
+  Sales).
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to technical document or JSON report
+  - name: audience
+    short: a
+    type: string
+    description: Target audience
+  - name: format
+    short: f
+    type: string
+    description: Output format
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Stakeholder Communicator

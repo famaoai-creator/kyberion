@@ -1,7 +1,26 @@
 ---
 name: issue-to-solution-bridge
-description: Automates the entire lifecycle from issue detection to solution. Interprets bug reports or feature requests and orchestrates other skills to implement and test the fix.
+description: >-
+  Automates the entire lifecycle from issue detection to solution. Interprets
+  bug reports or feature requests and orchestrates other skills to implement and
+  test the fix.
 status: implemented
+arguments:
+  - name: issue
+    short: i
+    type: string
+    description: GitHub issue number or URL
+  - name: description
+    short: d
+    type: string
+    description: Issue description text
+  - name: repo
+    short: r
+    type: string
+    description: Repository (owner/repo)
+  - name: dry-run
+    type: boolean
+    description: Analysis only, no changes
 ---
 
 # Issue-to-Solution Bridge

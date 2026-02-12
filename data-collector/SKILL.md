@@ -1,7 +1,29 @@
 ---
 name: data-collector
-description: Fetches data from URLs (Web/API) and saves it to a local directory with metadata (timestamp, source, hash) for traceability. Supports incremental updates.
+description: >-
+  Fetches data from URLs (Web/API) and saves it to a local directory with
+  metadata (timestamp, source, hash) for traceability. Supports incremental
+  updates.
 status: implemented
+arguments:
+  - name: url
+    short: u
+    type: string
+    required: true
+    description: Source URL to fetch
+  - name: out
+    short: o
+    type: string
+    required: true
+    description: Output directory
+  - name: name
+    short: 'n'
+    type: string
+    description: Output filename (optional)
+  - name: force
+    short: f
+    type: boolean
+    description: Force download ignoring cache/manifest
 ---
 
 # Data Collector

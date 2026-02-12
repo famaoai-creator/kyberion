@@ -7,7 +7,6 @@ arguments:
     short: i
     type: string
     required: true
-    description: Input file path
   - name: criteria
     short: c
     type: string

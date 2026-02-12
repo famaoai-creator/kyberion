@@ -2,6 +2,20 @@
 name: context-injector
 description: Inject knowledge into JSON data context.
 status: implemented
+arguments:
+  - name: data
+    short: d
+    type: string
+    required: true
+  - name: knowledge
+    short: k
+    type: string
+    required: true
+  - name: out
+    short: o
+    type: string
+  - name: output-tier
+    type: string
 ---
 # context-injector
 Inject knowledge into JSON data context.

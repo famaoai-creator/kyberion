@@ -1,7 +1,19 @@
 ---
 name: refactoring-engine
-description: Executes large-scale architectural refactoring and technical debt reduction across the entire codebase. Ensures consistency with modern design patterns.
+description: >-
+  Executes large-scale architectural refactoring and technical debt reduction
+  across the entire codebase. Ensures consistency with modern design patterns.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to source file to analyze
+  - name: out
+    short: o
+    type: string
+    description: Optional output file path
 ---
 
 # Refactoring Engine

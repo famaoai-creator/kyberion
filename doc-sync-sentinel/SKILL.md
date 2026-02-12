@@ -1,7 +1,23 @@
 ---
 name: doc-sync-sentinel
-description: Automatically synchronizes documentation with code changes. Detects drift between source code and READMEs, Wikis, or comments, and suggests autonomous updates.
+description: >-
+  Automatically synchronizes documentation with code changes. Detects drift
+  between source code and READMEs, Wikis, or comments, and suggests autonomous
+  updates.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Directory to check
+  - name: since
+    short: s
+    type: string
+    description: Check changes since
+  - name: out
+    short: o
+    type: string
+    description: Output report file
 ---
 
 # Doc-Sync Sentinel

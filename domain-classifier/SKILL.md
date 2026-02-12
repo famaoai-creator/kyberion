@@ -2,6 +2,11 @@
 name: domain-classifier
 description: Classify domain (tech, finance, legal).
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
 ---
 # domain-classifier
 Classify domain (tech, finance, legal).

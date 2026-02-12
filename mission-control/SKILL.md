@@ -1,33 +1,19 @@
 ---
 name: mission-control
-description: Orchestrates multiple skills to achieve high-level goals. Acts as the brain of the ecosystem to coordinate complex workflows across the SDLC.
+description: >-
+  Orchestrates multiple skills to achieve high-level goals. Acts as the brain of
+  the ecosystem to coordinate complex workflows across the SDLC.
 status: implemented
 arguments:
   - name: pipeline
     short: p
     type: string
-    description: Path to YAML pipeline definition file
   - name: skills
     short: s
     type: string
-    description: Comma-separated list of skill names for ad-hoc execution
   - name: dir
     short: d
     type: string
-    default: "."
-    description: Working directory for variable substitution
-  - name: input
-    short: i
-    type: string
-    description: Input path for variable substitution
-  - name: output
-    short: o
-    type: string
-    description: Output path for variable substitution
-  - name: parallel
-    type: boolean
-    default: false
-    description: Run ad-hoc skills in parallel
 ---
 
 # Mission Control (Orchestrator)

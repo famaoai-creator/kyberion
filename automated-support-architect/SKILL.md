@@ -1,7 +1,23 @@
 ---
 name: automated-support-architect
-description: Generates high-quality user support assets (FAQs, Troubleshooting Guides, Chatbot Knowledge) directly from source code and requirements. Bridges the gap between developers and end-users.
+description: >-
+  Generates high-quality user support assets (FAQs, Troubleshooting Guides,
+  Chatbot Knowledge) directly from source code and requirements. Bridges the gap
+  between developers and end-users.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: type
+    short: t
+    type: string
+    description: Support asset type
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Automated Support Architect

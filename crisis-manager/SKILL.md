@@ -1,12 +1,14 @@
 ---
 name: crisis-manager
-description: Provides rapid response during production incidents or critical security breaches. Coordinates diagnostics, temporary fixes, and post-mortem data collection.
+description: >-
+  Provides rapid response during production incidents or critical security
+  breaches. Coordinates diagnostics, temporary fixes, and post-mortem data
+  collection.
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
-    default: "."
     description: Project/repository directory
   - name: log
     short: l
@@ -15,7 +17,6 @@ arguments:
   - name: since
     short: s
     type: string
-    default: 24 hours ago
     description: Analyze changes since this time
   - name: out
     short: o

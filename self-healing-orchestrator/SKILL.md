@@ -1,6 +1,8 @@
 ---
 name: self-healing-orchestrator
-description: Automatically repairs known production issues by applying patches, rollbacks, or config changes. The autonomous counterpart to crisis-manager.
+description: >-
+  Automatically repairs known production issues by applying patches, rollbacks,
+  or config changes. The autonomous counterpart to crisis-manager.
 status: implemented
 arguments:
   - name: input
@@ -10,7 +12,6 @@ arguments:
     description: Path to error log or JSON error report
   - name: dry-run
     type: boolean
-    default: true
     description: Only propose fixes without applying them
   - name: out
     short: o

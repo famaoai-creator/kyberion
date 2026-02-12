@@ -1,6 +1,9 @@
 ---
 name: financial-modeling-maestro
-description: Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms business assumptions into multi-year financial statements.
+description: >-
+  Generates and analyzes financial models, P&L forecasts, and cash flow
+  projections. Transforms business assumptions into multi-year financial
+  statements.
 status: implemented
 arguments:
   - name: input
@@ -9,9 +12,8 @@ arguments:
     required: true
     description: Path to JSON file with financial assumptions
   - name: years
-    short: y
+    short: 'y'
     type: number
-    default: 3
     description: Number of years to project
   - name: out
     short: o

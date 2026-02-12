@@ -1,6 +1,8 @@
 ---
 name: visionary-ethos-keeper
-description: Ensures decisions and proposals align with company mission, values, and ethical guidelines. Checks for bias, privacy, and fairness concerns.
+description: >-
+  Ensures decisions and proposals align with company mission, values, and
+  ethical guidelines. Checks for bias, privacy, and fairness concerns.
 status: implemented
 arguments:
   - name: input

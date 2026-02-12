@@ -2,6 +2,11 @@
 name: encoding-detector
 description: Detect file encoding and line endings.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
 ---
 
 # Encoding Detector

@@ -1,7 +1,15 @@
 ---
 name: log-to-requirement-bridge
-description: Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Operations and Development.
+description: >-
+  Analyzes runtime errors and logs to draft improvement requirements. Bridges
+  the gap between Operations and Development.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to the log file to analyze
 ---
 
 # Log-to-Requirement Bridge

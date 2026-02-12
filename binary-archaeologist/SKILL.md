@@ -1,7 +1,20 @@
 ---
 name: binary-archaeologist
-description: Reverse engineers legacy binaries and "black box" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.
+description: >-
+  Reverse engineers legacy binaries and "black box" executables to extract logic
+  and dependencies. Re-integrates lost institutional assets into modern
+  codebases.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to binary or executable file
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Binary Archaeologist

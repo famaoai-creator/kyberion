@@ -1,7 +1,29 @@
 ---
 name: jira-agile-assistant
-description: Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints, and synchronizes the backlog with the technical roadmap.
+description: >-
+  Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints,
+  and synchronizes the backlog with the technical roadmap.
 status: implemented
+arguments:
+  - name: action
+    short: a
+    type: string
+    description: Action
+  - name: input
+    short: i
+    type: string
+    description: Input JSON file
+  - name: project
+    short: p
+    type: string
+    description: Jira project key
+  - name: dry-run
+    type: boolean
+    description: Simulate without API calls
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Jira Agile Assistant

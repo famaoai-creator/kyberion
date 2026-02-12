@@ -1,7 +1,18 @@
 ---
 name: post-quantum-shield
-description: Audits codebases for quantum-vulnerable cryptography and plans migration to Post-Quantum Cryptography (PQC) standards to ensure long-term data security.
+description: >-
+  Audits codebases for quantum-vulnerable cryptography and plans migration to
+  Post-Quantum Cryptography (PQC) standards to ensure long-term data security.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Post-Quantum Shield

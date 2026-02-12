@@ -1,7 +1,22 @@
 ---
 name: auto-context-mapper
-description: Intelligently links related knowledge assets across tiers. Automatically fetches prerequisite data and high-level mission context for any task.
+description: >-
+  Intelligently links related knowledge assets across tiers. Automatically
+  fetches prerequisite data and high-level mission context for any task.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project root directory
+  - name: query
+    short: q
+    type: string
+    description: Context query to resolve
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Auto-Context Mapper

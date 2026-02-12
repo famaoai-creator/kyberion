@@ -1,7 +1,22 @@
 ---
 name: strategic-roadmap-planner
-description: Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic roadmap. Aligns engineering effort with business ROI.
+description: >-
+  Analyzes code complexity, technical debt, and industry trends to propose a
+  3-month strategic roadmap. Aligns engineering effort with business ROI.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Project directory to analyze
+  - name: months
+    short: m
+    type: number
+    description: Planning horizon in months
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Strategic Roadmap Planner

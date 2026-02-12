@@ -1,6 +1,9 @@
 ---
 name: business-impact-analyzer
-description: Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financial impact. Helps justify technical investments to stakeholders.
+description: >-
+  Translates engineering metrics (DORA, error rates, technical debt) into
+  business KPIs and financial impact. Helps justify technical investments to
+  stakeholders.
 status: implemented
 arguments:
   - name: input

@@ -1,7 +1,29 @@
 ---
 name: browser-navigator
-description: Automates browser actions using Playwright CLI. Can record, replay, and generate browser automation scenarios stored in the knowledge base. Useful for UI testing, data extraction, and visual auditing.
+description: >-
+  Automates browser actions using Playwright CLI. Can record, replay, and
+  generate browser automation scenarios stored in the knowledge base. Useful for
+  UI testing, data extraction, and visual auditing.
 status: implemented
+arguments:
+  - name: url
+    short: u
+    type: string
+    description: URL to navigate to
+  - name: scenario
+    short: s
+    type: string
+    description: Path to Playwright spec file
+  - name: screenshot
+    type: boolean
+    description: Take a screenshot
+  - name: extract
+    type: string
+    description: CSS selector to extract text from
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Browser Navigator (Playwright-based)

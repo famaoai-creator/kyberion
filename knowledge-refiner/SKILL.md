@@ -1,7 +1,22 @@
 ---
 name: knowledge-refiner
-description: Maintains and consolidates the knowledge base. Cleans up unstructured data and merges it into structured glossaries or patterns.
+description: >-
+  Maintains and consolidates the knowledge base. Cleans up unstructured data and
+  merges it into structured glossaries or patterns.
 status: implemented
+arguments:
+  - name: dir
+    short: d
+    type: string
+    description: Knowledge base directory
+  - name: action
+    short: a
+    type: string
+    description: Refinement action
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # Knowledge Refiner

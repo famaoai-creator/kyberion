@@ -1,7 +1,24 @@
 ---
 name: ai-model-orchestrator
-description: Dynamically selects the optimal AI model based on task complexity, cost, and latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize efficiency.
+description: >-
+  Dynamically selects the optimal AI model based on task complexity, cost, and
+  latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize
+  efficiency.
 status: implemented
+arguments:
+  - name: input
+    short: i
+    type: string
+    required: true
+    description: Path to JSON task description or text prompt file
+  - name: budget
+    short: b
+    type: string
+    description: Cost tier preference
+  - name: out
+    short: o
+    type: string
+    description: Output file path
 ---
 
 # AI Model Orchestrator
