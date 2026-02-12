@@ -24,8 +24,8 @@ function generateSVG(resources) {
     const subnets = resources.filter(r => r.type === 'aws_subnet');
     const others = resources.filter(r => r.type !== 'aws_vpc' && r.type !== 'aws_subnet');
 
-    let x = 60;
-    let y = 80;
+    const x = 60;
+    const y = 80;
 
     // Draw VPCs as large containers
     vpcs.forEach(vpc => {
@@ -38,7 +38,7 @@ function generateSVG(resources) {
     });
 
     // Draw Subnets inside
-    let sx = x + 40;
+    const sx = x + 40;
     let sy = y + 60;
     subnets.forEach(sn => {
         svg += `
@@ -49,7 +49,7 @@ function generateSVG(resources) {
         
         // Draw Compute inside Subnet (simplified layout)
         let cx = sx + 40;
-        let cy = sy + 50;
+        const cy = sy + 50;
         others.filter(o => o.type === 'aws_instance').forEach(inst => {
             svg += `
             <g transform="translate(${cx}, ${cy})">
@@ -64,7 +64,7 @@ function generateSVG(resources) {
 
     // Draw Global Services (S3, Lambda) outside or at the bottom
     let gx = x + 40;
-    let gy = 650;
+    const gy = 650;
     others.filter(o => o.type !== 'aws_instance').forEach(res => {
         const iconUrl = ICON_MAP[res.type] || ICON_MAP.aws_instance;
         svg += `

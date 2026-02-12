@@ -2,7 +2,7 @@
   "name": "diagram-renderer",
   "version": "1.0.0",
   "description": "Text to Image diagram renderer",
-  "main": "scripts/render.cjs",
+  "main": "scripts/main.cjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

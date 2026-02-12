@@ -127,6 +127,18 @@ class Cache {
 const _fileCache = new Cache(200, 3600000);
 
 /**
+ * Global error handler. Logs error and exits with code 1.
+ * Set DEBUG=1 env var to see full stack traces.
+ * @param {Error} err - The error object
+ * @param {string} [context=''] - Description of where the error occurred
+ */
+const errorHandler = (err, context = '') => {
+  logger.error(`${context}: ${err.message || err}`);
+  if (process.env.DEBUG) console.error(err.stack);
+  process.exit(1);
+};
+
+/**
  * File system utilities with safe defaults.
  * @namespace
  */
@@ -195,18 +207,6 @@ const fileUtils = {
       errorHandler(err, 'fileUtils.writeJson');
     }
   },
-};
-
-/**
- * Global error handler. Logs error and exits with code 1.
- * Set DEBUG=1 env var to see full stack traces.
- * @param {Error} err - The error object
- * @param {string} [context=''] - Description of where the error occurred
- */
-const errorHandler = (err, context = '') => {
-  logger.error(`${context}: ${err.message || err}`);
-  if (process.env.DEBUG) console.error(err.stack);
-  process.exit(1);
 };
 
 module.exports = {
