@@ -1,7 +1,10 @@
 ---
 name: autonomous-skill-designer
-description: The ultimate "self-generation" skill. Autonomously designs and implements new Gemini skills to solve novel problems that current skills cannot address.
+description: >-
+  The ultimate "self-generation" skill. Autonomously designs and implements new
+  Gemini skills to solve novel problems that current skills cannot address.
 status: implemented
+category: Utilities
 ---
 
 # Autonomous Skill Designer

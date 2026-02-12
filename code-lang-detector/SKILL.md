@@ -6,6 +6,7 @@ arguments:
   - name: input
     short: i
     type: string
+category: Utilities
 ---
 # code-lang-detector
 Detect programming language of source code.

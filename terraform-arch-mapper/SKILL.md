@@ -1,7 +1,11 @@
 ---
 name: terraform-arch-mapper
-description: Generates a system architecture diagram from Terraform code. It parses .tf files to identify resources and relationships, then produces a diagram code (Mermaid/PlantUML). Use to visualize infrastructure.
+description: >-
+  Generates a system architecture diagram from Terraform code. It parses .tf
+  files to identify resources and relationships, then produces a diagram code
+  (Mermaid/PlantUML). Use to visualize infrastructure.
 status: implemented
+category: Engineering & DevOps
 ---
 
 # Terraform Arch Mapper

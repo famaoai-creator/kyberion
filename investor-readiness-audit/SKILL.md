@@ -17,6 +17,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Utilities
 ---
 
 # Investor Readiness Audit

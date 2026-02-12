@@ -10,6 +10,7 @@ arguments:
     type: string
     required: true
     description: Path to the log file to analyze
+category: Utilities
 ---
 
 # Log-to-Requirement Bridge

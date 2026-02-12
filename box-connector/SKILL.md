@@ -28,6 +28,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Integration & API
 ---
 
 # Box Connector

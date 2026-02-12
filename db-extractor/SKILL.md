@@ -13,6 +13,7 @@ arguments:
   - name: out
     short: o
     type: string
+category: Utilities
 ---
 
 # Db Extractor

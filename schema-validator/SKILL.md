@@ -13,6 +13,7 @@ arguments:
     type: string
     required: true
     description: JSON Schema file path
+category: Utilities
 ---
 
 # Schema Validator

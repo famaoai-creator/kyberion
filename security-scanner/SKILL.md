@@ -1,7 +1,11 @@
 ---
 name: security-scanner
-description: Scans the codebase for security risks, including hardcoded secrets (API keys, tokens), dangerous code patterns (eval, shell injection), and insecure configurations. Use to audit code before committing or reviewing.
+description: >-
+  Scans the codebase for security risks, including hardcoded secrets (API keys,
+  tokens), dangerous code patterns (eval, shell injection), and insecure
+  configurations. Use to audit code before committing or reviewing.
 status: implemented
+category: Governance & Security
 ---
 
 # Security Scanner

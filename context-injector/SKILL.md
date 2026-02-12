@@ -16,6 +16,7 @@ arguments:
     type: string
   - name: output-tier
     type: string
+category: Utilities
 ---
 # context-injector
 Inject knowledge into JSON data context.

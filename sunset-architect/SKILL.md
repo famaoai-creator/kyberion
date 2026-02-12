@@ -15,6 +15,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Strategy & Leadership
 ---
 
 # Sunset Architect

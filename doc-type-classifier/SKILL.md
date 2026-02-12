@@ -2,6 +2,7 @@
 name: doc-type-classifier
 description: Classify document type (meeting-notes, spec, etc).
 status: implemented
+category: Utilities
 ---
 # doc-type-classifier
 Classify document type (meeting-notes, spec, etc).

@@ -14,6 +14,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Governance & Security
 ---
 
 # IP Strategist

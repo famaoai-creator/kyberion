@@ -10,6 +10,7 @@ arguments:
   - name: out
     short: o
     type: string
+category: Engineering & DevOps
 ---
 
 # Sequence Mapper

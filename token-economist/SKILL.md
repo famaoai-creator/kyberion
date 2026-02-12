@@ -13,6 +13,7 @@ arguments:
     short: t
     type: string
     description: Raw text string to analyze
+category: Utilities
 ---
 
 # Token Economist

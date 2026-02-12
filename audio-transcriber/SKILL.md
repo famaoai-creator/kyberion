@@ -14,6 +14,7 @@ arguments:
   - name: out
     short: o
     type: string
+category: Interface & AI
 ---
 
 # Audio Transcriber

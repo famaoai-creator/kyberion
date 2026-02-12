@@ -20,6 +20,7 @@ arguments:
     short: o
     type: string
     description: Output directory (defaults to ./<name>)
+category: Utilities
 ---
 
 # Boilerplate Genie

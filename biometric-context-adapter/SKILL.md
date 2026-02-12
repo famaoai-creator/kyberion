@@ -1,7 +1,11 @@
 ---
 name: biometric-context-adapter
-description: Infers user stress/energy levels from interaction patterns (typing speed, error rate). Adjusts response verbosity and visualizes mood via a "Niko-Niko Calendar."
+description: >-
+  Infers user stress/energy levels from interaction patterns (typing speed,
+  error rate). Adjusts response verbosity and visualizes mood via a "Niko-Niko
+  Calendar."
 status: implemented
+category: Interface & AI
 ---
 
 # Biometric Context Adapter

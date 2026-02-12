@@ -2,6 +2,7 @@
 name: word-artisan
 description: Generate Word documents (.docx) from Markdown.
 status: implemented
+category: Data & Content
 ---
 
 # Word Artisan

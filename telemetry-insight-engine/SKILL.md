@@ -14,6 +14,7 @@ arguments:
     short: o
     type: string
     description: Output file path
+category: Engineering & DevOps
 ---
 
 # Telemetry Insight Engine
