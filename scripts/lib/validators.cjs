@@ -65,7 +65,7 @@ function validateDirPath(dirPath, label = 'directory') {
 function safeJsonParse(jsonString, label = 'JSON') {
   try {
     return JSON.parse(jsonString);
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Invalid ${label}: ${err.message}`);
   }
 }
