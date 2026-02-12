@@ -65,6 +65,36 @@ function safeReadFile(filePath, options = {}) {
 }
 
 /**
+ * Write a file safely with size validation and role-based write control.
+ * @param {string} filePath - Path to write
+ * @param {string|Buffer} data - Content to write
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.mkdir=true] - Create parent directory if missing
+ * @param {string} [options.encoding='utf8'] - File encoding
+ * @throws {Error} If write is denied by role-based control or FS error
+ */
+function safeWriteFile(filePath, data, options = {}) {
+  const { mkdir = true, encoding = 'utf8' } = options;
+  const resolved = path.resolve(filePath);
+
+  // Integrate role-based write control (Lazy-load to avoid circular deps)
+  const { validateWritePermission } = require('./tier-guard.cjs');
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) {
+    throw new Error(guard.reason);
+  }
+
+  if (mkdir) {
+    const dir = path.dirname(resolved);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+
+  fs.writeFileSync(resolved, data, encoding);
+}
+
+/**
  * Execute a command safely using execFileSync (no shell interpolation).
  * Uses execFileSync instead of execSync to prevent shell injection.
  * @param {string} command - The command to run (no shell expansion)

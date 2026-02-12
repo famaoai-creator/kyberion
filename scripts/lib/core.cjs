@@ -183,13 +183,8 @@ const fileUtils = {
    */
   writeJson: (filePath, data) => {
     try {
-      // Lazy-load tier-guard to avoid circular dependencies if any
-      const { validateWritePermission } = require('./tier-guard.cjs');
-      const guard = validateWritePermission(filePath);
-      if (!guard.allowed) {
-        throw new Error(guard.reason);
-      }
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      const { safeWriteFile } = require('./secure-io.cjs');
+      safeWriteFile(filePath, JSON.stringify(data, null, 2));
     } catch (err) {
       errorHandler(err, 'fileUtils.writeJson');
     }

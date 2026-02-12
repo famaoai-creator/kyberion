@@ -12,20 +12,26 @@ const indexFile = path.join(rootDir, 'knowledge/orchestration/global_skill_index
 
 try {
     const skills = [];
-    const dirs = fs.readdirSync(rootDir).filter(f => 
-        fs.statSync(path.join(rootDir, f)).isDirectory() && 
-        !f.startsWith('.') && f !== 'node_modules' && f !== 'knowledge' && f !== 'scripts'
-    );
+    const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+    
+    // Pre-compile regex for performance
+    const descRegex = /^description:\s*(.*)$/m;
+    const statusRegex = /^status:\s*(\w+)$/m;
+
+    const dirs = entries
+        .filter(e => e.isDirectory() && !e.name.startsWith('.') && !['node_modules', 'knowledge', 'scripts', 'evidence', 'work', 'templates', 'schemas', 'nonfunctional', 'pipelines', 'plugins'].includes(e.name))
+        .map(e => e.name);
 
     for (const dir of dirs) {
         const skillPath = path.join(rootDir, dir, 'SKILL.md');
         if (fs.existsSync(skillPath)) {
             const content = fs.readFileSync(skillPath, 'utf8');
-            const description = content.match(/description: (.*)/)?.[1] || '';
-            const statusMatch = content.match(/status:\s*(\w+)/);
+            const descMatch = content.match(descRegex);
+            const statusMatch = content.match(statusRegex);
+            
             skills.push({
                 name: dir,
-                description: description.trim(),
+                description: descMatch ? descMatch[1].trim() : '',
                 status: statusMatch ? statusMatch[1] : 'unknown',
                 path: `./${dir}/`
             });
