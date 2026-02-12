@@ -4,9 +4,47 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { fileUtils } = require('./core.cjs');
 
 const PERSONAL_DIR = path.resolve(__dirname, '../../knowledge/personal');
 const CONFIDENTIAL_DIR = path.resolve(__dirname, '../../knowledge/confidential');
+const PUBLIC_DIR = path.resolve(__dirname, '../../knowledge');
+
+/**
+ * Validate if the current role has permission to write to a specific path.
+ * Implements GEMINI.md 3.G (Role-Based Write Control).
+ * 
+ * @param {string} targetPath - Absolute or relative path to the file/directory.
+ * @returns {Object} { allowed: boolean, reason: string }
+ */
+function validateWritePermission(targetPath) {
+    const role = fileUtils.getCurrentRole();
+    const resolvedPath = path.resolve(targetPath);
+
+    // 1. Public Write (Architect Only)
+    if (resolvedPath.startsWith(PUBLIC_DIR) && 
+        !resolvedPath.startsWith(CONFIDENTIAL_DIR) && 
+        !resolvedPath.startsWith(PERSONAL_DIR)) {
+        if (role !== 'Ecosystem Architect') {
+            return { 
+                allowed: false, 
+                reason: `Public Write Denied: Only 'Ecosystem Architect' can modify Public Tier assets. Current role: ${role}` 
+            };
+        }
+    }
+
+    // 2. Confidential/Personal Isolation (Architect cannot write)
+    if (role === 'Ecosystem Architect') {
+        if (resolvedPath.startsWith(CONFIDENTIAL_DIR) || resolvedPath.startsWith(PERSONAL_DIR)) {
+            return {
+                allowed: false,
+                reason: `Confidential/Personal Write Denied: 'Ecosystem Architect' must not write to sensitive tiers. Current role: ${role}`
+            };
+        }
+    }
+
+    return { allowed: true };
+}
 
 /**
  * Scan content for potential leaks of sovereign secrets.

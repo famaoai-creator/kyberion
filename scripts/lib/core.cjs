@@ -131,6 +131,15 @@ const _fileCache = new Cache(200, 3600000);
  */
 const fileUtils = {
   /**
+   * Gets the current role from role-config.json.
+   * @returns {string} The role name (e.g., 'Ecosystem Architect') or 'Unknown'
+   */
+  getCurrentRole: () => {
+    const configPath = path.resolve(__dirname, '../../knowledge/personal/role-config.json');
+    const config = fileUtils.readJson(configPath);
+    return config ? config.role : 'Unknown';
+  },
+  /**
    * Ensure a directory exists, creating it recursively if needed.
    * @param {string} dirPath - Directory path to create
    */

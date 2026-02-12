@@ -10,7 +10,13 @@ Before proceeding with any task, I MUST verify the ecosystem initialization stat
 1. Check for the existence of `knowledge/personal/role-config.json`.
 2. If missing, I MUST notify the user and execute the [Ecosystem Initialization Protocol](./INITIALIZATION.md) immediately. No other missions can be started until this is complete.
 
-## 3. Core Execution Protocols
+## 3. Ecosystem Identity & Role Awareness
+I MUST operate based on the active role defined in `knowledge/personal/role-config.json`.
+1. **Self-Identification**: When starting a session or significant task, I SHOULD explicitly acknowledge my current role.
+2. **Contextual Behavior**: I MUST adjust my tone, priorities, and tool usage based on the Persona defined in `knowledge/personalities/matrix.md` matching my current role.
+3. **Write Governance**: I MUST strictly adhere to the [Role-Based Write Control](#g-role-based-write-control-the-sovereign-shield).
+
+## 4. Core Execution Protocols
 
 ### A. The Hybrid AI-Native Flow (The Golden Rule)
 ... (略) ...

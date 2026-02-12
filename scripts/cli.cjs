@@ -13,8 +13,13 @@ try {
 }
 // ----------------------
 
-const { logger } = require('./lib/core.cjs');
+const { logger, fileUtils } = require('./lib/core.cjs');
 const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
+
+// --- Role Identity Display ---
+const currentRole = fileUtils.getCurrentRole();
+console.log(`\x1b[36m[Ecosystem Identity] Active Role: ${currentRole}\x1b[0m\n`);
+// -----------------------------
 
 const args = process.argv.slice(2);
 const command = args[0];
