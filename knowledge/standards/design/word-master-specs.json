@@ -1,0 +1,18 @@
+{
+  "master_name": "Gemini-Report-Master",
+  "typography": {
+    "heading_1": { "size": 24, "color": "#232f3e", "bold": true, "alignment": "center" },
+    "heading_2": { "size": 18, "color": "#232f3e", "bold": true, "border_bottom": "2px solid #ff9900" },
+    "body": { "size": 10.5, "font": "MS Mincho", "line_height": 1.5, "color": "#1a1a1a" }
+  },
+  "layout": {
+    "margins": { "top": 1440, "right": 1440, "bottom": 1440, "left": 1440 },
+    "header": true,
+    "footer": true,
+    "page_numbers": true
+  },
+  "table_style": {
+    "header_bg": "#deeaf6",
+    "border_color": "#4472c4"
+  }
+}

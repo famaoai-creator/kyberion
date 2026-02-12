@@ -1,49 +1,53 @@
 #!/usr/bin/env node
+/**
+ * word-artisan/scripts/convert.cjs
+ * Data-Driven Word Renderer with Master Specs
+ */
+
 const fs = require('fs');
+const path = require('path');
 const { marked } = require('marked');
 const HTMLtoDOCX = require('html-to-docx');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkillAsync } = require('@gemini/core');
+const { requireArgs, validateFilePath } = require('@gemini/core/validators');
 
-const argv = createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', demandOption: true })
-    .option('out', { alias: 'o', type: 'string', demandOption: true })
-    .argv;
+runSkillAsync('word-artisan', async () => {
+    const argv = requireArgs(['input', 'out']);
+    validateFilePath(argv.input, 'input file');
 
-runAsyncSkill('word-artisan', async () => {
+    // 1. Load Master Specs
+    const specsPath = path.resolve(__dirname, '../../knowledge/standards/design/word-master-specs.json');
+    const specs = JSON.parse(fs.readFileSync(specsPath, 'utf8'));
+    const t = specs.typography;
+
+    // 2. Process Content
     const md = fs.readFileSync(argv.input, 'utf8');
-    const htmlContent = marked.parse(md);
+    const htmlBody = marked.parse(md);
 
     const fullHtml = `<!DOCTYPE html>
     <html lang="ja">
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: 'MS Mincho', 'Times New Roman', serif; font-size: 10.5pt; line-height: 1.5; }
-        h1 { font-size: 24pt; text-align: center; margin-top: 100pt; margin-bottom: 50pt; color: #1f4e78; }
-        h2 { font-size: 18pt; border-bottom: 2px solid #1f4e78; padding-bottom: 5px; margin-top: 30px; color: #2e75b5; page-break-before: always; }
-        h3 { font-size: 14pt; border-left: 10px solid #2e75b5; padding-left: 10px; margin-top: 20px; color: #1f4e78; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        th { background-color: #deeaf6; border: 1px solid #4472c4; padding: 8px; font-weight: bold; }
-        td { border: 1px solid #4472c4; padding: 8px; }
-        .toc { font-size: 12pt; line-height: 2; }
+        body { font-family: ${t.body.font}, serif; font-size: ${t.body.size}pt; line-height: ${t.body.line_height}; color: ${t.body.color}; }
+        h1 { font-size: ${t.heading_1.size}pt; text-align: ${t.heading_1.alignment}; color: ${t.heading_1.color}; }
+        h2 { font-size: ${t.heading_2.size}pt; border-bottom: ${t.heading_2.border_bottom}; color: ${t.heading_2.color}; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: ${specs.table_style.header_bg}; border: 1px solid ${specs.table_style.border_color}; padding: 8px; }
+        td { border: 1px solid ${specs.table_style.border_color}; padding: 8px; }
       </style>
     </head>
-    <body>
-      ${htmlContent}
-    </body>
+    <body>${htmlBody}</body>
     </html>`;
 
+    // 3. Generate DOCX
     const fileBuffer = await HTMLtoDOCX(fullHtml, null, {
-        table: { row: { cantSplit: true } },
-        footer: true,
-        pageNumber: true,
-        header: true,
-        font: 'MS Mincho',
-        fontSize: 21, // 10.5pt * 2
-        margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+        ...specs.layout,
+        fontSize: t.body.size * 2
     });
 
     fs.writeFileSync(argv.out, fileBuffer);
-    return { output: argv.out, size: fileBuffer.length };
+    console.log(`[Word] Rendered with Master '${specs.master_name}' to ${argv.out}`);
+
+    return { status: 'success', output: argv.out, master: specs.master_name };
 });

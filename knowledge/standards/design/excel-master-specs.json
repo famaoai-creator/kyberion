@@ -1,0 +1,27 @@
+{
+  "master_name": "Gemini-Financial-Master",
+  "styles": {
+    "header": {
+      "fill": { "type": "pattern", "pattern": "solid", "fgColor": { "argb": "FF232F3E" } },
+      "font": { "color": { "argb": "FFFFFFFF" }, "bold": true, "size": 12 },
+      "alignment": { "vertical": "middle", "horizontal": "center" },
+      "border": { "bottom": { "style": "medium", "color": { "argb": "FFFF9900" } } }
+    },
+    "data_row": {
+      "font": { "size": 11, "name": "Arial" },
+      "alignment": { "vertical": "middle" }
+    },
+    "currency_cell": {
+      "numFmt": "\"¥\"#,##0;[Red]\"¥\"-#,##0"
+    },
+    "total_row": {
+      "font": { "bold": true, "size": 12 },
+      "fill": { "type": "pattern", "pattern": "solid", "fgColor": { "argb": "FFF4F7F9" } },
+      "border": { "top": { "style": "thin" }, "bottom": { "style": "double" } }
+    }
+  },
+  "layout": {
+    "default_column_width": 25,
+    "hide_gridlines": true
+  }
+}
