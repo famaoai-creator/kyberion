@@ -90,18 +90,30 @@ class MetricsCollector {
    */
   summarize() {
     const summaries = [];
+    const TIME_BASE = 5000; // 5s baseline
+    const MEM_BASE = 200;   // 200MB baseline
+
     for (const [name, agg] of this._aggregates) {
+      const avgMs = agg.count > 0 ? Math.round(agg.totalMs / agg.count) : 0;
+      
+      // Efficiency Score: Higher is better (0-100)
+      // Penalizes both high latency and high memory usage
+      const timeImpact = Math.min(50, (avgMs / TIME_BASE) * 50);
+      const memImpact = Math.min(50, (agg.peakHeapMB / MEM_BASE) * 50);
+      const efficiencyScore = Math.max(0, Math.round(100 - (timeImpact + memImpact)));
+
       summaries.push({
         skill: name,
         executions: agg.count,
         errors: agg.errors,
         errorRate: agg.count > 0 ? Math.round((agg.errors / agg.count) * 1000) / 10 : 0,
-        avgMs: agg.count > 0 ? Math.round(agg.totalMs / agg.count) : 0,
+        avgMs,
         minMs: agg.minMs === Infinity ? 0 : agg.minMs,
         maxMs: agg.maxMs,
         lastRun: agg.lastRun,
         peakHeapMB: agg.peakHeapMB,
         peakRssMB: agg.peakRssMB,
+        efficiencyScore,
       });
     }
     return summaries.sort((a, b) => b.executions - a.executions);

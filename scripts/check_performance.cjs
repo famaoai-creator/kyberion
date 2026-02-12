@@ -32,16 +32,24 @@ async function main() {
     logger.success('No significant performance regressions detected in recent runs.');
   }
 
-  // 2. Identify Resource Hogs (Time)
-  const slowSkills = history.skills.filter(s => s.avgMs > 100).slice(0, 5);
-  if (slowSkills.length > 0) {
-    console.log(chalk.cyan('\n[i] Top 5 Slowest Skills (Avg Execution Time):'));
-    slowSkills.forEach(s => {
-      console.log(`  - ${s.skill.padEnd(25)} avg: ${s.avgMs}ms  max: ${s.maxMs}ms  (${s.executions} runs)`);
-    });
-  }
-
-  // 3. Reliability Check
+      // 2. Identify Resource Hogs (Time)
+      const slowSkills = history.skills.filter(s => s.avgMs > 100).slice(0, 5);
+      if (slowSkills.length > 0) {
+        console.log(chalk.cyan('\n[i] Top 5 Slowest Skills (Avg Execution Time):'));
+        slowSkills.forEach(s => {
+          console.log(`  - ${s.skill.padEnd(25)} avg: ${s.avgMs}ms  max: ${s.maxMs}ms  (Score: ${s.efficiencyScore})`);
+        });
+      }
+  
+      // 2.1 Low Efficiency Score Warning
+      const inefficient = history.skills.filter(s => s.efficiencyScore < 80).slice(0, 5);
+      if (inefficient.length > 0) {
+        console.log(chalk.magenta('\n[!] Skills with Low Efficiency Scores (< 80):'));
+        inefficient.forEach(s => {
+          console.log(`  - ${s.skill.padEnd(25)} Score: ${s.efficiencyScore} (avg: ${s.avgMs}ms, peak: ${s.peakHeapMB}MB)`);
+        });
+      }
+    // 3. Reliability Check
   const unstable = history.skills.filter(s => s.errorRate > 5).slice(0, 5);
   if (unstable.length > 0) {
     console.log(chalk.red('\n[!] Skills with High Error Rates (> 5%):'));

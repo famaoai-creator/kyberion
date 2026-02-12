@@ -285,12 +285,17 @@ function _validateOutput(output) {
  * @returns {Object} Standard skill output matching skill-output.schema.json
  */
 function buildOutput(skillName, status, dataOrError, startTime) {
+  const { fileUtils } = require('./core.cjs');
+  const { detectTier } = require('./tier-guard.cjs');
+  
   const base = {
     skill: skillName,
     status,
     metadata: {
       duration_ms: Date.now() - startTime,
       timestamp: new Date().toISOString(),
+      role: fileUtils.getCurrentRole(),
+      execution_tier: detectTier(process.cwd()), // Current working context tier
     },
   };
   if (status === 'success') {
