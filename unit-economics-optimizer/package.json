@@ -2,9 +2,6 @@
   "name": "unit-economics-optimizer",
   "version": "1.0.0",
   "private": true,
-  "dependencies": {
-    "yargs": "^18.0.0"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {

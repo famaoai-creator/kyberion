@@ -7,9 +7,6 @@
     "build": "tsc",
     "audit": "node dist/audit.js"
   },
-  "dependencies": {
-    "yargs": "^18.0.0"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {

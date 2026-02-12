@@ -6,10 +6,7 @@
   "author": "Gemini Agent",
   "license": "MIT",
   "dependencies": {
-    "chalk": "^4.1.2",
-    "exceljs": "^4.4.0",
-    "jsdom": "^24.0.0",
-    "yargs": "^18.0.0"
+    "jsdom": "^24.0.0"
   },
   "private": true,
   "devDependencies": {

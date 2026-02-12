@@ -5,10 +5,6 @@
   "main": "scripts/extract.cjs",
   "author": "Gemini Agent",
   "license": "MIT",
-  "dependencies": {
-    "sqlite3": "^5.1.7",
-    "yargs": "^18.0.0"
-  },
   "private": true,
   "devDependencies": {
     "@agent/core": "workspace:*"

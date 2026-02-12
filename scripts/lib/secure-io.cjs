@@ -37,28 +37,57 @@ function validateFileSize(filePath, maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB) {
 }
 
 /**
- * Read a file with size validation.
+ * Read a file with size validation and optional caching.
  * Combines file existence check, size validation, and reading.
  * @param {string} filePath - Path to read
  * @param {Object} [options] - Options
  * @param {number} [options.maxSizeMB=100] - Maximum file size in MB
  * @param {string} [options.encoding='utf8'] - File encoding
  * @param {string} [options.label='input'] - Label for error messages
+ * @param {boolean} [options.cache=true] - Use memory cache
  * @returns {string|Buffer} File contents
  * @throws {Error} If file not found, not a file, or exceeds size limit
  */
 function safeReadFile(filePath, options = {}) {
-  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input' } = options;
+  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input', cache = true } = options;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
   const resolved = path.resolve(filePath);
+  
+  // 1. Cache Check
+  if (cache) {
+    const { fileUtils } = require('./core.cjs');
+    // Note: readJson already uses caching, but raw file reads don't.
+    // For raw files, we use a dedicated cache key.
+    const cacheKey = `raw:${resolved}`;
+    const { _fileCache } = require('./core.cjs'); // Internal cache access
+    
+    if (fs.existsSync(resolved)) {
+      const stat = fs.statSync(resolved);
+      const cached = _fileCache.get(cacheKey);
+      if (cached && cached.mtimeMs === stat.mtimeMs) {
+        return cached.data;
+      }
+      
+      // 2. Fresh Read
+      if (stat.size > maxSizeMB * 1024 * 1024) {
+        throw new Error(`File too large: ${resolved}`);
+      }
+      const data = fs.readFileSync(resolved, encoding);
+      
+      // Store in cache if small enough
+      if (stat.size < 1 * 1024 * 1024) {
+        _fileCache.set(cacheKey, { mtimeMs: stat.mtimeMs, data });
+      }
+      return data;
+    }
+  }
+
+  // Fallback for non-cached or missing (existence check will throw)
   if (!fs.existsSync(resolved)) {
     throw new Error(`File not found: ${resolved}`);
-  }
-  if (!fs.statSync(resolved).isFile()) {
-    throw new Error(`Not a file: ${resolved}`);
   }
   validateFileSize(resolved, maxSizeMB);
   return fs.readFileSync(resolved, encoding);

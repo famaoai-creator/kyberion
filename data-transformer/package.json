@@ -6,9 +6,7 @@
   "author": "Gemini Agent",
   "license": "MIT",
   "dependencies": {
-    "js-yaml": "^4.1.1",
-    "papaparse": "^5.5.3",
-    "yargs": "^18.0.0"
+    "papaparse": "^5.5.3"
   },
   "private": true,
   "devDependencies": {

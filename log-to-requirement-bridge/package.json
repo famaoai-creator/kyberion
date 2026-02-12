@@ -7,9 +7,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "yargs": "^18.0.0"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {

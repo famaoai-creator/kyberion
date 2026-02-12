@@ -6,7 +6,6 @@
   "author": "Gemini Agent",
   "license": "MIT",
   "dependencies": {
-    "exceljs": "^4.4.0",
     "mammoth": "^1.6.0",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5.0.0"

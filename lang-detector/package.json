@@ -6,8 +6,7 @@
   "author": "Gemini Agent",
   "license": "MIT",
   "dependencies": {
-    "languagedetect": "^2.0.0",
-    "yargs": "^18.0.0"
+    "languagedetect": "^2.0.0"
   },
   "private": true,
   "devDependencies": {

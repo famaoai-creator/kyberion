@@ -6,9 +6,6 @@
   "scripts": {
     "audit": "node scripts/audit_repos.cjs"
   },
-  "dependencies": {
-    "js-yaml": "^4.1.1"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {

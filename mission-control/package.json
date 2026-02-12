@@ -7,8 +7,7 @@
     "orchestrate": "node scripts/orchestrate.cjs"
   },
   "dependencies": {
-    "@agent/core": "workspace:*",
-    "js-yaml": "^4.1.1"
+    "@agent/core": "workspace:*"
   },
   "author": "Gemini Agent",
   "license": "MIT",
