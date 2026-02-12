@@ -1,0 +1,27 @@
+{
+  "repository": "/Users/famaoai/gemini/skills/github/tests/_tmp/bug-repo",
+  "since": "1 year ago",
+  "totalFilesAnalyzed": 2,
+  "hotspots": [
+    {
+      "file": "app.js",
+      "churn": 2,
+      "lines": 7,
+      "complexity": 2,
+      "riskScore": 59.1
+    },
+    {
+      "file": "utils.js",
+      "churn": 1,
+      "lines": 1,
+      "complexity": 0,
+      "riskScore": 1
+    }
+  ],
+  "riskSummary": {
+    "high": 1,
+    "medium": 0,
+    "low": 1
+  },
+  "recommendation": "1 high-risk file(s) detected. Consider adding tests and refactoring."
+}

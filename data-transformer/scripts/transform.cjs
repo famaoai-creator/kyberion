@@ -9,7 +9,7 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const argv = createStandardYargs()
     .option('input', { alias: 'i', type: 'string', demandOption: true, description: 'Input file path (.json, .yaml, .csv)' })
-    .option('to', { alias: 't', type: 'string', choices: ['json', 'yaml', 'csv'], demandOption: true, description: 'Target format' })
+    .option('to', { alias: 'F', type: 'string', choices: ['json', 'yaml', 'csv'], demandOption: true, description: 'Target format' })
     .option('out', { alias: 'o', type: 'string', description: 'Output file path (optional)' })
     .argv;
 

@@ -1,0 +1,1 @@
+{"services":[{"name":"big-vm","type":"compute","provider":"aws","size":"xlarge","count":3},{"name":"big-db","type":"database","provider":"gcp","size":"xlarge"}]}

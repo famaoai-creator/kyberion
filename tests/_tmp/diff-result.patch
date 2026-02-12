@@ -1,0 +1,7 @@
+===================================================================
+--- /Users/famaoai/gemini/skills/github/tests/_tmp/diff-old.txt	Old File
++++ /Users/famaoai/gemini/skills/github/tests/_tmp/diff-new.txt	New File
+@@ -1,2 +1,2 @@
+ alpha
+-beta
++gamma

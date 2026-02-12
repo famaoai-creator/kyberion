@@ -1,0 +1,1 @@
+{"name":"test-project","scripts":{"test":"jest"},"devDependencies":{"jest":"^29.0.0","eslint":"^8.0.0"}}

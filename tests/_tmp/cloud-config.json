@@ -1,0 +1,1 @@
+{"services":[{"name":"web-server","type":"compute","provider":"aws","size":"medium","count":2},{"name":"database","type":"database","provider":"aws","size":"large"}]}

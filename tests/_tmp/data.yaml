@@ -1,0 +1,5 @@
+name: test
+version: 1.0
+items:
+  - one
+  - two

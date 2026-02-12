@@ -1,0 +1,1 @@
+{"services":[{"name":"api","type":"compute","size":"small","port":8080},{"name":"db","type":"database","engine":"postgres","size":"medium"}]}

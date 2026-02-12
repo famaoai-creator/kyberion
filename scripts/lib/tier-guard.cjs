@@ -10,6 +10,61 @@ const PERSONAL_DIR = path.resolve(__dirname, '../../knowledge/personal');
 const CONFIDENTIAL_DIR = path.resolve(__dirname, '../../knowledge/confidential');
 const PUBLIC_DIR = path.resolve(__dirname, '../../knowledge');
 
+/** Numeric weight for each tier (higher = more sensitive). */
+const TIERS = {
+    personal: 3,
+    confidential: 2,
+    public: 1,
+};
+
+/**
+ * Determine the knowledge tier of a file based on its path.
+ * @param {string} filePath - Absolute or relative path
+ * @returns {'personal'|'confidential'|'public'} The detected tier level
+ */
+function detectTier(filePath) {
+    const resolved = path.resolve(filePath);
+    if (resolved.startsWith(PERSONAL_DIR)) return 'personal';
+    if (resolved.startsWith(CONFIDENTIAL_DIR)) return 'confidential';
+    return 'public';
+}
+
+/**
+ * Check whether data from sourceTier is allowed to flow into targetTier.
+ * @param {string} sourceTier 
+ * @param {string} targetTier 
+ * @returns {boolean}
+ */
+function canFlowTo(sourceTier, targetTier) {
+    return (TIERS[sourceTier] || 1) <= (TIERS[targetTier] || 1);
+}
+
+/**
+ * Scan text content for patterns that suggest sensitive / confidential data.
+ * @param {string} content 
+ * @returns {Object} { hasMarkers: boolean, markers: string[] }
+ */
+function scanForConfidentialMarkers(content) {
+    const MARKERS = [
+        /CONFIDENTIAL/i,
+        /SECRET/i,
+        /PRIVATE/i,
+        /API[_-]?KEY/i,
+        /PASSWORD/i,
+        /TOKEN/i,
+        /Bearer\s+[A-Za-z0-9\-._~+/]+=*/,
+    ];
+
+    const found = [];
+    for (const pattern of MARKERS) {
+        if (pattern.test(content)) {
+            found.push(pattern.source);
+        }
+    }
+
+    return { hasMarkers: found.length > 0, markers: found };
+}
+
 /**
  * Validate if the current role has permission to write to a specific path.
  * Implements GEMINI.md 3.G (Role-Based Write Control).
@@ -87,4 +142,10 @@ function validateSovereignBoundary(content) {
     };
 }
 
-module.exports = { validateSovereignBoundary };
+module.exports = { 
+    validateSovereignBoundary, 
+    validateWritePermission,
+    detectTier,
+    canFlowTo,
+    scanForConfidentialMarkers
+};

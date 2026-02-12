@@ -1,0 +1,1 @@
+We will use the API and the SDK to build the app.

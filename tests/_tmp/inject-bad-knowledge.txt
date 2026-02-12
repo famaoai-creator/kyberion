@@ -1,0 +1,1 @@
+This contains API_KEY=abc123 and PASSWORD=secret
