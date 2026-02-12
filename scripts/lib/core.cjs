@@ -168,9 +168,15 @@ const fileUtils = {
         return cached.data;
       }
 
-      // Read fresh and update cache
-      const data = JSON.parse(fs.readFileSync(resolved, 'utf8'));
-      _fileCache.set(resolved, { mtimeMs, data });
+      // Read fresh
+      const content = fs.readFileSync(resolved, 'utf8');
+      const data = JSON.parse(content);
+
+      // Cache optimization: Only cache files smaller than 5MB
+      if (stat.size < 5 * 1024 * 1024) {
+        _fileCache.set(resolved, { mtimeMs, data });
+      }
+      
       return data;
     } catch (_e) {
       return null;
