@@ -4,9 +4,13 @@
   "description": "Detect natural language of text (ja, en, etc.).",
   "main": "scripts/detect.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "languagedetect": "^2.0.0",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

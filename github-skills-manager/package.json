@@ -4,6 +4,10 @@
   "description": "Management suite for Gemini skills with interactive dashboard.",
   "main": "scripts/create_skill.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

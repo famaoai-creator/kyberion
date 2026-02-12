@@ -5,5 +5,11 @@
   "main": "scripts/detect.cjs",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

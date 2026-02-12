@@ -4,8 +4,12 @@
   "description": "Evaluate text completeness based on criteria.",
   "main": "scripts/score.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

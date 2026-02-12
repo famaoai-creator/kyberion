@@ -4,9 +4,13 @@
   "description": "Detect file encoding and line endings.",
   "main": "scripts/detect.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "jschardet": "^3.1.4",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

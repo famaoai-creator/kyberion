@@ -4,8 +4,12 @@
   "description": "Analyzes a project directory and generates onboarding documentation.",
   "main": "scripts/generate.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

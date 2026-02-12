@@ -4,6 +4,10 @@
   "description": "Maps directory structure to help understand codebase layout.",
   "main": "scripts/map.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

@@ -4,6 +4,10 @@
   "description": "Executes project test suites and returns output.",
   "main": "scripts/run.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

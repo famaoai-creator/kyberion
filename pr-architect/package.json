@@ -4,8 +4,12 @@
   "description": "Analyzes a git repository and generates PR description/structure.",
   "main": "scripts/draft.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

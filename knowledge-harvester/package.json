@@ -4,8 +4,12 @@
   "description": "Analyzes a local directory/repo to extract patterns and knowledge.",
   "main": "scripts/harvest.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

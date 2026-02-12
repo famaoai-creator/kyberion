@@ -5,5 +5,10 @@
   "description": "Unified gateway for document generation.",
   "scripts": {
     "generate": "node scripts/generate.cjs"
+  },
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

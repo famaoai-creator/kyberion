@@ -1,1 +1,10 @@
-{ "name": "ai-ethics-auditor", "version": "1.0.0", "private": true }
+{
+  "name": "ai-ethics-auditor",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

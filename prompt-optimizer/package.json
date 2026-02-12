@@ -4,8 +4,12 @@
   "description": "Analyzes SKILL.md files and suggests improvements.",
   "main": "scripts/optimize.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

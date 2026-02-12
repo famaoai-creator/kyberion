@@ -4,8 +4,12 @@
   "description": "Automates browser actions using Playwright CLI.",
   "main": "scripts/navigate.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

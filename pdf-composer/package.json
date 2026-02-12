@@ -4,10 +4,14 @@
   "description": "Generate PDF documents from Markdown using Puppeteer.",
   "main": "scripts/compose.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "marked": "^12.0.0",
     "puppeteer": "^24.0.0",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

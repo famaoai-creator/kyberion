@@ -4,6 +4,10 @@
   "description": "Creates PowerPoint presentations from Markdown using Marp.",
   "main": "scripts/convert.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

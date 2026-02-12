@@ -1,1 +1,10 @@
-{"name":"knowledge-fetcher","main":"scripts/fetch.cjs"}
+{
+  "name": "knowledge-fetcher",
+  "main": "scripts/fetch.cjs",
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

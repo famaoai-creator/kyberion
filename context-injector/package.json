@@ -1,1 +1,10 @@
-{"name":"context-injector","main":"scripts/inject.cjs"}
+{
+  "name": "context-injector",
+  "main": "scripts/inject.cjs",
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

@@ -4,9 +4,13 @@
   "description": "Generate API documentation from OpenAPI specs or code.",
   "main": "scripts/generate.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "widdershins": "^4.0.1",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

@@ -4,6 +4,10 @@
   "description": "Converts visual designs to implementation code.",
   "main": "scripts/extract_images.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

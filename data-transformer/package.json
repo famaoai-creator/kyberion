@@ -4,10 +4,14 @@
   "description": "Convert between CSV, JSON, and YAML formats.",
   "main": "scripts/transform.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "js-yaml": "^4.1.1",
     "papaparse": "^5.5.3",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

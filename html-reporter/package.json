@@ -4,9 +4,13 @@
   "description": "Generate standalone HTML reports from JSON/Markdown.",
   "main": "scripts/report.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "marked": "^17.0.1",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

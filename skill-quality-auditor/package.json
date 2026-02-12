@@ -4,8 +4,12 @@
   "description": "Self-audit tool for the Gemini Skills monorepo.",
   "main": "scripts/audit.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

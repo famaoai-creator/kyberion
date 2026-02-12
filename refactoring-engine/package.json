@@ -4,8 +4,12 @@
   "description": "Analyzes code files for code smells and suggests improvements.",
   "main": "scripts/analyze.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

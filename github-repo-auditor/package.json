@@ -8,5 +8,10 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
+  },
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

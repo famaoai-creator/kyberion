@@ -4,6 +4,10 @@
   "description": "Infers user stress/energy levels from interaction patterns.",
   "main": "scripts/generate_niko_niko.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

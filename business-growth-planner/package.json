@@ -1,1 +1,10 @@
-{ "name": "business-growth-planner", "version": "1.0.0", "private": true }
+{
+  "name": "business-growth-planner",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

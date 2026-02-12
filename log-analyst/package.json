@@ -4,6 +4,10 @@
   "description": "Reads tail of log files for error analysis.",
   "main": "scripts/tail.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

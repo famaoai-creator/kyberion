@@ -4,6 +4,10 @@
   "description": "Bundles mission-specific skills into specialized subsets.",
   "main": "scripts/bundle.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

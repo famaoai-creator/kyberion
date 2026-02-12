@@ -4,8 +4,12 @@
   "description": "Generates business-value-focused release notes from Git logs.",
   "main": "scripts/main.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

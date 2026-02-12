@@ -7,10 +7,14 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.13.4",
     "mime-types": "^2.1.35",
-    "yargs": "^17.7.0"
+    "yargs": "^18.0.0"
   },
   "author": "Gemini Agent",
-  "license": "ISC"
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

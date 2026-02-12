@@ -4,9 +4,13 @@
   "description": "Validate JSON against schemas and identify best match.",
   "main": "scripts/validate.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "ajv": "^8.17.1",
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

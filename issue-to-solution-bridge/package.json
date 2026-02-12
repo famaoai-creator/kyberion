@@ -4,8 +4,12 @@
   "description": "Interprets issues and orchestrates skills to solve them.",
   "main": "scripts/solve.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

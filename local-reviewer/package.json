@@ -4,6 +4,10 @@
   "description": "Retrieves git diff of staged files for code review.",
   "main": "scripts/review.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

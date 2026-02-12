@@ -4,6 +4,10 @@
   "description": "Converts text to spoken audio with multiple voice personas.",
   "main": "scripts/chat_loop.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

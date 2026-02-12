@@ -4,6 +4,10 @@
   "description": "Captures microphone input and transcribes via Whisper.",
   "main": "scripts/listen.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
-  "dependencies": {}
+  "license": "MIT",
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
+  }
 }

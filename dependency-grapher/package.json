@@ -4,8 +4,12 @@
   "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
   "main": "scripts/graph.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

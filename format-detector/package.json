@@ -4,8 +4,12 @@
   "description": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
   "main": "scripts/detect.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "yargs": "^18.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

@@ -4,11 +4,15 @@
   "description": "Extract text from PDF, Excel, Word, and Images.",
   "main": "scripts/extract.cjs",
   "author": "Gemini Agent",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "exceljs": "^4.4.0",
     "mammoth": "^1.6.0",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }
