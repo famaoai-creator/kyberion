@@ -6,9 +6,6 @@
   "scripts": {
     "fetch": "node scripts/backlog.cjs"
   },
-  "dependencies": {
-    "axios": "^1.13.4"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {

@@ -261,4 +261,5 @@ module.exports = {
   fileUtils,
   errorHandler,
   Cache,
+  _fileCache, // Export for secure-io integration
 };

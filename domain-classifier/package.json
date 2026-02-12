@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "description": "Classify domain (tech, finance, legal).",
   "main": "scripts/classify.cjs",
-  "dependencies": {
-    "yargs": "^18.0.0"
-  },
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",

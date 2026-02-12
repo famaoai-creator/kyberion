@@ -7,9 +7,6 @@
     "save": "node scripts/save.cjs",
     "search": "node scripts/search.cjs"
   },
-  "dependencies": {
-    "js-yaml": "^4.1.1"
-  },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {
