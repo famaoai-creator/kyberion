@@ -17,6 +17,9 @@ const path = require('path');
 const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
 const DEFAULT_METRICS_FILE = 'skill-metrics.jsonl';
 
+// Default budget per skill execution (can be overridden)
+const DEFAULT_MEMORY_BUDGET_MB = 200;
+
 /**
  * In-memory aggregator for skill execution metrics.
  * Also supports persistent JSONL logging.
@@ -26,7 +29,8 @@ class MetricsCollector {
     this._metricsDir = options.metricsDir || DEFAULT_METRICS_DIR;
     this._metricsFile = options.metricsFile || DEFAULT_METRICS_FILE;
     this._persist = options.persist !== false;
-    /** @type {Map<string, {count: number, errors: number, totalMs: number, minMs: number, maxMs: number, lastRun: string}>} */
+    this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
+    /** @type {Map<string, {count: number, errors: number, totalMs: number, minMs: number, maxMs: number, lastRun: string, peakHeapMB: number, peakRssMB: number}>} */
     this._aggregates = new Map();
   }
 
@@ -35,7 +39,7 @@ class MetricsCollector {
    * @param {string} skillName - Name of the skill
    * @param {number} durationMs - Execution time in milliseconds
    * @param {'success'|'error'} status - Execution result
-   * @param {Object} [extra] - Additional metadata (e.g., input size, output size)
+   * @param {Object} [extra] - Additional metadata
    */
   record(skillName, durationMs, status, extra = {}) {
     // Capture memory snapshot
@@ -45,6 +49,12 @@ class MetricsCollector {
       heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024 * 100) / 100,
       rssMB: Math.round(mem.rss / 1024 / 1024 * 100) / 100,
     };
+
+    // Check budget
+    if (memory.heapUsedMB > this._memoryBudgetMB) {
+      const { logger } = require('./core.cjs');
+      logger.warn(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`);
+    }
 
     // Update in-memory aggregates
     let agg = this._aggregates.get(skillName);

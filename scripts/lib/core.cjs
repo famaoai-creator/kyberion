@@ -74,13 +74,24 @@ class Cache {
   }
 
   /**
-   * Store a value in the cache. Evicts the least-recently-used entry if full.
+   * Store a value in the cache. Evicts the least-recently-used entry if full or memory is low.
    * @param {string} key
    * @param {*} value
    * @param {number} [customTtlMs] - Optional custom TTL for this entry
    */
   set(key, value, customTtlMs) {
-    // Delete first so re-insert moves it to the end (most-recent)
+    // 1. Memory Check: If heap is over 80% used, clear some entries
+    const mem = process.memoryUsage();
+    if (mem.heapUsed / mem.heapTotal > 0.8) {
+      const { logger } = require('./core.cjs');
+      logger.warn('[Cache] High memory usage detected, purging half of the cache entries.');
+      const keysToKeep = Array.from(this._map.keys()).slice(Math.floor(this._map.size / 2));
+      const newMap = new Map();
+      keysToKeep.forEach(k => newMap.set(k, this._map.get(k)));
+      this._map = newMap;
+    }
+
+    // 2. Standard LRU Logic
     if (this._map.has(key)) {
       this._map.delete(key);
     }

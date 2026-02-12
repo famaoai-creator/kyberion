@@ -9,14 +9,21 @@ const chalk = require('chalk');
  */
 
 async function main() {
+  const argv = require('yargs/yargs')(process.argv.slice(2))
+    .option('fail-on-regression', { type: 'boolean', default: false, describe: 'Exit with code 1 if regressions detected' })
+    .argv;
+
   console.log(chalk.bold('\n--- Gemini Ecosystem Performance Health Check ---\n'));
 
   const history = metrics.reportFromHistory();
   logger.info(`Analyzing ${history.totalEntries} execution records across ${history.uniqueSkills} skills...`);
 
+  let regressionFound = false;
+
   // 1. Detect Regressions
   const regressions = metrics.detectRegressions(1.3); // Flag if > 30% slower than avg
   if (regressions.length > 0) {
+    regressionFound = true;
     console.log(chalk.yellow('\n[!] Potential Performance Regressions Detected:'));
     regressions.forEach(r => {
       console.log(`  - ${chalk.bold(r.skill.padEnd(25))} ${r.lastDuration}ms (vs avg ${r.historicalAvg}ms, ${r.increaseRate}x slower)`);
@@ -44,6 +51,11 @@ async function main() {
   }
 
   console.log(chalk.bold('\n--- Check Complete ---\n'));
+
+  if (argv['fail-on-regression'] && regressionFound) {
+    logger.error('Performance health check failed due to regressions.');
+    process.exit(1);
+  }
 }
 
 main().catch(err => {
