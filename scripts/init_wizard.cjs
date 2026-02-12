@@ -30,7 +30,8 @@ const DOMAINS = {
             '2': 'Software Developer',
             '3': 'Ecosystem Architect',
             '4': 'Reliability Engineer',
-            '5': 'Incident Commander'
+            '5': 'Incident Commander',
+            '6': 'Performance Engineer'
         }
     },
     '3': {
@@ -95,6 +96,10 @@ const ROLE_SKILLS = {
     'Incident Commander': {
         skills: ['crisis-manager', 'stakeholder-communicator', 'executive-reporting-maestro', 'slack-communicator-pro', 'log-analyst', 'document-generator', 'knowledge-fetcher'],
         description: 'Crisis Coordination, Remediation Strategy, and Incident Reporting'
+    },
+    'Performance Engineer': {
+        skills: ['performance-monitor-analyst', 'cloud-waste-hunter', 'cloud-cost-estimator', 'cognitive-load-auditor', 'refactoring-engine', 'log-analyst', 'benchmark', 'unit-economics-optimizer'],
+        description: 'Performance Evaluation, Resource Optimization, and Scalability'
     },
     'Strategic Sales': {
         skills: ['competitive-intel-strategist', 'business-growth-planner', 'stakeholder-communicator', 'ppt-artisan', 'document-generator', 'investor-readiness-audit', 'ip-profitability-architect'],
