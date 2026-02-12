@@ -56,7 +56,7 @@ function validateSovereignBoundary(content) {
     
     // 1. Gather all unique tokens from Personal tier
     const getTokens = (dir) => {
-        let tokens = [];
+        const tokens = [];
         if (!fs.existsSync(dir)) return tokens;
         
         const files = fs.readdirSync(dir, { recursive: true });

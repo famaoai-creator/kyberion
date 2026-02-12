@@ -19,7 +19,7 @@ function adfToMermaid(adf, iconMap) {
     adf.nodes.forEach(node => {
         const id = node.id.replace(/[\.\-]/g, '_');
         const icon = iconMap[node.type] || iconMap.default;
-        let label = `"${icon} ${node.name}"`;
+        const label = `"${icon} ${node.name}"`;
         mmd += `    ${id}(${label})\n`;
     });
 

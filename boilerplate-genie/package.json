@@ -2,7 +2,7 @@
   "name": "boilerplate-genie",
   "version": "0.1.0",
   "description": "Scaffolds new projects with best practices pre-configured.",
-  "main": "scripts/scaffold.cjs",
+  "main": "scripts/main.cjs",
   "author": "Gemini Agent",
   "license": "MIT",
   "dependencies": {

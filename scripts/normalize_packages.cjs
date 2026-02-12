@@ -20,7 +20,7 @@ console.log(`Normalizing ${skillDirs.length} packages...`);
 
 skillDirs.forEach(dir => {
   const pkgPath = path.join(rootDir, dir, 'package.json');
-  let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   let modified = false;
 
   // 1. Basic Fields

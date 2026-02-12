@@ -299,6 +299,13 @@ npm run cli -- run doc-type-classifier -- --input myfile.md
 npm run cli -- info data-transformer
 ```
 
+### Performance Health Check
+Diagnose ecosystem performance and detect regressions:
+
+```bash
+node scripts/check_performance.cjs
+```
+
 ### Skill Creation Wizard
 Scaffold a new skill from template:
 
@@ -411,18 +418,18 @@ npm run create-skill -- my-skill --description "My new skill"
 
 ### Shared Libraries
 
-All skills can use these shared libraries from `scripts/lib/`:
+All skills can use these shared libraries from `scripts/lib/` (aliased as `@agent/core`):
 
 | Library | Import | Purpose |
 |---------|--------|---------|
 | `skill-wrapper.cjs` | `runSkill()` / `runSkillAsync()` | Standardized JSON output format |
 | `classifier.cjs` | `classify()` / `classifyFile()` | Keyword-based classification engine |
-| `tier-guard.cjs` | `validateInjection()` / `scanForConfidentialMarkers()` | Knowledge Tier security validation |
-| `core.cjs` | `logger` / `fileUtils` / `errorHandler` | Logging, file I/O, error handling |
+| `tier-guard.cjs` | `validateInjection()` / `validateWritePermission()` | Knowledge Tier & Write Governance |
+| `core.cjs` | `logger` / `fileUtils` / `errorHandler` / `Cache` | Logging, Safe I/O, Caching |
 | `validators.cjs` | `requireArgs()` / `validateFilePath()` | CLI argument and path validation |
 | `validate.cjs` | `validateInput()` / `validateOutput()` | JSON Schema validation |
-| `metrics.cjs` | `metrics.record()` / `metrics.summarize()` | Skill execution metrics with memory tracking |
-| `secure-io.cjs` | `safeReadFile()` / `safeExec()` | Safe file I/O and command execution |
+| `metrics.cjs` | `metrics.record()` / `metrics.detectRegressions()` | Skill execution metrics & health checks |
+| `secure-io.cjs` | `safeReadFile()` / `safeWriteFile()` | Safe file I/O with governance checks |
 | `logger.cjs` | `createLogger()` | Structured leveled logging |
 | `orchestrator.cjs` | `runPipeline()` / `runParallel()` | Sequential and parallel skill execution with retry |
 
@@ -431,9 +438,9 @@ All skills should conform to the JSON Schema in `schemas/`:
 - `schemas/skill-input.schema.json` - Input contract
 - `schemas/skill-output.schema.json` - Output contract
 
-Use `runSkill()` from `scripts/lib/skill-wrapper.cjs` to automatically produce compliant output:
+Use `runSkill()` from `@agent/core` to automatically produce compliant output:
 ```javascript
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('@agent/core');
 runSkill('my-skill', () => {
     return { result: 'data' };
 });

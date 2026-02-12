@@ -28,7 +28,7 @@ runSkill('security-scanner', () => {
     const mappings = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
 
     const files = getAllFiles(projectRoot);
-    let allFindings = [];
+    const allFindings = [];
     let scannedCount = 0;
     let fullContentText = "";
 
