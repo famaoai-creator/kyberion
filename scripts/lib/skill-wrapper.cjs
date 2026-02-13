@@ -384,10 +384,18 @@ function _printOutput(output) {
  * @returns {Object} Standard skill output
  */
 function runSkill(skillName, fn) {
+  const { _fileCache } = require('./core.cjs');
+  if (_fileCache) _fileCache.resetStats(); // Start fresh for this execution
+
   _checkHelp(skillName);
   const output = wrapSkill(skillName, fn);
   const m = _getMetrics();
-  if (m) m.record(skillName, output.metadata.duration_ms, output.status);
+  
+  if (m) {
+    const cacheStats = _fileCache ? _fileCache.getStats() : null;
+    m.record(skillName, output.metadata.duration_ms, output.status, { cacheStats });
+  }
+  
   _printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;
@@ -400,10 +408,18 @@ function runSkill(skillName, fn) {
  * @returns {Promise<Object>} Standard skill output
  */
 async function runSkillAsync(skillName, fn) {
+  const { _fileCache } = require('./core.cjs');
+  if (_fileCache) _fileCache.resetStats();
+
   _checkHelp(skillName);
   const output = await wrapSkillAsync(skillName, fn);
   const m = _getMetrics();
-  if (m) m.record(skillName, output.metadata.duration_ms, output.status);
+  
+  if (m) {
+    const cacheStats = _fileCache ? _fileCache.getStats() : null;
+    m.record(skillName, output.metadata.duration_ms, output.status, { cacheStats });
+  }
+  
   _printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;
