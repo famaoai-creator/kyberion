@@ -1,0 +1,188 @@
+{
+  "timestamp": "2026-02-13T01:02:00.625Z",
+  "summary": {
+    "total_records": 2906,
+    "unique_skills": 77
+  },
+  "regressions": [
+    {
+      "skill": "sensitivity-detector",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 3,
+      "timestamp": "2026-02-12T19:45:18.960Z"
+    },
+    {
+      "skill": "intent-classifier",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 21,
+      "timestamp": "2026-02-12T19:45:08.853Z"
+    },
+    {
+      "skill": "log-analyst",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 3.2,
+      "timestamp": "2026-02-12T19:45:16.484Z"
+    },
+    {
+      "skill": "codebase-mapper",
+      "lastDuration": 20,
+      "historicalAvg": 7,
+      "increaseRate": 2.8,
+      "timestamp": "2026-02-12T19:45:16.643Z"
+    },
+    {
+      "skill": "boilerplate-genie",
+      "lastDuration": 26,
+      "historicalAvg": 2,
+      "increaseRate": 15.4,
+      "timestamp": "2026-02-12T19:45:13.159Z"
+    },
+    {
+      "skill": "glossary-resolver",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 4.4,
+      "timestamp": "2026-02-12T19:42:55.029Z"
+    },
+    {
+      "skill": "knowledge-harvester",
+      "lastDuration": 736,
+      "historicalAvg": 44,
+      "increaseRate": 16.7,
+      "timestamp": "2026-02-12T18:56:55.039Z"
+    },
+    {
+      "skill": "skill-bundle-packager",
+      "lastDuration": 7,
+      "historicalAvg": 2,
+      "increaseRate": 2.8,
+      "timestamp": "2026-02-12T19:45:14.541Z"
+    },
+    {
+      "skill": "issue-to-solution-bridge",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 3.3,
+      "timestamp": "2026-02-12T19:45:15.129Z"
+    },
+    {
+      "skill": "environment-provisioner",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 3,
+      "timestamp": "2026-02-12T19:43:06.629Z"
+    },
+    {
+      "skill": "business-impact-analyzer",
+      "lastDuration": 1,
+      "historicalAvg": 0,
+      "increaseRate": 3.6,
+      "timestamp": "2026-02-12T19:43:07.259Z"
+    },
+    {
+      "skill": "diagram-renderer",
+      "lastDuration": 1436,
+      "historicalAvg": 589,
+      "increaseRate": 2.4,
+      "timestamp": "2026-02-12T01:57:39.151Z"
+    }
+  ],
+  "slow_skills": [
+    {
+      "skill": "cloud-waste-hunter",
+      "executions": 66,
+      "errors": 16,
+      "errorRate": 24.2,
+      "avgMs": 430,
+      "minMs": 0,
+      "maxMs": 1187
+    },
+    {
+      "skill": "api-doc-generator",
+      "executions": 36,
+      "errors": 34,
+      "errorRate": 94.4,
+      "avgMs": 3357,
+      "minMs": 0,
+      "maxMs": 30023
+    },
+    {
+      "skill": "diagram-renderer",
+      "executions": 24,
+      "errors": 7,
+      "errorRate": 29.2,
+      "avgMs": 624,
+      "minMs": 0,
+      "maxMs": 3775
+    },
+    {
+      "skill": "doc-sync-sentinel",
+      "executions": 16,
+      "errors": 0,
+      "errorRate": 0,
+      "avgMs": 978,
+      "minMs": 83,
+      "maxMs": 4502
+    },
+    {
+      "skill": "ppt-artisan",
+      "executions": 14,
+      "errors": 1,
+      "errorRate": 7.1,
+      "avgMs": 5712,
+      "minMs": 2044,
+      "maxMs": 9409
+    }
+  ],
+  "unstable_skills": [
+    {
+      "skill": "encoding-detector",
+      "executions": 187,
+      "errors": 32,
+      "errorRate": 17.1,
+      "avgMs": 0,
+      "minMs": 0,
+      "maxMs": 1
+    },
+    {
+      "skill": "quality-scorer",
+      "executions": 96,
+      "errors": 8,
+      "errorRate": 8.3,
+      "avgMs": 17,
+      "minMs": 0,
+      "maxMs": 34
+    },
+    {
+      "skill": "data-transformer",
+      "executions": 87,
+      "errors": 32,
+      "errorRate": 36.8,
+      "avgMs": 1,
+      "minMs": 0,
+      "maxMs": 2
+    },
+    {
+      "skill": "environment-provisioner",
+      "executions": 86,
+      "errors": 26,
+      "errorRate": 30.2,
+      "avgMs": 0,
+      "minMs": 0,
+      "maxMs": 1
+    },
+    {
+      "skill": "cloud-cost-estimator",
+      "executions": 83,
+      "errors": 68,
+      "errorRate": 81.9,
+      "avgMs": 20,
+      "minMs": 0,
+      "maxMs": 35
+    }
+  ],
+  "efficiency_alerts": []
+}

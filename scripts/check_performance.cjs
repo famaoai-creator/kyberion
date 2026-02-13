@@ -2,6 +2,8 @@
 const { metrics } = require('./lib/metrics.cjs');
 const { logger } = require('./lib/core.cjs');
 const chalk = require('chalk');
+const path = require('path');
+const fs = require('fs');
 
 /**
  * Performance Health Check Tool
