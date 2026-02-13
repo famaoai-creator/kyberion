@@ -19,23 +19,31 @@ function refactorFile(filePath, skillDir) {
         modified = true;
     }
 
-    // 2. Ensure safeWriteFile is imported
-    if (modified && !content.includes('safeWriteFile')) {
-        // This shouldn't happen if we just replaced it, but check for definition
-    }
+    if (modified) {
+        // 2. Manage Imports
+        const hasSafeImport = content.includes('safeWriteFile');
+        const hasCoreImport = content.includes("require('@agent/core')");
 
-    if (modified && (!content.includes('const { safeWriteFile }') && !content.includes('const {runSkill, safeWriteFile}'))) {
-        // Inject import
-        const relativePath = path.relative(path.dirname(filePath), path.join(rootDir, 'scripts/lib/secure-io.cjs'));
-        const importLine = `const { safeWriteFile } = require('${relativePath}');
-`;
-        
-        // Find best place to inject (after other @agent/core or scripts/lib imports)
-        if (content.includes("require('@agent/core')")) {
-            content = content.replace(/(const .* = require\('@agent\/core'\);)/, `$1
-const { safeWriteFile } = require('${relativePath}');`);
-        } else {
-            content = importLine + content;
+        if (!hasSafeImport) {
+            const relativePath = path.relative(path.dirname(filePath), path.join(rootDir, 'scripts/lib/secure-io.cjs'));
+            
+            if (hasCoreImport) {
+                // Merge into existing @agent/core require
+                content = content.replace(/(const\s+\{\s*)([^}]*)(\s*\}\s*=\s*require\('@agent\/core'\);)/, (m, p1, p2, p3) => {
+                    if (p2.includes('safeWriteFile')) return m;
+                    const items = p2.split(',').map(i => i.trim()).filter(Boolean);
+                    items.push('safeWriteFile');
+                    return `${p1}${items.join(', ')}${p3}`;
+                });
+            } else {
+                // Add new separate import, ensuring shebang stays on top
+                const importLine = `const { safeWriteFile } = require('${relativePath}');\n`;
+                if (content.startsWith('#!')) {
+                    content = content.replace(/(^#!.*\n)/, `$1${importLine}`);
+                } else {
+                    content = importLine + content;
+                }
+            }
         }
     }
 

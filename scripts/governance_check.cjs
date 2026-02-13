@@ -32,9 +32,19 @@ async function runStaticAudit() {
   // Restricted APIs that bypass Sovereign Shield
   const RESTRICTED = ['fs.writeFileSync', 'fs.appendFileSync', 'fs.unlinkSync', 'fs.renameSync'];
   
+  // Foundational scripts that are allowed to use raw APIs
+  const EXEMPTIONS = [
+    'scripts/bootstrap.cjs',
+    'scripts/setup_ecosystem.sh',
+    'scripts/lib/secure-io.cjs',
+    'scripts/fix_shebangs.cjs',
+    'scripts/mass_refactor_governance.cjs'
+  ];
+  
   const entries = fs.readdirSync(rootDir, { withFileTypes: true });
   const skillDirs = entries.filter(e => e.isDirectory() && !e.name.startsWith('.') && !['node_modules', 'scripts', 'knowledge', 'work', 'templates'].includes(e.name));
 
+  // 1. Audit Skills
   for (const dir of skillDirs) {
     const scriptsPath = path.join(rootDir, dir.name, 'scripts');
     if (!fs.existsSync(scriptsPath)) continue;
@@ -48,6 +58,21 @@ async function runStaticAudit() {
         }
       });
     }
+  }
+
+  // 2. Audit Core Scripts (respecting exemptions)
+  const coreScriptsPath = path.join(rootDir, 'scripts');
+  const coreFiles = fs.readdirSync(coreScriptsPath).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+  for (const file of coreFiles) {
+    const relPath = `scripts/${file}`;
+    if (EXEMPTIONS.includes(relPath)) continue;
+
+    const content = fs.readFileSync(path.join(coreScriptsPath, file), 'utf8');
+    RESTRICTED.forEach(api => {
+      if (content.includes(api)) {
+        violations.push(`${relPath}: uses restricted API '${api}'`);
+      }
+    });
   }
 
   const duration = ((Date.now() - start) / 1000).toFixed(1);
