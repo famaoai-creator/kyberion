@@ -48,6 +48,26 @@ class Cache {
     this._persistenceDir = persistenceDir || path.join(process.cwd(), 'work/cache');
     /** @type {Map<string, {value: *, timestamp: number, ttl: number, persistent: boolean}>} */
     this._map = new Map();
+    this._stats = { hits: 0, misses: 0 };
+  }
+
+  /**
+   * Get current cache statistics.
+   * @returns {{hits: number, misses: number, ratio: number}}
+   */
+  getStats() {
+    const total = this._stats.hits + this._stats.misses;
+    return {
+      ...this._stats,
+      ratio: total > 0 ? Math.round((this._stats.hits / total) * 100) : 0,
+    };
+  }
+
+  /**
+   * Reset cache statistics.
+   */
+  resetStats() {
+    this._stats = { hits: 0, misses: 0 };
   }
 
   /**
@@ -66,6 +86,7 @@ class Cache {
         try {
           const diskEntry = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
           if (Date.now() - diskEntry.timestamp < diskEntry.ttl) {
+            this._stats.hits++;
             this.set(key, diskEntry.value, diskEntry.ttl, false); // Reload to memory
             return diskEntry.value;
           } else {
@@ -73,13 +94,17 @@ class Cache {
           }
         } catch (_) { /* ignore corrupt disk cache */ }
       }
+      this._stats.misses++;
       return undefined;
     }
 
     if (Date.now() - entry.timestamp > entry.ttl) {
+      this._stats.misses++;
       this._map.delete(key);
       return undefined;
     }
+    
+    this._stats.hits++;
     // Promote to most-recently-used
     this._map.delete(key);
     this._map.set(key, entry);

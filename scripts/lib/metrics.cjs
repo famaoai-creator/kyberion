@@ -59,7 +59,18 @@ class MetricsCollector {
     // Update in-memory aggregates
     let agg = this._aggregates.get(skillName);
     if (!agg) {
-      agg = { count: 0, errors: 0, totalMs: 0, minMs: Infinity, maxMs: 0, lastRun: '', peakHeapMB: 0, peakRssMB: 0 };
+      agg = { 
+        count: 0, 
+        errors: 0, 
+        totalMs: 0, 
+        minMs: Infinity, 
+        maxMs: 0, 
+        lastRun: '', 
+        peakHeapMB: 0, 
+        peakRssMB: 0,
+        cacheHits: 0,
+        cacheMisses: 0
+      };
       this._aggregates.set(skillName, agg);
     }
     agg.count++;
@@ -70,6 +81,11 @@ class MetricsCollector {
     agg.lastRun = new Date().toISOString();
     agg.peakHeapMB = Math.max(agg.peakHeapMB, memory.heapUsedMB);
     agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
+    
+    if (extra.cacheStats) {
+      agg.cacheHits += extra.cacheStats.hits || 0;
+      agg.cacheMisses += extra.cacheStats.misses || 0;
+    }
 
     // Persist to JSONL
     if (this._persist) {
