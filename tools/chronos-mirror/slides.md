@@ -12,14 +12,13 @@ title: Chronos Mirror - Gemini Reality Interface
 # Chronos Mirror
 ### Gemini Reality-Mirroring Interface v1.0
 
-<div class="pt-12 text-sm">
-  <span class="opacity-50">Current Role:</span> <span class="text-blue-400 font-bold">Ecosystem Architect</span><br/>
-  <span class="opacity-50">Active Mission:</span> <span class="text-yellow-400">Chronos Mirror Operation</span>
+<div class="pt-8">
+  <CommandCenter />
 </div>
 
-<div class="pt-8">
-  <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer hover:bg-white hover:bg-opacity-10 text-sm">
-    鏡の向こうへ進む <carbon:arrow-right class="inline"/>
+<div class="pt-4">
+  <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer hover:bg-white hover:bg-opacity-10 text-xs">
+    詳細ログとナレッジ探索へ <carbon:arrow-right class="inline"/>
   </span>
 </div>
 
@@ -153,6 +152,21 @@ layout: center
 `knowledge/` 配下の全191ドキュメントを動的に探索
 
 <KnowledgeBrowser />
+
+---
+layout: center
+---
+
+# 🧠 エージェント・インタラクション・ハブ
+ブラウザからエージェントの「思考」と「行動」を指揮
+
+<AgentConverse />
+
+<div class="mt-4 text-[9px] text-gray-500 flex justify-center gap-8 italic">
+  <span>💡 「セキュリティ状況を分析して」</span>
+  <span>💡 「技術負債の最新レポートを出して」</span>
+  <span>💡 「移行計画のボトルネックを特定して」</span>
+</div>
 
 ---
 layout: center

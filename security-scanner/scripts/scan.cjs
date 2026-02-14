@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 const isBinaryPath = require('is-binary-path');
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
@@ -31,7 +32,7 @@ runSkillAsync('security-scanner', async () => {
       isBinaryPath(file) ||
       file.includes('node_modules') ||
       file.includes('.git') ||
-      file.includes('work/archive')
+      file.includes(pathResolver.shared('archive'))
     )
       return null;
 

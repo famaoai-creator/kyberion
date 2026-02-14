@@ -44,6 +44,15 @@
       "schedule": "23:59",
       "description": "一日の業務成果をまとめます（テスト用に遅い時間を設定）。",
       "required_role": "all"
+    },
+    {
+      "id": "integrity-check",
+      "name": "Pulse稼働テスト",
+      "layer": "Role",
+      "frequency": "daily",
+      "schedule": "22:40",
+      "description": "Pulseが正常にエージェントをDispatchできるかを確認します。",
+      "required_role": "Ecosystem Architect"
     }
   ]
 }

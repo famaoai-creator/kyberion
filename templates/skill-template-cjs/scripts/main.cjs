@@ -14,9 +14,9 @@ runSkill('{{SKILL_NAME}}', () => {
 
   // 2. Skill Logic
   const result = {
-    message: "Hello from {{SKILL_NAME}}",
+    message: 'Hello from {{SKILL_NAME}}',
     timestamp: new Date().toISOString(),
-    status: "ready"
+    status: 'ready',
   };
 
   // 3. (Optional) Result persistence

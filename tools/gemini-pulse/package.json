@@ -1,0 +1,10 @@
+{
+  "name": "gemini-pulse",
+  "version": "1.0.0",
+  "description": "Ecosystem heartbeat daemon",
+  "main": "daemon.cjs",
+  "type": "commonjs",
+  "dependencies": {
+    "chokidar": "^5.0.0"
+  }
+}

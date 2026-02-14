@@ -10,7 +10,7 @@ if (isMainThread) {
   module.exports = function runInWorker(scriptPath, data) {
     return new Promise((resolve, reject) => {
       const worker = new Worker(__filename, {
-        workerData: { scriptPath, data }
+        workerData: { scriptPath, data },
       });
       worker.on('message', resolve);
       worker.on('error', reject);

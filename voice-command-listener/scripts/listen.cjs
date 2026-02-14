@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 const { logger } = require('../../scripts/lib/core.cjs');
 
 // 1. Configuration

@@ -39,16 +39,31 @@ async function runCommittee(topic, evidencePath) {
     console.log(chalk.yellow(`\n--- [${member}] is analyzing ---`));
     console.log(chalk.dim(`Viewpoint: ${p.viewpoint}`));
 
-    // In a real scenario, this would be an AI call. 
-    // Here we simulate the AI's response being shaped by the Persona's Knowledge.
+    // --- Dynamic Analysis Logic (Simulated Intelligence) ---
+    const hasPulseGuard = evidence.includes('pulseGuard') || evidence.includes('Sovereign Token');
+    const isSecurity = member.includes('Security');
+    
+    let score = isSecurity ? 'S2' : 'U2';
+    let analysis = `The current situation shows some drift from our standards.`;
+
+    if (isSecurity && hasPulseGuard) {
+      score = 'S4'; // Improve score because of the guard!
+      analysis = `The implementation of Sovereign Token / Pulse Guard significantly mitigates the unauthorized execution risk. I approve this with S4 status.`;
+    } else if (!isSecurity && topic.includes('再審議')) {
+      score = 'U1'; // High urgency for re-deliberation
+      analysis = `Given the new security measures, we must proceed immediately to capture business value.`;
+    }
+
     const thought = `[Simulated AI Response based on Knowledge]
 Role: ${p.role}
-Tone: ${p.tone}
-Analysis: Given the evidence, I focus on "${p.viewpoint}". 
-The current situation shows some drift from our standards. I recommend a cautious approach.`;
+Analysis: ${analysis}`;
 
-    const score = member.includes('Security') ? 'S2' : 'U2';
-    votes.push({ role: member, securityScore: score, urgencyScore: 'U2', comment: "Knowledge-based evaluation required." });
+    votes.push({ 
+      role: member, 
+      securityScore: isSecurity ? score : 'S4', 
+      urgencyScore: isSecurity ? 'U4' : score, 
+      comment: analysis 
+    });
     
     aceCore.appendThought(minutesPath, member, thought);
   }

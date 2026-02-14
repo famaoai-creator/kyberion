@@ -14,18 +14,20 @@ const pipelineDir = path.join(rootDir, 'pipelines');
 function analyze() {
   if (!fs.existsSync(pipelineDir)) return;
 
-  const pipelines = fs.readdirSync(pipelineDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+  const pipelines = fs
+    .readdirSync(pipelineDir)
+    .filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
   const graph = {}; // skill -> Set of related skills
 
-  pipelines.forEach(file => {
+  pipelines.forEach((file) => {
     try {
       const def = yaml.load(fs.readFileSync(path.join(pipelineDir, file), 'utf8'));
       if (def.pipeline && Array.isArray(def.pipeline)) {
-        const skillsInPipeline = def.pipeline.map(step => step.skill);
-        
-        skillsInPipeline.forEach(skill => {
+        const skillsInPipeline = def.pipeline.map((step) => step.skill);
+
+        skillsInPipeline.forEach((skill) => {
           if (!graph[skill]) graph[skill] = new Set();
-          skillsInPipeline.forEach(related => {
+          skillsInPipeline.forEach((related) => {
             if (skill !== related) graph[skill].add(related);
           });
         });
@@ -35,7 +37,7 @@ function analyze() {
 
   // Update SKILL.md files
   console.log(`Discovered relationships for ${Object.keys(graph).length} skills.`);
-  
+
   for (const [skill, relatedSet] of Object.entries(graph)) {
     const skillMdPath = path.join(rootDir, skill, 'SKILL.md');
     if (fs.existsSync(skillMdPath)) {
@@ -46,11 +48,11 @@ function analyze() {
         try {
           const fm = yaml.load(fmMatch[1]);
           const related = Array.from(relatedSet).sort();
-          
+
           if (JSON.stringify(fm.related_skills) !== JSON.stringify(related)) {
             fm.related_skills = related;
             const newFm = yaml.dump(fm, { lineWidth: -1 }).trim();
-            const newContent = content.replace(/^---\n[\s\S]*?\n---/m, "---\n" + newFm + "\n---");
+            const newContent = content.replace(/^---\n[\s\S]*?\n---/m, '---\n' + newFm + '\n---');
             fs.writeFileSync(skillMdPath, newContent);
             console.log(`  [${skill}] Linked to: ${related.join(', ')}`);
           }

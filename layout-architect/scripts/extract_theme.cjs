@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 const { execSync } = require('child_process');
 const { runSkillAsync } = require('@agent/core');
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
@@ -16,7 +17,7 @@ runSkillAsync('layout-architect', async () => {
 
   if (!fs.existsSync(inputPath)) throw new Error(`Input not found: ${inputPath}`);
 
-  const tmpDir = path.join(process.cwd(), 'work/ppt-train/tmp');
+  const tmpDir = path.join(process.cwd(), pathResolver.shared('ppt-train/tmp'));
   if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true });
   fs.mkdirSync(tmpDir, { recursive: true });
 

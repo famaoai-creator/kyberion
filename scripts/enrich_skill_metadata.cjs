@@ -55,8 +55,8 @@ if (fs.existsSync(tagDictPath)) {
 function inferTags(skillName, description) {
   const tags = new Set(tagRules.defaults);
   const content = (skillName + ' ' + (description || '')).toLowerCase();
-  
-  tagRules.rules.forEach(rule => {
+
+  tagRules.rules.forEach((rule) => {
     if (content.includes(rule.keyword)) {
       tags.add(rule.tag);
     }
@@ -94,7 +94,9 @@ skillDirs.forEach((dir) => {
       const newFm = yaml.dump(fm, { lineWidth: -1 }).trim();
       const newContent = content.replace(/^---\n[\s\S]*?\n---/m, `---\n${newFm}\n---`);
       fs.writeFileSync(skillMdPath, newContent);
-      console.log(`  [${dir}] Metadata enriched (Category: ${fm.category}, Tags: ${fm.tags.length})`);
+      console.log(
+        `  [${dir}] Metadata enriched (Category: ${fm.category}, Tags: ${fm.tags.length})`
+      );
     }
   } catch (err) {
     console.error(`Failed to enrich ${dir}: ${err.message}`);

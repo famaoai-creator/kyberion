@@ -2,6 +2,7 @@
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 const { google } = require('googleapis');
 const { runSkillAsync } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -212,12 +213,12 @@ async function startAuthFlow() {
     ],
   });
 
-  const tmpAuthPath = path.resolve(rootDir, 'work/google-auth-url.txt');
+  const tmpAuthPath = path.resolve(rootDir, pathResolver.shared('google-auth-url.txt'));
   fs.writeFileSync(tmpAuthPath, authUrl);
 
   return {
     message: 'Authorization URL generated safely',
-    url_file: 'work/google-auth-url.txt',
+    url_file: pathResolver.shared('google-auth-url.txt'),
     instructions:
       'The URL has been saved to a file to prevent security leakage. browser-navigator will use this file.',
   };

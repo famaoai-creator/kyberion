@@ -2,6 +2,7 @@
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 const { execSync } = require('child_process');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
@@ -19,7 +20,7 @@ const argv = createStandardYargs()
 
 const rootDir = path.resolve(__dirname, '../..');
 const _scenariosDir = path.join(rootDir, 'knowledge/browser-scenarios');
-const screenshotDir = path.join(rootDir, 'work/screenshots');
+const screenshotDir = path.join(rootDir, pathResolver.shared('screenshots'));
 
 runSkill('browser-navigator', () => {
   // Scenario execution mode
