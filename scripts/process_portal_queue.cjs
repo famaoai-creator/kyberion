@@ -27,10 +27,15 @@ async function processQueue() {
     const request = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
     const msgId = request.id;
     
+    // 0. Persona Extraction
+    const personaMatch = request.intent.match(/^\[Role: (.+?)\] (.*)/);
+    const persona = personaMatch ? personaMatch[1] : 'Autonomous Agent';
+    const cleanIntent = personaMatch ? personaMatch[2] : request.intent;
+
     // 1. Intent Analysis & Tier Selection
-    const isSafe = request.intent.toLowerCase().includes('analyze') || 
-                   request.intent.toLowerCase().includes('read') || 
-                   request.intent.toLowerCase().includes('investigate');
+    const isSafe = cleanIntent.toLowerCase().includes('analyze') || 
+                   cleanIntent.toLowerCase().includes('read') || 
+                   cleanIntent.toLowerCase().includes('investigate');
     
     // Tier 1: Read-Only (Plan) / Tier 3: Aggressive (YOLO)
     const modeFlag = isSafe ? '--approval-mode plan' : '--yolo';
@@ -43,12 +48,13 @@ async function processQueue() {
       readOnlyDirs: [rootDir] // Can read everything else
     };
     
-    console.log(chalk.bold.magenta(`\n\ud83e\udde0 [${msgId}] Awakening Sub-Agent (${tierName})`));
+    console.log(chalk.bold.magenta(`\n\ud83e\udde0 [${msgId}] Awakening Sub-Agent (${tierName}) as ${persona}`));
     console.log(chalk.dim(`    Scope: ${missionDir}`));
 
     const systemPrompt = `
 あなたは Gemini エコシステムの自律サブエージェントです。
-【ミッション】: ${request.intent}
+現在のあなたの役割（Persona）は **${persona}** です。その視点と行動原理に従ってください。
+【ミッション】: ${cleanIntent}
 【実行モード】: ${tierName}
 【許可領域 (Scope)】:
   - 書き込み許可: ${scope.allowedDirs.join(', ')}
