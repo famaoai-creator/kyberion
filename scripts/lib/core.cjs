@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
+const crypto = require('crypto');
 
 /**
  * Shared Utility Core for Gemini Skills.
@@ -136,6 +137,18 @@ class Cache {
       if (fs.existsSync(diskPath)) {
         try {
           const diskEntry = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
+          
+          // Integrity Check: Verify hash if present
+          if (diskEntry.h) {
+            const actualHash = this._generateHash(diskEntry.value);
+            if (actualHash !== diskEntry.h) {
+              const { logger } = require('./core.cjs');
+              logger.warn(`[Cache] Integrity violation for ${key}. Expected ${diskEntry.h}, got ${actualHash}. Purging.`);
+              fs.unlinkSync(diskPath);
+              return undefined;
+            }
+          }
+
           if (Date.now() - diskEntry.timestamp < diskEntry.ttl) {
             this._stats.hits++;
             this.set(key, diskEntry.value, diskEntry.ttl, false); // Reload to memory
@@ -194,9 +207,16 @@ class Cache {
       const diskPath = this._getDiskPath(key);
       try {
         if (!fs.existsSync(this._persistenceDir)) fs.mkdirSync(this._persistenceDir, { recursive: true });
-        fs.writeFileSync(diskPath, JSON.stringify({ value, timestamp, ttl }), 'utf8');
+        const hash = this._generateHash(value);
+        fs.writeFileSync(diskPath, JSON.stringify({ value, timestamp, ttl, h: hash }), 'utf8');
       } catch (_) { /* ignore write errors */ }
     }
+  }
+
+  /** @private */
+  _generateHash(data) {
+    const str = typeof data === 'string' ? data : JSON.stringify(data);
+    return crypto.createHash('md5').update(str).digest('hex').substring(0, 8); // Short MD5 is enough for local integrity
   }
 
   /** @private */
