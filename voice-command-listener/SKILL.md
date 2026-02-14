@@ -6,6 +6,7 @@ description: >-
   agent via voice.
 status: implemented
 category: Interface & AI
+last_updated: '2026-02-13'
 ---
 
 # Voice Command Listener

@@ -19,6 +19,7 @@ arguments:
     type: string
     description: Output file path
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Visionary Ethos Keeper

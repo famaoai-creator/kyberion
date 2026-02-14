@@ -19,6 +19,7 @@ arguments:
     type: string
     description: Output report file
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # Doc-Sync Sentinel

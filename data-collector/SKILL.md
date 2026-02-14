@@ -25,6 +25,7 @@ arguments:
     type: boolean
     description: Force download ignoring cache/manifest
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Data Collector

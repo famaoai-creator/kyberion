@@ -17,6 +17,7 @@ arguments:
   - name: output-tier
     type: string
 category: Utilities
+last_updated: '2026-02-13'
 ---
 # context-injector
 Inject knowledge into JSON data context.

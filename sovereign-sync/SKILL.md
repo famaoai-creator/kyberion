@@ -5,6 +5,7 @@ status: >-
   implemented Acts as the "Import/Export" bridge for L3 (Confidential) data,
   allowing organization-wide sharing of maps and analysis.
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Sovereign Sync

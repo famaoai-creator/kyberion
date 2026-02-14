@@ -10,6 +10,7 @@ arguments:
     type: string
     description: Input file or directory path
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 # Quality Scorer
 

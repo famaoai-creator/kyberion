@@ -10,6 +10,7 @@ arguments:
     type: string
     description: Git repository directory
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # PR Architect

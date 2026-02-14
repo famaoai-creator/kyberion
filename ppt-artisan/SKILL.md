@@ -5,6 +5,7 @@ description: >-
   the user wants to generate slides, manage themes, or convert MD to PPTX/PDF.
 status: implemented
 category: Data & Content
+last_updated: '2026-02-13'
 ---
 
 # PowerPoint Artisan (ppt-artisan)

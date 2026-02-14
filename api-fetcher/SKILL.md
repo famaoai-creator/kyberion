@@ -3,6 +3,7 @@ name: api-fetcher
 description: Fetch data from REST/GraphQL APIs securely.
 status: implemented
 category: Integration & API
+last_updated: '2026-02-13'
 ---
 
 # Api Fetcher

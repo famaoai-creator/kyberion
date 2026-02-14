@@ -6,6 +6,7 @@ description: >-
   Calendar."
 status: implemented
 category: Interface & AI
+last_updated: '2026-02-13'
 ---
 
 # Biometric Context Adapter

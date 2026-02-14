@@ -14,6 +14,7 @@ arguments:
     default: 100
     description: Number of lines to read
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Log Analyst Skill

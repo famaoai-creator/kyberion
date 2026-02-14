@@ -6,6 +6,7 @@ description: >-
   diagrams.
 status: implemented
 category: Data & Content
+last_updated: '2026-02-13'
 ---
 
 # Diagram Renderer

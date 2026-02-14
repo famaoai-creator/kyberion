@@ -15,6 +15,7 @@ arguments:
     type: string
     description: Optional output file path
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Prompt Optimizer

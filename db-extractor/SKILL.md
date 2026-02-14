@@ -14,6 +14,7 @@ arguments:
     short: o
     type: string
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Db Extractor

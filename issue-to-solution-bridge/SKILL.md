@@ -22,6 +22,7 @@ arguments:
     type: boolean
     description: Analysis only, no changes
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Issue-to-Solution Bridge

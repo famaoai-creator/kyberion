@@ -11,6 +11,7 @@ arguments:
     required: true
     description: Path to the log file to analyze
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Log-to-Requirement Bridge

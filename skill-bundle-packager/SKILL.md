@@ -6,6 +6,7 @@ description: >-
   high-level tasks.
 status: implemented
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Skill Bundle Packager

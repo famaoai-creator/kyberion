@@ -25,6 +25,7 @@ arguments:
     type: string
     description: Output file path
 category: Integration & API
+last_updated: '2026-02-13'
 ---
 
 # Google Workspace Integrator

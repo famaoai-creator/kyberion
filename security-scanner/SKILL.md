@@ -6,6 +6,7 @@ description: >-
   configurations. Use to audit code before committing or reviewing.
 status: implemented
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # Security Scanner

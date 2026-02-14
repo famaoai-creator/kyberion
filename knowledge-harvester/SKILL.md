@@ -12,6 +12,7 @@ arguments:
     required: true
     description: Git repository URL
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Knowledge Harvester

@@ -5,6 +5,7 @@ status: >-
   implemented Use when you need to group repositories by solution (IB, TrustId,
   etc.) and identify stale repositories for archiving.
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # GitHub Repo Auditor

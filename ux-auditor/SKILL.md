@@ -14,6 +14,7 @@ arguments:
     type: string
     description: Output file path
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # UX Auditor

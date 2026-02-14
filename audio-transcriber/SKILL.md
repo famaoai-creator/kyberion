@@ -15,6 +15,7 @@ arguments:
     short: o
     type: string
 category: Interface & AI
+last_updated: '2026-02-13'
 ---
 
 # Audio Transcriber

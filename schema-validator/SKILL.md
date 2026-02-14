@@ -14,6 +14,7 @@ arguments:
     required: true
     description: JSON Schema file path
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Schema Validator

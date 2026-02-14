@@ -6,6 +6,7 @@ description: >-
   images.
 status: implemented
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # Layout Architect

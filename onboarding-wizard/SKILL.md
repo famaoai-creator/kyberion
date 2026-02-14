@@ -10,6 +10,7 @@ arguments:
     type: string
     description: Project directory
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Onboarding Wizard

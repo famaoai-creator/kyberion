@@ -22,6 +22,7 @@ arguments:
     type: string
     description: Output file
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Bug Predictor

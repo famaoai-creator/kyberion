@@ -117,6 +117,26 @@ function generateDescription(commits, changedFiles, categories) {
             report.results.forEach(r => {
                 sections.push(`| ${r.name} | ${r.status === 'passed' ? '✅ PASSED' : '❌ FAILED'} | ${r.duration}s |`);
             });
+
+            // Specific details for performance
+            const perfResult = report.results.find(r => r.name === 'Performance Regression');
+            if (perfResult) {
+                if (perfResult.regressions && perfResult.regressions.length > 0) {
+                    sections.push('\n### 📉 Performance Regressions Detected');
+                    perfResult.regressions.forEach(r => {
+                        sections.push(`- **${r.skill}**: ${r.lastDuration}ms (avg ${r.historicalAvg}ms, ${r.increaseRate}x slower)`);
+                    });
+                }
+                if (perfResult.efficiency_alerts && perfResult.efficiency_alerts.length > 0) {
+                    const improving = perfResult.efficiency_alerts.filter(s => s.trend === 'improving');
+                    if (improving.length > 0) {
+                        sections.push('\n### 📈 Performance Improvements');
+                        improving.forEach(s => {
+                            sections.push(`- **${s.skill}**: Score improved to ${s.efficiencyScore} (from ${s.prevScore})`);
+                        });
+                    }
+                }
+            }
         } catch (_e) { /* skip if corrupt */ }
     }
 

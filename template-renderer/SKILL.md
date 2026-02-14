@@ -15,6 +15,7 @@ arguments:
     short: o
     type: string
 category: Data & Content
+last_updated: '2026-02-13'
 ---
 
 # Template Renderer

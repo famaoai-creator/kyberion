@@ -18,6 +18,7 @@ arguments:
     type: string
     description: Output file path (optional)
 category: Data & Content
+last_updated: '2026-02-13'
 ---
 
 # Data Transformer

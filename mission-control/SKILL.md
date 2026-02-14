@@ -15,6 +15,7 @@ arguments:
     short: d
     type: string
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Mission Control (Orchestrator)

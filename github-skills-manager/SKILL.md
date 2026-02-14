@@ -6,6 +6,7 @@ description: >-
   in a monorepo or individual repositories.
 status: implemented
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # GitHub Skills Manager

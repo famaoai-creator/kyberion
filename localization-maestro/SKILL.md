@@ -19,6 +19,7 @@ arguments:
     type: string
     description: Output file path
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # Localization Maestro

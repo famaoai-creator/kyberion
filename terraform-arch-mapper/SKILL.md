@@ -6,6 +6,7 @@ description: >-
   (Mermaid/PlantUML). Use to visualize infrastructure.
 status: implemented
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Terraform Arch Mapper

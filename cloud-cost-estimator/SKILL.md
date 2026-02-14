@@ -5,6 +5,7 @@ description: >-
   CloudFormation). Helps align architecture with budget constraints.
 status: implemented
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Cloud Cost Estimator

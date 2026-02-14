@@ -15,6 +15,7 @@ arguments:
     type: string
     description: Optional output file path
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Refactoring Engine

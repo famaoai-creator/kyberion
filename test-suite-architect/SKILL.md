@@ -11,6 +11,7 @@ arguments:
     required: true
     description: Path to project directory to analyze
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # Test Suite Architect

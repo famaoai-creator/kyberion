@@ -19,6 +19,7 @@ arguments:
     type: string
     description: Output file path (JSON or .md)
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # Executive Reporting Maestro

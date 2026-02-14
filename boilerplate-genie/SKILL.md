@@ -21,6 +21,7 @@ arguments:
     type: string
     description: Output directory (defaults to ./<name>)
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Boilerplate Genie

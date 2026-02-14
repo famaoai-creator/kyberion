@@ -14,6 +14,7 @@ arguments:
     type: string
     description: Raw text string to analyze
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Token Economist

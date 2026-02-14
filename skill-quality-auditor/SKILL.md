@@ -17,6 +17,7 @@ arguments:
     type: number
     description: Minimum passing score (0-12)
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # Skill Quality Auditor

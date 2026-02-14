@@ -6,6 +6,7 @@ description: >-
   need to produce Excel reports or modify existing spreadsheets.
 status: implemented
 category: Data & Content
+last_updated: '2026-02-13'
 ---
 
 # Excel Artisan

@@ -20,6 +20,7 @@ arguments:
     type: string
     description: Output file path for release notes
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Release Note Crafter

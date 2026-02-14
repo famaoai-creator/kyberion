@@ -16,6 +16,7 @@ arguments:
     default: 3
     description: Max depth to traverse
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Codebase Mapper Skill

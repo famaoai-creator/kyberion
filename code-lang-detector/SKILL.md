@@ -7,6 +7,7 @@ arguments:
     short: i
     type: string
 category: Utilities
+last_updated: '2026-02-13'
 ---
 # code-lang-detector
 Detect programming language of source code.

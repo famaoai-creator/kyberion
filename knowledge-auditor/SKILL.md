@@ -6,6 +6,7 @@ description: >-
   intentionally override) public ones.
 status: implemented
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # Knowledge Auditor

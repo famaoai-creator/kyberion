@@ -23,6 +23,7 @@ arguments:
     type: string
     description: Output file path for the report
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Environment Provisioner

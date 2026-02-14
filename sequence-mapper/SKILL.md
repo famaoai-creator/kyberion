@@ -11,6 +11,7 @@ arguments:
     short: o
     type: string
 category: Engineering & DevOps
+last_updated: '2026-02-13'
 ---
 
 # Sequence Mapper

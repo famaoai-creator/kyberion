@@ -8,6 +8,7 @@ arguments:
     type: string
     required: true
 category: Utilities
+last_updated: '2026-02-13'
 ---
 # domain-classifier
 Classify domain (tech, finance, legal).

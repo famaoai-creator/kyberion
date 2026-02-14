@@ -25,6 +25,7 @@ arguments:
     short: o
     type: string
 category: Integration & API
+last_updated: '2026-02-13'
 ---
 
 # Backlog Connector

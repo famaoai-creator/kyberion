@@ -7,6 +7,7 @@ description: >-
   requirements definition document.
 status: implemented
 category: Strategy & Leadership
+last_updated: '2026-02-13'
 ---
 
 # Non-Functional Architect

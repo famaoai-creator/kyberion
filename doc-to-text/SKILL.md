@@ -6,6 +6,7 @@ description: >-
   files.
 status: implemented
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Document to Text Converter

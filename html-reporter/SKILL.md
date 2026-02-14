@@ -7,6 +7,7 @@ arguments:
     short: title
     type: string
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Html Reporter

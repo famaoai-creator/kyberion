@@ -5,6 +5,7 @@ description: >-
   Quality Metrics) and provides a health score with improvement suggestions.
 status: implemented
 category: Governance & Security
+last_updated: '2026-02-13'
 ---
 
 # Project Health Check

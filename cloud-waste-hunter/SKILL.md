@@ -10,6 +10,7 @@ arguments:
     type: string
     description: Directory with cloud configs
 category: Utilities
+last_updated: '2026-02-13'
 ---
 
 # Cloud Waste Hunter
