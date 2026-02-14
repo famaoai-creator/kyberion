@@ -50,6 +50,13 @@ const ui = {
         process.stdout.write('\r' + (success ? chalk.green('\u2714') : chalk.red('\u2718')) + ` ${msg}\n`);
       }
     };
+  },
+  /**
+   * Generates a unique mission ID for traceability.
+   * @returns {string}
+   */
+  generateMissionId: () => {
+    return 'MSN-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
   }
 };
 
