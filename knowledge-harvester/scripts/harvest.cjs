@@ -16,5 +16,19 @@ runAsyncSkill('knowledge-harvester', async () => {
   const tmpDir = path.join(process.cwd(), 'work/tmp/harvest_' + Date.now());
   fs.mkdirSync(tmpDir, { recursive: true });
   execSync(`git clone --depth 1 ${argv.repo} ${tmpDir}`, { stdio: 'ignore' });
-  return { repository: argv.repo, harvestedAt: new Date().toISOString(), status: 'success' };
+  const result = { repository: argv.repo, harvestedAt: new Date().toISOString(), status: 'success' };
+
+  // Phase 3: Auto-Wiki (Local Sync)
+  const rootDir = path.resolve(__dirname, '../..');
+  const indexFile = path.join(rootDir, 'knowledge/_index.md');
+  const skills = fs.readdirSync(rootDir).filter(f => fs.existsSync(path.join(rootDir, f, 'SKILL.md')));
+
+  let md = "# Ecosystem Knowledge Base\n\n## Available Skills\n\n";
+  skills.sort().forEach(s => {
+    md += `- **${s}**: [Documentation](./${s}/SKILL.md)\n`;
+  });
+  fs.writeFileSync(indexFile, md);
+  
+  result.local_sync = { updated: 'knowledge/_index.md', skills_indexed: skills.length };
+  return result;
 });

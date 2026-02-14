@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-02-14T04:08:55.701Z",
+  "timestamp": "2026-02-14T04:22:41.948Z",
   "summary": {
-    "total_records": 2919,
+    "total_records": 2922,
     "unique_skills": 79
   },
   "regressions": [
@@ -49,10 +49,10 @@
     },
     {
       "skill": "knowledge-harvester",
-      "lastDuration": 736,
-      "historicalAvg": 44,
-      "increaseRate": 16.7,
-      "timestamp": "2026-02-12T18:56:55.039Z"
+      "lastDuration": 1116,
+      "historicalAvg": 102,
+      "increaseRate": 11,
+      "timestamp": "2026-02-14T04:22:41.866Z"
     },
     {
       "skill": "skill-bundle-packager",
@@ -83,6 +83,13 @@
       "timestamp": "2026-02-12T19:43:07.259Z"
     },
     {
+      "skill": "security-scanner",
+      "lastDuration": 238,
+      "historicalAvg": 46,
+      "increaseRate": 5.1,
+      "timestamp": "2026-02-14T04:22:09.707Z"
+    },
+    {
       "skill": "diagram-renderer",
       "lastDuration": 1436,
       "historicalAvg": 589,
@@ -101,7 +108,10 @@
       "maxMs": 1187,
       "cacheHitRatio": 0,
       "sloCompliance": 76,
-      "efficiencyScore": 96
+      "efficiencyScore": 96,
+      "manualMs": 300000,
+      "savedMs": 19771590,
+      "savedCost": 549
     },
     {
       "skill": "api-doc-generator",
@@ -114,6 +124,9 @@
       "cacheHitRatio": 0,
       "sloCompliance": 6,
       "efficiencyScore": 66,
+      "manualMs": 300000,
+      "savedMs": 10679154,
+      "savedCost": 297,
       "trend": "stable",
       "prevScore": 66
     },
@@ -127,7 +140,10 @@
       "maxMs": 3775,
       "cacheHitRatio": 0,
       "sloCompliance": 71,
-      "efficiencyScore": 94
+      "efficiencyScore": 94,
+      "manualMs": 300000,
+      "savedMs": 7185027,
+      "savedCost": 200
     },
     {
       "skill": "doc-sync-sentinel",
@@ -139,7 +155,10 @@
       "maxMs": 4502,
       "cacheHitRatio": 0,
       "sloCompliance": 100,
-      "efficiencyScore": 90
+      "efficiencyScore": 90,
+      "manualMs": 300000,
+      "savedMs": 4784354,
+      "savedCost": 133
     },
     {
       "skill": "ppt-artisan",
@@ -152,6 +171,9 @@
       "cacheHitRatio": 0,
       "sloCompliance": 7,
       "efficiencyScore": 50,
+      "manualMs": 1800000,
+      "savedMs": 25120036,
+      "savedCost": 698,
       "trend": "stable",
       "prevScore": 50
     }
@@ -169,6 +191,9 @@
       "cacheHitRatio": 0,
       "sloCompliance": 6,
       "efficiencyScore": 66,
+      "manualMs": 300000,
+      "savedMs": 10679154,
+      "savedCost": 297,
       "trend": "stable",
       "prevScore": 66
     },
@@ -183,6 +208,9 @@
       "cacheHitRatio": 0,
       "sloCompliance": 7,
       "efficiencyScore": 50,
+      "manualMs": 1800000,
+      "savedMs": 25120036,
+      "savedCost": 698,
       "trend": "stable",
       "prevScore": 50
     }
@@ -352,9 +380,9 @@
     },
     {
       "skill": "security-scanner",
-      "actual_latency": 46,
+      "actual_latency": 51,
       "target_latency": 60000,
-      "actual_success": "89.7",
+      "actual_success": "90.0",
       "target_success": 95,
       "consecutive_breaches": 2,
       "severity": "WARN"
@@ -414,9 +442,9 @@
     },
     {
       "skill": "knowledge-harvester",
-      "actual_latency": 102,
+      "actual_latency": 180,
       "target_latency": 5000,
-      "actual_success": "83.3",
+      "actual_success": "84.6",
       "target_success": 99,
       "consecutive_breaches": 2,
       "severity": "WARN"
