@@ -4,6 +4,8 @@ description: Launches the Slidev-based dynamic knowledge portal (DeepWiki) to vi
 status: implemented
 category: Documentation
 last_updated: '2026-02-14'
+tags:
+  - gemini-skill
 ---
 
 # knowledge-portal
