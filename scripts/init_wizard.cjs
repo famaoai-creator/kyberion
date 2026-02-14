@@ -32,6 +32,7 @@ const DOMAINS = {
       4: 'Reliability Engineer',
       5: 'Incident Commander',
       6: 'Performance Engineer',
+      7: 'Integration Steward',
     },
   },
   3: {

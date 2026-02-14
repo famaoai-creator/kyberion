@@ -11,7 +11,7 @@
   },
   "private": true,
   "devDependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "file:../scripts/lib"
   },
   "engines": {
     "node": ">=20.0.0"

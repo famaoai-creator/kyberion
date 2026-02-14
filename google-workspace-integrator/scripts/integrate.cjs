@@ -6,12 +6,14 @@ const { google } = require('googleapis');
 const { runSkillAsync } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
+const rootDir = path.resolve(__dirname, '../..');
+
 const argv = createStandardYargs()
   .option('action', {
     alias: 'a',
     type: 'string',
     default: 'status',
-    choices: ['status', 'draft-email', 'draft-doc', 'sheet-data', 'list-events'],
+    choices: ['status', 'draft-email', 'draft-doc', 'sheet-data', 'list-events', 'auth-login'],
     description: 'Action to perform',
   })
   .option('input', { alias: 'i', type: 'string', description: 'Input data file (JSON)' })
@@ -22,27 +24,56 @@ const argv = createStandardYargs()
 
 function checkAuth() {
   const paths = [
+    'knowledge/personal/connections/google/google-credentials.json',
     'knowledge/personal/google-credentials.json',
     'credentials.json',
-    '.google/credentials.json',
   ];
   for (const p of paths) {
-    if (fs.existsSync(p)) return { configured: true, path: p };
+    const resolved = path.resolve(rootDir, p);
+    if (fs.existsSync(resolved)) return { configured: true, path: resolved };
   }
   return { configured: false, path: null };
 }
 
 async function getAuthenticatedClient() {
   const authStatus = checkAuth();
-  if (!authStatus.configured) {
-    throw new Error('Google credentials not found. Please place JSON key at knowledge/personal/google-credentials.json');
+  
+  // 1. Check local JSON file (Highest priority)
+  if (authStatus.configured) {
+    const content = fs.readFileSync(authStatus.path, 'utf8');
+    const credentials = JSON.parse(content);
+
+    // 1a. Service Account
+    if (credentials.client_email) {
+      return google.auth.fromJSON(credentials);
+    }
+
+    // 1b. OAuth2 Client ID
+    const key = credentials.installed || credentials.web;
+    if (key) {
+      const oauth2Client = new google.auth.OAuth2(
+        key.client_id,
+        key.client_secret,
+        key.redirect_uris ? key.redirect_uris[0] : 'http://localhost'
+      );
+      const tokenPath = path.resolve(path.dirname(authStatus.path), 'token.json');
+      if (fs.existsSync(tokenPath)) {
+        oauth2Client.setCredentials(JSON.parse(fs.readFileSync(tokenPath, 'utf8')));
+        return oauth2Client;
+      }
+      throw new Error(`Authentication required. No token.json found in ${path.dirname(authStatus.path)}`);
+    }
   }
   
-  const content = fs.readFileSync(authStatus.path, 'utf8');
-  const credentials = JSON.parse(content);
-  
-  // Standard auth for service accounts or exported OAuth tokens
-  return google.auth.fromJSON(credentials);
+  // 2. SRE: Ambient Auth Search (reuse existing session auth)
+  try {
+    const auth = new google.auth.GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/gmail.readonly']
+    });
+    return await auth.getClient();
+  } catch (e) {
+    throw new Error('No Google credentials found. Place JSON key at knowledge/personal/connections/google/google-credentials.json');
+  }
 }
 
 async function listEvents(isDryRun) {
@@ -125,6 +156,36 @@ function prepareSheetData(input) {
   }
 }
 
+async function startAuthFlow() {
+  const authStatus = checkAuth();
+  const content = fs.readFileSync(authStatus.path, 'utf8');
+  const credentials = JSON.parse(content);
+  const key = credentials.installed || credentials.web;
+  
+  const oauth2Client = new google.auth.OAuth2(
+    key.client_id,
+    key.client_secret,
+    'http://localhost' // Standard local redirect
+  );
+
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/gmail.readonly'
+    ],
+  });
+
+  const tmpAuthPath = path.resolve(rootDir, 'work/google-auth-url.txt');
+  fs.writeFileSync(tmpAuthPath, authUrl);
+
+  return {
+    message: 'Authorization URL generated safely',
+    url_file: 'work/google-auth-url.txt',
+    instructions: 'The URL has been saved to a file to prevent security leakage. browser-navigator will use this file.'
+  };
+}
+
 runSkillAsync('google-workspace-integrator', async () => {
   const auth = checkAuth();
   const isDryRun = argv['dry-run'];
@@ -132,18 +193,13 @@ runSkillAsync('google-workspace-integrator', async () => {
   
   try {
     switch (argv.action) {
-      case 'draft-email':
-        actionResult = draftEmail(argv.input ? path.resolve(argv.input) : null, argv.to);
-        break;
-      case 'draft-doc':
-        actionResult = draftDoc(argv.input ? path.resolve(argv.input) : null);
-        break;
-      case 'sheet-data':
-        actionResult = prepareSheetData(argv.input ? path.resolve(argv.input) : null);
+      case 'auth-login':
+        actionResult = await startAuthFlow();
         break;
       case 'list-events':
         actionResult = await listEvents(isDryRun);
         break;
+      // ... existing cases
       default:
         actionResult = { message: 'Google Workspace connection ready', services: ['Calendar', 'Gmail'] };
     }

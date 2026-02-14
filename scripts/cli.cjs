@@ -19,11 +19,13 @@ const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index
 
 // --- UX: Proactive Health Check ---
 
-function checkHealth() {
+async function checkHealth() {
 
   const govPath = path.join(rootDir, 'work/governance-report.json');
 
   const perfDir = path.join(rootDir, 'evidence/performance');
+
+  const recipePath = path.join(rootDir, 'knowledge/orchestration/remediation-recipes.json');
 
   
 
@@ -35,11 +37,33 @@ function checkHealth() {
 
     if (report.overall_status !== 'compliant') {
 
-      logger.warn('Ecosystem is currently NON-COMPLIANT. Run "node scripts/governance_check.cjs" for details.');
+      logger.warn('Ecosystem is currently NON-COMPLIANT.');
+
+      
+
+      const recipes = fs.existsSync(recipePath) ? JSON.parse(fs.readFileSync(recipePath, 'utf8')) : {};
+
+      if (recipes.NON_COMPLIANT) {
+
+        const shouldFix = await ui.confirm(`Would you like to run the self-healing repair? (${recipes.NON_COMPLIANT.description})`);
+
+        if (shouldFix) {
+
+          console.log(chalk.cyan(`\n\u2699\ufe0f  Executing: ${recipes.NON_COMPLIANT.command}\n`));
+
+          execSync(recipes.NON_COMPLIANT.command, { stdio: 'inherit', cwd: rootDir });
+
+          console.log(chalk.green('\n\u2714  Repair complete. Continuing...'));
+
+        }
+
+      }
 
     }
 
   }
+
+
 
 
 
@@ -76,14 +100,26 @@ function checkHealth() {
 
 
 // --- Role Identity Display ---
-const currentRole = fileUtils.getCurrentRole();
-console.log(
-  `\x1b[36m[Ecosystem Identity]\x1b[0m ${chalk.bold(currentRole)} ${chalk.dim(`(Mission: ${process.env.MISSION_ID || 'None'})`)}\n`
-);
-checkHealth();
+
+
+
+// (Identity display moved into init)
+
+
+
 // -----------------------------
 
+
+
+
+
+
+
 const args = process.argv.slice(2);
+
+
+
+
 const command = args[0];
 const skillName = args[1];
 const skillArgs = args.slice(2);
@@ -369,25 +405,37 @@ ${chalk.bold('EXAMPLES:')}
 `);
 }
 
-if (args.includes('-h') || args.includes('--help') || !command) {
-  showHelp();
-  process.exit(0);
+async function init() {
+  const currentRole = fileUtils.getCurrentRole();
+  console.log(`\x1b[36m[Ecosystem Identity]\x1b[0m ${chalk.bold(currentRole)} ${chalk.dim(`(Mission: ${process.env.MISSION_ID || 'None'})`)}\n`);
+  
+  await checkHealth();
+
+  if (args.includes('-h') || args.includes('--help') || !command) {
+    showHelp();
+    process.exit(0);
+  }
+
+  switch (command) {
+    case 'run':
+      runCommand();
+      break;
+    case 'list':
+      listCommand();
+      break;
+    case 'search':
+      searchCommand();
+      break;
+    case 'info':
+      infoCommand();
+      break;
+    default:
+      showHelp();
+      process.exit(1);
+  }
 }
 
-switch (command) {
-  case 'run':
-    runCommand();
-    break;
-  case 'list':
-    listCommand();
-    break;
-  case 'search':
-    searchCommand();
-    break;
-  case 'info':
-    infoCommand();
-    break;
-  default:
-    showHelp();
-    process.exit(1);
-}
+init().catch(err => {
+  logger.error(err.message);
+  process.exit(1);
+});

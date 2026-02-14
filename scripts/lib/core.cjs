@@ -81,6 +81,24 @@ const ui = {
     return `[${chalk.cyan(bar)}] ${percent}%`;
   },
   /**
+   * Simple interactive confirmation.
+   * @param {string} question 
+   * @returns {Promise<boolean>}
+   */
+  confirm: (question) => {
+    if (process.argv.includes('-y') || process.argv.includes('--yes')) return Promise.resolve(true);
+    const readline = require('readline').createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    return new Promise((resolve) => {
+      readline.question(`${chalk.yellow.bold('\uff1f')} ${question} [y/N]: `, (answer) => {
+        readline.close();
+        resolve(answer.toLowerCase() === 'y');
+      });
+    });
+  },
+  /**
    * Intelligently summarizes large data objects for CLI display.
    */
   summarize: (data, maxItems = 10) => {

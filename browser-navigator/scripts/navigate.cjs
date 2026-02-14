@@ -37,7 +37,7 @@ runSkill('browser-navigator', () => {
         stdio: 'pipe',
       });
       return { mode: 'scenario', spec: specPath, result: 'passed', output };
-    } catch (_err) {
+    } catch (err) {
       return {
         mode: 'scenario',
         spec: specPath,
@@ -100,7 +100,7 @@ test('navigate', async ({ page }) => {
       result: 'completed',
       screenshot: argv.screenshot ? path.join(screenshotDir, 'latest.png') : null,
     };
-  } catch (_err) {
+  } catch (err) {
     return {
       mode: 'navigate',
       url,

@@ -8,12 +8,12 @@
     "score": "node dist/score.js"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "file:../scripts/lib"
   },
   "author": "Gemini Agent",
   "license": "MIT",
   "devDependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "file:../scripts/lib"
   },
   "engines": {
     "node": ">=20.0.0"

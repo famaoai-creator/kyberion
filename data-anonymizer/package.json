@@ -8,11 +8,11 @@
     "main": "node dist/main.js"
   },
   "dependencies": {
-    "@agent/core": "workspace:*"
+    "@agent/core": "file:../scripts/lib"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
-    "@agent/core": "workspace:*"
+    "@agent/core": "file:../scripts/lib"
   },
   "author": "Gemini Agent",
   "license": "MIT",
