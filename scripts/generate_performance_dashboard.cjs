@@ -43,10 +43,14 @@ function generate() {
 
     if (latest.efficiency_alerts.length > 0) {
         md += "### 💎 Low Efficiency (Resource vs Speed)\n\n";
-        md += "| Skill | Score | Latency | Memory |\n";
-        md += "| :--- | :--- | :--- | :--- |\n";
+        md += "| Skill | Score | Trend | Latency | Memory |\n";
+        md += "| :--- | :--- | :--- | :--- | :--- |\n";
         latest.efficiency_alerts.sort((a, b) => a.efficiencyScore - b.efficiencyScore).forEach(s => {
-            md += `| **${s.skill}** | ${s.efficiencyScore} | ${s.avgMs}ms | ${s.peakHeapMB}MB |\n`;
+            let trendIcon = '➖';
+            if (s.trend === 'improving') trendIcon = '📈';
+            if (s.trend === 'degrading') trendIcon = '📉';
+            
+            md += `| **${s.skill}** | ${s.efficiencyScore} | ${trendIcon} | ${s.avgMs}ms | ${s.peakHeapMB}MB |\n`;
         });
         md += "\n";
     }

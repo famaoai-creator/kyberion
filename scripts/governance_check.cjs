@@ -95,7 +95,20 @@ async function main() {
   results.push(await runStep('Type Check', 'npm run typecheck'));
   results.push(await runStep('Unit Tests', 'npm run test:unit'));
   results.push(await runStep('Ecosystem Health', 'node scripts/check_skills_health.cjs'));
-  results.push(await runStep('Performance Regression', 'node scripts/check_performance.cjs --fail-on-regression'));
+  
+  const perfResult = await runStep('Performance Regression', 'node scripts/check_performance.cjs --fail-on-regression');
+  
+  // Enrich performance result with trend data if available
+  const perfDir = path.resolve(__dirname, '../evidence/performance');
+  if (fs.existsSync(perfDir)) {
+    const perfFiles = fs.readdirSync(perfDir).filter(f => f.endsWith('.json')).sort();
+    if (perfFiles.length > 0) {
+      const latestPerf = JSON.parse(fs.readFileSync(path.join(perfDir, perfFiles[perfFiles.length - 1]), 'utf8'));
+      perfResult.regressions = latestPerf.regressions || [];
+      perfResult.efficiency_alerts = latestPerf.efficiency_alerts || [];
+    }
+  }
+  results.push(perfResult);
 
   const failed = results.filter(r => r.status === 'failed');
   
