@@ -100,10 +100,6 @@ class MetricsCollector {
     }
   }
 
-  /**
-   * Get aggregated metrics for all recorded skills.
-   * @returns {Object[]} Array of skill metric summaries
-   */
   summarize() {
     const summaries = [];
     const TIME_BASE = 5000; // 5s baseline
@@ -111,12 +107,18 @@ class MetricsCollector {
 
     for (const [name, agg] of this._aggregates) {
       const avgMs = agg.count > 0 ? Math.round(agg.totalMs / agg.count) : 0;
+      const totalCache = agg.cacheHits + agg.cacheMisses;
+      const cacheRatio = totalCache > 0 ? (agg.cacheHits / totalCache) : 0;
       
-      // Efficiency Score: Higher is better (0-100)
-      // Penalizes both high latency and high memory usage
-      const timeImpact = Math.min(50, (avgMs / TIME_BASE) * 50);
-      const memImpact = Math.min(50, (agg.peakHeapMB / MEM_BASE) * 50);
-      const efficiencyScore = Math.max(0, Math.round(100 - (timeImpact + memImpact)));
+      // Efficiency Score: 0-100
+      // 1. Latency Impact (max 40 pts penalty)
+      const timeImpact = Math.min(40, (avgMs / TIME_BASE) * 40);
+      // 2. Memory Impact (max 40 pts penalty)
+      const memImpact = Math.min(40, (agg.peakHeapMB / MEM_BASE) * 40);
+      // 3. Cache Bonus (max 20 pts bonus)
+      const cacheBonus = Math.round(cacheRatio * 20);
+      
+      const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - (timeImpact + memImpact) + cacheBonus)));
 
       summaries.push({
         skill: name,
@@ -130,6 +132,7 @@ class MetricsCollector {
         peakHeapMB: agg.peakHeapMB,
         peakRssMB: agg.peakRssMB,
         efficiencyScore,
+        cacheHitRatio: Math.round(cacheRatio * 100)
       });
     }
     return summaries.sort((a, b) => b.executions - a.executions);

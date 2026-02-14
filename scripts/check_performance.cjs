@@ -144,21 +144,131 @@ async function main() {
 
 
 
-  // 4. Save ADF Report
+    // 4. Save ADF Report & Trend Analysis
 
-  const defaultOutDir = path.resolve(__dirname, '../evidence/performance');
 
-  if (!fs.existsSync(defaultOutDir)) fs.mkdirSync(defaultOutDir, { recursive: true });
+
+    const defaultOutDir = path.resolve(__dirname, '../evidence/performance');
+
+
+
+    if (!fs.existsSync(defaultOutDir)) fs.mkdirSync(defaultOutDir, { recursive: true });
+
+
+
+    
+
+
+
+    // Find previous report for trend comparison
+
+
+
+    const prevReports = fs.readdirSync(defaultOutDir).filter(f => f.startsWith('perf-report-')).sort();
+
+
+
+    let trendData = {};
+
+
+
+    if (prevReports.length > 0) {
+
+
+
+      const lastReportPath = path.join(defaultOutDir, prevReports[prevReports.length - 1]);
+
+
+
+      try {
+
+
+
+        const lastReport = JSON.parse(fs.readFileSync(lastReportPath, 'utf8'));
+
+
+
+        lastReport.efficiency_alerts.forEach(s => {
+
+
+
+          trendData[s.skill] = s.efficiencyScore;
+
+
+
+        });
+
+
+
+      } catch (_) {}
+
+
+
+    }
+
+
 
   
 
-  const outPath = argv.out || path.join(defaultOutDir, `perf-report-${new Date().toISOString().split('T')[0]}.json`);
 
-  const { safeWriteFile } = require('./lib/secure-io.cjs');
 
-  safeWriteFile(outPath, JSON.stringify(adfReport, null, 2));
+    const outPath = argv.out || path.join(defaultOutDir, `perf-report-${new Date().toISOString().split('T')[0]}.json`);
 
-  console.log(chalk.dim(`\nADF Report saved to: ${outPath}`));
+
+
+    
+
+
+
+    // Add trend information to current report
+
+
+
+    adfReport.efficiency_alerts.forEach(s => {
+
+
+
+      const prevScore = trendData[s.skill];
+
+
+
+      if (prevScore !== undefined) {
+
+
+
+        s.trend = s.efficiencyScore > prevScore ? 'improving' : (s.efficiencyScore < prevScore ? 'degrading' : 'stable');
+
+
+
+        s.prevScore = prevScore;
+
+
+
+      }
+
+
+
+    });
+
+
+
+  
+
+
+
+    const { safeWriteFile } = require('./lib/secure-io.cjs');
+
+
+
+    safeWriteFile(outPath, JSON.stringify(adfReport, null, 2));
+
+
+
+    console.log(chalk.dim(`\nADF Report with Trends saved to: ${outPath}`));
+
+
+
+  
 
 
 
