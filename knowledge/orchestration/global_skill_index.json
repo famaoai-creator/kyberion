@@ -1,792 +1,793 @@
 {
-  "total_skills": 131,
-  "last_updated": "2026-02-12T02:24:15.549Z",
-  "skills": [
+  "v": "1.1.0",
+  "t": 131,
+  "u": "2026-02-14T01:55:35.284Z",
+  "s": [
     {
-      "name": "agent-activity-monitor",
-      "description": "Collects and visualizes statistics regarding the agent's activities, including skill usage, execution success rates, and task duration. Provides a data-driven dashboard for ecosystem health.",
-      "status": "implemented",
-      "path": "./agent-activity-monitor/"
+      "n": "agent-activity-monitor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/monitor.cjs"
     },
     {
-      "name": "ai-ethics-auditor",
-      "description": "Audits AI systems for bias, fairness, and privacy. Analyzes prompts and datasets to ensure ethical and safe AI implementation.",
-      "status": "implemented",
-      "path": "./ai-ethics-auditor/"
+      "n": "ai-ethics-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "ai-model-orchestrator",
-      "description": "Dynamically selects the optimal AI model based on task complexity, cost, and latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize efficiency.",
-      "status": "implemented",
-      "path": "./ai-model-orchestrator/"
+      "n": "ai-model-orchestrator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/orchestrate.cjs"
     },
     {
-      "name": "api-doc-generator",
-      "description": "Generate API documentation from OpenAPI specs or code.",
-      "status": "implemented",
-      "path": "./api-doc-generator/"
+      "n": "api-doc-generator",
+      "d": "Generate API documentation from OpenAPI specs or code.",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "api-evolution-manager",
-      "description": "Governs the evolution of public APIs. Detects breaking changes, manages deprecation cycles, and generates migration guides for clients.",
-      "status": "implemented",
-      "path": "./api-evolution-manager/"
+      "n": "api-evolution-manager",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/manage.cjs"
     },
     {
-      "name": "api-fetcher",
-      "description": "Fetch data from REST/GraphQL APIs securely.",
-      "status": "implemented",
-      "path": "./api-fetcher/"
+      "n": "api-fetcher",
+      "d": "Fetch data from REST/GraphQL APIs securely.",
+      "s": "impl",
+      "m": "scripts/fetch.cjs"
     },
     {
-      "name": "audio-transcriber",
-      "description": "Transcribe audio/video files to text using OpenAI Whisper.",
-      "status": "implemented",
-      "path": "./audio-transcriber/"
+      "n": "audio-transcriber",
+      "d": "Transcribe audio/video files to text using OpenAI Whisper.",
+      "s": "impl",
+      "m": "scripts/transcribe.cjs"
     },
     {
-      "name": "auto-context-mapper",
-      "description": "Intelligently links related knowledge assets across tiers. Automatically fetches prerequisite data and high-level mission context for any task.",
-      "status": "implemented",
-      "path": "./auto-context-mapper/"
+      "n": "auto-context-mapper",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/map.cjs"
     },
     {
-      "name": "automated-support-architect",
-      "description": "Generates high-quality user support assets (FAQs, Troubleshooting Guides, Chatbot Knowledge) directly from source code and requirements. Bridges the gap between developers and end-users.",
-      "status": "implemented",
-      "path": "./automated-support-architect/"
+      "n": "automated-support-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "autonomous-skill-designer",
-      "description": "The ultimate \"self-generation\" skill. Autonomously designs and implements new Gemini skills to solve novel problems that current skills cannot address.",
-      "status": "implemented",
-      "path": "./autonomous-skill-designer/"
+      "n": "autonomous-skill-designer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/design.cjs"
     },
     {
-      "name": "backlog-connector",
-      "description": "Specialized connector for Nulab Backlog API. Automatically resolves Project IDs and handles pagination for fetching issues and wikis.",
-      "status": "implemented",
-      "path": "./backlog-connector/"
+      "n": "backlog-connector",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/backlog.cjs"
     },
     {
-      "name": "binary-archaeologist",
-      "description": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.",
-      "status": "implemented",
-      "path": "./binary-archaeologist/"
+      "n": "binary-archaeologist",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "biometric-context-adapter",
-      "description": "Infers user stress/energy levels from interaction patterns (typing speed, error rate). Adjusts response verbosity and visualizes mood via a \"Niko-Niko Calendar.\"",
-      "status": "implemented",
-      "path": "./biometric-context-adapter/"
+      "n": "biometric-context-adapter",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate_niko_niko.cjs"
     },
     {
-      "name": "boilerplate-genie",
-      "description": "Scaffolds new projects with best practices (CI/CD, Tests, Linting) pre-configured. Ensures a \"healthy\" starting point for Next.js, FastAPI, Node.js, and more.",
-      "status": "implemented",
-      "path": "./boilerplate-genie/"
+      "n": "boilerplate-genie",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/main.cjs"
     },
     {
-      "name": "box-connector",
-      "description": "Securely connects to Box using the Node.js SDK (JWT). downloads files, searches content, and manages folder structures.",
-      "status": "implemented",
-      "path": "./box-connector/"
+      "n": "box-connector",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/connect.cjs"
     },
     {
-      "name": "browser-navigator",
-      "description": "Automates browser actions using Playwright CLI. Can record, replay, and generate browser automation scenarios stored in the knowledge base. Useful for UI testing, data extraction, and visual auditing.",
-      "status": "implemented",
-      "path": "./browser-navigator/"
+      "n": "browser-navigator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/navigate.cjs"
     },
     {
-      "name": "budget-variance-tracker",
-      "description": "Compares actual spend and revenue against forecasts. Provides variance analysis and corrective insights to ensure financial discipline.",
-      "status": "implemented",
-      "path": "./budget-variance-tracker/"
+      "n": "budget-variance-tracker",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/track.cjs"
     },
     {
-      "name": "bug-predictor",
-      "description": "Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns. Warns developers before a bug is even written.",
-      "status": "implemented",
-      "path": "./bug-predictor/"
+      "n": "bug-predictor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/predict.cjs"
     },
     {
-      "name": "business-growth-planner",
-      "description": "Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.",
-      "status": "implemented",
-      "path": "./business-growth-planner/"
+      "n": "business-growth-planner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/plan.cjs"
     },
     {
-      "name": "business-impact-analyzer",
-      "description": "Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financial impact. Helps justify technical investments to stakeholders.",
-      "status": "implemented",
-      "path": "./business-impact-analyzer/"
+      "n": "business-impact-analyzer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "chaos-monkey-orchestrator",
-      "description": "Injects managed chaos into environments to test system resilience. Validates that self-healing and monitoring systems work as expected under stress.",
-      "status": "implemented",
-      "path": "./chaos-monkey-orchestrator/"
+      "n": "chaos-monkey-orchestrator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/chaos.cjs"
     },
     {
-      "name": "cloud-cost-estimator",
-      "description": "Estimates monthly cloud infrastructure costs from IaC files (Terraform, CloudFormation). Helps align architecture with budget constraints.",
-      "status": "implemented",
-      "path": "./cloud-cost-estimator/"
+      "n": "cloud-cost-estimator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/estimate.cjs"
     },
     {
-      "name": "cloud-waste-hunter",
-      "description": "Actively identifies and eliminates unused or over-provisioned cloud resources. Goes beyond estimation to hunt for actual cost savings in live environments.",
-      "status": "implemented",
-      "path": "./cloud-waste-hunter/"
+      "n": "cloud-waste-hunter",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/hunt.cjs"
     },
     {
-      "name": "code-lang-detector",
-      "description": "Detect programming language of source code.",
-      "status": "implemented",
-      "path": "./code-lang-detector/"
+      "n": "code-lang-detector",
+      "d": "Detect programming language of source code.",
+      "s": "impl",
+      "m": "scripts/detect.cjs"
     },
     {
-      "name": "codebase-mapper",
-      "description": "Maps the directory structure of the project to help the AI understand the codebase layout.",
-      "status": "implemented",
-      "path": "./codebase-mapper/"
+      "n": "codebase-mapper",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/map.cjs"
     },
     {
-      "name": "competitive-intel-strategist",
-      "description": "Analyzes competitor releases and market trends to propose technical differentiation strategies. Ensures our products stay ahead by leveraging our unique code assets.",
-      "status": "implemented",
-      "path": "./competitive-intel-strategist/"
+      "n": "competitive-intel-strategist",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "completeness-scorer",
-      "description": "Evaluate text completeness based on criteria.",
-      "status": "implemented",
-      "path": "./completeness-scorer/"
+      "n": "completeness-scorer",
+      "d": "Evaluate text completeness based on criteria.",
+      "s": "impl",
+      "m": "scripts/score.cjs"
     },
     {
-      "name": "compliance-officer",
-      "description": "Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time compliance scores and audit-ready evidence reports.",
-      "status": "implemented",
-      "path": "./compliance-officer/"
+      "n": "compliance-officer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "connection-manager",
-      "description": "Manages secure connections to external tools (AWS, Slack, Jira, Box). Validates credentials in the Personal Tier and injects them into the execution context.",
-      "status": "implemented",
-      "path": "./connection-manager/"
+      "n": "connection-manager",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/diagnose.cjs"
     },
     {
-      "name": "context-injector",
-      "description": "Inject knowledge into JSON data context.",
-      "status": "implemented",
-      "path": "./context-injector/"
+      "n": "context-injector",
+      "d": "Inject knowledge into JSON data context.",
+      "s": "impl",
+      "m": "scripts/inject.cjs"
     },
     {
-      "name": "crisis-manager",
-      "description": "Provides rapid response during production incidents or critical security breaches. Coordinates diagnostics, temporary fixes, and post-mortem data collection.",
-      "status": "implemented",
-      "path": "./crisis-manager/"
+      "n": "crisis-manager",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/diagnose.cjs"
     },
     {
-      "name": "data-anonymizer",
-      "description": "Masks sensitive fields in JSON data for safe sharing.",
-      "status": "implemented",
-      "path": "./data-anonymizer/"
+      "n": "data-anonymizer",
+      "d": "Masks sensitive fields in JSON data for safe sharing.",
+      "s": "impl",
+      "m": "dist/main.js"
     },
     {
-      "name": "data-collector",
-      "description": "Fetches data from URLs (Web/API) and saves it to a local directory with metadata (timestamp, source, hash) for traceability. Supports incremental updates.",
-      "status": "implemented",
-      "path": "./data-collector/"
+      "n": "data-collector",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/collect.cjs"
     },
     {
-      "name": "data-lineage-guardian",
-      "description": "Tracks the flow and integrity of data across the entire stack. Monitors data quality, ensures \"Right to be Forgotten\" compliance, and visualizes data lineage.",
-      "status": "implemented",
-      "path": "./data-lineage-guardian/"
+      "n": "data-lineage-guardian",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/trace.cjs"
     },
     {
-      "name": "data-transformer",
-      "description": "Convert between CSV, JSON, and YAML formats.",
-      "status": "implemented",
-      "path": "./data-transformer/"
+      "n": "data-transformer",
+      "d": "Convert between CSV, JSON, and YAML formats.",
+      "s": "impl",
+      "m": "scripts/transform.cjs"
     },
     {
-      "name": "dataset-curator",
-      "description": "Prepares and audits high-quality datasets for AI/RAG applications. Cleans noise, structure data, and ensures privacy compliance in knowledge bases.",
-      "status": "implemented",
-      "path": "./dataset-curator/"
+      "n": "dataset-curator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/curate.cjs"
     },
     {
-      "name": "db-extractor",
-      "description": "Extract schema and sample data from databases for analysis.",
-      "status": "implemented",
-      "path": "./db-extractor/"
+      "n": "db-extractor",
+      "d": "Extract schema and sample data from databases for analysis.",
+      "s": "impl",
+      "m": "scripts/extract.cjs"
     },
     {
-      "name": "dependency-grapher",
-      "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
-      "status": "implemented",
-      "path": "./dependency-grapher/"
+      "n": "dependency-grapher",
+      "d": "Generate dependency graphs (Mermaid/DOT) from project files.",
+      "s": "impl",
+      "m": "scripts/graph.cjs"
     },
     {
-      "name": "dependency-lifeline",
-      "description": "Proactively monitors and plans library updates. Assesses the risk of breaking changes and proposes safe update paths.",
-      "status": "implemented",
-      "path": "./dependency-lifeline/"
+      "n": "dependency-lifeline",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/check.cjs"
     },
     {
-      "name": "diagram-renderer",
-      "description": "Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful for visualizing text-based architecture diagrams, flowcharts, and sequence diagrams.",
-      "status": "implemented",
-      "path": "./diagram-renderer/"
+      "n": "diagram-renderer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/main.cjs"
     },
     {
-      "name": "diff-visualizer",
-      "description": "Generate a visual difference report between two texts.",
-      "status": "implemented",
-      "path": "./diff-visualizer/"
+      "n": "diff-visualizer",
+      "d": "Generate a visual difference report between two texts.",
+      "s": "impl",
+      "m": "scripts/diff.cjs"
     },
     {
-      "name": "disaster-recovery-planner",
-      "description": "Generates actionable Disaster Recovery (DR) runbooks from infrastructure and requirements. Validates IaC for resilience (backups, redundancy).",
-      "status": "implemented",
-      "path": "./disaster-recovery-planner/"
+      "n": "disaster-recovery-planner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/plan.cjs"
     },
     {
-      "name": "doc-sync-sentinel",
-      "description": "Automatically synchronizes documentation with code changes. Detects drift between source code and READMEs, Wikis, or comments, and suggests autonomous updates.",
-      "status": "implemented",
-      "path": "./doc-sync-sentinel/"
+      "n": "doc-sync-sentinel",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/check.cjs"
     },
     {
-      "name": "doc-to-text",
-      "description": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, and ZIP Archives. Use for summarizing or analyzing binary files.",
-      "status": "implemented",
-      "path": "./doc-to-text/"
+      "n": "doc-to-text",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/extract.cjs"
     },
     {
-      "name": "doc-type-classifier",
-      "description": "Classify document type (meeting-notes, spec, etc).",
-      "status": "implemented",
-      "path": "./doc-type-classifier/"
+      "n": "doc-type-classifier",
+      "d": "Classify document type (meeting-notes, spec, etc).",
+      "s": "impl",
+      "m": "scripts/classify.cjs"
     },
     {
-      "name": "document-generator",
-      "description": "Unified gateway for all document generation tasks. Automatically routes to specialized artisan skills based on the requested format (PDF, DOCX, XLSX, PPTX, HTML).",
-      "status": "implemented",
-      "path": "./document-generator/"
+      "n": "document-generator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "domain-classifier",
-      "description": "Classify domain (tech, finance, legal).",
-      "status": "implemented",
-      "path": "./domain-classifier/"
+      "n": "domain-classifier",
+      "d": "Classify domain (tech, finance, legal).",
+      "s": "impl",
+      "m": "scripts/classify.cjs"
     },
     {
-      "name": "ecosystem-integration-test",
-      "description": "Validates the interoperability between skills. Ensures that output formats (JSON/Markdown) from one skill are correctly consumed by the next in a chain.",
-      "status": "implemented",
-      "path": "./ecosystem-integration-test/"
+      "n": "ecosystem-integration-test",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/verify.cjs"
     },
     {
-      "name": "encoding-detector",
-      "description": "Detect file encoding and line endings.",
-      "status": "implemented",
-      "path": "./encoding-detector/"
+      "n": "encoding-detector",
+      "d": "Detect file encoding and line endings.",
+      "s": "impl",
+      "m": "scripts/detect.cjs"
     },
     {
-      "name": "environment-provisioner",
-      "description": "Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive requirements. The creative counterpart to terraform-arch-mapper.",
-      "status": "implemented",
-      "path": "./environment-provisioner/"
+      "n": "environment-provisioner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/provision.cjs"
     },
     {
-      "name": "excel-artisan",
-      "description": "Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying cell values, and applying basic formatting. Use when you need to produce Excel reports or modify existing spreadsheets.",
-      "status": "implemented",
-      "path": "./excel-artisan/"
+      "n": "excel-artisan",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/html_to_excel.cjs"
     },
     {
-      "name": "executive-reporting-maestro",
-      "description": "Synthesizes technical data into professional external reports for PMOs and stakeholders. Focuses on ROI, milestones, and high-level project health.",
-      "status": "implemented",
-      "path": "./executive-reporting-maestro/"
+      "n": "executive-reporting-maestro",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/report.cjs"
     },
     {
-      "name": "financial-modeling-maestro",
-      "description": "Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms business assumptions into multi-year financial statements.",
-      "status": "implemented",
-      "path": "./financial-modeling-maestro/"
+      "n": "financial-modeling-maestro",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/model.cjs"
     },
     {
-      "name": "format-detector",
-      "description": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
-      "status": "implemented",
-      "path": "./format-detector/"
+      "n": "format-detector",
+      "d": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
+      "s": "impl",
+      "m": "scripts/detect.cjs"
     },
     {
-      "name": "github-repo-auditor",
-      "description": "Audits and classifies GitHub repositories into business solutions.",
-      "status": "implemented",
-      "path": "./github-repo-auditor/"
+      "n": "github-repo-auditor",
+      "d": "Audits and classifies GitHub repositories into business solutions.",
+      "s": "impl",
+      "m": "scripts/audit_repos.cjs"
     },
     {
-      "name": "github-skills-manager",
-      "description": "Comprehensive management suite for Gemini skills. Features an interactive dashboard to create, install, sync (git), and manage dependencies for skills in a monorepo or individual repositories.",
-      "status": "implemented",
-      "path": "./github-skills-manager/"
+      "n": "github-skills-manager",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/create_skill.cjs"
     },
     {
-      "name": "glossary-resolver",
-      "description": "Resolve terms using glossary.",
-      "status": "implemented",
-      "path": "./glossary-resolver/"
+      "n": "glossary-resolver",
+      "d": "Resolve terms using glossary.",
+      "s": "impl",
+      "m": "scripts/resolve.cjs"
     },
     {
-      "name": "google-workspace-integrator",
-      "description": "Automates Google Docs, Sheets, and Mail. Generates reports, tracks KPIs in spreadsheets, and drafts professional emails for stakeholders.",
-      "status": "implemented",
-      "path": "./google-workspace-integrator/"
+      "n": "google-workspace-integrator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/integrate.cjs"
     },
     {
-      "name": "html-reporter",
-      "description": "Generate standalone HTML reports from JSON/Markdown.",
-      "status": "implemented",
-      "path": "./html-reporter/"
+      "n": "html-reporter",
+      "d": "Generate standalone HTML reports from JSON/Markdown.",
+      "s": "impl",
+      "m": "scripts/report.cjs"
     },
     {
-      "name": "intent-classifier",
-      "description": "Classify intent of text (request, question, report).",
-      "status": "implemented",
-      "path": "./intent-classifier/"
+      "n": "intent-classifier",
+      "d": "Classify intent of text (request, question, report).",
+      "s": "impl",
+      "m": "scripts/classify.cjs"
     },
     {
-      "name": "investor-readiness-audit",
-      "description": "Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, and compliance data is boardroom-ready.",
-      "status": "implemented",
-      "path": "./investor-readiness-audit/"
+      "n": "investor-readiness-audit",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "ip-profitability-architect",
-      "description": "Designs business and licensing models for internal intellectual property. Transforms IP from a protection cost into a revenue-generating asset.",
-      "status": "implemented",
-      "path": "./ip-profitability-architect/"
+      "n": "ip-profitability-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "ip-strategist",
-      "description": "Identifies and protects intellectual property within the codebase. Drafts initial patent applications and IP reports for innovative algorithms or designs.",
-      "status": "implemented",
-      "path": "./ip-strategist/"
+      "n": "ip-strategist",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "issue-to-solution-bridge",
-      "description": "Automates the entire lifecycle from issue detection to solution. Interprets bug reports or feature requests and orchestrates other skills to implement and test the fix.",
-      "status": "implemented",
-      "path": "./issue-to-solution-bridge/"
+      "n": "issue-to-solution-bridge",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/solve.cjs"
     },
     {
-      "name": "jira-agile-assistant",
-      "description": "Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints, and synchronizes the backlog with the technical roadmap.",
-      "status": "implemented",
-      "path": "./jira-agile-assistant/"
+      "n": "jira-agile-assistant",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/assist.cjs"
     },
     {
-      "name": "kernel-compiler",
-      "description": "Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensures the ecosystem's \"Self-Bootstrapping\" capability.",
-      "status": "implemented",
-      "path": "./kernel-compiler/"
+      "n": "kernel-compiler",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/compile.cjs"
     },
     {
-      "name": "knowledge-auditor",
-      "description": "Audits the 3-tier knowledge base for consistency, freshness, and cross-tier contradictions. Ensures that proprietary standards align with (or intentionally override) public ones.",
-      "status": "implemented",
-      "path": "./knowledge-auditor/"
+      "n": "knowledge-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "knowledge-fetcher",
-      "description": "Fetch knowledge from both public and confidential directories. Bridges general best practices with proprietary internal standards.",
-      "status": "implemented",
-      "path": "./knowledge-fetcher/"
+      "n": "knowledge-fetcher",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/fetch.cjs"
     },
     {
-      "name": "knowledge-harvester",
-      "description": "Clones external Git repositories and analyzes them to extract valuable knowledge. Converts discovered prompts, rules, and patterns into local knowledge assets.",
-      "status": "implemented",
-      "path": "./knowledge-harvester/"
+      "n": "knowledge-harvester",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/harvest.cjs"
     },
     {
-      "name": "knowledge-refiner",
-      "description": "Maintains and consolidates the knowledge base. Cleans up unstructured data and merges it into structured glossaries or patterns.",
-      "status": "implemented",
-      "path": "./knowledge-refiner/"
+      "n": "knowledge-refiner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/refine.cjs"
     },
     {
-      "name": "lang-detector",
-      "description": "Detect natural language of text (ja, en, etc.).",
-      "status": "implemented",
-      "path": "./lang-detector/"
+      "n": "lang-detector",
+      "d": "Detect natural language of text (ja, en, etc.).",
+      "s": "impl",
+      "m": "scripts/detect.cjs"
     },
     {
-      "name": "layout-architect",
-      "description": "Converts visual designs (images/screenshots) into implementation code (CSS, Python-pptx, HTML). Use when recreating slide layouts or UI designs from images.",
-      "status": "implemented",
-      "path": "./layout-architect/"
+      "n": "layout-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/extract_images.cjs"
     },
     {
-      "name": "license-auditor",
-      "description": "Scans project dependencies for license compliance risks. Identifies restrictive licenses (GPL, AGPL) and generates mandatory attribution (NOTICE) files.",
-      "status": "implemented",
-      "path": "./license-auditor/"
+      "n": "license-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "local-reviewer",
-      "description": "Retrieves git diff of staged files for pre-commit AI code review.",
-      "status": "implemented",
-      "path": "./local-reviewer/"
+      "n": "local-reviewer",
+      "d": "Retrieves git diff of staged files for pre-commit AI code review.",
+      "s": "impl",
+      "m": "scripts/review.cjs"
     },
     {
-      "name": "localization-maestro",
-      "description": "Manages global expansion by automating i18n workflows and auditing for cultural/regional appropriateness. Handles formats, currency, and sensitive localized expressions.",
-      "status": "implemented",
-      "path": "./localization-maestro/"
+      "n": "localization-maestro",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/localize.cjs"
     },
     {
-      "name": "log-analyst",
-      "description": "Reads the tail of a log file to help analyze recent errors or behavior.",
-      "status": "implemented",
-      "path": "./log-analyst/"
+      "n": "log-analyst",
+      "d": "Reads the tail of a log file to help analyze recent errors or behavior.",
+      "s": "impl",
+      "m": "scripts/tail.cjs"
     },
     {
-      "name": "log-to-requirement-bridge",
-      "description": "Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Operations and Development.",
-      "status": "implemented",
-      "path": "./log-to-requirement-bridge/"
+      "n": "log-to-requirement-bridge",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "mission-control",
-      "description": "Orchestrates multiple skills to achieve high-level goals. Acts as the brain of the ecosystem to coordinate complex workflows across the SDLC.",
-      "status": "implemented",
-      "path": "./mission-control/"
+      "n": "mission-control",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/orchestrate.cjs"
     },
     {
-      "name": "monitoring-config-auditor",
-      "description": "Audits infrastructure code (Terraform, K8s) for monitoring compliance. Ensures alarms, thresholds, and notification paths are set up correctly according to best practices.",
-      "status": "implemented",
-      "path": "./monitoring-config-auditor/"
+      "n": "monitoring-config-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "nonfunctional-architect",
-      "description": "Interactive guide for defining non-functional requirements based on IPA \"Non-Functional Requirements Grade 2018\". Helps users select appropriate service levels (Availability, Performance, Security, etc.) and generates a requirements definition document.",
-      "status": "implemented",
-      "path": "./nonfunctional-architect/"
+      "n": "nonfunctional-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/assess.cjs"
     },
     {
-      "name": "onboarding-wizard",
-      "description": "Generates a personalized project guide for new members. Analyzes the codebase and skills to help someone get productive in day one.",
-      "status": "implemented",
-      "path": "./onboarding-wizard/"
+      "n": "onboarding-wizard",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "operational-runbook-generator",
-      "description": "Generates detailed, step-by-step operational runbooks for day-to-day tasks (scaling, patching, updates). Ensures consistency and safety with built-in rollback procedures.",
-      "status": "implemented",
-      "path": "./operational-runbook-generator/"
+      "n": "operational-runbook-generator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "pdf-composer",
-      "description": "Generate PDF documents from Markdown with headers/footers.",
-      "status": "implemented",
-      "path": "./pdf-composer/"
+      "n": "pdf-composer",
+      "d": "Generate PDF documents from Markdown with headers/footers.",
+      "s": "impl",
+      "m": "scripts/compose.cjs"
     },
     {
-      "name": "performance-monitor-analyst",
-      "description": "Correlates performance targets with actual profiling results. Identifies bottlenecks and validates against non-functional requirements.",
-      "status": "implemented",
-      "path": "./performance-monitor-analyst/"
+      "n": "performance-monitor-analyst",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "pmo-governance-lead",
-      "description": "Fulfills the role of a PMO by overseeing project quality gates, risks, and cross-skill alignment. Enforces IPA and industry standards across the lifecycle.",
-      "status": "implemented",
-      "path": "./pmo-governance-lead/"
+      "n": "pmo-governance-lead",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "post-quantum-shield",
-      "description": "Audits codebases for quantum-vulnerable cryptography and plans migration to Post-Quantum Cryptography (PQC) standards to ensure long-term data security.",
-      "status": "implemented",
-      "path": "./post-quantum-shield/"
+      "n": "post-quantum-shield",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "ppt-artisan",
-      "description": "Create and convert PowerPoint presentations from Markdown using Marp. Use when the user wants to generate slides, manage themes, or convert MD to PPTX/PDF.",
-      "status": "implemented",
-      "path": "./ppt-artisan/"
+      "n": "ppt-artisan",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/convert.cjs"
     },
     {
-      "name": "pr-architect",
-      "description": "Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain \"Why\", \"How\", and the \"Impact\" of the work.",
-      "status": "implemented",
-      "path": "./pr-architect/"
+      "n": "pr-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/draft.cjs"
     },
     {
-      "name": "project-health-check",
-      "description": "Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and provides a health score with improvement suggestions.",
-      "status": "implemented",
-      "path": "./project-health-check/"
+      "n": "project-health-check",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "prompt-optimizer",
-      "description": "Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.",
-      "status": "implemented",
-      "path": "./prompt-optimizer/"
+      "n": "prompt-optimizer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/optimize.cjs"
     },
     {
-      "name": "quality-scorer",
-      "description": "Evaluates technical and textual quality based on IPA benchmarks and readability standards.",
-      "status": "implemented",
-      "path": "./quality-scorer/"
+      "n": "quality-scorer",
+      "d": ">-",
+      "s": "impl",
+      "m": "dist/score.js"
     },
     {
-      "name": "red-team-adversary",
-      "description": "Performs active security \"war gaming\" by attempting to exploit identified vulnerabilities in a sandbox. Validates threat reality beyond static scans.",
-      "status": "implemented",
-      "path": "./red-team-adversary/"
+      "n": "red-team-adversary",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/simulate.cjs"
     },
     {
-      "name": "refactoring-engine",
-      "description": "Executes large-scale architectural refactoring and technical debt reduction across the entire codebase. Ensures consistency with modern design patterns.",
-      "status": "implemented",
-      "path": "./refactoring-engine/"
+      "n": "refactoring-engine",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "release-note-crafter",
-      "description": "Generates business-value-focused release notes by correlating Git logs with requirements. Focuses on \"what's new\" for users and stakeholders.",
-      "status": "implemented",
-      "path": "./release-note-crafter/"
+      "n": "release-note-crafter",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/main.cjs"
     },
     {
-      "name": "requirements-wizard",
-      "description": "Guide for creating and reviewing requirements definitions based on IPA standards. Provides best practices for business analysis, process mapping, data modeling, and review checklists.",
-      "status": "implemented",
-      "path": "./requirements-wizard/"
+      "n": "requirements-wizard",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/main.cjs"
     },
     {
-      "name": "scenario-multiverse-orchestrator",
-      "description": "Generates multiple business scenarios (Growth/Stability/Hybrid) from financial and strategic assumptions for executive decision-making.",
-      "status": "implemented",
-      "path": "./scenario-multiverse-orchestrator/"
+      "n": "scenario-multiverse-orchestrator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/orchestrate.cjs"
     },
     {
-      "name": "schema-inspector",
-      "description": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
-      "status": "implemented",
-      "path": "./schema-inspector/"
+      "n": "schema-inspector",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/inspect.cjs"
     },
     {
-      "name": "schema-validator",
-      "description": "Validate JSON against schemas and identify best match.",
-      "status": "implemented",
-      "path": "./schema-validator/"
+      "n": "schema-validator",
+      "d": "Validate JSON against schemas and identify best match.",
+      "s": "impl",
+      "m": "scripts/validate.cjs"
     },
     {
-      "name": "security-scanner",
-      "description": "Scans the codebase for security risks, including hardcoded secrets (API keys, tokens), dangerous code patterns (eval, shell injection), and insecure configurations. Use to audit code before committing or reviewing.",
-      "status": "implemented",
-      "path": "./security-scanner/"
+      "n": "security-scanner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/scan.cjs"
     },
     {
-      "name": "self-healing-orchestrator",
-      "description": "Automatically repairs known production issues by applying patches, rollbacks, or config changes. The autonomous counterpart to crisis-manager.",
-      "status": "implemented",
-      "path": "./self-healing-orchestrator/"
+      "n": "self-healing-orchestrator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/heal.cjs"
     },
     {
-      "name": "sensitivity-detector",
-      "description": "Detect PII and sensitive information in text.",
-      "status": "implemented",
-      "path": "./sensitivity-detector/"
+      "n": "sensitivity-detector",
+      "d": "Detect PII and sensitive information in text.",
+      "s": "impl",
+      "m": "scripts/scan.cjs"
     },
     {
-      "name": "sequence-mapper",
-      "description": "Generate Mermaid sequence diagrams from source code function calls.",
-      "status": "implemented",
-      "path": "./sequence-mapper/"
+      "n": "sequence-mapper",
+      "d": "Generate Mermaid sequence diagrams from source code function calls.",
+      "s": "impl",
+      "m": "scripts/map.cjs"
     },
     {
-      "name": "skill-bundle-packager",
-      "description": "Dynamically bundles mission-specific skills into specialized subsets. Optimizes agent performance by focusing on relevant tools for specific high-level tasks.",
-      "status": "implemented",
-      "path": "./skill-bundle-packager/"
+      "n": "skill-bundle-packager",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/bundle.cjs"
     },
     {
-      "name": "skill-evolution-engine",
-      "description": "Enables skills to self-improve by analyzing execution logs and user feedback. Automatically refines SKILL.md and scripts to fix recurring failures.",
-      "status": "implemented",
-      "path": "./skill-evolution-engine/"
+      "n": "skill-evolution-engine",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/evolve.cjs"
     },
     {
-      "name": "skill-quality-auditor",
-      "description": "Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality, script functionality, and test coverage for all skills.",
-      "status": "implemented",
-      "path": "./skill-quality-auditor/"
+      "n": "skill-quality-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "slack-communicator-pro",
-      "description": "Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, alerts, and strategic announcements.",
-      "status": "implemented",
-      "path": "./slack-communicator-pro/"
+      "n": "slack-communicator-pro",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/communicate.cjs"
     },
     {
-      "name": "sovereign-memory",
-      "description": "Multi-tier, persistent memory hub. Manages facts across Personal, Confidential, and Public tiers in accordance with the Sovereign Knowledge Protocol.",
-      "status": "implemented",
-      "path": "./sovereign-memory/"
+      "n": "sovereign-memory",
+      "d": "Multi-tier, persistent memory hub. Manages facts across Personal, Confidential, and Public tiers ...",
+      "s": "impl",
+      "m": "scripts/save.cjs"
     },
     {
-      "name": "sovereign-sync",
-      "description": "Syncs specific knowledge tiers with external private repositories.",
-      "status": "implemented",
-      "path": "./sovereign-sync/"
+      "n": "sovereign-sync",
+      "d": "Syncs specific knowledge tiers with external private repositories.",
+      "s": "impl",
+      "m": "scripts/sync.cjs"
     },
     {
-      "name": "stakeholder-communicator",
-      "description": "Translates technical decisions and architectural changes into clear, business-oriented language for non-technical stakeholders (Execs, Marketing, Sales).",
-      "status": "implemented",
-      "path": "./stakeholder-communicator/"
+      "n": "stakeholder-communicator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/communicate.cjs"
     },
     {
-      "name": "strategic-roadmap-planner",
-      "description": "Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic roadmap. Aligns engineering effort with business ROI.",
-      "status": "implemented",
-      "path": "./strategic-roadmap-planner/"
+      "n": "strategic-roadmap-planner",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/plan.cjs"
     },
     {
-      "name": "sunset-architect",
-      "description": "Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation cycles, handles data archiving, and generates migration paths for legacy users.",
-      "status": "implemented",
-      "path": "./sunset-architect/"
+      "n": "sunset-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/plan.cjs"
     },
     {
-      "name": "supply-chain-sentinel",
-      "description": "Protects the software supply chain by generating SBoMs and auditing dependency provenance. Monitors for malicious packages and maintenance risks.",
-      "status": "implemented",
-      "path": "./supply-chain-sentinel/"
+      "n": "supply-chain-sentinel",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/scan.cjs"
     },
     {
-      "name": "sustainability-consultant",
-      "description": "Estimates the environmental impact (Carbon Footprint) of code and infrastructure. Recommends optimizations for energy efficiency and \"GreenOps\".",
-      "status": "implemented",
-      "path": "./sustainability-consultant/"
+      "n": "sustainability-consultant",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/assess.cjs"
     },
     {
-      "name": "synthetic-user-persona",
-      "description": "Generates diverse AI user personas to autonomously test applications. Simulates beginners, power users, and users with accessibility needs to discover hidden UI/UX flaws.",
-      "status": "implemented",
-      "path": "./synthetic-user-persona/"
+      "n": "synthetic-user-persona",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "talent-requirement-generator",
-      "description": "Identifies the ideal human skills needed for the project's next phase. Analyzes technical debt, roadmap, and current team gaps to generate job descriptions and coding challenges.",
-      "status": "implemented",
-      "path": "./talent-requirement-generator/"
+      "n": "talent-requirement-generator",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate.cjs"
     },
     {
-      "name": "tech-dd-analyst",
-      "description": "Performs Technical Due Diligence on startups. Analyzes code (if available) or evaluates public signals (hiring, blogs) to assess technical risk and team maturity.",
-      "status": "implemented",
-      "path": "./tech-dd-analyst/"
+      "n": "tech-dd-analyst",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "tech-stack-librarian",
-      "description": "Autonomously researches and compiles best practices for specific tools (SaaS/OSS). Fetches official docs and structures them into the knowledge base.",
-      "status": "implemented",
-      "path": "./tech-stack-librarian/"
+      "n": "tech-stack-librarian",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/research.cjs"
     },
     {
-      "name": "technology-porter",
-      "description": "Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves logic equivalence while optimizing for the target language's idioms.",
-      "status": "implemented",
-      "path": "./technology-porter/"
+      "n": "technology-porter",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/port.cjs"
     },
     {
-      "name": "telemetry-insight-engine",
-      "description": "Analyzes real-world telemetry and usage data to identify feature gaps and usability issues. Feeds insights back into the requirements phase.",
-      "status": "implemented",
-      "path": "./telemetry-insight-engine/"
+      "n": "telemetry-insight-engine",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "template-renderer",
-      "description": "Render text from templates (Mustache/EJS) and data.",
-      "status": "implemented",
-      "path": "./template-renderer/"
+      "n": "template-renderer",
+      "d": "Render text from templates (Mustache/EJS) and data.",
+      "s": "impl",
+      "m": "scripts/render.cjs"
     },
     {
-      "name": "terraform-arch-mapper",
-      "description": "Generates a system architecture diagram from Terraform code. It parses .tf files to identify resources and relationships, then produces a diagram code (Mermaid/PlantUML). Use to visualize infrastructure.",
-      "status": "implemented",
-      "path": "./terraform-arch-mapper/"
+      "n": "terraform-arch-mapper",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/generate_diagram.cjs"
     },
     {
-      "name": "test-genie",
-      "description": "Executes the project's test suite and returns the output for AI analysis.",
-      "status": "implemented",
-      "path": "./test-genie/"
+      "n": "test-genie",
+      "d": "Executes the project's test suite and returns the output for AI analysis.",
+      "s": "impl",
+      "m": "scripts/run.cjs"
     },
     {
-      "name": "test-suite-architect",
-      "description": "Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. Enables Test-Driven Development (TDD) at scale.",
-      "status": "implemented",
-      "path": "./test-suite-architect/"
+      "n": "test-suite-architect",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "test-viewpoint-analyst",
-      "description": "Generates and reviews test scenarios based on IPA non-functional grade standards. Analyzes system requirements to identify critical test viewpoints for performance, security, and availability.",
-      "status": "implemented",
-      "path": "./test-viewpoint-analyst/"
+      "n": "test-viewpoint-analyst",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "asset-token-economist",
-      "description": "Minimizes token consumption and costs by optimizing data input. Performs smart summarization and chunking of large files without losing critical context.",
-      "status": "implemented",
-      "path": "./asset-token-economist/"
+      "n": "asset-token-economist",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/analyze.cjs"
     },
     {
-      "name": "unit-economics-optimizer",
-      "description": "Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer retention strategies to maximize unit margins.",
-      "status": "implemented",
-      "path": "./unit-economics-optimizer/"
+      "n": "unit-economics-optimizer",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/optimize.cjs"
     },
     {
-      "name": "ux-auditor",
-      "description": "Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to recommend improvements for usability and contrast.",
-      "status": "implemented",
-      "path": "./ux-auditor/"
+      "n": "ux-auditor",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/audit.cjs"
     },
     {
-      "name": "visionary-ethos-keeper",
-      "description": "Ensures decisions and proposals align with company mission, values, and ethical guidelines. Checks for bias, privacy, and fairness concerns.",
-      "status": "implemented",
-      "path": "./visionary-ethos-keeper/"
+      "n": "visionary-ethos-keeper",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/check.cjs"
     },
     {
-      "name": "voice-command-listener",
-      "description": "Captures microphone input and transcribes it into text commands. Uses SoX for recording and OpenAI Whisper for high-accuracy transcription to control the agent via voice.",
-      "status": "implemented",
-      "path": "./voice-command-listener/"
+      "n": "voice-command-listener",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/listen.cjs"
     },
     {
-      "name": "voice-interface-maestro",
-      "description": "Converts text responses into spoken audio (TTS). Supports multiple voice personas (Professional, Energetic, Calm) and secure configuration via the Personal Tier.",
-      "status": "implemented",
-      "path": "./voice-interface-maestro/"
+      "n": "voice-interface-maestro",
+      "d": ">-",
+      "s": "impl",
+      "m": "scripts/chat_loop.cjs"
     },
     {
-      "name": "word-artisan",
-      "description": "Generate Word documents (.docx) from Markdown.",
-      "status": "implemented",
-      "path": "./word-artisan/"
+      "n": "word-artisan",
+      "d": "Generate Word documents (.docx) from Markdown.",
+      "s": "impl",
+      "m": "scripts/convert.cjs"
     }
   ]
 }

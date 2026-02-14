@@ -27,10 +27,17 @@ const skillIndex = path.join(rootDir, 'knowledge/orchestration/global_skill_inde
 function resolveSkillScript(skillName) {
   // load the global skill index
   const index = JSON.parse(fs.readFileSync(skillIndex, 'utf8'));
-  const skill = index.skills.find(s => s.name === skillName);
+  const skill = (index.s || index.skills).find(s => (s.n || s.name) === skillName);
   if (!skill) throw new Error(`Skill "${skillName}" not found in index`);
 
-  // find the first .cjs script
+  // Use pre-resolved main path if available in compressed index
+  const mainPath = skill.m || skill.main;
+  if (mainPath) {
+    const fullPath = path.join(rootDir, skillName, mainPath);
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
+
+  // Fallback to legacy discovery if index is old or path is broken
   const scriptsDir = path.join(rootDir, skillName, 'scripts');
   if (!fs.existsSync(scriptsDir)) throw new Error(`No scripts/ directory for "${skillName}"`);
   const scripts = fs.readdirSync(scriptsDir).filter(f => /\.cjs$/.test(f));

@@ -33,10 +33,21 @@ try {
             let desc = descMatch ? descMatch[1].trim() : '';
             if (desc.length > 100) desc = desc.substring(0, 97) + '...';
 
+            // Get main script from package.json
+            const pkgPath = path.join(rootDir, dir, 'package.json');
+            let mainScript = '';
+            if (fs.existsSync(pkgPath)) {
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                    mainScript = pkg.main || '';
+                } catch (_) {}
+            }
+
             skills.push({
                 n: dir, // Compressed key: name
                 d: desc, // Compressed key: description
-                s: statusMatch ? statusMatch[1].substring(0, 4) : 'plan' // status: impl/plan/conc
+                s: statusMatch ? statusMatch[1].substring(0, 4) : 'plan', // status: impl/plan/conc
+                m: mainScript // Compressed key: main script path
             });
         }
     }
