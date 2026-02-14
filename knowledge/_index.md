@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*Last Updated: 2026-02-14T16:02:26.826Z*
+*Last Updated: 2026-02-14T18:13:09.099Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md)
@@ -31,12 +31,21 @@
 ## 📁 connections
 - [ユニバーサル接続設定ガイド (UCM Setup)](./connections/setup_guide.md)
 
+## 📁 design/brand
+- [Brand & Visual Identity Engineering](./design/brand/visual_identity.md)
+
 ## 📁 devops
 - [CI/CD Pipeline Design Patterns](./devops/ci-cd-patterns.md)
 - [クラウドネイティブ ＆ インフラ設計](./devops/cloud-native.md)
 
 ## 📁 economics
 - [IT Cost Benchmarks & Strategic ROI](./economics/it_cost_benchmarks.md)
+
+## 📁 economics/finops
+- [Cloud FinOps & Unit Economics Standard](./economics/finops/cloud_optimization.md)
+
+## 📁 ethics
+- [Data Ethics & AI Bias Mitigation Standard](./ethics/ai_bias_mitigation.md)
 
 ## 📁 evolution
 - [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md)
@@ -93,6 +102,12 @@
 
 ## 📁 frameworks
 - [Conceptual Frameworks Reference](./frameworks/conceptual-frameworks.md)
+
+## 📁 future
+- [Future-Proofing: Quantum-Safe & Sustainability](./future/quantum_sustainability.md)
+
+## 📁 legal/ip
+- [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md)
 
 ## 📁 nonfunctional/test-viewpoints
 - [非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)](./nonfunctional/test-viewpoints/ipa_grade_2018.md)
@@ -167,6 +182,9 @@
 - [MISSION: Technical Blueprint Discovery](./orchestration/onboarding-directives/19_dev_to_steward.md)
 - [MISSION: Market Dynamics & P&L Sensitivity](./orchestration/onboarding-directives/20_owner_to_steward.md)
 - [MISSION: Executive Support & Templates](./orchestration/onboarding-directives/21_assistant_to_steward.md)
+
+## 📁 organization
+- [Cultural Alignment & Change Management Protocol](./organization/change_management.md)
 
 ## 📁 personalities
 - [ペルソナ・マトリクス (Persona Matrix)](./personalities/matrix.md)
@@ -288,14 +306,26 @@
 ## 📁 security
 - [Security Best Practices](./security/security-best-practices.md)
 
+## 📁 security/advanced
+- [Diff-Based Security Scanning Strategy](./security/advanced/diff_based_scanning.md)
+
 ## 📁 skills/ux-visualizer
 - [Methodology: High-Fidelity SPA Reverse Engineering](./skills/ux-visualizer/methodology.md)
 
 ## 📁 software-design
 - [ソフトウェアデザインパターン & 設計原則](./software-design/patterns.md)
 
+## 📁 standards/adr
+- [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md)
+
 ## 📁 standards/ai-native
 - [Gemini AI-Native Coding Standard](./standards/ai-native/gemini-coding-standard.md)
+
+## 📁 standards/bcp
+- [Disaster Recovery & BCP Playbook](./standards/bcp/dr_playbook.md)
+
+## 📁 standards/contract
+- [Contract & SLA Negotiation Guardrails](./standards/contract/negotiation_guardrails.md)
 
 ## 📁 standards/engineering
 - [Source Code Analysis Protocol (SCAP)](./standards/engineering/code-analysis-protocol.md)
@@ -310,6 +340,17 @@
 ## 📁 standards/sdlc
 - [Software Development Life Cycle (SDLC) Methodologies](./standards/sdlc/methodologies.md)
 
+## 📁 standards/security
+- [OWASP Top 10 for LLM Applications](./standards/security/owasp_llm_top10.md)
+
+## 📁 standards/testing
+- [Test Automation Best Practices](./standards/testing/best_practices.md)
+- [Mobile Test Automation Standard](./standards/testing/mobile_automation.md)
+- [Web Test Automation Standard](./standards/testing/web_automation.md)
+
+## 📁 standards/ux
+- [Cognitive Load Principles for UX Design](./standards/ux/cognitive_load_principles.md)
+
 ## 📁 strategy
 - [Winning Proposal Standards (Strategic Communication)](./strategy/winning-proposal-standards.md)
 
@@ -322,8 +363,15 @@
 ## 📁 tech-stack/atlassian
 - [Jira 運用ベストプラクティス](./tech-stack/atlassian/jira_best_practices.md)
 
+## 📁 tech-stack/cloud
+- [The Rosetta Stone of Cloud (Multi-Cloud Mapping)](./tech-stack/cloud/rosetta_stone.md)
+
 ## 📁 tech-stack/google
 - [Google Workspace 連携ベストプラクティス](./tech-stack/google/workspace_best_practices.md)
+
+## 📁 tech-stack/java/terasoluna
+- [TERASOLUNA Layered Architecture Standard](./tech-stack/java/terasoluna/architecture.md)
+- [TERASOLUNA Implementation Standards](./tech-stack/java/terasoluna/implementation_standards.md)
 
 ## 📁 tech-stack/macos
 - [macOS 音声コントロール ＆ 音声入力活用ガイド](./tech-stack/macos/voice_control_guide.md)

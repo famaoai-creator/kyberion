@@ -78,6 +78,12 @@
     "category": "connections"
   },
   {
+    "id": "design/brand/visual_identity.md",
+    "title": "Brand & Visual Identity Engineering",
+    "path": "/knowledge_src/design/brand/visual_identity.md",
+    "category": "design/brand"
+  },
+  {
     "id": "devops/ci-cd-patterns.md",
     "title": "CI/CD Pipeline Design Patterns",
     "path": "/knowledge_src/devops/ci-cd-patterns.md",
@@ -90,10 +96,22 @@
     "category": "devops"
   },
   {
+    "id": "economics/finops/cloud_optimization.md",
+    "title": "Cloud FinOps & Unit Economics Standard",
+    "path": "/knowledge_src/economics/finops/cloud_optimization.md",
+    "category": "economics/finops"
+  },
+  {
     "id": "economics/it_cost_benchmarks.md",
     "title": "IT Cost Benchmarks & Strategic ROI",
     "path": "/knowledge_src/economics/it_cost_benchmarks.md",
     "category": "economics"
+  },
+  {
+    "id": "ethics/ai_bias_mitigation.md",
+    "title": "Data Ethics & AI Bias Mitigation Standard",
+    "path": "/knowledge_src/ethics/ai_bias_mitigation.md",
+    "category": "ethics"
   },
   {
     "id": "evolution/biometric_privacy.md",
@@ -334,6 +352,18 @@
     "title": "Conceptual Frameworks Reference",
     "path": "/knowledge_src/frameworks/conceptual-frameworks.md",
     "category": "frameworks"
+  },
+  {
+    "id": "future/quantum_sustainability.md",
+    "title": "Future-Proofing: Quantum-Safe & Sustainability",
+    "path": "/knowledge_src/future/quantum_sustainability.md",
+    "category": "future"
+  },
+  {
+    "id": "legal/ip/patent_strategy.md",
+    "title": "Legal & Intellectual Property Strategy",
+    "path": "/knowledge_src/legal/ip/patent_strategy.md",
+    "category": "legal/ip"
   },
   {
     "id": "nonfunctional/test-viewpoints/ipa_grade_2018.md",
@@ -672,6 +702,12 @@
     "category": "orchestration"
   },
   {
+    "id": "organization/change_management.md",
+    "title": "Cultural Alignment & Change Management Protocol",
+    "path": "/knowledge_src/organization/change_management.md",
+    "category": "organization"
+  },
+  {
     "id": "personalities/matrix.md",
     "title": "ペルソナ・マトリクス (Persona Matrix)",
     "path": "/knowledge_src/personalities/matrix.md",
@@ -942,6 +978,12 @@
     "category": "sdlc"
   },
   {
+    "id": "security/advanced/diff_based_scanning.md",
+    "title": "Diff-Based Security Scanning Strategy",
+    "path": "/knowledge_src/security/advanced/diff_based_scanning.md",
+    "category": "security/advanced"
+  },
+  {
     "id": "security/security-best-practices.md",
     "title": "Security Best Practices",
     "path": "/knowledge_src/security/security-best-practices.md",
@@ -960,10 +1002,28 @@
     "category": "software-design"
   },
   {
+    "id": "standards/adr/adr_standard.md",
+    "title": "Architecture Decision Record (ADR) Standard",
+    "path": "/knowledge_src/standards/adr/adr_standard.md",
+    "category": "standards/adr"
+  },
+  {
     "id": "standards/ai-native/gemini-coding-standard.md",
     "title": "Gemini AI-Native Coding Standard",
     "path": "/knowledge_src/standards/ai-native/gemini-coding-standard.md",
     "category": "standards/ai-native"
+  },
+  {
+    "id": "standards/bcp/dr_playbook.md",
+    "title": "Disaster Recovery & BCP Playbook",
+    "path": "/knowledge_src/standards/bcp/dr_playbook.md",
+    "category": "standards/bcp"
+  },
+  {
+    "id": "standards/contract/negotiation_guardrails.md",
+    "title": "Contract & SLA Negotiation Guardrails",
+    "path": "/knowledge_src/standards/contract/negotiation_guardrails.md",
+    "category": "standards/contract"
   },
   {
     "id": "standards/engineering/code-analysis-protocol.md",
@@ -996,6 +1056,36 @@
     "category": "standards/sdlc"
   },
   {
+    "id": "standards/security/owasp_llm_top10.md",
+    "title": "OWASP Top 10 for LLM Applications",
+    "path": "/knowledge_src/standards/security/owasp_llm_top10.md",
+    "category": "standards/security"
+  },
+  {
+    "id": "standards/testing/best_practices.md",
+    "title": "Test Automation Best Practices",
+    "path": "/knowledge_src/standards/testing/best_practices.md",
+    "category": "standards/testing"
+  },
+  {
+    "id": "standards/testing/mobile_automation.md",
+    "title": "Mobile Test Automation Standard",
+    "path": "/knowledge_src/standards/testing/mobile_automation.md",
+    "category": "standards/testing"
+  },
+  {
+    "id": "standards/testing/web_automation.md",
+    "title": "Web Test Automation Standard",
+    "path": "/knowledge_src/standards/testing/web_automation.md",
+    "category": "standards/testing"
+  },
+  {
+    "id": "standards/ux/cognitive_load_principles.md",
+    "title": "Cognitive Load Principles for UX Design",
+    "path": "/knowledge_src/standards/ux/cognitive_load_principles.md",
+    "category": "standards/ux"
+  },
+  {
     "id": "strategy/winning-proposal-standards.md",
     "title": "Winning Proposal Standards (Strategic Communication)",
     "path": "/knowledge_src/strategy/winning-proposal-standards.md",
@@ -1026,10 +1116,28 @@
     "category": "tech-stack"
   },
   {
+    "id": "tech-stack/cloud/rosetta_stone.md",
+    "title": "The Rosetta Stone of Cloud (Multi-Cloud Mapping)",
+    "path": "/knowledge_src/tech-stack/cloud/rosetta_stone.md",
+    "category": "tech-stack/cloud"
+  },
+  {
     "id": "tech-stack/google/workspace_best_practices.md",
     "title": "Google Workspace 連携ベストプラクティス",
     "path": "/knowledge_src/tech-stack/google/workspace_best_practices.md",
     "category": "tech-stack/google"
+  },
+  {
+    "id": "tech-stack/java/terasoluna/architecture.md",
+    "title": "TERASOLUNA Layered Architecture Standard",
+    "path": "/knowledge_src/tech-stack/java/terasoluna/architecture.md",
+    "category": "tech-stack/java/terasoluna"
+  },
+  {
+    "id": "tech-stack/java/terasoluna/implementation_standards.md",
+    "title": "TERASOLUNA Implementation Standards",
+    "path": "/knowledge_src/tech-stack/java/terasoluna/implementation_standards.md",
+    "category": "tech-stack/java/terasoluna"
   },
   {
     "id": "tech-stack/macos/voice_control_guide.md",
