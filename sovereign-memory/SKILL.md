@@ -2,6 +2,9 @@
 name: sovereign-memory
 description: Multi-tier, persistent memory hub. Manages facts across Personal, Confidential, and Public tiers in accordance with the Sovereign Knowledge Protocol.
 status: implemented
+category: Utilities
+tags:
+  - gemini-skill
 ---
 
 # Sovereign Memory (Multi-Tier)

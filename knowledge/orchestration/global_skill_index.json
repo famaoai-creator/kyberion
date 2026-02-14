@@ -4,6 +4,13 @@
   "u": "2026-02-14T04:33:56.710Z",
   "s": [
     {
+      "n": "source-importer",
+      "d": "Securely imports external source code into the ecosystem's quarantine area with mandatory security scanning.",
+      "s": "impl",
+      "m": "scripts/import.cjs",
+      "t": ["security", "data"]
+    },
+    {
       "n": "ux-visualizer",
       "d": "Generates screen transition diagrams and state transition diagrams in Mermaid format from requirements or code.",
       "s": "impl",

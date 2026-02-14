@@ -4,6 +4,9 @@ description: Analyzes source code or requirements to generate high-fidelity scre
 status: implemented
 category: UX/Design
 last_updated: '2026-02-14'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # ux-visualizer
