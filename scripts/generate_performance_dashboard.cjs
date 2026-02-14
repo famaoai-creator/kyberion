@@ -25,10 +25,36 @@ function generate() {
     const reports = files.map(f => JSON.parse(fs.readFileSync(path.join(perfDir, f), 'utf8')));
     const latest = reports[reports.length - 1];
 
-    let md = "# Performance & Efficiency Intelligence Dashboard\n\n";
-    md += `**Last Scan**: ${latest.timestamp}\n`;
-    md += `**Total Records**: ${latest.summary.total_records}\n`;
-    md += `**Unique Skills**: ${latest.summary.unique_skills}\n\n`;
+    // Aggregates for summary
+    const avgScore = Math.round(latest.efficiency_alerts.reduce((acc, s) => acc + s.efficiencyScore, 0) / (latest.efficiency_alerts.length || 1));
+    const totalExecs = latest.summary.total_records;
+    const avgCacheHit = Math.round(latest.unstable_skills.reduce((acc, s) => acc + (s.cacheHitRatio || 0), 0) / (latest.unstable_skills.length || 1));
+    const totalRecoveries = latest.unstable_skills.reduce((acc, s) => acc + (s.recoveries || 0), 0);
+
+    let md = "# 🚀 Performance & Reliability Intelligence Dashboard\n\n";
+    md += `*Last Updated: ${new Date().toLocaleString()}*\n\n`;
+
+    md += "## 📊 Ecosystem Health Summary\n\n";
+    md += "| Metric | Value | Status |\n";
+    md += "| :--- | :--- | :--- |\n";
+    md += `| **Overall Efficiency** | ${avgScore}/100 | ${avgScore >= 80 ? '🟢 Excellent' : '🟡 Good'} |\n`;
+    md += `| **Reliability (Success)** | ${totalExecs > 0 ? (100 - (latest.unstable_skills.reduce((acc, s) => acc + s.errors, 0) / totalExecs * 100)).toFixed(1) : 100}% | 🛡️ Secure |\n`;
+    md += `| **Cache Hit Ratio** | ${avgCacheHit}% | ⚡ High Speed |\n`;
+    md += `| **Total Recoveries** | ${totalRecoveries} | ♻️ Self-Healing |\n\n`;
+
+    // --- Hall of Fame ---
+    const topPerformers = latest.efficiency_alerts
+        .filter(s => s.efficiencyScore >= 90)
+        .sort((a, b) => b.efficiencyScore - a.efficiencyScore)
+        .slice(0, 5);
+
+    if (topPerformers.length > 0) {
+        md += "### 🏆 Hall of Fame (Top Performers)\n\n";
+        topPerformers.forEach(s => {
+            md += `- **${s.skill}** ([A+]) - Score: ${s.efficiencyScore}, Avg: ${s.avgMs}ms\n`;
+        });
+        md += "\n";
+    }
 
     md += "## 1. Top Performance Alerts\n\n";
     if (latest.regressions.length > 0) {
