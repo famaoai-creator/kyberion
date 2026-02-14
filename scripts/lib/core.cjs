@@ -143,7 +143,8 @@ class Cache {
             const actualHash = this._generateHash(diskEntry.value);
             if (actualHash !== diskEntry.h) {
               const { logger } = require('./core.cjs');
-              logger.warn(`[Cache] Integrity violation for ${key}. Expected ${diskEntry.h}, got ${actualHash}. Purging.`);
+              const isSampled = diskEntry.h.endsWith('S');
+              logger.warn(`[Cache] Integrity violation for ${key}. Method: ${isSampled ? 'Sampled' : 'Full'}. Expected ${diskEntry.h}, got ${actualHash}. Purging corrupted entry.`);
               this._stats.integrityFailures++;
               fs.unlinkSync(diskPath);
               return undefined;
@@ -217,7 +218,24 @@ class Cache {
   /** @private */
   _generateHash(data) {
     const str = typeof data === 'string' ? data : JSON.stringify(data);
-    return crypto.createHash('md5').update(str).digest('hex').substring(0, 8); // Short MD5 is enough for local integrity
+    const buf = Buffer.from(str);
+    const len = buf.length;
+
+    // Sampling Strategy for large data (> 64KB)
+    if (len > 64 * 1024) {
+      const sampleSize = 16 * 1024;
+      const mid = Math.floor(len / 2);
+      
+      const combined = Buffer.concat([
+        buf.subarray(0, sampleSize),
+        buf.subarray(mid - sampleSize / 2, mid + sampleSize / 2),
+        buf.subarray(len - sampleSize, len),
+        Buffer.from(len.toString()) // Include length to detect truncation
+      ]);
+      return crypto.createHash('md5').update(combined).digest('hex').substring(0, 8) + 'S'; // 'S' indicates sampled
+    }
+
+    return crypto.createHash('md5').update(buf).digest('hex').substring(0, 8);
   }
 
   /** @private */
