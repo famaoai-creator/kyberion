@@ -88,6 +88,53 @@ function safeReadFile(filePath, options = {}) {
 }
 
 /**
+ * Read a file asynchronously with size validation and caching.
+ * @param {string} filePath - Path to read
+ * @param {import('./types').SafeReadOptions} [options] - Options
+ * @returns {Promise<string|Buffer>} File contents
+ */
+async function safeReadFileAsync(filePath, options = {}) {
+  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input', cache = true } = options;
+
+  if (!filePath) {
+    throw new Error(`Missing required ${label} file path`);
+  }
+  const resolved = path.resolve(filePath);
+  
+  // 1. Cache Check
+  if (cache) {
+    const { _fileCache } = require('./core.cjs');
+    const cacheKey = `raw:${resolved}`;
+    
+    // Check memory cache first (synchronous check is fine)
+    if (fs.existsSync(resolved)) {
+      const stat = await fs.promises.stat(resolved);
+      const cached = _fileCache.get(cacheKey);
+      if (cached && cached.mtimeMs === stat.mtimeMs) {
+        return cached.data;
+      }
+      
+      // 2. Fresh Async Read
+      if (stat.size > maxSizeMB * 1024 * 1024) {
+        throw new Error(`File too large: ${resolved}`);
+      }
+      const data = await fs.promises.readFile(resolved, encoding);
+      
+      // Store in cache if small enough
+      if (stat.size < 1 * 1024 * 1024) {
+        _fileCache.set(cacheKey, { mtimeMs: stat.mtimeMs, data });
+      }
+      return data;
+    }
+  }
+
+  // Fallback
+  const stat = await fs.promises.stat(resolved);
+  if (stat.size > maxSizeMB * 1024 * 1024) throw new Error(`File too large: ${resolved}`);
+  return fs.promises.readFile(resolved, encoding);
+}
+
+/**
  * Write a file safely using atomic operations (write to temp -> rename).
  * Prevents partial writes or corruption on crash.
  * @param {string} filePath - Path to write
@@ -281,6 +328,7 @@ function validateUrl(url) {
 module.exports = {
   validateFileSize,
   safeReadFile,
+  safeReadFileAsync,
   safeWriteFile,
   safeAppendFileSync,
   safeUnlinkSync,
