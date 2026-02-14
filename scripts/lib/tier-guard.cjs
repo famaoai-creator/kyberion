@@ -104,6 +104,28 @@ function validateWritePermission(targetPath) {
 }
 
 /**
+ * Validate if reading from a path is allowed (Sandbox Security).
+ * @param {string} targetPath 
+ * @returns {Object} { allowed: boolean, reason: string }
+ */
+function validateReadPermission(targetPath) {
+  const resolved = path.resolve(targetPath);
+  const root = path.resolve(process.cwd());
+
+  // 1. Stay within Project Root
+  if (!resolved.startsWith(root)) {
+    return { allowed: false, reason: 'Escape detected: Path is outside project root.' };
+  }
+
+  // 2. Block sensitive system directories
+  if (resolved.includes('/.git/') || resolved.includes('/.ssh/')) {
+    return { allowed: false, reason: 'Access Denied: System directory is protected.' };
+  }
+
+  return { allowed: true };
+}
+
+/**
  * Validate that a knowledge file can be injected into output at the given tier.
  * @param {string} knowledgePath - Path to the knowledge file
  * @param {string} outputTier    - Target output tier
@@ -165,6 +187,7 @@ function validateSovereignBoundary(content) {
 module.exports = {
   validateSovereignBoundary,
   validateWritePermission,
+  validateReadPermission,
   detectTier,
   canFlowTo,
   scanForConfidentialMarkers,

@@ -54,8 +54,16 @@ function generate() {
   const totalSavedCost = latest.unstable_skills.reduce((acc, s) => acc + (s.savedCost || 0), 0);
   const totalSavedHours = Math.round(totalSavedMs / 3600000);
 
-  md += '## 💰 Business Impact (ROI)\n\n';
+  const { calculateReinvestment } = require('./lib/finance.cjs');
+  const strat = calculateReinvestment(totalSavedHours);
+
+  md += '## 💰 Business Impact & Strategic ROI\n\n';
   md += `> **Total Value Generated: $${totalSavedCost.toLocaleString()}** (Time Saved: ${totalSavedHours}h)\n\n`;
+  
+  md += '### 🏗️ Reinvestment Potential\n\n';
+  md += `- **Reinvestable Capacity**: ${strat.reinvestableHours} engineering hours\n`;
+  md += `- **New Skills Potential**: 🚀 **${strat.potentialFeatures} additional features** possible\n`;
+  md += `- **Strategic Advice**: ${strat.recommendation}\n\n`;
 
   md += '| Top Contributors | Saved Cost | Saved Hours |\n';
   md += '| :--- | :--- | :--- |\n';
