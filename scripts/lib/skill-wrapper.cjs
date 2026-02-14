@@ -285,15 +285,29 @@ function _formatHuman(output) {
   console.log(chalk.dim('\u2500'.repeat(50)));
 
   if (output.data) {
+    const isFull = process.argv.includes('--full');
+
     if (typeof output.data === 'string') {
-      console.log(output.data);
+      console.log(isFull ? output.data : ui.summarize(output.data));
     } else {
-      // Intelligently format small objects, use JSON for large ones
-      const keys = Object.keys(output.data);
-      if (keys.length <= 5) {
-        keys.forEach((k) => console.log(`${chalk.bold(k.padEnd(12))}: ${output.data[k]}`));
+      // Intelligently format objects
+      const displayData = isFull ? output.data : ui.summarize(output.data);
+      if (Array.isArray(displayData)) {
+        displayData.forEach((item) => {
+          if (typeof item === 'string') console.log(item);
+          else console.log(JSON.stringify(item));
+        });
       } else {
-        console.log(JSON.stringify(output.data, null, 2));
+        const keys = Object.keys(output.data);
+        if (keys.length <= 5) {
+          keys.forEach((k) => console.log(`${chalk.bold(k.padEnd(12))}: ${output.data[k]}`));
+        } else {
+          console.log(JSON.stringify(displayData, null, 2));
+        }
+      }
+
+      if (!isFull && Array.isArray(output.data) && output.data.length > 10) {
+        console.log(chalk.dim(`\n(Use --full to see all ${output.data.length} items)`));
       }
     }
   }

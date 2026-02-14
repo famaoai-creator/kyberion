@@ -81,6 +81,21 @@ const ui = {
     const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
     const percent = Math.round(progress * 100);
     return `[${chalk.cyan(bar)}] ${percent}%`;
+  },
+  /**
+   * Intelligently summarizes large data objects for CLI display.
+   */
+  summarize: (data, maxItems = 10) => {
+    if (Array.isArray(data)) {
+      if (data.length <= maxItems) return data;
+      const head = data.slice(0, Math.ceil(maxItems / 2));
+      const tail = data.slice(-Math.floor(maxItems / 2));
+      return [...head, chalk.dim(`... (${data.length - maxItems} more items) ...`), ...tail];
+    }
+    if (typeof data === 'string' && data.length > 500) {
+      return data.substring(0, 250) + chalk.dim('\n\n... (content truncated) ...\n\n') + data.slice(-250);
+    }
+    return data;
   }
 };
 
