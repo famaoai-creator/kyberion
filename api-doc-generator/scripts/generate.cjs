@@ -8,11 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const { Cache } = require('../../scripts/lib/core.cjs');
-
-// Local cache to persist extraction results per file
-const extractionCache = new Cache(1000, 86400000); // 24h TTL
+const { safeWriteFile, safeReadFileAsync } = require('../../scripts/lib/secure-io.cjs');
 
 runSkillAsync('api-doc-generator', async () => {
     const argv = requireArgs(['dir', 'out']);
@@ -21,7 +17,7 @@ runSkillAsync('api-doc-generator', async () => {
 
     // 1. Load Knowledge (Externalized Patterns)
     const patternsPath = path.resolve(__dirname, '../../knowledge/skills/api-doc-generator/patterns.json');
-    const { frameworks } = JSON.parse(fs.readFileSync(patternsPath, 'utf8'));
+    const { frameworks } = JSON.parse(await safeReadFileAsync(patternsPath));
     const expressPattern = new RegExp(frameworks.express.route_regex, 'g');
 
     const apiSpecs = {};
@@ -30,42 +26,28 @@ runSkillAsync('api-doc-generator', async () => {
         .filter(e => e.isFile() && (e.name.endsWith('.js') || e.name.endsWith('.cjs')))
         .map(e => e.name);
     
-    // 2. Parallel Extraction with Caching
+    // 2. Parallel Extraction with Global Cache
     const extractionTasks = files.map(async (file) => {
         const filePath = path.join(targetDir, file);
-        const stats = fs.statSync(filePath);
-        const cacheKey = `${filePath}:${stats.mtimeMs}`;
-
-        if (extractionCache.has(cacheKey)) {
-            return { file, specs: extractionCache.get(cacheKey) };
-        }
-
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        
+        // safeReadFileAsync handles caching and timeouts internally
+        const content = await safeReadFileAsync(filePath);
         const matches = content.matchAll(expressPattern);
-        const localSpecs = [];
         
         for (const match of matches) {
-            localSpecs.push({
-                method: match[frameworks.express.method_group].toUpperCase(),
-                route: match[frameworks.express.path_group]
-            });
-        }
-        
-        extractionCache.set(cacheKey, localSpecs);
-        return { file, specs: localSpecs };
-    });
-
-    const results = await Promise.all(extractionTasks);
-
-    // 3. Aggregate Results
-    results.forEach(({ file, specs }) => {
-        specs.forEach(({ method, route }) => {
+            const method = match[frameworks.express.method_group].toUpperCase();
+            const route = match[frameworks.express.path_group];
+            
+            // Note: simple assignment is not thread-safe if multiple files define same route,
+            // but for docs generation last-write-wins is acceptable or we can use a lock if needed.
             apiSpecs[`${method} ${route}`] = {
                 defined_in: file,
                 source_of_truth: 'Reverse Engineered via SCAP/RDP/Parallel'
             };
-        });
+        }
     });
+
+    await Promise.all(extractionTasks);
 
     // 4. Output as Source of Truth (Text-First)
     const adf = {

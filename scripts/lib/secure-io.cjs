@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync, spawnSync } = require('child_process');
+const { pipeline } = require('stream/promises');
 
 /**
  * Secure I/O utilities for Gemini Skills.
@@ -95,6 +95,7 @@ function safeReadFile(filePath, options = {}) {
  */
 async function safeReadFileAsync(filePath, options = {}) {
   const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input', cache = true } = options;
+  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
@@ -114,24 +115,38 @@ async function safeReadFileAsync(filePath, options = {}) {
         return cached.data;
       }
       
-      // 2. Fresh Async Read
+      // 2. Fresh Async Read with Timeout
       if (stat.size > maxSizeMB * 1024 * 1024) {
         throw new Error(`File too large: ${resolved}`);
       }
-      const data = await fs.promises.readFile(resolved, encoding);
       
-      // Store in cache if small enough
-      if (stat.size < 1 * 1024 * 1024) {
-        _fileCache.set(cacheKey, { mtimeMs: stat.mtimeMs, data });
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), timeoutMs);
+      
+      try {
+        const data = await fs.promises.readFile(resolved, { encoding, signal: ac.signal });
+        // Store in cache if small enough
+        if (stat.size < 1 * 1024 * 1024) {
+          _fileCache.set(cacheKey, { mtimeMs: stat.mtimeMs, data });
+        }
+        return data;
+      } finally {
+        clearTimeout(timer);
       }
-      return data;
     }
   }
 
   // Fallback
-  const stat = await fs.promises.stat(resolved);
-  if (stat.size > maxSizeMB * 1024 * 1024) throw new Error(`File too large: ${resolved}`);
-  return fs.promises.readFile(resolved, encoding);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  
+  try {
+    const stat = await fs.promises.stat(resolved);
+    if (stat.size > maxSizeMB * 1024 * 1024) throw new Error(`File too large: ${resolved}`);
+    return await fs.promises.readFile(resolved, { encoding, signal: ac.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -199,6 +214,23 @@ function safeUnlinkSync(filePath) {
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
   if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+}
+
+/**
+ * Safely pipe streams with error handling and cleanup.
+ * @param {import('stream').Readable} source 
+ * @param {import('stream').Writable} destination 
+ * @returns {Promise<void>}
+ */
+async function safeStreamPipeline(source, destination) {
+  try {
+    await pipeline(source, destination);
+  } catch (err) {
+    // Ensure streams are destroyed on error
+    if (!source.destroyed) source.destroy();
+    if (!destination.destroyed) destination.destroy();
+    throw err;
+  }
 }
 
 /**
@@ -332,6 +364,7 @@ module.exports = {
   safeWriteFile,
   safeAppendFileSync,
   safeUnlinkSync,
+  safeStreamPipeline,
   safeExec,
   safeSpawn,
   sanitizePath,
