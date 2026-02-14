@@ -15,7 +15,7 @@ patterns:
       pattern: "(replicas|desired_count|min_size)\\s*[:=]\\s*(\\d+)"
       thresholds:
         - min: 2
-          level: "2"  # 冗長構成
+          level: '2' # 冗長構成
 
   # サーバ冗長化（Multi-AZ）
   - id: A.2.1.1
@@ -26,9 +26,9 @@ patterns:
     condition:
       type: boolean_match
       patterns:
-        - "multi_az.*true"
+        - 'multi_az.*true'
         - "availability_zones.*\\[.*,.*\\]"
-      level: "2"  # 冗長構成
+      level: '2' # 冗長構成
 
   # バックアップ保持期間
   - id: C.1.2.6
@@ -42,15 +42,15 @@ patterns:
       pattern: "(retention_period|retention_days|backup_retention)\\s*[:=]\\s*(\\d+)"
       thresholds:
         - min: 3650
-          level: "4"  # 10年以上
+          level: '4' # 10年以上
         - min: 1825
-          level: "3"  # 5年以上
+          level: '3' # 5年以上
         - min: 1095
-          level: "2"  # 3年以上
+          level: '2' # 3年以上
         - min: 365
-          level: "1"  # 1年以上
+          level: '1' # 1年以上
         - min: 0
-          level: "0"  # 1年未満
+          level: '0' # 1年未満
 
   # ストレージ暗号化
   - id: E.6.1.2
@@ -63,11 +63,11 @@ patterns:
     condition:
       type: keyword_presence
       patterns:
-        - "encrypted.*true"
-        - "kms_key"
-        - "sse_algorithm"
-        - "encryption_at_rest"
-      level: "2"  # 暗号化あり
+        - 'encrypted.*true'
+        - 'kms_key'
+        - 'sse_algorithm'
+        - 'encryption_at_rest'
+      level: '2' # 暗号化あり
 
   # 監視設定
   - id: C.1.3.1
@@ -83,10 +83,10 @@ patterns:
     condition:
       type: keyword_presence
       patterns:
-        - "alert"
-        - "alarm"
-      level_if_match: "2"    # アラート設定あり
-      level_if_no_match: "1" # 監視ツールのみ
+        - 'alert'
+        - 'alarm'
+      level_if_match: '2' # アラート設定あり
+      level_if_no_match: '1' # 監視ツールのみ
 
   # ロードバランサ
   - id: A.2.1.2
@@ -100,11 +100,11 @@ patterns:
     condition:
       type: keyword_presence
       patterns:
-        - "load_balancer"
-        - "aws_lb"
-        - "aws_alb"
-        - "kubernetes_ingress"
-      level: "2"  # 負荷分散あり
+        - 'load_balancer'
+        - 'aws_lb'
+        - 'aws_alb'
+        - 'kubernetes_ingress'
+      level: '2' # 負荷分散あり
 
   # 自動スケーリング
   - id: B.1.2.1
@@ -117,19 +117,19 @@ patterns:
     condition:
       type: keyword_presence
       patterns:
-        - "autoscaling"
-        - "auto_scaling"
-        - "horizontal_pod_autoscaler"
-      level: "3"  # 自動スケーリング対応
+        - 'autoscaling'
+        - 'auto_scaling'
+        - 'horizontal_pod_autoscaler'
+      level: '3' # 自動スケーリング対応
 
 # 対応するIaCファイル拡張子
 supported_files:
-  - "*.tf"
-  - "*.yaml"
-  - "*.yml"
-  - "Dockerfile"
-  - "docker-compose*.yml"
-  - "*.json"  # AWS CloudFormation
+  - '*.tf'
+  - '*.yaml'
+  - '*.yml'
+  - 'Dockerfile'
+  - 'docker-compose*.yml'
+  - '*.json' # AWS CloudFormation
 
 # 除外ディレクトリ
 exclude_dirs:

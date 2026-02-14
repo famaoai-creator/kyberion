@@ -5,13 +5,24 @@ const path = require('path');
 const rootDir = path.resolve(__dirname, '..');
 
 const SKIP_DIRS = new Set([
-  'node_modules', 'knowledge', 'scripts', 'schemas', 'templates',
-  'evidence', 'coverage', 'test-results', 'work', 'nonfunctional', 'dist', 'tests', '.github'
+  'node_modules',
+  'knowledge',
+  'scripts',
+  'schemas',
+  'templates',
+  'evidence',
+  'coverage',
+  'test-results',
+  'work',
+  'nonfunctional',
+  'dist',
+  'tests',
+  '.github',
 ]);
 
 const IMPLEMENTED_SKILLS = [];
 
-const dirs = fs.readdirSync(rootDir).filter(f => {
+const dirs = fs.readdirSync(rootDir).filter((f) => {
   const fullPath = path.join(rootDir, f);
   return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && !SKIP_DIRS.has(f);
 });
@@ -20,7 +31,9 @@ for (const dir of dirs) {
   const skillPath = path.join(rootDir, dir, 'SKILL.md');
   const scriptsDir = path.join(rootDir, dir, 'scripts');
   if (fs.existsSync(skillPath) && fs.existsSync(scriptsDir)) {
-    const scripts = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js') || f.endsWith('.mjs'));
+    const scripts = fs
+      .readdirSync(scriptsDir)
+      .filter((f) => f.endsWith('.cjs') || f.endsWith('.js') || f.endsWith('.mjs'));
     if (scripts.length > 0) {
       IMPLEMENTED_SKILLS.push({ name: dir, script: scripts[0] });
     }

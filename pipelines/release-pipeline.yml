@@ -2,17 +2,17 @@ name: Release Pipeline
 description: Pre-release checks with quality, security, and release note generation
 steps:
   - skill: project-health-check
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: health
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: security
   - skill: license-auditor
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: licenses
   - skill: bug-predictor
-    args: "--dir \"{{dir}}\" --top 10 --since \"3 months ago\""
+    args: '--dir "{{dir}}" --top 10 --since "3 months ago"'
     output: bugs
   - skill: release-note-crafter
-    args: "--dir \"{{dir}}\" --from \"$prev.latestTag\""
+    args: '--dir "{{dir}}" --from "$prev.latestTag"'
     output: releaseNotes

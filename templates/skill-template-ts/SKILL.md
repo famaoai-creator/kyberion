@@ -10,9 +10,9 @@ arguments:
     description: Input file path
 ---
 
-# __SKILL_TITLE__
+# **SKILL_TITLE**
 
-__DESCRIPTION__
+**DESCRIPTION**
 
 ## Usage
 
@@ -21,6 +21,7 @@ npx ts-node __SKILL_NAME__/scripts/main.ts [options]
 ```
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`.
 - It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
 - Adheres to the [Sovereign Shield] write governance policy.

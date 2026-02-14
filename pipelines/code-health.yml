@@ -2,17 +2,17 @@ name: Code Health Pipeline
 description: Assess overall code health with quality scoring, refactoring analysis, and completeness checks
 steps:
   - skill: code-lang-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: language
   - skill: quality-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: quality
   - skill: completeness-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: completeness
   - skill: refactoring-engine
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: refactoring
   - skill: local-reviewer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: review

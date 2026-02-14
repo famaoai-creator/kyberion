@@ -77,9 +77,11 @@ runSkill('my-skill', () => {
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
-const argv = yargs(hideBin(process.argv))
-  .option('input', { alias: 'i', type: 'string', demandOption: true })
-  .argv;
+const argv = yargs(hideBin(process.argv)).option('input', {
+  alias: 'i',
+  type: 'string',
+  demandOption: true,
+}).argv;
 ```
 
 ### Knowledge Tier Rules

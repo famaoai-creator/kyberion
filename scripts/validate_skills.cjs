@@ -10,11 +10,22 @@ let errors = 0;
 let checked = 0;
 
 const SKIP_DIRS = new Set([
-  'node_modules', 'knowledge', 'scripts', 'schemas', 'templates',
-  'evidence', 'coverage', 'test-results', 'work', 'nonfunctional', 'dist', 'tests', '.github'
+  'node_modules',
+  'knowledge',
+  'scripts',
+  'schemas',
+  'templates',
+  'evidence',
+  'coverage',
+  'test-results',
+  'work',
+  'nonfunctional',
+  'dist',
+  'tests',
+  '.github',
 ]);
 
-const dirs = fs.readdirSync(rootDir).filter(f => {
+const dirs = fs.readdirSync(rootDir).filter((f) => {
   const fullPath = path.join(rootDir, f);
   return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && !SKIP_DIRS.has(f);
 });
@@ -46,7 +57,9 @@ for (const dir of dirs) {
   if (statusMatch) {
     const status = statusMatch[1].trim();
     if (!VALID_STATUSES.includes(status)) {
-      logger.error(`${dir}: Invalid status "${status}". Must be one of: ${VALID_STATUSES.join(', ')}`);
+      logger.error(
+        `${dir}: Invalid status "${status}". Must be one of: ${VALID_STATUSES.join(', ')}`
+      );
       errors++;
     }
   }
@@ -54,13 +67,18 @@ for (const dir of dirs) {
   // --- Architectural Integrity Checks ---
   const scriptDir = path.join(rootDir, dir, 'scripts');
   if (fs.existsSync(scriptDir)) {
-    const scripts = fs.readdirSync(scriptDir).filter(f => f.endsWith('.cjs'));
+    const scripts = fs.readdirSync(scriptDir).filter((f) => f.endsWith('.cjs'));
     for (const script of scripts) {
       const scriptContent = fs.readFileSync(path.join(scriptDir, script), 'utf8');
-      
+
       // Enforce common ignore lists
-      if (scriptContent.includes('const IGNORE_DIRS =') || scriptContent.includes('const ignorePatterns =')) {
-        logger.error(`${dir}: Hardcoded ignore lists found in ${script}. Migrate to config-loader.cjs`);
+      if (
+        scriptContent.includes('const IGNORE_DIRS =') ||
+        scriptContent.includes('const ignorePatterns =')
+      ) {
+        logger.error(
+          `${dir}: Hardcoded ignore lists found in ${script}. Migrate to config-loader.cjs`
+        );
         errors++;
       }
 

@@ -73,7 +73,7 @@ export function renderTemplate(template: string, data: TemplateData): string {
  */
 export function buildRenderOutput(
   result: RenderResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<RenderResult> {
   return {
     skill: 'template-renderer',

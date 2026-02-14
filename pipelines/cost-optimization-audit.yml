@@ -2,11 +2,11 @@ name: Cost Optimization Audit Pipeline
 description: Analyze cloud infrastructure costs and detect waste patterns
 steps:
   - skill: cloud-cost-estimator
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: costs
   - skill: cloud-waste-hunter
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: waste
   - skill: html-reporter
-    args: "-i \"$prev.output\" -o \"{{output}}\" -t \"Cost Optimization Report\""
+    args: '-i "$prev.output" -o "{{output}}" -t "Cost Optimization Report"'
     output: report

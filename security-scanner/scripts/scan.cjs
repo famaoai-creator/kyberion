@@ -13,69 +13,77 @@ const { getAllFilesAsync, mapAsync } = require('../../scripts/lib/fs-utils.cjs')
 const { safeReadFileAsync } = require('../../scripts/lib/secure-io.cjs');
 
 runSkillAsync('security-scanner', async () => {
-    const argv = requireArgs(['dir']);
-    const projectRoot = path.resolve(argv.dir);
-    const complianceTarget = argv.compliance; // e.g. 'fisc'
-    const concurrency = parseInt(argv.concurrency) || 10;
+  const argv = requireArgs(['dir']);
+  const projectRoot = path.resolve(argv.dir);
+  const complianceTarget = argv.compliance; // e.g. 'fisc'
+  const concurrency = parseInt(argv.concurrency) || 10;
 
-    // ... (logic for loading patterns and mappings)
+  // ... (logic for loading patterns and mappings)
 
-    const files = await getAllFilesAsync(projectRoot);
-    const allFindings = [];
-    let scannedCount = 0;
-    let fullContentText = "";
+  const files = await getAllFilesAsync(projectRoot);
+  const allFindings = [];
+  let scannedCount = 0;
+  let fullContentText = '';
 
-    // 3. Concurrency-Limited Scanning with Read Caching
-    const results = await mapAsync(files, concurrency, async (file) => {
-        if (isBinaryPath(file) || file.includes('node_modules') || file.includes('.git') || file.includes('work/archive')) return null;
-        
-        try {
-            const content = await safeReadFileAsync(file);
-            const relativePath = path.relative(projectRoot, file);
-            const localFindings = [];
-            
-            patterns.forEach(p => {
-                p.regex.lastIndex = 0;
-                const matches = content.matchAll(p.regex);
-                for (const _ of matches) {
-                    localFindings.push({
-                        file: relativePath,
-                        pattern: p.name,
-                        severity: p.severity,
-                        suggestion: p.suggestion
-                    });
-                }
-            });
-            return { content, findings: localFindings };
-        } catch (e) { return null; }
-    });
+  // 3. Concurrency-Limited Scanning with Read Caching
+  const results = await mapAsync(files, concurrency, async (file) => {
+    if (
+      isBinaryPath(file) ||
+      file.includes('node_modules') ||
+      file.includes('.git') ||
+      file.includes('work/archive')
+    )
+      return null;
 
-    results.forEach(res => {
-        if (!res) return;
-        allFindings.push(...res.findings);
-        fullContentText += res.content + "\n";
-        scannedCount++;
-    });
+    try {
+      const content = await safeReadFileAsync(file);
+      const relativePath = path.relative(projectRoot, file);
+      const localFindings = [];
 
-    // 4. Compliance Logic (Data-Driven)
-    if (complianceTarget && mappings[complianceTarget]) {
-        mappings[complianceTarget].forEach(ctrl => {
-            const found = ctrl.keywords.some(k => fullContentText.toLowerCase().includes(k));
-            if (!found) {
-                allFindings.push({
-                    file: 'Project-wide',
-                    pattern: `Missing Compliance Control: ${ctrl.name}`,
-                    severity: ctrl.severity,
-                    suggestion: `${complianceTarget.toUpperCase()} standard requires ${ctrl.name}.`
-                });
-            }
-        });
+      patterns.forEach((p) => {
+        p.regex.lastIndex = 0;
+        const matches = content.matchAll(p.regex);
+        for (const _ of matches) {
+          localFindings.push({
+            file: relativePath,
+            pattern: p.name,
+            severity: p.severity,
+            suggestion: p.suggestion,
+          });
+        }
+      });
+      return { content, findings: localFindings };
+    } catch (e) {
+      return null;
     }
+  });
 
-    return { 
-        projectRoot, 
-        scannedFiles: scannedCount, 
-        findingCount: allFindings.length,
-        findings: allFindings
-    };
+  results.forEach((res) => {
+    if (!res) return;
+    allFindings.push(...res.findings);
+    fullContentText += res.content + '\n';
+    scannedCount++;
+  });
+
+  // 4. Compliance Logic (Data-Driven)
+  if (complianceTarget && mappings[complianceTarget]) {
+    mappings[complianceTarget].forEach((ctrl) => {
+      const found = ctrl.keywords.some((k) => fullContentText.toLowerCase().includes(k));
+      if (!found) {
+        allFindings.push({
+          file: 'Project-wide',
+          pattern: `Missing Compliance Control: ${ctrl.name}`,
+          severity: ctrl.severity,
+          suggestion: `${complianceTarget.toUpperCase()} standard requires ${ctrl.name}.`,
+        });
+      }
+    });
+  }
+
+  return {
+    projectRoot,
+    scannedFiles: scannedCount,
+    findingCount: allFindings.length,
+    findings: allFindings,
+  };
 });

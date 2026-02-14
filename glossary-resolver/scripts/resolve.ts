@@ -53,7 +53,7 @@ export type ResolveResult = ResolveFileResult | ResolveInlineResult;
  */
 export function resolveGlossary(
   content: string,
-  glossary: Glossary,
+  glossary: Glossary
 ): { content: string; resolvedTerms: number } {
   let result = content;
   let resolvedCount = 0;
@@ -79,7 +79,7 @@ export function resolveGlossary(
 export function resolveGlossaryFile(
   inputPath: string,
   glossary: Glossary,
-  outPath?: string,
+  outPath?: string
 ): ResolveResult {
   const content = fs.readFileSync(inputPath, 'utf8');
   const resolved = resolveGlossary(content, glossary);
@@ -105,7 +105,7 @@ export function resolveGlossaryFile(
  */
 export function buildResolveOutput(
   result: ResolveResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<ResolveResult> {
   return {
     skill: 'glossary-resolver',

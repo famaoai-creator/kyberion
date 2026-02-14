@@ -73,10 +73,7 @@ export const PII_PATTERNS: PIIPattern[] = [
  * @param patterns - PII patterns to use (defaults to PII_PATTERNS)
  * @returns Scan result indicating whether PII was found and match counts per type
  */
-export function scanContent(
-  content: string,
-  patterns: PIIPattern[] = PII_PATTERNS,
-): ScanResult {
+export function scanContent(content: string, patterns: PIIPattern[] = PII_PATTERNS): ScanResult {
   const findings: PIIFindings = {};
   let hasPII = false;
 
@@ -101,10 +98,7 @@ export function scanContent(
  * @returns Scan result
  * @throws {Error} If the file cannot be read
  */
-export function scanFile(
-  filePath: string,
-  patterns: PIIPattern[] = PII_PATTERNS,
-): ScanResult {
+export function scanFile(filePath: string, patterns: PIIPattern[] = PII_PATTERNS): ScanResult {
   const content = fs.readFileSync(filePath, 'utf8');
   return scanContent(content, patterns);
 }
@@ -116,10 +110,7 @@ export function scanFile(
  * @param startMs - Start timestamp from Date.now()
  * @returns Standard SkillOutput envelope
  */
-export function buildScanOutput(
-  result: ScanResult,
-  startMs: number,
-): SkillOutput<ScanResult> {
+export function buildScanOutput(result: ScanResult, startMs: number): SkillOutput<ScanResult> {
   return {
     skill: 'sensitivity-detector',
     status: 'success',

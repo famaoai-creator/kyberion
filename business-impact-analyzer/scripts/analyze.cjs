@@ -22,8 +22,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Expected input JSON format:
@@ -50,7 +49,7 @@ const argv = createStandardYargs()
 // DORA benchmarks (per Google's Accelerate research)
 const _DORA_BENCHMARKS = {
   elite: { deployment_freq: 7, lead_time: 1, failure_rate: 0.05, mttr: 1 },
-  high: { deployment_freq: 3, lead_time: 24, failure_rate: 0.10, mttr: 4 },
+  high: { deployment_freq: 3, lead_time: 24, failure_rate: 0.1, mttr: 4 },
   medium: { deployment_freq: 1, lead_time: 168, failure_rate: 0.15, mttr: 24 },
   low: { deployment_freq: 0.15, lead_time: 720, failure_rate: 0.45, mttr: 168 },
 };
@@ -75,7 +74,7 @@ function classifyDORA(dora) {
 
   const cfr = dora.change_failure_rate || 1;
   if (cfr <= 0.05) scores.change_failure_rate = 'elite';
-  else if (cfr <= 0.10) scores.change_failure_rate = 'high';
+  else if (cfr <= 0.1) scores.change_failure_rate = 'high';
   else if (cfr <= 0.15) scores.change_failure_rate = 'medium';
 
   const mttr = dora.mttr_hours || 999;
@@ -85,7 +84,10 @@ function classifyDORA(dora) {
 
   const levels = Object.values(scores);
   const levelOrder = ['elite', 'high', 'medium', 'low'];
-  const worst = levels.reduce((w, l) => levelOrder.indexOf(l) > levelOrder.indexOf(w) ? l : w, 'elite');
+  const worst = levels.reduce(
+    (w, l) => (levelOrder.indexOf(l) > levelOrder.indexOf(w) ? l : w),
+    'elite'
+  );
 
   return { metrics: scores, overallLevel: worst };
 }

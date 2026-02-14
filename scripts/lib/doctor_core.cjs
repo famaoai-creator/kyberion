@@ -18,7 +18,7 @@ const doctor = {
       return false;
     }
   },
-  
+
   /** ファイルの存在チェック */
   checkFile: (filePath, name) => {
     if (fs.existsSync(filePath)) {
@@ -34,7 +34,9 @@ const doctor = {
   checkAccessibility: () => {
     if (process.platform !== 'darwin') return true;
     try {
-      execSync('osascript -e "tell application \"System Events\" to get name"', { stdio: 'ignore' });
+      execSync('osascript -e "tell application \"System Events\" to get name"', {
+        stdio: 'ignore',
+      });
       console.log('✅ Accessibility: OK');
       return true;
     } catch (_e) {
@@ -43,13 +45,13 @@ const doctor = {
     }
   },
 
-  /** 
+  /**
    * ナレッジ階層の整合性チェック (3-Tier Sovereign Model)
    * シンボリックリンク切れや、機密情報の露出を検知する
    */
   checkKnowledgeTiers: (rootDir) => {
     console.log('\n--- Knowledge Tier Health ---');
-    
+
     // 1. Confidential Symlink Check
     const confidentialPath = path.join(rootDir, 'knowledge', 'confidential');
     try {
@@ -80,7 +82,7 @@ const doctor = {
     try {
       const gitignore = fs.readFileSync(path.join(rootDir, '.gitignore'), 'utf8');
       const criticalIgnores = ['knowledge/personal/', 'knowledge/confidential/', 'work/'];
-      criticalIgnores.forEach(item => {
+      criticalIgnores.forEach((item) => {
         if (gitignore.includes(item)) {
           console.log(`✅ Security: ${item} is ignored by git`);
         } else {
@@ -92,19 +94,25 @@ const doctor = {
     }
   },
 
-  /** 
+  /**
    * 過去の接続実績（インベントリ）のロードと確認
    */
   checkOperationalMemory: (rootDir) => {
     console.log('\n--- Operational Memory (Active Connections) ---');
-    const inventoryPath = path.join(rootDir, 'knowledge', 'confidential', 'connections', 'inventory.json');
+    const inventoryPath = path.join(
+      rootDir,
+      'knowledge',
+      'confidential',
+      'connections',
+      'inventory.json'
+    );
     if (fs.existsSync(inventoryPath)) {
       try {
         const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
         const systems = Object.keys(inventory.systems || {});
         if (systems.length > 0) {
           console.log(`✅ Known Systems: ${systems.join(', ')}`);
-          systems.forEach(sys => {
+          systems.forEach((sys) => {
             const projects = Object.keys(inventory.systems[sys].projects || {});
             if (projects.length > 0) {
               console.log(`   - ${sys}: Found mappings for ${projects.join(', ')}`);
@@ -119,7 +127,7 @@ const doctor = {
     } else {
       console.log(`⚠️  No operational inventory found.`);
     }
-  }
+  },
 };
 
 module.exports = doctor;

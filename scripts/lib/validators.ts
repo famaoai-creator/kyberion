@@ -94,9 +94,7 @@ export function readJsonFile<T = unknown>(filePath: string, label = 'JSON file')
  * @throws {Error} If any required argument is missing (undefined or null)
  */
 export function requireArgs(argv: Record<string, unknown>, required: string[]): void {
-  const missing = required.filter(
-    (name) => argv[name] === undefined || argv[name] === null,
-  );
+  const missing = required.filter((name) => argv[name] === undefined || argv[name] === null);
   if (missing.length > 0) {
     throw new Error(`Missing required argument(s): ${missing.join(', ')}`);
   }

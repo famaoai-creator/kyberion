@@ -23,21 +23,28 @@ This skill acts as the gateway to the monorepo's collective intelligence, suppor
 ## Capabilities
 
 ### 1. 3-Tier Sovereign Search
+
 Automatically searches for relevant documentation across three tiers:
+
 - **Public Tier**: `knowledge/` (Synced with Git).
 - **Confidential Tier**: `knowledge/confidential/` (Company/Client-specific secrets).
 - **Personal Tier**: `knowledge/personal/` (Strictly local, machine-specific secrets).
 
 ### 2. Multi-Source Consolidation & Precedence
+
 - **Precedence**: Personal > Client-Confidential > General-Confidential > Public.
 - Merges findings from both tiers to provide a complete context.
 - Prioritizes confidential standards if a conflict exists with public ones (e.g., specific company policies overriding generic ones).
 
 ## Usage
+
 - "Fetch all knowledge regarding [Topic], including any internal confidential standards."
 - "What is our company's specific policy on [Security Method]? Check the confidential tier."
 
 ## Safety
+
 - This skill NEVER outputs the full content of confidential files if it detects a public-facing task (like drafting an issue on GitHub). It provides summarized, safe insights instead.
+
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

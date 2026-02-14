@@ -34,7 +34,7 @@ try {
 
   // 相対パスでシンボリックリンクを作成
   const relativeSource = path.relative(targetDir, coreSource);
-  fs.symlinkSync(relativeSource, coreLink, 'junction'); 
+  fs.symlinkSync(relativeSource, coreLink, 'junction');
 
   console.log(`[Bootstrap] Success: @agent/core -> ${relativeSource}`);
 } catch (err) {

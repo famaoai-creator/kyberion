@@ -10,12 +10,15 @@ console.log('--- Sentinel Analysis Starting ---');
 const checks = [
   { name: 'Security', cmd: 'node scripts/cli.cjs run security-scanner -- --dir .' },
   { name: 'Health', cmd: 'node scripts/cli.cjs run project-health-check -- --dir .' },
-  { name: 'Stale TODOs', cmd: 'grep -rE "TODO|FIXME" . --exclude-dir={node_modules,.git} | head -n 5' }
+  {
+    name: 'Stale TODOs',
+    cmd: 'grep -rE "TODO|FIXME" . --exclude-dir={node_modules,.git} | head -n 5',
+  },
 ];
 
 const results = {};
 
-checks.forEach(check => {
+checks.forEach((check) => {
   try {
     console.log(`[Sentinel] Running ${check.name}...`);
     const output = execSync(check.cmd).toString();

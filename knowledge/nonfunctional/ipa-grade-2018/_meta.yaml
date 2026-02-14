@@ -1,12 +1,11 @@
 name: IPA 非機能要求グレード 2018
-version: "2018"
+version: '2018'
 source: 独立行政法人情報処理推進機構（IPA）
 url: https://www.ipa.go.jp/archive/digital/iot-en-ci/jyouryuu/hikinou/ent03-b-1.html
 license: |
   本データはIPA「非機能要求グレード2018」を基に作成しています。
   ご利用にあたっては、上記URLの使用条件を必ずご確認ください。
-last_updated: "2025-01-01"
-
+last_updated: '2025-01-01'
 categories:
   - file: availability.yaml
     name: 可用性

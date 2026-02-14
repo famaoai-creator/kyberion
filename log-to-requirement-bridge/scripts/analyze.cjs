@@ -19,8 +19,7 @@ const argv = createStandardYargs()
     demandOption: true,
     description: 'Path to the log file to analyze',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // --- Pattern definitions for common log formats ---
 const LOG_LEVEL_PATTERNS = [
@@ -31,18 +30,59 @@ const LOG_LEVEL_PATTERNS = [
 ];
 
 const ERROR_CATEGORY_PATTERNS = [
-  { regex: /timeout|timed?\s*out/i, category: 'timeout', description: 'Request or operation timeout' },
-  { regex: /connection\s*(refused|reset|closed|failed)/i, category: 'connection-failure', description: 'Network connection failure' },
-  { regex: /out\s*of\s*memory|OOM|heap\s*(space|size)/i, category: 'memory', description: 'Memory exhaustion or OOM' },
-  { regex: /null\s*pointer|undefined\s*is\s*not|cannot\s*read\s*propert(y|ies)\s*of\s*(null|undefined)/i, category: 'null-reference', description: 'Null/undefined reference error' },
-  { regex: /permission\s*denied|access\s*denied|unauthorized|403\s*forbidden/i, category: 'auth-permission', description: 'Authorization or permission failure' },
+  {
+    regex: /timeout|timed?\s*out/i,
+    category: 'timeout',
+    description: 'Request or operation timeout',
+  },
+  {
+    regex: /connection\s*(refused|reset|closed|failed)/i,
+    category: 'connection-failure',
+    description: 'Network connection failure',
+  },
+  {
+    regex: /out\s*of\s*memory|OOM|heap\s*(space|size)/i,
+    category: 'memory',
+    description: 'Memory exhaustion or OOM',
+  },
+  {
+    regex:
+      /null\s*pointer|undefined\s*is\s*not|cannot\s*read\s*propert(y|ies)\s*of\s*(null|undefined)/i,
+    category: 'null-reference',
+    description: 'Null/undefined reference error',
+  },
+  {
+    regex: /permission\s*denied|access\s*denied|unauthorized|403\s*forbidden/i,
+    category: 'auth-permission',
+    description: 'Authorization or permission failure',
+  },
   { regex: /not\s*found|404|ENOENT/i, category: 'not-found', description: 'Resource not found' },
-  { regex: /disk\s*(full|space)|no\s*space\s*left/i, category: 'disk-space', description: 'Disk space exhaustion' },
-  { regex: /rate\s*limit|too\s*many\s*requests|429/i, category: 'rate-limit', description: 'Rate limiting triggered' },
-  { regex: /deadlock|lock\s*timeout/i, category: 'deadlock', description: 'Deadlock or lock contention' },
-  { regex: /syntax\s*error|parse\s*error|unexpected\s*token/i, category: 'parse-error', description: 'Syntax or parsing error' },
+  {
+    regex: /disk\s*(full|space)|no\s*space\s*left/i,
+    category: 'disk-space',
+    description: 'Disk space exhaustion',
+  },
+  {
+    regex: /rate\s*limit|too\s*many\s*requests|429/i,
+    category: 'rate-limit',
+    description: 'Rate limiting triggered',
+  },
+  {
+    regex: /deadlock|lock\s*timeout/i,
+    category: 'deadlock',
+    description: 'Deadlock or lock contention',
+  },
+  {
+    regex: /syntax\s*error|parse\s*error|unexpected\s*token/i,
+    category: 'parse-error',
+    description: 'Syntax or parsing error',
+  },
   { regex: /SSL|TLS|certificate/i, category: 'ssl-tls', description: 'SSL/TLS certificate issue' },
-  { regex: /database|SQL|query\s*failed|relation\s*.*does\s*not\s*exist/i, category: 'database', description: 'Database query or connection error' },
+  {
+    regex: /database|SQL|query\s*failed|relation\s*.*does\s*not\s*exist/i,
+    category: 'database',
+    description: 'Database query or connection error',
+  },
 ];
 
 /**
@@ -237,7 +277,12 @@ runSkill('log-to-requirement-bridge', () => {
   }
 
   const patterns = Object.values(patternMap).sort((a, b) => b.count - a.count);
-  const suggestedRequirements = generateRequirements(patterns, errorCount, warningCount, totalLines);
+  const suggestedRequirements = generateRequirements(
+    patterns,
+    errorCount,
+    warningCount,
+    totalLines
+  );
 
   return {
     source: path.basename(resolved),

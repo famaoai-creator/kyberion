@@ -1,9 +1,25 @@
 {
   "scoring_rules": {
-    "min_length": { "threshold": 50, "penalty": 20, "message": "Content is too short for high-fidelity analysis." },
-    "max_length": { "threshold": 10000, "penalty": 10, "message": "Content is very long, consider breaking it down." },
-    "avg_sentence_length": { "threshold": 100, "penalty": 10, "message": "Sentences are too long, reducing readability." },
-    "complexity": { "threshold": 15, "penalty": 15, "message": "High logical complexity detected (SCAP-Layer-2 violation)." }
+    "min_length": {
+      "threshold": 50,
+      "penalty": 20,
+      "message": "Content is too short for high-fidelity analysis."
+    },
+    "max_length": {
+      "threshold": 10000,
+      "penalty": 10,
+      "message": "Content is very long, consider breaking it down."
+    },
+    "avg_sentence_length": {
+      "threshold": 100,
+      "penalty": 10,
+      "message": "Sentences are too long, reducing readability."
+    },
+    "complexity": {
+      "threshold": 15,
+      "penalty": 15,
+      "message": "High logical complexity detected (SCAP-Layer-2 violation)."
+    }
   },
   "standard": "SCAP-Standard-v1"
 }

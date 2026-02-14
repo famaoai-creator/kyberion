@@ -2,17 +2,17 @@ name: Ecosystem Health Monitor Pipeline
 description: Comprehensive dependency health, licensing, and security analysis
 steps:
   - skill: dependency-grapher
-    args: "-d \"{{dir}}\""
+    args: '-d "{{dir}}"'
     output: graph
   - skill: dependency-lifeline
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: health
   - skill: license-auditor
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: licenses
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: security
   - skill: html-reporter
-    args: "-i \"$prev.output\" -o \"{{output}}\" -t \"Ecosystem Health Report\""
+    args: '-i "$prev.output" -o "{{output}}" -t "Ecosystem Health Report"'
     output: report

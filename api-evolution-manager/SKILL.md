@@ -29,16 +29,20 @@ This skill ensures that your API grows gracefully without breaking downstream co
 ## Capabilities
 
 ### 1. Breaking Change Detection
+
 - Compares current API schemas (OpenAPI, GraphQL) with previous versions.
 - Flags any changes that would break backward compatibility.
 
 ### 2. Lifecycle Management
+
 - Manages deprecation notices and sunsetting schedules.
 - Automatically generates "Migration Guides" for developers using the API.
 
 ## Usage
+
 - "Audit the latest API changes for breaking changes and update the versioning plan."
 - "Generate a migration guide for clients moving from v1.0 to v2.0."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

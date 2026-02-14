@@ -2,14 +2,14 @@ name: Document Analysis Pipeline
 description: Classify and analyze documents
 steps:
   - skill: domain-classifier
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: domain
   - skill: doc-type-classifier
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: docType
   - skill: intent-classifier
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: intent
   - skill: sensitivity-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: sensitivity

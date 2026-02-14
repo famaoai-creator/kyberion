@@ -20,10 +20,18 @@ function loadConfig() {
   } catch (_e) {
     return {
       runners: [
-        { name: 'npm test', detection: [{ type: 'package_json_script', script: 'test' }], command: 'npm test' },
-        { name: 'pytest', detection: [{ type: 'file_exists', path: 'pytest.ini' }], command: 'pytest' }
+        {
+          name: 'npm test',
+          detection: [{ type: 'package_json_script', script: 'test' }],
+          command: 'npm test',
+        },
+        {
+          name: 'pytest',
+          detection: [{ type: 'file_exists', path: 'pytest.ini' }],
+          command: 'pytest',
+        },
       ],
-      execution: { max_buffer: 5242880, timeout: 300000 }
+      execution: { max_buffer: 5242880, timeout: 300000 },
     };
   }
 }
@@ -68,7 +76,7 @@ function checkDetection(detection, dir) {
         if (!fs.existsSync(pkgPath)) return false;
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-        return Object.keys(allDeps).some(d => d.includes(detection.dependency));
+        return Object.keys(allDeps).some((d) => d.includes(detection.dependency));
       } catch (_e) {
         return false;
       }
@@ -81,7 +89,7 @@ function checkDetection(detection, dir) {
 function detectTestRunner(dir) {
   for (const runner of RUNNERS) {
     const detections = runner.detection || [];
-    const isDetected = detections.some(d => checkDetection(d, dir));
+    const isDetected = detections.some((d) => checkDetection(d, dir));
     if (isDetected) {
       return runner;
     }
@@ -105,32 +113,38 @@ if (!testCommand) {
 }
 
 runAsyncSkill('test-genie', async () => {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
 
-        exec(testCommand, {
-          cwd: targetDir,
-          maxBuffer: EXECUTION_CONFIG.max_buffer,
-          timeout: EXECUTION_CONFIG.timeout
-        }, (error, stdout, stderr) => {
-          const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    exec(
+      testCommand,
+      {
+        cwd: targetDir,
+        maxBuffer: EXECUTION_CONFIG.max_buffer,
+        timeout: EXECUTION_CONFIG.timeout,
+      },
+      (error, stdout, stderr) => {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-          const result = {
-            targetDir: path.resolve(targetDir),
-            runner: detectedRunner ? detectedRunner.name : 'custom',
-            command: testCommand,
-            duration: parseFloat(duration),
-            success: !error,
-            exitCode: error ? error.code : 0,
-            stdout,
-            stderr: stderr || undefined
-          };
+        const result = {
+          targetDir: path.resolve(targetDir),
+          runner: detectedRunner ? detectedRunner.name : 'custom',
+          command: testCommand,
+          duration: parseFloat(duration),
+          success: !error,
+          exitCode: error ? error.code : 0,
+          stdout,
+          stderr: stderr || undefined,
+        };
 
-          if (error) {
-            reject(Object.assign(new Error(`Test failed with exit code ${error.code}`), { data: result }));
-          } else {
-            resolve(result);
-          }
-        });
-    });
+        if (error) {
+          reject(
+            Object.assign(new Error(`Test failed with exit code ${error.code}`), { data: result })
+          );
+        } else {
+          resolve(result);
+        }
+      }
+    );
+  });
 });

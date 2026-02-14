@@ -2,14 +2,14 @@ name: Compliance Audit Pipeline
 description: License compliance, sensitivity detection, and security analysis
 steps:
   - skill: license-auditor
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: licenses
   - skill: sensitivity-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: sensitivity
   - skill: schema-validator
-    args: "-i \"{{input}}\" -s \"{{schema}}\""
+    args: '-i "{{input}}" -s "{{schema}}"'
     output: validation
   - skill: nonfunctional-architect
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: nfrGrade

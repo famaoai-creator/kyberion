@@ -2,13 +2,14 @@
 marp: true
 theme: business
 paginate: true
-header: "**Confidential**"
-footer: "© 2026 My Company"
+header: '**Confidential**'
+footer: '© 2026 My Company'
 ---
 
 <!-- _class: title -->
 
 # ビジネスプレゼンテーション
+
 ## 副題をここに入れます
 
 発表者名
@@ -45,6 +46,7 @@ footer: "© 2026 My Company"
 ### アプローチA
 
 従来のやり方を踏襲しつつ、一部を自動化します。
+
 - メリット: 導入コスト低
 - デメリット: 効果限定的
 
@@ -55,6 +57,7 @@ footer: "© 2026 My Company"
 ### アプローチB
 
 AIを導入してプロセスを刷新します。
+
 - メリット: 効果大
 - デメリット: 導入コスト高
 

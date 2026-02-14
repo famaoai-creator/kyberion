@@ -20,12 +20,12 @@ const tiers = [
   { name: 'personal', path: path.join(process.cwd(), 'knowledge', 'personal', 'memories') },
   { name: 'roles/ceo', path: path.join(process.cwd(), 'knowledge', 'roles', 'ceo', 'memories') },
   { name: 'confidential', path: path.join(process.cwd(), 'knowledge', 'confidential', 'memories') },
-  { name: 'public', path: path.join(process.cwd(), 'knowledge', 'public', 'memories') }
+  { name: 'public', path: path.join(process.cwd(), 'knowledge', 'public', 'memories') },
 ];
 
 console.log(`--- Searching for "${query}" across the Sovereign Matrix ---`);
 
-tiers.forEach(tier => {
+tiers.forEach((tier) => {
   if (fs.existsSync(tier.path)) {
     try {
       const result = execSync(`grep -rEi "${query}" "${tier.path}"`, { encoding: 'utf8' });

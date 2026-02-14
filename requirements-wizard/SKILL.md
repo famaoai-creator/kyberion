@@ -16,7 +16,9 @@ This skill provides expert guidance for Requirement Definition (RD) phases, leve
 ## Capabilities
 
 ### 1. Best Practice Advisory
+
 Consult the IPA-aligned knowledge base for advice on:
+
 - **Business Requirements**: Stakeholder mapping, objective structuring (Why/What/How).
 - **Process Visualization**: Hierarchical workflow design (Business vs. System levels).
 - **Data Modeling**: Conceptual ER diagrams and CRUD analysis.
@@ -24,17 +26,20 @@ Consult the IPA-aligned knowledge base for advice on:
 - **Non-Functional Requirements**: Using IPA grades and defining metrics.
 
 ### 2. Document Review
+
 The skill uses structured checklists to audit requirements documents following the `knowledge/orchestration/knowledge-protocol.md`:
+
 - **Hybrid Lookup**: Checks `knowledge/` (Public) AND `knowledge/confidential/` (Private).
 - **Precedence**: Internal confidential policies override general IPA/FISC standards.
 - **Safety**: Proprietary details found in the confidential tier must be summarized or masked when generating public reports.
 
 ## Knowledge Base Locations
+
 - **IPA Best Practices**: `knowledge/requirements-guide/ipa_best_practices.md`
 - **AI Best Practices**: `knowledge/ai-engineering/best_practices.md`
-- **Review Checklists**: 
-    - General: `knowledge/requirements-guide/review_checklist.md`
-    - AI-Specific: `knowledge/ai-engineering/review_checklist.md`
+- **Review Checklists**:
+  - General: `knowledge/requirements-guide/review_checklist.md`
+  - AI-Specific: `knowledge/ai-engineering/review_checklist.md`
 
 ## Usage Examples
 
@@ -43,9 +48,11 @@ The skill uses structured checklists to audit requirements documents following t
 - "Help me define the non-functional requirements for a high-availability banking API."
 
 ## Workflow Focus
+
 1.  **Analyze**: Understand the current context and project scope.
 2.  **Refer**: Retrieve relevant best practices from the knowledge base.
 3.  **Advise/Verify**: Provide specific improvements or check for gaps using the review checklist.
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

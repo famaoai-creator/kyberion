@@ -43,13 +43,18 @@ function validateFileSize(filePath, maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB) {
  * @returns {string|Buffer} File contents
  */
 function safeReadFile(filePath, options = {}) {
-  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input', cache = true } = options;
+  const {
+    maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB,
+    encoding = 'utf8',
+    label = 'input',
+    cache = true,
+  } = options;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
   const resolved = path.resolve(filePath);
-  
+
   // 1. Cache Check
   if (cache) {
     const { fileUtils } = require('./core.cjs');
@@ -57,20 +62,20 @@ function safeReadFile(filePath, options = {}) {
     // For raw files, we use a dedicated cache key.
     const cacheKey = `raw:${resolved}`;
     const { _fileCache } = require('./core.cjs'); // Internal cache access
-    
+
     if (fs.existsSync(resolved)) {
       const stat = fs.statSync(resolved);
       const cached = _fileCache.get(cacheKey);
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         return cached.data;
       }
-      
+
       // 2. Fresh Read
       if (stat.size > maxSizeMB * 1024 * 1024) {
         throw new Error(`File too large: ${resolved}`);
       }
       const data = fs.readFileSync(resolved, encoding);
-      
+
       // Store in cache if small enough
       if (stat.size < 1 * 1024 * 1024) {
         _fileCache.set(cacheKey, { mtimeMs: stat.mtimeMs, data });
@@ -94,19 +99,24 @@ function safeReadFile(filePath, options = {}) {
  * @returns {Promise<string|Buffer>} File contents
  */
 async function safeReadFileAsync(filePath, options = {}) {
-  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input', cache = true } = options;
+  const {
+    maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB,
+    encoding = 'utf8',
+    label = 'input',
+    cache = true,
+  } = options;
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
   const resolved = path.resolve(filePath);
-  
+
   // 1. Cache Check
   if (cache) {
     const { _fileCache } = require('./core.cjs');
     const cacheKey = `raw:${resolved}`;
-    
+
     // Check memory cache first (synchronous check is fine)
     if (fs.existsSync(resolved)) {
       const stat = await fs.promises.stat(resolved);
@@ -114,15 +124,15 @@ async function safeReadFileAsync(filePath, options = {}) {
       if (cached && cached.mtimeMs === stat.mtimeMs) {
         return cached.data;
       }
-      
+
       // 2. Fresh Async Read with Timeout
       if (stat.size > maxSizeMB * 1024 * 1024) {
         throw new Error(`File too large: ${resolved}`);
       }
-      
+
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), timeoutMs);
-      
+
       try {
         const data = await fs.promises.readFile(resolved, { encoding, signal: ac.signal });
         // Store in cache if small enough
@@ -139,7 +149,7 @@ async function safeReadFileAsync(filePath, options = {}) {
   // Fallback
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
-  
+
   try {
     const stat = await fs.promises.stat(resolved);
     if (stat.size > maxSizeMB * 1024 * 1024) throw new Error(`File too large: ${resolved}`);
@@ -175,7 +185,7 @@ function safeWriteFile(filePath, data, options = {}) {
   // Atomic Write Strategy with Durability (fsync) and Nanosecond Precision
   const ns = process.hrtime.bigint().toString();
   const tempPath = `${resolved}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
-  
+
   let fd;
   try {
     fd = fs.openSync(tempPath, 'w');
@@ -186,9 +196,14 @@ function safeWriteFile(filePath, data, options = {}) {
     fs.renameSync(tempPath, resolved);
   } catch (err) {
     // Cleanup
-    if (fd) try { fs.closeSync(fd); } catch (_) {}
+    if (fd)
+      try {
+        fs.closeSync(fd);
+      } catch (_) {}
     if (fs.existsSync(tempPath)) {
-      try { fs.unlinkSync(tempPath); } catch (_) {}
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_) {}
     }
     throw err;
   }
@@ -218,8 +233,8 @@ function safeUnlinkSync(filePath) {
 
 /**
  * Safely pipe streams with error handling and cleanup.
- * @param {import('stream').Readable} source 
- * @param {import('stream').Writable} destination 
+ * @param {import('stream').Readable} source
+ * @param {import('stream').Writable} destination
  * @returns {Promise<void>}
  */
 async function safeStreamPipeline(source, destination) {
@@ -303,10 +318,10 @@ function safeSpawn(command, args = [], options = {}) {
 function sanitizePath(input) {
   if (!input || typeof input !== 'string') return '';
   return input
-    .replace(/\0/g, '')          // Remove null bytes
-    .replace(/\.\.\//g, '')      // Remove path traversal
-    .replace(/\.\.\\/g, '')      // Remove Windows path traversal
-    .replace(/^[/\\]+/, '');     // Remove leading slashes
+    .replace(/\0/g, '') // Remove null bytes
+    .replace(/\.\.\//g, '') // Remove path traversal
+    .replace(/\.\.\\/g, '') // Remove Windows path traversal
+    .replace(/^[/\\]+/, ''); // Remove leading slashes
 }
 
 /**

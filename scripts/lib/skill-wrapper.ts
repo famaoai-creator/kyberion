@@ -44,7 +44,10 @@ export function wrapSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
   }
 }
 
-export async function wrapSkillAsync<T>(skillName: string, fn: () => Promise<T>): Promise<SkillOutput<T>> {
+export async function wrapSkillAsync<T>(
+  skillName: string,
+  fn: () => Promise<T>
+): Promise<SkillOutput<T>> {
   const startTime = Date.now();
   try {
     return buildOutput<T>(skillName, 'success', await fn(), startTime);
@@ -60,7 +63,10 @@ export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
   return output;
 }
 
-export async function runSkillAsync<T>(skillName: string, fn: () => Promise<T>): Promise<SkillOutput<T>> {
+export async function runSkillAsync<T>(
+  skillName: string,
+  fn: () => Promise<T>
+): Promise<SkillOutput<T>> {
   const output = await wrapSkillAsync(skillName, fn);
   console.log(JSON.stringify(output, null, 2));
   if (output.status === 'error') process.exit(1);

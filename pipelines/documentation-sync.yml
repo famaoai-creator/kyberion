@@ -2,14 +2,14 @@ name: Documentation Sync Pipeline
 description: Detect documentation drift and generate updated API docs
 steps:
   - skill: codebase-mapper
-    args: "\"{{dir}}\" 2"
+    args: '"{{dir}}" 2'
     output: map
   - skill: doc-sync-sentinel
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: drift
   - skill: api-doc-generator
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: apiDocs
   - skill: completeness-scorer
-    args: "-i \"{{dir}}/README.md\""
+    args: '-i "{{dir}}/README.md"'
     output: readmeScore

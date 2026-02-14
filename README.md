@@ -54,15 +54,16 @@ This is not a generic tool collection. It is a system where **you define your pe
 
 Each person can securely maintain their own knowledge base. Higher tiers always override lower tiers, and data never leaks downward.
 
-| Tier | Directory | Git | Description |
-|------|-----------|-----|-------------|
-| **Public** | `knowledge/` | Synced | Shared standards, frameworks, tech-stack guides. Safe for distribution. |
-| **Confidential** | `knowledge/confidential/` | Separate | Company/client secrets. Sub-paths: `skills/<name>/` and `clients/<name>/`. |
-| **Personal** | `knowledge/personal/` | Prohibited | Individual secrets — API keys, personal notes. Never leaves your machine. |
+| Tier             | Directory                 | Git        | Description                                                                |
+| ---------------- | ------------------------- | ---------- | -------------------------------------------------------------------------- |
+| **Public**       | `knowledge/`              | Synced     | Shared standards, frameworks, tech-stack guides. Safe for distribution.    |
+| **Confidential** | `knowledge/confidential/` | Separate   | Company/client secrets. Sub-paths: `skills/<name>/` and `clients/<name>/`. |
+| **Personal**     | `knowledge/personal/`     | Prohibited | Individual secrets — API keys, personal notes. Never leaves your machine.  |
 
 **Precedence:** Personal > Confidential (Client) > Confidential (General) > Public
 
 **Enforcement:** `tier-guard.cjs` prevents higher-tier data from leaking into lower-tier outputs:
+
 - `validateInjection()` — Validates data flow direction before injection
 - `scanForConfidentialMarkers()` — Detects accidental inclusion of secrets (API_KEY, PASSWORD, TOKEN, etc.)
 
@@ -72,11 +73,11 @@ See [`knowledge/orchestration/knowledge-protocol.md`](./knowledge/orchestration/
 
 Playbooks are role-specific workflow recipes with **Victory Conditions** — a checklist of what must be true for the mission to succeed.
 
-| Playbook | Persona | Skills | Output |
-|----------|---------|--------|--------|
-| **[ceo-strategy](./knowledge/orchestration/mission-playbooks/ceo-strategy.md)** | CEO | scenario-multiverse-orchestrator, financial-modeling-maestro, business-impact-analyzer, competitive-intel-strategist | Executive summary (PPTX) + Scenario comparison report |
-| **[product-audit](./knowledge/orchestration/mission-playbooks/product-audit.md)** | PM/Auditor | project-health-check, security-scanner, ux-auditor, pmo-governance-lead | Audit report + Delivery presentation |
-| **[saas-roi](./knowledge/orchestration/mission-playbooks/saas-roi.md)** | CEO | financial-modeling-maestro, unit-economics-optimizer, competitive-intel-strategist | 5-year P&L simulation + Investment pitch |
+| Playbook                                                                          | Persona    | Skills                                                                                                               | Output                                                |
+| --------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **[ceo-strategy](./knowledge/orchestration/mission-playbooks/ceo-strategy.md)**   | CEO        | scenario-multiverse-orchestrator, financial-modeling-maestro, business-impact-analyzer, competitive-intel-strategist | Executive summary (PPTX) + Scenario comparison report |
+| **[product-audit](./knowledge/orchestration/mission-playbooks/product-audit.md)** | PM/Auditor | project-health-check, security-scanner, ux-auditor, pmo-governance-lead                                              | Audit report + Delivery presentation                  |
+| **[saas-roi](./knowledge/orchestration/mission-playbooks/saas-roi.md)**           | CEO        | financial-modeling-maestro, unit-economics-optimizer, competitive-intel-strategist                                   | 5-year P&L simulation + Investment pitch              |
 
 Create your own playbooks in `knowledge/orchestration/mission-playbooks/` following the same format.
 
@@ -84,11 +85,11 @@ Create your own playbooks in `knowledge/orchestration/mission-playbooks/` follow
 
 Express your goals in natural language. The system maps trigger phrases to skill chains automatically via [`intent_mapping.yaml`](./knowledge/orchestration/meta-skills/intent_mapping.yaml):
 
-| Intent | Trigger Phrases | Skill Chain |
-|--------|----------------|-------------|
-| **Total Security Guarantee** | "audit security", "is this safe?" | security-scanner → license-auditor → supply-chain-sentinel → post-quantum-shield → red-team-adversary |
-| **Business Launchpad** | "new business idea", "launch product" | competitive-intel-strategist → financial-modeling-maestro → unit-economics-optimizer → business-growth-planner |
-| **Legacy Modernization** | "refactor this mess", "modernize legacy" | codebase-mapper → cognitive-load-auditor → refactoring-engine → technology-porter |
+| Intent                       | Trigger Phrases                          | Skill Chain                                                                                                    |
+| ---------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Total Security Guarantee** | "audit security", "is this safe?"        | security-scanner → license-auditor → supply-chain-sentinel → post-quantum-shield → red-team-adversary          |
+| **Business Launchpad**       | "new business idea", "launch product"    | competitive-intel-strategist → financial-modeling-maestro → unit-economics-optimizer → business-growth-planner |
+| **Legacy Modernization**     | "refactor this mess", "modernize legacy" | codebase-mapper → cognitive-load-auditor → refactoring-engine → technology-porter                              |
 
 ## Extending the Ecosystem
 
@@ -97,6 +98,7 @@ The system is designed for extensibility at every layer.
 **Plugin System** — Every skill execution passes through `skill-wrapper.cjs`, which supports `beforeSkill` / `afterSkill` hooks loaded from `.gemini-plugins.json`. Intercept, validate, or augment any skill execution without modifying core code.
 
 **Plugin Manager** — Install external skills or register local directories:
+
 ```bash
 npm run plugin -- install <package>    # Install from npm
 npm run plugin -- register ./my-skill  # Register a local skill
@@ -108,6 +110,7 @@ npm run plugin -- list                 # List installed plugins
 ---
 
 ## Table of Contents
+
 - [Philosophy](#philosophy-everyone-can-automate-their-own-work)
 - [How It Works](#how-it-works)
 - [3-Tier Knowledge Hierarchy](#3-tier-knowledge-hierarchy)
@@ -127,6 +130,7 @@ npm run plugin -- list                 # List installed plugins
 - [Contributing](#contributing)
 
 ## Quick Start
+
 1. Clone this repository.
 2. Run the interactive wizard: `node scripts/init_wizard.cjs` (installs dependencies and configures your role).
 3. Validate: `npm run validate`
@@ -135,9 +139,9 @@ npm run plugin -- list                 # List installed plugins
 
 Each skill has a `status` field in its `SKILL.md` frontmatter:
 
-| Status | Count | Meaning |
-|--------|-------|---------|
-| `implemented` | 130 | Has runnable scripts in `scripts/` directory |
+| Status        | Count | Meaning                                      |
+| ------------- | ----- | -------------------------------------------- |
+| `implemented` | 130   | Has runnable scripts in `scripts/` directory |
 
 26 additional conceptual frameworks have been moved to `knowledge/frameworks/`.
 
@@ -149,8 +153,8 @@ Each skill has a `status` field in its `SKILL.md` frontmatter:
 
 These skills have working code and can be executed.
 
-
 #### Data Processing & Transformation
+
 - **`data-transformer`**: Convert between CSV, JSON, and YAML formats
 - **`data-collector`**: Collect and aggregate data from multiple sources
 - **`db-extractor`**: Extract data from databases
@@ -159,6 +163,7 @@ These skills have working code and can be executed.
 - **`doc-to-text`**: Universal document extractor
 
 #### Document Generation
+
 - **`excel-artisan`**: Generate Excel workbooks
 - **`pdf-composer`**: Compose PDF documents
 - **`ppt-artisan`**: Generate PowerPoint presentations
@@ -168,6 +173,7 @@ These skills have working code and can be executed.
 - **`diagram-renderer`**: Text-to-Image (Mermaid)
 
 #### Code Analysis & Quality
+
 - **`code-lang-detector`**: Detect programming languages
 - **`codebase-mapper`**: Map directory structure
 - **`dependency-grapher`**: Generate dependency graphs
@@ -181,11 +187,13 @@ These skills have working code and can be executed.
 - **`bug-predictor`**: Predict bug hotspots from git churn and complexity
 
 #### Schema & Validation
+
 - **`schema-inspector`**: Inspect data schemas
 - **`schema-validator`**: Validate against schemas
 - **`nonfunctional-architect`**: NFR grade wizard (IPA standards)
 
 #### Classification & Detection
+
 - **`doc-type-classifier`**: Classify document types
 - **`domain-classifier`**: Classify domains
 - **`intent-classifier`**: Classify user intents
@@ -193,6 +201,7 @@ These skills have working code and can be executed.
 - **`sensitivity-detector`**: Detect sensitive data
 
 #### API & Integration
+
 - **`api-doc-generator`**: Generate API documentation
 - **`api-fetcher`**: Fetch data from APIs
 - **`audio-transcriber`**: Whisper audio transcription
@@ -201,25 +210,30 @@ These skills have working code and can be executed.
 - **`browser-navigator`**: Automate browser actions with Playwright
 
 #### Knowledge & Content
+
 - **`glossary-resolver`**: Resolve glossary terms
 - **`knowledge-fetcher`**: Fetch knowledge assets
 - **`layout-architect`**: Design document layouts
 - **`doc-sync-sentinel`**: Detect documentation drift from code changes
 
 #### Infrastructure & Security
+
 - **`terraform-arch-mapper`**: Visualize IaC
 - **`security-scanner`**: Trivy-integrated vulnerability scan
 - **`test-genie`**: Generate and run test code
 
 #### Issue & Project Management
+
 - **`issue-to-solution-bridge`**: Analyze GitHub issues and suggest solutions
 
 #### Voice & Platform
+
 - **`voice-command-listener`**: Listen for voice commands (macOS)
 - **`voice-interface-maestro`**: Voice interface control (macOS)
 - **`biometric-context-adapter`**: Biometric context integration
 
 #### Quality & Optimization
+
 - **`skill-quality-auditor`**: 12-point quality checklist auditor
 - **`prompt-optimizer`**: Analyze and improve SKILL.md quality
 - **`refactoring-engine`**: Detect code smells across 7 categories
@@ -227,11 +241,13 @@ These skills have working code and can be executed.
 - **`knowledge-auditor`**: Audit knowledge tiers and detect confidential marker violations
 
 #### Release & Documentation
+
 - **`release-note-crafter`**: Generate release notes from Git logs
 - **`boilerplate-genie`**: Scaffold new projects with best practices
 - **`requirements-wizard`**: Requirements review based on IPA standards
 
 #### Operations & Compliance
+
 - **`license-auditor`**: Audit dependencies for license compliance
 - **`operational-runbook-generator`**: Generate operational runbooks
 - **`dataset-curator`**: Clean and structure data for AI/RAG pipelines
@@ -240,6 +256,7 @@ These skills have working code and can be executed.
 - **`cloud-cost-estimator`**: Estimate cloud infrastructure costs
 
 #### Engineering & DevOps
+
 - **`pr-architect`**: Generate PR descriptions from git history
 - **`onboarding-wizard`**: Generate project onboarding documentation
 - **`cloud-waste-hunter`**: Detect cloud infrastructure cost waste
@@ -249,6 +266,7 @@ These skills have working code and can be executed.
 - **`test-suite-architect`**: Analyze test frameworks, coverage, and generate testing strategies
 
 #### Orchestration
+
 - **`skill-bundle-packager`**: Create mission-specific skill bundles
 - **`github-skills-manager`**: Monorepo dashboard
 - **`mission-control`**: Central workflow orchestration with pipeline and ad-hoc modes
@@ -268,7 +286,9 @@ These skills have working code and can be executed.
 - **Knowledge & Preservation**: deep-archive-librarian, intent-archivist, eternal-self-preservation-guardian, empathy-engine, persona-matrix-switcher
 
 ## Knowledge Base
+
 Structured `knowledge/` directory following the [3-Tier Sovereign Model](#3-tier-knowledge-hierarchy):
+
 - **`orchestration/`**: Playbooks, Protocols (3-Tier, MSC), Intent Mapping
 - **`frameworks/`**: 26 conceptual frameworks (consolidated)
 - **`personalities/`**: Persona Matrix definitions
@@ -283,6 +303,7 @@ Structured `knowledge/` directory following the [3-Tier Sovereign Model](#3-tier
 ## CLI Tools
 
 ### Unified CLI Runner
+
 Run any skill from a single entry point:
 
 ```bash
@@ -300,6 +321,7 @@ npm run cli -- info data-transformer
 ```
 
 ### Performance Health Check
+
 Diagnose ecosystem performance and detect regressions:
 
 ```bash
@@ -307,6 +329,7 @@ node scripts/check_performance.cjs
 ```
 
 ### Skill Creation Wizard
+
 Scaffold a new skill from template:
 
 ```bash
@@ -318,6 +341,7 @@ npm run create-skill -- my-ts-skill --template ts --description "TypeScript skil
 ```
 
 ### Performance Benchmarks
+
 Measure syntax-check load times for all implemented skills:
 
 ```bash
@@ -326,6 +350,7 @@ npm run benchmark
 ```
 
 ### Plugin Manager
+
 Install external skills or register local skill directories:
 
 ```bash
@@ -343,6 +368,7 @@ npm run plugin -- uninstall plugin-name
 ```
 
 ### Quality Audit
+
 Check all implemented skills against a quality checklist:
 
 ```bash
@@ -354,6 +380,7 @@ node scripts/audit_skills.cjs --format json
 ```
 
 ### Skill Pipelines
+
 Chain skills together with data passing:
 
 ```bash
@@ -362,15 +389,16 @@ node scripts/run_pipeline.cjs pipelines/my-pipeline.yml
 ```
 
 Pipeline YAML format:
+
 ```yaml
 name: security-audit
 pipeline:
   - skill: codebase-mapper
-    params: { dir: "." }
+    params: { dir: '.' }
   - skill: security-scanner
-    params: { input: "$prev.output" }
+    params: { input: '$prev.output' }
   - skill: html-reporter
-    params: { input: "$prev.report" }
+    params: { input: '$prev.report' }
 ```
 
 ## Development
@@ -405,6 +433,7 @@ npm run benchmark
 ```
 
 ### Creating a New Skill
+
 Use the creation wizard or copy from templates:
 
 ```bash
@@ -420,29 +449,32 @@ npm run create-skill -- my-skill --description "My new skill"
 
 All skills can use these shared libraries from `scripts/lib/` (aliased as `@agent/core`):
 
-| Library | Import | Purpose |
-|---------|--------|---------|
-| `skill-wrapper.cjs` | `runSkill()` / `runSkillAsync()` | Standardized JSON output format |
-| `classifier.cjs` | `classify()` / `classifyFile()` | Keyword-based classification engine |
-| `tier-guard.cjs` | `validateInjection()` / `validateWritePermission()` | Knowledge Tier & Write Governance |
-| `core.cjs` | `logger` / `fileUtils` / `errorHandler` / `Cache` | Logging, Safe I/O, Caching |
-| `validators.cjs` | `requireArgs()` / `validateFilePath()` | CLI argument and path validation |
-| `validate.cjs` | `validateInput()` / `validateOutput()` | JSON Schema validation |
-| `metrics.cjs` | `metrics.record()` / `metrics.detectRegressions()` | Skill execution metrics & health checks |
-| `secure-io.cjs` | `safeReadFile()` / `safeWriteFile()` | Safe file I/O with governance checks |
-| `logger.cjs` | `createLogger()` | Structured leveled logging |
-| `orchestrator.cjs` | `runPipeline()` / `runParallel()` | Sequential and parallel skill execution with retry |
+| Library             | Import                                              | Purpose                                            |
+| ------------------- | --------------------------------------------------- | -------------------------------------------------- |
+| `skill-wrapper.cjs` | `runSkill()` / `runSkillAsync()`                    | Standardized JSON output format                    |
+| `classifier.cjs`    | `classify()` / `classifyFile()`                     | Keyword-based classification engine                |
+| `tier-guard.cjs`    | `validateInjection()` / `validateWritePermission()` | Knowledge Tier & Write Governance                  |
+| `core.cjs`          | `logger` / `fileUtils` / `errorHandler` / `Cache`   | Logging, Safe I/O, Caching                         |
+| `validators.cjs`    | `requireArgs()` / `validateFilePath()`              | CLI argument and path validation                   |
+| `validate.cjs`      | `validateInput()` / `validateOutput()`              | JSON Schema validation                             |
+| `metrics.cjs`       | `metrics.record()` / `metrics.detectRegressions()`  | Skill execution metrics & health checks            |
+| `secure-io.cjs`     | `safeReadFile()` / `safeWriteFile()`                | Safe file I/O with governance checks               |
+| `logger.cjs`        | `createLogger()`                                    | Structured leveled logging                         |
+| `orchestrator.cjs`  | `runPipeline()` / `runParallel()`                   | Sequential and parallel skill execution with retry |
 
 ### Skill I/O Contract
+
 All skills should conform to the JSON Schema in `schemas/`:
+
 - `schemas/skill-input.schema.json` - Input contract
 - `schemas/skill-output.schema.json` - Output contract
 
 Use `runSkill()` from `@agent/core` to automatically produce compliant output:
+
 ```javascript
 const { runSkill } = require('@agent/core');
 runSkill('my-skill', () => {
-    return { result: 'data' };
+  return { result: 'data' };
 });
 ```
 
@@ -450,7 +482,7 @@ runSkill('my-skill', () => {
 
 [MIT License](./LICENSE) - Copyright (c) 2026 famaoai.
 
-*Note: Certain industry standards in `knowledge/` are subject to their respective creators' rights. See [knowledge/README.md](./knowledge/README.md) for details.*
+_Note: Certain industry standards in `knowledge/` are subject to their respective creators' rights. See [knowledge/README.md](./knowledge/README.md) for details._
 
 ## Acknowledgements & External Licenses
 

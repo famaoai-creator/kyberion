@@ -13,19 +13,22 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const { requireArgs, validateFilePath } = require('@agent/core/validators');
 
 runSkillAsync('word-artisan', async () => {
-    const argv = requireArgs(['input', 'out']);
-    validateFilePath(argv.input, 'input file');
+  const argv = requireArgs(['input', 'out']);
+  validateFilePath(argv.input, 'input file');
 
-    // 1. Load Master Specs
-    const specsPath = path.resolve(__dirname, '../../knowledge/standards/design/word-master-specs.json');
-    const specs = JSON.parse(fs.readFileSync(specsPath, 'utf8'));
-    const t = specs.typography;
+  // 1. Load Master Specs
+  const specsPath = path.resolve(
+    __dirname,
+    '../../knowledge/standards/design/word-master-specs.json'
+  );
+  const specs = JSON.parse(fs.readFileSync(specsPath, 'utf8'));
+  const t = specs.typography;
 
-    // 2. Process Content
-    const md = fs.readFileSync(argv.input, 'utf8');
-    const htmlBody = marked.parse(md);
+  // 2. Process Content
+  const md = fs.readFileSync(argv.input, 'utf8');
+  const htmlBody = marked.parse(md);
 
-    const fullHtml = `<!DOCTYPE html>
+  const fullHtml = `<!DOCTYPE html>
     <html lang="ja">
     <head>
       <meta charset="UTF-8">
@@ -41,14 +44,14 @@ runSkillAsync('word-artisan', async () => {
     <body>${htmlBody}</body>
     </html>`;
 
-    // 3. Generate DOCX
-    const fileBuffer = await HTMLtoDOCX(fullHtml, null, {
-        ...specs.layout,
-        fontSize: t.body.size * 2
-    });
+  // 3. Generate DOCX
+  const fileBuffer = await HTMLtoDOCX(fullHtml, null, {
+    ...specs.layout,
+    fontSize: t.body.size * 2,
+  });
 
-    safeWriteFile(argv.out, fileBuffer);
-    console.log(`[Word] Rendered with Master '${specs.master_name}' to ${argv.out}`);
+  safeWriteFile(argv.out, fileBuffer);
+  console.log(`[Word] Rendered with Master '${specs.master_name}' to ${argv.out}`);
 
-    return { status: 'success', output: argv.out, master: specs.master_name };
+  return { status: 'success', output: argv.out, master: specs.master_name };
 });

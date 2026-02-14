@@ -24,15 +24,19 @@ This skill helps you build eco-friendly software by monitoring and reducing carb
 ## Capabilities
 
 ### 1. Carbon Footprint Estimation
+
 - Estimates CO2 emissions based on cloud resource types, regions (grid intensity), and runtime profiling.
 - Correlates energy consumption with specific code modules.
 
 ### 2. Green Refactoring
+
 - Suggests energy-efficient alternatives (e.g., "Move this cron job to a cleaner grid region", "Optimize this high-CPU loop").
 
 ## Usage
+
 - "What is the estimated monthly carbon footprint of our current AWS setup?"
 - "Analyze this profile and suggest code changes to reduce energy consumption."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

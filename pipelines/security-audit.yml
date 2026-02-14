@@ -2,11 +2,11 @@ name: Security Audit Pipeline
 description: Full security analysis of a codebase
 steps:
   - skill: codebase-mapper
-    args: "\"{{dir}}\" 3"
+    args: '"{{dir}}" 3'
     output: map
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: scan
   - skill: bug-predictor
-    args: "--dir \"{{dir}}\" --top 10 --since \"6 months ago\""
+    args: '--dir "{{dir}}" --top 10 --since "6 months ago"'
     output: predictions

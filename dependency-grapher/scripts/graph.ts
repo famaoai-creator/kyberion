@@ -97,7 +97,7 @@ export function buildGraph(rootName: string, dependencies: Dependency[]): string
   mermaid += `    Root[${rootName}]
 `;
 
-  const prodDeps = dependencies.filter(d => !d.dev);
+  const prodDeps = dependencies.filter((d) => !d.dev);
   for (const dep of prodDeps) {
     const nodeId = dep.name.replace(/@|\/|\./g, '_');
     mermaid += `    Root --> ${nodeId}[${dep.name}]
@@ -118,10 +118,7 @@ export function buildGraph(rootName: string, dependencies: Dependency[]): string
  * @param startMs - Start timestamp from Date.now()
  * @returns Standard SkillOutput envelope
  */
-export function buildGraphOutput(
-  result: GraphResult,
-  startMs: number,
-): SkillOutput<GraphResult> {
+export function buildGraphOutput(result: GraphResult, startMs: number): SkillOutput<GraphResult> {
   return {
     skill: 'dependency-grapher',
     status: 'success',

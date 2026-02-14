@@ -2,14 +2,14 @@ name: Knowledge Extraction Pipeline
 description: Extract and index knowledge from codebase for documentation and pattern discovery
 steps:
   - skill: codebase-mapper
-    args: "\"{{dir}}\" 3"
+    args: '"{{dir}}" 3'
     output: map
   - skill: knowledge-harvester
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: harvest
   - skill: glossary-resolver
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: glossary
   - skill: doc-sync-sentinel
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: drift

@@ -8,10 +8,23 @@ const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateDirPath, requireArgs } = require('../../scripts/lib/validators.cjs');
 
 const argv = createStandardYargs()
-  .option('dir', { alias: 'd', type: 'string', describe: 'Git repository path', demandOption: true })
-  .option('since', { alias: 's', type: 'string', describe: 'Date or tag to start from', demandOption: true })
-  .option('out', { alias: 'o', type: 'string', describe: 'Output file path for release notes' })
-  .argv;
+  .option('dir', {
+    alias: 'd',
+    type: 'string',
+    describe: 'Git repository path',
+    demandOption: true,
+  })
+  .option('since', {
+    alias: 's',
+    type: 'string',
+    describe: 'Date or tag to start from',
+    demandOption: true,
+  })
+  .option('out', {
+    alias: 'o',
+    type: 'string',
+    describe: 'Output file path for release notes',
+  }).argv;
 
 /**
  * Map a conventional commit prefix to a section name.
@@ -61,8 +74,11 @@ runSkill('release-note-crafter', () => {
     throw new Error(`Failed to run git log: ${err.message}`);
   }
 
-  const lines = logOutput.trim().split('\n').filter(l => l.length > 0);
-  const commits = lines.map(line => {
+  const lines = logOutput
+    .trim()
+    .split('\n')
+    .filter((l) => l.length > 0);
+  const commits = lines.map((line) => {
     const parts = line.split('|');
     return {
       hash: parts[0] || '',
@@ -82,8 +98,17 @@ runSkill('release-note-crafter', () => {
 
   // Generate markdown
   const sectionOrder = [
-    'Features', 'Bug Fixes', 'Performance', 'Refactoring',
-    'Documentation', 'Tests', 'CI', 'Build', 'Style', 'Chores', 'Other'
+    'Features',
+    'Bug Fixes',
+    'Performance',
+    'Refactoring',
+    'Documentation',
+    'Tests',
+    'CI',
+    'Build',
+    'Style',
+    'Chores',
+    'Other',
   ];
 
   let markdown = `# Release Notes\n\n`;

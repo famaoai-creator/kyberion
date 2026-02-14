@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const fs = require('fs'); const path = require('path');
- const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const fs = require('fs');
+const path = require('path');
+const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
-  .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project root directory' })
+  .option('dir', {
+    alias: 'd',
+    type: 'string',
+    default: '.',
+    description: 'Project root directory',
+  })
   .option('query', { alias: 'q', type: 'string', description: 'Context query to resolve' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
   .help().argv;
@@ -19,10 +25,11 @@ function scanKnowledgeTiers(dir) {
   for (const full of allFiles) {
     const relativeToKnowledge = path.relative(knowledgeDir, full);
     const parts = relativeToKnowledge.split(path.sep);
-    
+
     let tier = 'public';
     if (parts.includes('personal')) tier = 'personal';
-    else if (parts.some(p => ['confidential', 'company', 'client'].includes(p))) tier = 'confidential';
+    else if (parts.some((p) => ['confidential', 'company', 'client'].includes(p)))
+      tier = 'confidential';
 
     if (['.md', '.json', '.yaml', '.yml'].includes(path.extname(full))) {
       tiers[tier].push({ path: path.relative(dir, full), name: path.basename(full), tier });
@@ -42,7 +49,7 @@ function buildContextMap(tiers, skills) {
           links.push({ source: file.path, target: skill, tier: file.tier, type: 'references' });
         }
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
   return links;
 }
@@ -56,9 +63,13 @@ function resolveQuery(query, tiers, _links) {
     try {
       const content = fs.readFileSync(path.join(process.cwd(), file.path), 'utf8');
       if (content.toLowerCase().includes(lower)) {
-        relevant.push({ file: file.path, tier: file.tier, relevance: (content.toLowerCase().split(lower).length - 1) });
+        relevant.push({
+          file: file.path,
+          tier: file.tier,
+          relevance: content.toLowerCase().split(lower).length - 1,
+        });
       }
-    } catch(_e){}
+    } catch (_e) {}
   }
   return relevant.sort((a, b) => b.relevance - a.relevance).slice(0, 10);
 }
@@ -68,9 +79,9 @@ function getSkillNames(dir) {
     const indexPath = path.join(dir, 'global_skill_index.json');
     if (fs.existsSync(indexPath)) {
       const idx = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      return (idx.skills || idx).map(s => s.name);
+      return (idx.skills || idx).map((s) => s.name);
     }
-  } catch(_e){}
+  } catch (_e) {}
   return [];
 }
 
@@ -82,9 +93,16 @@ runSkill('auto-context-mapper', () => {
   const links = buildContextMap(tiers, skills);
   const queryResult = resolveQuery(argv.query, tiers, links);
   const result = {
-    directory: targetDir, query: argv.query || null,
-    knowledgeAssets: { public: tiers.public.length, confidential: tiers.confidential.length, personal: tiers.personal.length, total: tiers.public.length + tiers.confidential.length + tiers.personal.length },
-    contextLinks: links.slice(0, 50), linkCount: links.length,
+    directory: targetDir,
+    query: argv.query || null,
+    knowledgeAssets: {
+      public: tiers.public.length,
+      confidential: tiers.confidential.length,
+      personal: tiers.personal.length,
+      total: tiers.public.length + tiers.confidential.length + tiers.personal.length,
+    },
+    contextLinks: links.slice(0, 50),
+    linkCount: links.length,
     queryResults: queryResult,
   };
   if (argv.out) safeWriteFile(argv.out, JSON.stringify(result, null, 2));

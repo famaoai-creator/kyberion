@@ -3,6 +3,7 @@
 This workflow defines the autonomous sequence for generating high-impact, brand-aligned business proposals.
 
 ## Workflow Steps:
+
 1. **Research Phase**:
    - Tool: `google_web_search`
    - Goal: Identify client's core business, brand visual identity (colors, logos), and current technological challenges.

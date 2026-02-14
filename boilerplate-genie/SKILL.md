@@ -31,15 +31,19 @@ This skill accelerates project kickoff by generating a robust directory structur
 ## Capabilities
 
 ### 1. Best-Practice Scaffolding
+
 - Generates project structures for Next.js, Python (FastAPI), Go, etc.
 - **Rule Injection**: Automatically copies harvested coding standards (from `knowledge/external-wisdom/everything-claude/rules/`) into the project's `docs/guidelines/` or `.cursorrules`.
 
 ### 2. CI/CD & Testing Setup
+
 - Configures GitHub Actions and test runners.
 
 ## Usage
+
 - "Scaffold a new Next.js project in `work/my-app` with full CI/CD setup."
 - "Create a clean FastAPI boilerplate for a REST API."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

@@ -13,5 +13,7 @@ module.exports = {
       timestamp: new Date().toISOString(),
     });
   },
-  getExecutions() { return executions; },
+  getExecutions() {
+    return executions;
+  },
 };

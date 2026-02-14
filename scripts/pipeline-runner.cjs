@@ -41,8 +41,7 @@ const argv = createStandardYargs()
     description: 'Input file variable for {{input}} placeholders',
   })
   .strict(false) // allow additional unknown flags for future variables
-  .help()
-  .argv;
+  .help().argv;
 
 // ---------------------------------------------------------------------------
 // Resolve the main .cjs script for a given skill name
@@ -52,7 +51,7 @@ function resolveSkillScript(skillName) {
   if (!fs.existsSync(scriptsDir)) {
     throw new Error(`No scripts/ directory found for skill "${skillName}"`);
   }
-  const scripts = fs.readdirSync(scriptsDir).filter(f => /\.cjs$/.test(f));
+  const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.cjs$/.test(f));
   if (scripts.length === 0) {
     throw new Error(`No .cjs scripts found for skill "${skillName}"`);
   }
@@ -163,11 +162,14 @@ runSkill('pipeline-runner', () => {
     // List available pipelines for a helpful error message
     const pipelinesDir = path.join(rootDir, 'pipelines');
     const available = fs.existsSync(pipelinesDir)
-      ? fs.readdirSync(pipelinesDir).filter(f => f.endsWith('.yml')).map(f => f.replace('.yml', ''))
+      ? fs
+          .readdirSync(pipelinesDir)
+          .filter((f) => f.endsWith('.yml'))
+          .map((f) => f.replace('.yml', ''))
       : [];
     throw new Error(
       `Pipeline "${pipelineName}" not found at ${pipelineFile}. ` +
-      `Available pipelines: ${available.length > 0 ? available.join(', ') : '(none)'}`
+        `Available pipelines: ${available.length > 0 ? available.join(', ') : '(none)'}`
     );
   }
 
@@ -195,8 +197,8 @@ runSkill('pipeline-runner', () => {
     steps: stepResults,
     summary: {
       total: pipelineDef.steps.length,
-      succeeded: stepResults.filter(s => s.status === 'success').length,
-      failed: stepResults.filter(s => s.status === 'error').length,
+      succeeded: stepResults.filter((s) => s.status === 'success').length,
+      failed: stepResults.filter((s) => s.status === 'error').length,
     },
     totalDuration_ms,
   };

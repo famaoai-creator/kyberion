@@ -8,9 +8,18 @@ const { requireArgs } = require('../../scripts/lib/validators.cjs');
 
 const argv = createStandardYargs()
   .option('name', { alias: 'n', type: 'string', describe: 'Project name', demandOption: true })
-  .option('type', { alias: 'T', type: 'string', choices: ['node', 'python', 'generic'], describe: 'Project type', demandOption: true })
-  .option('out', { alias: 'o', type: 'string', describe: 'Output directory (defaults to ./<name>)' })
-  .argv;
+  .option('type', {
+    alias: 'T',
+    type: 'string',
+    choices: ['node', 'python', 'generic'],
+    describe: 'Project type',
+    demandOption: true,
+  })
+  .option('out', {
+    alias: 'o',
+    type: 'string',
+    describe: 'Output directory (defaults to ./<name>)',
+  }).argv;
 
 /**
  * Validate and resolve the output directory path.
@@ -67,7 +76,10 @@ function generateNodeProject(name, outDir) {
   files.push('package.json');
 
   // README.md
-  writeFile(path.join(outDir, 'README.md'), `# ${name}\n\nA Node.js project.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n\n## Testing\n\n\`\`\`bash\nnpm test\n\`\`\`\n`);
+  writeFile(
+    path.join(outDir, 'README.md'),
+    `# ${name}\n\nA Node.js project.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n\n## Testing\n\n\`\`\`bash\nnpm test\n\`\`\`\n`
+  );
   files.push('README.md');
 
   // .gitignore
@@ -75,11 +87,17 @@ function generateNodeProject(name, outDir) {
   files.push('.gitignore');
 
   // src/index.js
-  writeFile(path.join(outDir, 'src', 'index.js'), `'use strict';\n\nconsole.log('Hello from ${name}!');\n`);
+  writeFile(
+    path.join(outDir, 'src', 'index.js'),
+    `'use strict';\n\nconsole.log('Hello from ${name}!');\n`
+  );
   files.push('src/index.js');
 
   // tests/index.test.js
-  writeFile(path.join(outDir, 'tests', 'index.test.js'), `'use strict';\n\ndescribe('${name}', () => {\n  test('should pass', () => {\n    expect(true).toBe(true);\n  });\n});\n`);
+  writeFile(
+    path.join(outDir, 'tests', 'index.test.js'),
+    `'use strict';\n\ndescribe('${name}', () => {\n  test('should pass', () => {\n    expect(true).toBe(true);\n  });\n});\n`
+  );
   files.push('tests/index.test.js');
 
   // .github/workflows/ci.yml
@@ -100,11 +118,17 @@ function generatePythonProject(name, outDir) {
   files.push('setup.py');
 
   // README.md
-  writeFile(path.join(outDir, 'README.md'), `# ${name}\n\nA Python project.\n\n## Getting Started\n\n\`\`\`bash\npip install -e .[dev]\npython -m ${pyName}\n\`\`\`\n\n## Testing\n\n\`\`\`bash\npytest\n\`\`\`\n`);
+  writeFile(
+    path.join(outDir, 'README.md'),
+    `# ${name}\n\nA Python project.\n\n## Getting Started\n\n\`\`\`bash\npip install -e .[dev]\npython -m ${pyName}\n\`\`\`\n\n## Testing\n\n\`\`\`bash\npytest\n\`\`\`\n`
+  );
   files.push('README.md');
 
   // .gitignore
-  writeFile(path.join(outDir, '.gitignore'), `__pycache__/\n*.pyc\n*.egg-info/\ndist/\nbuild/\n.env\n.venv/\n*.log\n.pytest_cache/\n`);
+  writeFile(
+    path.join(outDir, '.gitignore'),
+    `__pycache__/\n*.pyc\n*.egg-info/\ndist/\nbuild/\n.env\n.venv/\n*.log\n.pytest_cache/\n`
+  );
   files.push('.gitignore');
 
   // src/<pyName>/__init__.py
@@ -112,11 +136,17 @@ function generatePythonProject(name, outDir) {
   files.push(`src/${pyName}/__init__.py`);
 
   // src/<pyName>/__main__.py
-  writeFile(path.join(outDir, 'src', pyName, '__main__.py'), `"""Main entry point for ${name}."""\n\n\ndef main():\n    print('Hello from ${name}!')\n\n\nif __name__ == '__main__':\n    main()\n`);
+  writeFile(
+    path.join(outDir, 'src', pyName, '__main__.py'),
+    `"""Main entry point for ${name}."""\n\n\ndef main():\n    print('Hello from ${name}!')\n\n\nif __name__ == '__main__':\n    main()\n`
+  );
   files.push(`src/${pyName}/__main__.py`);
 
   // tests/test_main.py
-  writeFile(path.join(outDir, 'tests', 'test_main.py'), `"""Tests for ${name}."""\n\n\ndef test_placeholder():\n    assert True\n`);
+  writeFile(
+    path.join(outDir, 'tests', 'test_main.py'),
+    `"""Tests for ${name}."""\n\n\ndef test_placeholder():\n    assert True\n`
+  );
   files.push('tests/test_main.py');
 
   // .github/workflows/ci.yml
@@ -131,7 +161,10 @@ function generateGenericProject(name, outDir) {
   const files = [];
 
   // README.md
-  writeFile(path.join(outDir, 'README.md'), `# ${name}\n\nA project.\n\n## Getting Started\n\nSee the \`src/\` directory for source files.\n\n## Testing\n\nSee the \`tests/\` directory for test files.\n`);
+  writeFile(
+    path.join(outDir, 'README.md'),
+    `# ${name}\n\nA project.\n\n## Getting Started\n\nSee the \`src/\` directory for source files.\n\n## Testing\n\nSee the \`tests/\` directory for test files.\n`
+  );
   files.push('README.md');
 
   // .gitignore
@@ -147,7 +180,10 @@ function generateGenericProject(name, outDir) {
   files.push('tests/.gitkeep');
 
   // Makefile
-  writeFile(path.join(outDir, 'Makefile'), `# ${name} Makefile\n\n.PHONY: build test clean\n\nbuild:\n\t@echo "Build step (customize this)"\n\ntest:\n\t@echo "Test step (customize this)"\n\nclean:\n\t@echo "Clean step (customize this)"\n`);
+  writeFile(
+    path.join(outDir, 'Makefile'),
+    `# ${name} Makefile\n\n.PHONY: build test clean\n\nbuild:\n\t@echo "Build step (customize this)"\n\ntest:\n\t@echo "Test step (customize this)"\n\nclean:\n\t@echo "Clean step (customize this)"\n`
+  );
   files.push('Makefile');
 
   // .github/workflows/ci.yml

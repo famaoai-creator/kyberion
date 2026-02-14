@@ -22,7 +22,12 @@ import type { SkillOutput } from '../../scripts/lib/types.js';
 
 /** A single detection rule used to identify a test runner. */
 export interface DetectionRule {
-  type: 'file_exists' | 'directory_exists' | 'file_pattern' | 'package_json_script' | 'package_json_dep';
+  type:
+    | 'file_exists'
+    | 'directory_exists'
+    | 'file_pattern'
+    | 'package_json_script'
+    | 'package_json_dep';
   path?: string;
   pattern?: string;
   script?: string;
@@ -158,10 +163,7 @@ export function checkDetection(detection: DetectionRule, targetDir: string): boo
  * @param runners   - Array of runner configurations to check
  * @returns The matched runner config, or null if none matched
  */
-export function detectTestRunner(
-  targetDir: string,
-  runners: RunnerConfig[],
-): RunnerConfig | null {
+export function detectTestRunner(targetDir: string, runners: RunnerConfig[]): RunnerConfig | null {
   for (const runner of runners) {
     const detections = runner.detection ?? [];
     const isDetected = detections.some((d) => checkDetection(d, targetDir));
@@ -187,7 +189,7 @@ export function runTests(
   targetDir: string,
   command: string,
   runnerName: string,
-  executionConfig: ExecutionConfig = DEFAULT_CONFIG.execution,
+  executionConfig: ExecutionConfig = DEFAULT_CONFIG.execution
 ): Promise<TestRunResult> {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
@@ -208,7 +210,7 @@ export function runTests(
           command,
           duration,
           success: !error,
-          exitCode: error ? (error as NodeJS.ErrnoException).code as unknown as number : 0,
+          exitCode: error ? ((error as NodeJS.ErrnoException).code as unknown as number) : 0,
           stdout,
           stderr: stderr || undefined,
         };
@@ -216,13 +218,13 @@ export function runTests(
         if (error) {
           const err = Object.assign(
             new Error(`Test failed with exit code ${(error as NodeJS.ErrnoException).code}`),
-            { data: result },
+            { data: result }
           );
           reject(err);
         } else {
           resolve(result);
         }
-      },
+      }
     );
   });
 }
@@ -234,10 +236,7 @@ export function runTests(
  * @param startMs - Start timestamp from Date.now()
  * @returns Standard SkillOutput envelope
  */
-export function buildRunOutput(
-  result: TestRunResult,
-  startMs: number,
-): SkillOutput<TestRunResult> {
+export function buildRunOutput(result: TestRunResult, startMs: number): SkillOutput<TestRunResult> {
   return {
     skill: 'test-genie',
     status: result.success ? 'success' : 'error',

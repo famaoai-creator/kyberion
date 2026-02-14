@@ -27,25 +27,68 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 const DEFAULT_VALUES = {
   mission: 'Deliver value through technology with integrity and innovation',
   core_values: [
-    { name: 'User First', description: 'Prioritize user needs and experience above all', keywords: ['user', 'customer', 'experience', 'ux', 'accessibility', 'usability'] },
-    { name: 'Transparency', description: 'Operate with openness and honest communication', keywords: ['transparent', 'open', 'honest', 'clear', 'communicate', 'visibility'] },
-    { name: 'Innovation', description: 'Embrace creative solutions and continuous improvement', keywords: ['innovat', 'creative', 'improve', 'modern', 'cutting-edge', 'novel'] },
-    { name: 'Sustainability', description: 'Build for long-term impact, not short-term gains', keywords: ['sustain', 'long-term', 'maintain', 'durable', 'scalab', 'future'] },
-    { name: 'Diversity & Inclusion', description: 'Foster diverse perspectives and inclusive practices', keywords: ['divers', 'inclus', 'equit', 'access', 'fair', 'bias'] },
-    { name: 'Data Privacy', description: 'Protect user data and respect privacy', keywords: ['privacy', 'data protection', 'gdpr', 'consent', 'secure', 'encrypt'] },
-    { name: 'Quality', description: 'Deliver high-quality, reliable solutions', keywords: ['quality', 'reliable', 'robust', 'test', 'standard', 'best practice'] },
+    {
+      name: 'User First',
+      description: 'Prioritize user needs and experience above all',
+      keywords: ['user', 'customer', 'experience', 'ux', 'accessibility', 'usability'],
+    },
+    {
+      name: 'Transparency',
+      description: 'Operate with openness and honest communication',
+      keywords: ['transparent', 'open', 'honest', 'clear', 'communicate', 'visibility'],
+    },
+    {
+      name: 'Innovation',
+      description: 'Embrace creative solutions and continuous improvement',
+      keywords: ['innovat', 'creative', 'improve', 'modern', 'cutting-edge', 'novel'],
+    },
+    {
+      name: 'Sustainability',
+      description: 'Build for long-term impact, not short-term gains',
+      keywords: ['sustain', 'long-term', 'maintain', 'durable', 'scalab', 'future'],
+    },
+    {
+      name: 'Diversity & Inclusion',
+      description: 'Foster diverse perspectives and inclusive practices',
+      keywords: ['divers', 'inclus', 'equit', 'access', 'fair', 'bias'],
+    },
+    {
+      name: 'Data Privacy',
+      description: 'Protect user data and respect privacy',
+      keywords: ['privacy', 'data protection', 'gdpr', 'consent', 'secure', 'encrypt'],
+    },
+    {
+      name: 'Quality',
+      description: 'Deliver high-quality, reliable solutions',
+      keywords: ['quality', 'reliable', 'robust', 'test', 'standard', 'best practice'],
+    },
   ],
   ethical_guidelines: [
-    { rule: 'No dark patterns', description: 'Never use deceptive UX patterns', red_flags: ['dark pattern', 'trick', 'deceiv', 'manipulat', 'hidden fee', 'forced'] },
-    { rule: 'No bias amplification', description: 'Avoid amplifying societal biases', red_flags: ['discriminat', 'biased', 'unfair', 'stereotype', 'exclud'] },
-    { rule: 'Environmental responsibility', description: 'Consider environmental impact', red_flags: ['wasteful', 'inefficient', 'excessive resource', 'overprovisioned'] },
-    { rule: 'Fair labor practices', description: 'Respect worker rights and fair compensation', red_flags: ['overwork', 'unpaid', 'exploit', 'crunch', 'burnout'] },
+    {
+      rule: 'No dark patterns',
+      description: 'Never use deceptive UX patterns',
+      red_flags: ['dark pattern', 'trick', 'deceiv', 'manipulat', 'hidden fee', 'forced'],
+    },
+    {
+      rule: 'No bias amplification',
+      description: 'Avoid amplifying societal biases',
+      red_flags: ['discriminat', 'biased', 'unfair', 'stereotype', 'exclud'],
+    },
+    {
+      rule: 'Environmental responsibility',
+      description: 'Consider environmental impact',
+      red_flags: ['wasteful', 'inefficient', 'excessive resource', 'overprovisioned'],
+    },
+    {
+      rule: 'Fair labor practices',
+      description: 'Respect worker rights and fair compensation',
+      red_flags: ['overwork', 'unpaid', 'exploit', 'crunch', 'burnout'],
+    },
   ],
 };
 
@@ -62,7 +105,7 @@ function analyzeAlignment(content, values) {
   const alignment = [];
 
   for (const value of values.core_values) {
-    const matches = value.keywords.filter(k => lower.includes(k));
+    const matches = value.keywords.filter((k) => lower.includes(k));
     const score = matches.length > 0 ? Math.min(100, matches.length * 30) : 0;
     alignment.push({
       value: value.name,
@@ -81,7 +124,7 @@ function checkEthics(content, values) {
   const violations = [];
 
   for (const guideline of values.ethical_guidelines) {
-    const flags = guideline.red_flags.filter(f => lower.includes(f));
+    const flags = guideline.red_flags.filter((f) => lower.includes(f));
     if (flags.length > 0) {
       violations.push({
         rule: guideline.rule,
@@ -97,12 +140,12 @@ function checkEthics(content, values) {
 
 function generateRecommendations(alignment, violations) {
   const recs = [];
-  const unaddressed = alignment.filter(a => a.status === 'not_addressed');
+  const unaddressed = alignment.filter((a) => a.status === 'not_addressed');
 
   if (unaddressed.length > 0) {
     recs.push({
       priority: 'medium',
-      action: `Address ${unaddressed.length} unaddressed values: ${unaddressed.map(a => a.value).join(', ')}`,
+      action: `Address ${unaddressed.length} unaddressed values: ${unaddressed.map((a) => a.value).join(', ')}`,
     });
   }
 
@@ -117,7 +160,8 @@ function generateRecommendations(alignment, violations) {
   if (avgScore < 30) {
     recs.push({
       priority: 'high',
-      action: 'Overall mission alignment is low. Revisit proposal to explicitly address company values.',
+      action:
+        'Overall mission alignment is low. Revisit proposal to explicitly address company values.',
     });
   }
 
@@ -134,7 +178,9 @@ runSkill('visionary-ethos-keeper', () => {
   const violations = checkEthics(content, values);
   const recommendations = generateRecommendations(alignment, violations);
 
-  const avgScore = Math.round(alignment.reduce((s, a) => s + a.alignmentScore, 0) / alignment.length);
+  const avgScore = Math.round(
+    alignment.reduce((s, a) => s + a.alignmentScore, 0) / alignment.length
+  );
   let grade = 'F';
   if (avgScore >= 80) grade = 'A';
   else if (avgScore >= 60) grade = 'B';

@@ -40,7 +40,7 @@ const SKIP_FILES = [...INTERACTIVE_SKILLS, ...MODULE_FILES];
 function findSkillScripts() {
   const pattern = '*/scripts/*.cjs';
   const files = glob.sync(pattern, { cwd: ROOT });
-  return files.filter(f => !f.startsWith('scripts/')); // exclude top-level scripts/
+  return files.filter((f) => !f.startsWith('scripts/')); // exclude top-level scripts/
 }
 
 // --- Detect pattern ---
@@ -52,9 +52,11 @@ function detectPattern(content, relativePath) {
   if (SKIP_FILES.includes(relPath)) return 'skip';
 
   // Async IIFE pattern
-  if (content.includes('(async ()') || content.includes('async function') && (
-    content.includes('await ') || content.includes('.then(')
-  )) {
+  if (
+    content.includes('(async ()') ||
+    (content.includes('async function') &&
+      (content.includes('await ') || content.includes('.then(')))
+  ) {
     // Check for async IIFE specifically
     if (content.includes('(async ()') || content.includes('db.serialize')) return 'async';
   }
@@ -65,8 +67,10 @@ function detectPattern(content, relativePath) {
   }
 
   // Pattern B: File output with optional --out
-  if ((content.includes('argv.out') || content.includes('argv.o')) &&
-      content.includes('fs.writeFileSync')) {
+  if (
+    (content.includes('argv.out') || content.includes('argv.o')) &&
+    content.includes('fs.writeFileSync')
+  ) {
     return 'pattern-b';
   }
 
@@ -83,11 +87,11 @@ function main() {
   const files = findSkillScripts();
   const results = {
     'already-migrated': [],
-    'skip': [],
+    skip: [],
     'pattern-a': [],
     'pattern-b': [],
     'pattern-c': [],
-    'async': [],
+    async: [],
   };
 
   for (const file of files) {
@@ -100,22 +104,22 @@ function main() {
 
   // Report
   console.log(`Already migrated (${results['already-migrated'].length}):`);
-  results['already-migrated'].forEach(f => console.log(`  [OK] ${f}`));
+  results['already-migrated'].forEach((f) => console.log(`  [OK] ${f}`));
 
   console.log(`\nSkipped - interactive/module (${results['skip'].length}):`);
-  results['skip'].forEach(f => console.log(`  [SKIP] ${f}`));
+  results['skip'].forEach((f) => console.log(`  [SKIP] ${f}`));
 
   console.log(`\nPattern A - JSON output (${results['pattern-a'].length}):`);
-  results['pattern-a'].forEach(f => console.log(`  [A] ${f}`));
+  results['pattern-a'].forEach((f) => console.log(`  [A] ${f}`));
 
   console.log(`\nPattern B - File output (${results['pattern-b'].length}):`);
-  results['pattern-b'].forEach(f => console.log(`  [B] ${f}`));
+  results['pattern-b'].forEach((f) => console.log(`  [B] ${f}`));
 
   console.log(`\nPattern C - Text/other output (${results['pattern-c'].length}):`);
-  results['pattern-c'].forEach(f => console.log(`  [C] ${f}`));
+  results['pattern-c'].forEach((f) => console.log(`  [C] ${f}`));
 
   console.log(`\nPattern D - Async (${results['async'].length}):`);
-  results['async'].forEach(f => console.log(`  [D] ${f}`));
+  results['async'].forEach((f) => console.log(`  [D] ${f}`));
 
   // Summary
   const total = files.length;

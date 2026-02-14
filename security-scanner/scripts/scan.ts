@@ -49,14 +49,42 @@ export interface ScanResult {
 
 /** Directories to ignore during scanning. */
 const IGNORE_DIRS: string[] = [
-  '.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.nuxt',
-  'vendor', 'bin', 'obj', '.idea', '.vscode', '.DS_Store', 'tmp', 'temp',
+  '.git',
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  'vendor',
+  'bin',
+  'obj',
+  '.idea',
+  '.vscode',
+  '.DS_Store',
+  'tmp',
+  'temp',
 ];
 
 /** File extensions to ignore during scanning. */
 const IGNORE_EXTENSIONS: string[] = [
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2',
-  '.ttf', '.eot', '.mp4', '.mp3', '.pdf', '.zip', '.gz', '.tar', '.lock',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.ico',
+  '.svg',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.mp4',
+  '.mp3',
+  '.pdf',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.lock',
 ];
 
 // ---------------------------------------------------------------------------
@@ -75,7 +103,7 @@ function shouldIgnore(filePath: string): boolean {
   if (IGNORE_EXTENSIONS.includes(ext)) return true;
 
   const parts = filePath.split(path.sep);
-  return parts.some(part => IGNORE_DIRS.includes(part));
+  return parts.some((part) => IGNORE_DIRS.includes(part));
 }
 
 /**
@@ -110,10 +138,7 @@ export function scanProject(filePaths: string[], projectRoot: string): Vulnerabi
  * @param projectRoot - Root directory of the scanned project
  * @returns Structured scan result
  */
-export function parseScanResults(
-  findings: Vulnerability[],
-  projectRoot: string,
-): ScanResult {
+export function parseScanResults(findings: Vulnerability[], projectRoot: string): ScanResult {
   return {
     projectRoot,
     ignoreDirs: IGNORE_DIRS,
@@ -134,10 +159,7 @@ export function parseScanResults(
  * @param startMs - Start timestamp from Date.now()
  * @returns Standard SkillOutput envelope
  */
-export function buildScanOutput(
-  result: ScanResult,
-  startMs: number,
-): SkillOutput<ScanResult> {
+export function buildScanOutput(result: ScanResult, startMs: number): SkillOutput<ScanResult> {
   return {
     skill: 'security-scanner',
     status: 'success',

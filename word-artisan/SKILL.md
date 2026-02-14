@@ -17,6 +17,7 @@ Generate professional, comprehensive Word documents (.docx) from Markdown.
 3.  **Comprehensive Deep-Dive**: Exhaustive technical documentation including every parameter, CLI command, and edge case. Essential for NFR definitions and security audits.
 
 ## High-Fidelity Documentation Workflow
+
 1.  **Standard Alignment**: Choose the appropriate standard (e.g., IPA Grade) based on the target fidelity.
 2.  **Detail-Oriented Writing**: For Deep-Dive mode, expand sections with specific technical configurations.
 3.  **Visual Styling**: Apply professional templates consistently.
@@ -26,4 +27,5 @@ Generate professional, comprehensive Word documents (.docx) from Markdown.
 node word-artisan/scripts/convert.cjs [options]
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

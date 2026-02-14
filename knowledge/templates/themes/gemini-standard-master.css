@@ -2,57 +2,57 @@
 @import 'default';
 
 section {
-    width: 1280px;
-    height: 720px;
-    background-color: #ffffff;
-    color: #1a1a1a;
-    font-family: 'Arial', 'Hiragino Kaku Gothic ProN', sans-serif;
-    font-size: 24px;
-    padding: 60px;
-    line-height: 1.6;
+  width: 1280px;
+  height: 720px;
+  background-color: #ffffff;
+  color: #1a1a1a;
+  font-family: 'Arial', 'Hiragino Kaku Gothic ProN', sans-serif;
+  font-size: 24px;
+  padding: 60px;
+  line-height: 1.6;
 }
 
 h1 {
-    color: #232f3e;
-    font-family: 'Helvetica Neue', 'Hiragino Sans', 'Meiryo', sans-serif;
-    font-weight: 800;
-    border-left: 12px solid #ff9900;
-    padding-left: 20px;
-    margin-bottom: 30px;
+  color: #232f3e;
+  font-family: 'Helvetica Neue', 'Hiragino Sans', 'Meiryo', sans-serif;
+  font-weight: 800;
+  border-left: 12px solid #ff9900;
+  padding-left: 20px;
+  margin-bottom: 30px;
 }
 
 h2 {
-    color: #ff9900;
-    font-weight: bold;
-    margin-top: 0;
+  color: #ff9900;
+  font-weight: bold;
+  margin-top: 0;
 }
 
 li::before {
-    content: "◼";
-    color: #ff9900;
-    margin-right: 10px;
+  content: '◼';
+  color: #ff9900;
+  margin-right: 10px;
 }
 
 section.lead {
-    background: linear-gradient(135deg, #232f3e 0%, #1a1a1a 100%);
-    color: white;
-    justify-content: center;
+  background: linear-gradient(135deg, #232f3e 0%, #1a1a1a 100%);
+  color: white;
+  justify-content: center;
 }
 
 section.lead h1 {
-    color: #ff9900;
-    border-left: none;
-    font-size: 70px;
+  color: #ff9900;
+  border-left: none;
+  font-size: 70px;
 }
 
 section.divider {
-    background-color: #f4f7f9;
-    justify-content: center;
-    text-align: center;
+  background-color: #f4f7f9;
+  justify-content: center;
+  text-align: center;
 }
 
 footer {
-    font-size: 14px;
-    color: #ff9900;
-    border-top: 1px solid #d5dbdb;
+  font-size: 14px;
+  color: #ff9900;
+  border-top: 1px solid #d5dbdb;
 }

@@ -72,8 +72,7 @@ export interface PredictOptions {
 // ---------------------------------------------------------------------------
 
 /** Extensions considered as source code files. */
-const SOURCE_EXTENSIONS: RegExp =
-  /\.(js|ts|cjs|mjs|py|java|go|rs|rb|php|c|cpp|h)$/;
+const SOURCE_EXTENSIONS: RegExp = /\.(js|ts|cjs|mjs|py|java|go|rs|rb|php|c|cpp|h)$/;
 
 // ---------------------------------------------------------------------------
 // Git churn analysis
@@ -89,10 +88,12 @@ const SOURCE_EXTENSIONS: RegExp =
  */
 export function getChurnData(dir: string, since: string): ChurnMap {
   try {
-    const output = execSync(
-      `git log --since="${since}" --name-only --pretty=format: -- .`,
-      { encoding: 'utf8', cwd: dir, timeout: 15_000, stdio: 'pipe' },
-    );
+    const output = execSync(`git log --since="${since}" --name-only --pretty=format: -- .`, {
+      encoding: 'utf8',
+      cwd: dir,
+      timeout: 15_000,
+      stdio: 'pipe',
+    });
     const files = output.split('\n').filter((f) => f.trim().length > 0);
     const churn: ChurnMap = {};
     for (const file of files) {
@@ -100,9 +101,7 @@ export function getChurnData(dir: string, since: string): ChurnMap {
     }
     return churn;
   } catch (err) {
-    throw new Error(
-      `Git analysis failed: ${(err as Error).message}. Is this a git repository?`,
-    );
+    throw new Error(`Git analysis failed: ${(err as Error).message}. Is this a git repository?`);
   }
 }
 
@@ -155,11 +154,7 @@ export function estimateComplexity(filePath: string, dir: string): ComplexityMet
  * @param lines      - Total lines of code
  * @returns Risk score (0-100)
  */
-export function calculateRiskScore(
-  churn: number,
-  complexity: number,
-  lines: number,
-): number {
+export function calculateRiskScore(churn: number, complexity: number, lines: number): number {
   const complexityDensity = lines > 0 ? (complexity / lines) * 100 : 0;
   const rawScore = churn * (1 + complexityDensity);
   return Math.min(Math.round(rawScore * 10) / 10, 100);
@@ -180,7 +175,7 @@ export function calculateRiskScore(
 export function buildReport(
   churnData: ChurnMap,
   repoDir: string,
-  options: PredictOptions = {},
+  options: PredictOptions = {}
 ): PredictionReport {
   const top = options.top ?? 10;
   const since = options.since ?? '3 months ago';
@@ -249,7 +244,7 @@ export function predict(repoDir: string, options: PredictOptions = {}): Predicti
  */
 export function buildPredictOutput(
   report: PredictionReport,
-  startMs: number,
+  startMs: number
 ): SkillOutput<PredictionReport> {
   return {
     skill: 'bug-predictor',

@@ -18,28 +18,31 @@ console.log('--------------------------------------------------');
 
 // 2. 各スキルのスキャン
 const items = fs.readdirSync(rootDir, { withFileTypes: true });
-const skillDirs = items.filter(item => 
-    item.isDirectory() && 
-    !item.name.startsWith('.') && 
-    !['node_modules', 'scripts', 'knowledge', 'work', 'dist', 'coverage', 'evidence'].includes(item.name)
+const skillDirs = items.filter(
+  (item) =>
+    item.isDirectory() &&
+    !item.name.startsWith('.') &&
+    !['node_modules', 'scripts', 'knowledge', 'work', 'dist', 'coverage', 'evidence'].includes(
+      item.name
+    )
 );
 
 let total = 0;
 let withDoctor = 0;
 
-skillDirs.forEach(dir => {
-    total++;
-    const doctorPath = path.join(rootDir, dir.name, 'scripts', 'doctor.cjs');
-    
-    if (fs.existsSync(doctorPath)) {
-        withDoctor++;
-        console.log(`\n[${dir.name}]`);
-        try {
-            execSync(`node ${doctorPath}`, { stdio: 'inherit' });
-        } catch (_e) {
-            console.log(`   ❌ Diagnosis failed`);
-        }
+skillDirs.forEach((dir) => {
+  total++;
+  const doctorPath = path.join(rootDir, dir.name, 'scripts', 'doctor.cjs');
+
+  if (fs.existsSync(doctorPath)) {
+    withDoctor++;
+    console.log(`\n[${dir.name}]`);
+    try {
+      execSync(`node ${doctorPath}`, { stdio: 'inherit' });
+    } catch (_e) {
+      console.log(`   ❌ Diagnosis failed`);
     }
+  }
 });
 
 console.log('\n--------------------------------------------------');

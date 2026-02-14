@@ -36,15 +36,44 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 const AUDIENCE_PROFILES = {
-  executive: { label: 'Executive Team', focus: ['ROI', 'risk', 'timeline', 'strategic impact'], avoid: ['implementation details', 'code specifics', 'technical jargon'] },
-  board: { label: 'Board of Directors', focus: ['financial impact', 'market position', 'risk mitigation', 'growth trajectory'], avoid: ['technical details', 'operational minutiae'] },
-  marketing: { label: 'Marketing Team', focus: ['user benefits', 'competitive advantage', 'messaging opportunities', 'timeline for announcements'], avoid: ['backend architecture', 'database changes'] },
-  sales: { label: 'Sales Team', focus: ['customer value', 'feature differentiation', 'talking points', 'competitive positioning'], avoid: ['internal refactoring', 'tech debt'] },
-  'all-hands': { label: 'All Hands', focus: ['team achievement', 'product improvement', 'upcoming plans', 'how it helps users'], avoid: ['sensitive financial data', 'individual performance'] },
+  executive: {
+    label: 'Executive Team',
+    focus: ['ROI', 'risk', 'timeline', 'strategic impact'],
+    avoid: ['implementation details', 'code specifics', 'technical jargon'],
+  },
+  board: {
+    label: 'Board of Directors',
+    focus: ['financial impact', 'market position', 'risk mitigation', 'growth trajectory'],
+    avoid: ['technical details', 'operational minutiae'],
+  },
+  marketing: {
+    label: 'Marketing Team',
+    focus: [
+      'user benefits',
+      'competitive advantage',
+      'messaging opportunities',
+      'timeline for announcements',
+    ],
+    avoid: ['backend architecture', 'database changes'],
+  },
+  sales: {
+    label: 'Sales Team',
+    focus: [
+      'customer value',
+      'feature differentiation',
+      'talking points',
+      'competitive positioning',
+    ],
+    avoid: ['internal refactoring', 'tech debt'],
+  },
+  'all-hands': {
+    label: 'All Hands',
+    focus: ['team achievement', 'product improvement', 'upcoming plans', 'how it helps users'],
+    avoid: ['sensitive financial data', 'individual performance'],
+  },
 };
 
 const TECH_TO_BIZ = [
@@ -81,16 +110,19 @@ function translateContent(content) {
 
 function extractKeyPoints(content) {
   const points = [];
-  const _lines = content.split('\n').filter(l => l.trim().length > 10);
+  const _lines = content.split('\n').filter((l) => l.trim().length > 10);
 
   // Look for metrics/numbers
   const metrics = content.match(/\d+\.?\d*\s*(%|percent|users|customers|hours|days|ms|seconds)/gi);
-  if (metrics) points.push(...metrics.slice(0, 5).map(m => ({ type: 'metric', value: m.trim() })));
+  if (metrics)
+    points.push(...metrics.slice(0, 5).map((m) => ({ type: 'metric', value: m.trim() })));
 
   // Look for impact statements
-  const impactPatterns = /(?:improve|reduce|increase|decrease|save|eliminate|enable|prevent)[\w\s]{5,60}/gi;
+  const impactPatterns =
+    /(?:improve|reduce|increase|decrease|save|eliminate|enable|prevent)[\w\s]{5,60}/gi;
   const impacts = content.match(impactPatterns);
-  if (impacts) points.push(...impacts.slice(0, 3).map(i => ({ type: 'impact', value: i.trim() })));
+  if (impacts)
+    points.push(...impacts.slice(0, 3).map((i) => ({ type: 'impact', value: i.trim() })));
 
   return points;
 }
@@ -102,7 +134,7 @@ function generateOutput(content, audience, format, keyPoints, translations) {
   const sections = {
     headline: `Update for ${profile.label}`,
     summary: translated.substring(0, 500),
-    keyPoints: keyPoints.map(p => p.value),
+    keyPoints: keyPoints.map((p) => p.value),
     focusAreas: profile.focus,
     translationsApplied: translations.length,
   };
@@ -116,9 +148,12 @@ function generateOutput(content, audience, format, keyPoints, translations) {
     };
   } else if (format === 'presentation') {
     sections.structure = {
-      slide1: { title: sections.headline, bullets: keyPoints.slice(0, 3).map(p => p.value) },
+      slide1: { title: sections.headline, bullets: keyPoints.slice(0, 3).map((p) => p.value) },
       slide2: { title: 'Impact & Benefits', bullets: profile.focus },
-      slide3: { title: 'Next Steps', bullets: ['Review timeline', 'Align resources', 'Schedule follow-up'] },
+      slide3: {
+        title: 'Next Steps',
+        bullets: ['Review timeline', 'Align resources', 'Schedule follow-up'],
+      },
     };
   } else if (format === 'memo') {
     sections.structure = {
@@ -145,7 +180,9 @@ runSkill('stakeholder-communicator', () => {
     const json = JSON.parse(raw);
     content = JSON.stringify(json, null, 2);
     if (json.data) content = JSON.stringify(json.data, null, 2);
-  } catch (_e) { /* plain text */ }
+  } catch (_e) {
+    /* plain text */
+  }
 
   const { translations } = translateContent(content);
   const keyPoints = extractKeyPoints(content);
@@ -163,7 +200,15 @@ runSkill('stakeholder-communicator', () => {
 
   if (argv.out) {
     if (argv.out.endsWith('.md')) {
-      const md = [`# ${output.headline}`, '', output.summary, '', '## Key Points', ...keyPoints.map(p => `- ${p.value}`), ''].join('\n');
+      const md = [
+        `# ${output.headline}`,
+        '',
+        output.summary,
+        '',
+        '## Key Points',
+        ...keyPoints.map((p) => `- ${p.value}`),
+        '',
+      ].join('\n');
       safeWriteFile(argv.out, md);
     } else {
       safeWriteFile(argv.out, JSON.stringify(result, null, 2));

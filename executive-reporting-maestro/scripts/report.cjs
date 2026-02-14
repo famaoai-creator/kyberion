@@ -28,8 +28,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path (JSON or .md)',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 function loadResults(inputPath) {
   const results = [];
@@ -43,12 +42,14 @@ function loadResults(inputPath) {
       results.push(content);
     }
   } else if (stat.isDirectory()) {
-    const files = fs.readdirSync(inputPath).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(inputPath).filter((f) => f.endsWith('.json'));
     for (const file of files) {
       try {
         const content = JSON.parse(fs.readFileSync(path.join(inputPath, file), 'utf8'));
         results.push(content);
-      } catch (_e) { /* skip invalid JSON */ }
+      } catch (_e) {
+        /* skip invalid JSON */
+      }
     }
   }
 
@@ -63,7 +64,8 @@ function categorizeResult(result) {
   if (skill.match(/security|scanner|vulnerability/i)) return { domain: 'Security', skill, status };
   if (skill.match(/quality|score|completeness/i)) return { domain: 'Quality', skill, status };
   if (skill.match(/health|audit|governance/i)) return { domain: 'Project Health', skill, status };
-  if (skill.match(/cost|financial|budget|economics/i)) return { domain: 'Financial', skill, status };
+  if (skill.match(/cost|financial|budget|economics/i))
+    return { domain: 'Financial', skill, status };
   if (skill.match(/performance|monitor/i)) return { domain: 'Performance', skill, status };
   if (skill.match(/ux|accessibility/i)) return { domain: 'UX & Accessibility', skill, status };
   if (skill.match(/dependency|license/i)) return { domain: 'Dependencies', skill, status };
@@ -81,16 +83,25 @@ function extractHighlights(results) {
     if (data.score !== undefined) {
       const item = { skill: result.skill, score: data.score, grade: data.grade };
       if (data.score >= 80) {
-        highlights.push({ type: 'positive', ...item, message: `${result.skill}: Score ${data.score}${data.grade ? ' (' + data.grade + ')' : ''}` });
+        highlights.push({
+          type: 'positive',
+          ...item,
+          message: `${result.skill}: Score ${data.score}${data.grade ? ' (' + data.grade + ')' : ''}`,
+        });
       } else {
-        risks.push({ type: 'concern', ...item, message: `${result.skill}: Score ${data.score}${data.grade ? ' (' + data.grade + ')' : ''} - below threshold` });
+        risks.push({
+          type: 'concern',
+          ...item,
+          message: `${result.skill}: Score ${data.score}${data.grade ? ' (' + data.grade + ')' : ''} - below threshold`,
+        });
       }
     }
 
     // Extract recommendations
     if (Array.isArray(data.recommendations)) {
       for (const rec of data.recommendations.slice(0, 2)) {
-        const msg = typeof rec === 'string' ? rec : rec.action || rec.recommendation || JSON.stringify(rec);
+        const msg =
+          typeof rec === 'string' ? rec : rec.action || rec.recommendation || JSON.stringify(rec);
         risks.push({ type: 'recommendation', skill: result.skill, message: msg });
       }
     }
@@ -159,7 +170,8 @@ runSkill('executive-reporting-maestro', () => {
   const domainMap = {};
   for (let i = 0; i < results.length; i++) {
     const cat = categorized[i];
-    if (!domainMap[cat.domain]) domainMap[cat.domain] = { domain: cat.domain, skills: [], successCount: 0, total: 0 };
+    if (!domainMap[cat.domain])
+      domainMap[cat.domain] = { domain: cat.domain, skills: [], successCount: 0, total: 0 };
     domainMap[cat.domain].skills.push(cat.skill);
     domainMap[cat.domain].total++;
     if (cat.status === 'success') domainMap[cat.domain].successCount++;
@@ -169,8 +181,8 @@ runSkill('executive-reporting-maestro', () => {
     title: argv.title,
     generatedAt: new Date().toISOString(),
     totalResults: results.length,
-    successCount: results.filter(r => r.status === 'success').length,
-    errorCount: results.filter(r => r.status === 'error').length,
+    successCount: results.filter((r) => r.status === 'success').length,
+    errorCount: results.filter((r) => r.status === 'error').length,
     highlights,
     risks,
     domainSummary: Object.values(domainMap),

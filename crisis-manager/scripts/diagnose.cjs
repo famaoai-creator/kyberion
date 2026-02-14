@@ -34,18 +34,23 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 function getRecentCommits(dir, since) {
   try {
     const output = execSync(`git log --oneline --since="${since}" --no-merges`, {
-      cwd: dir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: dir,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
-    return output.trim().split('\n').filter(Boolean).map(line => {
-      const [hash, ...msg] = line.split(' ');
-      return { hash, message: msg.join(' ') };
-    });
+    return output
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, ...msg] = line.split(' ');
+        return { hash, message: msg.join(' ') };
+      });
   } catch (_e) {
     return [];
   }
@@ -53,9 +58,14 @@ function getRecentCommits(dir, since) {
 
 function getRecentChangedFiles(dir, since) {
   try {
-    const output = execSync(`git log --name-only --since="${since}" --no-merges --pretty=format:""`, {
-      cwd: dir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const output = execSync(
+      `git log --name-only --since="${since}" --no-merges --pretty=format:""`,
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
     const files = output.trim().split('\n').filter(Boolean);
     const counts = {};
     for (const f of files) {
@@ -82,7 +92,12 @@ function analyzeLogFile(logPath, maxLines) {
 
   for (const line of lines) {
     const lower = line.toLowerCase();
-    if (lower.includes('error') || lower.includes('exception') || lower.includes('fatal') || lower.includes('critical')) {
+    if (
+      lower.includes('error') ||
+      lower.includes('exception') ||
+      lower.includes('fatal') ||
+      lower.includes('critical')
+    ) {
       errors.push(line.trim().substring(0, 200));
       // Extract error patterns
       const match = line.match(/(?:error|exception|fatal)[\s:]+([^\n]{10,80})/i);
@@ -113,14 +128,14 @@ function correlateCommitsWithErrors(commits, logAnalysis) {
   if (!logAnalysis || commits.length === 0) return [];
 
   const correlations = [];
-  const errorPatterns = (logAnalysis.topErrorPatterns || []).map(p => p.pattern.toLowerCase());
+  const errorPatterns = (logAnalysis.topErrorPatterns || []).map((p) => p.pattern.toLowerCase());
 
   for (const commit of commits) {
     const commitMsg = commit.message.toLowerCase();
     for (const pattern of errorPatterns) {
       // Check for keyword overlap between commit messages and error patterns
-      const keywords = pattern.split(/\s+/).filter(w => w.length > 3);
-      const matching = keywords.filter(k => commitMsg.includes(k));
+      const keywords = pattern.split(/\s+/).filter((w) => w.length > 3);
+      const matching = keywords.filter((k) => commitMsg.includes(k));
       if (matching.length > 0) {
         correlations.push({
           commit: commit.hash,
@@ -136,21 +151,36 @@ function correlateCommitsWithErrors(commits, logAnalysis) {
 }
 
 function generateIncidentReport(commits, changedFiles, logAnalysis, correlations) {
-  const severity = logAnalysis && logAnalysis.errorCount > 50 ? 'critical'
-    : logAnalysis && logAnalysis.errorCount > 10 ? 'high'
-    : logAnalysis && logAnalysis.errorCount > 0 ? 'medium'
-    : 'low';
+  const severity =
+    logAnalysis && logAnalysis.errorCount > 50
+      ? 'critical'
+      : logAnalysis && logAnalysis.errorCount > 10
+        ? 'high'
+        : logAnalysis && logAnalysis.errorCount > 0
+          ? 'medium'
+          : 'low';
 
   const immediateActions = [];
   if (correlations.length > 0) {
-    immediateActions.push(`Investigate commit ${correlations[0].commit}: "${correlations[0].commitMessage}" (correlated with errors)`);
-    immediateActions.push(`Consider reverting recent changes to ${changedFiles.slice(0, 3).map(f => f.file).join(', ')}`);
+    immediateActions.push(
+      `Investigate commit ${correlations[0].commit}: "${correlations[0].commitMessage}" (correlated with errors)`
+    );
+    immediateActions.push(
+      `Consider reverting recent changes to ${changedFiles
+        .slice(0, 3)
+        .map((f) => f.file)
+        .join(', ')}`
+    );
   }
   if (logAnalysis && logAnalysis.errorCount > 0) {
-    immediateActions.push(`Top error pattern: "${logAnalysis.topErrorPatterns[0]?.pattern}" (${logAnalysis.topErrorPatterns[0]?.occurrences} occurrences)`);
+    immediateActions.push(
+      `Top error pattern: "${logAnalysis.topErrorPatterns[0]?.pattern}" (${logAnalysis.topErrorPatterns[0]?.occurrences} occurrences)`
+    );
   }
   if (immediateActions.length === 0) {
-    immediateActions.push('No clear root cause identified from available data. Check monitoring dashboards and service health.');
+    immediateActions.push(
+      'No clear root cause identified from available data. Check monitoring dashboards and service health.'
+    );
   }
 
   return {

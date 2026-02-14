@@ -55,11 +55,22 @@ function validate(data, schemaName) {
   if (schema.properties) {
     for (const [key, prop] of Object.entries(schema.properties)) {
       if (data[key] !== undefined && data[key] !== null) {
-        if (prop.type && typeof data[key] !== prop.type && prop.type !== 'object' && prop.type !== 'array') {
-          errors.push({ field: key, message: `Expected type "${prop.type}", got "${typeof data[key]}"` });
+        if (
+          prop.type &&
+          typeof data[key] !== prop.type &&
+          prop.type !== 'object' &&
+          prop.type !== 'array'
+        ) {
+          errors.push({
+            field: key,
+            message: `Expected type "${prop.type}", got "${typeof data[key]}"`,
+          });
         }
         if (prop.enum && !prop.enum.includes(data[key])) {
-          errors.push({ field: key, message: `Value "${data[key]}" not in allowed values: ${prop.enum.join(', ')}` });
+          errors.push({
+            field: key,
+            message: `Value "${data[key]}" not in allowed values: ${prop.enum.join(', ')}`,
+          });
         }
       }
     }

@@ -27,6 +27,7 @@ node scripts/init_wizard.cjs
 ```
 
 The wizard will ask you to choose your role:
+
 - **Engineer** — Code analysis, testing, DevOps, refactoring
 - **CEO / Executive** — Strategy, finance, organizational decisions
 - **PM / Auditor** — Compliance, quality assurance, project governance
@@ -41,17 +42,18 @@ bash scripts/troubleshoot_doctor.sh
 
 The wizard created `knowledge/personal/` for you — a Git-ignored directory for your private configuration.
 
-| Tier | Where to Place | Example |
-|------|----------------|---------|
-| **Personal** | `knowledge/personal/` | API keys, personal preferences, private notes |
-| **Confidential** | `knowledge/confidential/` | Company standards, client-specific rules |
-| **Public** | `knowledge/` | Shared frameworks, tech-stack guides |
+| Tier             | Where to Place            | Example                                       |
+| ---------------- | ------------------------- | --------------------------------------------- |
+| **Personal**     | `knowledge/personal/`     | API keys, personal preferences, private notes |
+| **Confidential** | `knowledge/confidential/` | Company standards, client-specific rules      |
+| **Public**       | `knowledge/`              | Shared frameworks, tech-stack guides          |
 
 Your personal settings always take priority. See [3-Tier Knowledge Hierarchy](./README.md#3-tier-knowledge-hierarchy) for details.
 
 ## Step 4: Your First Mission
 
 ### For CEOs / Executives
+
 > "Execute the ceo-strategy playbook for evaluating our new market entry."
 
 Uses: `mission-control` → `scenario-multiverse-orchestrator`, `financial-modeling-maestro`, `competitive-intel-strategist`
@@ -59,11 +61,13 @@ Uses: `mission-control` → `scenario-multiverse-orchestrator`, `financial-model
 Playbook: [`knowledge/orchestration/mission-playbooks/ceo-strategy.md`](./knowledge/orchestration/mission-playbooks/ceo-strategy.md)
 
 ### For Engineers
+
 > "Analyze this repository and create a refactoring plan."
 
 Uses: `codebase-mapper` → `refactoring-engine` (or the **Legacy Modernization** intent chain)
 
 ### For PM / Auditors
+
 > "Run a full product audit and generate the compliance report."
 
 Uses: `product-audit` playbook → `project-health-check`, `security-scanner`, `ux-auditor`

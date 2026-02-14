@@ -29,15 +29,19 @@ This skill translates the complex internal state of the ecosystem into a polishe
 ## Capabilities
 
 ### 1. External Status Reporting
+
 - Generates high-level status updates based on `knowledge/pmo/templates/external_status_report.md`.
 - Categorizes updates into "Executive Highlights" and "Technical Details."
 
 ### 2. Strategic Narrative
+
 - Uses `ppt-artisan` and `stakeholder-communicator` logic to ensure reports focus on business outcomes and risk mitigation.
 
 ## Usage
+
 - "Generate a bi-weekly status report for the external PMO team."
 - "Create an executive summary of our security posture for the quarterly review."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`.

@@ -28,8 +28,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Expected input JSON format:
@@ -106,7 +105,7 @@ function analyzeRunway(monthly, _initialCash) {
     }
   }
   // Find breakeven (first month with positive net income)
-  const breakevenMonth = monthly.findIndex(m => m.netIncome > 0);
+  const breakevenMonth = monthly.findIndex((m) => m.netIncome > 0);
   return {
     runwayMonths: monthly.length,
     breakevenMonth: breakevenMonth >= 0 ? breakevenMonth + 1 : null,
@@ -122,13 +121,16 @@ function generateScenarios(assumptions, years) {
 
   // Optimistic: 50% higher growth
   const optimistic = JSON.parse(JSON.stringify(assumptions));
-  if (optimistic.revenue) optimistic.revenue.monthly_growth_rate = (assumptions.revenue.monthly_growth_rate || 0.05) * 1.5;
+  if (optimistic.revenue)
+    optimistic.revenue.monthly_growth_rate =
+      (assumptions.revenue.monthly_growth_rate || 0.05) * 1.5;
   scenarios.optimistic = generatePnL(optimistic, years);
 
   // Pessimistic: half growth, double churn
   const pessimistic = JSON.parse(JSON.stringify(assumptions));
   if (pessimistic.revenue) {
-    pessimistic.revenue.monthly_growth_rate = (assumptions.revenue.monthly_growth_rate || 0.05) * 0.5;
+    pessimistic.revenue.monthly_growth_rate =
+      (assumptions.revenue.monthly_growth_rate || 0.05) * 0.5;
     pessimistic.revenue.churn_rate = (assumptions.revenue.churn_rate || 0.03) * 2;
   }
   scenarios.pessimistic = generatePnL(pessimistic, years);
@@ -166,12 +168,16 @@ runSkill('financial-modeling-maestro', () => {
   if (runway.breakevenMonth) {
     result.recommendations.push(`Breakeven expected at month ${runway.breakevenMonth}`);
   } else if (!runway.sustainable) {
-    result.recommendations.push(`Cash runs out at month ${runway.runwayMonths} - consider reducing burn or raising funding`);
+    result.recommendations.push(
+      `Cash runs out at month ${runway.runwayMonths} - consider reducing burn or raising funding`
+    );
   }
 
   const lastYear = projections.yearly[projections.yearly.length - 1];
   if (lastYear && lastYear.annualProfit < 0) {
-    result.recommendations.push('Final year still unprofitable - review cost structure or growth strategy');
+    result.recommendations.push(
+      'Final year still unprofitable - review cost structure or growth strategy'
+    );
   }
 
   if (argv.out) {

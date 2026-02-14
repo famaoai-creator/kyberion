@@ -40,15 +40,14 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 const DEFAULT_THRESHOLDS = {
-  responseTime: 200,   // milliseconds
-  memoryMB: 512,       // megabytes
-  cpuPercent: 80,      // percent
-  throughput: 100,     // requests per second (minimum)
-  errorRate: 5,        // percent (maximum)
+  responseTime: 200, // milliseconds
+  memoryMB: 512, // megabytes
+  cpuPercent: 80, // percent
+  throughput: 100, // requests per second (minimum)
+  errorRate: 5, // percent (maximum)
 };
 
 /**
@@ -60,10 +59,22 @@ function classifyMetric(metric) {
   const unit = (metric.unit || '').toLowerCase();
   const name = (metric.name || '').toLowerCase();
 
-  if (unit === 'ms' || unit === 'milliseconds' || name.includes('response') || name.includes('latency') || name.includes('duration')) {
+  if (
+    unit === 'ms' ||
+    unit === 'milliseconds' ||
+    name.includes('response') ||
+    name.includes('latency') ||
+    name.includes('duration')
+  ) {
     return 'responseTime';
   }
-  if (unit === 'mb' || unit === 'megabytes' || name.includes('memory') || name.includes('heap') || name.includes('rss')) {
+  if (
+    unit === 'mb' ||
+    unit === 'megabytes' ||
+    name.includes('memory') ||
+    name.includes('heap') ||
+    name.includes('rss')
+  ) {
     return 'memory';
   }
   if (unit === 'percent' || unit === '%') {
@@ -75,7 +86,12 @@ function classifyMetric(metric) {
     }
     return 'cpu'; // Default percent to CPU
   }
-  if (unit === 'rps' || unit === 'req/s' || name.includes('throughput') || name.includes('requests')) {
+  if (
+    unit === 'rps' ||
+    unit === 'req/s' ||
+    name.includes('throughput') ||
+    name.includes('requests')
+  ) {
     return 'throughput';
   }
   return 'other';
@@ -279,7 +295,9 @@ function generateRecommendations(violations, bottlenecks, summary) {
   }
 
   if (recommendations.length === 0) {
-    recommendations.push('Performance metrics are within acceptable thresholds. No immediate action required.');
+    recommendations.push(
+      'Performance metrics are within acceptable thresholds. No immediate action required.'
+    );
   }
 
   return recommendations;
@@ -342,23 +360,38 @@ runSkill('performance-monitor-analyst', () => {
   const cpuValues = categorized.cpu.map((m) => m.value);
 
   const summary = {
-    avgResponseTime: rtValues.length > 0
-      ? Math.round(rtValues.reduce((a, b) => a + b, 0) / rtValues.length * 100) / 100
-      : 0,
+    avgResponseTime:
+      rtValues.length > 0
+        ? Math.round((rtValues.reduce((a, b) => a + b, 0) / rtValues.length) * 100) / 100
+        : 0,
     maxResponseTime: rtValues.length > 0 ? Math.max(...rtValues) : 0,
-    p95ResponseTime: rtValues.length > 0
-      ? Math.round(calculatePercentile(rtValues.slice().sort((a, b) => a - b), 95) * 100) / 100
-      : 0,
-    p99ResponseTime: rtValues.length > 0
-      ? Math.round(calculatePercentile(rtValues.slice().sort((a, b) => a - b), 99) * 100) / 100
-      : 0,
+    p95ResponseTime:
+      rtValues.length > 0
+        ? Math.round(
+            calculatePercentile(
+              rtValues.slice().sort((a, b) => a - b),
+              95
+            ) * 100
+          ) / 100
+        : 0,
+    p99ResponseTime:
+      rtValues.length > 0
+        ? Math.round(
+            calculatePercentile(
+              rtValues.slice().sort((a, b) => a - b),
+              99
+            ) * 100
+          ) / 100
+        : 0,
     maxMemory: memValues.length > 0 ? Math.max(...memValues) : 0,
-    avgMemory: memValues.length > 0
-      ? Math.round(memValues.reduce((a, b) => a + b, 0) / memValues.length * 100) / 100
-      : 0,
-    avgCpu: cpuValues.length > 0
-      ? Math.round(cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length * 100) / 100
-      : 0,
+    avgMemory:
+      memValues.length > 0
+        ? Math.round((memValues.reduce((a, b) => a + b, 0) / memValues.length) * 100) / 100
+        : 0,
+    avgCpu:
+      cpuValues.length > 0
+        ? Math.round((cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length) * 100) / 100
+        : 0,
     maxCpu: cpuValues.length > 0 ? Math.max(...cpuValues) : 0,
   };
 

@@ -119,8 +119,11 @@ export function stripPrefix(subject: string): string {
  * @returns Array of parsed commits
  */
 export function parseGitLog(logOutput: string): Commit[] {
-  const lines = logOutput.trim().split('\n').filter(l => l.length > 0);
-  return lines.map(line => {
+  const lines = logOutput
+    .trim()
+    .split('\n')
+    .filter((l) => l.length > 0);
+  return lines.map((line) => {
     const parts = line.split('|');
     return {
       hash: parts[0] || '',
@@ -141,9 +144,7 @@ export function parseGitLog(logOutput: string): Commit[] {
  * @param commits - Array of parsed commits
  * @returns Map of section name to commits in that section
  */
-export function groupCommitsBySections(
-  commits: Commit[],
-): Partial<Record<SectionName, Commit[]>> {
+export function groupCommitsBySections(commits: Commit[]): Partial<Record<SectionName, Commit[]>> {
   const sections: Partial<Record<SectionName, Commit[]>> = {};
   for (const commit of commits) {
     const section = classifyCommit(commit.subject);
@@ -164,7 +165,7 @@ export function groupCommitsBySections(
 export function generateReleaseNotes(
   commits: Commit[],
   since: string,
-  generated?: string,
+  generated?: string
 ): ReleaseNoteResult {
   const sections = groupCommitsBySections(commits);
 
@@ -222,7 +223,7 @@ export function writeReleaseNotes(markdown: string, outPath: string): void {
  */
 export function buildReleaseNoteOutput(
   result: ReleaseNoteResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<ReleaseNoteResult> {
   return {
     skill: 'release-note-crafter',

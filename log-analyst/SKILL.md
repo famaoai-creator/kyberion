@@ -26,5 +26,7 @@ Reads the tail (end) of a log file to help analyze recent errors or runtime beha
 ```bash
 node log-analyst/scripts/tail.cjs <path_to_log_file> [num_lines]
 ```
+
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

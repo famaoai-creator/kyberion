@@ -33,9 +33,11 @@ last_updated: '2026-02-13'
 This skill automates interactions with the Backlog API using credentials stored in the Personal/Confidential tiers.
 
 ## Usage
+
 - "Use `backlog-connector` to fetch all issues from NBS_INCIDENT."
 - "Get the user list from the project."
 
 ## Knowledge Protocol
+
 - Reads `knowledge/personal/connections/backlog.md` for API Key.
 - Reads `knowledge/confidential/connections/inventory.json` for Project ID mapping.

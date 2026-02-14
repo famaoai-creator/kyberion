@@ -18,14 +18,19 @@ This skill provides a structured way to store and recall long-term facts based o
 ## Capabilities
 
 ### 1. Persistent Storage (Capture)
+
 Store facts into the appropriate tier based on sensitivity.
+
 - **Command**: `node scripts/save.cjs <tier> <category> <fact>`
 - **Example**: `node scripts/save.cjs confidential solution_mapping IB is Online Banking.`
 
 ### 2. Multi-Tier Retrieval (Recall)
+
 Search for keywords across all memory tiers simultaneously.
+
 - **Command**: `node scripts/search.cjs <query>`
 
 ## Knowledge Protocol
+
 - This skill ensures high privacy by keeping `personal` and `confidential` data in restricted local directories.
 - The skill implementation itself is generic and safe for public sharing.

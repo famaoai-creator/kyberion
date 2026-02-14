@@ -1,14 +1,7 @@
 {
   "all": false,
-  "include": [
-    "scripts/lib/**/*.cjs"
-  ],
-  "exclude": [
-    "node_modules/**",
-    "dist/**",
-    "tests/**",
-    "evidence/**"
-  ],
+  "include": ["scripts/lib/**/*.cjs"],
+  "exclude": ["node_modules/**", "dist/**", "tests/**", "evidence/**"],
   "reporter": ["text", "html", "json-summary"],
   "report-dir": "coverage",
   "skip-full": true

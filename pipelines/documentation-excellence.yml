@@ -2,20 +2,20 @@ name: Documentation Excellence Pipeline
 description: Comprehensive documentation quality validation and consistency checking
 steps:
   - skill: doc-type-classifier
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: docType
   - skill: doc-sync-sentinel
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: drift
   - skill: completeness-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: completeness
   - skill: glossary-resolver
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: glossary
   - skill: intent-classifier
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: intent
   - skill: quality-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: quality

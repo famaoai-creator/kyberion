@@ -20,15 +20,19 @@ This skill is the ultimate cost-optimizer, focusing on eliminating actual waste 
 ## Capabilities
 
 ### 1. Waste Identification
+
 - Identifies unattached storage (EBS), idle load balancers, and over-provisioned instances.
 - Detects old snapshots or log streams that are consuming excessive budget.
 
 ### 2. Autonomous Downsizing
+
 - Suggests or executes downsizing of resources based on actual CPU/Memory utilization history.
 
 ## Usage
+
 - "Scan our AWS environment for unattached resources and old snapshots."
 - "Recommend the top 5 cost-saving actions we can take right now based on usage logs."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

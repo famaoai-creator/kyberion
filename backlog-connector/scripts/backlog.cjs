@@ -6,24 +6,29 @@ const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
 
 runSkillAsync('backlog-connector', async () => {
-    const argv = requireArgs(['project']);
-    
-    // 1. Load Skill Knowledge
-    const configPath = path.resolve(__dirname, '../../knowledge/skills/backlog-connector/config.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  const argv = requireArgs(['project']);
 
-    // 2. Load Credentials & Inventory
-    const inventory = JSON.parse(fs.readFileSync('../../knowledge/confidential/connections/inventory.json', 'utf8'));
-    const backlogCreds = fs.readFileSync('../../knowledge/personal/connections/backlog.md', 'utf8');
-    const apiKey = backlogCreds.match(new RegExp(config.credential_pattern))[1];
-    
-    const projectInfo = inventory.systems.backlog.projects[argv.project];
-    if (!projectInfo) throw new Error(`Project ${argv.project} not found in inventory.`);
+  // 1. Load Skill Knowledge
+  const configPath = path.resolve(
+    __dirname,
+    '../../knowledge/skills/backlog-connector/config.json'
+  );
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-    // 3. Execute API Call
-    const url = `${inventory.systems.backlog.space_url}${config.endpoints.issues}?apiKey=${apiKey}&projectId[]=${projectInfo.id}&count=100`;
-    const response = execSync(`curl -s "${url}"`, { encoding: 'utf8' });
-    const data = JSON.parse(response);
+  // 2. Load Credentials & Inventory
+  const inventory = JSON.parse(
+    fs.readFileSync('../../knowledge/confidential/connections/inventory.json', 'utf8')
+  );
+  const backlogCreds = fs.readFileSync('../../knowledge/personal/connections/backlog.md', 'utf8');
+  const apiKey = backlogCreds.match(new RegExp(config.credential_pattern))[1];
 
-    return { project: argv.project, count: data.length };
+  const projectInfo = inventory.systems.backlog.projects[argv.project];
+  if (!projectInfo) throw new Error(`Project ${argv.project} not found in inventory.`);
+
+  // 3. Execute API Call
+  const url = `${inventory.systems.backlog.space_url}${config.endpoints.issues}?apiKey=${apiKey}&projectId[]=${projectInfo.id}&count=100`;
+  const response = execSync(`curl -s "${url}"`, { encoding: 'utf8' });
+  const data = JSON.parse(response);
+
+  return { project: argv.project, count: data.length };
 });

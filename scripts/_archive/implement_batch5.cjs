@@ -6,20 +6,22 @@ const rootDir = process.cwd();
 
 // Helper to write file safely
 function write(filePath, content) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, content);
-    console.log(`Updated: ${path.relative(rootDir, filePath)}`);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content);
+  console.log(`Updated: ${path.relative(rootDir, filePath)}`);
 }
 
 // Helper to scaffold skill
 function scaffoldSkill(name, desc, scriptName, scriptContent, deps = 'yargs') {
-    const skillDir = path.join(rootDir, name);
-    const scriptsDir = path.join(skillDir, 'scripts');
+  const skillDir = path.join(rootDir, name);
+  const scriptsDir = path.join(skillDir, 'scripts');
 
-    if (!fs.existsSync(scriptsDir)) fs.mkdirSync(scriptsDir, { recursive: true });
+  if (!fs.existsSync(scriptsDir)) fs.mkdirSync(scriptsDir, { recursive: true });
 
-    // SKILL.md
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), `--- 
+  // SKILL.md
+  fs.writeFileSync(
+    path.join(skillDir, 'SKILL.md'),
+    `--- 
 name: ${name}
 description: ${desc}
 --- 
@@ -29,37 +31,56 @@ ${desc}
 \`\`\`bash
 node ${name}/scripts/${scriptName} --input <file>
 \`\`\`
-`);
+`
+  );
 
-    // package.json
-    fs.writeFileSync(path.join(skillDir, 'package.json'), JSON.stringify({
+  // package.json
+  fs.writeFileSync(
+    path.join(skillDir, 'package.json'),
+    JSON.stringify(
+      {
         name: name,
-        version: "0.1.0",
+        version: '0.1.0',
         description: desc,
         main: `scripts/${scriptName}`,
-        dependencies: {}
-    }, null, 2));
+        dependencies: {},
+      },
+      null,
+      2
+    )
+  );
 
-    // Script
-    fs.writeFileSync(path.join(scriptsDir, scriptName), `#!/usr/bin/env node
+  // Script
+  fs.writeFileSync(
+    path.join(scriptsDir, scriptName),
+    `#!/usr/bin/env node
 ${scriptContent}
-`);
-    fs.chmodSync(path.join(scriptsDir, scriptName), '755');
+`
+  );
+  fs.chmodSync(path.join(scriptsDir, scriptName), '755');
 
-    // Install deps
-    if (deps) {
-        try { execSync(`npm install ${deps}`, { cwd: skillDir, stdio: 'ignore' }); } catch(e) {}
-    }
-    
-    // Install skill
-    try { execSync(`gemini skills install ${name} --scope workspace --consent`, { stdio: 'ignore' }); } catch(e) {}
-    console.log(`✅ Created & Installed: ${name}`);
+  // Install deps
+  if (deps) {
+    try {
+      execSync(`npm install ${deps}`, { cwd: skillDir, stdio: 'ignore' });
+    } catch (e) {}
+  }
+
+  // Install skill
+  try {
+    execSync(`gemini skills install ${name} --scope workspace --consent`, { stdio: 'ignore' });
+  } catch (e) {}
+  console.log(`✅ Created & Installed: ${name}`);
 }
 
-console.log("=== Implementing Batch 5: Classifiers ===\n");
+console.log('=== Implementing Batch 5: Classifiers ===\n');
 
 // 1. code-lang-detector
-scaffoldSkill('code-lang-detector', 'Detect programming language of source code.', 'detect.cjs', `
+scaffoldSkill(
+  'code-lang-detector',
+  'Detect programming language of source code.',
+  'detect.cjs',
+  `
 const fs = require('fs');
 
 const argv = createStandardYargs().option('input', { alias: 'i', type: 'string' }).argv;
@@ -106,10 +127,15 @@ try {
     console.log(JSON.stringify({ lang: bestLang, confidence: maxScore > 0 ? 0.8 : 0, method: 'keyword' }));
 
 } catch (_e) { console.error(JSON.stringify({ error: e.message })); }
-`);
+`
+);
 
 // 2. doc-type-classifier
-scaffoldSkill('doc-type-classifier', 'Classify document type (meeting-notes, spec, etc).', 'classify.cjs', `
+scaffoldSkill(
+  'doc-type-classifier',
+  'Classify document type (meeting-notes, spec, etc).',
+  'classify.cjs',
+  `
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -139,10 +165,15 @@ try {
 
     console.log(JSON.stringify({ type: bestType, confidence: maxScore / 5, matches: maxScore }));
 } catch (_e) { console.error(JSON.stringify({ error: e.message })); }
-`);
+`
+);
 
 // 3. intent-classifier
-scaffoldSkill('intent-classifier', 'Classify intent of text (request, question, report).', 'classify.cjs', `
+scaffoldSkill(
+  'intent-classifier',
+  'Classify intent of text (request, question, report).',
+  'classify.cjs',
+  `
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -167,10 +198,15 @@ try {
     }
     console.log(JSON.stringify({ intent: bestIntent, confidence: maxScore > 0 ? 0.7 : 0 }));
 } catch (_e) { console.error(JSON.stringify({ error: e.message })); }
-`);
+`
+);
 
 // 4. domain-classifier
-scaffoldSkill('domain-classifier', 'Classify domain (tech, finance, legal).', 'classify.cjs', `
+scaffoldSkill(
+  'domain-classifier',
+  'Classify domain (tech, finance, legal).',
+  'classify.cjs',
+  `
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -195,10 +231,15 @@ try {
     }
     console.log(JSON.stringify({ domain: bestDomain, confidence: maxScore > 0 ? 0.6 : 0 }));
 } catch (_e) { console.error(JSON.stringify({ error: e.message })); }
-`);
+`
+);
 
 // 5. quality-scorer
-scaffoldSkill('quality-scorer', 'Score text quality (readability, length).', 'score.cjs', `
+scaffoldSkill(
+  'quality-scorer',
+  'Score text quality (readability, length).',
+  'score.cjs',
+  `
 const fs = require('fs');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -225,4 +266,5 @@ try {
 
     console.log(JSON.stringify({ score, metrics: { charCount, lines, avgLen }, issues }));
 } catch (_e) { console.error(JSON.stringify({ error: e.message })); }
-`);
+`
+);

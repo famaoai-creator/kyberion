@@ -11,19 +11,19 @@ const path = require('path');
 const textract = require('textract'); // Assuming textract is used based on skill name
 
 runSkillAsync('doc-to-text', async () => {
-    const argv = requireArgs(['input']);
-    const inputPath = validateFilePath(argv.input, 'input file');
+  const argv = requireArgs(['input']);
+  const inputPath = validateFilePath(argv.input, 'input file');
 
-    return new Promise((resolve, reject) => {
-        textract.fromFileWithPath(inputPath, (error, text) => {
-            if (error) {
-                return reject(new Error(`Extraction failed: ${error.message}`));
-            }
-            resolve({
-                file: argv.input,
-                length: text.length,
-                content: text
-            });
-        });
+  return new Promise((resolve, reject) => {
+    textract.fromFileWithPath(inputPath, (error, text) => {
+      if (error) {
+        return reject(new Error(`Extraction failed: ${error.message}`));
+      }
+      resolve({
+        file: argv.input,
+        length: text.length,
+        content: text,
+      });
     });
+  });
 });

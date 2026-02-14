@@ -2,14 +2,14 @@ name: Team Onboarding Pipeline
 description: Generate comprehensive onboarding documentation for new team members
 steps:
   - skill: project-health-check
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: health
   - skill: onboarding-wizard
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: onboarding
   - skill: requirements-wizard
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: requirements
   - skill: operational-runbook-generator
-    args: "-t deploy -n \"{{name}}\""
+    args: '-t deploy -n "{{name}}"'
     output: runbook

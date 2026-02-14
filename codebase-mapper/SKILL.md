@@ -31,5 +31,7 @@ node codebase-mapper/scripts/map.cjs <directory_path> [max_depth]
 
 - `<directory_path>`: Root directory to map (default: `.`)
 - `[max_depth]`: How deep to traverse (default: `3`)
+
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

@@ -9,16 +9,16 @@ Use spread operator for immutable updates:
 ```typescript
 // WRONG: Mutation
 function updateUser(user, name) {
-  user.name = name  // MUTATION!
-  return user
+  user.name = name; // MUTATION!
+  return user;
 }
 
 // CORRECT: Immutability
 function updateUser(user, name) {
   return {
     ...user,
-    name
-  }
+    name,
+  };
 }
 ```
 
@@ -28,11 +28,11 @@ Use async/await with try-catch:
 
 ```typescript
 try {
-  const result = await riskyOperation()
-  return result
+  const result = await riskyOperation();
+  return result;
 } catch (error) {
-  console.error('Operation failed:', error)
-  throw new Error('Detailed user-friendly message')
+  console.error('Operation failed:', error);
+  throw new Error('Detailed user-friendly message');
 }
 ```
 
@@ -41,14 +41,14 @@ try {
 Use Zod for schema-based validation:
 
 ```typescript
-import { z } from 'zod'
+import { z } from 'zod';
 
 const schema = z.object({
   email: z.string().email(),
-  age: z.number().int().min(0).max(150)
-})
+  age: z.number().int().min(0).max(150),
+});
 
-const validated = schema.parse(input)
+const validated = schema.parse(input);
 ```
 
 ## Console.log

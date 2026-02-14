@@ -1,0 +1,10 @@
+{
+  "default": {
+    "latency_ms": 5000,
+    "success_rate": 99.0
+  },
+  "critical_path": {
+    "api-doc-generator": { "latency_ms": 30000 },
+    "security-scanner": { "latency_ms": 60000, "success_rate": 95.0 }
+  }
+}

@@ -88,11 +88,7 @@ export function detectFormat(filePath: string): DataFormat {
  *                     caller has already parsed using a CJS library)
  * @returns Parsed data value
  */
-export function parseContent(
-  content: string,
-  format: DataFormat,
-  parsedData?: unknown,
-): unknown {
+export function parseContent(content: string, format: DataFormat, parsedData?: unknown): unknown {
   if (parsedData !== undefined) return parsedData;
 
   switch (format) {
@@ -100,9 +96,7 @@ export function parseContent(
       return JSON.parse(content) as unknown;
     case 'yaml':
     case 'csv':
-      throw new Error(
-        `Format "${format}" requires a pre-parsed data value (parsedData argument)`,
-      );
+      throw new Error(`Format "${format}" requires a pre-parsed data value (parsedData argument)`);
     default:
       throw new Error(`Unsupported input format: ${format}`);
   }
@@ -123,7 +117,7 @@ export function parseContent(
 export function serializeData(
   data: unknown,
   format: DataFormat,
-  serialiser?: (data: unknown) => string,
+  serialiser?: (data: unknown) => string
 ): string {
   if (serialiser) return serialiser(data);
 
@@ -132,9 +126,7 @@ export function serializeData(
       return JSON.stringify(data, null, 2);
     case 'yaml':
     case 'csv':
-      throw new Error(
-        `Format "${format}" requires an external serialiser callback`,
-      );
+      throw new Error(`Format "${format}" requires an external serialiser callback`);
     default:
       throw new Error(`Unsupported output format: ${format}`);
   }
@@ -155,7 +147,7 @@ export function serializeData(
 export function transformData(
   data: unknown,
   options: TransformOptions,
-  serialiser?: (data: unknown) => string,
+  serialiser?: (data: unknown) => string
 ): TransformResult {
   const output = serializeData(data, options.to, serialiser);
 
@@ -176,7 +168,7 @@ export function transformData(
  */
 export function buildTransformOutput(
   result: TransformResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<TransformResult> {
   return {
     skill: 'data-transformer',

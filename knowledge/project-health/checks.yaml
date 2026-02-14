@@ -9,26 +9,26 @@ checks:
     weight: 25
     patterns:
       # GitHub Actions
-      - ".github/workflows"
+      - '.github/workflows'
       # GitLab CI
-      - ".gitlab-ci.yml"
+      - '.gitlab-ci.yml'
       # CircleCI
-      - ".circleci/config.yml"
+      - '.circleci/config.yml'
       # Azure DevOps
-      - "azure-pipelines.yml"
+      - 'azure-pipelines.yml'
       # Bitbucket
-      - "bitbucket-pipelines.yml"
+      - 'bitbucket-pipelines.yml'
       # Jenkins
-      - "Jenkinsfile"
+      - 'Jenkinsfile'
       # AWS CodeBuild
-      - "buildspec.yml"
+      - 'buildspec.yml'
       # Google Cloud Build
-      - "cloudbuild.yaml"
+      - 'cloudbuild.yaml'
       # Drone CI
-      - ".drone.yml"
+      - '.drone.yml'
       # Travis CI
-      - ".travis.yml"
-    suggestion: "CI/CDパイプラインを設定して、ビルド・テスト・デプロイを自動化しましょう"
+      - '.travis.yml'
+    suggestion: 'CI/CDパイプラインを設定して、ビルド・テスト・デプロイを自動化しましょう'
 
   test:
     name: Testing Framework
@@ -36,31 +36,31 @@ checks:
     weight: 25
     patterns:
       # JavaScript/TypeScript
-      - "jest.config.*"
-      - "vitest.config.*"
-      - ".mocharc.*"
+      - 'jest.config.*'
+      - 'vitest.config.*'
+      - '.mocharc.*'
       # Python
-      - "pytest.ini"
-      - "pyproject.toml"
-      - "setup.cfg"
-      - "tox.ini"
+      - 'pytest.ini'
+      - 'pyproject.toml'
+      - 'setup.cfg'
+      - 'tox.ini'
       # Ruby
-      - ".rspec"
-      - "spec/"
+      - '.rspec'
+      - 'spec/'
       # Java
-      - "pom.xml"
-      - "build.gradle*"
+      - 'pom.xml'
+      - 'build.gradle*'
       # Go
-      - "go.mod"
-      - "*_test.go"
+      - 'go.mod'
+      - '*_test.go'
       # Rust
-      - "Cargo.toml"
+      - 'Cargo.toml'
       # .NET
-      - "*.csproj"
+      - '*.csproj'
       # Generic
-      - "tests/"
-      - "test/"
-      - "__tests__/"
+      - 'tests/'
+      - 'test/'
+      - '__tests__/'
     package_json_check:
       dependencies:
         - jest
@@ -73,7 +73,7 @@ checks:
         - playwright
       scripts:
         - test
-    suggestion: "テストフレームワークを導入して、コードの品質を担保しましょう"
+    suggestion: 'テストフレームワークを導入して、コードの品質を担保しましょう'
 
   lint:
     name: Linting & Formatting
@@ -81,27 +81,27 @@ checks:
     weight: 15
     patterns:
       # JavaScript/TypeScript
-      - ".eslintrc*"
-      - "eslint.config.*"
-      - ".prettierrc*"
-      - "prettier.config.*"
-      - "biome.json"
+      - '.eslintrc*'
+      - 'eslint.config.*'
+      - '.prettierrc*'
+      - 'prettier.config.*'
+      - 'biome.json'
       # Python
-      - ".flake8"
-      - ".pylintrc"
-      - "ruff.toml"
+      - '.flake8'
+      - '.pylintrc'
+      - 'ruff.toml'
       # Ruby
-      - ".rubocop.yml"
+      - '.rubocop.yml'
       # Java
-      - "checkstyle.xml"
-      - "pmd.xml"
+      - 'checkstyle.xml'
+      - 'pmd.xml'
       # Go
-      - ".golangci.yml"
+      - '.golangci.yml'
       # Rust
-      - "rustfmt.toml"
-      - "clippy.toml"
+      - 'rustfmt.toml'
+      - 'clippy.toml'
       # General
-      - ".editorconfig"
+      - '.editorconfig'
     package_json_check:
       dependencies:
         - eslint
@@ -112,7 +112,7 @@ checks:
       scripts:
         - lint
         - format
-    suggestion: "Linter/Formatterを設定して、コードスタイルを統一しましょう"
+    suggestion: 'Linter/Formatterを設定して、コードスタイルを統一しましょう'
 
   iac:
     name: Containerization & IaC
@@ -120,62 +120,62 @@ checks:
     weight: 20
     patterns:
       # Docker
-      - "Dockerfile"
-      - "docker-compose.yml"
-      - "docker-compose.yaml"
-      - "compose.yml"
-      - "compose.yaml"
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'docker-compose.yaml'
+      - 'compose.yml'
+      - 'compose.yaml'
       # Kubernetes
-      - "k8s/"
-      - "kubernetes/"
-      - "helm/"
-      - "kustomization.yaml"
+      - 'k8s/'
+      - 'kubernetes/'
+      - 'helm/'
+      - 'kustomization.yaml'
       # Terraform
-      - "terraform/"
-      - "main.tf"
-      - "*.tf"
+      - 'terraform/'
+      - 'main.tf'
+      - '*.tf'
       # Pulumi
-      - "Pulumi.yaml"
+      - 'Pulumi.yaml'
       # CloudFormation
-      - "template.yaml"
-      - "cloudformation/"
+      - 'template.yaml'
+      - 'cloudformation/'
       # Serverless
-      - "serverless.yml"
-      - "serverless.yaml"
+      - 'serverless.yml'
+      - 'serverless.yaml'
       # Ansible
-      - "ansible/"
-      - "playbook.yml"
-    suggestion: "Dockerfileやterraformを使って、インフラをコード化しましょう"
+      - 'ansible/'
+      - 'playbook.yml'
+    suggestion: 'Dockerfileやterraformを使って、インフラをコード化しましょう'
 
   docs:
     name: Documentation
     description: 良いドキュメントはオンボーディングコストを下げ「なぜ」を説明する
     weight: 15
     patterns:
-      - "README.md"
-      - "README.rst"
-      - "CONTRIBUTING.md"
-      - "CHANGELOG.md"
-      - "docs/"
-      - "doc/"
-      - "documentation/"
-      - "wiki/"
-      - "API.md"
-    suggestion: "README.mdを充実させ、プロジェクトの目的と使い方を説明しましょう"
+      - 'README.md'
+      - 'README.rst'
+      - 'CONTRIBUTING.md'
+      - 'CHANGELOG.md'
+      - 'docs/'
+      - 'doc/'
+      - 'documentation/'
+      - 'wiki/'
+      - 'API.md'
+    suggestion: 'README.mdを充実させ、プロジェクトの目的と使い方を説明しましょう'
 
   security:
     name: Security Configuration
     description: セキュリティ設定により脆弱性を早期に検出
-    weight: 0  # オプション（重みを0にすることで総合スコアに影響しない）
+    weight: 0 # オプション（重みを0にすることで総合スコアに影響しない）
     optional: true
     patterns:
-      - ".snyk"
-      - "security.txt"
-      - ".trivyignore"
-      - "SECURITY.md"
-      - "dependabot.yml"
-      - ".github/dependabot.yml"
-    suggestion: "Dependabotやセキュリティポリシーを設定しましょう"
+      - '.snyk'
+      - 'security.txt'
+      - '.trivyignore'
+      - 'SECURITY.md'
+      - 'dependabot.yml'
+      - '.github/dependabot.yml'
+    suggestion: 'Dependabotやセキュリティポリシーを設定しましょう'
 
 # 採点基準
 grading:

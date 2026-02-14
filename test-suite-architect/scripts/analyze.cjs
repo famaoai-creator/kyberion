@@ -7,11 +7,25 @@ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 
-
 const SOURCE_EXTENSIONS = new Set([
-  '.js', '.jsx', '.ts', '.tsx', '.cjs', '.mjs',
-  '.py', '.rb', '.go', '.rs', '.java', '.cs',
-  '.php', '.swift', '.kt', '.scala', '.vue', '.svelte',
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.cjs',
+  '.mjs',
+  '.py',
+  '.rb',
+  '.go',
+  '.rs',
+  '.java',
+  '.cs',
+  '.php',
+  '.swift',
+  '.kt',
+  '.scala',
+  '.vue',
+  '.svelte',
 ]);
 
 const TEST_PATTERNS = [
@@ -22,13 +36,7 @@ const TEST_PATTERNS = [
   /\.tests\.[a-z]+$/i,
 ];
 
-const TEST_DIR_PATTERNS = [
-  /^tests?$/i,
-  /^__tests__$/i,
-  /^spec$/i,
-  /^specs$/i,
-  /^test-suite$/i,
-];
+const TEST_DIR_PATTERNS = [/^tests?$/i, /^__tests__$/i, /^spec$/i, /^specs$/i, /^test-suite$/i];
 
 /**
  * Framework detection rules: config files and package.json indicators.
@@ -114,8 +122,7 @@ const argv = createStandardYargs()
     return true;
   })
   .strict()
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Check if a file is a test file based on name patterns and directory.
@@ -125,10 +132,10 @@ function isTestFile(filePath) {
   const dirParts = filePath.split(path.sep);
 
   // Check if file is in a test directory
-  const inTestDir = dirParts.some(part => TEST_DIR_PATTERNS.some(p => p.test(part)));
+  const inTestDir = dirParts.some((part) => TEST_DIR_PATTERNS.some((p) => p.test(part)));
 
   // Check if filename matches test patterns
-  const matchesPattern = TEST_PATTERNS.some(p => p.test(basename));
+  const matchesPattern = TEST_PATTERNS.some((p) => p.test(basename));
 
   return inTestDir || matchesPattern;
 }
@@ -149,8 +156,8 @@ function isSourceFile(filePath) {
  */
 function detectFrameworks(projectDir, allFiles) {
   const detected = [];
-  const fileNames = new Set(allFiles.map(f => path.relative(projectDir, f)));
-  const basenames = new Set(allFiles.map(f => path.basename(f)));
+  const fileNames = new Set(allFiles.map((f) => path.relative(projectDir, f)));
+  const basenames = new Set(allFiles.map((f) => path.basename(f)));
 
   // Check package.json
   let pkgJson = null;
@@ -199,7 +206,7 @@ function detectFrameworks(projectDir, allFiles) {
 
     // Check for markers in config files
     if (!found && detector.markerInConfig) {
-      for (const cfgFile of (detector.configFiles || [])) {
+      for (const cfgFile of detector.configFiles || []) {
         const cfgPath = path.join(projectDir, cfgFile);
         if (fs.existsSync(cfgPath)) {
           try {
@@ -263,11 +270,13 @@ function generateStrategy(frameworks, testRatio, untested, sourceFiles, testFile
   let recommendedFramework = 'jest';
   if (frameworks.length > 0) {
     recommendedFramework = frameworks[0];
-    recommendations.push('Detected framework: ' + frameworks.join(', ') + ' - continue using ' + frameworks[0]);
+    recommendations.push(
+      'Detected framework: ' + frameworks.join(', ') + ' - continue using ' + frameworks[0]
+    );
   } else {
-    const hasPython = sourceFiles.some(f => f.endsWith('.py'));
-    const hasRust = sourceFiles.some(f => f.endsWith('.rs'));
-    const hasGo = sourceFiles.some(f => f.endsWith('.go'));
+    const hasPython = sourceFiles.some((f) => f.endsWith('.py'));
+    const hasRust = sourceFiles.some((f) => f.endsWith('.rs'));
+    const hasGo = sourceFiles.some((f) => f.endsWith('.go'));
 
     if (hasPython) {
       recommendedFramework = 'pytest';
@@ -284,25 +293,39 @@ function generateStrategy(frameworks, testRatio, untested, sourceFiles, testFile
   let coverageTarget = 80;
   if (testRatio < 0.1) {
     coverageTarget = 50;
-    recommendations.push('Very low test ratio (' + (testRatio * 100).toFixed(1) + '%) - start with 50% coverage target');
+    recommendations.push(
+      'Very low test ratio (' + (testRatio * 100).toFixed(1) + '%) - start with 50% coverage target'
+    );
   } else if (testRatio < 0.3) {
     coverageTarget = 70;
-    recommendations.push('Low test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 70% coverage target');
+    recommendations.push(
+      'Low test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 70% coverage target'
+    );
   } else if (testRatio >= 0.5) {
     coverageTarget = 90;
-    recommendations.push('Good test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 90% coverage target');
+    recommendations.push(
+      'Good test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 90% coverage target'
+    );
   } else {
-    recommendations.push('Moderate test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 80% coverage target');
+    recommendations.push(
+      'Moderate test ratio (' + (testRatio * 100).toFixed(1) + '%) - aim for 80% coverage target'
+    );
   }
 
   // Untested files
   if (untested.length > 0) {
     const topUntested = untested.slice(0, 5);
-    recommendations.push('Priority: add tests for ' + topUntested.join(', ') + (untested.length > 5 ? ' and ' + (untested.length - 5) + ' more' : ''));
+    recommendations.push(
+      'Priority: add tests for ' +
+        topUntested.join(', ') +
+        (untested.length > 5 ? ' and ' + (untested.length - 5) + ' more' : '')
+    );
   }
 
   if (testFiles.length === 0) {
-    recommendations.push('No test files found - create initial test suite with ' + recommendedFramework);
+    recommendations.push(
+      'No test files found - create initial test suite with ' + recommendedFramework
+    );
   }
 
   return {
@@ -316,8 +339,8 @@ runSkill('test-suite-architect', () => {
   const projectDir = path.resolve(argv.dir);
   const allFiles = getAllFiles(projectDir, { maxDepth: 10 });
 
-  const testFiles = allFiles.filter(f => isTestFile(f));
-  const sourceFiles = allFiles.filter(f => isSourceFile(f));
+  const testFiles = allFiles.filter((f) => isTestFile(f));
+  const sourceFiles = allFiles.filter((f) => isSourceFile(f));
   const frameworks = detectFrameworks(projectDir, allFiles);
   const testRatio = sourceFiles.length > 0 ? testFiles.length / sourceFiles.length : 0;
   const untested = findUntestedFiles(sourceFiles, testFiles, projectDir);
@@ -327,10 +350,16 @@ runSkill('test-suite-architect', () => {
   if (frameworks.length > 0) {
     recommendations.push('Detected framework(s): ' + frameworks.join(', '));
   } else {
-    recommendations.push('No test framework detected - recommend adopting ' + strategy.recommendedFramework);
+    recommendations.push(
+      'No test framework detected - recommend adopting ' + strategy.recommendedFramework
+    );
   }
   if (testRatio < 0.3) {
-    recommendations.push('Test-to-source ratio is low at ' + (testRatio * 100).toFixed(1) + '% - prioritize adding tests');
+    recommendations.push(
+      'Test-to-source ratio is low at ' +
+        (testRatio * 100).toFixed(1) +
+        '% - prioritize adding tests'
+    );
   }
   if (untested.length > 0) {
     recommendations.push(untested.length + ' source file(s) appear to lack corresponding tests');
@@ -338,8 +367,8 @@ runSkill('test-suite-architect', () => {
 
   return {
     framework: frameworks,
-    testFiles: testFiles.map(f => path.relative(projectDir, f)),
-    sourceFiles: sourceFiles.map(f => path.relative(projectDir, f)),
+    testFiles: testFiles.map((f) => path.relative(projectDir, f)),
+    sourceFiles: sourceFiles.map((f) => path.relative(projectDir, f)),
     testRatio: Math.round(testRatio * 1000) / 1000,
     untested: untested.slice(0, 50),
     strategy,

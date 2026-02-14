@@ -27,8 +27,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // --- Healing Runbook: pattern -> repair action ---
 const HEALING_RUNBOOK = [
@@ -69,7 +68,8 @@ const HEALING_RUNBOOK = [
     pattern: /timeout|ETIMEDOUT|ESOCKETTIMEDOUT/i,
     severity: 'medium',
     diagnosis: 'Operation timed out',
-    action: 'Check network connectivity, increase timeout values, or investigate slow dependencies.',
+    action:
+      'Check network connectivity, increase timeout values, or investigate slow dependencies.',
     category: 'connectivity',
   },
   {
@@ -77,7 +77,8 @@ const HEALING_RUNBOOK = [
     pattern: /EACCES|Permission denied|EPERM/i,
     severity: 'medium',
     diagnosis: 'Permission denied',
-    action: 'Check file/directory permissions. Ensure the process runs with appropriate user privileges.',
+    action:
+      'Check file/directory permissions. Ensure the process runs with appropriate user privileges.',
     category: 'permissions',
   },
   {
@@ -131,12 +132,15 @@ function parseInput(inputPath) {
       errors.push(...json.incident.immediateActions);
     }
     if (errors.length > 0) return errors;
-  } catch (_e) { /* not JSON, treat as plain text log */ }
+  } catch (_e) {
+    /* not JSON, treat as plain text log */
+  }
 
   // Plain text: extract lines with errors
-  return content.split('\n')
-    .filter(line => /error|exception|fatal|critical|fail/i.test(line))
-    .map(line => line.trim())
+  return content
+    .split('\n')
+    .filter((line) => /error|exception|fatal|critical|fail/i.test(line))
+    .map((line) => line.trim())
     .filter(Boolean)
     .slice(-100);
 }
@@ -183,9 +187,10 @@ runSkill('self-healing-orchestrator', () => {
     matchedRules: healingPlan.length,
     healingPlan,
     unmatchedErrors: errors.length - healingPlan.reduce((s, _h) => s + 1, 0),
-    summary: healingPlan.length > 0
-      ? `Found ${healingPlan.length} actionable patterns. Top issue: ${healingPlan[0].diagnosis}`
-      : 'No known error patterns matched. Manual investigation recommended.',
+    summary:
+      healingPlan.length > 0
+        ? `Found ${healingPlan.length} actionable patterns. Top issue: ${healingPlan[0].diagnosis}`
+        : 'No known error patterns matched. Manual investigation recommended.',
   };
 
   if (argv.out) {

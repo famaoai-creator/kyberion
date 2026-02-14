@@ -1,14 +1,7 @@
 {
   "audit_name": "Public Knowledge Sovereignty Check",
   "target_tiers": ["knowledge"],
-  "exclusions": [
-    ".git",
-    "node_modules",
-    "personal/",
-    "confidential/",
-    "*.svg",
-    "*.png"
-  ],
+  "exclusions": [".git", "node_modules", "personal/", "confidential/", "*.svg", "*.png"],
   "severity_mapping": {
     "personal_leak": "critical",
     "confidential_leak": "high"

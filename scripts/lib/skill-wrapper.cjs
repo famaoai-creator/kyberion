@@ -19,7 +19,11 @@ const { logger } = require('./core.cjs');
 let _metrics = null;
 function _getMetrics() {
   if (_metrics === null) {
-    try { _metrics = require('./metrics.cjs').metrics; } catch (_) { _metrics = false; }
+    try {
+      _metrics = require('./metrics.cjs').metrics;
+    } catch (_) {
+      _metrics = false;
+    }
   }
   return _metrics || null;
 }
@@ -41,19 +45,25 @@ function _loadHooks() {
         if (typeof mod.afterSkill === 'function') _hooks.after.push(mod.afterSkill);
       }
     }
-  } catch (_) { /* Ignore plugin load errors to avoid blocking skill execution */ }
+  } catch (_) {
+    /* Ignore plugin load errors to avoid blocking skill execution */
+  }
 }
 
 function _runBeforeHooks(skillName, args) {
   _loadHooks();
   for (const hook of _hooks.before) {
-    try { hook(skillName, args); } catch (_) {}
+    try {
+      hook(skillName, args);
+    } catch (_) {}
   }
 }
 
 function _runAfterHooks(skillName, output) {
   for (const hook of _hooks.after) {
-    try { hook(skillName, output); } catch (_) {}
+    try {
+      hook(skillName, output);
+    } catch (_) {}
   }
   return output;
 }
@@ -87,7 +97,11 @@ function _parseFrontmatter(content) {
           const kvMatch = val.match(/^(\w+):\s*(.+)/);
           if (kvMatch) obj[kvMatch[1]] = kvMatch[2].trim();
           arrayItems.push(obj);
-        } else if (arrayItems.length > 0 && typeof arrayItems[arrayItems.length - 1] === 'object' && !Array.isArray(arrayItems[arrayItems.length - 1])) {
+        } else if (
+          arrayItems.length > 0 &&
+          typeof arrayItems[arrayItems.length - 1] === 'object' &&
+          !Array.isArray(arrayItems[arrayItems.length - 1])
+        ) {
           // Property of current object
           const kvMatch = val.match(/^(\w+):\s*(.+)/);
           if (kvMatch) {
@@ -96,7 +110,10 @@ function _parseFrontmatter(content) {
             else if (v === 'false') v = false;
             else if (/^\d+$/.test(v)) v = Number(v);
             else if (v.startsWith('[') && v.endsWith(']')) {
-              v = v.slice(1, -1).split(',').map(s => s.trim());
+              v = v
+                .slice(1, -1)
+                .split(',')
+                .map((s) => s.trim());
             }
             arrayItems[arrayItems.length - 1][kvMatch[1]] = v;
           }
@@ -107,13 +124,20 @@ function _parseFrontmatter(content) {
       }
       // Check if it's an indented property of the last object
       const propMatch = line.match(/^\s{4,}(\w+):\s*(.+)/);
-      if (propMatch && arrayItems.length > 0 && typeof arrayItems[arrayItems.length - 1] === 'object') {
+      if (
+        propMatch &&
+        arrayItems.length > 0 &&
+        typeof arrayItems[arrayItems.length - 1] === 'object'
+      ) {
         let v = propMatch[2].trim();
         if (v === 'true') v = true;
         else if (v === 'false') v = false;
         else if (/^\d+$/.test(v)) v = Number(v);
         else if (v.startsWith('[') && v.endsWith(']')) {
-          v = v.slice(1, -1).split(',').map(s => s.trim());
+          v = v
+            .slice(1, -1)
+            .split(',')
+            .map((s) => s.trim());
         }
         arrayItems[arrayItems.length - 1][propMatch[1]] = v;
         continue;
@@ -162,7 +186,7 @@ function _showHelp(skillName) {
   const scriptsDir = path.join(rootDir, skillName, 'scripts');
   let scriptName = 'main.cjs';
   if (fs.existsSync(scriptsDir)) {
-    const files = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+    const files = fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
     if (files.length > 0) scriptName = files[0];
   }
 
@@ -176,7 +200,8 @@ function _showHelp(skillName) {
         ? `  <${arg.name}>`
         : `  --${arg.name}${arg.short ? ', -' + arg.short : ''}`;
       const reqStr = arg.required ? ' (required)' : '';
-      const defStr = arg.default !== undefined && arg.default !== null ? ` [default: ${arg.default}]` : '';
+      const defStr =
+        arg.default !== undefined && arg.default !== null ? ` [default: ${arg.default}]` : '';
       const choicesStr = arg.choices ? ` {${arg.choices.join(', ')}}` : '';
       const descStr = arg.description || '';
       console.log(`${nameStr.padEnd(24)} ${descStr}${choicesStr}${reqStr}${defStr}`);
@@ -190,11 +215,13 @@ function _showHelp(skillName) {
   const playbooksDir = path.join(rootDir, 'knowledge/orchestration/mission-playbooks');
   if (fs.existsSync(playbooksDir)) {
     try {
-      const playbooks = fs.readdirSync(playbooksDir).filter(f => f.endsWith('.md'));
+      const playbooks = fs.readdirSync(playbooksDir).filter((f) => f.endsWith('.md'));
       if (playbooks.length > 0) {
-        console.log(`Playbooks:  ${playbooks.map(p => p.replace('.md', '')).join(', ')}`);
+        console.log(`Playbooks:  ${playbooks.map((p) => p.replace('.md', '')).join(', ')}`);
       }
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
   console.log(`More info:  npm run cli -- info ${skillName}`);
@@ -217,7 +244,11 @@ function _addSuggestion(errorObj, skillName) {
     errorObj.suggestion = 'Run: npm install (from project root)';
   } else if (msg.includes('Missing required argument') || msg.includes('required')) {
     errorObj.suggestion = `Run: node ${skillName}/scripts/<script>.cjs --help`;
-  } else if (msg.includes('ENOENT') || msg.includes('no such file') || msg.includes('File not found')) {
+  } else if (
+    msg.includes('ENOENT') ||
+    msg.includes('no such file') ||
+    msg.includes('File not found')
+  ) {
     errorObj.suggestion = 'Check that the file path exists and is accessible';
   } else if (msg.includes('EACCES') || msg.includes('permission denied')) {
     errorObj.suggestion = 'Check file permissions or run with appropriate access';
@@ -240,14 +271,17 @@ function _getRank(score) {
 function _formatHuman(output) {
   const { ui } = require('./core.cjs');
   const chalk = require('chalk');
-  
+
   const statusIcon = output.status === 'success' ? chalk.green('\u2714') : chalk.red('\u2718');
   const duration = ui.formatDuration(output.metadata.duration_ms);
   const mem = output.metadata.memory || { heapUsedMB: 0 };
-  const memColor = mem.heapUsedMB > 200 ? chalk.red : (mem.heapUsedMB > 100 ? chalk.yellow : chalk.green);
+  const memColor =
+    mem.heapUsedMB > 200 ? chalk.red : mem.heapUsedMB > 100 ? chalk.yellow : chalk.green;
   const rank = _getRank(output.metadata.efficiency_score || 100);
 
-  console.log(`\n${statusIcon} ${chalk.bold.cyan(output.skill.toUpperCase())} ${rank} ${chalk.dim(`(${duration}, `)}${memColor(mem.heapUsedMB + 'MB')}${chalk.dim(')')}`);
+  console.log(
+    `\n${statusIcon} ${chalk.bold.cyan(output.skill.toUpperCase())} ${rank} ${chalk.dim(`(${duration}, `)}${memColor(mem.heapUsedMB + 'MB')}${chalk.dim(')')}`
+  );
   console.log(chalk.dim('\u2500'.repeat(50)));
 
   if (output.data) {
@@ -257,7 +291,7 @@ function _formatHuman(output) {
       // Intelligently format small objects, use JSON for large ones
       const keys = Object.keys(output.data);
       if (keys.length <= 5) {
-        keys.forEach(k => console.log(`${chalk.bold(k.padEnd(12))}: ${output.data[k]}`));
+        keys.forEach((k) => console.log(`${chalk.bold(k.padEnd(12))}: ${output.data[k]}`));
       } else {
         console.log(JSON.stringify(output.data, null, 2));
       }
@@ -268,7 +302,7 @@ function _formatHuman(output) {
     const suggestions = {
       'security-scanner': 'Try "node scripts/cli.cjs html-reporter" to visualize these findings.',
       'codebase-mapper': 'Run "api-doc-generator" next to document your endpoints.',
-      'mission-control': 'View the full timeline in "PERFORMANCE_DASHBOARD.md".'
+      'mission-control': 'View the full timeline in "PERFORMANCE_DASHBOARD.md".',
     };
     const next = suggestions[output.skill];
     if (next) {
@@ -280,7 +314,9 @@ function _formatHuman(output) {
     const retryIcon = output.error.retryable ? '\u21bb\ufe0f' : '\u26d4\ufe0f';
     console.log(`\n${chalk.bgRed.white.bold(' ERROR ')} ${chalk.red(output.error.message)}`);
     if (output.error.suggestion) {
-      console.log(`${chalk.cyan.bold('\u21aa Suggested Fix:')} ${chalk.cyan(output.error.suggestion)}`);
+      console.log(
+        `${chalk.cyan.bold('\u21aa Suggested Fix:')} ${chalk.cyan(output.error.suggestion)}`
+      );
     }
     console.log(chalk.dim(`${retryIcon} Retryable: ${output.error.retryable ? 'Yes' : 'No'}`));
   }
@@ -299,11 +335,15 @@ function _validateOutput(output) {
     if (_ajv === null) {
       const Ajv = require('ajv');
       _ajv = new Ajv({ allErrors: true });
-      _schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../../schemas/skill-output.schema.json'), 'utf8'));
+      _schema = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '../../schemas/skill-output.schema.json'), 'utf8')
+      );
     }
     const validate = _ajv.compile(_schema);
     if (!validate(output)) {
-      logger.warn(`[${output.skill}] Output schema validation failed: ${JSON.stringify(validate.errors)}`);
+      logger.warn(
+        `[${output.skill}] Output schema validation failed: ${JSON.stringify(validate.errors)}`
+      );
       return false;
     }
     return true;
@@ -324,7 +364,7 @@ function _validateOutput(output) {
 function buildOutput(skillName, status, dataOrError, startTime) {
   const { fileUtils } = require('./core.cjs');
   const { detectTier } = require('./tier-guard.cjs');
-  
+
   const base = {
     skill: skillName,
     status,
@@ -343,11 +383,15 @@ function buildOutput(skillName, status, dataOrError, startTime) {
       code: dataOrError.code || 'EXECUTION_ERROR',
       message: dataOrError.message || String(dataOrError),
     };
-    
+
     // SRE: Detect retryable conditions (e.g. timeouts, locked files)
     const msg = base.error.message.toLowerCase();
-    base.error.retryable = msg.includes('timeout') || msg.includes('busy') || msg.includes('locked') || msg.includes('econnreset');
-    
+    base.error.retryable =
+      msg.includes('timeout') ||
+      msg.includes('busy') ||
+      msg.includes('locked') ||
+      msg.includes('econnreset');
+
     _addSuggestion(base.error, skillName);
     logger.error(`[${skillName}] ${base.error.message}`);
   }
@@ -357,12 +401,14 @@ function buildOutput(skillName, status, dataOrError, startTime) {
   const rawOutput = JSON.stringify(base);
   const guard = validateSovereignBoundary(rawOutput);
   if (!guard.safe) {
-    console.error(`\n[SECURITY ALERT] Sovereign boundary violation in ${skillName}! Output blocked.`);
+    console.error(
+      `\n[SECURITY ALERT] Sovereign boundary violation in ${skillName}! Output blocked.`
+    );
     return {
       skill: skillName,
       status: 'error',
       error: { code: 'SOVEREIGN_VIOLATION', message: 'Output contains forbidden tokens.' },
-      metadata: base.metadata
+      metadata: base.metadata,
     };
   }
 
@@ -433,12 +479,12 @@ function runSkill(skillName, fn) {
   _checkHelp(skillName);
   const output = wrapSkill(skillName, fn);
   const m = _getMetrics();
-  
+
   if (m) {
     const cacheStats = _fileCache ? _fileCache.getStats() : null;
     m.record(skillName, output.metadata.duration_ms, output.status, { cacheStats });
   }
-  
+
   _printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;
@@ -457,12 +503,12 @@ async function runSkillAsync(skillName, fn) {
   _checkHelp(skillName);
   const output = await wrapSkillAsync(skillName, fn);
   const m = _getMetrics();
-  
+
   if (m) {
     const cacheStats = _fileCache ? _fileCache.getStats() : null;
     m.record(skillName, output.metadata.duration_ms, output.status, { cacheStats });
   }
-  
+
   _printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;

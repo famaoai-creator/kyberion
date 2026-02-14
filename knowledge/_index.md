@@ -5,131 +5,131 @@
 
 ## Summary
 
-| Metric | Value |
-| ------ | ----- |
-| Total files | 117 |
-| Total size | 436.0 KB |
-| personal files | 1 (679 B) |
-| public files | 116 (435.4 KB) |
+| Metric         | Value          |
+| -------------- | -------------- |
+| Total files    | 117            |
+| Total size     | 436.0 KB       |
+| personal files | 1 (679 B)      |
+| public files   | 116 (435.4 KB) |
 
 ## File Catalog
 
-| Tier | Path | Title / Key | Size | Modified | Stale? |
-| ---- | ---- | ----------- | ---- | -------- | ------ |
-| personal | personal/README.md | Personal Tier Configuration (Local Only) | 679 B | 2026-02-07 |  |
-| public | ai-engineering/best_practices.md | AIエンジニアリング・ベストプラクティス | 1.5 KB | 2026-02-07 |  |
-| public | ai-engineering/review_checklist.md | AIシステム・レビューチェックリスト | 743 B | 2026-02-07 |  |
-| public | ai-engineering/strategy.md | エンタープライズ生成AI導入戦略 (Enterprise AI Strategy) | 1.6 KB | 2026-02-07 |  |
-| public | ceo/finance/kpi_standards.md | 財務KPI標準基準 (Financial KPI Standards) | 1.1 KB | 2026-02-07 |  |
-| public | ceo/investment/tech_dd_standard.md | 技術デューデリジェンス (Tech DD) 標準基準 | 1.7 KB | 2026-02-07 |  |
-| public | ceo/mission/corporate_purpose.md | コーポレート・パーパス ＆ 経営理念 (Corporate Purpose) | 1002 B | 2026-02-07 |  |
-| public | ceo/planning/frameworks.md | 事業計画 ＆ 戦略フレームワーク (Planning Frameworks) | 906 B | 2026-02-07 |  |
-| public | common/exclude-patterns.yaml | directories | 1.4 KB | 2026-02-07 |  |
-| public | connections/setup_guide.md | ユニバーサル接続設定ガイド (UCM Setup) | 1.1 KB | 2026-02-07 |  |
-| public | evolution/biometric_privacy.md | Biometric & Mood Data Privacy Protocol | 711 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/architect.md | Your Role | 6.1 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/build-error-resolver.md | Build Error Resolver | 11.9 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/code-reviewer.md | Security Checks (CRITICAL) | 2.8 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/database-reviewer.md | Database Reviewer | 17.5 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/doc-updater.md | Documentation & Codemap Specialist | 10.8 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/e2e-runner.md | E2E Test Runner | 22.1 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/go-build-resolver.md | Go Build Error Resolver | 7.2 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/go-reviewer.md | Security Checks (CRITICAL) | 6.5 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/planner.md | Your Role | 3.2 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/python-reviewer.md | Security Checks (CRITICAL) | 10.1 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/refactor-cleaner.md | Refactor & Dead Code Cleaner | 7.5 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/security-reviewer.md | Security Reviewer | 14.0 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/agents/tdd-guide.md | Your Role | 6.9 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/agents.md | Agent Orchestration | 1.5 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/coding-style.md | Coding Style | 1.4 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/git-workflow.md | Git Workflow | 1.0 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/hooks.md | Hooks System | 768 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/patterns.md | Common Patterns | 1022 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/performance.md | Performance Optimization | 1.6 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/security.md | Security Guidelines | 862 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/common/testing.md | Testing Requirements | 770 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/golang/coding-style.md | Go Coding Style | 519 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/golang/hooks.md | Go Hooks | 345 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/golang/patterns.md | Go Patterns | 828 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/golang/security.md | Go Security | 497 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/golang/testing.md | Go Testing | 396 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/python/coding-style.md | Python Coding Style | 667 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/python/hooks.md | Python Hooks | 380 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/python/patterns.md | Python Patterns | 779 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/python/security.md | Python Security | 480 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/python/testing.md | Python Testing | 537 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/README.md | Rules | 2.3 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/typescript/coding-style.md | TypeScript/JavaScript Coding Style | 1.0 KB | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/typescript/hooks.md | TypeScript/JavaScript Hooks | 488 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/typescript/patterns.md | TypeScript/JavaScript Patterns | 957 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/typescript/security.md | TypeScript/JavaScript Security | 475 B | 2026-02-07 |  |
-| public | external-wisdom/everything-claude/rules/typescript/testing.md | TypeScript/JavaScript Testing | 302 B | 2026-02-07 |  |
-| public | fisc-compliance/aws_fisc_standard.md | AWS FISC (金融機関向け安全対策基準) 準拠ガイド | 1.8 KB | 2026-02-07 |  |
-| public | fisc-compliance/blea_fisc_reference.md | AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド | 2.1 KB | 2026-02-07 |  |
-| public | frameworks/conceptual-frameworks.md | Conceptual Frameworks Reference | 11.9 KB | 2026-02-07 |  |
-| public | frameworks/README.md | Conceptual Frameworks | 1.3 KB | 2026-02-07 |  |
-| public | glossaries/nonfunctional.json | RPO | 2.9 KB | 2026-02-07 |  |
-| public | glossaries/tech.json | API | 76 B | 2026-02-07 |  |
-| public | nonfunctional/iac-patterns.yaml | patterns | 3.1 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/_meta.yaml | IPA 非機能要求グレード 2018 | 1.6 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/availability.yaml | category | 16.2 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/environment.yaml | category | 23.0 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/migration.yaml | category | 9.4 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/operation.yaml | category | 37.4 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/performance.yaml | category | 32.4 KB | 2026-02-07 |  |
-| public | nonfunctional/ipa-grade-2018/security.yaml | category | 25.3 KB | 2026-02-07 |  |
-| public | nonfunctional/test-viewpoints/ipa_grade_2018.md | 非機能テスト観点カタログ (IPA非機能要求グレード2018準拠) | 2.2 KB | 2026-02-07 |  |
-| public | operations/monitoring/best_practices.md | 監視設定ベストプラクティス・チェックリスト | 946 B | 2026-02-07 |  |
-| public | operations/monitoring/datadog_best_practices.md | Datadog 導入・運用ベストプラクティス | 1.0 KB | 2026-02-07 |  |
-| public | operations/monitoring/newrelic_best_practices.md | New Relic 導入・運用ベストプラクティス | 1019 B | 2026-02-07 |  |
-| public | operations/runbooks/standard.md | 運用ランブック（手順書）標準構成 | 1.0 KB | 2026-02-07 |  |
-| public | orchestration/advanced-development-flow.md | 高度な自律開発標準ワークフロー (Advanced Development Flow) | 1.4 KB | 2026-02-07 |  |
-| public | orchestration/autonomous-debug-loop.md | 自律型デバッグ・ループ (Autonomous Debug Loop) | 1.4 KB | 2026-02-07 |  |
-| public | orchestration/context-extraction-rules.md | コンテキスト抽出・要約ルール (Context Extraction Rules) | 1.1 KB | 2026-02-07 |  |
-| public | orchestration/corporate-env-guide.md | 企業内ネットワーク環境セットアップガイド | 1.1 KB | 2026-02-07 |  |
-| public | orchestration/data-handover-specs.md | スキル間データ受け渡し仕様 (Data Handover Specs) | 833 B | 2026-02-07 |  |
-| public | orchestration/fusion-protocols/learning_loop.md | Continuous Learning Loop Protocol | 886 B | 2026-02-07 |  |
-| public | orchestration/git-flow-standards.md | 自律的 Git ブランチ・PR 運用基準 (Git Flow Standards) | 1.1 KB | 2026-02-07 |  |
-| public | orchestration/global_skill_index.json | total_skills | 29.5 KB | 2026-02-07 |  |
-| public | orchestration/hybrid-development-flow.md | ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow) | 1.3 KB | 2026-02-07 |  |
-| public | orchestration/knowledge-protocol.md | ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model) | 1.7 KB | 2026-02-07 |  |
-| public | orchestration/meta-skills/intent_mapping.yaml | intents | 942 B | 2026-02-07 |  |
-| public | orchestration/mission-playbooks/ceo-strategy.md | ミッション・プレイブック：CEO戦略的意思決定 | 1.1 KB | 2026-02-07 |  |
-| public | orchestration/mission-playbooks/product-audit.md | ミッション・プレイブック：プロダクト健全性 ＆ リリース監査 | 922 B | 2026-02-07 |  |
-| public | orchestration/mission-playbooks/saas-roi.md | ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定 | 923 B | 2026-02-07 |  |
-| public | orchestration/optimization-standards.md | 自律型シナジー標準基準 (Autonomous Synergy Standards) | 1.2 KB | 2026-02-07 |  |
-| public | orchestration/polyglot-roadmap.md | Polyglot Core Transformation Roadmap (Sidecar Architecture) | 899 B | 2026-02-07 |  |
-| public | orchestration/proposal-pipeline.md | Professional Proposal Pipeline (Orchestration Pattern) | 1.1 KB | 2026-02-07 |  |
-| public | orchestration/quality-management-flow.md | エンタープライズ品質管理フロー (Quality Management Flow) | 873 B | 2026-02-07 |  |
-| public | orchestration/asset-token-economy-protocol.md | トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol) | 1.5 KB | 2026-02-07 |  |
-| public | personalities/matrix.md | ペルソナ・マトリクス (Persona Matrix) | 1.6 KB | 2026-02-07 |  |
-| public | pmo/standards/governance.md | PMO ガバナンス標準基準 (Governance Standard) | 1.2 KB | 2026-02-07 |  |
-| public | pmo/templates/external_status_report.md | 対外報告用ステータスレポート・テンプレート | 727 B | 2026-02-07 |  |
-| public | project-health/checks.yaml | checks | 4.8 KB | 2026-02-07 |  |
-| public | quality-management/metrics_standards.md | 定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics) | 2.0 KB | 2026-02-07 |  |
-| public | README.md | Gemini Skills Knowledge Base: Rights & Usage | 1.1 KB | 2026-02-07 |  |
-| public | requirements-guide/ipa_best_practices.md | 要件定義ガイド (IPA準拠) | 2.0 KB | 2026-02-07 |  |
-| public | requirements-guide/review_checklist.md | 要件定義ドキュメント・レビューチェックリスト | 1.5 KB | 2026-02-07 |  |
-| public | schema/detection-patterns.yaml | patterns | 2.5 KB | 2026-02-07 |  |
-| public | sdlc/design_standard_nablarch.md | アプリケーション方式設計標準 (Nablarch/AWS参考) | 1.8 KB | 2026-02-07 |  |
-| public | sdlc/waterfall_standard.md | ウォーターフォール開発標準：工程と成果物 (SDLC Standard) | 1.7 KB | 2026-02-07 |  |
-| public | security/scan-patterns.yaml | secret_patterns | 4.7 KB | 2026-02-07 |  |
-| public | strategy/winning-proposal-standards.md | Winning Proposal Standards (Strategic Communication) | 789 B | 2026-02-07 |  |
-| public | tech-stack/atlassian/jira_best_practices.md | Jira 運用ベストプラクティス | 641 B | 2026-02-07 |  |
-| public | tech-stack/aws_unified_operations_support.md | AWS Unified Operations Team (Premium Support Extension) | 1.8 KB | 2026-02-07 |  |
-| public | tech-stack/box_api.md | Box API 連携ガイド (Node.js SDK) | 1.5 KB | 2026-02-07 |  |
-| public | tech-stack/box_cli.md | Box CLI 活用ガイド | 1.2 KB | 2026-02-07 |  |
-| public | tech-stack/google/workspace_best_practices.md | Google Workspace 連携ベストプラクティス | 610 B | 2026-02-07 |  |
-| public | tech-stack/macos/voice_control_guide.md | macOS 音声コントロール ＆ 音声入力活用ガイド | 1.4 KB | 2026-02-07 |  |
-| public | templates/themes/excel_design_guide.md | プロフェッショナル・エクセル設計書テーマガイド | 1.6 KB | 2026-02-07 |  |
-| public | templates/themes/marp_theme_guide.md | Marp テーマ作成 ＆ スタイリング完全ガイド | 2.1 KB | 2026-02-07 |  |
-| public | templates/themes/palettes/blue-cloud.json | primary | 153 B | 2026-02-07 |  |
-| public | templates/themes/palettes/self-brand.json | Gemini Autonomous Engineering | 219 B | 2026-02-07 |  |
-| public | templates/themes/proposer/palettes/gae.json | proposer_name | 236 B | 2026-02-07 |  |
-| public | templates/themes/theme_design_guide.md | プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS) | 2.4 KB | 2026-02-07 |  |
-| public | templates/themes/visual_harmony_guide.md | ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition | 1.0 KB | 2026-02-07 |  |
-| public | terraform/diagram-config.yaml | provider_icons | 3.1 KB | 2026-02-07 |  |
-| public | test-runners/detection.yaml | runners | 3.4 KB | 2026-02-07 |  |
-| public | testing/test_item_specification.md | テスト項目表・実施結果標準仕様 (Test Item Specification) | 1.3 KB | 2026-02-07 |  |
-| public | testing/viewpoint-catalogs/tis_catalog_v1_6.md | テスト観点カタログ (TIS株式会社 公開版 v1.6) | 2.8 KB | 2026-02-07 |  |
-| public | voice/persona_definitions.md | 音声ペルソナ定義 (Voice Persona Definitions) | 1.0 KB | 2026-02-07 |  |
+| Tier     | Path                                                               | Title / Key                                                              | Size    | Modified   | Stale? |
+| -------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------- | ---------- | ------ |
+| personal | personal/README.md                                                 | Personal Tier Configuration (Local Only)                                 | 679 B   | 2026-02-07 |        |
+| public   | ai-engineering/best_practices.md                                   | AIエンジニアリング・ベストプラクティス                                   | 1.5 KB  | 2026-02-07 |        |
+| public   | ai-engineering/review_checklist.md                                 | AIシステム・レビューチェックリスト                                       | 743 B   | 2026-02-07 |        |
+| public   | ai-engineering/strategy.md                                         | エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)                  | 1.6 KB  | 2026-02-07 |        |
+| public   | ceo/finance/kpi_standards.md                                       | 財務KPI標準基準 (Financial KPI Standards)                                | 1.1 KB  | 2026-02-07 |        |
+| public   | ceo/investment/tech_dd_standard.md                                 | 技術デューデリジェンス (Tech DD) 標準基準                                | 1.7 KB  | 2026-02-07 |        |
+| public   | ceo/mission/corporate_purpose.md                                   | コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)                   | 1002 B  | 2026-02-07 |        |
+| public   | ceo/planning/frameworks.md                                         | 事業計画 ＆ 戦略フレームワーク (Planning Frameworks)                     | 906 B   | 2026-02-07 |        |
+| public   | common/exclude-patterns.yaml                                       | directories                                                              | 1.4 KB  | 2026-02-07 |        |
+| public   | connections/setup_guide.md                                         | ユニバーサル接続設定ガイド (UCM Setup)                                   | 1.1 KB  | 2026-02-07 |        |
+| public   | evolution/biometric_privacy.md                                     | Biometric & Mood Data Privacy Protocol                                   | 711 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/architect.md              | Your Role                                                                | 6.1 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/build-error-resolver.md   | Build Error Resolver                                                     | 11.9 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/code-reviewer.md          | Security Checks (CRITICAL)                                               | 2.8 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/database-reviewer.md      | Database Reviewer                                                        | 17.5 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/doc-updater.md            | Documentation & Codemap Specialist                                       | 10.8 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/e2e-runner.md             | E2E Test Runner                                                          | 22.1 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/go-build-resolver.md      | Go Build Error Resolver                                                  | 7.2 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/go-reviewer.md            | Security Checks (CRITICAL)                                               | 6.5 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/planner.md                | Your Role                                                                | 3.2 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/python-reviewer.md        | Security Checks (CRITICAL)                                               | 10.1 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/refactor-cleaner.md       | Refactor & Dead Code Cleaner                                             | 7.5 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/security-reviewer.md      | Security Reviewer                                                        | 14.0 KB | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/agents/tdd-guide.md              | Your Role                                                                | 6.9 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/agents.md           | Agent Orchestration                                                      | 1.5 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/coding-style.md     | Coding Style                                                             | 1.4 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/git-workflow.md     | Git Workflow                                                             | 1.0 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/hooks.md            | Hooks System                                                             | 768 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/patterns.md         | Common Patterns                                                          | 1022 B  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/performance.md      | Performance Optimization                                                 | 1.6 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/security.md         | Security Guidelines                                                      | 862 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/common/testing.md          | Testing Requirements                                                     | 770 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/golang/coding-style.md     | Go Coding Style                                                          | 519 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/golang/hooks.md            | Go Hooks                                                                 | 345 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/golang/patterns.md         | Go Patterns                                                              | 828 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/golang/security.md         | Go Security                                                              | 497 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/golang/testing.md          | Go Testing                                                               | 396 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/python/coding-style.md     | Python Coding Style                                                      | 667 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/python/hooks.md            | Python Hooks                                                             | 380 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/python/patterns.md         | Python Patterns                                                          | 779 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/python/security.md         | Python Security                                                          | 480 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/python/testing.md          | Python Testing                                                           | 537 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/README.md                  | Rules                                                                    | 2.3 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/typescript/coding-style.md | TypeScript/JavaScript Coding Style                                       | 1.0 KB  | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/typescript/hooks.md        | TypeScript/JavaScript Hooks                                              | 488 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/typescript/patterns.md     | TypeScript/JavaScript Patterns                                           | 957 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/typescript/security.md     | TypeScript/JavaScript Security                                           | 475 B   | 2026-02-07 |        |
+| public   | external-wisdom/everything-claude/rules/typescript/testing.md      | TypeScript/JavaScript Testing                                            | 302 B   | 2026-02-07 |        |
+| public   | fisc-compliance/aws_fisc_standard.md                               | AWS FISC (金融機関向け安全対策基準) 準拠ガイド                           | 1.8 KB  | 2026-02-07 |        |
+| public   | fisc-compliance/blea_fisc_reference.md                             | AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド             | 2.1 KB  | 2026-02-07 |        |
+| public   | frameworks/conceptual-frameworks.md                                | Conceptual Frameworks Reference                                          | 11.9 KB | 2026-02-07 |        |
+| public   | frameworks/README.md                                               | Conceptual Frameworks                                                    | 1.3 KB  | 2026-02-07 |        |
+| public   | glossaries/nonfunctional.json                                      | RPO                                                                      | 2.9 KB  | 2026-02-07 |        |
+| public   | glossaries/tech.json                                               | API                                                                      | 76 B    | 2026-02-07 |        |
+| public   | nonfunctional/iac-patterns.yaml                                    | patterns                                                                 | 3.1 KB  | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/\_meta.yaml                           | IPA 非機能要求グレード 2018                                              | 1.6 KB  | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/availability.yaml                     | category                                                                 | 16.2 KB | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/environment.yaml                      | category                                                                 | 23.0 KB | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/migration.yaml                        | category                                                                 | 9.4 KB  | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/operation.yaml                        | category                                                                 | 37.4 KB | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/performance.yaml                      | category                                                                 | 32.4 KB | 2026-02-07 |        |
+| public   | nonfunctional/ipa-grade-2018/security.yaml                         | category                                                                 | 25.3 KB | 2026-02-07 |        |
+| public   | nonfunctional/test-viewpoints/ipa_grade_2018.md                    | 非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)                 | 2.2 KB  | 2026-02-07 |        |
+| public   | operations/monitoring/best_practices.md                            | 監視設定ベストプラクティス・チェックリスト                               | 946 B   | 2026-02-07 |        |
+| public   | operations/monitoring/datadog_best_practices.md                    | Datadog 導入・運用ベストプラクティス                                     | 1.0 KB  | 2026-02-07 |        |
+| public   | operations/monitoring/newrelic_best_practices.md                   | New Relic 導入・運用ベストプラクティス                                   | 1019 B  | 2026-02-07 |        |
+| public   | operations/runbooks/standard.md                                    | 運用ランブック（手順書）標準構成                                         | 1.0 KB  | 2026-02-07 |        |
+| public   | orchestration/advanced-development-flow.md                         | 高度な自律開発標準ワークフロー (Advanced Development Flow)               | 1.4 KB  | 2026-02-07 |        |
+| public   | orchestration/autonomous-debug-loop.md                             | 自律型デバッグ・ループ (Autonomous Debug Loop)                           | 1.4 KB  | 2026-02-07 |        |
+| public   | orchestration/context-extraction-rules.md                          | コンテキスト抽出・要約ルール (Context Extraction Rules)                  | 1.1 KB  | 2026-02-07 |        |
+| public   | orchestration/corporate-env-guide.md                               | 企業内ネットワーク環境セットアップガイド                                 | 1.1 KB  | 2026-02-07 |        |
+| public   | orchestration/data-handover-specs.md                               | スキル間データ受け渡し仕様 (Data Handover Specs)                         | 833 B   | 2026-02-07 |        |
+| public   | orchestration/fusion-protocols/learning_loop.md                    | Continuous Learning Loop Protocol                                        | 886 B   | 2026-02-07 |        |
+| public   | orchestration/git-flow-standards.md                                | 自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)                    | 1.1 KB  | 2026-02-07 |        |
+| public   | orchestration/global_skill_index.json                              | total_skills                                                             | 29.5 KB | 2026-02-07 |        |
+| public   | orchestration/hybrid-development-flow.md                           | ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)             | 1.3 KB  | 2026-02-07 |        |
+| public   | orchestration/knowledge-protocol.md                                | ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)              | 1.7 KB  | 2026-02-07 |        |
+| public   | orchestration/meta-skills/intent_mapping.yaml                      | intents                                                                  | 942 B   | 2026-02-07 |        |
+| public   | orchestration/mission-playbooks/ceo-strategy.md                    | ミッション・プレイブック：CEO戦略的意思決定                              | 1.1 KB  | 2026-02-07 |        |
+| public   | orchestration/mission-playbooks/product-audit.md                   | ミッション・プレイブック：プロダクト健全性 ＆ リリース監査               | 922 B   | 2026-02-07 |        |
+| public   | orchestration/mission-playbooks/saas-roi.md                        | ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定       | 923 B   | 2026-02-07 |        |
+| public   | orchestration/optimization-standards.md                            | 自律型シナジー標準基準 (Autonomous Synergy Standards)                    | 1.2 KB  | 2026-02-07 |        |
+| public   | orchestration/polyglot-roadmap.md                                  | Polyglot Core Transformation Roadmap (Sidecar Architecture)              | 899 B   | 2026-02-07 |        |
+| public   | orchestration/proposal-pipeline.md                                 | Professional Proposal Pipeline (Orchestration Pattern)                   | 1.1 KB  | 2026-02-07 |        |
+| public   | orchestration/quality-management-flow.md                           | エンタープライズ品質管理フロー (Quality Management Flow)                 | 873 B   | 2026-02-07 |        |
+| public   | orchestration/asset-token-economy-protocol.md                            | トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)    | 1.5 KB  | 2026-02-07 |        |
+| public   | personalities/matrix.md                                            | ペルソナ・マトリクス (Persona Matrix)                                    | 1.6 KB  | 2026-02-07 |        |
+| public   | pmo/standards/governance.md                                        | PMO ガバナンス標準基準 (Governance Standard)                             | 1.2 KB  | 2026-02-07 |        |
+| public   | pmo/templates/external_status_report.md                            | 対外報告用ステータスレポート・テンプレート                               | 727 B   | 2026-02-07 |        |
+| public   | project-health/checks.yaml                                         | checks                                                                   | 4.8 KB  | 2026-02-07 |        |
+| public   | quality-management/metrics_standards.md                            | 定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)               | 2.0 KB  | 2026-02-07 |        |
+| public   | README.md                                                          | Gemini Skills Knowledge Base: Rights & Usage                             | 1.1 KB  | 2026-02-07 |        |
+| public   | requirements-guide/ipa_best_practices.md                           | 要件定義ガイド (IPA準拠)                                                 | 2.0 KB  | 2026-02-07 |        |
+| public   | requirements-guide/review_checklist.md                             | 要件定義ドキュメント・レビューチェックリスト                             | 1.5 KB  | 2026-02-07 |        |
+| public   | schema/detection-patterns.yaml                                     | patterns                                                                 | 2.5 KB  | 2026-02-07 |        |
+| public   | sdlc/design_standard_nablarch.md                                   | アプリケーション方式設計標準 (Nablarch/AWS参考)                          | 1.8 KB  | 2026-02-07 |        |
+| public   | sdlc/waterfall_standard.md                                         | ウォーターフォール開発標準：工程と成果物 (SDLC Standard)                 | 1.7 KB  | 2026-02-07 |        |
+| public   | security/scan-patterns.yaml                                        | secret_patterns                                                          | 4.7 KB  | 2026-02-07 |        |
+| public   | strategy/winning-proposal-standards.md                             | Winning Proposal Standards (Strategic Communication)                     | 789 B   | 2026-02-07 |        |
+| public   | tech-stack/atlassian/jira_best_practices.md                        | Jira 運用ベストプラクティス                                              | 641 B   | 2026-02-07 |        |
+| public   | tech-stack/aws_unified_operations_support.md                       | AWS Unified Operations Team (Premium Support Extension)                  | 1.8 KB  | 2026-02-07 |        |
+| public   | tech-stack/box_api.md                                              | Box API 連携ガイド (Node.js SDK)                                         | 1.5 KB  | 2026-02-07 |        |
+| public   | tech-stack/box_cli.md                                              | Box CLI 活用ガイド                                                       | 1.2 KB  | 2026-02-07 |        |
+| public   | tech-stack/google/workspace_best_practices.md                      | Google Workspace 連携ベストプラクティス                                  | 610 B   | 2026-02-07 |        |
+| public   | tech-stack/macos/voice_control_guide.md                            | macOS 音声コントロール ＆ 音声入力活用ガイド                             | 1.4 KB  | 2026-02-07 |        |
+| public   | templates/themes/excel_design_guide.md                             | プロフェッショナル・エクセル設計書テーマガイド                           | 1.6 KB  | 2026-02-07 |        |
+| public   | templates/themes/marp_theme_guide.md                               | Marp テーマ作成 ＆ スタイリング完全ガイド                                | 2.1 KB  | 2026-02-07 |        |
+| public   | templates/themes/palettes/blue-cloud.json                          | primary                                                                  | 153 B   | 2026-02-07 |        |
+| public   | templates/themes/palettes/self-brand.json                          | Gemini Autonomous Engineering                                            | 219 B   | 2026-02-07 |        |
+| public   | templates/themes/proposer/palettes/gae.json                        | proposer_name                                                            | 236 B   | 2026-02-07 |        |
+| public   | templates/themes/theme_design_guide.md                             | プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)                  | 2.4 KB  | 2026-02-07 |        |
+| public   | templates/themes/visual_harmony_guide.md                           | ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition | 1.0 KB  | 2026-02-07 |        |
+| public   | terraform/diagram-config.yaml                                      | provider_icons                                                           | 3.1 KB  | 2026-02-07 |        |
+| public   | test-runners/detection.yaml                                        | runners                                                                  | 3.4 KB  | 2026-02-07 |        |
+| public   | testing/test_item_specification.md                                 | テスト項目表・実施結果標準仕様 (Test Item Specification)                 | 1.3 KB  | 2026-02-07 |        |
+| public   | testing/viewpoint-catalogs/tis_catalog_v1_6.md                     | テスト観点カタログ (TIS株式会社 公開版 v1.6)                             | 2.8 KB  | 2026-02-07 |        |
+| public   | voice/persona_definitions.md                                       | 音声ペルソナ定義 (Voice Persona Definitions)                             | 1.0 KB  | 2026-02-07 |        |

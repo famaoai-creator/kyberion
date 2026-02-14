@@ -51,7 +51,7 @@ export interface CompletenessResult {
  */
 export function scoreCompleteness(
   content: string,
-  criteria?: CompletenessCriteria,
+  criteria?: CompletenessCriteria
 ): CompletenessResult {
   let score = 100;
   const issues: string[] = [];
@@ -71,7 +71,7 @@ export function scoreCompleteness(
 
   // Check 3: Required Keywords (if criteria provided)
   if (criteria?.required) {
-    criteria.required.forEach(keyword => {
+    criteria.required.forEach((keyword) => {
       if (!content.includes(keyword)) {
         score -= 10;
         issues.push(`Missing keyword: ${keyword}`);
@@ -95,7 +95,7 @@ export function scoreCompleteness(
  */
 export function buildCompletenessOutput(
   result: CompletenessResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<CompletenessResult> {
   return {
     skill: 'completeness-scorer',

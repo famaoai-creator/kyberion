@@ -57,22 +57,28 @@ const argv = createStandardYargs()
   .check((parsed) => {
     const validProviders = ['aws', 'azure', 'gcp'];
     if (!validProviders.includes(parsed.provider.toLowerCase())) {
-      throw new Error(`Invalid provider "${parsed.provider}". Must be one of: ${validProviders.join(', ')}`);
+      throw new Error(
+        `Invalid provider "${parsed.provider}". Must be one of: ${validProviders.join(', ')}`
+      );
     }
     const validFormats = ['terraform', 'docker', 'k8s'];
     if (!validFormats.includes(parsed.format.toLowerCase())) {
-      throw new Error(`Invalid format "${parsed.format}". Must be one of: ${validFormats.join(', ')}`);
+      throw new Error(
+        `Invalid format "${parsed.format}". Must be one of: ${validFormats.join(', ')}`
+      );
     }
     return true;
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // --- Resource mappings per provider ---
 const PROVIDER_RESOURCES = {
   aws: {
     compute: { resource: 'aws_instance', ami: 'ami-0c55b159cbfafe1f0' },
-    database: { resource: 'aws_db_instance', engines: { postgres: 'postgres', mysql: 'mysql', mariadb: 'mariadb' } },
+    database: {
+      resource: 'aws_db_instance',
+      engines: { postgres: 'postgres', mysql: 'mysql', mariadb: 'mariadb' },
+    },
     storage: { resource: 'aws_s3_bucket' },
     cache: { resource: 'aws_elasticache_cluster' },
     queue: { resource: 'aws_sqs_queue' },
@@ -80,7 +86,10 @@ const PROVIDER_RESOURCES = {
   },
   azure: {
     compute: { resource: 'azurerm_linux_virtual_machine' },
-    database: { resource: 'azurerm_postgresql_flexible_server', engines: { postgres: 'postgres', mysql: 'mysql' } },
+    database: {
+      resource: 'azurerm_postgresql_flexible_server',
+      engines: { postgres: 'postgres', mysql: 'mysql' },
+    },
     storage: { resource: 'azurerm_storage_account' },
     cache: { resource: 'azurerm_redis_cache' },
     queue: { resource: 'azurerm_servicebus_queue' },
@@ -88,7 +97,10 @@ const PROVIDER_RESOURCES = {
   },
   gcp: {
     compute: { resource: 'google_compute_instance' },
-    database: { resource: 'google_sql_database_instance', engines: { postgres: 'POSTGRES', mysql: 'MYSQL' } },
+    database: {
+      resource: 'google_sql_database_instance',
+      engines: { postgres: 'POSTGRES', mysql: 'MYSQL' },
+    },
     storage: { resource: 'google_storage_bucket' },
     cache: { resource: 'google_redis_instance' },
     queue: { resource: 'google_pubsub_topic' },
@@ -98,14 +110,34 @@ const PROVIDER_RESOURCES = {
 
 const SIZE_MAP = {
   aws: { small: 't3.small', medium: 't3.medium', large: 't3.large', xlarge: 't3.xlarge' },
-  azure: { small: 'Standard_B1s', medium: 'Standard_B2s', large: 'Standard_D2s_v3', xlarge: 'Standard_D4s_v3' },
+  azure: {
+    small: 'Standard_B1s',
+    medium: 'Standard_B2s',
+    large: 'Standard_D2s_v3',
+    xlarge: 'Standard_D4s_v3',
+  },
   gcp: { small: 'e2-small', medium: 'e2-medium', large: 'e2-standard-2', xlarge: 'e2-standard-4' },
 };
 
 const DB_SIZE_MAP = {
-  aws: { small: 'db.t3.small', medium: 'db.t3.medium', large: 'db.r5.large', xlarge: 'db.r5.xlarge' },
-  azure: { small: 'B_Standard_B1ms', medium: 'GP_Standard_D2s_v3', large: 'GP_Standard_D4s_v3', xlarge: 'GP_Standard_D8s_v3' },
-  gcp: { small: 'db-f1-micro', medium: 'db-custom-2-7680', large: 'db-custom-4-15360', xlarge: 'db-custom-8-30720' },
+  aws: {
+    small: 'db.t3.small',
+    medium: 'db.t3.medium',
+    large: 'db.r5.large',
+    xlarge: 'db.r5.xlarge',
+  },
+  azure: {
+    small: 'B_Standard_B1ms',
+    medium: 'GP_Standard_D2s_v3',
+    large: 'GP_Standard_D4s_v3',
+    xlarge: 'GP_Standard_D8s_v3',
+  },
+  gcp: {
+    small: 'db-f1-micro',
+    medium: 'db-custom-2-7680',
+    large: 'db-custom-4-15360',
+    xlarge: 'db-custom-8-30720',
+  },
 };
 
 /**
@@ -614,12 +646,22 @@ function generateDockerCompose(services) {
       };
     } else if (type === 'database') {
       const engine = (svc.engine || 'postgres').toLowerCase();
-      const images = { postgres: 'postgres:15-alpine', mysql: 'mysql:8.0', mariadb: 'mariadb:10.11' };
+      const images = {
+        postgres: 'postgres:15-alpine',
+        mysql: 'mysql:8.0',
+        mariadb: 'mariadb:10.11',
+      };
       composeServices[name] = {
         image: images[engine] || images.postgres,
-        environment: engine === 'postgres'
-          ? ['POSTGRES_DB=app', 'POSTGRES_USER=app', 'POSTGRES_PASSWORD=changeme']
-          : ['MYSQL_DATABASE=app', 'MYSQL_USER=app', 'MYSQL_PASSWORD=changeme', 'MYSQL_ROOT_PASSWORD=changeme'],
+        environment:
+          engine === 'postgres'
+            ? ['POSTGRES_DB=app', 'POSTGRES_USER=app', 'POSTGRES_PASSWORD=changeme']
+            : [
+                'MYSQL_DATABASE=app',
+                'MYSQL_USER=app',
+                'MYSQL_PASSWORD=changeme',
+                'MYSQL_ROOT_PASSWORD=changeme',
+              ],
         volumes: [`${name}_data:/var/lib/${engine === 'postgres' ? 'postgresql/data' : 'mysql'}`],
         restart: 'unless-stopped',
       };
@@ -936,7 +978,9 @@ function generateRecommendations(services, provider, format) {
   if (provider === 'aws') {
     recommendations.push('Enable AWS CloudTrail and GuardDuty for security monitoring.');
   } else if (provider === 'azure') {
-    recommendations.push('Enable Azure Security Center for threat detection and compliance monitoring.');
+    recommendations.push(
+      'Enable Azure Security Center for threat detection and compliance monitoring.'
+    );
   } else if (provider === 'gcp') {
     recommendations.push('Enable Cloud Audit Logs and Security Command Center for visibility.');
   }
@@ -956,9 +1000,7 @@ runSkill('environment-provisioner', () => {
   const config = parseConfig(resolved);
 
   if (!config || !Array.isArray(config.services) || config.services.length === 0) {
-    throw new Error(
-      'Config must contain a "services" array with at least one service definition.'
-    );
+    throw new Error('Config must contain a "services" array with at least one service definition.');
   }
 
   const provider = argv.provider.toLowerCase();

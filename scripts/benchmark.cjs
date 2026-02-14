@@ -10,12 +10,23 @@ const resultsDir = path.join(rootDir, 'evidence/benchmarks');
 if (!fs.existsSync(resultsDir)) fs.mkdirSync(resultsDir, { recursive: true });
 
 const SKIP_DIRS = new Set([
-  'node_modules', 'knowledge', 'scripts', 'schemas', 'templates',
-  'evidence', 'coverage', 'test-results', 'work', 'nonfunctional', 'dist', 'tests', '.github'
+  'node_modules',
+  'knowledge',
+  'scripts',
+  'schemas',
+  'templates',
+  'evidence',
+  'coverage',
+  'test-results',
+  'work',
+  'nonfunctional',
+  'dist',
+  'tests',
+  '.github',
 ]);
 
 const skills = [];
-const dirs = fs.readdirSync(rootDir).filter(f => {
+const dirs = fs.readdirSync(rootDir).filter((f) => {
   const fullPath = path.join(rootDir, f);
   return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && !SKIP_DIRS.has(f);
 });
@@ -23,7 +34,7 @@ const dirs = fs.readdirSync(rootDir).filter(f => {
 for (const dir of dirs) {
   const scriptsDir = path.join(rootDir, dir, 'scripts');
   if (!fs.existsSync(scriptsDir)) continue;
-  const files = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+  const files = fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
   if (files.length > 0) {
     skills.push({ name: dir, script: path.join(scriptsDir, files[0]) });
   }
@@ -60,7 +71,9 @@ for (const skill of skills) {
     iterations,
   });
 
-  console.log(`  ${skill.name.padEnd(35)} avg: ${avg.toFixed(1)}ms  min: ${min.toFixed(1)}ms  max: ${max.toFixed(1)}ms`);
+  console.log(
+    `  ${skill.name.padEnd(35)} avg: ${avg.toFixed(1)}ms  min: ${min.toFixed(1)}ms  max: ${max.toFixed(1)}ms`
+  );
 }
 
 const report = {

@@ -13,12 +13,38 @@ try {
 }
 // ----------------------
 
-const { logger, fileUtils } = require('./lib/core.cjs');
+const { logger, fileUtils, ui } = require('./lib/core.cjs');
+const chalk = require('chalk');
 const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
+
+// --- UX: Proactive Health Check ---
+function checkHealth() {
+  const reportPath = path.join(rootDir, 'work/governance-report.json');
+  if (fs.existsSync(reportPath)) {
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    const lastScan = new Date(report.timestamp);
+    const hoursSinceScan = (Date.now() - lastScan) / (1000 * 60 * 60);
+
+    if (report.overall_status !== 'compliant') {
+      logger.warn(
+        'Ecosystem is currently NON-COMPLIANT. Run "node scripts/governance_check.cjs" for details.'
+      );
+    } else if (hoursSinceScan > 24) {
+      logger.info(
+        `Last governance check was ${Math.round(hoursSinceScan)}h ago. Consider running a fresh scan.`
+      );
+    }
+  } else {
+    logger.warn('No governance report found. Initializing health check is recommended.');
+  }
+}
 
 // --- Role Identity Display ---
 const currentRole = fileUtils.getCurrentRole();
-console.log(`\x1b[36m[Ecosystem Identity] Active Role: ${currentRole}\x1b[0m\n`);
+console.log(
+  `\x1b[36m[Ecosystem Identity]\x1b[0m ${chalk.bold(currentRole)} ${chalk.dim(`(Mission: ${process.env.MISSION_ID || 'None'})`)}\n`
+);
+checkHealth();
 // -----------------------------
 
 const args = process.argv.slice(2);
@@ -33,19 +59,19 @@ function loadIndex() {
 function findScript(skillDir) {
   const scriptsDir = path.join(skillDir, 'scripts');
   const distDir = path.join(skillDir, 'dist');
-  
+
   // 1. Search in scripts/ (prefer main.cjs)
   if (fs.existsSync(scriptsDir)) {
-    const files = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
-    const main = files.find(f => f === 'main.cjs' || f === 'main.js');
+    const files = fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
+    const main = files.find((f) => f === 'main.cjs' || f === 'main.js');
     if (main) return path.join(scriptsDir, main);
     if (files.length > 0) return path.join(scriptsDir, files[0]);
   }
 
   // 2. Search in dist/ (compiled TS)
   if (fs.existsSync(distDir)) {
-    const files = fs.readdirSync(distDir).filter(f => f.endsWith('.js'));
-    const main = files.find(f => f === 'main.js' || f === 'score.js');
+    const files = fs.readdirSync(distDir).filter((f) => f.endsWith('.js'));
+    const main = files.find((f) => f === 'main.js' || f === 'score.js');
     if (main) return path.join(distDir, main);
     if (files.length > 0) return path.join(distDir, files[0]);
   }
@@ -60,12 +86,12 @@ function runCommand() {
   }
 
   const index = loadIndex();
-  const skill = index.skills.find(s => s.name === skillName);
+  const skill = index.skills.find((s) => s.name === skillName);
   if (!skill) {
     logger.error(`Skill "${skillName}" not found in index`);
     const similar = index.skills
-      .filter(s => s.name.includes(skillName) || skillName.includes(s.name))
-      .map(s => s.name);
+      .filter((s) => s.name.includes(skillName) || skillName.includes(s.name))
+      .map((s) => s.name);
     if (similar.length > 0) logger.info(`Did you mean: ${similar.join(', ')}?`);
     process.exit(1);
   }
@@ -78,8 +104,8 @@ function runCommand() {
   }
 
   // Clean arguments: remove the '--' separator if present so child processes can parse flags correctly
-  const cleanArgs = skillArgs.filter(arg => arg !== '--');
-  const cmd = `node "${script}" ${cleanArgs.map(a => `"${a}"`).join(' ')}`;
+  const cleanArgs = skillArgs.filter((arg) => arg !== '--');
+  const cmd = `node "${script}" ${cleanArgs.map((a) => `"${a}"`).join(' ')}`;
   try {
     const output = execSync(cmd, { encoding: 'utf8', cwd: rootDir, stdio: 'pipe' });
     process.stdout.write(output);
@@ -96,18 +122,18 @@ function listCommand() {
 
   let skills = index.skills;
   if (filter && ['implemented', 'planned', 'conceptual'].includes(filter)) {
-    skills = skills.filter(s => s.status === filter);
+    skills = skills.filter((s) => s.status === filter);
   }
 
   // Load metrics for scores
   const { metrics } = require('./lib/metrics.cjs');
   const history = metrics.reportFromHistory();
   const scores = new Map();
-  history.skills.forEach(s => scores.set(s.skill, s.efficiencyScore));
+  history.skills.forEach((s) => scores.set(s.skill, s.efficiencyScore));
 
   // Group by "Domain/Category" (simulated by path prefix or first tag)
   const groups = {};
-  skills.forEach(s => {
+  skills.forEach((s) => {
     // Try to find category from SKILL.md frontmatter or fallback to 'General'
     const skillMd = path.join(rootDir, s.name, 'SKILL.md');
     let category = 'General';
@@ -116,24 +142,30 @@ function listCommand() {
       const fm = parseFrontmatter(content);
       if (fm.category) category = fm.category;
     }
-    
+
     if (!groups[category]) groups[category] = [];
     groups[category].push(s);
   });
 
   console.log(`\n${skills.length} skills${filter ? ` (${filter})` : ''} available:\n`);
 
-  Object.keys(groups).sort().forEach(cat => {
-    console.log(chalk.bold.underline(`${cat}:`));
-    groups[cat].sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
-      const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
-      const score = scores.get(s.name) || '--';
-      const scoreColor = score !== '--' && score < 70 ? chalk.yellow : chalk.green;
-      
-      console.log(`  [${hasScript}] ${s.name.padEnd(30)} ${scoreColor(String(score).padStart(3))} | ${s.description.substring(0, 50)}`);
+  Object.keys(groups)
+    .sort()
+    .forEach((cat) => {
+      console.log(chalk.bold.underline(`${cat}:`));
+      groups[cat]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((s) => {
+          const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
+          const score = scores.get(s.name) || '--';
+          const scoreColor = score !== '--' && score < 70 ? chalk.yellow : chalk.green;
+
+          console.log(
+            `  [${hasScript}] ${s.name.padEnd(30)} ${scoreColor(String(score).padStart(3))} | ${s.description.substring(0, 50)}`
+          );
+        });
+      console.log('');
     });
-    console.log('');
-  });
 
   console.log(`  [+] = runnable | Score: Efficiency (0-100)\n`);
 }
@@ -165,7 +197,11 @@ function parseFrontmatter(content) {
         continue;
       }
       const propMatch = line.match(/^\s{4,}(\w+):\s*(.+)/);
-      if (propMatch && arrayItems.length > 0 && typeof arrayItems[arrayItems.length - 1] === 'object') {
+      if (
+        propMatch &&
+        arrayItems.length > 0 &&
+        typeof arrayItems[arrayItems.length - 1] === 'object'
+      ) {
         arrayItems[arrayItems.length - 1][propMatch[1]] = propMatch[2].trim();
         continue;
       }
@@ -177,8 +213,10 @@ function parseFrontmatter(content) {
     if (kvMatch) {
       currentKey = kvMatch[1];
       const val = kvMatch[2].trim();
-      if (val === '') { inArray = true; arrayItems = []; }
-      else fm[currentKey] = val;
+      if (val === '') {
+        inArray = true;
+        arrayItems = [];
+      } else fm[currentKey] = val;
     }
   }
   if (inArray && currentKey) fm[currentKey] = arrayItems;
@@ -195,9 +233,8 @@ function searchCommand() {
   const index = loadIndex();
   const lowerKey = keyword.toLowerCase();
 
-  const results = index.skills.filter(s =>
-    s.name.toLowerCase().includes(lowerKey) ||
-    s.description.toLowerCase().includes(lowerKey)
+  const results = index.skills.filter(
+    (s) => s.name.toLowerCase().includes(lowerKey) || s.description.toLowerCase().includes(lowerKey)
   );
 
   if (results.length === 0) {
@@ -224,9 +261,11 @@ function searchCommand() {
       const content = fs.readFileSync(skillMd, 'utf8');
       const fm = parseFrontmatter(content);
       if (Array.isArray(fm.arguments) && fm.arguments.length > 0) {
-        const argStr = fm.arguments.map(a =>
-          a.positional ? `<${a.name}>` : `--${a.name}${a.required === 'true' ? '*' : ''}`
-        ).join(' ');
+        const argStr = fm.arguments
+          .map((a) =>
+            a.positional ? `<${a.name}>` : `--${a.name}${a.required === 'true' ? '*' : ''}`
+          )
+          .join(' ');
         console.log(`       args: ${argStr}`);
       }
     }

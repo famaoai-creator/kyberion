@@ -2,29 +2,29 @@
 # Maps abstract user intents to concrete skill chains.
 
 intents:
-  - name: "Total Security Guarantee"
-    trigger_phrases: ["audit security", "is this safe?", "check for vulnerabilities"]
+  - name: 'Total Security Guarantee'
+    trigger_phrases: ['audit security', 'is this safe?', 'check for vulnerabilities']
     chain:
-      - "security-scanner"
-      - "license-auditor"
-      - "supply-chain-sentinel"
-      - "post-quantum-shield"
-      - "red-team-adversary"
+      - 'security-scanner'
+      - 'license-auditor'
+      - 'supply-chain-sentinel'
+      - 'post-quantum-shield'
+      - 'red-team-adversary'
 
-  - name: "Business Launchpad"
-    trigger_phrases: ["new business idea", "launch product", "startup plan"]
+  - name: 'Business Launchpad'
+    trigger_phrases: ['new business idea', 'launch product', 'startup plan']
     chain:
-      - "competitive-intel-strategist"
-      - "financial-modeling-maestro"
-      - "unit-economics-optimizer"
-      - "business-growth-planner"
-      - "pitch-deck-architect"
+      - 'competitive-intel-strategist'
+      - 'financial-modeling-maestro'
+      - 'unit-economics-optimizer'
+      - 'business-growth-planner'
+      - 'pitch-deck-architect'
 
-  - name: "Legacy Modernization"
-    trigger_phrases: ["refactor this mess", "modernize legacy", "update stack"]
+  - name: 'Legacy Modernization'
+    trigger_phrases: ['refactor this mess', 'modernize legacy', 'update stack']
     chain:
-      - "codebase-mapper"
-      - "cognitive-load-auditor"
-      - "technical-debt-valuator"
-      - "refactoring-engine"
-      - "technology-porter"
+      - 'codebase-mapper'
+      - 'cognitive-load-auditor'
+      - 'technical-debt-valuator'
+      - 'refactoring-engine'
+      - 'technology-porter'

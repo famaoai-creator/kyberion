@@ -6,14 +6,16 @@ const { classifyFile } = require('../../scripts/lib/classifier.cjs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
-const argv = createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', demandOption: true })
-    .argv;
+const argv = createStandardYargs().option('input', {
+  alias: 'i',
+  type: 'string',
+  demandOption: true,
+}).argv;
 
 const rulesPath = path.join(__dirname, '../../knowledge/classifiers/intent-rules.yml');
 const rulesData = yaml.load(fs.readFileSync(rulesPath, 'utf8'));
 const INTENTS = rulesData.categories;
 
 runSkill('intent-classifier', () => {
-    return classifyFile(argv.input, INTENTS, { resultKey: rulesData.resultKey });
+  return classifyFile(argv.input, INTENTS, { resultKey: rulesData.resultKey });
 });

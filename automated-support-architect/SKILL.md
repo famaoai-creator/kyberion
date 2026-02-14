@@ -29,15 +29,19 @@ This skill transforms technical implementation details into helpful resources fo
 ## Capabilities
 
 ### 1. Support Asset Generation
+
 - Analyzes requirements and code to generate "How-To" guides and FAQs.
 - Creates structured knowledge bases for customer support chatbots.
 
 ### 2. Error Translation
+
 - Translates technical error codes and stack traces into user-friendly troubleshooting steps.
 
 ## Usage
+
 - "Generate a troubleshooting guide for the new mobile checkout feature."
 - "Build a support FAQ based on the latest API documentation and known edge cases."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

@@ -5,20 +5,20 @@
 const assert = require('assert');
 
 function describe(name, fn) {
-    console.log(`
+  console.log(`
 DESCRIBE: ${name}`);
-    fn();
+  fn();
 }
 
 async function it(name, fn) {
-    try {
-        await fn();
-        console.log(`  [PASS] ${name}`);
-    } catch (e) {
-        console.log(`  [FAIL] ${name}`);
-        console.error(e);
-        process.exit(1);
-    }
+  try {
+    await fn();
+    console.log(`  [PASS] ${name}`);
+  } catch (e) {
+    console.log(`  [FAIL] ${name}`);
+    console.error(e);
+    process.exit(1);
+  }
 }
 
 module.exports = { describe, it, assert };

@@ -22,8 +22,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // --- UX Heuristic Rules ---
 
@@ -32,44 +31,120 @@ const HEURISTICS = {
     name: 'Accessibility',
     weight: 30,
     checks: [
-      { id: 'img-alt', pattern: /<img(?![^>]*alt=)/gi, severity: 'error', message: 'Image missing alt attribute' },
-      { id: 'input-label', pattern: /<input(?![^>]*aria-label)(?![^>]*id=)/gi, severity: 'warning', message: 'Input may lack associated label' },
-      { id: 'lang-attr', pattern: /<html(?![^>]*lang=)/gi, severity: 'error', message: 'HTML tag missing lang attribute' },
-      { id: 'heading-order', pattern: null, custom: 'checkHeadingOrder', severity: 'warning', message: 'Heading hierarchy may be incorrect' },
+      {
+        id: 'img-alt',
+        pattern: /<img(?![^>]*alt=)/gi,
+        severity: 'error',
+        message: 'Image missing alt attribute',
+      },
+      {
+        id: 'input-label',
+        pattern: /<input(?![^>]*aria-label)(?![^>]*id=)/gi,
+        severity: 'warning',
+        message: 'Input may lack associated label',
+      },
+      {
+        id: 'lang-attr',
+        pattern: /<html(?![^>]*lang=)/gi,
+        severity: 'error',
+        message: 'HTML tag missing lang attribute',
+      },
+      {
+        id: 'heading-order',
+        pattern: null,
+        custom: 'checkHeadingOrder',
+        severity: 'warning',
+        message: 'Heading hierarchy may be incorrect',
+      },
     ],
   },
   forms: {
     name: 'Form Usability',
     weight: 20,
     checks: [
-      { id: 'form-action', pattern: /<form(?![^>]*action=)/gi, severity: 'warning', message: 'Form missing explicit action attribute' },
-      { id: 'submit-btn', pattern: null, custom: 'checkSubmitButton', severity: 'warning', message: 'Form may lack a submit button' },
-      { id: 'placeholder-only', pattern: /<input[^>]*placeholder=[^>]*(?!.*(?:label|aria-label))/gi, severity: 'info', message: 'Input uses placeholder without label (placeholder is not a label substitute)' },
+      {
+        id: 'form-action',
+        pattern: /<form(?![^>]*action=)/gi,
+        severity: 'warning',
+        message: 'Form missing explicit action attribute',
+      },
+      {
+        id: 'submit-btn',
+        pattern: null,
+        custom: 'checkSubmitButton',
+        severity: 'warning',
+        message: 'Form may lack a submit button',
+      },
+      {
+        id: 'placeholder-only',
+        pattern: /<input[^>]*placeholder=[^>]*(?!.*(?:label|aria-label))/gi,
+        severity: 'info',
+        message: 'Input uses placeholder without label (placeholder is not a label substitute)',
+      },
     ],
   },
   navigation: {
     name: 'Navigation & Structure',
     weight: 20,
     checks: [
-      { id: 'nav-element', pattern: /<nav/gi, severity: 'info', message: 'Navigation landmark found', positive: true },
-      { id: 'main-element', pattern: /<main/gi, severity: 'info', message: 'Main content landmark found', positive: true },
-      { id: 'skip-link', pattern: /skip.*(nav|content|main)/gi, severity: 'info', message: 'Skip navigation link found', positive: true },
+      {
+        id: 'nav-element',
+        pattern: /<nav/gi,
+        severity: 'info',
+        message: 'Navigation landmark found',
+        positive: true,
+      },
+      {
+        id: 'main-element',
+        pattern: /<main/gi,
+        severity: 'info',
+        message: 'Main content landmark found',
+        positive: true,
+      },
+      {
+        id: 'skip-link',
+        pattern: /skip.*(nav|content|main)/gi,
+        severity: 'info',
+        message: 'Skip navigation link found',
+        positive: true,
+      },
     ],
   },
   performance: {
     name: 'Performance Hints',
     weight: 15,
     checks: [
-      { id: 'large-inline-style', pattern: /style="[^"]{200,}"/gi, severity: 'warning', message: 'Large inline style detected - consider external CSS' },
-      { id: 'blocking-script', pattern: /<script(?![^>]*(?:async|defer))[^>]*src=/gi, severity: 'info', message: 'Render-blocking script without async/defer' },
+      {
+        id: 'large-inline-style',
+        pattern: /style="[^"]{200,}"/gi,
+        severity: 'warning',
+        message: 'Large inline style detected - consider external CSS',
+      },
+      {
+        id: 'blocking-script',
+        pattern: /<script(?![^>]*(?:async|defer))[^>]*src=/gi,
+        severity: 'info',
+        message: 'Render-blocking script without async/defer',
+      },
     ],
   },
   responsive: {
     name: 'Responsive Design',
     weight: 15,
     checks: [
-      { id: 'viewport-meta', pattern: /<meta[^>]*viewport/gi, severity: 'error', message: 'Missing viewport meta tag', positive: true },
-      { id: 'fixed-width', pattern: /width:\s*\d{4,}px/gi, severity: 'warning', message: 'Fixed pixel width over 1000px detected' },
+      {
+        id: 'viewport-meta',
+        pattern: /<meta[^>]*viewport/gi,
+        severity: 'error',
+        message: 'Missing viewport meta tag',
+        positive: true,
+      },
+      {
+        id: 'fixed-width',
+        pattern: /width:\s*\d{4,}px/gi,
+        severity: 'warning',
+        message: 'Fixed pixel width over 1000px detected',
+      },
     ],
   },
 };
@@ -88,7 +163,9 @@ function findHtmlFiles(dir, maxDepth, depth) {
         results.push(full);
       }
     }
-  } catch (_e) { /* skip unreadable dirs */ }
+  } catch (_e) {
+    /* skip unreadable dirs */
+  }
   return results;
 }
 
@@ -130,10 +207,20 @@ function auditFile(filePath) {
         const matches = content.match(check.pattern);
         if (check.positive) {
           if (matches && matches.length > 0) {
-            findings.push({ id: check.id, severity: 'pass', message: check.message, count: matches.length });
+            findings.push({
+              id: check.id,
+              severity: 'pass',
+              message: check.message,
+              count: matches.length,
+            });
           }
         } else if (matches && matches.length > 0) {
-          findings.push({ id: check.id, severity: check.severity, message: check.message, count: matches.length });
+          findings.push({
+            id: check.id,
+            severity: check.severity,
+            message: check.message,
+            count: matches.length,
+          });
         }
       }
       if (check.custom && CUSTOM_CHECKS[check.custom]) {
@@ -154,11 +241,11 @@ function calculateScore(allFindings) {
 
   for (const [_key, config] of Object.entries(HEURISTICS)) {
     totalWeight += config.weight;
-    const categoryIds = config.checks.map(c => c.id);
-    const categoryFindings = allFindings.filter(f => categoryIds.includes(f.id));
-    const errors = categoryFindings.filter(f => f.severity === 'error').length;
-    const warnings = categoryFindings.filter(f => f.severity === 'warning').length;
-    const passes = categoryFindings.filter(f => f.severity === 'pass').length;
+    const categoryIds = config.checks.map((c) => c.id);
+    const categoryFindings = allFindings.filter((f) => categoryIds.includes(f.id));
+    const errors = categoryFindings.filter((f) => f.severity === 'error').length;
+    const warnings = categoryFindings.filter((f) => f.severity === 'warning').length;
+    const passes = categoryFindings.filter((f) => f.severity === 'pass').length;
 
     const deduction = errors * 0.3 + warnings * 0.1;
     const bonus = passes * 0.1;
@@ -197,12 +284,15 @@ runSkill('ux-auditor', () => {
   else if (score >= 60) grade = 'C';
   else if (score >= 40) grade = 'D';
 
-  const errorCount = allFindings.filter(f => f.severity === 'error').length;
-  const warningCount = allFindings.filter(f => f.severity === 'warning').length;
-  const infoCount = allFindings.filter(f => f.severity === 'info').length;
+  const errorCount = allFindings.filter((f) => f.severity === 'error').length;
+  const warningCount = allFindings.filter((f) => f.severity === 'warning').length;
+  const infoCount = allFindings.filter((f) => f.severity === 'info').length;
 
   const recommendations = [];
-  if (errorCount > 0) recommendations.push(`Fix ${errorCount} accessibility errors (alt tags, lang attributes, viewport)`);
+  if (errorCount > 0)
+    recommendations.push(
+      `Fix ${errorCount} accessibility errors (alt tags, lang attributes, viewport)`
+    );
   if (warningCount > 0) recommendations.push(`Address ${warningCount} usability warnings`);
   if (files.length === 0) recommendations.push('No HTML-like files found in the target directory');
 

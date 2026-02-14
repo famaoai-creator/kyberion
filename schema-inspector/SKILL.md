@@ -17,5 +17,7 @@ Automatically locates and displays the content of schema definition files (SQL, 
 ```bash
 node schema-inspector/scripts/inspect.cjs <project_root>
 ```
+
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

@@ -99,16 +99,16 @@ extensions:
 # 除外ファイル名パターン
 file_patterns:
   # ロックファイル
-  - "*.lock"
-  - "*-lock.json"
-  - "*-lock.yaml"
+  - '*.lock'
+  - '*-lock.json'
+  - '*-lock.yaml'
 
   # ミニファイ済みファイル
-  - "*.min.js"
-  - "*.min.css"
+  - '*.min.js'
+  - '*.min.css'
 
   # ソースマップ
-  - "*.map"
+  - '*.map'
 
   # 環境変数（読み込み対象外）
-  - ".env*"
+  - '.env*'

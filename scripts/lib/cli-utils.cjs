@@ -3,7 +3,7 @@ const { hideBin } = require('yargs/helpers');
 
 /**
  * Creates a pre-configured yargs instance with common options.
- * 
+ *
  * @param {Array} args - Process arguments (default: process.argv)
  * @returns {yargs.Argv}
  */
@@ -12,23 +12,23 @@ function createStandardYargs(args = process.argv) {
     .option('input', {
       alias: 'i',
       type: 'string',
-      description: 'Input file or directory path'
+      description: 'Input file or directory path',
     })
     .option('out', {
       alias: 'o',
       type: 'string',
-      description: 'Output file path (optional)'
+      description: 'Output file path (optional)',
     })
     .option('tier', {
       type: 'string',
       choices: ['personal', 'confidential', 'public'],
       default: 'public',
-      description: 'Knowledge tier for the operation'
+      description: 'Knowledge tier for the operation',
     })
     .help('h')
     .alias('h', 'help');
 }
 
 module.exports = {
-  createStandardYargs
+  createStandardYargs,
 };

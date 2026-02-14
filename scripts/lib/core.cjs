@@ -23,15 +23,20 @@ const v8 = require('v8');
  */
 const logger = {
   /** @param {string} msg - Info message (blue) */
-  info: (msg) => console.log(chalk.blue(' [INFO] ') + msg),
-  /** @param {string} msg - Success message (green) */
-  success: (msg) => console.log(chalk.green(' [SUCCESS] ') + msg),
-  /** @param {string} msg - Warning message (yellow) */
-  warn: (msg) => {
-    if (process.env.NODE_ENV !== 'test') console.error(chalk.yellow(' [WARN] ') + msg);
+/**
+ * Internal logger with SRE traceability.
+ */
+const logger = {
+  _log: (level, msg) => {
+    if (process.env.NODE_ENV === 'test' && level !== 'error') return;
+    const ts = chalk.dim(new Date().toISOString());
+    const mid = process.env.MISSION_ID ? chalk.magenta(` [${process.env.MISSION_ID}]`) : '';
+    const prefix = level === 'error' ? chalk.red(' [ERROR] ') : (level === 'warn' ? chalk.yellow(' [WARN]  ') : chalk.blue(' [INFO]  '));
+    console.error(`${ts}${mid}${prefix}${msg}`);
   },
-  /** @param {string} msg - Error message (red, to stderr) */
-  error: (msg) => console.error(chalk.red(' [ERROR] ') + msg),
+  info: (msg) => logger._log('info', msg),
+  warn: (msg) => logger._log('warn', msg),
+  error: (msg) => logger._log('error', msg),
 };
 
 /**

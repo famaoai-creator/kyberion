@@ -19,7 +19,7 @@ const rootDir = path.resolve(__dirname, '..');
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const name = args.find(a => !a.startsWith('--'));
+  const name = args.find((a) => !a.startsWith('--'));
   const descIdx = args.indexOf('--description');
   const description = descIdx !== -1 ? args[descIdx + 1] : '';
   const templateIdx = args.indexOf('--template');

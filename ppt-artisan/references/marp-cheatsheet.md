@@ -3,19 +3,23 @@
 ## Basic Syntax
 
 ### Slide Separator
+
 Use `---` to separate slides.
 
 ```markdown
 # Slide 1
+
 Content...
 
 ---
 
 # Slide 2
+
 Content...
 ```
 
 ### Directives
+
 Place at the top of the file.
 
 ```yaml
@@ -33,16 +37,18 @@ Classes are defined in the theme CSS (`assets/themes/*.css`). Use `<!-- _class: 
 
 ### Business Theme (`theme: business`)
 
-| Class | Description |
-| :--- | :--- |
-| `title` | Title slide with centered text and blue background. |
-| (default) | Standard content slide with header/footer support. |
+| Class     | Description                                         |
+| :-------- | :-------------------------------------------------- |
+| `title`   | Title slide with centered text and blue background. |
+| (default) | Standard content slide with header/footer support.  |
 
 **Example:**
 
 ```markdown
 <!-- _class: title -->
+
 # Presentation Title
+
 ## Subtitle
 ```
 
@@ -52,12 +58,8 @@ Use HTML to create columns.
 
 ```html
 <div class="columns">
-  <div>
-    Left content
-  </div>
-  <div>
-    Right content
-  </div>
+  <div>Left content</div>
+  <div>Right content</div>
 </div>
 ```
 

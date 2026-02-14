@@ -13,11 +13,11 @@ function loadProjectStandards() {
     // Fallback defaults if config is missing
     return {
       ignore_dirs: ['.git', 'node_modules', '.DS_Store'],
-      ignore_extensions: ['.lock', '.bin']
+      ignore_extensions: ['.lock', '.bin'],
     };
   }
 }
 
 module.exports = {
-  loadProjectStandards
+  loadProjectStandards,
 };

@@ -22,7 +22,7 @@ function saveRegistry(registry) {
 function installPlugin(packageName) {
   const registry = loadRegistry();
 
-  if (registry.plugins.find(p => p.package === packageName)) {
+  if (registry.plugins.find((p) => p.package === packageName)) {
     logger.warn(`Plugin "${packageName}" is already installed`);
     return;
   }
@@ -81,7 +81,7 @@ function registerLocal(skillDir) {
   const name = nameMatch ? nameMatch[1].trim() : path.basename(absDir);
   const description = descMatch ? descMatch[1].trim() : '';
 
-  if (registry.plugins.find(p => p.name === name)) {
+  if (registry.plugins.find((p) => p.name === name)) {
     logger.warn(`Plugin "${name}" is already registered`);
     return;
   }
@@ -102,7 +102,7 @@ function registerLocal(skillDir) {
 function uninstallPlugin(nameOrPackage) {
   const registry = loadRegistry();
   const idx = registry.plugins.findIndex(
-    p => p.name === nameOrPackage || p.package === nameOrPackage
+    (p) => p.name === nameOrPackage || p.package === nameOrPackage
   );
 
   if (idx === -1) {
@@ -147,16 +147,25 @@ const target = args[1];
 
 switch (command) {
   case 'install':
-    if (!target) { logger.error('Usage: plugin-manager install <npm-package>'); process.exit(1); }
+    if (!target) {
+      logger.error('Usage: plugin-manager install <npm-package>');
+      process.exit(1);
+    }
     installPlugin(target);
     break;
   case 'register':
-    if (!target) { logger.error('Usage: plugin-manager register <local-skill-dir>'); process.exit(1); }
+    if (!target) {
+      logger.error('Usage: plugin-manager register <local-skill-dir>');
+      process.exit(1);
+    }
     registerLocal(target);
     break;
   case 'uninstall':
   case 'remove':
-    if (!target) { logger.error('Usage: plugin-manager uninstall <name>'); process.exit(1); }
+    if (!target) {
+      logger.error('Usage: plugin-manager uninstall <name>');
+      process.exit(1);
+    }
     uninstallPlugin(target);
     break;
   case 'list':

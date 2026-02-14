@@ -51,31 +51,165 @@ export interface RequirementsResult {
 /** Checklist definitions matching the CJS implementation. */
 export const CHECKLISTS: Record<StandardName, ChecklistItem[]> = {
   ipa: [
-    { name: 'scope', keywords: ['scope', 'objective', 'goal', 'purpose', 'target', 'boundary', 'boundaries'] },
-    { name: 'stakeholders', keywords: ['stakeholder', 'user', 'actor', 'role', 'customer', 'client', 'sponsor', 'owner'] },
-    { name: 'functional requirements', keywords: ['functional requirement', 'function', 'feature', 'use case', 'user story', 'capability', 'shall'] },
-    { name: 'non-functional requirements', keywords: ['non-functional', 'nonfunctional', 'performance', 'reliability', 'availability', 'scalability', 'security', 'maintainability', 'usability'] },
-    { name: 'constraints', keywords: ['constraint', 'limitation', 'restriction', 'assumption', 'dependency', 'prerequisite'] },
-    { name: 'glossary', keywords: ['glossary', 'definition', 'terminology', 'term', 'acronym', 'abbreviation'] },
-    { name: 'acceptance criteria', keywords: ['acceptance criteria', 'acceptance test', 'done', 'definition of done', 'verification', 'validation', 'success criteria'] },
+    {
+      name: 'scope',
+      keywords: ['scope', 'objective', 'goal', 'purpose', 'target', 'boundary', 'boundaries'],
+    },
+    {
+      name: 'stakeholders',
+      keywords: ['stakeholder', 'user', 'actor', 'role', 'customer', 'client', 'sponsor', 'owner'],
+    },
+    {
+      name: 'functional requirements',
+      keywords: [
+        'functional requirement',
+        'function',
+        'feature',
+        'use case',
+        'user story',
+        'capability',
+        'shall',
+      ],
+    },
+    {
+      name: 'non-functional requirements',
+      keywords: [
+        'non-functional',
+        'nonfunctional',
+        'performance',
+        'reliability',
+        'availability',
+        'scalability',
+        'security',
+        'maintainability',
+        'usability',
+      ],
+    },
+    {
+      name: 'constraints',
+      keywords: [
+        'constraint',
+        'limitation',
+        'restriction',
+        'assumption',
+        'dependency',
+        'prerequisite',
+      ],
+    },
+    {
+      name: 'glossary',
+      keywords: ['glossary', 'definition', 'terminology', 'term', 'acronym', 'abbreviation'],
+    },
+    {
+      name: 'acceptance criteria',
+      keywords: [
+        'acceptance criteria',
+        'acceptance test',
+        'done',
+        'definition of done',
+        'verification',
+        'validation',
+        'success criteria',
+      ],
+    },
   ],
   ieee: [
-    { name: 'introduction', keywords: ['introduction', 'purpose', 'scope', 'overview', 'document conventions'] },
-    { name: 'overall description', keywords: ['overall description', 'product perspective', 'product functions', 'user characteristics', 'operating environment'] },
-    { name: 'external interfaces', keywords: ['external interface', 'user interface', 'hardware interface', 'software interface', 'communication interface'] },
-    { name: 'system features', keywords: ['system feature', 'functional requirement', 'feature', 'use case', 'stimulus', 'response'] },
-    { name: 'non-functional requirements', keywords: ['non-functional', 'performance', 'safety', 'security', 'reliability', 'availability'] },
-    { name: 'data requirements', keywords: ['data requirement', 'data model', 'entity', 'database', 'schema', 'data dictionary'] },
+    {
+      name: 'introduction',
+      keywords: ['introduction', 'purpose', 'scope', 'overview', 'document conventions'],
+    },
+    {
+      name: 'overall description',
+      keywords: [
+        'overall description',
+        'product perspective',
+        'product functions',
+        'user characteristics',
+        'operating environment',
+      ],
+    },
+    {
+      name: 'external interfaces',
+      keywords: [
+        'external interface',
+        'user interface',
+        'hardware interface',
+        'software interface',
+        'communication interface',
+      ],
+    },
+    {
+      name: 'system features',
+      keywords: [
+        'system feature',
+        'functional requirement',
+        'feature',
+        'use case',
+        'stimulus',
+        'response',
+      ],
+    },
+    {
+      name: 'non-functional requirements',
+      keywords: [
+        'non-functional',
+        'performance',
+        'safety',
+        'security',
+        'reliability',
+        'availability',
+      ],
+    },
+    {
+      name: 'data requirements',
+      keywords: [
+        'data requirement',
+        'data model',
+        'entity',
+        'database',
+        'schema',
+        'data dictionary',
+      ],
+    },
     { name: 'appendices', keywords: ['appendix', 'appendices', 'glossary', 'index', 'reference'] },
   ],
   agile: [
-    { name: 'user stories', keywords: ['user story', 'as a', 'i want', 'so that', 'story', 'epic'] },
-    { name: 'acceptance criteria', keywords: ['acceptance criteria', 'given', 'when', 'then', 'scenario', 'done'] },
-    { name: 'personas', keywords: ['persona', 'user type', 'actor', 'role', 'stakeholder', 'archetype'] },
-    { name: 'priority', keywords: ['priority', 'must have', 'should have', 'could have', 'moscow', 'backlog', 'sprint'] },
-    { name: 'definition of done', keywords: ['definition of done', 'done', 'complete', 'ready', 'dod'] },
-    { name: 'non-functional requirements', keywords: ['non-functional', 'performance', 'scalability', 'security', 'quality attribute'] },
-    { name: 'constraints', keywords: ['constraint', 'limitation', 'budget', 'timeline', 'technical debt', 'dependency'] },
+    {
+      name: 'user stories',
+      keywords: ['user story', 'as a', 'i want', 'so that', 'story', 'epic'],
+    },
+    {
+      name: 'acceptance criteria',
+      keywords: ['acceptance criteria', 'given', 'when', 'then', 'scenario', 'done'],
+    },
+    {
+      name: 'personas',
+      keywords: ['persona', 'user type', 'actor', 'role', 'stakeholder', 'archetype'],
+    },
+    {
+      name: 'priority',
+      keywords: [
+        'priority',
+        'must have',
+        'should have',
+        'could have',
+        'moscow',
+        'backlog',
+        'sprint',
+      ],
+    },
+    {
+      name: 'definition of done',
+      keywords: ['definition of done', 'done', 'complete', 'ready', 'dod'],
+    },
+    {
+      name: 'non-functional requirements',
+      keywords: ['non-functional', 'performance', 'scalability', 'security', 'quality attribute'],
+    },
+    {
+      name: 'constraints',
+      keywords: ['constraint', 'limitation', 'budget', 'timeline', 'technical debt', 'dependency'],
+    },
   ],
 };
 
@@ -91,7 +225,7 @@ export const CHECKLISTS: Record<StandardName, ChecklistItem[]> = {
  * @returns Evaluation result for this check
  */
 export function evaluateCheck(content: string, checkItem: ChecklistItem): CheckResult {
-  const foundKeywords = checkItem.keywords.filter(kw => content.includes(kw.toLowerCase()));
+  const foundKeywords = checkItem.keywords.filter((kw) => content.includes(kw.toLowerCase()));
   const passed = foundKeywords.length > 0;
 
   let detail: string;
@@ -116,29 +250,26 @@ export function evaluateCheck(content: string, checkItem: ChecklistItem): CheckR
  * @returns Scoring result with checks, score, and recommendations
  * @throws {Error} If the standard name is not recognised
  */
-export function scoreRequirements(
-  rawContent: string,
-  standard: StandardName,
-): RequirementsResult {
+export function scoreRequirements(rawContent: string, standard: StandardName): RequirementsResult {
   const checklist = CHECKLISTS[standard];
   if (!checklist) {
     throw new Error(
-      `Unknown standard: ${standard}. Supported: ${Object.keys(CHECKLISTS).join(', ')}`,
+      `Unknown standard: ${standard}. Supported: ${Object.keys(CHECKLISTS).join(', ')}`
     );
   }
 
   const content = rawContent.toLowerCase();
 
   // Evaluate each check
-  const checks = checklist.map(item => evaluateCheck(content, item));
-  const passedChecks = checks.filter(c => c.passed).length;
+  const checks = checklist.map((item) => evaluateCheck(content, item));
+  const passedChecks = checks.filter((c) => c.passed).length;
   const totalChecks = checks.length;
   const score = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
 
   // Generate recommendations for failed checks
   const recommendations = checks
-    .filter(c => !c.passed)
-    .map(c => `Add a "${c.name}" section to improve document completeness.`);
+    .filter((c) => !c.passed)
+    .map((c) => `Add a "${c.name}" section to improve document completeness.`);
 
   return {
     standard,
@@ -163,7 +294,7 @@ export function scoreRequirements(
  */
 export function buildRequirementsOutput(
   result: RequirementsResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<RequirementsResult> {
   return {
     skill: 'requirements-wizard',

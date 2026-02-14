@@ -45,34 +45,36 @@ class MetricsCollector {
     // Capture memory snapshot
     const mem = process.memoryUsage();
     const memory = {
-      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024 * 100) / 100,
-      heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024 * 100) / 100,
-      rssMB: Math.round(mem.rss / 1024 / 1024 * 100) / 100,
+      heapUsedMB: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
+      heapTotalMB: Math.round((mem.heapTotal / 1024 / 1024) * 100) / 100,
+      rssMB: Math.round((mem.rss / 1024 / 1024) * 100) / 100,
     };
 
     // Check budget
     if (memory.heapUsedMB > this._memoryBudgetMB) {
       const { logger } = require('./core.cjs');
-      logger.warn(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`);
+      logger.warn(
+        `[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`
+      );
     }
 
     // Update in-memory aggregates
     let agg = this._aggregates.get(skillName);
     if (!agg) {
-      agg = { 
-        count: 0, 
-        errors: 0, 
-        totalMs: 0, 
-        minMs: Infinity, 
-        maxMs: 0, 
-        lastRun: '', 
-        peakHeapMB: 0, 
+      agg = {
+        count: 0,
+        errors: 0,
+        totalMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastRun: '',
+        peakHeapMB: 0,
         peakRssMB: 0,
         cacheHits: 0,
         cacheMisses: 0,
         cachePurges: 0,
         recoveries: 0,
-        cacheIntegrityFailures: 0
+        cacheIntegrityFailures: 0,
       };
       this._aggregates.set(skillName, agg);
     }
@@ -85,7 +87,7 @@ class MetricsCollector {
     agg.lastRun = new Date().toISOString();
     agg.peakHeapMB = Math.max(agg.peakHeapMB, memory.heapUsedMB);
     agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
-    
+
     if (extra.cacheStats) {
       agg.cacheHits += extra.cacheStats.hits || 0;
       agg.cacheMisses += extra.cacheStats.misses || 0;
@@ -109,13 +111,13 @@ class MetricsCollector {
   summarize() {
     const summaries = [];
     const TIME_BASE = 5000; // 5s baseline
-    const MEM_BASE = 200;   // 200MB baseline
+    const MEM_BASE = 200; // 200MB baseline
 
     for (const [name, agg] of this._aggregates) {
       const avgMs = agg.count > 0 ? Math.round(agg.totalMs / agg.count) : 0;
       const totalCache = agg.cacheHits + agg.cacheMisses;
-      const cacheRatio = totalCache > 0 ? (agg.cacheHits / totalCache) : 0;
-      
+      const cacheRatio = totalCache > 0 ? agg.cacheHits / totalCache : 0;
+
       // Efficiency Score: 0-100
       // 1. Latency Impact (max 40 pts penalty)
       const timeImpact = Math.min(40, (avgMs / TIME_BASE) * 40);
@@ -125,8 +127,11 @@ class MetricsCollector {
       const cacheBonus = Math.round(cacheRatio * 20);
       // 4. Purge Penalty (penalty for causing memory pressure)
       const purgePenalty = Math.min(20, (agg.cachePurges || 0) * 5);
-      
-      const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - (timeImpact + memImpact) + cacheBonus - purgePenalty)));
+
+      const efficiencyScore = Math.max(
+        0,
+        Math.min(100, Math.round(100 - (timeImpact + memImpact) + cacheBonus - purgePenalty))
+      );
 
       summaries.push({
         skill: name,
@@ -143,7 +148,7 @@ class MetricsCollector {
         cacheHitRatio: Math.round(cacheRatio * 100),
         cachePurges: agg.cachePurges || 0,
         recoveries: agg.recoveries || 0,
-        recoveryRate: agg.count > 0 ? Math.round((agg.recoveries / agg.count) * 1000) / 10 : 0
+        recoveryRate: agg.count > 0 ? Math.round((agg.recoveries / agg.count) * 1000) / 10 : 0,
       });
     }
     return summaries.sort((a, b) => b.executions - a.executions);
@@ -180,7 +185,7 @@ class MetricsCollector {
     if (!fs.existsSync(filePath)) return [];
     try {
       const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(Boolean);
-      return lines.map(line => JSON.parse(line));
+      return lines.map((line) => JSON.parse(line));
     } catch (_) {
       return [];
     }
@@ -195,7 +200,15 @@ class MetricsCollector {
     const bySkill = {};
     for (const entry of entries) {
       if (!bySkill[entry.skill]) {
-        bySkill[entry.skill] = { count: 0, errors: 0, totalMs: 0, minMs: Infinity, maxMs: 0, cacheHits: 0, cacheMisses: 0 };
+        bySkill[entry.skill] = {
+          count: 0,
+          errors: 0,
+          totalMs: 0,
+          minMs: Infinity,
+          maxMs: 0,
+          cacheHits: 0,
+          cacheMisses: 0,
+        };
       }
       const s = bySkill[entry.skill];
       s.count++;
@@ -203,7 +216,7 @@ class MetricsCollector {
       s.totalMs += entry.duration_ms || 0;
       s.minMs = Math.min(s.minMs, entry.duration_ms || 0);
       s.maxMs = Math.max(s.maxMs, entry.duration_ms || 0);
-      
+
       if (entry.cacheStats) {
         s.cacheHits += entry.cacheStats.hits || 0;
         s.cacheMisses += entry.cacheStats.misses || 0;
@@ -213,7 +226,7 @@ class MetricsCollector {
     const skills = Object.entries(bySkill).map(([name, s]) => {
       const totalCache = s.cacheHits + s.cacheMisses;
       const cacheHitRatio = totalCache > 0 ? Math.round((s.cacheHits / totalCache) * 100) : 0;
-      
+
       return {
         skill: name,
         executions: s.count,
@@ -229,9 +242,10 @@ class MetricsCollector {
     return {
       totalEntries: entries.length,
       uniqueSkills: skills.length,
-      dateRange: entries.length > 0
-        ? { from: entries[0].timestamp, to: entries[entries.length - 1].timestamp }
-        : null,
+      dateRange:
+        entries.length > 0
+          ? { from: entries[0].timestamp, to: entries[entries.length - 1].timestamp }
+          : null,
       skills: skills.sort((a, b) => b.executions - a.executions),
     };
   }
@@ -252,11 +266,11 @@ class MetricsCollector {
     const regressions = [];
     for (const [name, runs] of Object.entries(bySkill)) {
       if (runs.length < 5) continue; // Need enough history
-      
+
       const lastRun = runs[runs.length - 1];
       const history = runs.slice(0, -1);
       const avgMs = history.reduce((sum, r) => sum + (r.duration_ms || 0), 0) / history.length;
-      
+
       if (lastRun.duration_ms > avgMs * thresholdMultiplier) {
         regressions.push({
           skill: name,

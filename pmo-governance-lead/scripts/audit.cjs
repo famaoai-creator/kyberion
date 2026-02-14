@@ -29,23 +29,38 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 const QUALITY_GATES = {
   requirements: {
     name: 'Requirements Phase',
     evidence: [
-      { type: 'file', patterns: ['**/requirements*.md', '**/PRD*.md', '**/specs/**', '**/requirements*.yaml'], label: 'Requirements Document' },
-      { type: 'file', patterns: ['**/stakeholder*', '**/meeting-notes*'], label: 'Stakeholder Sign-off' },
+      {
+        type: 'file',
+        patterns: ['**/requirements*.md', '**/PRD*.md', '**/specs/**', '**/requirements*.yaml'],
+        label: 'Requirements Document',
+      },
+      {
+        type: 'file',
+        patterns: ['**/stakeholder*', '**/meeting-notes*'],
+        label: 'Stakeholder Sign-off',
+      },
     ],
     weight: 20,
   },
   design: {
     name: 'Design Phase',
     evidence: [
-      { type: 'file', patterns: ['**/design*.md', '**/architecture*.md', '**/diagrams/**', '**/ADR*'], label: 'Design Document / ADR' },
-      { type: 'file', patterns: ['**/schema*', '**/erd*', '**/openapi*', '**/swagger*'], label: 'Schema / API Design' },
+      {
+        type: 'file',
+        patterns: ['**/design*.md', '**/architecture*.md', '**/diagrams/**', '**/ADR*'],
+        label: 'Design Document / ADR',
+      },
+      {
+        type: 'file',
+        patterns: ['**/schema*', '**/erd*', '**/openapi*', '**/swagger*'],
+        label: 'Schema / API Design',
+      },
     ],
     weight: 20,
   },
@@ -54,24 +69,48 @@ const QUALITY_GATES = {
     evidence: [
       { type: 'dir', patterns: ['src/', 'lib/', 'app/', 'scripts/'], label: 'Source Code' },
       { type: 'file', patterns: ['.gitignore', '.editorconfig'], label: 'Development Standards' },
-      { type: 'file', patterns: ['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'], label: 'Contributing Guidelines' },
+      {
+        type: 'file',
+        patterns: ['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
+        label: 'Contributing Guidelines',
+      },
     ],
     weight: 20,
   },
   testing: {
     name: 'Testing Phase',
     evidence: [
-      { type: 'dir', patterns: ['tests/', 'test/', '__tests__/', 'spec/', 'e2e/'], label: 'Test Suite' },
-      { type: 'file', patterns: ['jest.config*', 'vitest.config*', 'pytest.ini', '.rspec', 'cypress.config*'], label: 'Test Configuration' },
-      { type: 'file', patterns: ['**/coverage/**', '.c8rc*', '.nycrc*', 'codecov*'], label: 'Coverage Configuration' },
+      {
+        type: 'dir',
+        patterns: ['tests/', 'test/', '__tests__/', 'spec/', 'e2e/'],
+        label: 'Test Suite',
+      },
+      {
+        type: 'file',
+        patterns: ['jest.config*', 'vitest.config*', 'pytest.ini', '.rspec', 'cypress.config*'],
+        label: 'Test Configuration',
+      },
+      {
+        type: 'file',
+        patterns: ['**/coverage/**', '.c8rc*', '.nycrc*', 'codecov*'],
+        label: 'Coverage Configuration',
+      },
     ],
     weight: 20,
   },
   deployment: {
     name: 'Deployment Phase',
     evidence: [
-      { type: 'file', patterns: ['.github/workflows/*', '.gitlab-ci.yml', 'Jenkinsfile', 'azure-pipelines.yml'], label: 'CI/CD Pipeline' },
-      { type: 'file', patterns: ['Dockerfile', 'docker-compose*', 'k8s/**', 'terraform/**'], label: 'Infrastructure Config' },
+      {
+        type: 'file',
+        patterns: ['.github/workflows/*', '.gitlab-ci.yml', 'Jenkinsfile', 'azure-pipelines.yml'],
+        label: 'CI/CD Pipeline',
+      },
+      {
+        type: 'file',
+        patterns: ['Dockerfile', 'docker-compose*', 'k8s/**', 'terraform/**'],
+        label: 'Infrastructure Config',
+      },
       { type: 'file', patterns: ['CHANGELOG.md', 'RELEASE*'], label: 'Release Documentation' },
     ],
     weight: 20,
@@ -82,7 +121,7 @@ function simpleGlob(dir, pattern) {
   // Simple pattern matching for common glob patterns
   const parts = pattern.split('/');
   const fileName = parts[parts.length - 1];
-  const hasWildDir = parts.some(p => p === '**');
+  const hasWildDir = parts.some((p) => p === '**');
 
   try {
     if (hasWildDir) {
@@ -92,7 +131,7 @@ function simpleGlob(dir, pattern) {
     if (!fs.existsSync(targetDir)) return [];
     const files = fs.readdirSync(targetDir);
     const regex = new RegExp('^' + fileName.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
-    return files.filter(f => regex.test(f)).map(f => path.join(targetDir, f));
+    return files.filter((f) => regex.test(f)).map((f) => path.join(targetDir, f));
   } catch (_e) {
     return [];
   }
@@ -109,10 +148,14 @@ function searchRecursive(dir, filePattern, maxDepth, depth = 0) {
       if (entry.isFile() && regex.test(entry.name)) {
         results.push(path.join(dir, entry.name));
       } else if (entry.isDirectory()) {
-        results.push(...searchRecursive(path.join(dir, entry.name), filePattern, maxDepth, depth + 1));
+        results.push(
+          ...searchRecursive(path.join(dir, entry.name), filePattern, maxDepth, depth + 1)
+        );
       }
     }
-  } catch (_e) { /* skip */ }
+  } catch (_e) {
+    /* skip */
+  }
   return results;
 }
 
@@ -148,7 +191,8 @@ function auditPhase(dir, phaseKey) {
     if (check.found) passed++;
   }
 
-  const completion = gate.evidence.length > 0 ? Math.round((passed / gate.evidence.length) * 100) : 0;
+  const completion =
+    gate.evidence.length > 0 ? Math.round((passed / gate.evidence.length) * 100) : 0;
 
   return {
     phase: gate.name,
@@ -169,7 +213,7 @@ function identifyRisks(phaseResults) {
         risk: `${phase.phase} has insufficient evidence (${phase.completion}% complete)`,
       });
     }
-    const missing = phase.evidence.filter(e => e.status === 'missing');
+    const missing = phase.evidence.filter((e) => e.status === 'missing');
     for (const m of missing) {
       risks.push({
         severity: phase.completion < 50 ? 'high' : 'medium',
@@ -189,12 +233,13 @@ runSkill('pmo-governance-lead', () => {
   }
 
   const phases = argv.phase === 'all' ? Object.keys(QUALITY_GATES) : [argv.phase];
-  const phaseResults = phases.map(p => auditPhase(targetDir, p));
+  const phaseResults = phases.map((p) => auditPhase(targetDir, p));
   const risks = identifyRisks(phaseResults);
 
-  const totalCompletion = phaseResults.length > 0
-    ? Math.round(phaseResults.reduce((s, p) => s + p.completion, 0) / phaseResults.length)
-    : 0;
+  const totalCompletion =
+    phaseResults.length > 0
+      ? Math.round(phaseResults.reduce((s, p) => s + p.completion, 0) / phaseResults.length)
+      : 0;
 
   let overallStatus = 'not_ready';
   if (totalCompletion >= 80) overallStatus = 'ready';
@@ -206,7 +251,7 @@ runSkill('pmo-governance-lead', () => {
     overallStatus,
     phases: phaseResults,
     risks,
-    highRiskCount: risks.filter(r => r.severity === 'high').length,
+    highRiskCount: risks.filter((r) => r.severity === 'high').length,
   };
 
   if (argv.out) {

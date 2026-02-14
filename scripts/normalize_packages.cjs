@@ -8,25 +8,34 @@ const rootPkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), '
 // Target versions from root package
 const TARGET_VERSIONS = {
   ...rootPkg.dependencies,
-  ...rootPkg.devDependencies
+  ...rootPkg.devDependencies,
 };
 
 const entries = fs.readdirSync(rootDir, { withFileTypes: true });
 const skillDirs = entries
-  .filter(e => e.isDirectory() && fs.existsSync(path.join(rootDir, e.name, 'package.json')))
-  .map(e => e.name);
+  .filter((e) => e.isDirectory() && fs.existsSync(path.join(rootDir, e.name, 'package.json')))
+  .map((e) => e.name);
 
 console.log(`Normalizing ${skillDirs.length} packages...`);
 
-skillDirs.forEach(dir => {
+skillDirs.forEach((dir) => {
   const pkgPath = path.join(rootDir, dir, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   let modified = false;
 
   // 1. Basic Fields
-  if (pkg.private !== true) { pkg.private = true; modified = true; }
-  if (pkg.author !== "Gemini Agent") { pkg.author = "Gemini Agent"; modified = true; }
-  if (pkg.license !== "MIT") { pkg.license = "MIT"; modified = true; }
+  if (pkg.private !== true) {
+    pkg.private = true;
+    modified = true;
+  }
+  if (pkg.author !== 'Gemini Agent') {
+    pkg.author = 'Gemini Agent';
+    modified = true;
+  }
+  if (pkg.license !== 'MIT') {
+    pkg.license = 'MIT';
+    modified = true;
+  }
 
   // 1.1 Node.js Engine
   if (rootPkg.engines && rootPkg.engines.node) {
@@ -40,7 +49,9 @@ skillDirs.forEach(dir => {
   if (pkg.dependencies) {
     for (const [name, version] of Object.entries(pkg.dependencies)) {
       if (TARGET_VERSIONS[name] && pkg.dependencies[name] !== TARGET_VERSIONS[name]) {
-        console.log(`  [${dir}] Updating ${name}: ${pkg.dependencies[name]} -> ${TARGET_VERSIONS[name]}`);
+        console.log(
+          `  [${dir}] Updating ${name}: ${pkg.dependencies[name]} -> ${TARGET_VERSIONS[name]}`
+        );
         pkg.dependencies[name] = TARGET_VERSIONS[name];
         modified = true;
       }
@@ -57,7 +68,7 @@ skillDirs.forEach(dir => {
   }
 
   if (modified) {
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
   }
 });
 

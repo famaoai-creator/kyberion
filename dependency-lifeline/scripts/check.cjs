@@ -32,23 +32,43 @@ const argv = createStandardYargs()
     }
     return true;
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // Known deprecated packages
 const DEPRECATED_PACKAGES = new Set([
-  'request', 'request-promise', 'request-promise-native',
-  'tslint', 'istanbul', 'nomnom', 'coffee-script',
-  'jade', 'bower', 'grunt-cli', 'gulp-util',
-  'domutils', 'natives', 'left-pad', 'merge',
+  'request',
+  'request-promise',
+  'request-promise-native',
+  'tslint',
+  'istanbul',
+  'nomnom',
+  'coffee-script',
+  'jade',
+  'bower',
+  'grunt-cli',
+  'gulp-util',
+  'domutils',
+  'natives',
+  'left-pad',
+  'merge',
 ]);
 
 // Security-related packages (deserve extra attention)
 const SECURITY_PACKAGES = new Set([
-  'helmet', 'cors', 'csurf', 'express-rate-limit',
-  'jsonwebtoken', 'bcrypt', 'bcryptjs', 'crypto-js',
-  'passport', 'express-session', 'cookie-parser',
-  'hpp', 'xss-clean', 'express-mongo-sanitize',
+  'helmet',
+  'cors',
+  'csurf',
+  'express-rate-limit',
+  'jsonwebtoken',
+  'bcrypt',
+  'bcryptjs',
+  'crypto-js',
+  'passport',
+  'express-session',
+  'cookie-parser',
+  'hpp',
+  'xss-clean',
+  'express-mongo-sanitize',
 ]);
 
 /**
@@ -135,9 +155,7 @@ function generateRecommendations(depResults, counts) {
   const recommendations = [];
 
   if (counts.majorUpdates > 0) {
-    const majorPkgs = depResults
-      .filter((d) => d.updateType === 'major')
-      .map((d) => d.name);
+    const majorPkgs = depResults.filter((d) => d.updateType === 'major').map((d) => d.name);
     recommendations.push(
       `${counts.majorUpdates} package(s) have major version differences (${majorPkgs.join(', ')}). Review changelogs for breaking changes before updating.`
     );

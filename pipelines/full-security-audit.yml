@@ -2,20 +2,20 @@ name: Full Security Audit Pipeline
 description: Comprehensive security analysis with vulnerability scanning, license compliance, and bug prediction
 steps:
   - skill: codebase-mapper
-    args: "\"{{dir}}\" 3"
+    args: '"{{dir}}" 3'
     output: map
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: scan
   - skill: bug-predictor
-    args: "--dir \"{{dir}}\" --top 15 --since \"6 months ago\""
+    args: '--dir "{{dir}}" --top 15 --since "6 months ago"'
     output: predictions
   - skill: license-auditor
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: licenses
   - skill: dependency-grapher
-    args: "-i \"{{dir}}/package.json\""
+    args: '-i "{{dir}}/package.json"'
     output: dependencies
   - skill: html-reporter
-    args: "--title \"Security Audit Report\" --input \"$prev.output\""
+    args: '--title "Security Audit Report" --input "$prev.output"'
     output: report

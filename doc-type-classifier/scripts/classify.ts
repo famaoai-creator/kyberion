@@ -26,10 +26,7 @@ const RULES: Record<string, string[]> = {
 function classify(content: string): ClassifyResult {
   let bestType = 'unknown';
   let maxScore = 0;
-  const totalKeywords = Math.max(
-    ...Object.values(RULES).map((kw) => kw.length),
-    1
-  );
+  const totalKeywords = Math.max(...Object.values(RULES).map((kw) => kw.length), 1);
 
   for (const [type, keywords] of Object.entries(RULES)) {
     let score = 0;
@@ -42,10 +39,7 @@ function classify(content: string): ClassifyResult {
     }
   }
 
-  const confidence =
-    maxScore > 0
-      ? Math.min(0.7 + (maxScore / totalKeywords) * 0.3, 1.0)
-      : 0;
+  const confidence = maxScore > 0 ? Math.min(0.7 + (maxScore / totalKeywords) * 0.3, 1.0) : 0;
 
   return {
     type: bestType,

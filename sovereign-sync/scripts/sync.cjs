@@ -11,24 +11,24 @@ const path = require('path');
 const fs = require('fs');
 
 runSkill('sovereign-sync', () => {
-    const args = requireArgs(['tier', 'repo']);
-    const tier = args.tier.toLowerCase();
-    const repoUrl = args.repo;
+  const args = requireArgs(['tier', 'repo']);
+  const tier = args.tier.toLowerCase();
+  const repoUrl = args.repo;
 
-    const targetDir = path.resolve(__dirname, `../../knowledge/${tier}`);
-    if (!fs.existsSync(targetDir)) {
-        throw new Error(`Tier directory not found: ${targetDir}`);
-    }
+  const targetDir = path.resolve(__dirname, `../../knowledge/${tier}`);
+  if (!fs.existsSync(targetDir)) {
+    throw new Error(`Tier directory not found: ${targetDir}`);
+  }
 
-    console.log(`[Sync] Synchronizing ${tier} tier with ${repoUrl}...`);
-    
-    // Simulate git sync logic (In real use, this would involve git fetch/merge)
-    const result = {
-        tier,
-        repo: repoUrl,
-        last_sync: new Date().toISOString(),
-        status: 'simulated_success'
-    };
+  console.log(`[Sync] Synchronizing ${tier} tier with ${repoUrl}...`);
 
-    return result;
+  // Simulate git sync logic (In real use, this would involve git fetch/merge)
+  const result = {
+    tier,
+    repo: repoUrl,
+    last_sync: new Date().toISOString(),
+    status: 'simulated_success',
+  };
+
+  return result;
 });

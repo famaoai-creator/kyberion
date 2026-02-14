@@ -91,7 +91,7 @@ function readJsonFile(filePath, label = 'JSON file') {
  */
 function requireArgs(argvOrRequired, requiredList) {
   let argv, required;
-  
+
   if (Array.isArray(argvOrRequired)) {
     // Legacy support: fetch argv automatically if not provided
     const yargs = require('yargs/yargs')(process.argv.slice(2));
@@ -105,7 +105,7 @@ function requireArgs(argvOrRequired, requiredList) {
   if (!argv) throw new Error('Arguments object (argv) is undefined.');
   if (!Array.isArray(required)) throw new Error('Required arguments list must be an array.');
 
-  const missing = required.filter(name => argv[name] === undefined || argv[name] === null);
+  const missing = required.filter((name) => argv[name] === undefined || argv[name] === null);
   if (missing.length > 0) {
     throw new Error(`Missing required argument(s): ${missing.join(', ')}`);
   }

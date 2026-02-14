@@ -8,15 +8,21 @@ const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
 const argv = createStandardYargs()
   .option('service', { alias: 's', type: 'string', describe: 'Service name', demandOption: true })
-  .option('type', { alias: 't', type: 'string', describe: 'Runbook type', choices: ['deploy', 'rollback', 'incident', 'scaling'], default: 'deploy' })
-  .option('out', { alias: 'o', type: 'string', describe: 'Output file path' })
-  .argv;
+  .option('type', {
+    alias: 't',
+    type: 'string',
+    describe: 'Runbook type',
+    choices: ['deploy', 'rollback', 'incident', 'scaling'],
+    default: 'deploy',
+  })
+  .option('out', { alias: 'o', type: 'string', describe: 'Output file path' }).argv;
 
 // --- Runbook Templates ---
 
 const TEMPLATES = {
   deploy: {
-    overview: (service) => `This runbook describes the standard deployment procedure for **${service}**. Follow each step in order and verify before proceeding.`,
+    overview: (service) =>
+      `This runbook describes the standard deployment procedure for **${service}**. Follow each step in order and verify before proceeding.`,
     prerequisites: [
       'Ensure CI/CD pipeline is green on the target branch',
       'Verify staging environment has been tested and approved',
@@ -51,7 +57,8 @@ const TEMPLATES = {
     ],
   },
   rollback: {
-    overview: (service) => `This runbook describes the emergency rollback procedure for **${service}**. Use when a deployment has caused degradation.`,
+    overview: (service) =>
+      `This runbook describes the emergency rollback procedure for **${service}**. Use when a deployment has caused degradation.`,
     prerequisites: [
       'Confirm the issue is caused by the recent deployment',
       'Identify the last known-good version/tag',
@@ -82,7 +89,8 @@ const TEMPLATES = {
     ],
   },
   incident: {
-    overview: (service) => `This runbook provides the incident response procedure for **${service}**. Follow the steps to diagnose, mitigate, and resolve the incident.`,
+    overview: (service) =>
+      `This runbook provides the incident response procedure for **${service}**. Follow the steps to diagnose, mitigate, and resolve the incident.`,
     prerequisites: [
       'Acknowledge the incident in the alerting system',
       'Join the incident communication channel',
@@ -114,7 +122,8 @@ const TEMPLATES = {
     ],
   },
   scaling: {
-    overview: (service) => `This runbook describes the scaling procedure for **${service}**. Use when the service needs to handle increased load.`,
+    overview: (service) =>
+      `This runbook describes the scaling procedure for **${service}**. Use when the service needs to handle increased load.`,
     prerequisites: [
       'Review current resource utilization metrics (CPU, memory, connections)',
       'Identify the scaling trigger (traffic spike, planned event, growth)',
@@ -221,7 +230,9 @@ runSkill('operational-runbook-generator', () => {
   const template = TEMPLATES[type];
 
   if (!template) {
-    throw new Error(`Unknown runbook type: ${type}. Valid types: deploy, rollback, incident, scaling`);
+    throw new Error(
+      `Unknown runbook type: ${type}. Valid types: deploy, rollback, incident, scaling`
+    );
   }
 
   const { sections, markdown } = generateMarkdown(service, type, template);

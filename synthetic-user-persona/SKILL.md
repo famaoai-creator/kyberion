@@ -29,16 +29,20 @@ This skill takes browser automation to the next level by simulating human behavi
 ## Capabilities
 
 ### 1. Persona Generation
+
 - Creates "Virtual Users" with specific goals, skill levels, and constraints.
 - Includes personas for accessibility testing (e.g., screen reader users, users with motor impairments).
 
 ### 2. Exploratory Testing
+
 - Instead of following a script, the AI "explores" the UI based on its persona's mental model.
 - Discovers non-obvious bugs and usability friction points.
 
 ## Usage
+
 - "Have a 'Novice User' persona try to complete our checkout flow and report any confusion."
 - "Perform an exploratory accessibility audit using three different synthetic personas."
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

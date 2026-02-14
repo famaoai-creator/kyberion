@@ -28,8 +28,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Expected input:
@@ -47,7 +46,8 @@ const argv = createStandardYargs()
 const SCENARIO_TEMPLATES = {
   aggressive_growth: {
     label: 'Aggressive Growth',
-    description: 'Maximize growth at the cost of higher burn. Hire aggressively, invest in marketing.',
+    description:
+      'Maximize growth at the cost of higher burn. Hire aggressively, invest in marketing.',
     revenue_multiplier: 1.5,
     cost_multiplier: 1.8,
     headcount_growth: 0.5,
@@ -107,8 +107,8 @@ function projectScenario(base, template, months) {
   const timeline = [];
 
   for (let m = 1; m <= months; m++) {
-    currentMRR *= (1 + monthlyRevGrowth);
-    currentBurn *= (1 + monthlyCostGrowth);
+    currentMRR *= 1 + monthlyRevGrowth;
+    currentBurn *= 1 + monthlyCostGrowth;
     const netIncome = currentMRR - currentBurn;
     currentCash += netIncome;
 
@@ -124,9 +124,12 @@ function projectScenario(base, template, months) {
   }
 
   const finalHeadcount = Math.round(headcount * (1 + template.headcount_growth));
-  const runwayMonths = currentCash > 0 && currentMRR < currentBurn
-    ? Math.round(currentCash / (currentBurn - currentMRR))
-    : currentMRR >= currentBurn ? Infinity : 0;
+  const runwayMonths =
+    currentCash > 0 && currentMRR < currentBurn
+      ? Math.round(currentCash / (currentBurn - currentMRR))
+      : currentMRR >= currentBurn
+        ? Infinity
+        : 0;
 
   return {
     scenario: template.label,
@@ -154,11 +157,18 @@ function compareScenarios(scenarios) {
     recommended: null,
   };
 
-  let maxRev = 0, maxRunway = 0;
+  let maxRev = 0,
+    maxRunway = 0;
   for (const s of scenarios) {
-    if (s.endState.mrr > maxRev) { maxRev = s.endState.mrr; comparison.highestRevenue = s.scenario; }
+    if (s.endState.mrr > maxRev) {
+      maxRev = s.endState.mrr;
+      comparison.highestRevenue = s.scenario;
+    }
     const runway = s.endState.runwayMonths === 'infinite' ? 9999 : s.endState.runwayMonths;
-    if (runway > maxRunway) { maxRunway = runway; comparison.longestRunway = s.scenario; }
+    if (runway > maxRunway) {
+      maxRunway = runway;
+      comparison.longestRunway = s.scenario;
+    }
   }
 
   comparison.lowestRisk = scenarios.reduce((best, s) => {
@@ -167,7 +177,8 @@ function compareScenarios(scenarios) {
   }, scenarios[0]).scenario;
 
   // Recommend balanced option
-  comparison.recommended = scenarios.find(s => s.riskLevel === 'medium')?.scenario || scenarios[0].scenario;
+  comparison.recommended =
+    scenarios.find((s) => s.riskLevel === 'medium')?.scenario || scenarios[0].scenario;
 
   return comparison;
 }
@@ -181,7 +192,9 @@ runSkill('scenario-multiverse-orchestrator', () => {
   const numScenarios = Math.min(argv.scenarios, Object.keys(SCENARIO_TEMPLATES).length);
 
   const templateKeys = Object.keys(SCENARIO_TEMPLATES).slice(0, numScenarios);
-  const scenarios = templateKeys.map(key => projectScenario(base, SCENARIO_TEMPLATES[key], months));
+  const scenarios = templateKeys.map((key) =>
+    projectScenario(base, SCENARIO_TEMPLATES[key], months)
+  );
   const comparison = compareScenarios(scenarios);
 
   const result = {

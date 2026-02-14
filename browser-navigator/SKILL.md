@@ -35,23 +35,29 @@ This skill automates web browser interactions using the Playwright CLI. It focus
 ## Capabilities
 
 ### 1. Scenario Execution
+
 Run existing Playwright test scripts to perform complex multi-step actions.
+
 - **Command**: `npx playwright test <path_to_spec>`
 - **Results**: Check output logs and screenshots saved in `work/screenshots/`.
 
 ### 2. Scenario Generation
+
 Create new automation scripts (`.spec.js`) based on user requirements.
-- **Workflow**: 
-    1.  Define the goal (e.g., "Log in and export the table").
-    2.  Draft the Playwright script using `@playwright/test` syntax.
-    3.  Save the script to `knowledge/browser-scenarios/` for future use.
-    4.  Verify by running it.
+
+- **Workflow**:
+  1.  Define the goal (e.g., "Log in and export the table").
+  2.  Draft the Playwright script using `@playwright/test` syntax.
+  3.  Save the script to `knowledge/browser-scenarios/` for future use.
+  4.  Verify by running it.
 
 ### 3. Visual & Content Auditing
+
 - Capture full-page screenshots for UI review.
 - Extract text content or specific DOM elements for analysis.
 
 ## Knowledge Base
+
 - **Scenarios**: `knowledge/browser-scenarios/`
   - Always check this directory first for reusable scripts before creating new ones.
   - New scripts should be named descriptively (e.g., `github-login.spec.js`).
@@ -63,6 +69,7 @@ Create new automation scripts (`.spec.js`) based on user requirements.
 - "Debug the UI of my local dev server at localhost:3000."
 
 ## Safety & Best Practices
+
 - **Privacy**: Never hardcode credentials. Use environment variables if necessary.
 - **Paths**: Always save screenshots to `work/screenshots/`.
 - **Cleanup**: Close browser contexts properly (Playwright handles this in `test` blocks).
@@ -70,13 +77,14 @@ Create new automation scripts (`.spec.js`) based on user requirements.
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `Cannot find module '@playwright/test'` | Playwright not installed | Run `npm install -D @playwright/test` |
-| `browserType.launch: Executable doesn't exist` | Browser binaries missing | Run `npx playwright install chromium` |
-| `Target page, context or browser has been closed` | Navigation timeout | Increase timeout or check URL validity |
-| `net::ERR_CONNECTION_REFUSED` | Target server not running | Start the local dev server first |
-| `EPERM: operation not permitted` | File permission issue on screenshots | Check write permissions on `work/screenshots/` |
+| Error                                             | Cause                                | Fix                                            |
+| ------------------------------------------------- | ------------------------------------ | ---------------------------------------------- |
+| `Cannot find module '@playwright/test'`           | Playwright not installed             | Run `npm install -D @playwright/test`          |
+| `browserType.launch: Executable doesn't exist`    | Browser binaries missing             | Run `npx playwright install chromium`          |
+| `Target page, context or browser has been closed` | Navigation timeout                   | Increase timeout or check URL validity         |
+| `net::ERR_CONNECTION_REFUSED`                     | Target server not running            | Start the local dev server first               |
+| `EPERM: operation not permitted`                  | File permission issue on screenshots | Check write permissions on `work/screenshots/` |
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

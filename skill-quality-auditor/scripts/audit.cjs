@@ -5,17 +5,25 @@ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 
 const argv = createStandardYargs()
-    .option('dir', { alias: 'd', type: 'string', default: process.cwd(), describe: 'Project root directory' })
-    .option('skill', { alias: 's', type: 'string', describe: 'Audit a single skill by name' })
-    .option('min-score', { type: 'number', default: 0, describe: 'Minimum passing score (0-12)' })
-    .argv;
+  .option('dir', {
+    alias: 'd',
+    type: 'string',
+    default: process.cwd(),
+    describe: 'Project root directory',
+  })
+  .option('skill', { alias: 's', type: 'string', describe: 'Audit a single skill by name' })
+  .option('min-score', {
+    type: 'number',
+    default: 0,
+    describe: 'Minimum passing score (0-12)',
+  }).argv;
 
 const rootDir = path.resolve(argv.dir);
 const unitTestPath = path.join(rootDir, 'tests/unit.test.cjs');
 const integrationTestPath = path.join(rootDir, 'tests/integration.test.cjs');
 
 function getSkillDirs() {
-  return fs.readdirSync(rootDir).filter(name => {
+  return fs.readdirSync(rootDir).filter((name) => {
     const skillMd = path.join(rootDir, name, 'SKILL.md');
     if (!fs.existsSync(skillMd)) return false;
     const content = fs.readFileSync(skillMd, 'utf8');
@@ -31,7 +39,7 @@ function auditSkill(skillName) {
   // Helper: read first .cjs script content
   function getMainScript() {
     if (!fs.existsSync(scriptsDir)) return null;
-    const scripts = fs.readdirSync(scriptsDir).filter(f => /\.(cjs|js)$/.test(f));
+    const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.(cjs|js)$/.test(f));
     if (scripts.length === 0) return null;
     return fs.readFileSync(path.join(scriptsDir, scripts[0]), 'utf8');
   }
@@ -46,7 +54,11 @@ function auditSkill(skillName) {
   checks.push({
     name: 'skill-md-valid',
     label: 'SKILL.md has valid frontmatter',
-    passed: skillMdExists && /^name:\s*.+$/m.test(skillMdContent) && /^description:\s*.+$/m.test(skillMdContent) && /^status:\s*implemented/m.test(skillMdContent),
+    passed:
+      skillMdExists &&
+      /^name:\s*.+$/m.test(skillMdContent) &&
+      /^description:\s*.+$/m.test(skillMdContent) &&
+      /^status:\s*implemented/m.test(skillMdContent),
   });
 
   // 2. SKILL.md has Troubleshooting section
@@ -81,7 +93,9 @@ function auditSkill(skillName) {
   checks.push({
     name: 'skill-wrapper',
     label: 'Uses skill-wrapper (runSkill/runSkillAsync)',
-    passed: scriptContent !== null && (scriptContent.includes('runSkill') || scriptContent.includes('runSkillAsync')),
+    passed:
+      scriptContent !== null &&
+      (scriptContent.includes('runSkill') || scriptContent.includes('runSkillAsync')),
   });
 
   // 7. Uses yargs for CLI
@@ -99,8 +113,8 @@ function auditSkill(skillName) {
   });
 
   // 9. Has TypeScript type definitions
-  const hasTs = fs.existsSync(scriptsDir) &&
-    fs.readdirSync(scriptsDir).some(f => f.endsWith('.ts'));
+  const hasTs =
+    fs.existsSync(scriptsDir) && fs.readdirSync(scriptsDir).some((f) => f.endsWith('.ts'));
   checks.push({
     name: 'typescript',
     label: 'Has TypeScript type definitions',
@@ -135,14 +149,14 @@ function auditSkill(skillName) {
   checks.push({
     name: 'error-handling',
     label: 'Has proper error handling',
-    passed: scriptContent !== null && (
-      scriptContent.includes('runSkill') ||
-      scriptContent.includes('try {') ||
-      scriptContent.includes('catch (')
-    ),
+    passed:
+      scriptContent !== null &&
+      (scriptContent.includes('runSkill') ||
+        scriptContent.includes('try {') ||
+        scriptContent.includes('catch (')),
   });
 
-  const passedCount = checks.filter(c => c.passed).length;
+  const passedCount = checks.filter((c) => c.passed).length;
   const totalCount = checks.length;
   const score = passedCount;
   const percentage = Math.round((passedCount / totalCount) * 100);
@@ -155,8 +169,8 @@ function auditSkill(skillName) {
   else grade = 'F';
 
   const recommendations = checks
-    .filter(c => !c.passed)
-    .map(c => `Add ${c.label.toLowerCase()}`);
+    .filter((c) => !c.passed)
+    .map((c) => `Add ${c.label.toLowerCase()}`);
 
   return {
     skill: skillName,
@@ -177,15 +191,15 @@ runSkill('skill-quality-auditor', () => {
   results.sort((a, b) => a.score - b.score);
 
   const totalSkills = results.length;
-  const avgScore = totalSkills > 0
-    ? Math.round(results.reduce((s, r) => s + r.score, 0) / totalSkills * 10) / 10
-    : 0;
-  const avgPercentage = totalSkills > 0
-    ? Math.round(results.reduce((s, r) => s + r.percentage, 0) / totalSkills)
-    : 0;
-  const gradeA = results.filter(r => r.grade === 'A').length;
-  const gradeB = results.filter(r => r.grade === 'B').length;
-  const failing = results.filter(r => r.score < argv['min-score']).length;
+  const avgScore =
+    totalSkills > 0
+      ? Math.round((results.reduce((s, r) => s + r.score, 0) / totalSkills) * 10) / 10
+      : 0;
+  const avgPercentage =
+    totalSkills > 0 ? Math.round(results.reduce((s, r) => s + r.percentage, 0) / totalSkills) : 0;
+  const gradeA = results.filter((r) => r.grade === 'A').length;
+  const gradeB = results.filter((r) => r.grade === 'B').length;
+  const failing = results.filter((r) => r.score < argv['min-score']).length;
 
   return {
     summary: {
@@ -195,9 +209,9 @@ runSkill('skill-quality-auditor', () => {
       gradeDistribution: {
         A: gradeA,
         B: gradeB,
-        C: results.filter(r => r.grade === 'C').length,
-        D: results.filter(r => r.grade === 'D').length,
-        F: results.filter(r => r.grade === 'F').length,
+        C: results.filter((r) => r.grade === 'C').length,
+        D: results.filter((r) => r.grade === 'D').length,
+        F: results.filter((r) => r.grade === 'F').length,
       },
       failingThreshold: failing > 0 ? `${failing} skills below ${argv['min-score']}/12` : 'none',
     },

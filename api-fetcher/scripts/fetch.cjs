@@ -11,23 +11,23 @@ const { requireArgs, safeJsonParse } = require('@agent/core/validators');
 const { secureFetch } = require('@agent/core/network');
 
 runSkillAsync('api-fetcher', async () => {
-    const args = requireArgs(['url']);
-    const method = args.method || 'GET';
-    
-    const config = {
-        method,
-        url: args.url,
-        headers: args.headers ? safeJsonParse(args.headers, 'headers') : {},
-        data: args.body ? safeJsonParse(args.body, 'request body') : undefined,
-    };
+  const args = requireArgs(['url']);
+  const method = args.method || 'GET';
 
-    const data = await secureFetch(config);
-    const jsonStr = JSON.stringify(data, null, 2);
+  const config = {
+    method,
+    url: args.url,
+    headers: args.headers ? safeJsonParse(args.headers, 'headers') : {},
+    data: args.body ? safeJsonParse(args.body, 'request body') : undefined,
+  };
 
-    if (args.out) {
-        safeWriteFile(args.out, jsonStr);
-        return { output: args.out, size: jsonStr.length };
-    }
+  const data = await secureFetch(config);
+  const jsonStr = JSON.stringify(data, null, 2);
 
-    return { data };
+  if (args.out) {
+    safeWriteFile(args.out, jsonStr);
+    return { output: args.out, size: jsonStr.length };
+  }
+
+  return { data };
 });

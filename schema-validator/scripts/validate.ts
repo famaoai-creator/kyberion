@@ -55,7 +55,7 @@ export interface ValidationResult {
  */
 export function validateAgainstSchema(
   data: Record<string, unknown>,
-  schema: Record<string, unknown>,
+  schema: Record<string, unknown>
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const required = (schema.required ?? []) as string[];
@@ -109,7 +109,7 @@ export function validateAgainstSchema(
  */
 export function buildValidationOutput(
   result: ValidationResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<ValidationResult> {
   return {
     skill: 'schema-validator',

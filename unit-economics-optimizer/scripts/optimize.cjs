@@ -22,8 +22,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Expected input JSON:
@@ -53,7 +52,7 @@ function calculateLTV(segment) {
   const churn = segment.monthly_churn_rate || 0.05;
   const avgLifetimeMonths = churn > 0 ? 1 / churn : 120;
   const monthlyRevenue = segment.monthly_price || 0;
-  const grossMargin = segment.gross_margin || 0.80;
+  const grossMargin = segment.gross_margin || 0.8;
   return Math.round(monthlyRevenue * grossMargin * avgLifetimeMonths);
 }
 
@@ -63,7 +62,8 @@ function analyzeSegment(segment) {
   const ltvCacRatio = cac > 0 ? Math.round((ltv / cac) * 100) / 100 : Infinity;
   const churn = segment.monthly_churn_rate || 0.05;
   const avgLifetimeMonths = churn > 0 ? Math.round(1 / churn) : 120;
-  const monthsToRecoverCAC = cac > 0 ? Math.ceil(cac / ((segment.monthly_price || 0) * (segment.gross_margin || 0.8))) : 0;
+  const monthsToRecoverCAC =
+    cac > 0 ? Math.ceil(cac / ((segment.monthly_price || 0) * (segment.gross_margin || 0.8))) : 0;
 
   let health = 'healthy';
   if (ltvCacRatio < 1) health = 'unprofitable';
@@ -120,7 +120,7 @@ function generateRecommendations(analyses) {
 
   // Portfolio-level recommendations
   const totalRevenue = analyses.reduce((s, a) => s + a.monthlyRevenue, 0);
-  const unprofitable = analyses.filter(a => a.health === 'unprofitable');
+  const unprofitable = analyses.filter((a) => a.health === 'unprofitable');
   if (unprofitable.length > 0) {
     const unprofitableRevenue = unprofitable.reduce((s, a) => s + a.monthlyRevenue, 0);
     recs.push({
@@ -148,7 +148,8 @@ runSkill('unit-economics-optimizer', () => {
   const recommendations = generateRecommendations(analyses);
 
   const totalMRR = analyses.reduce((s, a) => s + a.monthlyRevenue, 0);
-  const weightedLtvCac = analyses.reduce((s, a) => s + a.ltvCacRatio * a.monthlyRevenue, 0) / (totalMRR || 1);
+  const weightedLtvCac =
+    analyses.reduce((s, a) => s + a.ltvCacRatio * a.monthlyRevenue, 0) / (totalMRR || 1);
 
   const result = {
     source: path.basename(resolved),

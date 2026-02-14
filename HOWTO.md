@@ -129,24 +129,24 @@ node mission-control/scripts/orchestrate.cjs --pipeline pipelines/release-pipeli
 
 **Available pre-built pipelines** (in `pipelines/`):
 
-| Pipeline | Description |
-|----------|-------------|
-| `security-audit.yml` | Codebase mapping + vulnerability scan + bug prediction |
-| `full-security-audit.yml` | Extended security analysis |
-| `code-quality.yml` | Quality scoring + completeness + format detection |
-| `code-health.yml` | Project health metrics |
-| `release-pipeline.yml` | Pre-release: health + security + licenses + bugs + release notes |
-| `compliance-audit.yml` | License and compliance checks |
-| `documentation-sync.yml` | Documentation drift detection |
-| `documentation-excellence.yml` | Full documentation quality check |
-| `team-onboarding.yml` | New member onboarding documentation |
-| `knowledge-extraction.yml` | Tech stack and pattern extraction |
-| `cost-optimization-audit.yml` | Cloud cost analysis |
-| `intelligent-code-review.yml` | AI-powered code review |
-| `ecosystem-health-monitor.yml` | Full ecosystem health check |
-| `full-quality-gate.yml` | Complete quality gate for releases |
-| `data-flow-audit.yml` | Data flow security audit |
-| `doc-analysis.yml` | Document analysis pipeline |
+| Pipeline                       | Description                                                      |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `security-audit.yml`           | Codebase mapping + vulnerability scan + bug prediction           |
+| `full-security-audit.yml`      | Extended security analysis                                       |
+| `code-quality.yml`             | Quality scoring + completeness + format detection                |
+| `code-health.yml`              | Project health metrics                                           |
+| `release-pipeline.yml`         | Pre-release: health + security + licenses + bugs + release notes |
+| `compliance-audit.yml`         | License and compliance checks                                    |
+| `documentation-sync.yml`       | Documentation drift detection                                    |
+| `documentation-excellence.yml` | Full documentation quality check                                 |
+| `team-onboarding.yml`          | New member onboarding documentation                              |
+| `knowledge-extraction.yml`     | Tech stack and pattern extraction                                |
+| `cost-optimization-audit.yml`  | Cloud cost analysis                                              |
+| `intelligent-code-review.yml`  | AI-powered code review                                           |
+| `ecosystem-health-monitor.yml` | Full ecosystem health check                                      |
+| `full-quality-gate.yml`        | Complete quality gate for releases                               |
+| `data-flow-audit.yml`          | Data flow security audit                                         |
+| `doc-analysis.yml`             | Document analysis pipeline                                       |
 
 ---
 
@@ -181,14 +181,14 @@ node mission-control/scripts/orchestrate.cjs \
 
 **Options:**
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--pipeline` | `-p` | Path to YAML pipeline file |
-| `--skills` | `-s` | Comma-separated skill names |
-| `--dir` | `-d` | Working directory (default: `.`) |
-| `--input` | `-i` | Input file path |
-| `--output` | `-o` | Output file path |
-| `--parallel` | | Run ad-hoc skills in parallel |
+| Flag         | Short | Description                      |
+| ------------ | ----- | -------------------------------- |
+| `--pipeline` | `-p`  | Path to YAML pipeline file       |
+| `--skills`   | `-s`  | Comma-separated skill names      |
+| `--dir`      | `-d`  | Working directory (default: `.`) |
+| `--input`    | `-i`  | Input file path                  |
+| `--output`   | `-o`  | Output file path                 |
+| `--parallel` |       | Run ad-hoc skills in parallel    |
 
 ---
 
@@ -353,14 +353,14 @@ runSkill('my-new-skill', () => {
 **Available shared libraries:**
 
 ```javascript
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');  // Standard output
-const { classify } = require('../../scripts/lib/classifier.cjs');      // Classification
+const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs'); // Standard output
+const { classify } = require('../../scripts/lib/classifier.cjs'); // Classification
 const { validateInjection } = require('../../scripts/lib/tier-guard.cjs'); // Knowledge tier
-const { logger, fileUtils } = require('../../scripts/lib/core.cjs');   // Logging, file I/O
-const { requireArgs } = require('../../scripts/lib/validators.cjs');   // Argument validation
-const { validateInput } = require('../../scripts/lib/validate.cjs');   // Schema validation
-const { safeReadFile } = require('../../scripts/lib/secure-io.cjs');   // Safe file I/O
-const { createLogger } = require('../../scripts/lib/logger.cjs');      // Structured logging
+const { logger, fileUtils } = require('../../scripts/lib/core.cjs'); // Logging, file I/O
+const { requireArgs } = require('../../scripts/lib/validators.cjs'); // Argument validation
+const { validateInput } = require('../../scripts/lib/validate.cjs'); // Schema validation
+const { safeReadFile } = require('../../scripts/lib/secure-io.cjs'); // Safe file I/O
+const { createLogger } = require('../../scripts/lib/logger.cjs'); // Structured logging
 const { MetricsCollector } = require('../../scripts/lib/metrics.cjs'); // Metrics
 ```
 
@@ -404,9 +404,7 @@ Plugins use a hook system via `.gemini-plugins.json`. Every skill execution can 
 
 ```json
 {
-  "plugins": [
-    "./my-plugins/audit-logger.cjs"
-  ]
+  "plugins": ["./my-plugins/audit-logger.cjs"]
 }
 ```
 
@@ -419,7 +417,7 @@ module.exports = {
   },
   afterSkill(skillName, output) {
     console.log(`Finished: ${skillName}, status: ${output.status}`);
-  }
+  },
 };
 ```
 
@@ -447,12 +445,12 @@ steps:
 
 **Variable substitution:**
 
-| Variable | Replaced with |
-|----------|--------------|
-| `{{dir}}` | `--dir` value |
-| `{{input}}` | `--input` value |
-| `{{output}}` | `--output` value |
-| `$prev.*` | Output from the previous step |
+| Variable     | Replaced with                 |
+| ------------ | ----------------------------- |
+| `{{dir}}`    | `--dir` value                 |
+| `{{input}}`  | `--input` value               |
+| `{{output}}` | `--output` value              |
+| `$prev.*`    | Output from the previous step |
 
 **Run your pipeline:**
 
@@ -491,9 +489,9 @@ const result = pipeline.run({ dir: '/path/to/project' });
 steps:
   - skill: security-scanner
     args: '"{{dir}}"'
-    retries: 2           # Retry up to 2 times on failure
-    retryDelay: 3000     # Wait 3 seconds between retries
-    timeout: 120000      # 2 minute timeout
+    retries: 2 # Retry up to 2 times on failure
+    retryDelay: 3000 # Wait 3 seconds between retries
+    timeout: 120000 # 2 minute timeout
     continueOnError: true # Don't stop pipeline on failure
 ```
 
@@ -513,13 +511,13 @@ node scripts/audit_skills.cjs --format json
 
 **The audit checks 5 criteria per skill:**
 
-| Check | What it verifies |
-|-------|-----------------|
-| `pkg.json` | Has a `package.json` |
-| `wrapper` | Uses `runSkill()` or `runSkillAsync()` from skill-wrapper |
-| `yargs` | Uses `yargs` for argument parsing |
-| `SKILL.md` | Has valid metadata (name, description, status) |
-| `tests` | Has unit tests in `tests/unit.test.cjs` |
+| Check      | What it verifies                                          |
+| ---------- | --------------------------------------------------------- |
+| `pkg.json` | Has a `package.json`                                      |
+| `wrapper`  | Uses `runSkill()` or `runSkillAsync()` from skill-wrapper |
+| `yargs`    | Uses `yargs` for argument parsing                         |
+| `SKILL.md` | Has valid metadata (name, description, status)            |
+| `tests`    | Has unit tests in `tests/unit.test.cjs`                   |
 
 Each skill gets a score from 0/5 to 5/5.
 
@@ -555,18 +553,18 @@ npm run benchmark
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Setup | `node scripts/init_wizard.cjs` |
-| Run a skill | `npm run cli -- run <skill> -- [args]` |
-| List skills | `npm run cli -- list [implemented\|planned]` |
-| Skill info | `npm run cli -- info <skill>` |
-| Run pipeline | `node mission-control/scripts/orchestrate.cjs -p pipelines/<name>.yml` |
-| Ad-hoc chain | `node mission-control/scripts/orchestrate.cjs -s "skill-a,skill-b" -d .` |
-| Parallel run | `node mission-control/scripts/orchestrate.cjs -s "a,b,c" --parallel` |
-| Create bundle | `node skill-bundle-packager/scripts/bundle.cjs <mission> <skills...>` |
-| New skill | `npm run create-skill -- <name> --description "..."` |
-| Install plugin | `npm run plugin -- install <package>` |
-| Quality audit | `node scripts/audit_skills.cjs` |
-| Run tests | `npm run test:unit` |
-| Benchmark | `npm run benchmark` |
+| Task           | Command                                                                  |
+| -------------- | ------------------------------------------------------------------------ |
+| Setup          | `node scripts/init_wizard.cjs`                                           |
+| Run a skill    | `npm run cli -- run <skill> -- [args]`                                   |
+| List skills    | `npm run cli -- list [implemented\|planned]`                             |
+| Skill info     | `npm run cli -- info <skill>`                                            |
+| Run pipeline   | `node mission-control/scripts/orchestrate.cjs -p pipelines/<name>.yml`   |
+| Ad-hoc chain   | `node mission-control/scripts/orchestrate.cjs -s "skill-a,skill-b" -d .` |
+| Parallel run   | `node mission-control/scripts/orchestrate.cjs -s "a,b,c" --parallel`     |
+| Create bundle  | `node skill-bundle-packager/scripts/bundle.cjs <mission> <skills...>`    |
+| New skill      | `npm run create-skill -- <name> --description "..."`                     |
+| Install plugin | `npm run plugin -- install <package>`                                    |
+| Quality audit  | `node scripts/audit_skills.cjs`                                          |
+| Run tests      | `npm run test:unit`                                                      |
+| Benchmark      | `npm run benchmark`                                                      |

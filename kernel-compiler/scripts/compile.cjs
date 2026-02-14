@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const fs = require('fs'); const path = require('path');
+const fs = require('fs');
+const path = require('path');
 const { execSync } = require('child_process');
- const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project directory' })
-  .option('target', { alias: 't', type: 'string', default: 'node', choices: ['node', 'go', 'rust', 'docker'], description: 'Compilation target' })
+  .option('target', {
+    alias: 't',
+    type: 'string',
+    default: 'node',
+    choices: ['node', 'go', 'rust', 'docker'],
+    description: 'Compilation target',
+  })
   .option('dry-run', { type: 'boolean', default: true, description: 'Analyze without compiling' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
   .help().argv;
@@ -18,7 +25,10 @@ function analyzeProject(dir) {
   if (fs.existsSync(pkgPath)) {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
     if (pkg.main) analysis.entryPoints.push(pkg.main);
-    if (pkg.bin) { const bins = typeof pkg.bin === 'string' ? { default: pkg.bin } : pkg.bin; analysis.entryPoints.push(...Object.values(bins)); }
+    if (pkg.bin) {
+      const bins = typeof pkg.bin === 'string' ? { default: pkg.bin } : pkg.bin;
+      analysis.entryPoints.push(...Object.values(bins));
+    }
     analysis.dependencies = Object.keys(pkg.dependencies || {}).length;
     analysis.scripts = Object.keys(pkg.scripts || {});
   }
@@ -35,10 +45,30 @@ function analyzeProject(dir) {
 
 function generateBuildPlan(analysis, target) {
   const plans = {
-    node: { tool: 'pkg or nexe', command: `npx pkg ${analysis.entryPoints[0] || 'index.js'} --targets node18-linux-x64,node18-macos-x64,node18-win-x64`, output: 'dist/', prerequisites: ['npm install --production'] },
-    go: { tool: 'Go compiler', command: 'GOOS=linux GOARCH=amd64 go build -o dist/app .', output: 'dist/app', prerequisites: ['go mod tidy'] },
-    rust: { tool: 'Cargo', command: 'cargo build --release --target x86_64-unknown-linux-gnu', output: 'target/release/', prerequisites: ['cargo check'] },
-    docker: { tool: 'Docker', command: `docker build -t app:latest .`, output: 'Docker image', prerequisites: ['Dockerfile must exist'] },
+    node: {
+      tool: 'pkg or nexe',
+      command: `npx pkg ${analysis.entryPoints[0] || 'index.js'} --targets node18-linux-x64,node18-macos-x64,node18-win-x64`,
+      output: 'dist/',
+      prerequisites: ['npm install --production'],
+    },
+    go: {
+      tool: 'Go compiler',
+      command: 'GOOS=linux GOARCH=amd64 go build -o dist/app .',
+      output: 'dist/app',
+      prerequisites: ['go mod tidy'],
+    },
+    rust: {
+      tool: 'Cargo',
+      command: 'cargo build --release --target x86_64-unknown-linux-gnu',
+      output: 'target/release/',
+      prerequisites: ['cargo check'],
+    },
+    docker: {
+      tool: 'Docker',
+      command: `docker build -t app:latest .`,
+      output: 'Docker image',
+      prerequisites: ['Dockerfile must exist'],
+    },
   };
   return plans[target];
 }
@@ -46,11 +76,32 @@ function generateBuildPlan(analysis, target) {
 function checkToolchain(target) {
   const checks = {};
   try {
-    if (target === 'node') { checks.node = execSync('node --version', { encoding: 'utf8' }).trim(); checks.npm = execSync('npm --version', { encoding: 'utf8' }).trim(); }
-    if (target === 'go') { try { checks.go = execSync('go version', { encoding: 'utf8' }).trim(); } catch(_e) { checks.go = 'not installed'; } }
-    if (target === 'rust') { try { checks.rust = execSync('rustc --version', { encoding: 'utf8' }).trim(); } catch(_e) { checks.rust = 'not installed'; } }
-    if (target === 'docker') { try { checks.docker = execSync('docker --version', { encoding: 'utf8' }).trim(); } catch(_e) { checks.docker = 'not installed'; } }
-  } catch(_e){}
+    if (target === 'node') {
+      checks.node = execSync('node --version', { encoding: 'utf8' }).trim();
+      checks.npm = execSync('npm --version', { encoding: 'utf8' }).trim();
+    }
+    if (target === 'go') {
+      try {
+        checks.go = execSync('go version', { encoding: 'utf8' }).trim();
+      } catch (_e) {
+        checks.go = 'not installed';
+      }
+    }
+    if (target === 'rust') {
+      try {
+        checks.rust = execSync('rustc --version', { encoding: 'utf8' }).trim();
+      } catch (_e) {
+        checks.rust = 'not installed';
+      }
+    }
+    if (target === 'docker') {
+      try {
+        checks.docker = execSync('docker --version', { encoding: 'utf8' }).trim();
+      } catch (_e) {
+        checks.docker = 'not installed';
+      }
+    }
+  } catch (_e) {}
   return checks;
 }
 
@@ -61,10 +112,16 @@ runSkill('kernel-compiler', () => {
   const buildPlan = generateBuildPlan(analysis, argv.target);
   const toolchain = checkToolchain(argv.target);
   const result = {
-    directory: targetDir, target: argv.target, mode: argv['dry-run'] ? 'dry-run' : 'compile',
-    projectAnalysis: analysis, buildPlan, toolchain,
+    directory: targetDir,
+    target: argv.target,
+    mode: argv['dry-run'] ? 'dry-run' : 'compile',
+    projectAnalysis: analysis,
+    buildPlan,
+    toolchain,
     recommendations: [
-      analysis.entryPoints.length === 0 ? '[warn] No entry point found - specify in package.json "main" or "bin"' : `Entry: ${analysis.entryPoints[0]}`,
+      analysis.entryPoints.length === 0
+        ? '[warn] No entry point found - specify in package.json "main" or "bin"'
+        : `Entry: ${analysis.entryPoints[0]}`,
       `Dependencies: ${analysis.dependencies} (will be bundled)`,
     ],
   };

@@ -3,6 +3,7 @@
 Marpit フレームワークを用いた高度なスライドデザインのためのリファレンス。
 
 ## 1. カスタムテーマの基本構造 (Theme CSS)
+
 Marp のテーマは標準的な CSS ファイルです。`section` 要素がスライド1枚に対応します。
 
 ```css
@@ -24,14 +25,17 @@ h1 {
 ```
 
 ## 2. ディレクティブ (Directives)
+
 Markdown の Front-matter または HTML コメントで指定します。
 
 ### Global (全体適用)
+
 - `theme`: 使用するテーマ名。
 - `headingDivider`: 指定した見出しレベル（例: 2）で自動的に改ページする。
 - `style`: テーマ CSS を部分的に上書きする。
 
 ### Local (ページ適用)
+
 - `paginate: true`: ページ番号を表示。
 - `header`: ヘッダーテキストを指定。
 - `footer`: フッターテキストを指定。
@@ -39,6 +43,7 @@ Markdown の Front-matter または HTML コメントで指定します。
 - `_class`: **そのページだけに** クラスを適用（Spot Directive）。
 
 ## 3. 画像構文 (Extended Image Syntax)
+
 背景画像の設定に特化した拡張構文があります。
 
 - **背景設定**: `![bg](image.jpg)`
@@ -47,7 +52,9 @@ Markdown の Front-matter または HTML コメントで指定します。
 - **フィルタ**: `![bg brightness:0.8](image.jpg)` (明るさ調整)
 
 ## 4. 高度なテクニック
+
 ### ページ番号のスタイリング
+
 ```css
 section::after {
   content: attr(data-marpit-pagination) ' / ' attr(data-marpit-pagination-total);
@@ -58,9 +65,13 @@ section::after {
 ```
 
 ### スコープ付きスタイル
+
 特定の要素やスライドだけに CSS を適用する場合、`<style scoped>` を使用します。
+
 ```html
 <style scoped>
-h1 { color: red; }
+  h1 {
+    color: red;
+  }
 </style>
 ```

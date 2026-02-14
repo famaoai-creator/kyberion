@@ -12,6 +12,7 @@ last_updated: '2026-02-13'
 # Terraform Arch Mapper
 
 ## Overview
+
 This skill analyzes Terraform configuration files (`.tf`) to extract infrastructure resources and their dependencies. It then generates a visual representation of the system architecture using **Mermaid.js** or **PlantUML**.
 
 ## Capabilities
@@ -36,8 +37,10 @@ node scripts/generate_diagram.cjs [path/to/terraform/dir] --format plantuml
 ```
 
 ## Dependencies
+
 - Node.js environment
 - `hcl2-parser` (for parsing Terraform files)
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

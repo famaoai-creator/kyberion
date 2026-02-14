@@ -2,7 +2,12 @@
   "master_name": "Gemini-Report-Master",
   "typography": {
     "heading_1": { "size": 24, "color": "#232f3e", "bold": true, "alignment": "center" },
-    "heading_2": { "size": 18, "color": "#232f3e", "bold": true, "border_bottom": "2px solid #ff9900" },
+    "heading_2": {
+      "size": 18,
+      "color": "#232f3e",
+      "bold": true,
+      "border_bottom": "2px solid #ff9900"
+    },
     "body": { "size": 10.5, "font": "MS Mincho", "line_height": 1.5, "color": "#1a1a1a" }
   },
   "layout": {

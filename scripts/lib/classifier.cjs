@@ -19,10 +19,7 @@ function classify(content, rules, options = {}) {
 
   let bestCategory = 'unknown';
   let maxScore = 0;
-  const totalKeywords = Math.max(
-    ...Object.values(rules).map(kw => kw.length),
-    1
-  );
+  const totalKeywords = Math.max(...Object.values(rules).map((kw) => kw.length), 1);
 
   for (const [category, keywords] of Object.entries(rules)) {
     let score = 0;
@@ -35,9 +32,8 @@ function classify(content, rules, options = {}) {
     }
   }
 
-  const confidence = maxScore > 0
-    ? Math.min(baseConfidence + (maxScore / totalKeywords) * 0.3, 1.0)
-    : 0;
+  const confidence =
+    maxScore > 0 ? Math.min(baseConfidence + (maxScore / totalKeywords) * 0.3, 1.0) : 0;
 
   return {
     [resultKey]: bestCategory,

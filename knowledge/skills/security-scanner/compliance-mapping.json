@@ -1,7 +1,15 @@
 {
   "fisc": [
-    { "name": "Encryption at Rest", "keywords": ["kms", "encrypt", "encrypted", "vault"], "severity": "high" },
-    { "name": "Log Management", "keywords": ["log", "logger", "winston", "cloudtrail"], "severity": "medium" },
+    {
+      "name": "Encryption at Rest",
+      "keywords": ["kms", "encrypt", "encrypted", "vault"],
+      "severity": "high"
+    },
+    {
+      "name": "Log Management",
+      "keywords": ["log", "logger", "winston", "cloudtrail"],
+      "severity": "medium"
+    },
     { "name": "MFA/IAM", "keywords": ["mfa", "iam", "auth"], "severity": "high" }
   ]
 }

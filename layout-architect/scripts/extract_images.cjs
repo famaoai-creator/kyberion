@@ -20,17 +20,22 @@ if (!fs.existsSync(absInput)) {
 }
 
 runSkill('layout-architect', () => {
-    // Prepare output directory
-    if (!fs.existsSync(absOutput)) {
-      fs.mkdirSync(absOutput, { recursive: true });
-    }
+  // Prepare output directory
+  if (!fs.existsSync(absOutput)) {
+    fs.mkdirSync(absOutput, { recursive: true });
+  }
 
-    // Use unzip to extract only media files
-    // ppt/media/ directory contains images in a pptx file (which is a zip)
-    execSync(`unzip -j -q "${absInput}" "ppt/media/*" -d "${absOutput}"`, { stdio: 'inherit' });
+  // Use unzip to extract only media files
+  // ppt/media/ directory contains images in a pptx file (which is a zip)
+  execSync(`unzip -j -q "${absInput}" "ppt/media/*" -d "${absOutput}"`, { stdio: 'inherit' });
 
-    // List extracted files
-    const files = fs.readdirSync(absOutput);
+  // List extracted files
+  const files = fs.readdirSync(absOutput);
 
-    return { input: path.basename(absInput), outputDir: absOutput, extractedCount: files.length, sampleFiles: files.slice(0, 5) };
+  return {
+    input: path.basename(absInput),
+    outputDir: absOutput,
+    extractedCount: files.length,
+    sampleFiles: files.slice(0, 5),
+  };
 });

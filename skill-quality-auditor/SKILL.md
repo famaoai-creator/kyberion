@@ -30,11 +30,11 @@ node skill-quality-auditor/scripts/audit.cjs [options]
 
 ## Options
 
-| Flag | Alias | Type | Required | Description |
-|------|-------|------|----------|-------------|
-| `--dir` | `-d` | string | No | Project root directory (default: cwd) |
-| `--skill` | `-s` | string | No | Audit a single skill by name |
-| `--min-score` | | number | No | Minimum passing score 0-12 (default: 0) |
+| Flag          | Alias | Type   | Required | Description                             |
+| ------------- | ----- | ------ | -------- | --------------------------------------- |
+| `--dir`       | `-d`  | string | No       | Project root directory (default: cwd)   |
+| `--skill`     | `-s`  | string | No       | Audit a single skill by name            |
+| `--min-score` |       | number | No       | Minimum passing score 0-12 (default: 0) |
 
 ## Quality Checks (12 total)
 
@@ -53,10 +53,11 @@ node skill-quality-auditor/scripts/audit.cjs [options]
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `SKILL.md not found` | Running from wrong directory | Ensure `--dir` points to monorepo root |
+| Error                         | Cause                                | Fix                                             |
+| ----------------------------- | ------------------------------------ | ----------------------------------------------- |
+| `SKILL.md not found`          | Running from wrong directory         | Ensure `--dir` points to monorepo root          |
 | `No implemented skills found` | No skills with `status: implemented` | Check SKILL.md frontmatter in skill directories |
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

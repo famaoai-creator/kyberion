@@ -10,7 +10,7 @@ if (!fs.existsSync(schemasDir)) {
 }
 
 let errors = 0;
-const files = fs.readdirSync(schemasDir).filter(f => f.endsWith('.schema.json'));
+const files = fs.readdirSync(schemasDir).filter((f) => f.endsWith('.schema.json'));
 
 for (const file of files) {
   const filePath = path.join(schemasDir, file);

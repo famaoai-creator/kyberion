@@ -22,8 +22,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 function findImplementedSkills(rootDir) {
   const skills = [];
@@ -31,13 +30,16 @@ function findImplementedSkills(rootDir) {
     const entries = fs.readdirSync(rootDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'templates') continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'templates')
+        continue;
 
       const skillMd = path.join(rootDir, entry.name, 'SKILL.md');
       const scriptsDir = path.join(rootDir, entry.name, 'scripts');
       if (!fs.existsSync(skillMd) || !fs.existsSync(scriptsDir)) continue;
 
-      const scripts = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+      const scripts = fs
+        .readdirSync(scriptsDir)
+        .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
       if (scripts.length === 0) continue;
 
       const mdContent = fs.readFileSync(skillMd, 'utf8');
@@ -47,17 +49,20 @@ function findImplementedSkills(rootDir) {
       skills.push({
         name: entry.name,
         status,
-        scripts: scripts.map(s => path.join(scriptsDir, s)),
+        scripts: scripts.map((s) => path.join(scriptsDir, s)),
         skillMdPath: skillMd,
       });
     }
-  } catch (_e) { /* skip */ }
+  } catch (_e) {
+    /* skip */
+  }
   return skills;
 }
 
 function checkWrapperUsage(scriptPath) {
   const content = fs.readFileSync(scriptPath, 'utf8');
-  const usesWrapper = content.includes('skill-wrapper') ||
+  const usesWrapper =
+    content.includes('skill-wrapper') ||
     content.includes('runSkill') ||
     content.includes('runSkillAsync') ||
     content.includes('runAsyncSkill');
@@ -78,7 +83,8 @@ function checkSkillMd(skillMdPath) {
   }
 
   // Check knowledge protocol reference
-  const hasKnowledgeProtocol = content.includes('knowledge-protocol') || content.includes('Knowledge Protocol');
+  const hasKnowledgeProtocol =
+    content.includes('knowledge-protocol') || content.includes('Knowledge Protocol');
 
   return { issues, hasKnowledgeProtocol };
 }
@@ -125,7 +131,11 @@ runSkill('ecosystem-integration-test', () => {
     }
 
     if (!mdCheck.hasKnowledgeProtocol) {
-      checks.push({ check: 'Knowledge Protocol', status: 'warn', message: 'No Knowledge Protocol reference in SKILL.md' });
+      checks.push({
+        check: 'Knowledge Protocol',
+        status: 'warn',
+        message: 'No Knowledge Protocol reference in SKILL.md',
+      });
       warnCount++;
     } else {
       checks.push({ check: 'Knowledge Protocol', status: 'pass' });
@@ -142,7 +152,11 @@ runSkill('ecosystem-integration-test', () => {
         checks.push({ check: `${scriptName}: wrapper`, status: 'pass' });
         passCount++;
       } else {
-        checks.push({ check: `${scriptName}: wrapper`, status: 'fail', message: 'Does not use skill-wrapper' });
+        checks.push({
+          check: `${scriptName}: wrapper`,
+          status: 'fail',
+          message: 'Does not use skill-wrapper',
+        });
         failCount++;
       }
 
@@ -150,13 +164,20 @@ runSkill('ecosystem-integration-test', () => {
         checks.push({ check: `${scriptName}: envelope`, status: 'pass' });
         passCount++;
       } else {
-        checks.push({ check: `${scriptName}: envelope`, status: 'warn', message: 'May not produce standard output envelope' });
+        checks.push({
+          check: `${scriptName}: envelope`,
+          status: 'warn',
+          message: 'May not produce standard output envelope',
+        });
         warnCount++;
       }
     }
 
-    const skillStatus = checks.some(c => c.status === 'fail') ? 'fail'
-      : checks.some(c => c.status === 'warn') ? 'warn' : 'pass';
+    const skillStatus = checks.some((c) => c.status === 'fail')
+      ? 'fail'
+      : checks.some((c) => c.status === 'warn')
+        ? 'warn'
+        : 'pass';
 
     results.push({ skill: skill.name, status: skillStatus, checks });
   }
@@ -165,7 +186,8 @@ runSkill('ecosystem-integration-test', () => {
     directory: rootDir,
     skillsFound: skills.length,
     summary: { pass: passCount, fail: failCount, warn: warnCount },
-    overallHealth: failCount === 0 ? (warnCount === 0 ? 'healthy' : 'minor_issues') : 'needs_attention',
+    overallHealth:
+      failCount === 0 ? (warnCount === 0 ? 'healthy' : 'minor_issues') : 'needs_attention',
     skills: results,
   };
 

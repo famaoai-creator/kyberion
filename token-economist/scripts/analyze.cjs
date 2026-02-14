@@ -34,8 +34,7 @@ const argv = createStandardYargs()
     }
     return true;
   })
-  .help()
-  .argv;
+  .help().argv;
 
 // --- Pricing per 1K tokens (USD, approximate as of 2024-2025) ---
 const PRICING = {
@@ -62,7 +61,9 @@ function detectContentType(text) {
     // Code signals: braces, semicolons, arrows, imports, keywords
     if (
       /[{};]/.test(trimmed) ||
-      /^\s*(import|export|const|let|var|function|class|def|public|private|if|for|while|return)\b/.test(trimmed) ||
+      /^\s*(import|export|const|let|var|function|class|def|public|private|if|for|while|return)\b/.test(
+        trimmed
+      ) ||
       /^\s*(#include|#define|#ifdef|package |using )/.test(trimmed) ||
       /=>/.test(trimmed) ||
       /^\s*\/\//.test(trimmed) ||
@@ -146,9 +147,7 @@ function generateRecommendations(charCount, estimatedTokens, contentType, lineCo
   }
 
   if (estimatedTokens < 500) {
-    recommendations.push(
-      'Input is small enough for any model tier without cost concerns.'
-    );
+    recommendations.push('Input is small enough for any model tier without cost concerns.');
   }
 
   if (recommendations.length === 0) {
@@ -182,7 +181,12 @@ runSkill('asset-token-economist', () => {
   const contentType = detectContentType(text);
   const estimatedTokens = estimateTokens(text, contentType);
   const costEstimate = computeCosts(estimatedTokens);
-  const recommendations = generateRecommendations(inputChars, estimatedTokens, contentType, lineCount);
+  const recommendations = generateRecommendations(
+    inputChars,
+    estimatedTokens,
+    contentType,
+    lineCount
+  );
 
   return {
     source: sourceName,

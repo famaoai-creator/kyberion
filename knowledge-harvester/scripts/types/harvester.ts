@@ -28,12 +28,7 @@ export interface HarvestConfig {
 // ---------------------------------------------------------------------------
 
 /** Category of an architectural or project pattern. */
-export type PatternType =
-  | 'architecture'
-  | 'ci-cd'
-  | 'testing'
-  | 'deployment'
-  | 'quality';
+export type PatternType = 'architecture' | 'ci-cd' | 'testing' | 'deployment' | 'quality';
 
 /** A single detected pattern in the project. */
 export interface ProjectPattern {

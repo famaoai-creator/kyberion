@@ -8,10 +8,19 @@ const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
 const argv = createStandardYargs()
-  .option('input', { alias: 'i', type: 'string', describe: 'Path to data file (JSON/CSV/text)', demandOption: true })
+  .option('input', {
+    alias: 'i',
+    type: 'string',
+    describe: 'Path to data file (JSON/CSV/text)',
+    demandOption: true,
+  })
   .option('out', { alias: 'o', type: 'string', describe: 'Output file path' })
-  .option('format', { alias: 'f', type: 'string', describe: 'Data format', choices: ['json', 'csv', 'text'] })
-  .argv;
+  .option('format', {
+    alias: 'f',
+    type: 'string',
+    describe: 'Data format',
+    choices: ['json', 'csv', 'text'],
+  }).argv;
 
 /**
  * Detect file format from extension or content.
@@ -40,7 +49,8 @@ function detectFormat(filePath, content) {
 function detectEncodingIssues(content) {
   const issues = [];
   // Check for common mojibake patterns
-  if (/\ufffd/.test(content)) issues.push('Contains Unicode replacement characters (possible encoding corruption)');
+  if (/\ufffd/.test(content))
+    issues.push('Contains Unicode replacement characters (possible encoding corruption)');
   if (/Ã[\x80-\xbf]/.test(content)) issues.push('Possible UTF-8 decoded as Latin-1 (mojibake)');
   if (/\x00/.test(content)) issues.push('Contains null bytes');
   return issues;
@@ -97,7 +107,7 @@ function curateJson(content) {
   let columns = [];
   if (cleaned.length > 0 && typeof cleaned[0] === 'object' && !Array.isArray(cleaned[0])) {
     const allKeys = new Set();
-    cleaned.forEach(r => Object.keys(r).forEach(k => allKeys.add(k)));
+    cleaned.forEach((r) => Object.keys(r).forEach((k) => allKeys.add(k)));
     columns = Array.from(allKeys);
   }
 
@@ -120,9 +130,7 @@ function curateCsv(content) {
   const issues = [];
 
   // Remove empty lines and trim whitespace
-  let cleaned = lines
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
+  let cleaned = lines.map((line) => line.trim()).filter((line) => line.length > 0);
 
   const emptyRemoved = originalCount - cleaned.length;
 
@@ -152,7 +160,7 @@ function curateCsv(content) {
   // Detect columns from header
   let columns = [];
   if (cleaned.length > 0) {
-    columns = cleaned[0].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    columns = cleaned[0].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
   }
 
   // Count nulls (empty fields)
@@ -185,9 +193,7 @@ function curateText(content) {
   const issues = [];
 
   // Remove empty lines and trim whitespace
-  let cleaned = lines
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
+  let cleaned = lines.map((line) => line.trim()).filter((line) => line.length > 0);
 
   const emptyRemoved = originalCount - cleaned.length;
 

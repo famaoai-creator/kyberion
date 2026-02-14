@@ -10,15 +10,18 @@ const { runSkill } = require('@agent/core');
 const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 runSkill('layout-architect', () => {
-    const specsPath = path.resolve(__dirname, '../../knowledge/standards/design/master-slide-specs.json');
-    if (!fs.existsSync(specsPath)) throw new Error('Master specs not found.');
+  const specsPath = path.resolve(
+    __dirname,
+    '../../knowledge/standards/design/master-slide-specs.json'
+  );
+  if (!fs.existsSync(specsPath)) throw new Error('Master specs not found.');
 
-    const specs = JSON.parse(fs.readFileSync(specsPath, 'utf8'));
-    const t = specs.typography;
-    const c = specs.color_palette;
-    const l = specs.layout_specs;
+  const specs = JSON.parse(fs.readFileSync(specsPath, 'utf8'));
+  const t = specs.typography;
+  const c = specs.color_palette;
+  const l = specs.layout_specs;
 
-    const css = `/* @theme ${specs.master_name} */
+  const css = `/* @theme ${specs.master_name} */
 @import 'default';
 
 section {
@@ -78,12 +81,15 @@ footer {
 }
 `;
 
-    const outPath = path.resolve(__dirname, `../../knowledge/templates/themes/${specs.master_name.toLowerCase()}.css`);
-    safeWriteFile(outPath, css);
+  const outPath = path.resolve(
+    __dirname,
+    `../../knowledge/templates/themes/${specs.master_name.toLowerCase()}.css`
+  );
+  safeWriteFile(outPath, css);
 
-    return { 
-        status: 'theme_generated', 
-        masterName: specs.master_name,
-        output: outPath 
-    };
+  return {
+    status: 'theme_generated',
+    masterName: specs.master_name,
+    output: outPath,
+  };
 });

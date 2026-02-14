@@ -32,7 +32,11 @@ const { z } = require('zod');
 const userSchema = z.object({
   email: z.string().email(),
   age: z.number().int().min(0).max(150),
-  name: z.string().min(1).max(100).regex(/^[a-zA-Z\s'-]+$/),
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-zA-Z\s'-]+$/),
 });
 
 function validateInput(data) {
@@ -53,7 +57,7 @@ const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
 
 ```javascript
 const helmet = require('helmet');
-app.use(helmet());  // Sets Content-Security-Policy, X-Frame-Options, etc.
+app.use(helmet()); // Sets Content-Security-Policy, X-Frame-Options, etc.
 ```
 
 ### Rate Limiting
@@ -61,14 +65,15 @@ app.use(helmet());  // Sets Content-Security-Policy, X-Frame-Options, etc.
 ```javascript
 const rateLimit = require('express-rate-limit');
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,                    // limit each IP to 100 requests per window
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
   standardHeaders: true,
 });
 app.use('/api/', limiter);
 ```
 
 ### Secrets Management
+
 - Never store secrets in source code or environment files committed to version control.
 - Use secret managers (AWS Secrets Manager, HashiCorp Vault, GCP Secret Manager).
 - Rotate secrets regularly and audit access logs.
@@ -78,6 +83,7 @@ app.use('/api/', limiter);
 ## 3. Common Vulnerability Patterns to Detect
 
 ### Code Review Red Flags
+
 - **`eval()` or `Function()` with dynamic input** -- Code injection vector.
 - **`dangerouslySetInnerHTML`** -- XSS risk in React applications.
 - **`child_process.exec()` with unsanitized input** -- Command injection.
@@ -89,6 +95,7 @@ app.use('/api/', limiter);
 - **Logging sensitive data (passwords, tokens, PII)** -- Information disclosure.
 
 ### Dependency Vulnerabilities
+
 - Outdated packages with known CVEs.
 - Typosquatting packages (e.g., `lodash` vs `1odash`).
 - Packages with excessive permissions or install scripts.
@@ -97,16 +104,16 @@ app.use('/api/', limiter);
 
 ## 4. Security Scanning Tools and Use Cases
 
-| Tool | Use Case | Integration Point |
-|------|----------|-------------------|
-| **Snyk** | Dependency vulnerability scanning, container scanning | CI pipeline, IDE plugin |
-| **SonarQube** | Static application security testing (SAST) | CI pipeline, PR checks |
-| **OWASP ZAP** | Dynamic application security testing (DAST) | Staging environment scans |
-| **Trivy** | Container image and filesystem vulnerability scanning | CI pipeline, pre-deploy |
-| **Semgrep** | Custom static analysis rules, pattern matching | CI pipeline, pre-commit |
-| **Gitleaks / TruffleHog** | Secret detection in git history | Pre-commit hooks, CI |
-| **npm audit / yarn audit** | Node.js dependency vulnerability checks | CI pipeline, local dev |
-| **Checkov** | Infrastructure-as-code (IaC) security scanning | CI pipeline for Terraform/CloudFormation |
+| Tool                       | Use Case                                              | Integration Point                        |
+| -------------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| **Snyk**                   | Dependency vulnerability scanning, container scanning | CI pipeline, IDE plugin                  |
+| **SonarQube**              | Static application security testing (SAST)            | CI pipeline, PR checks                   |
+| **OWASP ZAP**              | Dynamic application security testing (DAST)           | Staging environment scans                |
+| **Trivy**                  | Container image and filesystem vulnerability scanning | CI pipeline, pre-deploy                  |
+| **Semgrep**                | Custom static analysis rules, pattern matching        | CI pipeline, pre-commit                  |
+| **Gitleaks / TruffleHog**  | Secret detection in git history                       | Pre-commit hooks, CI                     |
+| **npm audit / yarn audit** | Node.js dependency vulnerability checks               | CI pipeline, local dev                   |
+| **Checkov**                | Infrastructure-as-code (IaC) security scanning        | CI pipeline for Terraform/CloudFormation |
 
 ### Recommended Pipeline Integration
 
@@ -124,12 +131,14 @@ app.use('/api/', limiter);
 ## 5. Input Validation and Sanitization Guidelines
 
 ### Validation Principles
+
 - **Validate on the server side** -- Client-side validation is for UX only; never trust it for security.
 - **Use allowlists over denylists** -- Define what is permitted rather than what is blocked.
 - **Validate data type, length, range, and format** -- Apply all relevant constraints.
 - **Reject invalid input early** -- Fail fast and return clear (but non-leaking) error messages.
 
 ### Sanitization Strategies
+
 - **HTML output**: Use context-aware encoding (HTML entity encoding for HTML contexts, JavaScript encoding for script contexts).
 - **SQL**: Use parameterized queries exclusively; never sanitize and concatenate.
 - **File uploads**: Validate MIME type and file extension, scan for malware, store outside the webroot, and generate new filenames.

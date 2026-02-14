@@ -25,15 +25,19 @@ This skill turns your proprietary code into a strategic profit engine.
 ## Capabilities
 
 ### 1. Monetization Modeling
+
 - Analyzes patentable code found by `ip-strategist` and proposes licensing models (SaaS, OEM, White-label).
 - Estimates potential revenue from opening certain modules as "Commercial SDKs."
 
 ### 2. Open-Source Strategy
+
 - Evaluates the business impact of open-sourcing parts of the codebase to build community trust vs. keeping them proprietary for competitive edge.
 
 ## Usage
+
 - "How can we monetize our unique order validation algorithm?"
 - "Draft a licensing model for our AI-native UI components."
 
 ## Knowledge Protocol
+
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.

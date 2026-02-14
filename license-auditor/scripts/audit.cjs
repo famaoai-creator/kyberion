@@ -8,9 +8,13 @@ const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateDirPath } = require('../../scripts/lib/validators.cjs');
 
 const argv = createStandardYargs()
-  .option('dir', { alias: 'd', type: 'string', describe: 'Project directory to audit', demandOption: true })
-  .option('out', { alias: 'o', type: 'string', describe: 'Output file path' })
-  .argv;
+  .option('dir', {
+    alias: 'd',
+    type: 'string',
+    describe: 'Project directory to audit',
+    demandOption: true,
+  })
+  .option('out', { alias: 'o', type: 'string', describe: 'Output file path' }).argv;
 
 // Restrictive license patterns
 const RESTRICTIVE_LICENSES = [
@@ -89,9 +93,9 @@ runSkill('license-auditor', () => {
   // Build summary
   const summary = {
     total: packages.length,
-    permissive: packages.filter(p => p.risk === 'permissive').length,
-    restrictive: packages.filter(p => p.risk === 'restrictive').length,
-    unknown: packages.filter(p => p.risk === 'unknown').length,
+    permissive: packages.filter((p) => p.risk === 'permissive').length,
+    restrictive: packages.filter((p) => p.risk === 'restrictive').length,
+    unknown: packages.filter((p) => p.risk === 'unknown').length,
   };
 
   const result = {

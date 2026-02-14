@@ -2,11 +2,11 @@ name: Code Quality Pipeline
 description: Comprehensive code quality assessment
 steps:
   - skill: quality-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: quality
   - skill: completeness-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: completeness
   - skill: format-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: format

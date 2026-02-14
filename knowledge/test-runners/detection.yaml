@@ -62,7 +62,7 @@ runners:
       - type: directory_exists
         path: tests
       - type: file_pattern
-        pattern: "test_*.py"
+        pattern: 'test_*.py'
     command: python -m unittest discover
     language: python
     description: Python unittest
@@ -129,9 +129,9 @@ runners:
   - name: dotnet test
     detection:
       - type: file_pattern
-        pattern: "*.csproj"
+        pattern: '*.csproj'
       - type: file_pattern
-        pattern: "*.sln"
+        pattern: '*.sln'
     command: dotnet test
     language: csharp
     description: .NET テストランナー
@@ -149,6 +149,6 @@ runners:
 
 # 実行設定
 execution:
-  max_buffer: 5242880  # 5MB
-  timeout: 300000      # 5 minutes
+  max_buffer: 5242880 # 5MB
+  timeout: 300000 # 5 minutes
   encoding: utf8

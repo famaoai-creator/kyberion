@@ -5,115 +5,115 @@
 provider_icons:
   # AWS
   aws:
-    prefix: "aws_"
-    icon: "☁️"
-    color: "#FF9900"
+    prefix: 'aws_'
+    icon: '☁️'
+    color: '#FF9900'
     resources:
-      aws_instance: "🖥️"
-      aws_lambda_function: "λ"
-      aws_s3_bucket: "🪣"
-      aws_rds_instance: "🗄️"
-      aws_dynamodb_table: "📊"
-      aws_vpc: "🌐"
-      aws_subnet: "📡"
-      aws_security_group: "🔒"
-      aws_iam_role: "👤"
-      aws_iam_policy: "📜"
-      aws_lb: "⚖️"
-      aws_ecs_cluster: "🐳"
-      aws_eks_cluster: "☸️"
-      aws_cloudwatch_log_group: "📋"
-      aws_sns_topic: "📢"
-      aws_sqs_queue: "📬"
+      aws_instance: '🖥️'
+      aws_lambda_function: 'λ'
+      aws_s3_bucket: '🪣'
+      aws_rds_instance: '🗄️'
+      aws_dynamodb_table: '📊'
+      aws_vpc: '🌐'
+      aws_subnet: '📡'
+      aws_security_group: '🔒'
+      aws_iam_role: '👤'
+      aws_iam_policy: '📜'
+      aws_lb: '⚖️'
+      aws_ecs_cluster: '🐳'
+      aws_eks_cluster: '☸️'
+      aws_cloudwatch_log_group: '📋'
+      aws_sns_topic: '📢'
+      aws_sqs_queue: '📬'
 
   # Google Cloud
   google:
-    prefix: "google_"
-    icon: "🔵"
-    color: "#4285F4"
+    prefix: 'google_'
+    icon: '🔵'
+    color: '#4285F4'
     resources:
-      google_compute_instance: "🖥️"
-      google_cloud_run_service: "🏃"
-      google_storage_bucket: "🪣"
-      google_sql_database_instance: "🗄️"
-      google_container_cluster: "☸️"
-      google_pubsub_topic: "📢"
-      google_bigquery_dataset: "📊"
+      google_compute_instance: '🖥️'
+      google_cloud_run_service: '🏃'
+      google_storage_bucket: '🪣'
+      google_sql_database_instance: '🗄️'
+      google_container_cluster: '☸️'
+      google_pubsub_topic: '📢'
+      google_bigquery_dataset: '📊'
 
   # Azure
   azure:
-    prefix: "azurerm_"
-    icon: "🔷"
-    color: "#0078D4"
+    prefix: 'azurerm_'
+    icon: '🔷'
+    color: '#0078D4'
     resources:
-      azurerm_virtual_machine: "🖥️"
-      azurerm_function_app: "⚡"
-      azurerm_storage_account: "🪣"
-      azurerm_mssql_server: "🗄️"
-      azurerm_kubernetes_cluster: "☸️"
-      azurerm_app_service: "🌐"
+      azurerm_virtual_machine: '🖥️'
+      azurerm_function_app: '⚡'
+      azurerm_storage_account: '🪣'
+      azurerm_mssql_server: '🗄️'
+      azurerm_kubernetes_cluster: '☸️'
+      azurerm_app_service: '🌐'
 
   # その他
   default:
-    icon: "📄"
-    color: "#888888"
+    icon: '📄'
+    color: '#888888'
 
 # リソースカテゴリ（グループ化用）
 resource_categories:
   compute:
     name: Compute
     patterns:
-      - "*_instance"
-      - "*_function*"
-      - "*_lambda*"
-      - "*_ecs_*"
-      - "*_eks_*"
-      - "*_container*"
+      - '*_instance'
+      - '*_function*'
+      - '*_lambda*'
+      - '*_ecs_*'
+      - '*_eks_*'
+      - '*_container*'
 
   storage:
     name: Storage
     patterns:
-      - "*_bucket"
-      - "*_storage*"
-      - "*_s3_*"
+      - '*_bucket'
+      - '*_storage*'
+      - '*_s3_*'
 
   database:
     name: Database
     patterns:
-      - "*_rds_*"
-      - "*_dynamodb*"
-      - "*_sql_*"
-      - "*_database*"
+      - '*_rds_*'
+      - '*_dynamodb*'
+      - '*_sql_*'
+      - '*_database*'
 
   network:
     name: Network
     patterns:
-      - "*_vpc*"
-      - "*_subnet*"
-      - "*_security_group*"
-      - "*_lb*"
-      - "*_load_balancer*"
+      - '*_vpc*'
+      - '*_subnet*'
+      - '*_security_group*'
+      - '*_lb*'
+      - '*_load_balancer*'
 
   identity:
     name: Identity
     patterns:
-      - "*_iam_*"
-      - "*_role*"
-      - "*_policy*"
+      - '*_iam_*'
+      - '*_role*'
+      - '*_policy*'
 
   messaging:
     name: Messaging
     patterns:
-      - "*_sns_*"
-      - "*_sqs_*"
-      - "*_pubsub*"
-      - "*_queue*"
-      - "*_topic*"
+      - '*_sns_*'
+      - '*_sqs_*'
+      - '*_pubsub*'
+      - '*_queue*'
+      - '*_topic*'
 
 # 出力設定
 output:
   mermaid:
-    graph_direction: TD  # TD (top-down), LR (left-right), etc.
+    graph_direction: TD # TD (top-down), LR (left-right), etc.
     default_filename: terraform_architecture.mmd
     node_style: |
       classDef compute fill:#E1F5FE,stroke:#01579B
@@ -128,9 +128,9 @@ output:
 
 # リレーションシップ検出パターン
 relationship_patterns:
-  - pattern: "${type}.${name}"
+  - pattern: '${type}.${name}'
     description: Standard Terraform reference
-  - pattern: "depends_on"
+  - pattern: 'depends_on'
     description: Explicit dependency
-  - pattern: "source = module"
+  - pattern: 'source = module'
     description: Module reference

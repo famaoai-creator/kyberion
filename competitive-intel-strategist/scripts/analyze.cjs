@@ -22,8 +22,7 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 /**
  * Expected input JSON:
@@ -54,10 +53,12 @@ function analyzeGaps(ourProduct, competitors) {
 
   const allCompetitorFeatures = new Set();
   for (const comp of competitors) {
-    for (const f of (comp.features || [])) {
+    for (const f of comp.features || []) {
       allCompetitorFeatures.add(f);
       if (!ourFeatures.has(f)) {
-        const competitorsWithFeature = competitors.filter(c => (c.features || []).includes(f)).map(c => c.name);
+        const competitorsWithFeature = competitors
+          .filter((c) => (c.features || []).includes(f))
+          .map((c) => c.name);
         gaps.push({ feature: f, offeredBy: competitorsWithFeature });
       }
     }
@@ -80,12 +81,13 @@ function analyzePricing(ourProduct, competitors) {
   for (const tier of tiers) {
     const ourPrice = ourPricing[tier];
     const competitorPrices = competitors
-      .filter(c => c.pricing && c.pricing[tier] !== undefined)
-      .map(c => ({ name: c.name, price: c.pricing[tier] }));
+      .filter((c) => c.pricing && c.pricing[tier] !== undefined)
+      .map((c) => ({ name: c.name, price: c.pricing[tier] }));
 
     if (competitorPrices.length === 0) continue;
 
-    const avgCompPrice = competitorPrices.reduce((s, c) => s + c.price, 0) / competitorPrices.length;
+    const avgCompPrice =
+      competitorPrices.reduce((s, c) => s + c.price, 0) / competitorPrices.length;
     const priceDiff = Math.round(((ourPrice - avgCompPrice) / avgCompPrice) * 100);
 
     analysis.push({
@@ -109,7 +111,7 @@ function generateStrategy(ourProduct, competitors, gapAnalysis, pricingAnalysis)
     strategies.push({
       area: 'Feature Gaps',
       priority: gapAnalysis.gaps.length > 3 ? 'high' : 'medium',
-      recommendation: `${gapAnalysis.gaps.length} features offered by competitors but not by us. Top gaps: ${topGaps.map(g => g.feature).join(', ')}`,
+      recommendation: `${gapAnalysis.gaps.length} features offered by competitors but not by us. Top gaps: ${topGaps.map((g) => g.feature).join(', ')}`,
     });
   }
 
@@ -118,32 +120,32 @@ function generateStrategy(ourProduct, competitors, gapAnalysis, pricingAnalysis)
     strategies.push({
       area: 'Differentiation',
       priority: 'high',
-      recommendation: `Leverage unique features: ${gapAnalysis.advantages.map(a => a.feature).join(', ')}. Double down on marketing these differentiators.`,
+      recommendation: `Leverage unique features: ${gapAnalysis.advantages.map((a) => a.feature).join(', ')}. Double down on marketing these differentiators.`,
     });
   }
 
   // Pricing strategy
-  const belowMarket = pricingAnalysis.filter(p => p.position === 'below_market');
-  const aboveMarket = pricingAnalysis.filter(p => p.position === 'above_market');
+  const belowMarket = pricingAnalysis.filter((p) => p.position === 'below_market');
+  const aboveMarket = pricingAnalysis.filter((p) => p.position === 'above_market');
   if (belowMarket.length > 0) {
     strategies.push({
       area: 'Pricing',
       priority: 'medium',
-      recommendation: `${belowMarket.map(p => p.tier).join(', ')} tier(s) priced below market. Consider price increase to capture margin.`,
+      recommendation: `${belowMarket.map((p) => p.tier).join(', ')} tier(s) priced below market. Consider price increase to capture margin.`,
     });
   }
   if (aboveMarket.length > 0) {
     strategies.push({
       area: 'Pricing',
       priority: 'medium',
-      recommendation: `${aboveMarket.map(p => p.tier).join(', ')} tier(s) above market. Ensure value proposition justifies premium.`,
+      recommendation: `${aboveMarket.map((p) => p.tier).join(', ')} tier(s) above market. Ensure value proposition justifies premium.`,
     });
   }
 
   // Weakness exploitation
   const competitorWeaknesses = [];
   for (const comp of competitors) {
-    for (const w of (comp.weaknesses || [])) {
+    for (const w of comp.weaknesses || []) {
       competitorWeaknesses.push({ competitor: comp.name, weakness: w });
     }
   }
@@ -151,7 +153,10 @@ function generateStrategy(ourProduct, competitors, gapAnalysis, pricingAnalysis)
     strategies.push({
       area: 'Competitor Weakness',
       priority: 'high',
-      recommendation: `Exploit competitor weaknesses: ${competitorWeaknesses.slice(0, 3).map(w => `${w.competitor}: ${w.weakness}`).join('; ')}`,
+      recommendation: `Exploit competitor weaknesses: ${competitorWeaknesses
+        .slice(0, 3)
+        .map((w) => `${w.competitor}: ${w.weakness}`)
+        .join('; ')}`,
     });
   }
 
@@ -166,11 +171,17 @@ runSkill('competitive-intel-strategist', () => {
 
   const data = JSON.parse(fs.readFileSync(resolved, 'utf8'));
   if (!data.our_product) throw new Error('Input must contain "our_product" object');
-  if (!data.competitors || !Array.isArray(data.competitors)) throw new Error('Input must contain "competitors" array');
+  if (!data.competitors || !Array.isArray(data.competitors))
+    throw new Error('Input must contain "competitors" array');
 
   const gapAnalysis = analyzeGaps(data.our_product, data.competitors);
   const pricingAnalysis = analyzePricing(data.our_product, data.competitors);
-  const strategies = generateStrategy(data.our_product, data.competitors, gapAnalysis, pricingAnalysis);
+  const strategies = generateStrategy(
+    data.our_product,
+    data.competitors,
+    gapAnalysis,
+    pricingAnalysis
+  );
 
   const result = {
     source: path.basename(resolved),

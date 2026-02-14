@@ -6,18 +6,20 @@ const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
 const lngDetector = new LanguageDetect();
-const argv = createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', demandOption: true })
-    .argv;
+const argv = createStandardYargs().option('input', {
+  alias: 'i',
+  type: 'string',
+  demandOption: true,
+}).argv;
 
 runSkill('lang-detector', () => {
-    const inputPath = validateFilePath(argv.input, 'input');
-    const content = fs.readFileSync(inputPath, 'utf8');
-    const results = lngDetector.detect(content, 1);
+  const inputPath = validateFilePath(argv.input, 'input');
+  const content = fs.readFileSync(inputPath, 'utf8');
+  const results = lngDetector.detect(content, 1);
 
-    if (results.length > 0) {
-        return { language: results[0][0], confidence: results[0][1] };
-    } else {
-        return { language: 'unknown', confidence: 0 };
-    }
+  if (results.length > 0) {
+    return { language: results[0][0], confidence: results[0][1] };
+  } else {
+    return { language: 'unknown', confidence: 0 };
+  }
 });

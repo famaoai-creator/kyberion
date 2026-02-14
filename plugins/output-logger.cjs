@@ -7,7 +7,9 @@ const logFile = path.join(process.cwd(), 'work', 'plugin-output.log');
 module.exports = {
   afterSkill(skillName, output) {
     try {
-      const line = JSON.stringify({ skill: skillName, status: output.status, ts: new Date().toISOString() }) + '\n';
+      const line =
+        JSON.stringify({ skill: skillName, status: output.status, ts: new Date().toISOString() }) +
+        '\n';
       fs.mkdirSync(path.dirname(logFile), { recursive: true });
       fs.appendFileSync(logFile, line);
     } catch (_e) {}

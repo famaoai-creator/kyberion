@@ -2,14 +2,14 @@ name: Data Flow Audit Pipeline
 description: Trace sensitive data through codebase for GDPR/privacy compliance
 steps:
   - skill: codebase-mapper
-    args: "\"{{dir}}\" 3"
+    args: '"{{dir}}" 3'
     output: map
   - skill: sensitivity-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: sensitivity
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: security
   - skill: html-reporter
-    args: "-i \"$prev.output\" -o \"{{output}}\" -t \"Data Flow Audit Report\""
+    args: '-i "$prev.output" -o "{{output}}" -t "Data Flow Audit Report"'
     output: report

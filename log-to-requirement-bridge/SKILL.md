@@ -21,16 +21,20 @@ This skill turns "problems" found in logs into "tasks" for developers. It analyz
 ## Capabilities
 
 ### 1. Error Correlation
+
 - Aggregates similar log errors.
 - Identifies root causes (e.g., "Frequent timeouts at API X").
 
 ### 2. Requirement Drafting
+
 - Automatically drafts "Improvement Requirements" using the `requirements-wizard` format.
 - Links logs as evidence for new requirements.
 
 ## Usage
+
 - "Analyze the last 1000 lines of `app.log` and draft a requirement to fix the most frequent issue."
 - "Bridge the gap: based on these error logs, what should we add to our Non-Functional Requirements?"
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.

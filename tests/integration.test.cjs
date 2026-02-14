@@ -70,16 +70,28 @@ test('detect JSON format then transform to YAML', () => {
 
   // Step 2: Run format-detector to identify the file format
   const detectEnv = runAndParse('format-detector/scripts/detect.cjs', `-i "${jsonFile}"`);
-  assert(detectEnv.data.format === 'json', `Expected format "json", got "${detectEnv.data.format}"`);
+  assert(
+    detectEnv.data.format === 'json',
+    `Expected format "json", got "${detectEnv.data.format}"`
+  );
   assert(detectEnv.data.confidence > 0, 'Format detector should have positive confidence');
-  assert(detectEnv.skill === 'format-detector', `Expected skill "format-detector", got "${detectEnv.skill}"`);
+  assert(
+    detectEnv.skill === 'format-detector',
+    `Expected skill "format-detector", got "${detectEnv.skill}"`
+  );
   assert(detectEnv.metadata.duration_ms >= 0, 'Envelope should have duration_ms');
 
   // Step 3: Since format was detected as JSON, transform it to YAML
   const detectedFormat = detectEnv.data.format;
   assert(detectedFormat === 'json', 'Chain gate: format must be json before transforming');
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${jsonFile}" -t yaml`);
-  assert(transformEnv.data.format === 'yaml', `Expected transformed format "yaml", got "${transformEnv.data.format}"`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${jsonFile}" -t yaml`
+  );
+  assert(
+    transformEnv.data.format === 'yaml',
+    `Expected transformed format "yaml", got "${transformEnv.data.format}"`
+  );
 
   // Step 4: Verify the YAML output contains original data values
   const yamlContent = transformEnv.data.content;
@@ -94,7 +106,7 @@ test('detect JSON format then transform to CSV (array data)', () => {
   const arrayData = [
     { name: 'alpha', priority: 1, status: 'active' },
     { name: 'beta', priority: 2, status: 'pending' },
-    { name: 'gamma', priority: 3, status: 'done' }
+    { name: 'gamma', priority: 3, status: 'done' },
   ];
   const jsonFile = writeTemp('chain1_array.json', JSON.stringify(arrayData));
 
@@ -103,7 +115,10 @@ test('detect JSON format then transform to CSV (array data)', () => {
   assert(detectEnv.data.format === 'json', 'Should detect JSON format for array data');
 
   // Step 3: Transform to CSV
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${jsonFile}" -t csv`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${jsonFile}" -t csv`
+  );
   assert(transformEnv.data.format === 'csv', 'Should report csv format after transformation');
 
   // Step 4: Verify CSV output has headers and rows
@@ -135,13 +150,19 @@ test('classify tech document through domain -> doc-type -> intent pipeline', () 
 
   // Step 2: Run domain-classifier -> should detect tech domain
   const domainEnv = runAndParse('domain-classifier/scripts/classify.cjs', `-i "${techFile}"`);
-  assert(domainEnv.data.domain === 'tech', `Expected domain "tech", got "${domainEnv.data.domain}"`);
+  assert(
+    domainEnv.data.domain === 'tech',
+    `Expected domain "tech", got "${domainEnv.data.domain}"`
+  );
   assert(domainEnv.data.confidence > 0, 'Domain classifier should have positive confidence');
   assert(domainEnv.data.matches > 0, 'Should have keyword matches');
 
   // Step 3: Since domain is tech, run doc-type-classifier -> should detect specification
   const docTypeEnv = runAndParse('doc-type-classifier/scripts/classify.cjs', `-i "${techFile}"`);
-  assert(docTypeEnv.data.type === 'specification', `Expected type "specification", got "${docTypeEnv.data.type}"`);
+  assert(
+    docTypeEnv.data.type === 'specification',
+    `Expected type "specification", got "${docTypeEnv.data.type}"`
+  );
   assert(docTypeEnv.data.confidence > 0, 'Doc-type classifier should have positive confidence');
 
   // Step 4: Run intent-classifier -> verify the intent
@@ -153,7 +174,8 @@ test('classify tech document through domain -> doc-type -> intent pipeline', () 
 });
 
 test('classification pipeline preserves envelope structure across all classifiers', () => {
-  const doc = 'Budget report for Q4 fiscal year. Total cost: $500,000. Revenue projection analysis.';
+  const doc =
+    'Budget report for Q4 fiscal year. Total cost: $500,000. Revenue projection analysis.';
   const docFile = writeTemp('chain2_finance.txt', doc);
 
   const domainEnv = runAndParse('domain-classifier/scripts/classify.cjs', `-i "${docFile}"`);
@@ -161,7 +183,11 @@ test('classification pipeline preserves envelope structure across all classifier
   const intentEnv = runAndParse('intent-classifier/scripts/classify.cjs', `-i "${docFile}"`);
 
   // Verify all three return proper envelopes with consistent structure
-  for (const [name, env] of [['domain', domainEnv], ['doc-type', docTypeEnv], ['intent', intentEnv]]) {
+  for (const [name, env] of [
+    ['domain', domainEnv],
+    ['doc-type', docTypeEnv],
+    ['intent', intentEnv],
+  ]) {
     assert(env.status === 'success', `${name} classifier should succeed`);
     assert(env.skill !== undefined, `${name} classifier envelope should have skill name`);
     assert(env.metadata !== undefined, `${name} classifier should have metadata`);
@@ -201,20 +227,31 @@ test('score quality and completeness then generate HTML report', () => {
 
   // Step 2: Run quality-scorer
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${mdFile}"`);
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100, `Quality score should be 0-100, got ${qualityEnv.data.score}`);
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    `Quality score should be 0-100, got ${qualityEnv.data.score}`
+  );
   assert(qualityEnv.data.metrics !== undefined, 'Quality scorer should return metrics');
   assert(qualityEnv.data.metrics.charCount > 0, 'Char count should be positive');
 
   // Step 3: Run completeness-scorer
   const completenessEnv = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${mdFile}"`);
-  assert(completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100, `Completeness score should be 0-100, got ${completenessEnv.data.score}`);
-  assert(Array.isArray(completenessEnv.data.issues), 'Completeness scorer should return issues array');
+  assert(
+    completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100,
+    `Completeness score should be 0-100, got ${completenessEnv.data.score}`
+  );
+  assert(
+    Array.isArray(completenessEnv.data.issues),
+    'Completeness scorer should return issues array'
+  );
 
   // Step 4: Generate HTML report from the scored markdown
   const htmlOutFile = path.join(tmpDir, 'chain3_output.html');
   const reportTitle = `Quality: ${qualityEnv.data.score}, Completeness: ${completenessEnv.data.score}`;
-  const reportEnv = runAndParse('html-reporter/scripts/report.cjs',
-    `-i "${mdFile}" -o "${htmlOutFile}" -t "${reportTitle}"`);
+  const reportEnv = runAndParse(
+    'html-reporter/scripts/report.cjs',
+    `-i "${mdFile}" -o "${htmlOutFile}" -t "${reportTitle}"`
+  );
   assert(reportEnv.data.output === htmlOutFile, 'HTML reporter should report correct output path');
   assert(reportEnv.data.title === reportTitle, 'HTML reporter should use the chain-derived title');
   assert(reportEnv.data.size > 0, 'HTML report size should be positive');
@@ -223,7 +260,10 @@ test('score quality and completeness then generate HTML report', () => {
   assert(fs.existsSync(htmlOutFile), 'HTML output file should exist on disk');
   const htmlContent = fs.readFileSync(htmlOutFile, 'utf8');
   assert(htmlContent.includes('<h1>'), 'HTML should contain H1 heading');
-  assert(htmlContent.includes('Project Status Report'), 'HTML should contain the report title text');
+  assert(
+    htmlContent.includes('Project Status Report'),
+    'HTML should contain the report title text'
+  );
   assert(htmlContent.includes('<strong>'), 'HTML should render bold markdown');
   assert(htmlContent.includes('<li>'), 'HTML should render list items');
 });
@@ -249,17 +289,30 @@ test('quality and completeness scores correlate for complete vs incomplete docs'
   const incompleteFile = writeTemp('chain3_incomplete.txt', incompleteDoc);
 
   const _completeQuality = runAndParse('quality-scorer/scripts/score.cjs', `-i "${completeFile}"`);
-  const _incompleteQuality = runAndParse('quality-scorer/scripts/score.cjs', `-i "${incompleteFile}"`);
-  const completeCompleteness = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${completeFile}"`);
-  const incompleteCompleteness = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${incompleteFile}"`);
+  const _incompleteQuality = runAndParse(
+    'quality-scorer/scripts/score.cjs',
+    `-i "${incompleteFile}"`
+  );
+  const completeCompleteness = runAndParse(
+    'completeness-scorer/scripts/score.cjs',
+    `-i "${completeFile}"`
+  );
+  const incompleteCompleteness = runAndParse(
+    'completeness-scorer/scripts/score.cjs',
+    `-i "${incompleteFile}"`
+  );
 
   // The incomplete doc should have lower completeness
-  assert(completeCompleteness.data.score > incompleteCompleteness.data.score,
-    `Complete doc (${completeCompleteness.data.score}) should score higher than incomplete (${incompleteCompleteness.data.score})`);
+  assert(
+    completeCompleteness.data.score > incompleteCompleteness.data.score,
+    `Complete doc (${completeCompleteness.data.score}) should score higher than incomplete (${incompleteCompleteness.data.score})`
+  );
 
   // The incomplete doc should have issues flagged
-  assert(incompleteCompleteness.data.issues.length > 0,
-    'Incomplete doc should have flagged issues');
+  assert(
+    incompleteCompleteness.data.issues.length > 0,
+    'Incomplete doc should have flagged issues'
+  );
 });
 
 // ========================================
@@ -301,12 +354,19 @@ test('detect code language, check sensitivity, and verify encoding', () => {
   // Step 4: Detect encoding -> should be UTF-8 with LF line endings
   const encodingEnv = runAndParse('encoding-detector/scripts/detect.cjs', `-i "${jsFile}"`);
   assert(encodingEnv.data.encoding !== undefined, 'Should detect an encoding');
-  assert(encodingEnv.data.lineEnding === 'LF', `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`);
+  assert(
+    encodingEnv.data.lineEnding === 'LF',
+    `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`
+  );
   assert(encodingEnv.data.confidence > 0, 'Should have positive encoding confidence');
 
   // Verify the full chain produced consistent results for the same file
-  assert(langEnv.skill !== undefined && sensitivityEnv.skill !== undefined && encodingEnv.skill !== undefined,
-    'All skills in chain should identify themselves in the envelope');
+  assert(
+    langEnv.skill !== undefined &&
+      sensitivityEnv.skill !== undefined &&
+      encodingEnv.skill !== undefined,
+    'All skills in chain should identify themselves in the envelope'
+  );
 });
 
 test('code analysis chain flags PII in code with embedded secrets', () => {
@@ -370,11 +430,11 @@ test('graph dependencies then render with template', () => {
     dependencies: {
       express: '^4.18.0',
       lodash: '^4.17.0',
-      axios: '^1.5.0'
+      axios: '^1.5.0',
     },
     devDependencies: {
-      jest: '^29.0.0'
-    }
+      jest: '^29.0.0',
+    },
   };
   fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(pkgData, null, 2));
 
@@ -399,7 +459,7 @@ test('graph dependencies then render with template', () => {
     '</pre>',
     '<p>Nodes: {{nodeCount}}</p>',
     '</body>',
-    '</html>'
+    '</html>',
   ].join('\n');
   const templateFile = writeTemp('chain5_template.mustache', templateContent);
 
@@ -407,41 +467,73 @@ test('graph dependencies then render with template', () => {
   const templateData = {
     title: `Dependencies for ${pkgData.name}`,
     graph: graphEnv.data.content,
-    nodeCount: graphEnv.data.nodeCount
+    nodeCount: graphEnv.data.nodeCount,
   };
   const dataFile = writeTemp('chain5_data.json', JSON.stringify(templateData));
 
   // Step 5: Render the template with graph data
-  const renderEnv = runAndParse('template-renderer/scripts/render.cjs', `-t "${templateFile}" -d "${dataFile}"`);
-  assert(renderEnv.data.content.includes('Dependencies for my-web-app'), 'Rendered output should include title');
-  assert(renderEnv.data.content.includes('graph TD'), 'Rendered output should include the mermaid graph');
-  assert(renderEnv.data.content.includes('express'), 'Rendered output should include dependency names');
-  assert(renderEnv.data.content.includes(`Nodes: ${graphEnv.data.nodeCount}`), 'Rendered output should include node count');
-  assert(renderEnv.data.content.includes('<html>'), 'Rendered output should be valid HTML structure');
+  const renderEnv = runAndParse(
+    'template-renderer/scripts/render.cjs',
+    `-t "${templateFile}" -d "${dataFile}"`
+  );
+  assert(
+    renderEnv.data.content.includes('Dependencies for my-web-app'),
+    'Rendered output should include title'
+  );
+  assert(
+    renderEnv.data.content.includes('graph TD'),
+    'Rendered output should include the mermaid graph'
+  );
+  assert(
+    renderEnv.data.content.includes('express'),
+    'Rendered output should include dependency names'
+  );
+  assert(
+    renderEnv.data.content.includes(`Nodes: ${graphEnv.data.nodeCount}`),
+    'Rendered output should include node count'
+  );
+  assert(
+    renderEnv.data.content.includes('<html>'),
+    'Rendered output should be valid HTML structure'
+  );
 });
 
 test('dependency graph node count feeds into template accurately', () => {
   // Minimal package with known dependency count
   const pkgDir2 = path.join(tmpDir, 'chain5_pkg2');
   if (!fs.existsSync(pkgDir2)) fs.mkdirSync(pkgDir2, { recursive: true });
-  fs.writeFileSync(path.join(pkgDir2, 'package.json'), JSON.stringify({
-    name: 'tiny-lib',
-    dependencies: { chalk: '^5.0.0' }
-  }));
+  fs.writeFileSync(
+    path.join(pkgDir2, 'package.json'),
+    JSON.stringify({
+      name: 'tiny-lib',
+      dependencies: { chalk: '^5.0.0' },
+    })
+  );
 
   const graphEnv = runAndParse('dependency-grapher/scripts/graph.cjs', `-d "${pkgDir2}"`);
   // With 1 dependency + root: should be 2 nodes
   assert(graphEnv.data.nodeCount === 2, `Expected 2 nodes, got ${graphEnv.data.nodeCount}`);
 
-  const simpleTemplate = writeTemp('chain5_simple.mustache', 'Package {{name}} has {{nodeCount}} nodes.');
-  const simpleData = writeTemp('chain5_simple_data.json', JSON.stringify({
-    name: 'tiny-lib',
-    nodeCount: graphEnv.data.nodeCount
-  }));
+  const simpleTemplate = writeTemp(
+    'chain5_simple.mustache',
+    'Package {{name}} has {{nodeCount}} nodes.'
+  );
+  const simpleData = writeTemp(
+    'chain5_simple_data.json',
+    JSON.stringify({
+      name: 'tiny-lib',
+      nodeCount: graphEnv.data.nodeCount,
+    })
+  );
 
-  const renderEnv = runAndParse('template-renderer/scripts/render.cjs', `-t "${simpleTemplate}" -d "${simpleData}"`);
-  assert(renderEnv.data.content === 'Package tiny-lib has 2 nodes.',
-    `Expected exact rendered string, got "${renderEnv.data.content}"`);
+  const renderEnv = runAndParse(
+    'template-renderer/scripts/render.cjs',
+    `-t "${simpleTemplate}" -d "${simpleData}"`
+  );
+  assert(
+    renderEnv.data.content === 'Package tiny-lib has 2 nodes.',
+    `Expected exact rendered string, got "${renderEnv.data.content}"`
+  );
 });
 
 // ========================================
@@ -457,24 +549,33 @@ test('validate valid input against skill-input schema then invalidate modified d
     skill: 'data-transformer',
     action: 'transform',
     params: { format: 'yaml', inputFile: '/tmp/data.json' },
-    context: { knowledge_tier: 'public', caller: 'integration-test' }
+    context: { knowledge_tier: 'public', caller: 'integration-test' },
   };
   const validFile = writeTemp('chain6_valid.json', JSON.stringify(validData));
 
   // Step 2: Validate -> should pass
-  const validEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${validFile}" -s "${schemaPath}"`);
+  const validEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${validFile}" -s "${schemaPath}"`
+  );
   assert(validEnv.data.valid === true, 'Valid data should pass schema validation');
 
   // Step 3: Create invalid data (missing required "skill" and "action" fields)
   const invalidData = {
     params: { format: 'yaml' },
-    context: { knowledge_tier: 'public' }
+    context: { knowledge_tier: 'public' },
   };
   const invalidFile = writeTemp('chain6_invalid.json', JSON.stringify(invalidData));
 
   // Step 4: Validate -> should fail
-  const invalidEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${invalidFile}" -s "${schemaPath}"`);
-  assert(invalidEnv.data.valid === false, 'Invalid data (missing required fields) should fail validation');
+  const invalidEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${invalidFile}" -s "${schemaPath}"`
+  );
+  assert(
+    invalidEnv.data.valid === false,
+    'Invalid data (missing required fields) should fail validation'
+  );
   assert(Array.isArray(invalidEnv.data.errors), 'Failed validation should include errors array');
   assert(invalidEnv.data.errors.length > 0, 'Should have at least one validation error');
 });
@@ -485,33 +586,51 @@ test('schema validation correctly handles progressively degraded input', () => {
   // Full valid input
   const fullInput = { skill: 'test', action: 'run', params: { x: 1 } };
   const fullFile = writeTemp('chain6_full.json', JSON.stringify(fullInput));
-  const fullEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${fullFile}" -s "${schemaPath}"`);
+  const fullEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${fullFile}" -s "${schemaPath}"`
+  );
   assert(fullEnv.data.valid === true, 'Full input should be valid');
 
   // Minimal valid input (only required fields)
   const minimalInput = { skill: 'test', action: 'run' };
   const minimalFile = writeTemp('chain6_minimal.json', JSON.stringify(minimalInput));
-  const minimalEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${minimalFile}" -s "${schemaPath}"`);
+  const minimalEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${minimalFile}" -s "${schemaPath}"`
+  );
   assert(minimalEnv.data.valid === true, 'Minimal input with only required fields should be valid');
 
   // Missing "action" field
   const noAction = { skill: 'test' };
   const noActionFile = writeTemp('chain6_no_action.json', JSON.stringify(noAction));
-  const noActionEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${noActionFile}" -s "${schemaPath}"`);
+  const noActionEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${noActionFile}" -s "${schemaPath}"`
+  );
   assert(noActionEnv.data.valid === false, 'Input missing "action" should be invalid');
 
   // Missing "skill" field
   const noSkill = { action: 'run' };
   const noSkillFile = writeTemp('chain6_no_skill.json', JSON.stringify(noSkill));
-  const noSkillEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${noSkillFile}" -s "${schemaPath}"`);
+  const noSkillEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${noSkillFile}" -s "${schemaPath}"`
+  );
   assert(noSkillEnv.data.valid === false, 'Input missing "skill" should be invalid');
 
   // Completely empty object
   const emptyObj = {};
   const emptyFile = writeTemp('chain6_empty.json', JSON.stringify(emptyObj));
-  const emptyEnv = runAndParse('schema-validator/scripts/validate.cjs', `-i "${emptyFile}" -s "${schemaPath}"`);
+  const emptyEnv = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${emptyFile}" -s "${schemaPath}"`
+  );
   assert(emptyEnv.data.valid === false, 'Empty object should be invalid');
-  assert(emptyEnv.data.errors.length >= 1, 'Empty object should have at least 1 validation error for missing required fields');
+  assert(
+    emptyEnv.data.errors.length >= 1,
+    'Empty object should have at least 1 validation error for missing required fields'
+  );
 });
 
 test('schema validation chain: validate then re-validate after fixing', () => {
@@ -521,15 +640,25 @@ test('schema validation chain: validate then re-validate after fixing', () => {
   const brokenData = { description: 'missing required fields' };
   const dataFile = writeTemp('chain6_fix.json', JSON.stringify(brokenData));
 
-  const firstValidation = runAndParse('schema-validator/scripts/validate.cjs', `-i "${dataFile}" -s "${schemaPath}"`);
+  const firstValidation = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${dataFile}" -s "${schemaPath}"`
+  );
   assert(firstValidation.data.valid === false, 'First validation should fail');
 
   // Step 2: Fix the data by adding required fields
-  const fixedData = { skill: 'repaired-skill', action: 'execute', description: 'now has required fields' };
+  const fixedData = {
+    skill: 'repaired-skill',
+    action: 'execute',
+    description: 'now has required fields',
+  };
   fs.writeFileSync(dataFile, JSON.stringify(fixedData));
 
   // Step 3: Re-validate -> should pass now
-  const secondValidation = runAndParse('schema-validator/scripts/validate.cjs', `-i "${dataFile}" -s "${schemaPath}"`);
+  const secondValidation = runAndParse(
+    'schema-validator/scripts/validate.cjs',
+    `-i "${dataFile}" -s "${schemaPath}"`
+  );
   assert(secondValidation.data.valid === true, 'Second validation after fix should pass');
 });
 
@@ -539,18 +668,31 @@ test('schema validation chain: validate then re-validate after fixing', () => {
 console.log('\n--- Cross-chain: Multi-skill consistency ---');
 
 test('all skills in a chain produce consistent envelope metadata', () => {
-  const testFile = writeTemp('cross_chain.json', JSON.stringify({ skill: 'test', action: 'verify' }));
+  const testFile = writeTemp(
+    'cross_chain.json',
+    JSON.stringify({ skill: 'test', action: 'verify' })
+  );
 
   const formatEnv = runAndParse('format-detector/scripts/detect.cjs', `-i "${testFile}"`);
   const encodingEnv = runAndParse('encoding-detector/scripts/detect.cjs', `-i "${testFile}"`);
   const sensitivityEnv = runAndParse('sensitivity-detector/scripts/scan.cjs', `-i "${testFile}"`);
 
   // All envelopes should follow the same structure
-  for (const [name, env] of [['format', formatEnv], ['encoding', encodingEnv], ['sensitivity', sensitivityEnv]]) {
-    assert(typeof env.skill === 'string' && env.skill.length > 0, `${name}: skill should be a non-empty string`);
+  for (const [name, env] of [
+    ['format', formatEnv],
+    ['encoding', encodingEnv],
+    ['sensitivity', sensitivityEnv],
+  ]) {
+    assert(
+      typeof env.skill === 'string' && env.skill.length > 0,
+      `${name}: skill should be a non-empty string`
+    );
     assert(env.status === 'success', `${name}: status should be "success"`);
     assert(typeof env.data === 'object' && env.data !== null, `${name}: data should be an object`);
-    assert(typeof env.metadata === 'object' && env.metadata !== null, `${name}: metadata should be an object`);
+    assert(
+      typeof env.metadata === 'object' && env.metadata !== null,
+      `${name}: metadata should be an object`
+    );
     assert(typeof env.metadata.duration_ms === 'number', `${name}: duration_ms should be a number`);
     assert(typeof env.metadata.timestamp === 'string', `${name}: timestamp should be a string`);
   }
@@ -566,7 +708,10 @@ test('format detection output drives correct transformer target', () => {
   assert(formatEnv.data.format === 'yaml', 'Should detect YAML format');
 
   // Since it is YAML, transform to JSON (the opposite direction from chain 1)
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${yamlFile}" -t json`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${yamlFile}" -t json`
+  );
   assert(transformEnv.data.format === 'json', 'Should transform to JSON');
 
   // Verify the JSON content is valid
@@ -589,34 +734,43 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
   if (!fs.existsSync(auditDir)) fs.mkdirSync(auditDir, { recursive: true });
 
   const srcFile1 = path.join(auditDir, 'app.js');
-  fs.writeFileSync(srcFile1, [
-    'const express = require("express");',
-    'const app = express();',
-    'app.get("/", (req, res) => {',
-    '  if (req.query.admin) {',
-    '    res.send("admin panel");',
-    '  } else {',
-    '    res.send("hello");',
-    '  }',
-    '});',
-    'module.exports = app;'
-  ].join('\n'));
+  fs.writeFileSync(
+    srcFile1,
+    [
+      'const express = require("express");',
+      'const app = express();',
+      'app.get("/", (req, res) => {',
+      '  if (req.query.admin) {',
+      '    res.send("admin panel");',
+      '  } else {',
+      '    res.send("hello");',
+      '  }',
+      '});',
+      'module.exports = app;',
+    ].join('\n')
+  );
 
   const srcFile2 = path.join(auditDir, 'config.json');
   fs.writeFileSync(srcFile2, JSON.stringify({ port: 3000, debug: true }, null, 2));
 
   const srcFile3 = path.join(auditDir, 'utils.js');
-  fs.writeFileSync(srcFile3, [
-    'function validate(input) {',
-    '  if (!input) throw new Error("missing");',
-    '  return input.trim();',
-    '}',
-    'module.exports = { validate };'
-  ].join('\n'));
+  fs.writeFileSync(
+    srcFile3,
+    [
+      'function validate(input) {',
+      '  if (!input) throw new Error("missing");',
+      '  return input.trim();',
+      '}',
+      'module.exports = { validate };',
+    ].join('\n')
+  );
 
   // Step 2: Run codebase-mapper on the audit directory
   const mapEnv = runAndParse('codebase-mapper/scripts/map.cjs', `"${auditDir}" 2`);
-  assert(mapEnv.skill === 'codebase-mapper', `Expected skill "codebase-mapper", got "${mapEnv.skill}"`);
+  assert(
+    mapEnv.skill === 'codebase-mapper',
+    `Expected skill "codebase-mapper", got "${mapEnv.skill}"`
+  );
   assert(mapEnv.data.root !== undefined, 'Codebase mapper should return root path');
   assert(Array.isArray(mapEnv.data.tree), 'Codebase mapper should return tree array');
   assert(mapEnv.data.tree.length > 0, 'Tree should have entries for the created files');
@@ -627,8 +781,14 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
   const secJsonStart = secRaw.indexOf('{');
   assert(secJsonStart >= 0, 'Security scanner output should contain JSON');
   const secEnv = JSON.parse(secRaw.slice(secJsonStart));
-  assert(secEnv.status === 'success', `Security scanner should succeed: ${JSON.stringify(secEnv.error)}`);
-  assert(secEnv.skill === 'security-scanner', `Expected skill "security-scanner", got "${secEnv.skill}"`);
+  assert(
+    secEnv.status === 'success',
+    `Security scanner should succeed: ${JSON.stringify(secEnv.error)}`
+  );
+  assert(
+    secEnv.skill === 'security-scanner',
+    `Expected skill "security-scanner", got "${secEnv.skill}"`
+  );
   assert(secEnv.data.status === 'scan_complete', 'Security scanner should report scan_complete');
   assert(Array.isArray(secEnv.data.ignoreDirs), 'Security scanner should list ignored dirs');
 
@@ -636,11 +796,17 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
   // Initialize the audit directory as a git repo with a few commits
   execSync('git init', { cwd: auditDir, stdio: 'pipe' });
   execSync('git add -A', { cwd: auditDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "initial"', { cwd: auditDir, stdio: 'pipe' });
+  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "initial"', {
+    cwd: auditDir,
+    stdio: 'pipe',
+  });
   // Modify a file and commit again to create churn
   fs.writeFileSync(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// updated\n');
   execSync('git add -A', { cwd: auditDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "update app"', { cwd: auditDir, stdio: 'pipe' });
+  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "update app"', {
+    cwd: auditDir,
+    stdio: 'pipe',
+  });
 
   const bugEnv = runAndParse('bug-predictor/scripts/predict.cjs', `-d "${auditDir}" -n 5`);
   assert(bugEnv.skill === 'bug-predictor', `Expected skill "bug-predictor", got "${bugEnv.skill}"`);
@@ -671,15 +837,24 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
   const auditMdFile = writeTemp('chain7_audit_summary.md', auditSummaryMd);
   const auditHtmlFile = path.join(tmpDir, 'chain7_audit_report.html');
 
-  const reportEnv = runAndParse('html-reporter/scripts/report.cjs',
-    `-i "${auditMdFile}" -o "${auditHtmlFile}" -t "Security Audit Report"`);
-  assert(reportEnv.skill === 'html-reporter', `Expected skill "html-reporter", got "${reportEnv.skill}"`);
+  const reportEnv = runAndParse(
+    'html-reporter/scripts/report.cjs',
+    `-i "${auditMdFile}" -o "${auditHtmlFile}" -t "Security Audit Report"`
+  );
+  assert(
+    reportEnv.skill === 'html-reporter',
+    `Expected skill "html-reporter", got "${reportEnv.skill}"`
+  );
   assert(reportEnv.data.size > 0, 'HTML report size should be positive');
   assert(fs.existsSync(auditHtmlFile), 'Audit HTML report file should exist on disk');
 
   // Verify all 4 envelopes have consistent metadata structure
-  for (const [name, env] of [['codebase-mapper', mapEnv], ['security-scanner', secEnv],
-                              ['bug-predictor', bugEnv], ['html-reporter', reportEnv]]) {
+  for (const [name, env] of [
+    ['codebase-mapper', mapEnv],
+    ['security-scanner', secEnv],
+    ['bug-predictor', bugEnv],
+    ['html-reporter', reportEnv],
+  ]) {
     assert(env.status === 'success', `${name}: status should be success`);
     assert(typeof env.metadata === 'object', `${name}: metadata should be an object`);
     assert(typeof env.metadata.duration_ms === 'number', `${name}: should have duration_ms`);
@@ -716,20 +891,30 @@ test('format-detector -> data-transformer -> quality-scorer -> completeness-scor
   const sourceData = {
     title: 'Quarterly Review Document',
     department: 'Engineering',
-    summary: 'This document provides a comprehensive overview of engineering progress. All milestones have been met and the team continues to deliver high quality results. Performance metrics remain strong across all categories.',
+    summary:
+      'This document provides a comprehensive overview of engineering progress. All milestones have been met and the team continues to deliver high quality results. Performance metrics remain strong across all categories.',
     metrics: { velocity: 42, coverage: 88, satisfaction: 95 },
-    status: 'on-track'
+    status: 'on-track',
   };
   const jsonFile = writeTemp('chain8_input.json', JSON.stringify(sourceData, null, 2));
 
   // Step 2: Detect its format (should be json)
   const formatEnv = runAndParse('format-detector/scripts/detect.cjs', `-i "${jsonFile}"`);
-  assert(formatEnv.data.format === 'json', `Expected format "json", got "${formatEnv.data.format}"`);
+  assert(
+    formatEnv.data.format === 'json',
+    `Expected format "json", got "${formatEnv.data.format}"`
+  );
   assert(formatEnv.data.confidence === 1.0, 'JSON detection should have full confidence');
 
   // Step 3: Transform to YAML
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${jsonFile}" -t yaml`);
-  assert(transformEnv.data.format === 'yaml', `Expected transformed format "yaml", got "${transformEnv.data.format}"`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${jsonFile}" -t yaml`
+  );
+  assert(
+    transformEnv.data.format === 'yaml',
+    `Expected transformed format "yaml", got "${transformEnv.data.format}"`
+  );
   const yamlContent = transformEnv.data.content;
   assert(yamlContent.includes('title:'), 'YAML should contain title field');
   assert(yamlContent.includes('Quarterly Review Document'), 'YAML should preserve title value');
@@ -738,52 +923,78 @@ test('format-detector -> data-transformer -> quality-scorer -> completeness-scor
   const yamlFile = writeTemp('chain8_transformed.yaml', yamlContent);
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${yamlFile}"`);
   assert(typeof qualityEnv.data.score === 'number', 'Quality score should be a number');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
-    `Quality score should be 0-100, got ${qualityEnv.data.score}`);
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    `Quality score should be 0-100, got ${qualityEnv.data.score}`
+  );
   assert(qualityEnv.data.metrics.charCount > 0, 'Quality metrics charCount should be positive');
 
   // Step 5: Score completeness on the YAML output
   const completenessEnv = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${yamlFile}"`);
   assert(typeof completenessEnv.data.score === 'number', 'Completeness score should be a number');
-  assert(completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100,
-    `Completeness score should be 0-100, got ${completenessEnv.data.score}`);
+  assert(
+    completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100,
+    `Completeness score should be 0-100, got ${completenessEnv.data.score}`
+  );
   assert(Array.isArray(completenessEnv.data.issues), 'Completeness should return issues array');
 
   // Step 6: Render a summary template with the scores
-  const summaryTemplate = writeTemp('chain8_summary.mustache', [
-    'Document Processing Summary',
-    '===========================',
-    'Input Format: {{inputFormat}} (confidence: {{formatConfidence}})',
-    'Output Format: {{outputFormat}}',
-    'Quality Score: {{qualityScore}}/100',
-    'Completeness Score: {{completenessScore}}/100',
-    'Character Count: {{charCount}}',
-    'Issues Found: {{issueCount}}'
-  ].join('\n'));
+  const summaryTemplate = writeTemp(
+    'chain8_summary.mustache',
+    [
+      'Document Processing Summary',
+      '===========================',
+      'Input Format: {{inputFormat}} (confidence: {{formatConfidence}})',
+      'Output Format: {{outputFormat}}',
+      'Quality Score: {{qualityScore}}/100',
+      'Completeness Score: {{completenessScore}}/100',
+      'Character Count: {{charCount}}',
+      'Issues Found: {{issueCount}}',
+    ].join('\n')
+  );
 
-  const summaryData = writeTemp('chain8_summary_data.json', JSON.stringify({
-    inputFormat: formatEnv.data.format,
-    formatConfidence: formatEnv.data.confidence,
-    outputFormat: transformEnv.data.format,
-    qualityScore: qualityEnv.data.score,
-    completenessScore: completenessEnv.data.score,
-    charCount: qualityEnv.data.metrics.charCount,
-    issueCount: completenessEnv.data.issues.length
-  }));
+  const summaryData = writeTemp(
+    'chain8_summary_data.json',
+    JSON.stringify({
+      inputFormat: formatEnv.data.format,
+      formatConfidence: formatEnv.data.confidence,
+      outputFormat: transformEnv.data.format,
+      qualityScore: qualityEnv.data.score,
+      completenessScore: completenessEnv.data.score,
+      charCount: qualityEnv.data.metrics.charCount,
+      issueCount: completenessEnv.data.issues.length,
+    })
+  );
 
-  const renderEnv = runAndParse('template-renderer/scripts/render.cjs',
-    `-t "${summaryTemplate}" -d "${summaryData}"`);
-  assert(renderEnv.data.content.includes('Input Format: json'), 'Rendered summary should contain input format');
-  assert(renderEnv.data.content.includes('Output Format: yaml'), 'Rendered summary should contain output format');
-  assert(renderEnv.data.content.includes(`Quality Score: ${qualityEnv.data.score}`),
-    'Rendered summary should contain quality score');
-  assert(renderEnv.data.content.includes(`Completeness Score: ${completenessEnv.data.score}`),
-    'Rendered summary should contain completeness score');
+  const renderEnv = runAndParse(
+    'template-renderer/scripts/render.cjs',
+    `-t "${summaryTemplate}" -d "${summaryData}"`
+  );
+  assert(
+    renderEnv.data.content.includes('Input Format: json'),
+    'Rendered summary should contain input format'
+  );
+  assert(
+    renderEnv.data.content.includes('Output Format: yaml'),
+    'Rendered summary should contain output format'
+  );
+  assert(
+    renderEnv.data.content.includes(`Quality Score: ${qualityEnv.data.score}`),
+    'Rendered summary should contain quality score'
+  );
+  assert(
+    renderEnv.data.content.includes(`Completeness Score: ${completenessEnv.data.score}`),
+    'Rendered summary should contain completeness score'
+  );
 
   // Verify all 5 envelopes are valid
-  for (const [name, env] of [['format-detector', formatEnv], ['data-transformer', transformEnv],
-                              ['quality-scorer', qualityEnv], ['completeness-scorer', completenessEnv],
-                              ['template-renderer', renderEnv]]) {
+  for (const [name, env] of [
+    ['format-detector', formatEnv],
+    ['data-transformer', transformEnv],
+    ['quality-scorer', qualityEnv],
+    ['completeness-scorer', completenessEnv],
+    ['template-renderer', renderEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata.duration_ms === 'number', `${name}: should have duration_ms`);
@@ -846,7 +1057,10 @@ test('code-lang-detector -> encoding-detector -> sensitivity-detector -> quality
   // Step 3: Check its encoding
   const encodingEnv = runAndParse('encoding-detector/scripts/detect.cjs', `-i "${jsFile}"`);
   assert(encodingEnv.data.encoding !== undefined, 'Should detect an encoding');
-  assert(encodingEnv.data.lineEnding === 'LF', `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`);
+  assert(
+    encodingEnv.data.lineEnding === 'LF',
+    `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`
+  );
   assert(encodingEnv.data.confidence > 0, 'Should have positive encoding confidence');
 
   // Step 4: Scan for sensitivity (clean code, no PII)
@@ -856,8 +1070,10 @@ test('code-lang-detector -> encoding-detector -> sensitivity-detector -> quality
   // Step 5: Score its quality
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${jsFile}"`);
   assert(typeof qualityEnv.data.score === 'number', 'Quality score should be a number');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
-    `Quality score should be 0-100, got ${qualityEnv.data.score}`);
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    `Quality score should be 0-100, got ${qualityEnv.data.score}`
+  );
   assert(qualityEnv.data.metrics.lines > 20, 'Should have more than 20 lines');
 
   // Verify all 4 envelopes have consistent metadata
@@ -865,23 +1081,26 @@ test('code-lang-detector -> encoding-detector -> sensitivity-detector -> quality
     ['code-lang-detector', langEnv],
     ['encoding-detector', encodingEnv],
     ['sensitivity-detector', sensitivityEnv],
-    ['quality-scorer', qualityEnv]
+    ['quality-scorer', qualityEnv],
   ];
   for (const [name, env] of allEnvelopes) {
     assert(env.status === 'success', `${name}: should have success status`);
     assert(env.skill === name, `${name}: skill field should be "${name}", got "${env.skill}"`);
-    assert(typeof env.metadata === 'object' && env.metadata !== null, `${name}: metadata should be an object`);
-    assert(typeof env.metadata.duration_ms === 'number', `${name}: should have numeric duration_ms`);
+    assert(
+      typeof env.metadata === 'object' && env.metadata !== null,
+      `${name}: metadata should be an object`
+    );
+    assert(
+      typeof env.metadata.duration_ms === 'number',
+      `${name}: should have numeric duration_ms`
+    );
     assert(typeof env.metadata.timestamp === 'string', `${name}: should have string timestamp`);
   }
 });
 
 test('code review chain detects PII and scores very short code', () => {
   // Create code with PII and very short content (under 50 chars triggers quality penalty)
-  const badCode = [
-    'var x = "admin@corp.com";',
-    'var y = "192.168.1.1";',
-  ].join('\n');
+  const badCode = ['var x = "admin@corp.com";', 'var y = "192.168.1.1";'].join('\n');
   const badFile = writeTemp('chain9_bad.js', badCode);
 
   const langEnv = runAndParse('code-lang-detector/scripts/detect.cjs', `-i "${badFile}"`);
@@ -894,7 +1113,10 @@ test('code review chain detects PII and scores very short code', () => {
 
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${badFile}"`);
   // The code is under 50 chars, so quality scorer deducts 20 points
-  assert(qualityEnv.data.score < 100, 'Very short code (under 50 chars) should have reduced quality score');
+  assert(
+    qualityEnv.data.score < 100,
+    'Very short code (under 50 chars) should have reduced quality score'
+  );
   assert(qualityEnv.data.metrics.charCount < 50, 'Bad code should be under 50 chars');
 });
 
@@ -923,13 +1145,19 @@ test('domain-classifier -> doc-type-classifier -> intent-classifier -> lang-dete
 
   // Step 1: Classify domain -> should be "tech"
   const domainEnv = runAndParse('domain-classifier/scripts/classify.cjs', `-i "${techFile}"`);
-  assert(domainEnv.data.domain === 'tech', `Expected domain "tech", got "${domainEnv.data.domain}"`);
+  assert(
+    domainEnv.data.domain === 'tech',
+    `Expected domain "tech", got "${domainEnv.data.domain}"`
+  );
   assert(domainEnv.data.confidence > 0, 'Domain confidence should be positive');
   assert(domainEnv.data.matches > 0, 'Domain should have keyword matches');
 
   // Step 2: Classify doc-type -> should be "specification"
   const docTypeEnv = runAndParse('doc-type-classifier/scripts/classify.cjs', `-i "${techFile}"`);
-  assert(docTypeEnv.data.type === 'specification', `Expected type "specification", got "${docTypeEnv.data.type}"`);
+  assert(
+    docTypeEnv.data.type === 'specification',
+    `Expected type "specification", got "${docTypeEnv.data.type}"`
+  );
   assert(docTypeEnv.data.confidence > 0, 'Doc-type confidence should be positive');
 
   // Step 3: Classify intent
@@ -947,7 +1175,7 @@ test('domain-classifier -> doc-type-classifier -> intent-classifier -> lang-dete
     ['domain-classifier', domainEnv],
     ['doc-type-classifier', docTypeEnv],
     ['intent-classifier', intentEnv],
-    ['lang-detector', langEnv]
+    ['lang-detector', langEnv],
   ];
   for (const [name, env] of allEnvelopes) {
     assert(env.status === 'success', `${name}: should succeed`);
@@ -958,8 +1186,10 @@ test('domain-classifier -> doc-type-classifier -> intent-classifier -> lang-dete
   }
 
   // Verify domain is "tech" for this technical content
-  assert(domainEnv.data.domain === 'tech',
-    'Domain should be "tech" for document with API, Server, Code, Bug, Deploy keywords');
+  assert(
+    domainEnv.data.domain === 'tech',
+    'Domain should be "tech" for document with API, Server, Code, Bug, Deploy keywords'
+  );
 });
 
 test('classification deep chain returns different domain for finance content', () => {
@@ -975,7 +1205,10 @@ test('classification deep chain returns different domain for finance content', (
   const financeFile = writeTemp('chain10_finance_doc.txt', financeDoc);
 
   const domainEnv = runAndParse('domain-classifier/scripts/classify.cjs', `-i "${financeFile}"`);
-  assert(domainEnv.data.domain === 'finance', `Expected domain "finance", got "${domainEnv.data.domain}"`);
+  assert(
+    domainEnv.data.domain === 'finance',
+    `Expected domain "finance", got "${domainEnv.data.domain}"`
+  );
 
   const docTypeEnv = runAndParse('doc-type-classifier/scripts/classify.cjs', `-i "${financeFile}"`);
   assert(docTypeEnv.data.type !== undefined, 'Doc-type should be detected for finance doc');
@@ -987,8 +1220,10 @@ test('classification deep chain returns different domain for finance content', (
   assert(langEnv.data.language !== undefined, 'Language should be detected for finance doc');
 
   // Verify domain differs from tech
-  assert(domainEnv.data.domain !== 'tech',
-    'Finance document should NOT be classified as tech domain');
+  assert(
+    domainEnv.data.domain !== 'tech',
+    'Finance document should NOT be classified as tech domain'
+  );
 });
 
 // ========================================
@@ -1015,14 +1250,23 @@ test('format-detector on nonexistent file produces parseable error envelope', ()
   // The error envelope should be parseable JSON
   assert(errorOutput.length > 0, 'Error output should not be empty');
   const errorEnvelope = JSON.parse(errorOutput);
-  assert(errorEnvelope.status === 'error', `Expected status "error", got "${errorEnvelope.status}"`);
+  assert(
+    errorEnvelope.status === 'error',
+    `Expected status "error", got "${errorEnvelope.status}"`
+  );
   assert(errorEnvelope.skill === 'format-detector', 'Error envelope should identify the skill');
   assert(errorEnvelope.error !== undefined, 'Error envelope should have an error field');
   assert(typeof errorEnvelope.error.message === 'string', 'Error should have a message string');
-  assert(errorEnvelope.error.message.includes('not found') || errorEnvelope.error.message.includes('File'),
-    'Error message should mention file not found');
+  assert(
+    errorEnvelope.error.message.includes('not found') ||
+      errorEnvelope.error.message.includes('File'),
+    'Error message should mention file not found'
+  );
   assert(typeof errorEnvelope.metadata === 'object', 'Error envelope should still have metadata');
-  assert(typeof errorEnvelope.metadata.duration_ms === 'number', 'Error envelope should have duration_ms');
+  assert(
+    typeof errorEnvelope.metadata.duration_ms === 'number',
+    'Error envelope should have duration_ms'
+  );
 });
 
 test('quality-scorer on nonexistent file produces parseable error envelope', () => {
@@ -1063,7 +1307,8 @@ test('error propagation: error from format-detector does not crash quality-score
   assert(formatError.status === 'error', 'Format-detector should return error status');
 
   // Step 2: Despite the error, quality-scorer should work fine on a valid file
-  const validContent = 'This is a valid document with enough content to be scored properly by the quality engine.';
+  const validContent =
+    'This is a valid document with enough content to be scored properly by the quality engine.';
   const validFile = writeTemp('chain11_valid.txt', validContent);
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${validFile}"`);
   assert(qualityEnv.status === 'success', 'Quality scorer should succeed on valid input');
@@ -1074,10 +1319,15 @@ test('error propagation: error from format-detector does not crash quality-score
   assert(qualityEnv.skill !== undefined, 'Success envelope should have skill field');
   assert(formatError.metadata !== undefined, 'Error envelope should have metadata');
   assert(qualityEnv.metadata !== undefined, 'Success envelope should have metadata');
-  assert(typeof formatError.metadata.duration_ms === 'number', 'Error envelope duration_ms should be a number');
-  assert(typeof qualityEnv.metadata.duration_ms === 'number', 'Success envelope duration_ms should be a number');
+  assert(
+    typeof formatError.metadata.duration_ms === 'number',
+    'Error envelope duration_ms should be a number'
+  );
+  assert(
+    typeof qualityEnv.metadata.duration_ms === 'number',
+    'Success envelope duration_ms should be a number'
+  );
 });
-
 
 // ========================================
 // Chain 12: Knowledge Pipeline (3 skills)
@@ -1089,34 +1339,47 @@ test('harvest knowledge, optimize SKILL.md, render template', () => {
   // Step 1: Create a temp directory with package.json + README.md
   const knowledgeDir = path.join(tmpDir, 'chain12_project');
   if (!fs.existsSync(knowledgeDir)) fs.mkdirSync(knowledgeDir, { recursive: true });
-  fs.writeFileSync(path.join(knowledgeDir, 'package.json'), JSON.stringify({
-    name: 'sample-project',
-    version: '1.0.0',
-    description: 'A sample project for testing knowledge harvesting',
-    dependencies: { express: '^4.18.0', lodash: '^4.17.21' },
-    devDependencies: { jest: '^29.0.0', eslint: '^8.0.0' },
-    scripts: { test: 'jest', start: 'node index.js' }
-  }, null, 2));
-  fs.writeFileSync(path.join(knowledgeDir, 'README.md'), [
-    '# Sample Project',
-    '',
-    'A Node.js web server built with Express.',
-    '',
-    '## Usage',
-    '',
-    'Run npm start to launch the server.',
-    '',
-    '## Troubleshooting',
-    '',
-    'Check logs for errors.',
-    '',
-    '## Options',
-    '',
-    '- --port: specify port number',
-  ].join('\n'));
+  fs.writeFileSync(
+    path.join(knowledgeDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'sample-project',
+        version: '1.0.0',
+        description: 'A sample project for testing knowledge harvesting',
+        dependencies: { express: '^4.18.0', lodash: '^4.17.21' },
+        devDependencies: { jest: '^29.0.0', eslint: '^8.0.0' },
+        scripts: { test: 'jest', start: 'node index.js' },
+      },
+      null,
+      2
+    )
+  );
+  fs.writeFileSync(
+    path.join(knowledgeDir, 'README.md'),
+    [
+      '# Sample Project',
+      '',
+      'A Node.js web server built with Express.',
+      '',
+      '## Usage',
+      '',
+      'Run npm start to launch the server.',
+      '',
+      '## Troubleshooting',
+      '',
+      'Check logs for errors.',
+      '',
+      '## Options',
+      '',
+      '- --port: specify port number',
+    ].join('\n')
+  );
 
   // Step 2: Run knowledge-harvester on the temp dir
-  const harvestEnv = runAndParse('knowledge-harvester/scripts/harvest.cjs', `--dir "${knowledgeDir}"`);
+  const harvestEnv = runAndParse(
+    'knowledge-harvester/scripts/harvest.cjs',
+    `--dir "${knowledgeDir}"`
+  );
   assert(harvestEnv.skill === 'knowledge-harvester', 'Skill should be knowledge-harvester');
   assert(harvestEnv.data !== undefined, 'Harvest should return data');
   assert(typeof harvestEnv.metadata === 'object', 'Should have metadata');
@@ -1125,9 +1388,9 @@ test('harvest knowledge, optimize SKILL.md, render template', () => {
   const harvestData = harvestEnv.data;
   assert(
     (harvestData.files && harvestData.files.length > 0) ||
-    (harvestData.techStack && harvestData.techStack.length > 0) ||
-    (harvestData.dependencies) ||
-    (harvestData.highlights),
+      (harvestData.techStack && harvestData.techStack.length > 0) ||
+      harvestData.dependencies ||
+      harvestData.highlights,
     'Harvest should find files, techStack, or dependencies'
   );
 
@@ -1137,26 +1400,44 @@ test('harvest knowledge, optimize SKILL.md, render template', () => {
   assert(optimizerEnv.skill === 'prompt-optimizer', 'Skill should be prompt-optimizer');
   assert(typeof optimizerEnv.data.score === 'number', 'Optimizer should return a score');
   assert(optimizerEnv.data.score >= 0 && optimizerEnv.data.score <= 100, 'Score should be 0-100');
-  assert(typeof optimizerEnv.metadata.duration_ms === 'number', 'Optimizer should have duration_ms');
+  assert(
+    typeof optimizerEnv.metadata.duration_ms === 'number',
+    'Optimizer should have duration_ms'
+  );
 
   // Step 4: Feed harvest data into template-renderer
-  const templateFile = writeTemp('chain12_template.mustache', [
-    'Project Knowledge Report',
-    '========================',
-    'Skill: {{skill}}',
-    'Score: {{score}}',
-    'Status: {{status}}'
-  ].join('\n'));
-  const templateData = writeTemp('chain12_data.json', JSON.stringify({
-    skill: harvestEnv.skill,
-    score: optimizerEnv.data.score,
-    status: harvestEnv.status
-  }));
-  const rendererEnv = runAndParse('template-renderer/scripts/render.cjs', `-t "${templateFile}" -d "${templateData}"`);
+  const templateFile = writeTemp(
+    'chain12_template.mustache',
+    [
+      'Project Knowledge Report',
+      '========================',
+      'Skill: {{skill}}',
+      'Score: {{score}}',
+      'Status: {{status}}',
+    ].join('\n')
+  );
+  const templateData = writeTemp(
+    'chain12_data.json',
+    JSON.stringify({
+      skill: harvestEnv.skill,
+      score: optimizerEnv.data.score,
+      status: harvestEnv.status,
+    })
+  );
+  const rendererEnv = runAndParse(
+    'template-renderer/scripts/render.cjs',
+    `-t "${templateFile}" -d "${templateData}"`
+  );
   assert(rendererEnv.skill === 'template-renderer', 'Skill should be template-renderer');
   assert(rendererEnv.data.content !== undefined, 'Renderer should produce content');
-  assert(rendererEnv.data.content.includes('knowledge-harvester'), 'Rendered content should include skill name');
-  assert(rendererEnv.data.content.includes('Project Knowledge Report'), 'Rendered content should include report title');
+  assert(
+    rendererEnv.data.content.includes('knowledge-harvester'),
+    'Rendered content should include skill name'
+  );
+  assert(
+    rendererEnv.data.content.includes('Project Knowledge Report'),
+    'Rendered content should include report title'
+  );
   assert(typeof rendererEnv.metadata.duration_ms === 'number', 'Renderer should have duration_ms');
 });
 
@@ -1173,18 +1454,36 @@ test('detect format, score quality, score completeness', () => {
     title: 'Product Catalog',
     version: '2.1',
     items: [
-      { id: 1, name: 'Widget A', price: 9.99, description: 'A high-quality widget for general use.' },
-      { id: 2, name: 'Widget B', price: 19.99, description: 'Premium widget with extended features.' },
-      { id: 3, name: 'Gadget C', price: 29.99, description: 'Advanced gadget with smart capabilities.' }
+      {
+        id: 1,
+        name: 'Widget A',
+        price: 9.99,
+        description: 'A high-quality widget for general use.',
+      },
+      {
+        id: 2,
+        name: 'Widget B',
+        price: 19.99,
+        description: 'Premium widget with extended features.',
+      },
+      {
+        id: 3,
+        name: 'Gadget C',
+        price: 29.99,
+        description: 'Advanced gadget with smart capabilities.',
+      },
     ],
-    metadata: { created: '2025-01-15', author: 'Data Team' }
+    metadata: { created: '2025-01-15', author: 'Data Team' },
   };
   const jsonFile = writeTemp('chain13_catalog.json', JSON.stringify(dataContent, null, 2));
 
   // Step 2: Run format-detector to verify it is JSON
   const detectEnv = runAndParse('format-detector/scripts/detect.cjs', `-i "${jsonFile}"`);
   assert(detectEnv.skill === 'format-detector', 'Skill should be format-detector');
-  assert(detectEnv.data.format === 'json', `Expected format "json", got "${detectEnv.data.format}"`);
+  assert(
+    detectEnv.data.format === 'json',
+    `Expected format "json", got "${detectEnv.data.format}"`
+  );
   assert(detectEnv.data.confidence > 0, 'Confidence should be positive');
   assert(typeof detectEnv.metadata.duration_ms === 'number', 'Should have duration_ms');
 
@@ -1192,21 +1491,36 @@ test('detect format, score quality, score completeness', () => {
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${jsonFile}"`);
   assert(qualityEnv.skill === 'quality-scorer', 'Skill should be quality-scorer');
   assert(typeof qualityEnv.data.score === 'number', 'Quality scorer should return a numeric score');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100, 'Quality score should be 0-100');
-  assert(typeof qualityEnv.metadata.duration_ms === 'number', 'Quality scorer should have duration_ms');
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    'Quality score should be 0-100'
+  );
+  assert(
+    typeof qualityEnv.metadata.duration_ms === 'number',
+    'Quality scorer should have duration_ms'
+  );
 
   // Step 4: Run completeness-scorer on the same file
   const completenessEnv = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${jsonFile}"`);
   assert(completenessEnv.skill === 'completeness-scorer', 'Skill should be completeness-scorer');
-  assert(typeof completenessEnv.data.score === 'number', 'Completeness scorer should return a numeric score');
-  assert(completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100, 'Completeness score should be 0-100');
-  assert(typeof completenessEnv.metadata.duration_ms === 'number', 'Completeness scorer should have duration_ms');
+  assert(
+    typeof completenessEnv.data.score === 'number',
+    'Completeness scorer should return a numeric score'
+  );
+  assert(
+    completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100,
+    'Completeness score should be 0-100'
+  );
+  assert(
+    typeof completenessEnv.metadata.duration_ms === 'number',
+    'Completeness scorer should have duration_ms'
+  );
 
   // Verify all three skills returned consistent envelope structure
   const allEnvelopes = [
     ['format-detector', detectEnv],
     ['quality-scorer', qualityEnv],
-    ['completeness-scorer', completenessEnv]
+    ['completeness-scorer', completenessEnv],
   ];
   for (const [name, env] of allEnvelopes) {
     assert(env.status === 'success', `${name}: should succeed`);
@@ -1268,7 +1582,10 @@ test('detect language, find code smells, score quality', () => {
   // Step 2: Run code-lang-detector
   const langEnv = runAndParse('code-lang-detector/scripts/detect.cjs', `-i "${jsFile}"`);
   assert(langEnv.skill === 'code-lang-detector', 'Skill should be code-lang-detector');
-  assert(langEnv.data.lang === 'javascript', `Expected language "javascript", got "${langEnv.data.lang}"`);
+  assert(
+    langEnv.data.lang === 'javascript',
+    `Expected language "javascript", got "${langEnv.data.lang}"`
+  );
   assert(langEnv.data.confidence > 0, 'Language confidence should be positive');
   assert(typeof langEnv.metadata.duration_ms === 'number', 'Lang detector should have duration_ms');
 
@@ -1279,25 +1596,34 @@ test('detect language, find code smells, score quality', () => {
   // Should find smells (magic numbers, deep nesting)
   assert(
     (refactorEnv.data.smells && refactorEnv.data.smells.length > 0) ||
-    (refactorEnv.data.issues && refactorEnv.data.issues.length > 0) ||
-    (refactorEnv.data.totalSmells > 0) ||
-    (refactorEnv.data.summary),
+      (refactorEnv.data.issues && refactorEnv.data.issues.length > 0) ||
+      refactorEnv.data.totalSmells > 0 ||
+      refactorEnv.data.summary,
     'Refactoring engine should find at least one code smell'
   );
-  assert(typeof refactorEnv.metadata.duration_ms === 'number', 'Refactoring engine should have duration_ms');
+  assert(
+    typeof refactorEnv.metadata.duration_ms === 'number',
+    'Refactoring engine should have duration_ms'
+  );
 
   // Step 4: Run quality-scorer on the same JS file
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${jsFile}"`);
   assert(qualityEnv.skill === 'quality-scorer', 'Skill should be quality-scorer');
   assert(typeof qualityEnv.data.score === 'number', 'Quality score should be a number');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100, 'Quality score should be 0-100');
-  assert(typeof qualityEnv.metadata.duration_ms === 'number', 'Quality scorer should have duration_ms');
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    'Quality score should be 0-100'
+  );
+  assert(
+    typeof qualityEnv.metadata.duration_ms === 'number',
+    'Quality scorer should have duration_ms'
+  );
 
   // Verify all envelopes
   const allEnvelopes = [
     ['code-lang-detector', langEnv],
     ['refactoring-engine', refactorEnv],
-    ['quality-scorer', qualityEnv]
+    ['quality-scorer', qualityEnv],
   ];
   for (const [name, env] of allEnvelopes) {
     assert(env.status === 'success', `${name}: should succeed`);
@@ -1370,39 +1696,59 @@ test('score requirements, assess completeness, measure quality', () => {
   const reqFile = writeTemp('chain15_requirements.md', requirementsDoc);
 
   // Step 2: Run requirements-wizard with IPA standard
-  const reqEnv = runAndParse('requirements-wizard/scripts/main.cjs', `-i "${reqFile}" --standard ipa`);
+  const reqEnv = runAndParse(
+    'requirements-wizard/scripts/main.cjs',
+    `-i "${reqFile}" --standard ipa`
+  );
   assert(reqEnv.skill === 'requirements-wizard', 'Skill should be requirements-wizard');
   assert(typeof reqEnv.data === 'object', 'Requirements wizard should return data');
   assert(
     typeof reqEnv.data.score === 'number' ||
-    typeof reqEnv.data.totalScore === 'number' ||
-    typeof reqEnv.data.coverage === 'number',
+      typeof reqEnv.data.totalScore === 'number' ||
+      typeof reqEnv.data.coverage === 'number',
     'Requirements wizard should return a score or coverage metric'
   );
-  assert(typeof reqEnv.metadata.duration_ms === 'number', 'Requirements wizard should have duration_ms');
+  assert(
+    typeof reqEnv.metadata.duration_ms === 'number',
+    'Requirements wizard should have duration_ms'
+  );
 
   // Step 3: Run completeness-scorer on the requirements doc
   const completenessEnv = runAndParse('completeness-scorer/scripts/score.cjs', `-i "${reqFile}"`);
   assert(completenessEnv.skill === 'completeness-scorer', 'Skill should be completeness-scorer');
   assert(typeof completenessEnv.data.score === 'number', 'Completeness score should be a number');
-  assert(completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100, 'Completeness score should be 0-100');
-  assert(typeof completenessEnv.metadata.duration_ms === 'number', 'Completeness scorer should have duration_ms');
+  assert(
+    completenessEnv.data.score >= 0 && completenessEnv.data.score <= 100,
+    'Completeness score should be 0-100'
+  );
+  assert(
+    typeof completenessEnv.metadata.duration_ms === 'number',
+    'Completeness scorer should have duration_ms'
+  );
   // A well-structured requirements doc should score reasonably high
-  assert(completenessEnv.data.score >= 50,
-    `Requirements doc completeness should be >= 50, got ${completenessEnv.data.score}`);
+  assert(
+    completenessEnv.data.score >= 50,
+    `Requirements doc completeness should be >= 50, got ${completenessEnv.data.score}`
+  );
 
   // Step 4: Run quality-scorer on the requirements doc
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${reqFile}"`);
   assert(qualityEnv.skill === 'quality-scorer', 'Skill should be quality-scorer');
   assert(typeof qualityEnv.data.score === 'number', 'Quality score should be a number');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100, 'Quality score should be 0-100');
-  assert(typeof qualityEnv.metadata.duration_ms === 'number', 'Quality scorer should have duration_ms');
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    'Quality score should be 0-100'
+  );
+  assert(
+    typeof qualityEnv.metadata.duration_ms === 'number',
+    'Quality scorer should have duration_ms'
+  );
 
   // Verify all envelopes have consistent structure
   const allEnvelopes = [
     ['requirements-wizard', reqEnv],
     ['completeness-scorer', completenessEnv],
-    ['quality-scorer', qualityEnv]
+    ['quality-scorer', qualityEnv],
   ];
   for (const [name, env] of allEnvelopes) {
     assert(env.status === 'success', `${name}: should succeed`);
@@ -1412,10 +1758,11 @@ test('score requirements, assess completeness, measure quality', () => {
   }
 
   // Cross-chain assertion: both completeness and quality should be scored
-  assert(typeof completenessEnv.data.score === 'number' && typeof qualityEnv.data.score === 'number',
-    'Both completeness and quality should produce numeric scores for the same document');
+  assert(
+    typeof completenessEnv.data.score === 'number' && typeof qualityEnv.data.score === 'number',
+    'Both completeness and quality should produce numeric scores for the same document'
+  );
 });
-
 
 // ========================================
 // Chain 16: License Audit -> Local Reviewer
@@ -1425,7 +1772,10 @@ console.log('\n--- Chain 16: License Audit -> Local Reviewer ---');
 test('license-auditor scans project then local-reviewer produces valid output', () => {
   // Step 1: Run license-auditor on the project root
   const auditEnv = runAndParse('license-auditor/scripts/audit.cjs', `--dir "${rootDir}"`);
-  assert(auditEnv.skill === 'license-auditor', `Expected skill "license-auditor", got "${auditEnv.skill}"`);
+  assert(
+    auditEnv.skill === 'license-auditor',
+    `Expected skill "license-auditor", got "${auditEnv.skill}"`
+  );
   assert(Array.isArray(auditEnv.data.packages), 'License auditor should return packages array');
   assert(auditEnv.data.packages.length > 0, 'License auditor should find at least one package');
   assert(auditEnv.data.summary !== undefined, 'License auditor should return summary');
@@ -1441,13 +1791,22 @@ test('license-auditor scans project then local-reviewer produces valid output', 
 
   // Step 3: Run local-reviewer (reviews staged git changes)
   const reviewEnv = runAndParse('local-reviewer/scripts/review.cjs', '');
-  assert(reviewEnv.skill === 'local-reviewer', `Expected skill "local-reviewer", got "${reviewEnv.skill}"`);
+  assert(
+    reviewEnv.skill === 'local-reviewer',
+    `Expected skill "local-reviewer", got "${reviewEnv.skill}"`
+  );
   assert(reviewEnv.status === 'success', 'Local reviewer should return success status');
   assert(typeof reviewEnv.data === 'object', 'Local reviewer should return data object');
-  assert(typeof reviewEnv.metadata.duration_ms === 'number', 'Local reviewer should have duration_ms');
+  assert(
+    typeof reviewEnv.metadata.duration_ms === 'number',
+    'Local reviewer should have duration_ms'
+  );
 
   // Step 4: Verify both skills produce valid envelope metadata
-  for (const [name, env] of [['license-auditor', auditEnv], ['local-reviewer', reviewEnv]]) {
+  for (const [name, env] of [
+    ['license-auditor', auditEnv],
+    ['local-reviewer', reviewEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1464,33 +1823,49 @@ test('harvest knowledge from project then optimize SKILL.md prompt', () => {
   // Step 1: Create a temp project directory with package.json and README.md
   const harvestDir = path.join(tmpDir, 'chain17_project');
   if (!fs.existsSync(harvestDir)) fs.mkdirSync(harvestDir, { recursive: true });
-  fs.writeFileSync(path.join(harvestDir, 'package.json'), JSON.stringify({
-    name: 'chain17-sample',
-    version: '1.0.0',
-    description: 'A sample project for knowledge harvesting',
-    dependencies: { express: '^4.18.0', lodash: '^4.17.21' },
-    devDependencies: { jest: '^29.0.0' },
-    scripts: { test: 'jest', start: 'node index.js' }
-  }, null, 2));
-  fs.writeFileSync(path.join(harvestDir, 'README.md'), [
-    '# Chain17 Sample Project',
-    '',
-    'A Node.js API service built with Express.',
-    '',
-    '## Usage',
-    '',
-    'Run npm start to launch the server.',
-  ].join('\n'));
+  fs.writeFileSync(
+    path.join(harvestDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'chain17-sample',
+        version: '1.0.0',
+        description: 'A sample project for knowledge harvesting',
+        dependencies: { express: '^4.18.0', lodash: '^4.17.21' },
+        devDependencies: { jest: '^29.0.0' },
+        scripts: { test: 'jest', start: 'node index.js' },
+      },
+      null,
+      2
+    )
+  );
+  fs.writeFileSync(
+    path.join(harvestDir, 'README.md'),
+    [
+      '# Chain17 Sample Project',
+      '',
+      'A Node.js API service built with Express.',
+      '',
+      '## Usage',
+      '',
+      'Run npm start to launch the server.',
+    ].join('\n')
+  );
 
   // Step 2: Run knowledge-harvester
-  const harvestEnv = runAndParse('knowledge-harvester/scripts/harvest.cjs', `--dir "${harvestDir}"`);
-  assert(harvestEnv.skill === 'knowledge-harvester', `Expected skill "knowledge-harvester", got "${harvestEnv.skill}"`);
+  const harvestEnv = runAndParse(
+    'knowledge-harvester/scripts/harvest.cjs',
+    `--dir "${harvestDir}"`
+  );
+  assert(
+    harvestEnv.skill === 'knowledge-harvester',
+    `Expected skill "knowledge-harvester", got "${harvestEnv.skill}"`
+  );
   assert(harvestEnv.data.directory !== undefined, 'Harvest should return directory');
   assert(harvestEnv.data.projectName !== undefined, 'Harvest should return projectName');
   assert(harvestEnv.data.fileCount > 0, 'Harvest should find files');
   assert(
     (harvestEnv.data.techStack && harvestEnv.data.techStack.length > 0) ||
-    (harvestEnv.data.patterns && harvestEnv.data.patterns.length > 0),
+      (harvestEnv.data.patterns && harvestEnv.data.patterns.length > 0),
     'Harvest should detect tech stack or patterns'
   );
   assert(typeof harvestEnv.data.summary === 'string', 'Harvest should return a summary string');
@@ -1529,17 +1904,26 @@ test('harvest knowledge from project then optimize SKILL.md prompt', () => {
 
   // Step 4: Run prompt-optimizer on the SKILL.md file
   const optimizerEnv = runAndParse('prompt-optimizer/scripts/optimize.cjs', `-i "${skillMdFile}"`);
-  assert(optimizerEnv.skill === 'prompt-optimizer', `Expected skill "prompt-optimizer", got "${optimizerEnv.skill}"`);
+  assert(
+    optimizerEnv.skill === 'prompt-optimizer',
+    `Expected skill "prompt-optimizer", got "${optimizerEnv.skill}"`
+  );
   assert(typeof optimizerEnv.data.score === 'number', 'Optimizer should return a score');
   assert(optimizerEnv.data.score >= 0, 'Score should be non-negative');
   assert(typeof optimizerEnv.data.maxScore === 'number', 'Optimizer should return maxScore');
   assert(Array.isArray(optimizerEnv.data.checks), 'Optimizer should return checks array');
   assert(optimizerEnv.data.checks.length > 0, 'Should have at least one check');
   assert(Array.isArray(optimizerEnv.data.suggestions), 'Optimizer should return suggestions array');
-  assert(typeof optimizerEnv.metadata.duration_ms === 'number', 'Optimizer should have duration_ms');
+  assert(
+    typeof optimizerEnv.metadata.duration_ms === 'number',
+    'Optimizer should have duration_ms'
+  );
 
   // Step 5: Verify both skills produce consistent envelope structure
-  for (const [name, env] of [['knowledge-harvester', harvestEnv], ['prompt-optimizer', optimizerEnv]]) {
+  for (const [name, env] of [
+    ['knowledge-harvester', harvestEnv],
+    ['prompt-optimizer', optimizerEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1559,20 +1943,41 @@ test('curate dataset then extract text from markdown document', () => {
     { id: 2, name: '', category: 'software', price: null },
     { id: 3, name: 'Gadget Gamma', category: 'hardware', price: 49.99 },
     { id: 4, name: 'Service Delta', category: 'service', price: 99.99 },
-    { id: 5, name: null, category: '', price: 0 }
+    { id: 5, name: null, category: '', price: 0 },
   ];
   const datasetFile = writeTemp('chain18_dataset.json', JSON.stringify(datasetContent, null, 2));
 
   // Step 2: Run dataset-curator on the JSON dataset
-  const curateEnv = runAndParse('dataset-curator/scripts/curate.cjs', `-i "${datasetFile}" -f json`);
-  assert(curateEnv.skill === 'dataset-curator', `Expected skill "dataset-curator", got "${curateEnv.skill}"`);
+  const curateEnv = runAndParse(
+    'dataset-curator/scripts/curate.cjs',
+    `-i "${datasetFile}" -f json`
+  );
+  assert(
+    curateEnv.skill === 'dataset-curator',
+    `Expected skill "dataset-curator", got "${curateEnv.skill}"`
+  );
   assert(curateEnv.data.inputFile !== undefined, 'Curator should return inputFile');
-  assert(curateEnv.data.format === 'json', `Expected format "json", got "${curateEnv.data.format}"`);
-  assert(typeof curateEnv.data.originalRecords === 'number', 'Curator should return originalRecords count');
-  assert(curateEnv.data.originalRecords === 5, `Expected 5 original records, got ${curateEnv.data.originalRecords}`);
-  assert(typeof curateEnv.data.cleanedRecords === 'number', 'Curator should return cleanedRecords count');
+  assert(
+    curateEnv.data.format === 'json',
+    `Expected format "json", got "${curateEnv.data.format}"`
+  );
+  assert(
+    typeof curateEnv.data.originalRecords === 'number',
+    'Curator should return originalRecords count'
+  );
+  assert(
+    curateEnv.data.originalRecords === 5,
+    `Expected 5 original records, got ${curateEnv.data.originalRecords}`
+  );
+  assert(
+    typeof curateEnv.data.cleanedRecords === 'number',
+    'Curator should return cleanedRecords count'
+  );
   assert(curateEnv.data.qualityReport !== undefined, 'Curator should return qualityReport');
-  assert(typeof curateEnv.data.qualityReport.nulls === 'number', 'Quality report should have nulls count');
+  assert(
+    typeof curateEnv.data.qualityReport.nulls === 'number',
+    'Quality report should have nulls count'
+  );
   assert(curateEnv.data.qualityReport.nulls > 0, 'Should detect null values in the dataset');
   assert(typeof curateEnv.metadata.duration_ms === 'number', 'Curator should have duration_ms');
 
@@ -1601,18 +2006,39 @@ test('curate dataset then extract text from markdown document', () => {
   const extractMatch = extractRaw.match(/\{[\s\S]*\}/);
   assert(extractMatch !== null, 'doc-to-text output should contain JSON');
   const extractEnv = JSON.parse(extractMatch[0]);
-  assert(extractEnv.status === 'success', `doc-to-text should succeed: ${JSON.stringify(extractEnv.error)}`);
-  assert(extractEnv.skill === 'doc-to-text', `Expected skill "doc-to-text", got "${extractEnv.skill}"`);
+  assert(
+    extractEnv.status === 'success',
+    `doc-to-text should succeed: ${JSON.stringify(extractEnv.error)}`
+  );
+  assert(
+    extractEnv.skill === 'doc-to-text',
+    `Expected skill "doc-to-text", got "${extractEnv.skill}"`
+  );
   assert(extractEnv.data.filePath !== undefined, 'Extract should return filePath');
-  assert(extractEnv.data.format === '.md', `Expected format ".md", got "${extractEnv.data.format}"`);
+  assert(
+    extractEnv.data.format === '.md',
+    `Expected format ".md", got "${extractEnv.data.format}"`
+  );
   assert(typeof extractEnv.data.contentLength === 'number', 'Extract should return contentLength');
   assert(extractEnv.data.contentLength > 0, 'Extracted content length should be positive');
-  assert(extractEnv.data.content.includes('Dataset Quality Report'), 'Extracted text should contain the report title');
-  assert(extractEnv.data.content.includes('Recommendations'), 'Extracted text should contain Recommendations section');
-  assert(typeof extractEnv.metadata.duration_ms === 'number', 'doc-to-text should have duration_ms');
+  assert(
+    extractEnv.data.content.includes('Dataset Quality Report'),
+    'Extracted text should contain the report title'
+  );
+  assert(
+    extractEnv.data.content.includes('Recommendations'),
+    'Extracted text should contain Recommendations section'
+  );
+  assert(
+    typeof extractEnv.metadata.duration_ms === 'number',
+    'doc-to-text should have duration_ms'
+  );
 
   // Step 5: Verify both skills produce consistent envelope structure
-  for (const [name, env] of [['dataset-curator', curateEnv], ['doc-to-text', extractEnv]]) {
+  for (const [name, env] of [
+    ['dataset-curator', curateEnv],
+    ['doc-to-text', extractEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1627,18 +2053,38 @@ console.log('\n--- Chain 19: Operational Runbook -> Sequence Mapper ---');
 
 test('generate deploy runbook then map sequences from code-like output', () => {
   // Step 1: Run operational-runbook-generator with --service test --type deploy
-  const runbookEnv = runAndParse('operational-runbook-generator/scripts/generate.cjs', '--service test-api --type deploy');
-  assert(runbookEnv.skill === 'operational-runbook-generator',
-    `Expected skill "operational-runbook-generator", got "${runbookEnv.skill}"`);
-  assert(runbookEnv.data.service === 'test-api', `Expected service "test-api", got "${runbookEnv.data.service}"`);
-  assert(runbookEnv.data.type === 'deploy', `Expected type "deploy", got "${runbookEnv.data.type}"`);
+  const runbookEnv = runAndParse(
+    'operational-runbook-generator/scripts/generate.cjs',
+    '--service test-api --type deploy'
+  );
+  assert(
+    runbookEnv.skill === 'operational-runbook-generator',
+    `Expected skill "operational-runbook-generator", got "${runbookEnv.skill}"`
+  );
+  assert(
+    runbookEnv.data.service === 'test-api',
+    `Expected service "test-api", got "${runbookEnv.data.service}"`
+  );
+  assert(
+    runbookEnv.data.type === 'deploy',
+    `Expected type "deploy", got "${runbookEnv.data.type}"`
+  );
   assert(typeof runbookEnv.data.markdown === 'string', 'Runbook should return markdown string');
   assert(runbookEnv.data.markdown.length > 0, 'Runbook markdown should not be empty');
-  assert(runbookEnv.data.markdown.includes('# Deploy Runbook'), 'Runbook should contain deploy heading');
-  assert(runbookEnv.data.markdown.includes('test-api'), 'Runbook should reference the service name');
+  assert(
+    runbookEnv.data.markdown.includes('# Deploy Runbook'),
+    'Runbook should contain deploy heading'
+  );
+  assert(
+    runbookEnv.data.markdown.includes('test-api'),
+    'Runbook should reference the service name'
+  );
   assert(Array.isArray(runbookEnv.data.sections), 'Runbook should return sections array');
   assert(runbookEnv.data.sections.length > 0, 'Runbook should have at least one section');
-  assert(typeof runbookEnv.metadata.duration_ms === 'number', 'Runbook generator should have duration_ms');
+  assert(
+    typeof runbookEnv.metadata.duration_ms === 'number',
+    'Runbook generator should have duration_ms'
+  );
 
   // Step 2: Create a temp file with code-like content derived from the runbook
   // sequence-mapper detects function definitions and function calls
@@ -1661,21 +2107,45 @@ test('generate deploy runbook then map sequences from code-like output', () => {
 
   // Step 3: Run sequence-mapper on the code-like file
   const sequenceEnv = runAndParse('sequence-mapper/scripts/map.cjs', `-i "${sequenceFile}"`);
-  assert(sequenceEnv.skill === 'sequence-mapper', `Expected skill "sequence-mapper", got "${sequenceEnv.skill}"`);
-  assert(typeof sequenceEnv.data.content === 'string', 'Sequence mapper should return content string');
-  assert(sequenceEnv.data.content.includes('sequenceDiagram'), 'Output should contain mermaid sequenceDiagram');
+  assert(
+    sequenceEnv.skill === 'sequence-mapper',
+    `Expected skill "sequence-mapper", got "${sequenceEnv.skill}"`
+  );
+  assert(
+    typeof sequenceEnv.data.content === 'string',
+    'Sequence mapper should return content string'
+  );
+  assert(
+    sequenceEnv.data.content.includes('sequenceDiagram'),
+    'Output should contain mermaid sequenceDiagram'
+  );
   assert(sequenceEnv.data.content.includes('autonumber'), 'Output should contain autonumber');
   // Verify it detected the function calls
-  assert(sequenceEnv.data.content.includes('deployPipeline'), 'Should detect deployPipeline as caller');
+  assert(
+    sequenceEnv.data.content.includes('deployPipeline'),
+    'Should detect deployPipeline as caller'
+  );
   assert(sequenceEnv.data.content.includes('pullRelease'), 'Should detect pullRelease call');
-  assert(sequenceEnv.data.content.includes('runHealthChecks'), 'Should detect runHealthChecks call');
+  assert(
+    sequenceEnv.data.content.includes('runHealthChecks'),
+    'Should detect runHealthChecks call'
+  );
   assert(sequenceEnv.data.content.includes('deployVersion'), 'Should detect deployVersion call');
-  assert(sequenceEnv.data.content.includes('rollbackProcedure'), 'Should detect rollbackProcedure as caller');
+  assert(
+    sequenceEnv.data.content.includes('rollbackProcedure'),
+    'Should detect rollbackProcedure as caller'
+  );
   assert(sequenceEnv.data.content.includes('revertVersion'), 'Should detect revertVersion call');
-  assert(typeof sequenceEnv.metadata.duration_ms === 'number', 'Sequence mapper should have duration_ms');
+  assert(
+    typeof sequenceEnv.metadata.duration_ms === 'number',
+    'Sequence mapper should have duration_ms'
+  );
 
   // Step 4: Verify both skills produce consistent envelope structure
-  for (const [name, env] of [['operational-runbook-generator', runbookEnv], ['sequence-mapper', sequenceEnv]]) {
+  for (const [name, env] of [
+    ['operational-runbook-generator', runbookEnv],
+    ['sequence-mapper', sequenceEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1716,35 +2186,57 @@ test('asset-token-economist analyzes file then quality-scorer assesses same cont
 
   // Step 2: Run asset-token-economist to get token count and cost estimates
   const tokenEnv = runAndParse('asset-token-economist/scripts/analyze.cjs', `-i "${docFile}"`);
-  assert(tokenEnv.skill === 'asset-token-economist', `Expected skill "asset-token-economist", got "${tokenEnv.skill}"`);
+  assert(
+    tokenEnv.skill === 'asset-token-economist',
+    `Expected skill "asset-token-economist", got "${tokenEnv.skill}"`
+  );
   assert(typeof tokenEnv.data.inputChars === 'number', 'Token economist should return inputChars');
   assert(tokenEnv.data.inputChars > 0, 'Input chars should be positive');
-  assert(typeof tokenEnv.data.estimatedTokens === 'number', 'Token economist should return estimatedTokens');
+  assert(
+    typeof tokenEnv.data.estimatedTokens === 'number',
+    'Token economist should return estimatedTokens'
+  );
   assert(tokenEnv.data.estimatedTokens > 0, 'Estimated tokens should be positive');
   assert(typeof tokenEnv.data.lineCount === 'number', 'Token economist should return lineCount');
   assert(tokenEnv.data.lineCount > 0, 'Line count should be positive');
   assert(tokenEnv.data.costEstimate !== undefined, 'Token economist should return costEstimate');
   assert(tokenEnv.data.costEstimate.gpt4 !== undefined, 'Cost estimate should include gpt4');
   assert(tokenEnv.data.costEstimate.claude !== undefined, 'Cost estimate should include claude');
-  assert(typeof tokenEnv.metadata.duration_ms === 'number', 'Token economist should have duration_ms');
+  assert(
+    typeof tokenEnv.metadata.duration_ms === 'number',
+    'Token economist should have duration_ms'
+  );
 
   // Step 3: Run quality-scorer on the same file for overall assessment
   const qualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${docFile}"`);
-  assert(qualityEnv.skill === 'quality-scorer', `Expected skill "quality-scorer", got "${qualityEnv.skill}"`);
+  assert(
+    qualityEnv.skill === 'quality-scorer',
+    `Expected skill "quality-scorer", got "${qualityEnv.skill}"`
+  );
   assert(typeof qualityEnv.data.score === 'number', 'Quality score should be a number');
-  assert(qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
-    `Quality score should be 0-100, got ${qualityEnv.data.score}`);
+  assert(
+    qualityEnv.data.score >= 0 && qualityEnv.data.score <= 100,
+    `Quality score should be 0-100, got ${qualityEnv.data.score}`
+  );
   assert(qualityEnv.data.metrics !== undefined, 'Quality scorer should return metrics');
   assert(qualityEnv.data.metrics.charCount > 0, 'Char count should be positive');
-  assert(typeof qualityEnv.metadata.duration_ms === 'number', 'Quality scorer should have duration_ms');
+  assert(
+    typeof qualityEnv.metadata.duration_ms === 'number',
+    'Quality scorer should have duration_ms'
+  );
 
   // Step 4: Cross-validate that both skills agree on content size
   // Token economist's inputChars and quality scorer's charCount should match
-  assert(tokenEnv.data.inputChars === qualityEnv.data.metrics.charCount,
-    `Token economist inputChars (${tokenEnv.data.inputChars}) should match quality scorer charCount (${qualityEnv.data.metrics.charCount})`);
+  assert(
+    tokenEnv.data.inputChars === qualityEnv.data.metrics.charCount,
+    `Token economist inputChars (${tokenEnv.data.inputChars}) should match quality scorer charCount (${qualityEnv.data.metrics.charCount})`
+  );
 
   // Step 5: Verify consistent envelope structure
-  for (const [name, env] of [['asset-token-economist', tokenEnv], ['quality-scorer', qualityEnv]]) {
+  for (const [name, env] of [
+    ['asset-token-economist', tokenEnv],
+    ['quality-scorer', qualityEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1759,11 +2251,17 @@ test('asset-token-economist recommendations vary by input size', () => {
 
   const smallTokenEnv = runAndParse('asset-token-economist/scripts/analyze.cjs', `-i "${smallFile}"`);
   assert(smallTokenEnv.data.estimatedTokens > 0, 'Small file should still have tokens');
-  assert(Array.isArray(smallTokenEnv.data.recommendations), 'Token economist should return recommendations array');
+  assert(
+    Array.isArray(smallTokenEnv.data.recommendations),
+    'Token economist should return recommendations array'
+  );
 
   // Score the small file's quality too
   const smallQualityEnv = runAndParse('quality-scorer/scripts/score.cjs', `-i "${smallFile}"`);
-  assert(typeof smallQualityEnv.data.score === 'number', 'Quality score for small file should be a number');
+  assert(
+    typeof smallQualityEnv.data.score === 'number',
+    'Quality score for small file should be a number'
+  );
   // Very short content (under 50 chars) should trigger a quality deduction
   assert(smallQualityEnv.data.metrics.charCount < 50, 'Small file should be under 50 chars');
 });
@@ -1779,37 +2277,55 @@ test('bug-predictor identifies hotspots then release-note-crafter generates note
   if (!fs.existsSync(bugDir)) fs.mkdirSync(bugDir, { recursive: true });
 
   const srcFile1 = path.join(bugDir, 'server.js');
-  fs.writeFileSync(srcFile1, [
-    'const http = require("http");',
-    'const server = http.createServer((req, res) => {',
-    '  res.writeHead(200);',
-    '  res.end("ok");',
-    '});',
-    'module.exports = server;'
-  ].join('\n'));
+  fs.writeFileSync(
+    srcFile1,
+    [
+      'const http = require("http");',
+      'const server = http.createServer((req, res) => {',
+      '  res.writeHead(200);',
+      '  res.end("ok");',
+      '});',
+      'module.exports = server;',
+    ].join('\n')
+  );
 
   const srcFile2 = path.join(bugDir, 'utils.js');
-  fs.writeFileSync(srcFile2, [
-    'function validate(input) {',
-    '  if (!input) throw new Error("missing");',
-    '  return input.trim();',
-    '}',
-    'module.exports = { validate };'
-  ].join('\n'));
+  fs.writeFileSync(
+    srcFile2,
+    [
+      'function validate(input) {',
+      '  if (!input) throw new Error("missing");',
+      '  return input.trim();',
+      '}',
+      'module.exports = { validate };',
+    ].join('\n')
+  );
 
   // Initialize git repo and create commit history for churn analysis
   execSync('git init', { cwd: bugDir, stdio: 'pipe' });
   execSync('git add -A', { cwd: bugDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "feat: initial server and utils"', { cwd: bugDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "feat: initial server and utils"',
+    { cwd: bugDir, stdio: 'pipe' }
+  );
 
   // Add more changes to create churn
   fs.writeFileSync(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// fix: handle errors\n');
   execSync('git add -A', { cwd: bugDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "fix: add error handling to server"', { cwd: bugDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "fix: add error handling to server"',
+    { cwd: bugDir, stdio: 'pipe' }
+  );
 
-  fs.writeFileSync(srcFile2, fs.readFileSync(srcFile2, 'utf8') + '\n// refactor: improved validation\n');
+  fs.writeFileSync(
+    srcFile2,
+    fs.readFileSync(srcFile2, 'utf8') + '\n// refactor: improved validation\n'
+  );
   execSync('git add -A', { cwd: bugDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "refactor: improve input validation"', { cwd: bugDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "refactor: improve input validation"',
+    { cwd: bugDir, stdio: 'pipe' }
+  );
 
   // Step 2: Run bug-predictor on the small repo
   const bugEnv = runAndParse('bug-predictor/scripts/predict.cjs', `-d "${bugDir}" -n 5`);
@@ -1818,25 +2334,52 @@ test('bug-predictor identifies hotspots then release-note-crafter generates note
   assert(Array.isArray(bugEnv.data.hotspots), 'Bug predictor should return hotspots array');
   assert(bugEnv.data.riskSummary !== undefined, 'Bug predictor should return risk summary');
   assert(typeof bugEnv.data.riskSummary.high === 'number', 'Risk summary should have high count');
-  assert(typeof bugEnv.data.riskSummary.medium === 'number', 'Risk summary should have medium count');
+  assert(
+    typeof bugEnv.data.riskSummary.medium === 'number',
+    'Risk summary should have medium count'
+  );
   assert(typeof bugEnv.data.riskSummary.low === 'number', 'Risk summary should have low count');
-  assert(typeof bugEnv.data.totalFilesAnalyzed === 'number', 'Bug predictor should report totalFilesAnalyzed');
+  assert(
+    typeof bugEnv.data.totalFilesAnalyzed === 'number',
+    'Bug predictor should report totalFilesAnalyzed'
+  );
   assert(bugEnv.data.recommendation !== undefined, 'Bug predictor should include a recommendation');
   assert(typeof bugEnv.metadata.duration_ms === 'number', 'Bug predictor should have duration_ms');
 
   // Step 3: Run release-note-crafter on the same repo
-  const releaseEnv = runAndParse('release-note-crafter/scripts/main.cjs', `-d "${bugDir}" -s "2020-01-01"`);
-  assert(releaseEnv.skill === 'release-note-crafter', `Expected skill "release-note-crafter", got "${releaseEnv.skill}"`);
-  assert(typeof releaseEnv.data.commits === 'number', 'Release note crafter should return commit count');
+  const releaseEnv = runAndParse(
+    'release-note-crafter/scripts/main.cjs',
+    `-d "${bugDir}" -s "2020-01-01"`
+  );
+  assert(
+    releaseEnv.skill === 'release-note-crafter',
+    `Expected skill "release-note-crafter", got "${releaseEnv.skill}"`
+  );
+  assert(
+    typeof releaseEnv.data.commits === 'number',
+    'Release note crafter should return commit count'
+  );
   assert(releaseEnv.data.commits > 0, 'Should find commits in the repo');
   assert(releaseEnv.data.sections !== undefined, 'Release note crafter should return sections');
-  assert(typeof releaseEnv.data.markdown === 'string', 'Release note crafter should return markdown string');
+  assert(
+    typeof releaseEnv.data.markdown === 'string',
+    'Release note crafter should return markdown string'
+  );
   assert(releaseEnv.data.markdown.length > 0, 'Release notes markdown should not be empty');
-  assert(releaseEnv.data.markdown.includes('Release Notes'), 'Release notes should contain heading');
-  assert(typeof releaseEnv.metadata.duration_ms === 'number', 'Release note crafter should have duration_ms');
+  assert(
+    releaseEnv.data.markdown.includes('Release Notes'),
+    'Release notes should contain heading'
+  );
+  assert(
+    typeof releaseEnv.metadata.duration_ms === 'number',
+    'Release note crafter should have duration_ms'
+  );
 
   // Step 4: Verify both envelopes have consistent structure
-  for (const [name, env] of [['bug-predictor', bugEnv], ['release-note-crafter', releaseEnv]]) {
+  for (const [name, env] of [
+    ['bug-predictor', bugEnv],
+    ['release-note-crafter', releaseEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1848,13 +2391,17 @@ test('release-note-crafter sections reflect commit message prefixes', () => {
   // The chain21 repo was set up in the previous test with feat:, fix:, and refactor: commits
   const bugDir = path.join(tmpDir, 'chain21_repo');
   if (fs.existsSync(bugDir)) {
-    const releaseEnv = runAndParse('release-note-crafter/scripts/main.cjs', `-d "${bugDir}" -s "2020-01-01"`);
+    const releaseEnv = runAndParse(
+      'release-note-crafter/scripts/main.cjs',
+      `-d "${bugDir}" -s "2020-01-01"`
+    );
     assert(releaseEnv.data.commits === 3, `Expected 3 commits, got ${releaseEnv.data.commits}`);
     // Verify that conventional commit prefixes were parsed into sections
     const sections = releaseEnv.data.sections;
     assert(sections !== undefined, 'Should have sections object');
     // At least Features or Bug Fixes or Refactoring should have entries
-    const totalCategorized = (sections.Features || 0) + (sections['Bug Fixes'] || 0) + (sections.Refactoring || 0);
+    const totalCategorized =
+      (sections.Features || 0) + (sections['Bug Fixes'] || 0) + (sections.Refactoring || 0);
     assert(totalCategorized > 0, 'Should have categorized at least one commit by prefix');
   } else {
     assert(false, 'chain21_repo directory not found - previous test may have failed');
@@ -1871,35 +2418,56 @@ test('encoding-detector verifies file encoding then data-transformer converts fo
   const jsonData = {
     title: 'International Menu',
     items: [
-      { id: 1, name: 'Croissant', origin: 'France', price: 3.50 },
-      { id: 2, name: 'Sushi', origin: 'Japan', price: 12.00 },
-      { id: 3, name: 'Tacos', origin: 'Mexico', price: 8.50 }
+      { id: 1, name: 'Croissant', origin: 'France', price: 3.5 },
+      { id: 2, name: 'Sushi', origin: 'Japan', price: 12.0 },
+      { id: 3, name: 'Tacos', origin: 'Mexico', price: 8.5 },
     ],
-    currency: 'USD'
+    currency: 'USD',
   };
   const jsonFile = writeTemp('chain22_menu.json', JSON.stringify(jsonData, null, 2));
 
   // Step 2: Run encoding-detector to verify the file encoding
   const encodingEnv = runAndParse('encoding-detector/scripts/detect.cjs', `-i "${jsonFile}"`);
-  assert(encodingEnv.skill === 'encoding-detector', `Expected skill "encoding-detector", got "${encodingEnv.skill}"`);
+  assert(
+    encodingEnv.skill === 'encoding-detector',
+    `Expected skill "encoding-detector", got "${encodingEnv.skill}"`
+  );
   assert(encodingEnv.data.encoding !== undefined, 'Encoding detector should return encoding');
   assert(encodingEnv.data.confidence > 0, 'Encoding confidence should be positive');
   assert(encodingEnv.data.lineEnding !== undefined, 'Encoding detector should report line ending');
-  assert(typeof encodingEnv.metadata.duration_ms === 'number', 'Encoding detector should have duration_ms');
+  assert(
+    typeof encodingEnv.metadata.duration_ms === 'number',
+    'Encoding detector should have duration_ms'
+  );
 
   // Step 3: Since encoding is valid, transform the JSON to YAML
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${jsonFile}" -t yaml`);
-  assert(transformEnv.skill === 'data-transformer', `Expected skill "data-transformer", got "${transformEnv.skill}"`);
-  assert(transformEnv.data.format === 'yaml', `Expected format "yaml", got "${transformEnv.data.format}"`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${jsonFile}" -t yaml`
+  );
+  assert(
+    transformEnv.skill === 'data-transformer',
+    `Expected skill "data-transformer", got "${transformEnv.skill}"`
+  );
+  assert(
+    transformEnv.data.format === 'yaml',
+    `Expected format "yaml", got "${transformEnv.data.format}"`
+  );
   assert(typeof transformEnv.data.content === 'string', 'Transformer should return content string');
   assert(transformEnv.data.content.includes('International Menu'), 'YAML should contain the title');
   assert(transformEnv.data.content.includes('Croissant'), 'YAML should contain first item name');
   assert(transformEnv.data.content.includes('Sushi'), 'YAML should contain second item name');
   assert(transformEnv.data.content.includes('Tacos'), 'YAML should contain third item name');
-  assert(typeof transformEnv.metadata.duration_ms === 'number', 'Data transformer should have duration_ms');
+  assert(
+    typeof transformEnv.metadata.duration_ms === 'number',
+    'Data transformer should have duration_ms'
+  );
 
   // Step 4: Verify consistent envelope structure
-  for (const [name, env] of [['encoding-detector', encodingEnv], ['data-transformer', transformEnv]]) {
+  for (const [name, env] of [
+    ['encoding-detector', encodingEnv],
+    ['data-transformer', transformEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -1914,12 +2482,21 @@ test('encoding-detector detects LF line endings then data-transformer preserves 
 
   // Step 2: Detect encoding and verify LF line endings
   const encodingEnv = runAndParse('encoding-detector/scripts/detect.cjs', `-i "${csvFile}"`);
-  assert(encodingEnv.data.lineEnding === 'LF', `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`);
+  assert(
+    encodingEnv.data.lineEnding === 'LF',
+    `Expected LF line ending, got "${encodingEnv.data.lineEnding}"`
+  );
   assert(encodingEnv.data.confidence > 0, 'Should have positive confidence');
 
   // Step 3: Transform CSV to JSON
-  const transformEnv = runAndParse('data-transformer/scripts/transform.cjs', `-i "${csvFile}" -t json`);
-  assert(transformEnv.data.format === 'json', `Expected format "json", got "${transformEnv.data.format}"`);
+  const transformEnv = runAndParse(
+    'data-transformer/scripts/transform.cjs',
+    `-i "${csvFile}" -t json`
+  );
+  assert(
+    transformEnv.data.format === 'json',
+    `Expected format "json", got "${transformEnv.data.format}"`
+  );
 
   // Step 4: Verify the JSON output preserves all CSV data
   const parsedJson = JSON.parse(transformEnv.data.content);
@@ -1981,30 +2558,48 @@ test('refactoring-engine finds smells then code-lang-detector confirms language'
 
   // Step 2: Run refactoring-engine to find code smells
   const refactorEnv = runAndParse('refactoring-engine/scripts/analyze.cjs', `-i "${jsFile}"`);
-  assert(refactorEnv.skill === 'refactoring-engine', `Expected skill "refactoring-engine", got "${refactorEnv.skill}"`);
+  assert(
+    refactorEnv.skill === 'refactoring-engine',
+    `Expected skill "refactoring-engine", got "${refactorEnv.skill}"`
+  );
   assert(typeof refactorEnv.data === 'object', 'Refactoring engine should return data');
   assert(refactorEnv.data.file !== undefined, 'Refactoring engine should report the analyzed file');
   assert(Array.isArray(refactorEnv.data.smells), 'Refactoring engine should return smells array');
-  assert(refactorEnv.data.smells.length > 0, 'Should find code smells in the intentionally smelly code');
+  assert(
+    refactorEnv.data.smells.length > 0,
+    'Should find code smells in the intentionally smelly code'
+  );
   assert(refactorEnv.data.summary !== undefined, 'Refactoring engine should return summary');
   assert(typeof refactorEnv.data.summary.total === 'number', 'Summary should have total count');
   assert(refactorEnv.data.summary.total > 0, 'Total smells should be positive');
-  assert(typeof refactorEnv.metadata.duration_ms === 'number', 'Refactoring engine should have duration_ms');
+  assert(
+    typeof refactorEnv.metadata.duration_ms === 'number',
+    'Refactoring engine should have duration_ms'
+  );
 
   // Verify at least one magic-number smell was found
-  const magicSmells = refactorEnv.data.smells.filter(s => s.type === 'magic-number');
+  const magicSmells = refactorEnv.data.smells.filter((s) => s.type === 'magic-number');
   assert(magicSmells.length > 0, 'Should find at least one magic-number smell');
 
   // Step 3: Run code-lang-detector on the same file to confirm language
   const langEnv = runAndParse('code-lang-detector/scripts/detect.cjs', `-i "${jsFile}"`);
-  assert(langEnv.skill === 'code-lang-detector', `Expected skill "code-lang-detector", got "${langEnv.skill}"`);
+  assert(
+    langEnv.skill === 'code-lang-detector',
+    `Expected skill "code-lang-detector", got "${langEnv.skill}"`
+  );
   assert(langEnv.data.lang === 'javascript', `Expected "javascript", got "${langEnv.data.lang}"`);
   assert(langEnv.data.confidence === 1.0, 'Should have full confidence for .js extension');
   assert(langEnv.data.method === 'extension', 'Should use extension-based detection for .js file');
-  assert(typeof langEnv.metadata.duration_ms === 'number', 'Code lang detector should have duration_ms');
+  assert(
+    typeof langEnv.metadata.duration_ms === 'number',
+    'Code lang detector should have duration_ms'
+  );
 
   // Step 4: Verify both envelopes have consistent structure
-  for (const [name, env] of [['refactoring-engine', refactorEnv], ['code-lang-detector', langEnv]]) {
+  for (const [name, env] of [
+    ['refactoring-engine', refactorEnv],
+    ['code-lang-detector', langEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2053,7 +2648,10 @@ test('refactoring-engine results and code-lang-detector agree on Python code via
   assert(langEnv.data.confidence > 0, 'Confidence should be positive');
 
   // Step 4: Verify both envelopes
-  for (const [name, env] of [['refactoring-engine', refactorEnv], ['code-lang-detector', langEnv]]) {
+  for (const [name, env] of [
+    ['refactoring-engine', refactorEnv],
+    ['code-lang-detector', langEnv],
+  ]) {
     assert(env.status === 'success', `${name}: should succeed`);
     assert(env.skill === name, `${name}: skill field should match`);
     assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2072,28 +2670,47 @@ test('pr-architect generates PR data then release-note-crafter generates notes f
   if (!fs.existsSync(prDir)) fs.mkdirSync(prDir, { recursive: true });
 
   const appFile = path.join(prDir, 'app.js');
-  fs.writeFileSync(appFile, [
-    'const express = require("express");',
-    'const app = express();',
-    'app.get("/", (req, res) => res.send("hello"));',
-    'module.exports = app;'
-  ].join('\n'));
+  fs.writeFileSync(
+    appFile,
+    [
+      'const express = require("express");',
+      'const app = express();',
+      'app.get("/", (req, res) => res.send("hello"));',
+      'module.exports = app;',
+    ].join('\n')
+  );
 
   const configFile = path.join(prDir, 'config.json');
   fs.writeFileSync(configFile, JSON.stringify({ port: 3000, env: 'development' }, null, 2));
 
   execSync('git init', { cwd: prDir, stdio: 'pipe' });
   execSync('git add -A', { cwd: prDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "feat: add express app with config"', { cwd: prDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "feat: add express app with config"',
+    { cwd: prDir, stdio: 'pipe' }
+  );
 
   // Add a second commit to create diff history
-  fs.writeFileSync(appFile, fs.readFileSync(appFile, 'utf8') + '\n// fix: handle 404\napp.use((req, res) => res.status(404).send("not found"));\n');
+  fs.writeFileSync(
+    appFile,
+    fs.readFileSync(appFile, 'utf8') +
+      '\n// fix: handle 404\napp.use((req, res) => res.status(404).send("not found"));\n'
+  );
   execSync('git add -A', { cwd: prDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "fix: add 404 handler"', { cwd: prDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "fix: add 404 handler"',
+    { cwd: prDir, stdio: 'pipe' }
+  );
 
-  fs.writeFileSync(configFile, JSON.stringify({ port: 3000, env: 'production', debug: false }, null, 2));
+  fs.writeFileSync(
+    configFile,
+    JSON.stringify({ port: 3000, env: 'production', debug: false }, null, 2)
+  );
   execSync('git add -A', { cwd: prDir, stdio: 'pipe' });
-  execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "chore: update config for production"', { cwd: prDir, stdio: 'pipe' });
+  execSync(
+    'git -c user.email="test@test.com" -c user.name="Test" commit -m "chore: update config for production"',
+    { cwd: prDir, stdio: 'pipe' }
+  );
 
   // Step 2: Run pr-architect to generate PR data
   const prEnv = runAndParse('pr-architect/scripts/draft.cjs', `-d "${prDir}"`);
@@ -2102,32 +2719,60 @@ test('pr-architect generates PR data then release-note-crafter generates notes f
   assert(prEnv.data.title.length > 0, 'PR title should not be empty');
   assert(typeof prEnv.data.description === 'string', 'PR architect should return a description');
   assert(Array.isArray(prEnv.data.commits), 'PR architect should return commits array');
-  assert(prEnv.data.commits.length >= 3, `Expected at least 3 commits, got ${prEnv.data.commits.length}`);
+  assert(
+    prEnv.data.commits.length >= 3,
+    `Expected at least 3 commits, got ${prEnv.data.commits.length}`
+  );
   assert(typeof prEnv.metadata.duration_ms === 'number', 'PR architect should have duration_ms');
 
   // Step 3: Run release-note-crafter on the same repo
-  const releaseEnv = runAndParse('release-note-crafter/scripts/main.cjs', `-d "${prDir}" -s "2020-01-01"`);
-  assert(releaseEnv.skill === 'release-note-crafter', `Expected skill "release-note-crafter", got "${releaseEnv.skill}"`);
-  assert(typeof releaseEnv.data.commits === 'number', 'Release note crafter should return commit count');
+  const releaseEnv = runAndParse(
+    'release-note-crafter/scripts/main.cjs',
+    `-d "${prDir}" -s "2020-01-01"`
+  );
+  assert(
+    releaseEnv.skill === 'release-note-crafter',
+    `Expected skill "release-note-crafter", got "${releaseEnv.skill}"`
+  );
+  assert(
+    typeof releaseEnv.data.commits === 'number',
+    'Release note crafter should return commit count'
+  );
   assert(releaseEnv.data.commits === 3, `Expected 3 commits, got ${releaseEnv.data.commits}`);
-  assert(typeof releaseEnv.data.markdown === 'string', 'Release note crafter should return markdown');
-  assert(releaseEnv.data.markdown.includes('Release Notes'), 'Release notes should contain heading');
-  assert(typeof releaseEnv.metadata.duration_ms === 'number', 'Release note crafter should have duration_ms');
+  assert(
+    typeof releaseEnv.data.markdown === 'string',
+    'Release note crafter should return markdown'
+  );
+  assert(
+    releaseEnv.data.markdown.includes('Release Notes'),
+    'Release notes should contain heading'
+  );
+  assert(
+    typeof releaseEnv.metadata.duration_ms === 'number',
+    'Release note crafter should have duration_ms'
+  );
 
   // Step 4: Verify cross-skill consistency: both analyzed same commit history
   const prCommitCount = prEnv.data.commits.length;
   const releaseCommitCount = releaseEnv.data.commits;
-  assert(prCommitCount >= releaseCommitCount, 'PR architect should see at least as many commits as release-note-crafter');
+  assert(
+    prCommitCount >= releaseCommitCount,
+    'PR architect should see at least as many commits as release-note-crafter'
+  );
 });
 
 test('release-note-crafter sections reflect conventional prefixes from pr-architect commits', () => {
   const prDir = path.join(tmpDir, 'chain24_repo');
   if (fs.existsSync(prDir)) {
-    const releaseEnv = runAndParse('release-note-crafter/scripts/main.cjs', `-d "${prDir}" -s "2020-01-01"`);
+    const releaseEnv = runAndParse(
+      'release-note-crafter/scripts/main.cjs',
+      `-d "${prDir}" -s "2020-01-01"`
+    );
     const sections = releaseEnv.data.sections;
     assert(sections !== undefined, 'Should have sections object');
     // The repo has feat:, fix:, and chore: commits
-    const totalCategorized = (sections.Features || 0) + (sections['Bug Fixes'] || 0) + (sections.Chores || 0);
+    const totalCategorized =
+      (sections.Features || 0) + (sections['Bug Fixes'] || 0) + (sections.Chores || 0);
     assert(totalCategorized === 3, `Expected 3 categorized commits, got ${totalCategorized}`);
     assert((sections.Features || 0) >= 1, 'Should have at least 1 feature');
     assert((sections['Bug Fixes'] || 0) >= 1, 'Should have at least 1 bug fix');
@@ -2140,8 +2785,14 @@ test('pr-architect and release-note-crafter envelopes have consistent structure'
   const prDir = path.join(tmpDir, 'chain24_repo');
   if (fs.existsSync(prDir)) {
     const prEnv = runAndParse('pr-architect/scripts/draft.cjs', `-d "${prDir}"`);
-    const releaseEnv = runAndParse('release-note-crafter/scripts/main.cjs', `-d "${prDir}" -s "2020-01-01"`);
-    for (const [name, env] of [['pr-architect', prEnv], ['release-note-crafter', releaseEnv]]) {
+    const releaseEnv = runAndParse(
+      'release-note-crafter/scripts/main.cjs',
+      `-d "${prDir}" -s "2020-01-01"`
+    );
+    for (const [name, env] of [
+      ['pr-architect', prEnv],
+      ['release-note-crafter', releaseEnv],
+    ]) {
       assert(env.status === 'success', `${name}: should succeed`);
       assert(env.skill === name, `${name}: skill field should match`);
       assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2162,56 +2813,108 @@ test('onboarding-wizard generates docs then project-health-check audits the same
   const projDir = path.join(tmpDir, 'chain25_project');
   if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
 
-  fs.writeFileSync(path.join(projDir, 'package.json'), JSON.stringify({
-    name: 'chain25-test-project',
-    version: '1.0.0',
-    scripts: { test: 'jest', dev: 'node server.js', lint: 'eslint .' },
-    devDependencies: { jest: '^29.0.0', eslint: '^8.0.0' }
-  }, null, 2));
+  fs.writeFileSync(
+    path.join(projDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'chain25-test-project',
+        version: '1.0.0',
+        scripts: { test: 'jest', dev: 'node server.js', lint: 'eslint .' },
+        devDependencies: { jest: '^29.0.0', eslint: '^8.0.0' },
+      },
+      null,
+      2
+    )
+  );
 
-  fs.writeFileSync(path.join(projDir, 'README.md'), '# Chain 25 Test Project\nA project for testing skill chains.');
-  fs.writeFileSync(path.join(projDir, 'server.js'), 'const http = require("http");\nhttp.createServer((req, res) => res.end("ok")).listen(3000);');
+  fs.writeFileSync(
+    path.join(projDir, 'README.md'),
+    '# Chain 25 Test Project\nA project for testing skill chains.'
+  );
+  fs.writeFileSync(
+    path.join(projDir, 'server.js'),
+    'const http = require("http");\nhttp.createServer((req, res) => res.end("ok")).listen(3000);'
+  );
 
   // Add CI config for health check
   const workflowDir = path.join(projDir, '.github', 'workflows');
   fs.mkdirSync(workflowDir, { recursive: true });
-  fs.writeFileSync(path.join(workflowDir, 'ci.yml'), 'name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n');
+  fs.writeFileSync(
+    path.join(workflowDir, 'ci.yml'),
+    'name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n'
+  );
 
   // Step 2: Run onboarding-wizard on the project
   const onboardEnv = runAndParse('onboarding-wizard/scripts/generate.cjs', `-d "${projDir}"`);
-  assert(onboardEnv.skill === 'onboarding-wizard', `Expected skill "onboarding-wizard", got "${onboardEnv.skill}"`);
-  assert(typeof onboardEnv.data.projectName === 'string', 'Onboarding wizard should return project name');
-  assert(onboardEnv.data.projectName === 'chain25-test-project', `Expected project name "chain25-test-project", got "${onboardEnv.data.projectName}"`);
-  assert(Array.isArray(onboardEnv.data.prerequisites), 'Onboarding wizard should return prerequisites array');
+  assert(
+    onboardEnv.skill === 'onboarding-wizard',
+    `Expected skill "onboarding-wizard", got "${onboardEnv.skill}"`
+  );
+  assert(
+    typeof onboardEnv.data.projectName === 'string',
+    'Onboarding wizard should return project name'
+  );
+  assert(
+    onboardEnv.data.projectName === 'chain25-test-project',
+    `Expected project name "chain25-test-project", got "${onboardEnv.data.projectName}"`
+  );
+  assert(
+    Array.isArray(onboardEnv.data.prerequisites),
+    'Onboarding wizard should return prerequisites array'
+  );
   assert(onboardEnv.data.prerequisites.length > 0, 'Should have at least one prerequisite');
   assert(Array.isArray(onboardEnv.data.setupSteps), 'Onboarding wizard should return setup steps');
   assert(onboardEnv.data.setupSteps.length > 0, 'Should have at least one setup step');
   assert(Array.isArray(onboardEnv.data.keyFiles), 'Onboarding wizard should return key files');
-  assert(typeof onboardEnv.data.quickStart === 'string', 'Onboarding wizard should return quickStart markdown');
-  assert(onboardEnv.data.quickStart.includes('chain25-test-project'), 'Quick start should mention project name');
-  assert(typeof onboardEnv.metadata.duration_ms === 'number', 'Onboarding wizard should have duration_ms');
+  assert(
+    typeof onboardEnv.data.quickStart === 'string',
+    'Onboarding wizard should return quickStart markdown'
+  );
+  assert(
+    onboardEnv.data.quickStart.includes('chain25-test-project'),
+    'Quick start should mention project name'
+  );
+  assert(
+    typeof onboardEnv.metadata.duration_ms === 'number',
+    'Onboarding wizard should have duration_ms'
+  );
 
   // Step 3: Run project-health-check on the same directory
   // project-health-check reads from process.cwd(), so we must run it with the correct cwd
   const healthCmd = `node "${path.join(rootDir, 'project-health-check/scripts/audit.cjs')}"`;
   const healthRaw = execSync(healthCmd, { encoding: 'utf8', cwd: projDir, timeout: 15000 });
   const healthEnv = JSON.parse(healthRaw);
-  assert(healthEnv.status === 'success', `Project health check failed: ${JSON.stringify(healthEnv.error)}`);
-  assert(healthEnv.skill === 'project-health-check', `Expected skill "project-health-check", got "${healthEnv.skill}"`);
+  assert(
+    healthEnv.status === 'success',
+    `Project health check failed: ${JSON.stringify(healthEnv.error)}`
+  );
+  assert(
+    healthEnv.skill === 'project-health-check',
+    `Expected skill "project-health-check", got "${healthEnv.skill}"`
+  );
   assert(typeof healthEnv.data.score === 'number', 'Health check should return a score');
-  assert(healthEnv.data.score >= 0 && healthEnv.data.score <= 100, 'Score should be between 0 and 100');
+  assert(
+    healthEnv.data.score >= 0 && healthEnv.data.score <= 100,
+    'Score should be between 0 and 100'
+  );
   assert(typeof healthEnv.data.grade === 'string', 'Health check should return a grade');
   assert(Array.isArray(healthEnv.data.checks), 'Health check should return checks array');
   assert(healthEnv.data.checks.length > 0, 'Should have at least one check');
-  assert(typeof healthEnv.metadata.duration_ms === 'number', 'Health check should have duration_ms');
+  assert(
+    typeof healthEnv.metadata.duration_ms === 'number',
+    'Health check should have duration_ms'
+  );
 
   // Step 4: Verify field relationships between skills
   // Onboarding wizard found README.md as a key file; health check should detect documentation
-  const hasReadmeInKeyFiles = onboardEnv.data.keyFiles.some(kf => kf.file === 'README.md');
+  const hasReadmeInKeyFiles = onboardEnv.data.keyFiles.some((kf) => kf.file === 'README.md');
   assert(hasReadmeInKeyFiles, 'Onboarding wizard should identify README.md as a key file');
-  const docsCheck = healthEnv.data.checks.find(c => c.check === 'Documentation');
+  const docsCheck = healthEnv.data.checks.find((c) => c.check === 'Documentation');
   assert(docsCheck !== undefined, 'Health check should have a Documentation check');
-  assert(docsCheck.status === 'found', 'Documentation check should be "found" since README.md exists');
+  assert(
+    docsCheck.status === 'found',
+    'Documentation check should be "found" since README.md exists'
+  );
 });
 
 test('onboarding-wizard prerequisites and health-check detected tools are consistent', () => {
@@ -2224,16 +2927,22 @@ test('onboarding-wizard prerequisites and health-check detected tools are consis
     const healthEnv = JSON.parse(healthRaw);
 
     // Both skills should recognize the testing framework (jest in package.json)
-    const testCheck = healthEnv.data.checks.find(c => c.check === 'Testing Framework');
+    const testCheck = healthEnv.data.checks.find((c) => c.check === 'Testing Framework');
     assert(testCheck !== undefined, 'Health check should have a Testing Framework check');
-    assert(testCheck.status === 'found', 'Testing Framework should be found (jest in devDependencies)');
+    assert(
+      testCheck.status === 'found',
+      'Testing Framework should be found (jest in devDependencies)'
+    );
 
     // Onboarding wizard should list npm test in setup steps
-    const hasTestStep = onboardEnv.data.setupSteps.some(s => s.includes('npm test'));
+    const hasTestStep = onboardEnv.data.setupSteps.some((s) => s.includes('npm test'));
     assert(hasTestStep, 'Onboarding wizard should include "npm test" in setup steps');
 
     // Verify both envelopes
-    for (const [name, env] of [['onboarding-wizard', onboardEnv], ['project-health-check', healthEnv]]) {
+    for (const [name, env] of [
+      ['onboarding-wizard', onboardEnv],
+      ['project-health-check', healthEnv],
+    ]) {
       assert(env.status === 'success', `${name}: should succeed`);
       assert(env.skill === name, `${name}: skill field should match`);
       assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2255,44 +2964,64 @@ test('cloud-waste-hunter detects waste then cloud-cost-estimator prices the infr
   if (!fs.existsSync(cloudDir)) fs.mkdirSync(cloudDir, { recursive: true });
 
   const tfFile = path.join(cloudDir, 'main.tf');
-  fs.writeFileSync(tfFile, [
-    'resource "aws_instance" "web" {',
-    '  ami           = "ami-0c55b159cbfafe1f0"',
-    '  instance_type = "m5.4xlarge"',
-    '  tags = {',
-    '    Name = "production-web"',
-    '  }',
-    '}',
-    '',
-    'resource "aws_instance" "worker" {',
-    '  ami           = "ami-0c55b159cbfafe1f0"',
-    '  instance_type = "c5.9xlarge"',
-    '  tags = {',
-    '    Name = "batch-worker"',
-    '  }',
-    '}',
-    '',
-    'resource "aws_ebs_volume" "data" {',
-    '  availability_zone = "us-east-1a"',
-    '  size              = 500',
-    '}',
-  ].join('\n'));
+  fs.writeFileSync(
+    tfFile,
+    [
+      'resource "aws_instance" "web" {',
+      '  ami           = "ami-0c55b159cbfafe1f0"',
+      '  instance_type = "m5.4xlarge"',
+      '  tags = {',
+      '    Name = "production-web"',
+      '  }',
+      '}',
+      '',
+      'resource "aws_instance" "worker" {',
+      '  ami           = "ami-0c55b159cbfafe1f0"',
+      '  instance_type = "c5.9xlarge"',
+      '  tags = {',
+      '    Name = "batch-worker"',
+      '  }',
+      '}',
+      '',
+      'resource "aws_ebs_volume" "data" {',
+      '  availability_zone = "us-east-1a"',
+      '  size              = 500',
+      '}',
+    ].join('\n')
+  );
 
   // Step 2: Run cloud-waste-hunter to detect waste patterns
   const wasteEnv = runAndParse('cloud-waste-hunter/scripts/hunt.cjs', `-d "${cloudDir}"`);
-  assert(wasteEnv.skill === 'cloud-waste-hunter', `Expected skill "cloud-waste-hunter", got "${wasteEnv.skill}"`);
+  assert(
+    wasteEnv.skill === 'cloud-waste-hunter',
+    `Expected skill "cloud-waste-hunter", got "${wasteEnv.skill}"`
+  );
   assert(Array.isArray(wasteEnv.data.findings), 'Waste hunter should return findings array');
-  assert(wasteEnv.data.findings.length > 0, 'Should find waste patterns in oversized infrastructure');
+  assert(
+    wasteEnv.data.findings.length > 0,
+    'Should find waste patterns in oversized infrastructure'
+  );
   assert(typeof wasteEnv.data.wasteScore === 'number', 'Waste hunter should return wasteScore');
   assert(wasteEnv.data.wasteScore > 0, 'Waste score should be positive for oversized instances');
-  assert(wasteEnv.data.totalFiles === 1, `Expected 1 file scanned, got ${wasteEnv.data.totalFiles}`);
-  assert(Array.isArray(wasteEnv.data.recommendations), 'Waste hunter should return recommendations');
+  assert(
+    wasteEnv.data.totalFiles === 1,
+    `Expected 1 file scanned, got ${wasteEnv.data.totalFiles}`
+  );
+  assert(
+    Array.isArray(wasteEnv.data.recommendations),
+    'Waste hunter should return recommendations'
+  );
   assert(wasteEnv.data.recommendations.length > 0, 'Should have at least one recommendation');
 
   // Verify specific waste findings
-  const oversizedFindings = wasteEnv.data.findings.filter(f => f.type === 'oversized-instance');
-  assert(oversizedFindings.length >= 2, `Expected at least 2 oversized-instance findings, got ${oversizedFindings.length}`);
-  const autoscalingFindings = wasteEnv.data.findings.filter(f => f.type === 'missing-autoscaling');
+  const oversizedFindings = wasteEnv.data.findings.filter((f) => f.type === 'oversized-instance');
+  assert(
+    oversizedFindings.length >= 2,
+    `Expected at least 2 oversized-instance findings, got ${oversizedFindings.length}`
+  );
+  const autoscalingFindings = wasteEnv.data.findings.filter(
+    (f) => f.type === 'missing-autoscaling'
+  );
   assert(autoscalingFindings.length >= 1, 'Should detect missing autoscaling');
 
   // Step 3: Create a cloud-cost-estimator config derived from the waste findings
@@ -2301,21 +3030,45 @@ test('cloud-waste-hunter detects waste then cloud-cost-estimator prices the infr
       { name: 'web-server', type: 'compute', provider: 'aws', size: 'xlarge', count: 1 },
       { name: 'batch-worker', type: 'compute', provider: 'aws', size: 'xlarge', count: 1 },
       { name: 'data-volume', type: 'storage', provider: 'aws', size: 'large', count: 1 },
-    ]
+    ],
   };
   const costConfigFile = writeTemp('chain26_cost_config.json', JSON.stringify(costConfig, null, 2));
 
   // Step 4: Run cloud-cost-estimator on the derived config
-  const costEnv = runAndParse('cloud-cost-estimator/scripts/estimate.cjs', `-i "${costConfigFile}"`);
-  assert(costEnv.skill === 'cloud-cost-estimator', `Expected skill "cloud-cost-estimator", got "${costEnv.skill}"`);
+  const costEnv = runAndParse(
+    'cloud-cost-estimator/scripts/estimate.cjs',
+    `-i "${costConfigFile}"`
+  );
+  assert(
+    costEnv.skill === 'cloud-cost-estimator',
+    `Expected skill "cloud-cost-estimator", got "${costEnv.skill}"`
+  );
   assert(Array.isArray(costEnv.data.services), 'Cost estimator should return services array');
-  assert(costEnv.data.services.length === 3, `Expected 3 services, got ${costEnv.data.services.length}`);
-  assert(typeof costEnv.data.totalMonthlyCost === 'number', 'Cost estimator should return totalMonthlyCost');
+  assert(
+    costEnv.data.services.length === 3,
+    `Expected 3 services, got ${costEnv.data.services.length}`
+  );
+  assert(
+    typeof costEnv.data.totalMonthlyCost === 'number',
+    'Cost estimator should return totalMonthlyCost'
+  );
   assert(costEnv.data.totalMonthlyCost > 0, 'Total monthly cost should be positive');
-  assert(typeof costEnv.data.totalYearlyCost === 'number', 'Cost estimator should return totalYearlyCost');
-  assert(costEnv.data.totalYearlyCost === costEnv.data.totalMonthlyCost * 12, 'Yearly cost should be 12x monthly');
-  assert(Array.isArray(costEnv.data.recommendations), 'Cost estimator should return recommendations');
-  assert(typeof costEnv.metadata.duration_ms === 'number', 'Cost estimator should have duration_ms');
+  assert(
+    typeof costEnv.data.totalYearlyCost === 'number',
+    'Cost estimator should return totalYearlyCost'
+  );
+  assert(
+    costEnv.data.totalYearlyCost === costEnv.data.totalMonthlyCost * 12,
+    'Yearly cost should be 12x monthly'
+  );
+  assert(
+    Array.isArray(costEnv.data.recommendations),
+    'Cost estimator should return recommendations'
+  );
+  assert(
+    typeof costEnv.metadata.duration_ms === 'number',
+    'Cost estimator should have duration_ms'
+  );
 });
 
 test('waste hunter recommendations align with cost estimator findings', () => {
@@ -2323,16 +3076,27 @@ test('waste hunter recommendations align with cost estimator findings', () => {
   if (fs.existsSync(cloudDir)) {
     const wasteEnv = runAndParse('cloud-waste-hunter/scripts/hunt.cjs', `-d "${cloudDir}"`);
     const costConfigFile = path.join(tmpDir, 'chain26_cost_config.json');
-    const costEnv = runAndParse('cloud-cost-estimator/scripts/estimate.cjs', `-i "${costConfigFile}"`);
+    const costEnv = runAndParse(
+      'cloud-cost-estimator/scripts/estimate.cjs',
+      `-i "${costConfigFile}"`
+    );
 
     // Waste hunter found oversized instances -> cost estimator should recommend reserved/spot instances
-    const hasOversized = wasteEnv.data.findings.some(f => f.type === 'oversized-instance');
+    const hasOversized = wasteEnv.data.findings.some((f) => f.type === 'oversized-instance');
     assert(hasOversized, 'Waste hunter should have found oversized instances');
-    const hasComputeReco = costEnv.data.recommendations.some(r => r.includes('reserved instances') || r.includes('spot instances'));
-    assert(hasComputeReco, 'Cost estimator should recommend reserved/spot instances for large compute');
+    const hasComputeReco = costEnv.data.recommendations.some(
+      (r) => r.includes('reserved instances') || r.includes('spot instances')
+    );
+    assert(
+      hasComputeReco,
+      'Cost estimator should recommend reserved/spot instances for large compute'
+    );
 
     // Verify both envelopes
-    for (const [name, env] of [['cloud-waste-hunter', wasteEnv], ['cloud-cost-estimator', costEnv]]) {
+    for (const [name, env] of [
+      ['cloud-waste-hunter', wasteEnv],
+      ['cloud-cost-estimator', costEnv],
+    ]) {
       assert(env.status === 'success', `${name}: should succeed`);
       assert(env.skill === name, `${name}: skill field should match`);
       assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2368,7 +3132,10 @@ test('log-to-requirement-bridge extracts requirements then issue-to-solution-bri
 
   // Step 2: Run log-to-requirement-bridge to analyze the log
   const logEnv = runAndParse('log-to-requirement-bridge/scripts/analyze.cjs', `-i "${logFile}"`);
-  assert(logEnv.skill === 'log-to-requirement-bridge', `Expected skill "log-to-requirement-bridge", got "${logEnv.skill}"`);
+  assert(
+    logEnv.skill === 'log-to-requirement-bridge',
+    `Expected skill "log-to-requirement-bridge", got "${logEnv.skill}"`
+  );
   assert(typeof logEnv.data.totalLines === 'number', 'Should return totalLines');
   assert(logEnv.data.totalLines === 12, `Expected 12 lines, got ${logEnv.data.totalLines}`);
   assert(typeof logEnv.data.errorCount === 'number', 'Should return errorCount');
@@ -2382,8 +3149,11 @@ test('log-to-requirement-bridge extracts requirements then issue-to-solution-bri
   assert(typeof logEnv.metadata.duration_ms === 'number', 'Should have duration_ms');
 
   // Verify specific patterns were detected
-  const patternCategories = logEnv.data.patterns.map(p => p.pattern);
-  assert(patternCategories.includes('connection-failure'), 'Should detect connection-failure pattern');
+  const patternCategories = logEnv.data.patterns.map((p) => p.pattern);
+  assert(
+    patternCategories.includes('connection-failure'),
+    'Should detect connection-failure pattern'
+  );
   assert(patternCategories.includes('timeout'), 'Should detect timeout pattern');
   assert(patternCategories.includes('memory'), 'Should detect memory pattern');
   assert(patternCategories.includes('database'), 'Should detect database pattern');
@@ -2392,14 +3162,23 @@ test('log-to-requirement-bridge extracts requirements then issue-to-solution-bri
   const topRequirements = logEnv.data.suggestedRequirements.slice(0, 3).join(' ');
   const issueDescription = `Production issues detected: ${topRequirements}`;
 
-  const issueEnv = runAndParse('issue-to-solution-bridge/scripts/solve.cjs', `-d "${issueDescription}"`);
-  assert(issueEnv.skill === 'issue-to-solution-bridge', `Expected skill "issue-to-solution-bridge", got "${issueEnv.skill}"`);
+  const issueEnv = runAndParse(
+    'issue-to-solution-bridge/scripts/solve.cjs',
+    `-d "${issueDescription}"`
+  );
+  assert(
+    issueEnv.skill === 'issue-to-solution-bridge',
+    `Expected skill "issue-to-solution-bridge", got "${issueEnv.skill}"`
+  );
   assert(typeof issueEnv.data.title === 'string', 'Issue bridge should return title');
   assert(issueEnv.data.title.length > 0, 'Issue title should not be empty');
   assert(typeof issueEnv.data.analysis === 'object', 'Issue bridge should return analysis');
   assert(typeof issueEnv.data.analysis.type === 'string', 'Analysis should have a type');
   assert(typeof issueEnv.data.analysis.severity === 'string', 'Analysis should have severity');
-  assert(Array.isArray(issueEnv.data.analysis.suggestedActions), 'Analysis should have suggestedActions');
+  assert(
+    Array.isArray(issueEnv.data.analysis.suggestedActions),
+    'Analysis should have suggestedActions'
+  );
   assert(issueEnv.data.analysis.suggestedActions.length > 0, 'Should suggest at least one action');
   assert(issueEnv.data.dry_run === true, 'Should default to dry-run mode');
   assert(typeof issueEnv.metadata.duration_ms === 'number', 'Issue bridge should have duration_ms');
@@ -2412,17 +3191,29 @@ test('issue-to-solution-bridge classifies log-derived issues as bugs', () => {
 
     // Build issue description from requirements (they mention errors, timeouts, failures)
     const description = logEnv.data.suggestedRequirements.join(' ');
-    const issueEnv = runAndParse('issue-to-solution-bridge/scripts/solve.cjs', `-d "${description}"`);
+    const issueEnv = runAndParse(
+      'issue-to-solution-bridge/scripts/solve.cjs',
+      `-d "${description}"`
+    );
 
     // Because the requirements mention errors, connection failures, timeouts -> should classify as "bug"
-    assert(issueEnv.data.analysis.type === 'bug', `Expected issue type "bug", got "${issueEnv.data.analysis.type}"`);
+    assert(
+      issueEnv.data.analysis.type === 'bug',
+      `Expected issue type "bug", got "${issueEnv.data.analysis.type}"`
+    );
 
     // High error rate with production keywords -> should be critical or medium severity
     const severity = issueEnv.data.analysis.severity;
-    assert(severity === 'critical' || severity === 'medium', `Expected severity "critical" or "medium", got "${severity}"`);
+    assert(
+      severity === 'critical' || severity === 'medium',
+      `Expected severity "critical" or "medium", got "${severity}"`
+    );
 
     // Verify both envelopes
-    for (const [name, env] of [['log-to-requirement-bridge', logEnv], ['issue-to-solution-bridge', issueEnv]]) {
+    for (const [name, env] of [
+      ['log-to-requirement-bridge', logEnv],
+      ['issue-to-solution-bridge', issueEnv],
+    ]) {
       assert(env.status === 'success', `${name}: should succeed`);
       assert(env.skill === name, `${name}: skill field should match`);
       assert(typeof env.metadata === 'object', `${name}: should have metadata`);
@@ -2443,14 +3234,21 @@ test('dependency-lifeline and project-health-check both analyze same project dir
   // Create a test project with package.json
   const projDir = path.join(tmpDir, 'chain28_project');
   if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
-  fs.writeFileSync(path.join(projDir, 'package.json'), JSON.stringify({
-    name: 'chain28-test-project',
-    version: '2.0.0',
-    description: 'Test project for chain 28',
-    dependencies: { express: '^4.18.0' },
-    devDependencies: { jest: '^29.0.0' },
-    scripts: { test: 'jest', start: 'node index.js' },
-  }, null, 2));
+  fs.writeFileSync(
+    path.join(projDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'chain28-test-project',
+        version: '2.0.0',
+        description: 'Test project for chain 28',
+        dependencies: { express: '^4.18.0' },
+        devDependencies: { jest: '^29.0.0' },
+        scripts: { test: 'jest', start: 'node index.js' },
+      },
+      null,
+      2
+    )
+  );
   fs.writeFileSync(path.join(projDir, 'index.js'), 'console.log("hello");\n');
 
   // Step 1: Run dependency-lifeline
@@ -2466,7 +3264,10 @@ test('dependency-lifeline and project-health-check both analyze same project dir
   assert(typeof healthEnv.data === 'object', 'Should return health data');
 
   // Both should agree the project has a package.json
-  assert(lifelineEnv.data.project === 'chain28-test-project', 'Lifeline should detect project name');
+  assert(
+    lifelineEnv.data.project === 'chain28-test-project',
+    'Lifeline should detect project name'
+  );
   assert(lifelineEnv.status === 'success' && healthEnv.status === 'success', 'Both should succeed');
 });
 
@@ -2476,7 +3277,7 @@ test('dependency-lifeline detects all dep sources in chain28 project', () => {
 
   // Should find both dependencies and devDependencies
   assert(lifelineEnv.data.totalDeps === 2, `Expected 2 deps, got ${lifelineEnv.data.totalDeps}`);
-  const depNames = lifelineEnv.data.dependencies.map(d => d.name);
+  const depNames = lifelineEnv.data.dependencies.map((d) => d.name);
   assert(depNames.includes('express'), 'Should find express');
   assert(depNames.includes('jest'), 'Should find jest');
 });
@@ -2495,12 +3296,19 @@ test('test-suite-architect analyzes project then codebase-mapper maps same dir',
   if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir, { recursive: true });
   if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
 
-  fs.writeFileSync(path.join(projDir, 'package.json'), JSON.stringify({
-    name: 'chain29-project',
-    version: '1.0.0',
-    devDependencies: { jest: '^29.0.0' },
-    scripts: { test: 'jest' },
-  }, null, 2));
+  fs.writeFileSync(
+    path.join(projDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'chain29-project',
+        version: '1.0.0',
+        devDependencies: { jest: '^29.0.0' },
+        scripts: { test: 'jest' },
+      },
+      null,
+      2
+    )
+  );
   fs.writeFileSync(path.join(srcDir, 'app.js'), 'module.exports = { greet: () => "hello" };\n');
   fs.writeFileSync(path.join(srcDir, 'utils.js'), 'module.exports = { add: (a, b) => a + b };\n');
   fs.writeFileSync(path.join(testDir, 'app.test.js'), 'test("greet", () => {});\n');
@@ -2532,8 +3340,14 @@ test('test-suite-architect returns strategy and recommendations', () => {
   const archEnv = runAndParse('test-suite-architect/scripts/analyze.cjs', `--dir "${projDir}"`);
 
   assert(typeof archEnv.data.strategy === 'object', 'Should return strategy object');
-  assert(typeof archEnv.data.strategy.recommendedFramework === 'string', 'Should recommend a framework');
-  assert(typeof archEnv.data.strategy.coverageTarget === 'number', 'Should suggest coverage target');
+  assert(
+    typeof archEnv.data.strategy.recommendedFramework === 'string',
+    'Should recommend a framework'
+  );
+  assert(
+    typeof archEnv.data.strategy.coverageTarget === 'number',
+    'Should suggest coverage target'
+  );
   assert(typeof archEnv.data.strategy.estimatedEffort === 'string', 'Should estimate effort');
   assert(Array.isArray(archEnv.data.untested), 'Should return untested array');
 });
@@ -2551,17 +3365,23 @@ test('knowledge-auditor scans dir then sensitivity-detector checks a file from i
 
   // Public file with no sensitive content
   const publicFile = path.join(knDir, 'readme.md');
-  fs.writeFileSync(publicFile, '# Public Documentation\n\nThis is a public readme for the project.\n');
+  fs.writeFileSync(
+    publicFile,
+    '# Public Documentation\n\nThis is a public readme for the project.\n'
+  );
 
   // File with some sensitive-looking content
   const sensitiveFile = path.join(knDir, 'config.txt');
-  fs.writeFileSync(sensitiveFile, [
-    'Database Configuration',
-    'Host: db.internal.example.com',
-    'Password: supersecret123',
-    'API_KEY=sk-1234567890abcdef',
-    'TOKEN=eyJhbGciOiJIUzI1NiJ9.test',
-  ].join('\n'));
+  fs.writeFileSync(
+    sensitiveFile,
+    [
+      'Database Configuration',
+      'Host: db.internal.example.com',
+      'Password: supersecret123',
+      'API_KEY=sk-1234567890abcdef',
+      'TOKEN=eyJhbGciOiJIUzI1NiJ9.test',
+    ].join('\n')
+  );
 
   // Step 1: Run knowledge-auditor on the directory
   const auditEnv = runAndParse('knowledge-auditor/scripts/audit.cjs', `--dir "${knDir}"`);
@@ -2599,11 +3419,16 @@ console.log('\n--- Chain 31: Mission Control Ad-Hoc -> Format Detector ---');
 
 test('mission-control orchestrates format-detector via ad-hoc mode', () => {
   // Create a test file for format detection
-  const jsonFile = writeTemp('chain31_data.json', JSON.stringify({ key: 'value', items: [1, 2, 3] }));
+  const jsonFile = writeTemp(
+    'chain31_data.json',
+    JSON.stringify({ key: 'value', items: [1, 2, 3] })
+  );
 
   // Run mission-control in ad-hoc mode with format-detector
-  const mcEnv = runAndParse('mission-control/scripts/orchestrate.cjs',
-    `--skills "format-detector" --input "${jsonFile}"`);
+  const mcEnv = runAndParse(
+    'mission-control/scripts/orchestrate.cjs',
+    `--skills "format-detector" --input "${jsonFile}"`
+  );
   assert(mcEnv.skill === 'mission-control', 'Should identify as mission-control');
   assert(mcEnv.data.mode === 'sequential', 'Ad-hoc mode should be sequential');
   assert(Array.isArray(mcEnv.data.skillsExecuted), 'Should list executed skills');
@@ -2613,11 +3438,16 @@ test('mission-control orchestrates format-detector via ad-hoc mode', () => {
 });
 
 test('mission-control orchestrates multiple skills sequentially', () => {
-  const sampleFile = writeTemp('chain31_sample.txt', 'Hello world, this is a sample document for testing.');
+  const sampleFile = writeTemp(
+    'chain31_sample.txt',
+    'Hello world, this is a sample document for testing.'
+  );
 
   // Run mission-control with two skills
-  const mcEnv = runAndParse('mission-control/scripts/orchestrate.cjs',
-    `--skills "format-detector,quality-scorer" --input "${sampleFile}"`);
+  const mcEnv = runAndParse(
+    'mission-control/scripts/orchestrate.cjs',
+    `--skills "format-detector,quality-scorer" --input "${sampleFile}"`
+  );
   assert(mcEnv.skill === 'mission-control', 'Should identify as mission-control');
   assert(mcEnv.data.skillsExecuted.length === 2, 'Should execute 2 skills');
   assert(mcEnv.data.results.total === 2, 'Should report 2 total');

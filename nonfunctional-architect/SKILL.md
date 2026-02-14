@@ -13,6 +13,7 @@ last_updated: '2026-02-13'
 # Non-Functional Architect
 
 ## Overview
+
 This skill assists in the **Non-Functional Requirements Definition** phase of system development. It uses the IPA "Non-Functional Requirements Grade 2018" as a knowledge base to interview the user and determine the necessary system service levels.
 
 ## Capabilities
@@ -33,8 +34,10 @@ node scripts/assess.cjs
 ```
 
 ## Resources
+
 - **Knowledge Base**: `assets/requirements.yaml` (Converted from IPA Excel sheet)
 
 ## Knowledge Protocol
+
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
 - References [Availability Best Practices](../knowledge/operations/availability_best_practices.md) for standardizing availability levels and disaster recovery goals.

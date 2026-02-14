@@ -2,26 +2,26 @@ name: Full Quality Gate Pipeline
 description: Comprehensive pre-release validation covering code, security, dependencies, and documentation
 steps:
   - skill: project-health-check
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: health
   - skill: code-lang-detector
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: language
   - skill: quality-scorer
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: quality
   - skill: security-scanner
-    cwd: "{{dir}}"
+    cwd: '{{dir}}'
     output: security
   - skill: bug-predictor
-    args: "--dir \"{{dir}}\" --top 10 --since \"3 months ago\""
+    args: '--dir "{{dir}}" --top 10 --since "3 months ago"'
     output: bugs
   - skill: license-auditor
-    args: "--dir \"{{dir}}\""
+    args: '--dir "{{dir}}"'
     output: licenses
   - skill: refactoring-engine
-    args: "-i \"{{input}}\""
+    args: '-i "{{input}}"'
     output: refactoring
   - skill: html-reporter
-    args: "-i \"$prev.output\" -o \"{{output}}\" -t \"Quality Gate Report\""
+    args: '-i "$prev.output" -o "{{output}}" -t "Quality Gate Report"'
     output: report

@@ -7,6 +7,7 @@ Reference guide for microservices architecture, covering core design patterns, c
 ## 1. Core Microservices Design Patterns
 
 ### API Gateway
+
 A single entry point for all client requests. Routes, aggregates, and transforms requests before forwarding to downstream services.
 
 - **Responsibilities**: Request routing, authentication, rate limiting, response aggregation, protocol translation.
@@ -14,6 +15,7 @@ A single entry point for all client requests. Routes, aggregates, and transforms
 - **Consideration**: Avoid turning the gateway into a monolithic "god service." Keep transformation logic minimal.
 
 ### Circuit Breaker
+
 Prevents cascading failures by stopping requests to a failing service. Transitions through Closed -> Open -> Half-Open states.
 
 ```
@@ -28,6 +30,7 @@ Prevents cascading failures by stopping requests to a failing service. Transitio
 - **Fallback strategies**: Return cached data, default values, or a degraded response when the circuit is open.
 
 ### Saga Pattern
+
 Manages distributed transactions across multiple services using a sequence of local transactions with compensating actions for rollback.
 
 **Choreography-based Saga**: Each service publishes events and listens for events from other services.
@@ -50,12 +53,14 @@ Manages distributed transactions across multiple services using a sequence of lo
 - **Orchestration**: Better for complex flows; provides clear visibility into the saga state.
 
 ### Strangler Fig
+
 Incrementally migrate a monolith to microservices by routing traffic from the old system to new services one feature at a time.
 
 - **Approach**: Place a facade (often the API gateway) in front of the monolith. Redirect routes to new services as they are built.
 - **Advantage**: Reduces risk by avoiding a "big bang" rewrite.
 
 ### Bulkhead
+
 Isolate components so that a failure in one does not cascade to others. Inspired by ship hull compartments.
 
 - **Thread pool isolation**: Assign separate thread pools per downstream dependency.
@@ -67,21 +72,22 @@ Isolate components so that a failure in one does not cascade to others. Inspired
 
 ### Synchronous Communication
 
-| Pattern | Protocol | Use Case | Trade-off |
-|---------|----------|----------|-----------|
-| **REST** | HTTP/JSON | CRUD operations, public APIs | Simple but can create tight coupling |
-| **gRPC** | HTTP/2 + Protobuf | Internal service-to-service, high throughput | Fast binary protocol, requires schema management |
-| **GraphQL** | HTTP/JSON | Client-driven queries, BFF (Backend for Frontend) | Flexible queries but complex server implementation |
+| Pattern     | Protocol          | Use Case                                          | Trade-off                                          |
+| ----------- | ----------------- | ------------------------------------------------- | -------------------------------------------------- |
+| **REST**    | HTTP/JSON         | CRUD operations, public APIs                      | Simple but can create tight coupling               |
+| **gRPC**    | HTTP/2 + Protobuf | Internal service-to-service, high throughput      | Fast binary protocol, requires schema management   |
+| **GraphQL** | HTTP/JSON         | Client-driven queries, BFF (Backend for Frontend) | Flexible queries but complex server implementation |
 
 ### Asynchronous Communication
 
-| Pattern | Mechanism | Use Case | Trade-off |
-|---------|-----------|----------|-----------|
-| **Message Queue** | RabbitMQ, SQS | Task distribution, work queues | Decoupled but adds operational complexity |
-| **Event Streaming** | Kafka, Kinesis | Event sourcing, real-time data pipelines | High throughput, requires event schema management |
-| **Pub/Sub** | SNS, Google Pub/Sub | Fan-out notifications | Loose coupling, eventual consistency |
+| Pattern             | Mechanism           | Use Case                                 | Trade-off                                         |
+| ------------------- | ------------------- | ---------------------------------------- | ------------------------------------------------- |
+| **Message Queue**   | RabbitMQ, SQS       | Task distribution, work queues           | Decoupled but adds operational complexity         |
+| **Event Streaming** | Kafka, Kinesis      | Event sourcing, real-time data pipelines | High throughput, requires event schema management |
+| **Pub/Sub**         | SNS, Google Pub/Sub | Fan-out notifications                    | Loose coupling, eventual consistency              |
 
 ### Communication Guidelines
+
 - **Prefer asynchronous communication** for operations that do not require an immediate response.
 - **Use synchronous calls** only when the client needs an immediate result (e.g., user-facing reads).
 - **Define clear API contracts**: Use OpenAPI for REST, Protobuf for gRPC, and AsyncAPI for event-driven interfaces.
@@ -91,9 +97,9 @@ Isolate components so that a failure in one does not cascade to others. Inspired
 ```javascript
 // Idempotent message handler example
 async function handleOrderEvent(event) {
-  const existing = await db.query(
-    'SELECT id FROM processed_events WHERE event_id = $1', [event.id]
-  );
+  const existing = await db.query('SELECT id FROM processed_events WHERE event_id = $1', [
+    event.id,
+  ]);
   if (existing.rows.length > 0) return; // Already processed
 
   await db.transaction(async (tx) => {
@@ -108,12 +114,14 @@ async function handleOrderEvent(event) {
 ## 3. Data Management in Microservices
 
 ### Database per Service
+
 Each microservice owns its database. No service directly accesses another service's database.
 
 - **Benefits**: Independent schema evolution, technology freedom (SQL vs NoSQL per service), independent scaling.
 - **Challenge**: Cross-service queries require API composition or event-driven synchronization.
 
 ### CQRS (Command Query Responsibility Segregation)
+
 Separate the read model from the write model. Commands modify state; queries read from optimized views.
 
 - **Write side**: Processes commands, validates business rules, persists events.
@@ -121,12 +129,14 @@ Separate the read model from the write model. Commands modify state; queries rea
 - **Use when**: Read and write workloads have significantly different scaling or modeling requirements.
 
 ### Event Sourcing
+
 Persist state changes as an immutable sequence of events rather than mutable records.
 
 - **Benefits**: Complete audit trail, ability to reconstruct state at any point in time, natural fit for event-driven architectures.
 - **Challenges**: Increased storage, eventual consistency, event schema evolution.
 
 ### Data Consistency Strategies
+
 - **Strong consistency**: Use distributed transactions (2PC) only when absolutely necessary (rare in microservices).
 - **Eventual consistency**: Accept temporary inconsistency; use sagas and compensation for cross-service operations.
 - **Conflict resolution**: Use last-writer-wins, vector clocks, or domain-specific merge logic depending on requirements.
@@ -155,12 +165,14 @@ Persist state changes as an immutable sequence of events rather than mutable rec
 - **Recommendation**: Use platform-provided discovery (Kubernetes Services, cloud DNS) when available. It reduces operational overhead and integrates with health checks.
 
 ### Load Balancing Strategies
+
 - **Round Robin**: Distributes requests evenly. Simple but ignores instance health and capacity.
 - **Least Connections**: Routes to the instance with the fewest active connections. Better for variable-latency workloads.
 - **Weighted**: Assigns weights based on instance capacity. Useful during canary deployments.
 - **Consistent Hashing**: Routes based on a request attribute (e.g., user ID). Provides session affinity and cache locality.
 
 ### Health Checks
+
 - **Liveness probes**: Detect deadlocked or crashed services. Restart the instance on failure.
 - **Readiness probes**: Detect services that are not yet ready to accept traffic. Remove from load balancer until ready.
 - **Startup probes**: Allow slow-starting services time to initialize before liveness checks begin.
@@ -220,6 +232,7 @@ logger.info(log);
 - **USE method**: Utilization, Saturation, Errors -- for infrastructure resources.
 
 ### Alerting in Microservices
+
 - **Service-level objectives (SLOs)**: Define target reliability (e.g., 99.9% availability, p99 latency under 200ms).
 - **Error budgets**: Track remaining error budget. Slow down deployments when budget is low.
 - **Alert on SLO burn rate**: Trigger alerts when the error budget is being consumed faster than expected.

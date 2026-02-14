@@ -6,16 +6,18 @@ const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
 const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
 const { validateFilePath } = require('../../scripts/lib/validators.cjs');
 
-const argv = createStandardYargs()
-    .option('title', { alias: 'title', type: 'string', default: 'Report' })
-    .argv;
+const argv = createStandardYargs().option('title', {
+  alias: 'title',
+  type: 'string',
+  default: 'Report',
+}).argv;
 
 runSkill('html-reporter', () => {
-    const inputPath = validateFilePath(argv.input, 'input markdown');
-    const md = fs.readFileSync(inputPath, 'utf8');
-    const body = marked.parse(md);
+  const inputPath = validateFilePath(argv.input, 'input markdown');
+  const md = fs.readFileSync(inputPath, 'utf8');
+  const body = marked.parse(md);
 
-    const html = `
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -36,6 +38,6 @@ runSkill('html-reporter', () => {
 </body>
 </html>`;
 
-    safeWriteFile(argv.out, html);
-    return { output: argv.out, title: argv.title, size: html.length };
+  safeWriteFile(argv.out, html);
+  return { output: argv.out, title: argv.title, size: html.length };
 });

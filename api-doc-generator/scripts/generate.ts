@@ -68,7 +68,7 @@ export function parseRoutes(openApiObj: Record<string, unknown>): ApiEndpoint[] 
       if (typeof detail !== 'object' || detail === null) continue;
       const op = detail as Record<string, unknown>;
       const params = Array.isArray(op.parameters)
-        ? (op.parameters as Array<Record<string, unknown>>).map(p => String(p.name ?? ''))
+        ? (op.parameters as Array<Record<string, unknown>>).map((p) => String(p.name ?? ''))
         : undefined;
 
       endpoints.push({
@@ -126,7 +126,7 @@ export function generateDocMarkdown(endpoints: ApiEndpoint[]): string {
  */
 export function buildApiDocOutput(
   result: ApiDocResult,
-  startMs: number,
+  startMs: number
 ): SkillOutput<ApiDocResult> {
   return {
     skill: 'api-doc-generator',

@@ -38,11 +38,36 @@ export interface AuditReport {
 
 // --- Config ---
 const CHECKS: ChecksMap = {
-  ci: { name: 'CI/CD Pipelines', patterns: ['.github/workflows', '.gitlab-ci.yml'], weight: 25, message: 'Automated pipelines ensure safety.' },
-  test: { name: 'Testing Framework', patterns: ['jest.config.*', 'package.json'], weight: 25, message: 'Tests prevent regressions.' },
-  lint: { name: 'Linting & Formatting', patterns: ['.eslintrc*', '.prettierrc*'], weight: 15, message: 'Style analysis reduces bugs.' },
-  iac: { name: 'Containerization & IaC', patterns: ['Dockerfile', 'docker-compose.yml', 'terraform/'], weight: 20, message: 'IaC ensures reproducibility.' },
-  docs: { name: 'Documentation', patterns: ['README.md', 'CONTRIBUTING.md'], weight: 15, message: 'Docs lower onboarding cost.' },
+  ci: {
+    name: 'CI/CD Pipelines',
+    patterns: ['.github/workflows', '.gitlab-ci.yml'],
+    weight: 25,
+    message: 'Automated pipelines ensure safety.',
+  },
+  test: {
+    name: 'Testing Framework',
+    patterns: ['jest.config.*', 'package.json'],
+    weight: 25,
+    message: 'Tests prevent regressions.',
+  },
+  lint: {
+    name: 'Linting & Formatting',
+    patterns: ['.eslintrc*', '.prettierrc*'],
+    weight: 15,
+    message: 'Style analysis reduces bugs.',
+  },
+  iac: {
+    name: 'Containerization & IaC',
+    patterns: ['Dockerfile', 'docker-compose.yml', 'terraform/'],
+    weight: 20,
+    message: 'IaC ensures reproducibility.',
+  },
+  docs: {
+    name: 'Documentation',
+    patterns: ['README.md', 'CONTRIBUTING.md'],
+    weight: 15,
+    message: 'Docs lower onboarding cost.',
+  },
 };
 
 // --- Logic ---
@@ -57,7 +82,7 @@ function deriveGrade(score: number): Grade {
 runSkill('project-health-check', () => {
   const args = requireArgs(['dir']);
   const projectRoot = path.resolve(args.dir);
-  
+
   let totalScore = 0;
   let maxScore = 0;
   const results: CheckResult[] = [];
@@ -78,18 +103,28 @@ runSkill('project-health-check', () => {
 
     if (found) {
       totalScore += config.weight;
-      results.push({ check: config.name, status: 'found', match: matchPath, weight: config.weight });
+      results.push({
+        check: config.name,
+        status: 'found',
+        match: matchPath,
+        weight: config.weight,
+      });
     } else {
-      results.push({ check: config.name, status: 'missing', suggestion: config.message, weight: config.weight });
+      results.push({
+        check: config.name,
+        status: 'missing',
+        suggestion: config.message,
+        weight: config.weight,
+      });
     }
   }
 
   const score = Math.round((totalScore / maxScore) * 100);
-  
+
   return {
     projectRoot,
     score,
     grade: deriveGrade(score),
-    checks: results
+    checks: results,
   };
 });
