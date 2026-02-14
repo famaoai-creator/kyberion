@@ -4,6 +4,9 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  },
   "devDependencies": {
     "@agent/core": "workspace:*"
   },
