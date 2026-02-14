@@ -70,12 +70,14 @@ class MetricsCollector {
         peakRssMB: 0,
         cacheHits: 0,
         cacheMisses: 0,
-        cachePurges: 0
+        cachePurges: 0,
+        recoveries: 0
       };
       this._aggregates.set(skillName, agg);
     }
     agg.count++;
     if (status === 'error') agg.errors++;
+    if (extra.recovered) agg.recoveries++;
     agg.totalMs += durationMs;
     agg.minMs = Math.min(agg.minMs, durationMs);
     agg.maxMs = Math.max(agg.maxMs, durationMs);
@@ -137,7 +139,9 @@ class MetricsCollector {
         peakRssMB: agg.peakRssMB,
         efficiencyScore,
         cacheHitRatio: Math.round(cacheRatio * 100),
-        cachePurges: agg.cachePurges || 0
+        cachePurges: agg.cachePurges || 0,
+        recoveries: agg.recoveries || 0,
+        recoveryRate: agg.count > 0 ? Math.round((agg.recoveries / agg.count) * 1000) / 10 : 0
       });
     }
     return summaries.sort((a, b) => b.executions - a.executions);

@@ -69,12 +69,12 @@ function buildArgs(params) {
  * Execute a single skill step with optional retry logic.
  * @param {string} script - Path to the skill script
  * @param {string} args - CLI arguments string
- * @param {Object} step - Step definition (may include retries, retryDelay)
- * @returns {{ status: string, data?: any, error?: string, attempts: number }}
+ * @param {Object} step - Step definition
+ * @returns {{ status: string, data?: any, error?: string, attempts: number, recovered: boolean }}
  */
 function runStep(script, args, step = {}) {
   const maxAttempts = (step.retries || 0) + 1;
-  const retryDelay = step.retryDelay || 1000;
+  const initialDelay = step.retryDelay || 1000;
   const timeout = step.timeout || 60000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -86,18 +86,34 @@ function runStep(script, args, step = {}) {
       let parsed;
       try { parsed = JSON.parse(output); } catch { parsed = { raw: output.trim() }; }
 
-      return { status: 'success', data: parsed, attempts: attempt };
+      return { status: 'success', data: parsed, attempts: attempt, recovered: attempt > 1 };
     } catch (err) {
-      if (attempt < maxAttempts) {
-        // Synchronous sleep before retry
-        const waitUntil = Date.now() + retryDelay;
-        while (Date.now() < waitUntil) { /* busy wait */ }
+      let parsedError;
+      try { parsedError = JSON.parse(err.stdout || err.message); } catch { parsedError = null; }
+      
+      const isRetryable = parsedError?.error?.retryable || false;
+      const shouldRetry = attempt < maxAttempts && (isRetryable || !parsedError);
+
+      if (shouldRetry) {
+        // Exponential Backoff: delay * 2^(attempt-1)
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        const { logger } = require('./core.cjs');
+        logger.warn(`[Orchestrator] Step failed (retryable: ${isRetryable}). Retrying attempt ${attempt + 1}/${maxAttempts} after ${delay}ms...`);
+        
+        const waitUntil = Date.now() + delay;
+        while (Date.now() < waitUntil) { /* busy wait or sleep replacement */ }
         continue;
       }
-      return { status: 'error', error: err.message, attempts: attempt };
+      
+      return { 
+        status: 'error', 
+        error: parsedError?.error?.message || err.message, 
+        attempts: attempt,
+        recovered: false
+      };
     }
   }
-  return { status: 'error', error: 'Exhausted retries', attempts: maxAttempts };
+  return { status: 'error', error: 'Exhausted retries', attempts: maxAttempts, recovered: false };
 }
 
 /**
@@ -121,6 +137,9 @@ function runPipeline(steps, initialData = {}) {
 
     if (result.status === 'success') {
       prevOutput = result.data?.data || result.data;
+      // Record metric with recovery info
+      const { metrics } = require('./metrics.cjs');
+      metrics.record(step.skill, result.data?.metadata?.duration_ms || 0, 'success', { recovered: result.recovered });
     } else if (!step.continueOnError) {
       break;
     }
