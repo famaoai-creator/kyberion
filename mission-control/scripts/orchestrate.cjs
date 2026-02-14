@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { runSkill } = require('@agent/core');
+const { runSkill, ui } = require('@agent/core');
 const { runPipeline } = require('../../scripts/lib/orchestrator.cjs');
 
 // Improved argument extraction to handle CLI runner artifacts
@@ -47,6 +47,11 @@ function substituteVars(params, vars, prevResults = []) {
 }
 
 runSkill('mission-control', () => {
+  // SRE: Initialize Mission ID for the entire pipeline
+  const missionId = ui.generateMissionId();
+  process.env.MISSION_ID = missionId;
+  console.log(`\x1b[35m[Mission Control] Initialized Mission: ${missionId}\x1b[0m\n`);
+
   if (argv.pipeline) {
     const pipelinePath = path.resolve(argv.pipeline);
     if (!fs.existsSync(pipelinePath)) throw new Error(`Pipeline file not found: ${pipelinePath}`);

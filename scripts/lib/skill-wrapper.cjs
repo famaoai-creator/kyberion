@@ -299,6 +299,7 @@ function buildOutput(skillName, status, dataOrError, startTime) {
       timestamp: new Date().toISOString(),
       role: fileUtils.getCurrentRole(),
       execution_tier: detectTier(process.cwd()), // Current working context tier
+      mission_id: process.env.MISSION_ID || null,
     },
   };
   if (status === 'success') {
