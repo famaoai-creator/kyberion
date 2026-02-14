@@ -9,5 +9,6 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "main": "scripts/simulate.cjs"
 }

@@ -16,5 +16,6 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "main": "scripts/orchestrate.cjs"
 }
