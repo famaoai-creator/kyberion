@@ -21,8 +21,6 @@ const v8 = require('v8');
  * Color-coded console logger.
  * @namespace
  */
-const logger = {
-  /** @param {string} msg - Info message (blue) */
 /**
  * Internal logger with SRE traceability.
  */

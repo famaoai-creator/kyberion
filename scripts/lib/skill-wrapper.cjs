@@ -261,6 +261,7 @@ function _addSuggestion(errorObj, skillName) {
 // --- Human-Readable Format ---
 
 function _getRank(score) {
+  const chalk = require('chalk');
   if (score >= 95) return chalk.bgGreen.bold(' A+ ');
   if (score >= 85) return chalk.green.bold(' A  ');
   if (score >= 70) return chalk.yellow.bold(' B  ');

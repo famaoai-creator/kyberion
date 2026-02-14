@@ -122,18 +122,31 @@ function runCommand() {
   }
 
   const index = loadIndex();
-  const skill = index.skills.find((s) => s.name === skillName);
+  // Support compressed index (s) or legacy (skills)
+  const skills = index.s || index.skills;
+  
+  const skill = skills.find(s => (s.n || s.name) === skillName);
   if (!skill) {
     logger.error(`Skill "${skillName}" not found in index`);
-    const similar = index.skills
-      .filter((s) => s.name.includes(skillName) || skillName.includes(s.name))
-      .map((s) => s.name);
+    const similar = skills
+      .filter(s => (s.n || s.name).includes(skillName) || skillName.includes(s.n || s.name))
+      .map(s => s.n || s.name);
     if (similar.length > 0) logger.info(`Did you mean: ${similar.join(', ')}?`);
     process.exit(1);
   }
 
-  const skillDir = path.join(rootDir, skill.name);
-  const script = findScript(skillDir);
+  const skillNameResolved = skill.n || skill.name;
+  const skillDir = path.join(rootDir, skillNameResolved);
+  
+  // Use pre-resolved main path if available
+  let script = null;
+  const mainPath = skill.m || skill.main;
+  if (mainPath) {
+    const fullPath = path.join(rootDir, skillNameResolved, mainPath);
+    if (fs.existsSync(fullPath)) script = fullPath;
+  }
+  
+  if (!script) script = findScript(skillDir);
   if (!script) {
     logger.error(`Skill "${skillName}" has no runnable scripts (status may be "planned")`);
     process.exit(1);
@@ -143,7 +156,8 @@ function runCommand() {
   const cleanArgs = skillArgs.filter((arg) => arg !== '--');
   const cmd = `node "${script}" ${cleanArgs.map((a) => `"${a}"`).join(' ')}`;
   try {
-    const output = execSync(cmd, { encoding: 'utf8', cwd: rootDir, stdio: 'pipe' });
+    const env = { ...process.env, GEMINI_FORMAT: 'human' };
+    const output = execSync(cmd, { encoding: 'utf8', cwd: rootDir, stdio: 'pipe', env });
     process.stdout.write(output);
   } catch (err) {
     if (err.stdout) process.stdout.write(err.stdout);
@@ -156,52 +170,49 @@ function listCommand() {
   const index = loadIndex();
   const filter = skillName; // optional status filter
 
-  let skills = index.skills;
+  let skills = index.s || index.skills;
   if (filter && ['implemented', 'planned', 'conceptual'].includes(filter)) {
-    skills = skills.filter((s) => s.status === filter);
+    skills = skills.filter(s => (s.s || s.status).startsWith(filter.substring(0, 4)));
   }
 
   // Load metrics for scores
   const { metrics } = require('./lib/metrics.cjs');
   const history = metrics.reportFromHistory();
   const scores = new Map();
-  history.skills.forEach((s) => scores.set(s.skill, s.efficiencyScore));
+  history.skills.forEach(s => scores.set(s.skill, s.efficiencyScore));
 
   // Group by "Domain/Category" (simulated by path prefix or first tag)
   const groups = {};
-  skills.forEach((s) => {
-    // Try to find category from SKILL.md frontmatter or fallback to 'General'
-    const skillMd = path.join(rootDir, s.name, 'SKILL.md');
+  skills.forEach(s => {
+    const name = s.n || s.name;
+    const skillMd = path.join(rootDir, name, 'SKILL.md');
     let category = 'General';
     if (fs.existsSync(skillMd)) {
       const content = fs.readFileSync(skillMd, 'utf8');
       const fm = parseFrontmatter(content);
       if (fm.category) category = fm.category;
     }
-
+    
     if (!groups[category]) groups[category] = [];
     groups[category].push(s);
   });
 
   console.log(`\n${skills.length} skills${filter ? ` (${filter})` : ''} available:\n`);
 
-  Object.keys(groups)
-    .sort()
-    .forEach((cat) => {
-      console.log(chalk.bold.underline(`${cat}:`));
-      groups[cat]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .forEach((s) => {
-          const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
-          const score = scores.get(s.name) || '--';
-          const scoreColor = score !== '--' && score < 70 ? chalk.yellow : chalk.green;
-
-          console.log(
-            `  [${hasScript}] ${s.name.padEnd(30)} ${scoreColor(String(score).padStart(3))} | ${s.description.substring(0, 50)}`
-          );
-        });
-      console.log('');
+  Object.keys(groups).sort().forEach(cat => {
+    console.log(chalk.bold.underline(`${cat}:`));
+    groups[cat].sort((a, b) => (a.n || a.name).localeCompare(b.n || b.name)).forEach(s => {
+      const name = s.n || s.name;
+      const desc = s.d || s.description;
+      // Check pre-resolved or find
+      const hasScript = (s.m || s.main || findScript(path.join(rootDir, name))) ? '+' : ' ';
+      const score = scores.get(name) || '--';
+      const scoreColor = score !== '--' && score < 70 ? chalk.yellow : chalk.green;
+      
+      console.log(`  [${hasScript}] ${name.padEnd(30)} ${scoreColor(String(score).padStart(3))} | ${desc.substring(0, 50)}`);
     });
+    console.log('');
+  });
 
   console.log(`  [+] = runnable | Score: Efficiency (0-100)\n`);
 }
@@ -267,10 +278,12 @@ function searchCommand() {
   }
 
   const index = loadIndex();
+  const skills = index.s || index.skills;
   const lowerKey = keyword.toLowerCase();
 
-  const results = index.skills.filter(
-    (s) => s.name.toLowerCase().includes(lowerKey) || s.description.toLowerCase().includes(lowerKey)
+  const results = skills.filter(s =>
+    (s.n || s.name).toLowerCase().includes(lowerKey) ||
+    (s.d || s.description).toLowerCase().includes(lowerKey)
   );
 
   if (results.length === 0) {
@@ -280,28 +293,28 @@ function searchCommand() {
 
   // Sort: implemented first
   const sorted = results.sort((a, b) => {
-    const aImpl = findScript(path.join(rootDir, a.name)) ? 0 : 1;
-    const bImpl = findScript(path.join(rootDir, b.name)) ? 0 : 1;
+    const aImpl = (a.m || a.main || findScript(path.join(rootDir, a.n || a.name))) ? 0 : 1;
+    const bImpl = (b.m || b.main || findScript(path.join(rootDir, b.n || b.name))) ? 0 : 1;
     return aImpl - bImpl;
   });
 
   console.log(`\n${sorted.length} skills matching "${keyword}":\n`);
 
   for (const s of sorted) {
-    const hasScript = findScript(path.join(rootDir, s.name)) ? '+' : ' ';
-    console.log(`  [${hasScript}] ${s.name.padEnd(35)} ${s.description.substring(0, 60)}`);
+    const name = s.n || s.name;
+    const desc = s.d || s.description;
+    const hasScript = (s.m || s.main || findScript(path.join(rootDir, name))) ? '+' : ' ';
+    console.log(`  [${hasScript}] ${name.padEnd(35)} ${desc.substring(0, 60)}`);
 
     // Show arguments summary from SKILL.md
-    const skillMd = path.join(rootDir, s.name, 'SKILL.md');
+    const skillMd = path.join(rootDir, name, 'SKILL.md');
     if (fs.existsSync(skillMd)) {
       const content = fs.readFileSync(skillMd, 'utf8');
       const fm = parseFrontmatter(content);
       if (Array.isArray(fm.arguments) && fm.arguments.length > 0) {
-        const argStr = fm.arguments
-          .map((a) =>
-            a.positional ? `<${a.name}>` : `--${a.name}${a.required === 'true' ? '*' : ''}`
-          )
-          .join(' ');
+        const argStr = fm.arguments.map(a =>
+          a.positional ? `<${a.name}>` : `--${a.name}${a.required === 'true' ? '*' : ''}`
+        ).join(' ');
         console.log(`       args: ${argStr}`);
       }
     }
@@ -362,3 +375,19 @@ if (args.includes('-h') || args.includes('--help') || !command) {
 }
 
 switch (command) {
+  case 'run':
+    runCommand();
+    break;
+  case 'list':
+    listCommand();
+    break;
+  case 'search':
+    searchCommand();
+    break;
+  case 'info':
+    infoCommand();
+    break;
+  default:
+    showHelp();
+    process.exit(1);
+}
