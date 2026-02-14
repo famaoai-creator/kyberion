@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath, readJsonFile } = require('../../scripts/lib/validators.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { validateFilePath, readJsonFile } = require('@agent/core/validators');
 
 const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true })

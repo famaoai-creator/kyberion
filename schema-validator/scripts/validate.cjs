@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const Ajv = require('ajv');
 const { runSkill } = require('@agent/core');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { readJsonFile } = require('../../scripts/lib/validators.cjs');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { readJsonFile } = require('@agent/core/validators');
 
 const ajv = new Ajv({ allErrors: true });
 const argv = createStandardYargs()

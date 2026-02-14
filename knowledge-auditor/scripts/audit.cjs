@@ -10,8 +10,8 @@ const { runSkill } = require('@agent/core');
 const {
   validateSovereignBoundary,
   validateWritePermission,
-} = require('../../scripts/lib/tier-guard.cjs');
-const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+} = require('@agent/core/tier-guard');
+const { getAllFiles } = require('@agent/core/fs-utils');
 
 runSkill('knowledge-auditor', () => {
   // Robust argument extraction (consistent with updated framework)
@@ -51,7 +51,7 @@ runSkill('knowledge-auditor', () => {
           severity: config.severity_mapping.personal_leak,
         });
       }
-    } catch (e) {
+    } catch (_e) {
       /* Skip binary */
     }
 

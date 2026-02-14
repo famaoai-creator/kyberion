@@ -9,7 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
  * Replaces restricted APIs with safe alternatives and manages imports.
  */
 
-function refactorFile(filePath, skillDir) {
+function refactorFile(filePath, _skillDir) {
   let content = fs.readFileSync(filePath, 'utf8');
   let modified = false;
 

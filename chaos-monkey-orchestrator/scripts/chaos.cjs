@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { runSkill } = require('@agent/core');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 const fs = require('fs');
 const path = require('path');
 

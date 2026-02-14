@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { requireArgs } = require('../../scripts/lib/validators.cjs');
+const { runSkill } = require('@agent/core');
+const { requireArgs } = require('@agent/core/validators');
 
 runSkill('dependency-grapher', () => {
   const args = requireArgs(['dir']);
@@ -44,7 +44,7 @@ runSkill('dependency-grapher', () => {
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Skip non-accessible files
     }
   }

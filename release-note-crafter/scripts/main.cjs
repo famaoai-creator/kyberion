@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateDirPath, requireArgs } = require('../../scripts/lib/validators.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { validateDirPath, requireArgs } = require('@agent/core/validators');
 
 const argv = createStandardYargs()
   .option('dir', {
@@ -70,7 +70,7 @@ runSkill('release-note-crafter', () => {
   let logOutput;
   try {
     logOutput = execSync(gitCmd, { cwd: repoDir, encoding: 'utf8', timeout: 30000 });
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Failed to run git log: ${err.message}`);
   }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 /**
  * investor-readiness-audit: Audits project readiness for fundraising, board meetings, or IPO.
  * Validates documentation, financial data, technical health, and compliance.
@@ -7,8 +7,8 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('dir', {

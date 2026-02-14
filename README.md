@@ -86,7 +86,7 @@ Create your own playbooks in `knowledge/orchestration/mission-playbooks/` follow
 Express your goals in natural language. The system maps trigger phrases to skill chains automatically via [`intent_mapping.yaml`](./knowledge/orchestration/meta-skills/intent_mapping.yaml):
 
 | Intent                       | Trigger Phrases                          | Skill Chain                                                                                                    |
-| ---------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| :--------------------------- | :--------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
 | **Total Security Guarantee** | "audit security", "is this safe?"        | security-scanner → license-auditor → supply-chain-sentinel → post-quantum-shield → red-team-adversary          |
 | **Business Launchpad**       | "new business idea", "launch product"    | competitive-intel-strategist → financial-modeling-maestro → unit-economics-optimizer → business-growth-planner |
 | **Legacy Modernization**     | "refactor this mess", "modernize legacy" | codebase-mapper → cognitive-load-auditor → refactoring-engine → technology-porter                              |
@@ -133,7 +133,7 @@ npm run plugin -- list                 # List installed plugins
 
 1. Clone this repository.
 2. Run the interactive wizard: `node scripts/init_wizard.cjs` (installs dependencies and configures your role).
-3. Validate: `npm run validate`
+3. Validate: `npm run doctor`
 
 ## Project Status
 
@@ -141,7 +141,7 @@ Each skill has a `status` field in its `SKILL.md` frontmatter:
 
 | Status        | Count | Meaning                                      |
 | ------------- | ----- | -------------------------------------------- |
-| `implemented` | 130   | Has runnable scripts in `scripts/` directory |
+| `implemented` | 131   | Has runnable scripts in `scripts/` directory |
 
 26 additional conceptual frameworks have been moved to `knowledge/frameworks/`.
 

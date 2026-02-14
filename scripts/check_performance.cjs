@@ -114,8 +114,8 @@ async function main() {
     .sort()
     .reverse(); // Newest first
 
-  let trendData = {};
-  let chronicBreaches = {}; // skill -> count
+  const trendData = {};
+  const chronicBreaches = {}; // skill -> count
 
   if (prevReports.length > 0) {
     // 1. Load latest report for trend

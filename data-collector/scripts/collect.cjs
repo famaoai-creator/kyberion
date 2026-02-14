@@ -1,11 +1,11 @@
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios');
 const mime = require('mime-types');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('url', {
@@ -84,7 +84,7 @@ runAsyncSkill('data-collector', async () => {
         timeout: 60000,
         maxContentLength: 100 * 1024 * 1024, // 100MB limit
       });
-    } catch (_err) {
+    } catch (err) {
       if (err.code === 'ECONNABORTED') {
         throw new Error(`Download timed out after 60s: ${url}`);
       }

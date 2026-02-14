@@ -23,8 +23,13 @@ const SKIP_DIRS = new Set([
 const IMPLEMENTED_SKILLS = [];
 
 const dirs = fs.readdirSync(rootDir).filter((f) => {
+  if (f.startsWith('.') || SKIP_DIRS.has(f)) return false;
   const fullPath = path.join(rootDir, f);
-  return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && !SKIP_DIRS.has(f);
+  try {
+    return fs.statSync(fullPath).isDirectory();
+  } catch (_e) {
+    return false; // Skip broken symlinks or non-stat-able entries
+  }
 });
 
 for (const dir of dirs) {
@@ -53,7 +58,7 @@ for (const skill of IMPLEMENTED_SKILLS) {
     console.log(`  pass  ${skill.name}/${skill.script}`);
     passed++;
   } catch (_err) {
-    console.error(`  FAIL  ${skill.name}/${skill.script}: ${err.message.split('\n')[0]}`);
+    console.error(`  FAIL  ${skill.name}/${skill.script}: ${_err.message.split('\n')[0]}`);
     failures.push(skill.name);
     failed++;
   }
@@ -67,7 +72,7 @@ if (failures.length > 0) {
 }
 
 const failureRate = IMPLEMENTED_SKILLS.length > 0 ? failed / IMPLEMENTED_SKILLS.length : 0;
-if (failureRate > 0.2) {
-  console.error(`\nFailure rate ${(failureRate * 100).toFixed(1)}% exceeds 20% threshold`);
+if (failureRate > 0.05) {
+  console.error(`\nFailure rate ${(failureRate * 100).toFixed(1)}% exceeds 5% threshold`);
   process.exit(1);
 }

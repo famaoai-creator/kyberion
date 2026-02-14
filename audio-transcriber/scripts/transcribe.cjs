@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('file', { alias: 'f', type: 'string', demandOption: true })
@@ -53,7 +53,7 @@ runAsyncSkill('audio-transcriber', async () => {
       timeout: 120000, // 2 minute timeout for transcription
       maxContentLength: 50 * 1024 * 1024,
     });
-  } catch (_err) {
+  } catch (err) {
     if (err.code === 'ECONNABORTED') {
       throw new Error('Transcription request timed out after 120s');
     }

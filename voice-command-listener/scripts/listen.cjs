@@ -1,8 +1,8 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
-const { logger } = require('../../scripts/lib/core.cjs');
+const _pathResolver = require('@agent/core/path-resolver');
+const { logger } = require('@agent/core/core');
 
 // 1. Configuration
 const workDir = path.resolve(__dirname, '../../work/voice_input');

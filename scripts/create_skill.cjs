@@ -67,7 +67,7 @@ function updateWorkspaces(skillName) {
 function regenerateIndex() {
   try {
     execSync('node scripts/generate_skill_index.cjs', { cwd: rootDir, stdio: 'pipe' });
-  } catch (_e) {
+  } catch (e) {
     logger.warn('Could not regenerate skill index: ' + e.message);
   }
 }

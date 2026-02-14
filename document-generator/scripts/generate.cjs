@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 const { execSync } = require('child_process');
 const path = require('path');
 

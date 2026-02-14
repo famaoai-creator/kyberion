@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const { createLogger } = require('../scripts/lib/logger.cjs');
+const { createLogger } = require('@agent/core/logger');
 
 // We need to clear require cache for skill-wrapper to ensure we can manipulate process.argv before it runs specific logic if needed,
 // though skill-wrapper functions read process.argv when called.
@@ -38,7 +38,7 @@ function capture(fn) {
   try {
     fn();
   } catch (_e) {
-    if (!e.message.startsWith('ProcessExit')) throw e;
+    if (!_e.message.startsWith('ProcessExit')) throw _e;
   } finally {
     process.stdout.write = originalStdout;
     process.stderr.write = originalStderr;
@@ -169,7 +169,7 @@ console.log('--- Coverage Boost: Skill Wrapper Help ---');
     );
   } catch (_e) {
     console.error('Failed to parse JSON output:', jsonOutput);
-    throw e;
+    throw _e;
   }
 
   // Restore FS and Argv

@@ -3,10 +3,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pathResolver = require('@agent/core/path-resolver');
 
 const PORT = 3030;
-const rootDir = path.resolve(__dirname, '../..');
+const _rootDir = path.resolve(__dirname, '../..');
 const queueDir = pathResolver.shared('queue');
 
 const server = http.createServer((req, res) => {

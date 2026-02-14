@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 /**
  * tech-dd-analyst: Technical due diligence analysis on project directories.
  * Evaluates code quality, architecture, team maturity, and technical risk.
@@ -8,9 +8,9 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { getAllFiles } = require('@agent/core/fs-utils');
 
 const argv = createStandardYargs()
   .option('dir', {

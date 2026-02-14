@@ -9,7 +9,7 @@ const path = require('path');
 const { marked } = require('marked');
 const HTMLtoDOCX = require('html-to-docx');
 const { runSkillAsync } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const { requireArgs, validateFilePath } = require('@agent/core/validators');
 
 runSkillAsync('word-artisan', async () => {

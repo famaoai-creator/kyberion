@@ -1,7 +1,7 @@
 const fs = require('fs');
-const path = require('path');
+const _path = require('path');
 const crypto = require('crypto');
-const chalk = require('chalk');
+const _chalk = require('chalk');
 
 /**
  * ACE (Autonomous Consensus Engine) Core Utility
@@ -17,7 +17,7 @@ const aceCore = {
   /**
    * Append a signed thought to the minutes with hash chaining
    */
-  appendThought: (minutesPath, role, thought, metadata = {}) => {
+  appendThought: (minutesPath, role, thought, _metadata = {}) => {
     let content = '';
     if (fs.existsSync(minutesPath)) {
       content = fs.readFileSync(minutesPath, 'utf8');
@@ -44,7 +44,7 @@ const aceCore = {
   /**
    * Validate the integrity of the hash chain in the minutes
    */
-  validateIntegrity: (minutesPath) => {
+  validateIntegrity: (_minutesPath) => {
     // TODO: Implement full chain validation logic
     return true; 
   },

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pathResolver = require('@agent/core/path-resolver');
 const { execSync } = require('child_process');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('url', { alias: 'u', type: 'string', description: 'URL to navigate to' })
@@ -109,6 +109,6 @@ test('navigate', async ({ page }) => {
       error: err.stderr || err.message,
     };
   } finally {
-    if (fs.existsSync(tmpSpec)) require('../../scripts/lib/secure-io.cjs').safeUnlinkSync(tmpSpec);
+    if (fs.existsSync(tmpSpec)) require('@agent/core/secure-io').safeUnlinkSync(tmpSpec);
   }
 });

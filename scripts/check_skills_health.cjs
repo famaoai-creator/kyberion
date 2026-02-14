@@ -77,7 +77,7 @@ skills.forEach((skill) => {
         if (argv.fix) {
           const scriptsDir = path.join(skillPath, 'scripts');
           const distDir = path.join(skillPath, 'dist');
-          let candidates = [];
+          const candidates = [];
 
           if (fs.existsSync(scriptsDir)) {
             candidates.push(

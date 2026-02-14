@@ -1,9 +1,12 @@
 # Meta-Skill Intent Mapping
 # Maps abstract user intents to concrete skill chains.
+# Each intent defines trigger phrases and the skill chain to execute.
 
 intents:
+  # === Security & Compliance ===
   - name: 'Total Security Guarantee'
-    trigger_phrases: ['audit security', 'is this safe?', 'check for vulnerabilities']
+    trigger_phrases:
+      ['audit security', 'is this safe?', 'check for vulnerabilities', 'security scan']
     chain:
       - 'security-scanner'
       - 'license-auditor'
@@ -11,20 +14,118 @@ intents:
       - 'post-quantum-shield'
       - 'red-team-adversary'
 
+  - name: 'Compliance Checkpoint'
+    trigger_phrases: ['check compliance', 'audit licenses', 'governance check']
+    chain:
+      - 'license-auditor'
+      - 'compliance-officer'
+      - 'pmo-governance-lead'
+
+  # === Business & Strategy ===
   - name: 'Business Launchpad'
-    trigger_phrases: ['new business idea', 'launch product', 'startup plan']
+    trigger_phrases: ['new business idea', 'launch product', 'startup plan', 'market entry']
     chain:
       - 'competitive-intel-strategist'
       - 'financial-modeling-maestro'
       - 'unit-economics-optimizer'
       - 'business-growth-planner'
-      - 'pitch-deck-architect'
 
+  - name: 'Executive Strategy'
+    trigger_phrases:
+      ['strategic plan', 'business roadmap', 'executive summary', 'scenario analysis']
+    chain:
+      - 'scenario-multiverse-orchestrator'
+      - 'financial-modeling-maestro'
+      - 'business-impact-analyzer'
+      - 'competitive-intel-strategist'
+      - 'strategic-roadmap-planner'
+
+  - name: 'Investment Readiness'
+    trigger_phrases: ['investor pitch', 'fundraising', 'due diligence', 'valuation']
+    chain:
+      - 'investor-readiness-audit'
+      - 'financial-modeling-maestro'
+      - 'unit-economics-optimizer'
+      - 'ip-strategist'
+
+  # === Code & Engineering ===
   - name: 'Legacy Modernization'
-    trigger_phrases: ['refactor this mess', 'modernize legacy', 'update stack']
+    trigger_phrases: ['refactor this mess', 'modernize legacy', 'update stack', 'tech debt']
     chain:
       - 'codebase-mapper'
-      - 'cognitive-load-auditor'
-      - 'technical-debt-valuator'
       - 'refactoring-engine'
       - 'technology-porter'
+      - 'dependency-lifeline'
+
+  - name: 'Code Quality Audit'
+    trigger_phrases: ['review code', 'code quality', 'check code health', 'code smell']
+    chain:
+      - 'codebase-mapper'
+      - 'quality-scorer'
+      - 'bug-predictor'
+      - 'local-reviewer'
+      - 'refactoring-engine'
+
+  - name: 'Test Strategy'
+    trigger_phrases: ['write tests', 'improve coverage', 'test strategy', 'testing plan']
+    chain:
+      - 'test-suite-architect'
+      - 'test-genie'
+      - 'project-health-check'
+
+  - name: 'Release Preparation'
+    trigger_phrases: ['prepare release', 'release notes', 'changelog', 'ship it']
+    chain:
+      - 'release-note-crafter'
+      - 'security-scanner'
+      - 'license-auditor'
+      - 'pr-architect'
+
+  # === Data & Documents ===
+  - name: 'Data Pipeline'
+    trigger_phrases: ['transform data', 'convert format', 'process data', 'ETL']
+    chain:
+      - 'format-detector'
+      - 'encoding-detector'
+      - 'data-transformer'
+      - 'schema-validator'
+
+  - name: 'Document Generation'
+    trigger_phrases: ['create report', 'generate document', 'make presentation', 'build slides']
+    chain:
+      - 'data-collector'
+      - 'template-renderer'
+      - 'html-reporter'
+
+  - name: 'Knowledge Audit'
+    trigger_phrases: ['audit knowledge', 'check docs', 'documentation health', 'doc drift']
+    chain:
+      - 'knowledge-auditor'
+      - 'doc-sync-sentinel'
+      - 'glossary-resolver'
+
+  # === Infrastructure & DevOps ===
+  - name: 'Cloud Cost Optimization'
+    trigger_phrases:
+      ['reduce cloud cost', 'cloud waste', 'optimize infrastructure', 'save money on cloud']
+    chain:
+      - 'cloud-cost-estimator'
+      - 'cloud-waste-hunter'
+      - 'performance-monitor-analyst'
+
+  - name: 'Infrastructure Blueprint'
+    trigger_phrases:
+      ['setup infrastructure', 'provision environment', 'terraform plan', 'deploy architecture']
+    chain:
+      - 'terraform-arch-mapper'
+      - 'environment-provisioner'
+      - 'operational-runbook-generator'
+
+  # === Project Management ===
+  - name: 'Product Audit'
+    trigger_phrases: ['product audit', 'project health', 'delivery status', 'project governance']
+    chain:
+      - 'project-health-check'
+      - 'security-scanner'
+      - 'pmo-governance-lead'
+      - 'stakeholder-communicator'

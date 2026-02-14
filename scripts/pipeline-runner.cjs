@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const { runSkill } = require('./lib/skill-wrapper.cjs');
+const { createStandardYargs } = require('./lib/cli-utils.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
 
@@ -127,7 +128,7 @@ function executeStep(step, vars) {
       data,
       duration_ms,
     };
-  } catch (_err) {
+  } catch (err) {
     const duration_ms = Date.now() - startTime;
 
     // Try to extract JSON from stderr/stdout even on failure

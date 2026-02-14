@@ -47,7 +47,7 @@ skillDirs.forEach((dir) => {
 
   // 2. Normalize Dependencies
   if (pkg.dependencies) {
-    for (const [name, version] of Object.entries(pkg.dependencies)) {
+    for (const [name, _version] of Object.entries(pkg.dependencies)) {
       if (TARGET_VERSIONS[name] && pkg.dependencies[name] !== TARGET_VERSIONS[name]) {
         console.log(
           `  [${dir}] Updating ${name}: ${pkg.dependencies[name]} -> ${TARGET_VERSIONS[name]}`

@@ -45,7 +45,7 @@ runSkillAsync('excel-artisan', async () => {
     // Dynamic formatting for numbers
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber > 1) {
-        row.eachCell((cell, colNumber) => {
+        row.eachCell((cell, _colNumber) => {
           if (typeof cell.value === 'number') {
             cell.numFmt = specs.styles.currency_cell.numFmt;
           }

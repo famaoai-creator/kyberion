@@ -145,33 +145,56 @@ function validateInjection(knowledgePath, outputTier) {
 
 /**
  * Scan content for potential leaks of sovereign secrets.
+ * Uses an in-memory cache (60s TTL) to avoid re-scanning directories on every call.
  * @param {string} content - The content to be validated.
  * @returns {Object} { safe: boolean, detected: string[] }
  */
-function validateSovereignBoundary(content) {
-  const findings = [];
 
-  // 1. Gather all unique tokens from Personal tier
-  const getTokens = (dir) => {
-    const tokens = [];
-    if (!fs.existsSync(dir)) return tokens;
+// Module-level token cache with TTL
+let _sovereignTokenCache = null;
+let _sovereignTokenCacheExpiry = 0;
+const SOVEREIGN_CACHE_TTL_MS = 60000; // 60 seconds
 
-    const files = fs.readdirSync(dir, { recursive: true });
-    files.forEach((f) => {
-      const p = path.join(dir, f);
+function _collectTokensFromDir(dir) {
+  const tokens = [];
+  if (!fs.existsSync(dir)) return tokens;
+
+  const files = fs.readdirSync(dir, { recursive: true });
+  files.forEach((f) => {
+    const p = path.join(dir, f);
+    try {
       if (fs.statSync(p).isFile()) {
         const text = fs.readFileSync(p, 'utf8');
         // Extract API keys, passwords, specific names from personal files
         const matches = text.match(/[A-Za-z0-9\-_]{20,}/g);
         if (matches) tokens.push(...matches);
       }
-    });
-    return [...new Set(tokens)];
-  };
+    } catch (_e) {
+      // Skip files that cannot be read (permissions, encoding, etc.)
+    }
+  });
+  return tokens;
+}
 
-  const forbiddenTokens = [...getTokens(PERSONAL_DIR), ...getTokens(CONFIDENTIAL_DIR)];
+function _getForbiddenTokens() {
+  const now = Date.now();
+  if (_sovereignTokenCache && now < _sovereignTokenCacheExpiry) {
+    return _sovereignTokenCache;
+  }
+  const tokens = [
+    ..._collectTokensFromDir(PERSONAL_DIR),
+    ..._collectTokensFromDir(CONFIDENTIAL_DIR),
+  ];
+  _sovereignTokenCache = [...new Set(tokens)];
+  _sovereignTokenCacheExpiry = now + SOVEREIGN_CACHE_TTL_MS;
+  return _sovereignTokenCache;
+}
 
-  // 2. Scan the provided content for any of these tokens
+function validateSovereignBoundary(content) {
+  const findings = [];
+  const forbiddenTokens = _getForbiddenTokens();
+
+  // Scan the provided content for any of these tokens
   forbiddenTokens.forEach((token) => {
     if (content.includes(token)) {
       findings.push(token.substring(0, 4) + '...');

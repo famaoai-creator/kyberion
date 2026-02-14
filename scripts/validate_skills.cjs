@@ -26,8 +26,13 @@ const SKIP_DIRS = new Set([
 ]);
 
 const dirs = fs.readdirSync(rootDir).filter((f) => {
+  if (f.startsWith('.') || SKIP_DIRS.has(f)) return false;
   const fullPath = path.join(rootDir, f);
-  return fs.statSync(fullPath).isDirectory() && !f.startsWith('.') && !SKIP_DIRS.has(f);
+  try {
+    return fs.statSync(fullPath).isDirectory();
+  } catch (_e) {
+    return false; // Skip broken symlinks or non-stat-able entries
+  }
 });
 
 for (const dir of dirs) {

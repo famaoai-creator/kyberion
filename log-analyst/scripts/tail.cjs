@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('@agent/core');
 
 const logFile = process.argv[2];
 const linesToRead = parseInt(process.argv[3] || '100', 10);

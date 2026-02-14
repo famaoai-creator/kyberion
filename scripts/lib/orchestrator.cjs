@@ -1,4 +1,4 @@
-const { execSync, exec } = require('child_process');
+const { execSync, exec, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
@@ -42,6 +42,12 @@ function resolveSkillScript(skillName) {
   if (!fs.existsSync(scriptsDir)) throw new Error(`No scripts/ directory for "${skillName}"`);
   const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.cjs$/.test(f));
   if (scripts.length === 0) throw new Error(`No .cjs scripts found for "${skillName}"`);
+  if (scripts.length > 1) {
+    const { logger } = require('./core.cjs');
+    logger.warn(
+      `[Orchestrator] Skill "${skillName}" has ${scripts.length} scripts but no "main" in index. Using "${scripts[0]}" — consider adding a "main" field to SKILL.md.`
+    );
+  }
   return path.join(scriptsDir, scripts[0]);
 }
 
@@ -121,10 +127,9 @@ function runStep(script, args, step = {}) {
           `[Orchestrator] Step failed (retryable: ${isRetryable}). Retrying attempt ${attempt + 1}/${maxAttempts} after ${delay}ms...`
         );
 
-        const waitUntil = Date.now() + delay;
-        while (Date.now() < waitUntil) {
-          /* busy wait or sleep replacement */
-        }
+        // Sleep without burning CPU (synchronous context requires spawnSync)
+        const delaySec = Math.ceil(delay / 1000);
+        spawnSync('sleep', [String(delaySec)], { stdio: 'ignore' });
         continue;
       }
 

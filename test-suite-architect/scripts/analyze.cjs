@@ -3,9 +3,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { getAllFiles } = require('@agent/core/fs-utils');
 
 const SOURCE_EXTENSIONS = new Set([
   '.js',

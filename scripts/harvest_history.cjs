@@ -43,7 +43,7 @@ function harvest() {
             note: subject
           });
         }
-      } catch (e) {
+      } catch (_e) {
         // ファイルが存在しないコミットはスキップ
       }
     }

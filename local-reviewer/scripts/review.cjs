@@ -1,5 +1,5 @@
 const { execSync } = require('child_process');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('@agent/core');
 
 runSkill('local-reviewer', () => {
   // Get staged changes with context

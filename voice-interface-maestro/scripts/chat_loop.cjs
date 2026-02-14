@@ -2,7 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { logger } = require('../../scripts/lib/core.cjs');
+const { logger } = require('@agent/core/core');
 
 // 1. Configuration
 const toggleScript = path.resolve(__dirname, '../applescript/toggle_dictation.scpt');

@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
-const { Cache } = require('../../scripts/lib/core.cjs');
+const { Cache } = require('@agent/core/core');
 
 describe('Cache Memory Optimization', () => {
   test('should evict LRU items when capacity is exceeded', () => {

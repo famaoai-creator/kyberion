@@ -96,7 +96,7 @@ async function runStaticAudit() {
 }
 
 async function main() {
-  const argv = require('yargs/yargs')(process.argv.slice(2))
+  const _argv = require('yargs/yargs')(process.argv.slice(2))
     .option('verbose', {
       alias: 'v',
       type: 'boolean',

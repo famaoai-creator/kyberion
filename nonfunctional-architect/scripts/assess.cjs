@@ -1,4 +1,4 @@
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
@@ -53,7 +53,7 @@ try {
       });
     });
   });
-} catch (_e) {
+} catch (e) {
   console.error(chalk.red(`Error loading knowledge base: ${e.message}`));
   process.exit(1);
 }

@@ -52,7 +52,7 @@ async function runTask(task) {
     logger.success(`Clocked out at ${new Date().toLocaleTimeString()}. Great work!`);
   } else if (task.id === 'integrity-check') {
     const { execSync } = require('child_process');
-    try { execSync('node scripts/check_knowledge_integrity.cjs', { stdio: 'inherit', cwd: rootDir }); } catch (e) {}
+    try { execSync('node scripts/check_knowledge_integrity.cjs', { stdio: 'inherit', cwd: rootDir }); } catch (_e) {}
   } else {
     console.log(chalk.dim('  (Executing generic logic...)'));
   }

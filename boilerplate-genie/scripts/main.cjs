@@ -2,9 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { requireArgs } = require('../../scripts/lib/validators.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { requireArgs } = require('@agent/core/validators');
 
 const argv = createStandardYargs()
   .option('name', { alias: 'n', type: 'string', describe: 'Project name', demandOption: true })

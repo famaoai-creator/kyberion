@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
-const { safeWriteFile, safeReadFileAsync } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile, safeReadFileAsync } = require('@agent/core/secure-io');
 
 runSkillAsync('api-doc-generator', async () => {
   const argv = requireArgs(['dir', 'out']);

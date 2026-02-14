@@ -10,7 +10,19 @@
     "./validators": "./validators.cjs",
     "./core": "./core.cjs",
     "./logger": "./logger.cjs",
-    "./network": "./network.cjs"
+    "./network": "./network.cjs",
+    "./secure-io": "./secure-io.cjs",
+    "./tier-guard": "./tier-guard.cjs",
+    "./metrics": "./metrics.cjs",
+    "./error-codes": "./error-codes.cjs",
+    "./cli-utils": "./cli-utils.cjs",
+    "./fs-utils": "./fs-utils.cjs",
+    "./classifier": "./classifier.cjs",
+    "./validate": "./validate.cjs",
+    "./orchestrator": "./orchestrator.cjs",
+    "./path-resolver": "./path-resolver.cjs",
+    "./test-utils": "./test-utils.cjs",
+    "./pulse-guard": "./pulse-guard.cjs"
   },
   "dependencies": {
     "chalk": "^4.1.2",

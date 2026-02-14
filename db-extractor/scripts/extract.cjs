@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const fs = require('fs');
+const { safeWriteFile } = require('@agent/core/secure-io');
+const _fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('db', { alias: 'd', type: 'string', demandOption: true })

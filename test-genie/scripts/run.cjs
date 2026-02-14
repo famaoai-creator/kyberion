@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
 const glob = require('glob');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runAsyncSkill } = require('@agent/core');
 
 const targetDir = process.argv[2] || '.';
 const customCommand = process.argv[3];

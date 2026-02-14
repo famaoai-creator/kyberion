@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const {
   validateInjection,
   scanForConfidentialMarkers,
-} = require('../../scripts/lib/tier-guard.cjs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath, readJsonFile } = require('../../scripts/lib/validators.cjs');
+} = require('@agent/core/tier-guard');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { validateFilePath, readJsonFile } = require('@agent/core/validators');
 
 const argv = createStandardYargs()
   .option('data', { alias: 'd', type: 'string', demandOption: true })

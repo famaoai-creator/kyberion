@@ -1,5 +1,5 @@
 name: Living-Documentation-Pipeline
-pipeline:
+steps:
   - skill: api-doc-generator
     params: { dir: 'work/sample-check/src', out: 'work/extracted-api.adf.json' }
   - skill: word-artisan

@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { logger } = require('./lib/core.cjs');
+const { logger: _logger } = require('./lib/core.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
 

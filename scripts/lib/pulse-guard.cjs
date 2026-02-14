@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
+const _fs = require('fs');
+const _path = require('path');
 
 /**
  * Pulse Guard: Sovereign Token Manager
@@ -36,7 +36,7 @@ const pulseGuard = {
       if (Date.now() - data.ts > 3600000) return null;
 
       return data;
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }

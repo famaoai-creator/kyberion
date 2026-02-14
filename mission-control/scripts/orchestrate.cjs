@@ -4,8 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+const chalk = require('chalk');
 const { runSkill, ui } = require('@agent/core');
-const { runPipeline } = require('../../scripts/lib/orchestrator.cjs');
+const { runPipeline } = require('@agent/core/orchestrator');
 
 // Improved argument extraction to handle CLI runner artifacts
 function getArgs() {

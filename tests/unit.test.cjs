@@ -25,7 +25,7 @@ function test(name, fn) {
   }
 }
 
-test.skip = function (name, fn) {
+test.skip = function (name, _fn) {
   console.log(`  skip  ${name}`);
 };
 
@@ -183,23 +183,23 @@ test('invalid data fails schema validation', () => {
 console.log('\n--- tier-guard ---');
 
 test('tier-guard detects public tier', () => {
-  const { detectTier } = require('../scripts/lib/tier-guard.cjs');
+  const { detectTier } = require('@agent/core/tier-guard');
   const tier = detectTier(path.join(rootDir, 'knowledge/orchestration/global_skill_index.json'));
   assert(tier === 'public', `Should be public, got ${tier}`);
 });
 
 test('tier-guard allows public to public', () => {
-  const { canFlowTo } = require('../scripts/lib/tier-guard.cjs');
+  const { canFlowTo } = require('@agent/core/tier-guard');
   assert(canFlowTo('public', 'public') === true, 'public -> public should be allowed');
 });
 
 test('tier-guard blocks personal to public', () => {
-  const { canFlowTo } = require('../scripts/lib/tier-guard.cjs');
+  const { canFlowTo } = require('@agent/core/tier-guard');
   assert(canFlowTo('personal', 'public') === false, 'personal -> public should be blocked');
 });
 
 test('tier-guard scans confidential markers', () => {
-  const { scanForConfidentialMarkers } = require('../scripts/lib/tier-guard.cjs');
+  const { scanForConfidentialMarkers } = require('@agent/core/tier-guard');
   const result = scanForConfidentialMarkers('The API_KEY is abc123 and PASSWORD is secret');
   assert(result.hasMarkers === true, 'Should detect markers');
   assert(result.markers.length >= 2, 'Should find at least 2 markers');
@@ -211,7 +211,7 @@ test('tier-guard scans confidential markers', () => {
 console.log('\n--- skill-wrapper ---');
 
 test('wrapSkill returns success format', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('test-skill', () => ({ hello: 'world' }));
   assert(result.skill === 'test-skill', 'Should have skill name');
   assert(result.status === 'success', 'Should be success');
@@ -220,7 +220,7 @@ test('wrapSkill returns success format', () => {
 });
 
 test('wrapSkill returns error format on throw', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('test-skill', () => {
     throw new Error('boom');
   });
@@ -229,7 +229,7 @@ test('wrapSkill returns error format on throw', () => {
 });
 
 test('wrapSkillAsync returns success for async fn', async () => {
-  const { wrapSkillAsync } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkillAsync } = require('@agent/core');
   const result = await wrapSkillAsync('async-test', async () => ({ value: 42 }));
   assert(result.skill === 'async-test', 'Should have skill name');
   assert(result.status === 'success', 'Should be success');
@@ -237,7 +237,7 @@ test('wrapSkillAsync returns success for async fn', async () => {
 });
 
 test('wrapSkillAsync returns error for async throw', async () => {
-  const { wrapSkillAsync } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkillAsync } = require('@agent/core');
   const result = await wrapSkillAsync('async-test', async () => {
     throw new Error('async-boom');
   });
@@ -251,7 +251,7 @@ test('wrapSkillAsync returns error for async throw', async () => {
 console.log('\n--- classifier library ---');
 
 test('classify returns correct category', () => {
-  const { classify } = require('../scripts/lib/classifier.cjs');
+  const { classify } = require('@agent/core/classifier');
   const result = classify(
     'Deploy the API Server',
     {
@@ -265,7 +265,7 @@ test('classify returns correct category', () => {
 });
 
 test('classify returns unknown for no matches', () => {
-  const { classify } = require('../scripts/lib/classifier.cjs');
+  const { classify } = require('@agent/core/classifier');
   const result = classify('lorem ipsum dolor sit amet', {
     tech: ['API', 'Server'],
   });
@@ -1266,7 +1266,7 @@ test('skill-quality-auditor returns recommendations for imperfect skills', () =>
 console.log('\n--- metrics library ---');
 
 test('MetricsCollector record and summarize', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('test-skill-a', 100, 'success');
   mc.record('test-skill-a', 200, 'success');
@@ -1299,7 +1299,7 @@ test('MetricsCollector record and summarize', () => {
 });
 
 test('MetricsCollector getSkillMetrics', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('my-skill', 150, 'success');
   mc.record('my-skill', 250, 'error');
@@ -1318,7 +1318,7 @@ test('MetricsCollector getSkillMetrics', () => {
 });
 
 test('MetricsCollector memory tracking captures peak values', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('mem-test', 100, 'success');
   mc.record('mem-test', 200, 'success');
@@ -1332,14 +1332,14 @@ test('MetricsCollector memory tracking captures peak values', () => {
 });
 
 test('MetricsCollector getSkillMetrics returns null for unknown skill', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   const result = mc.getSkillMetrics('nonexistent-skill');
   assert(result === null, 'Should return null for unknown skill');
 });
 
 test('MetricsCollector reset clears aggregates', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('reset-test', 100, 'success');
   assert(mc.summarize().length === 1, 'Should have 1 skill before reset');
@@ -1354,7 +1354,7 @@ test('MetricsCollector reset clears aggregates', () => {
 console.log('\n--- secure-io library ---');
 
 test('validateFileSize returns size for small file', () => {
-  const { validateFileSize } = require('../scripts/lib/secure-io.cjs');
+  const { validateFileSize } = require('@agent/core/secure-io');
   const smallFile = writeTemp('small-file.txt', 'Hello, World!');
   const size = validateFileSize(smallFile);
   assert(typeof size === 'number', 'Should return file size as number');
@@ -1362,7 +1362,7 @@ test('validateFileSize returns size for small file', () => {
 });
 
 test('validateFileSize throws for oversized file', () => {
-  const { validateFileSize } = require('../scripts/lib/secure-io.cjs');
+  const { validateFileSize } = require('@agent/core/secure-io');
   const smallFile = writeTemp('tiny-but-limited.txt', 'x'.repeat(100));
   try {
     validateFileSize(smallFile, 0.00001); // Tiny limit: ~10 bytes
@@ -1373,14 +1373,14 @@ test('validateFileSize throws for oversized file', () => {
 });
 
 test('safeReadFile reads valid file', () => {
-  const { safeReadFile } = require('../scripts/lib/secure-io.cjs');
+  const { safeReadFile } = require('@agent/core/secure-io');
   const testFile = writeTemp('safe-read.txt', 'Safe content here');
   const content = safeReadFile(testFile);
   assert(content === 'Safe content here', 'Should return file content');
 });
 
 test('safeReadFile throws for missing file', () => {
-  const { safeReadFile } = require('../scripts/lib/secure-io.cjs');
+  const { safeReadFile } = require('@agent/core/secure-io');
   try {
     safeReadFile('/tmp/nonexistent_file_secure_io_test_xyz.txt');
     assert(false, 'Should have thrown for missing file');
@@ -1390,7 +1390,7 @@ test('safeReadFile throws for missing file', () => {
 });
 
 test('safeReadFile throws for null path', () => {
-  const { safeReadFile } = require('../scripts/lib/secure-io.cjs');
+  const { safeReadFile } = require('@agent/core/secure-io');
   try {
     safeReadFile(null);
     assert(false, 'Should have thrown for null path');
@@ -1400,7 +1400,7 @@ test('safeReadFile throws for null path', () => {
 });
 
 test('safeWriteFile performs atomic write', () => {
-  const { safeWriteFile } = require('../scripts/lib/secure-io.cjs');
+  const { safeWriteFile } = require('@agent/core/secure-io');
   const atomicFile = writeTemp('atomic.txt', 'initial');
 
   // Write new content
@@ -1416,7 +1416,7 @@ test('safeWriteFile performs atomic write', () => {
 });
 
 test('sanitizePath removes path traversal', () => {
-  const { sanitizePath } = require('../scripts/lib/secure-io.cjs');
+  const { sanitizePath } = require('@agent/core/secure-io');
   assert(sanitizePath('../etc/passwd') === 'etc/passwd', 'Should remove ../');
   assert(sanitizePath('..\\windows\\system32') === 'windows\\system32', 'Should remove ..\\');
   assert(sanitizePath('/absolute/path') === 'absolute/path', 'Should remove leading slash');
@@ -1429,20 +1429,20 @@ test('sanitizePath removes path traversal', () => {
 });
 
 test('sanitizePath removes null bytes', () => {
-  const { sanitizePath } = require('../scripts/lib/secure-io.cjs');
+  const { sanitizePath } = require('@agent/core/secure-io');
   const result = sanitizePath('file\0name.txt');
   assert(!result.includes('\0'), 'Should remove null bytes');
   assert(result === 'filename.txt', 'Should remove null byte from filename');
 });
 
 test('validateUrl accepts valid HTTPS URL', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   const url = validateUrl('https://example.com/api');
   assert(url === 'https://example.com/api', 'Should return the URL unchanged');
 });
 
 test('validateUrl blocks localhost', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   try {
     validateUrl('http://localhost:3000/secret');
     assert(false, 'Should have thrown for localhost');
@@ -1452,7 +1452,7 @@ test('validateUrl blocks localhost', () => {
 });
 
 test('validateUrl blocks private IP addresses', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   const privateIPs = [
     'http://127.0.0.1:8080',
     'http://10.0.0.1',
@@ -1470,7 +1470,7 @@ test('validateUrl blocks private IP addresses', () => {
 });
 
 test('validateUrl rejects non-HTTP protocols', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   try {
     validateUrl('ftp://example.com/file');
     assert(false, 'Should have thrown for ftp protocol');
@@ -1480,7 +1480,7 @@ test('validateUrl rejects non-HTTP protocols', () => {
 });
 
 test('validateUrl rejects invalid URLs', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   try {
     validateUrl('not-a-url');
     assert(false, 'Should have thrown for invalid URL');
@@ -1490,7 +1490,7 @@ test('validateUrl rejects invalid URLs', () => {
 });
 
 test('validateUrl rejects empty input', () => {
-  const { validateUrl } = require('../scripts/lib/secure-io.cjs');
+  const { validateUrl } = require('@agent/core/secure-io');
   try {
     validateUrl('');
     assert(false, 'Should have thrown for empty URL');
@@ -1901,7 +1901,7 @@ test('knowledge-fetcher returns envelope for query', () => {
 console.log('\n--- orchestrator library ---');
 
 test('orchestrator resolveSkillScript finds skill scripts', () => {
-  const { resolveSkillScript } = require('../scripts/lib/orchestrator.cjs');
+  const { resolveSkillScript } = require('@agent/core/orchestrator');
   const script = resolveSkillScript('log-analyst');
   assert(typeof script === 'string', 'Should return a string path');
   assert(script.endsWith('.cjs'), 'Should return a .cjs file');
@@ -1909,7 +1909,7 @@ test('orchestrator resolveSkillScript finds skill scripts', () => {
 });
 
 test('orchestrator runPipeline executes sequential steps', () => {
-  const { runPipeline } = require('../scripts/lib/orchestrator.cjs');
+  const { runPipeline } = require('@agent/core/orchestrator');
   const tmpInput = writeTemp('pipe-test.txt', 'Hello pipeline test');
   const result = runPipeline([{ skill: 'encoding-detector', params: { input: tmpInput } }]);
   assert(result.pipeline === true, 'Should be marked as pipeline');
@@ -1920,7 +1920,7 @@ test('orchestrator runPipeline executes sequential steps', () => {
 });
 
 test('orchestrator runPipeline handles step failure', () => {
-  const { runPipeline } = require('../scripts/lib/orchestrator.cjs');
+  const { runPipeline } = require('@agent/core/orchestrator');
   const result = runPipeline([
     { skill: 'encoding-detector', params: { input: '/nonexistent/file.txt' } },
   ]);
@@ -1929,7 +1929,7 @@ test('orchestrator runPipeline handles step failure', () => {
 });
 
 test('orchestrator runPipeline with continueOnError', () => {
-  const { runPipeline } = require('../scripts/lib/orchestrator.cjs');
+  const { runPipeline } = require('@agent/core/orchestrator');
   const tmpInput = writeTemp('pipe-continue.txt', 'test content');
   const result = runPipeline([
     {
@@ -1945,7 +1945,7 @@ test('orchestrator runPipeline with continueOnError', () => {
 });
 
 test('orchestrator runParallel returns a promise', () => {
-  const { runParallel } = require('../scripts/lib/orchestrator.cjs');
+  const { runParallel } = require('@agent/core/orchestrator');
   const tmpInput1 = writeTemp('par-test1.txt', 'parallel test 1');
   const tmpInput2 = writeTemp('par-test2.txt', 'parallel test 2');
   const promise = runParallel([
@@ -1964,14 +1964,14 @@ test('orchestrator runParallel returns a promise', () => {
 console.log('\n--- error paths and edge cases ---');
 
 test('skill-wrapper handles missing skill name gracefully', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('', () => ({ test: true }));
   assert(result.status === 'success', 'Should succeed even with empty name');
   assert(result.data.test === true, 'Data should still be returned');
 });
 
 test('classifier handles empty input', () => {
-  const { classify } = require('../scripts/lib/classifier.cjs');
+  const { classify } = require('@agent/core/classifier');
   const rules = { tech: ['code', 'api'], docs: ['readme', 'guide'] };
   const result = classify('', rules);
   assert(typeof result === 'object', 'Should return object for empty input');
@@ -1980,7 +1980,7 @@ test('classifier handles empty input', () => {
 });
 
 test('classifier handles very long input', () => {
-  const { classify } = require('../scripts/lib/classifier.cjs');
+  const { classify } = require('@agent/core/classifier');
   const rules = { tech: ['code', 'api'], docs: ['readme', 'guide'] };
   const longInput = 'a'.repeat(100000);
   const result = classify(longInput, rules);
@@ -1989,7 +1989,7 @@ test('classifier handles very long input', () => {
 });
 
 test('MetricsCollector handles zero duration', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('zero-dur', 0, 'success');
   const s = mc.getSkillMetrics('zero-dur');
@@ -1999,7 +1999,7 @@ test('MetricsCollector handles zero duration', () => {
 });
 
 test('MetricsCollector handles negative duration', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('neg-dur', -10, 'success');
   const s = mc.getSkillMetrics('neg-dur');
@@ -2007,7 +2007,7 @@ test('MetricsCollector handles negative duration', () => {
 });
 
 test('MetricsCollector errorRate rounds correctly', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('rate-test', 100, 'error');
   mc.record('rate-test', 100, 'error');
@@ -2017,26 +2017,26 @@ test('MetricsCollector errorRate rounds correctly', () => {
 });
 
 test('secure-io rejects path with double dot traversal', () => {
-  const { sanitizePath } = require('../scripts/lib/secure-io.cjs');
+  const { sanitizePath } = require('@agent/core/secure-io');
   const result = sanitizePath('../../etc/passwd');
   assert(!result.includes('..'), 'Should remove double dots');
 });
 
 test('secure-io validateFileSize handles zero-byte file', () => {
-  const { validateFileSize } = require('../scripts/lib/secure-io.cjs');
+  const { validateFileSize } = require('@agent/core/secure-io');
   const emptyFile = writeTemp('empty-edge.txt', '');
   const result = validateFileSize(emptyFile);
   assert(result === 0, 'Should return 0 for empty file');
 });
 
 test('tier-guard canFlowTo allows same tier', () => {
-  const { canFlowTo } = require('../scripts/lib/tier-guard.cjs');
+  const { canFlowTo } = require('@agent/core/tier-guard');
   const result = canFlowTo('public', 'public');
   assert(result === true, 'Public to public should be allowed');
 });
 
 test('tier-guard detectTier identifies public path', () => {
-  const { detectTier } = require('../scripts/lib/tier-guard.cjs');
+  const { detectTier } = require('@agent/core/tier-guard');
   const result = detectTier('/some/random/path.txt');
   assert(result === 'public', 'Non-knowledge path should be public');
 });
@@ -2395,13 +2395,13 @@ console.log('\n--- validators.cjs ---');
 
 test('validateFilePath returns resolved path for valid file', () => {
   const tmpFile = writeTemp('val-test.txt', 'hello');
-  const { validateFilePath } = require('../scripts/lib/validators.cjs');
+  const { validateFilePath } = require('@agent/core/validators');
   const resolved = validateFilePath(tmpFile, 'test');
   assert(resolved === path.resolve(tmpFile), 'Should return resolved path');
 });
 
 test('validateFilePath throws for missing file', () => {
-  const { validateFilePath } = require('../scripts/lib/validators.cjs');
+  const { validateFilePath } = require('@agent/core/validators');
   try {
     validateFilePath('/nonexistent/file_xyz_404.txt', 'test');
     assert(false, 'Should have thrown');
@@ -2414,7 +2414,7 @@ test('validateFilePath throws for missing file', () => {
 });
 
 test('validateFilePath throws for null path', () => {
-  const { validateFilePath } = require('../scripts/lib/validators.cjs');
+  const { validateFilePath } = require('@agent/core/validators');
   try {
     validateFilePath(null, 'test');
     assert(false, 'Should have thrown');
@@ -2427,13 +2427,13 @@ test('validateFilePath throws for null path', () => {
 });
 
 test('validateDirPath returns resolved path for valid directory', () => {
-  const { validateDirPath } = require('../scripts/lib/validators.cjs');
+  const { validateDirPath } = require('@agent/core/validators');
   const resolved = validateDirPath(tmpDir, 'test');
   assert(resolved === path.resolve(tmpDir), 'Should return resolved path');
 });
 
 test('validateDirPath throws for missing directory', () => {
-  const { validateDirPath } = require('../scripts/lib/validators.cjs');
+  const { validateDirPath } = require('@agent/core/validators');
   try {
     validateDirPath('/nonexistent/dir_xyz_404', 'test');
     assert(false, 'Should have thrown');
@@ -2446,13 +2446,13 @@ test('validateDirPath throws for missing directory', () => {
 });
 
 test('safeJsonParse parses valid JSON', () => {
-  const { safeJsonParse } = require('../scripts/lib/validators.cjs');
+  const { safeJsonParse } = require('@agent/core/validators');
   const result = safeJsonParse('{"a": 1}', 'test');
   assert(result.a === 1, 'Should parse correctly');
 });
 
 test('safeJsonParse throws for invalid JSON', () => {
-  const { safeJsonParse } = require('../scripts/lib/validators.cjs');
+  const { safeJsonParse } = require('@agent/core/validators');
   try {
     safeJsonParse('not json', 'test');
     assert(false, 'Should have thrown');
@@ -2465,20 +2465,20 @@ test('safeJsonParse throws for invalid JSON', () => {
 });
 
 test('readJsonFile reads and parses JSON file', () => {
-  const { readJsonFile } = require('../scripts/lib/validators.cjs');
+  const { readJsonFile } = require('@agent/core/validators');
   const tmpFile = writeTemp('val-json.json', JSON.stringify({ key: 'value' }));
   const result = readJsonFile(tmpFile, 'test');
   assert(result.key === 'value', 'Should return parsed JSON');
 });
 
 test('requireArgs passes with all required args present', () => {
-  const { requireArgs } = require('../scripts/lib/validators.cjs');
+  const { requireArgs } = require('@agent/core/validators');
   requireArgs({ input: 'test', output: 'out' }, ['input', 'output']);
   assert(true, 'Should not throw');
 });
 
 test('requireArgs throws for missing args', () => {
-  const { requireArgs } = require('../scripts/lib/validators.cjs');
+  const { requireArgs } = require('@agent/core/validators');
   try {
     requireArgs({ input: 'test' }, ['input', 'output']);
     assert(false, 'Should have thrown');
@@ -2493,20 +2493,20 @@ test('requireArgs throws for missing args', () => {
 console.log('\n--- core.cjs Cache ---');
 
 test('Cache basic get/set', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   cache.set('key1', 'value1');
   assert(cache.get('key1') === 'value1', 'Should retrieve stored value');
 });
 
 test('Cache returns undefined for missing key', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   assert(cache.get('nonexistent') === undefined, 'Should return undefined');
 });
 
 test('Cache has() checks existence', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   cache.set('k', 'v');
   assert(cache.has('k') === true, 'Should return true for existing key');
@@ -2514,7 +2514,7 @@ test('Cache has() checks existence', () => {
 });
 
 test('Cache size property', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   assert(cache.size === 0, 'Empty cache should have size 0');
   cache.set('a', 1);
@@ -2523,7 +2523,7 @@ test('Cache size property', () => {
 });
 
 test('Cache clear() empties the cache', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   cache.set('a', 1);
   cache.set('b', 2);
@@ -2533,7 +2533,7 @@ test('Cache clear() empties the cache', () => {
 });
 
 test('Cache LRU eviction at max capacity', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(3, 60000);
   cache.set('a', 1);
   cache.set('b', 2);
@@ -2545,7 +2545,7 @@ test('Cache LRU eviction at max capacity', () => {
 });
 
 test('Cache overwrite existing key', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   cache.set('key', 'old');
   cache.set('key', 'new');
@@ -2559,7 +2559,7 @@ test('Cache overwrite existing key', () => {
 console.log('\n--- logger.cjs ---');
 
 test('createLogger returns object with log methods', () => {
-  const { createLogger } = require('../scripts/lib/logger.cjs');
+  const { createLogger } = require('@agent/core/logger');
   const logger = createLogger('test-logger');
   assert(typeof logger.debug === 'function', 'Should have debug method');
   assert(typeof logger.info === 'function', 'Should have info method');
@@ -2569,7 +2569,7 @@ test('createLogger returns object with log methods', () => {
 });
 
 test('LOG_LEVELS has expected values', () => {
-  const { LOG_LEVELS } = require('../scripts/lib/logger.cjs');
+  const { LOG_LEVELS } = require('@agent/core/logger');
   assert(LOG_LEVELS.debug === 0, 'debug should be 0');
   assert(LOG_LEVELS.info === 1, 'info should be 1');
   assert(LOG_LEVELS.warn === 2, 'warn should be 2');
@@ -2578,7 +2578,7 @@ test('LOG_LEVELS has expected values', () => {
 });
 
 test('createLogger child returns nested logger', () => {
-  const { createLogger } = require('../scripts/lib/logger.cjs');
+  const { createLogger } = require('@agent/core/logger');
   const parent = createLogger('parent');
   const child = parent.child('child');
   assert(typeof child.info === 'function', 'Child should have info method');
@@ -2701,7 +2701,7 @@ test('cloud-waste-hunter fails on non-existent directory', () => {
 });
 
 test('validators validateFilePath rejects directory as file', () => {
-  const { validateFilePath } = require('../scripts/lib/validators.cjs');
+  const { validateFilePath } = require('@agent/core/validators');
   try {
     validateFilePath(tmpDir, 'test');
     assert(false, 'Should have thrown');
@@ -2714,7 +2714,7 @@ test('validators validateFilePath rejects directory as file', () => {
 });
 
 test('validators validateDirPath rejects file as directory', () => {
-  const { validateDirPath } = require('../scripts/lib/validators.cjs');
+  const { validateDirPath } = require('@agent/core/validators');
   const tmpFile = writeTemp('not-a-dir.txt', 'hello');
   try {
     validateDirPath(tmpFile, 'test');
@@ -2728,7 +2728,7 @@ test('validators validateDirPath rejects file as directory', () => {
 });
 
 test('validators readJsonFile rejects non-JSON content', () => {
-  const { readJsonFile } = require('../scripts/lib/validators.cjs');
+  const { readJsonFile } = require('@agent/core/validators');
   const tmpFile = writeTemp('bad-json.json', 'not json content');
   try {
     readJsonFile(tmpFile, 'test');
@@ -2742,7 +2742,7 @@ test('validators readJsonFile rejects non-JSON content', () => {
 });
 
 test('validators requireArgs allows zero value', () => {
-  const { requireArgs } = require('../scripts/lib/validators.cjs');
+  const { requireArgs } = require('@agent/core/validators');
   requireArgs({ count: 0, name: '' }, ['count', 'name']);
   assert(true, 'Should accept zero and empty string as present');
 });
@@ -2910,7 +2910,7 @@ test('environment-provisioner includes security recommendations', () => {
 console.log('\n--- orchestrator edge cases ---');
 
 test('orchestrator runPipeline with empty steps array', () => {
-  const { runPipeline } = require('../scripts/lib/orchestrator.cjs');
+  const { runPipeline } = require('@agent/core/orchestrator');
   const result = runPipeline([]);
   assert(result.totalSteps === 0, 'Should have 0 total steps');
   assert(result.completedSteps === 0, 'Should have 0 completed steps');
@@ -2919,7 +2919,7 @@ test('orchestrator runPipeline with empty steps array', () => {
 });
 
 test('orchestrator runPipeline handles missing skill gracefully', () => {
-  const { runPipeline } = require('../scripts/lib/orchestrator.cjs');
+  const { runPipeline } = require('@agent/core/orchestrator');
   try {
     runPipeline([{ skill: 'nonexistent-skill-xyz-404', params: {} }]);
     assert(false, 'Should have thrown');
@@ -2929,7 +2929,7 @@ test('orchestrator runPipeline handles missing skill gracefully', () => {
 });
 
 test('orchestrator resolveSkillScript throws for unknown skill', () => {
-  const { resolveSkillScript } = require('../scripts/lib/orchestrator.cjs');
+  const { resolveSkillScript } = require('@agent/core/orchestrator');
   try {
     resolveSkillScript('totally-fake-skill-999');
     assert(false, 'Should have thrown');
@@ -2939,7 +2939,7 @@ test('orchestrator resolveSkillScript throws for unknown skill', () => {
 });
 
 test('orchestrator runParallel returns a promise for empty steps', async () => {
-  const { runParallel } = require('../scripts/lib/orchestrator.cjs');
+  const { runParallel } = require('@agent/core/orchestrator');
   const result = await runParallel([]);
   assert(result.totalSteps === 0, 'Should have 0 total steps');
   assert(result.parallel === true, 'Should be marked as parallel');
@@ -2952,7 +2952,7 @@ test('orchestrator runParallel returns a promise for empty steps', async () => {
 console.log('\n--- metrics edge cases ---');
 
 test('MetricsCollector multiple records aggregate correctly', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   mc.record('test-skill', 100, 'success');
   mc.record('test-skill', 200, 'success');
@@ -2968,7 +2968,7 @@ test('MetricsCollector multiple records aggregate correctly', () => {
 });
 
 test('MetricsCollector summarize with no records', () => {
-  const { MetricsCollector } = require('../scripts/lib/metrics.cjs');
+  const { MetricsCollector } = require('@agent/core/metrics');
   const mc = new MetricsCollector({ persist: false });
   const summary = mc.summarize();
   assert(Array.isArray(summary), 'Summary should be an array');
@@ -2981,14 +2981,14 @@ test('MetricsCollector summarize with no records', () => {
 console.log('\n--- core.cjs fileUtils ---');
 
 test('fileUtils.ensureDir creates nested directories', () => {
-  const { fileUtils } = require('../scripts/lib/core.cjs');
+  const { fileUtils } = require('@agent/core/core');
   const nested = path.join(tmpDir, 'a', 'b', 'c');
   fileUtils.ensureDir(nested);
   assert(fs.existsSync(nested), 'Nested directories should be created');
 });
 
 test('fileUtils.writeJson and readJson roundtrip', () => {
-  const { fileUtils } = require('../scripts/lib/core.cjs');
+  const { fileUtils } = require('@agent/core/core');
   const testFile = path.join(tmpDir, 'roundtrip.json');
   const data = { key: 'value', num: 42, arr: [1, 2, 3] };
   fileUtils.writeJson(testFile, data);
@@ -2999,7 +2999,7 @@ test('fileUtils.writeJson and readJson roundtrip', () => {
 });
 
 test('fileUtils.ensureDir handles existing directory', () => {
-  const { fileUtils } = require('../scripts/lib/core.cjs');
+  const { fileUtils } = require('@agent/core/core');
   const existing = path.join(tmpDir, 'existing-dir');
   fs.mkdirSync(existing, { recursive: true });
   fileUtils.ensureDir(existing);
@@ -3012,14 +3012,14 @@ test('fileUtils.ensureDir handles existing directory', () => {
 console.log('\n--- skill-wrapper edge cases ---');
 
 test('wrapSkill handles empty object return', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('test-empty', () => ({}));
   assert(result.status === 'success', 'Should succeed');
   assert(typeof result.data === 'object', 'Data should be empty object');
 });
 
 test('wrapSkill handles array return', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('test-array', () => [1, 2, 3]);
   assert(result.status === 'success', 'Should succeed');
   assert(Array.isArray(result.data), 'Data should be array');
@@ -3027,7 +3027,7 @@ test('wrapSkill handles array return', () => {
 });
 
 test('wrapSkill handles string return', () => {
-  const { wrapSkill } = require('../scripts/lib/skill-wrapper.cjs');
+  const { wrapSkill } = require('@agent/core');
   const result = wrapSkill('test-string', () => 'hello');
   assert(result.status === 'success', 'Should succeed');
 });
@@ -3079,7 +3079,7 @@ test('environment-provisioner rejects non-existent file', () => {
 });
 
 test('Cache TTL-like behavior with overwrite', () => {
-  const { Cache } = require('../scripts/lib/core.cjs');
+  const { Cache } = require('@agent/core/core');
   const cache = new Cache(10, 60000);
   cache.set('k', 'v1');
   cache.set('k', 'v2');
@@ -3089,7 +3089,7 @@ test('Cache TTL-like behavior with overwrite', () => {
 });
 
 test('validators requireArgs with null value throws', () => {
-  const { requireArgs } = require('../scripts/lib/validators.cjs');
+  const { requireArgs } = require('@agent/core/validators');
   try {
     requireArgs({ input: null }, ['input']);
     assert(false, 'Should have thrown');

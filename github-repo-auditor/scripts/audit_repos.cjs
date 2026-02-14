@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 
 /**
  * github-repo-auditor/scripts/audit_repos.cjs

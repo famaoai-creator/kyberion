@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { fileUtils } = require('../../scripts/lib/core.cjs');
+const { runSkill } = require('@agent/core');
+const { fileUtils } = require('@agent/core/core');
 
 const projectRoot = process.cwd();
 

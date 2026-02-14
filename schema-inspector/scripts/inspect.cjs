@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { walk } = require('../../scripts/lib/fs-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { walk } = require('@agent/core/fs-utils');
 
 const argv = createStandardYargs().argv;
 

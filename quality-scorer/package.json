@@ -18,5 +18,5 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "dist/score.js"
+  "main": "scripts/score.ts"
 }

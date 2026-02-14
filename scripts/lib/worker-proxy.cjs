@@ -1,5 +1,5 @@
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
-const path = require('path');
+const _path = require('path');
 
 /**
  * Worker Proxy for Gemini Skills.

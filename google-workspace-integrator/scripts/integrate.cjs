@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pathResolver = require('@agent/core/path-resolver');
 const { google } = require('googleapis');
-const { runSkillAsync } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkillAsync } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const rootDir = path.resolve(__dirname, '../..');
 
@@ -77,7 +77,7 @@ async function getAuthenticatedClient() {
       ],
     });
     return await auth.getClient();
-  } catch (e) {
+  } catch (_e) {
     throw new Error(
       'No Google credentials found. Place JSON key at knowledge/personal/connections/google/google-credentials.json'
     );
@@ -138,7 +138,7 @@ async function listEvents(isDryRun) {
   }));
 }
 
-function draftEmail(input, to) {
+function _draftEmail(input, to) {
   let subject = 'Update',
     body = '';
   if (input) {
@@ -158,7 +158,7 @@ function draftEmail(input, to) {
   };
 }
 
-function draftDoc(input) {
+function _draftDoc(input) {
   let title = 'Document',
     content = '';
   if (input) {
@@ -174,7 +174,7 @@ function draftDoc(input) {
   return { title, content: content.substring(0, 5000), format: 'text/markdown' };
 }
 
-function prepareSheetData(input) {
+function _prepareSheetData(input) {
   if (!input) return { headers: [], rows: [] };
   try {
     const data = JSON.parse(fs.readFileSync(input, 'utf8'));

@@ -2,7 +2,7 @@
  * excel-artisan/tests/unit.test.cjs
  * Self-generated unit test using gemini test-utils.
  */
-const { describe, it, assert } = require('../../scripts/lib/test-utils.cjs');
+const { describe, it, assert } = require('@agent/core/test-utils');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const LanguageDetect = require('languagedetect');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath } = require('../../scripts/lib/validators.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { validateFilePath } = require('@agent/core/validators');
 
 const lngDetector = new LanguageDetect();
 const argv = createStandardYargs().option('input', {

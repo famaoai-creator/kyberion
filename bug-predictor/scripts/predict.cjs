@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Repository directory' })
@@ -38,7 +38,7 @@ function getChurnData(dir, since) {
       churn[file] = (churn[file] || 0) + 1;
     }
     return churn;
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Git analysis failed: ${err.message}. Is this a git repository?`);
   }
 }

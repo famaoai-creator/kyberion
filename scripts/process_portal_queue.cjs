@@ -4,7 +4,7 @@ const path = require('path');
 const chalk = require('chalk');
 const pathResolver = require('./lib/path-resolver.cjs');
 
-const rootDir = path.resolve(__dirname, '..');
+const _rootDir = path.resolve(__dirname, '..');
 const queueDir = pathResolver.shared('queue');
 
 async function processQueue() {
@@ -35,7 +35,7 @@ async function processQueue() {
     }, null, 2));
 
     // 2. 行動 (Simulation)
-    let result = `意図「${request.intent}」に基づき、ミッションを完遂した。`;
+    const result = `意図「${request.intent}」に基づき、ミッションを完遂した。`;
     // 必要に応じてここで実際のスキルを実行
 
     // 3. 完了報告

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 /**
  * performance-monitor-analyst: Analyzes performance metrics from profiling
  * outputs. Compares against configurable thresholds, identifies bottlenecks,
@@ -25,8 +25,8 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('input', {
@@ -315,7 +315,7 @@ runSkill('performance-monitor-analyst', () => {
   let data;
   try {
     data = JSON.parse(fs.readFileSync(resolved, 'utf8'));
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Failed to parse JSON: ${err.message}`);
   }
 

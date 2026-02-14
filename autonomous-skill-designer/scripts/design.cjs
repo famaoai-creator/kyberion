@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const { requireArgs } = require('@agent/core/validators');
 
 function createSkillFiles(targetDir, name, description) {
@@ -58,7 +58,7 @@ runSkill('${name}', () => {
   safeWriteFile(path.join(skillPath, 'scripts/main.ts'), tsCode);
 
   // 5. Generate Unit Test
-  const testCode = `const { describe, it, assert } = require('../../scripts/lib/test-utils.cjs');
+  const testCode = `const { describe, it, assert } = require('@agent/core/test-utils');
 const { execSync } = require('child_process');
 
 describe('${name} Skill', () => {

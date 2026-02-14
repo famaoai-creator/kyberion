@@ -1,6 +1,8 @@
+---
 name: sovereign-memory
 description: Multi-tier, persistent memory hub. Manages facts across Personal, Confidential, and Public tiers in accordance with the Sovereign Knowledge Protocol.
 status: implemented
+---
 
 # Sovereign Memory (Multi-Tier)
 

@@ -3,8 +3,8 @@ const ExcelJS = require('exceljs');
 const chalk = require('chalk');
 const jsdom = require('jsdom');
 const { JSDOM } = jsdom;
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { validateFilePath } = require('../../scripts/lib/validators.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { validateFilePath } = require('@agent/core/validators');
 
 const inputFile = process.argv[2];
 const outputFile = process.argv[3];

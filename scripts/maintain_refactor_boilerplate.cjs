@@ -24,12 +24,12 @@ async function refactorYargs() {
       console.log(`Refactoring CLI in: ${path.relative(rootDir, filePath)}`);
       if (!content.includes('cli-utils.cjs')) {
         content = content.replace(
-          "const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');",
-          "const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');\nconst { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');"
+          "const { runSkill } = require('@agent/core');",
+          "const { runSkill } = require('@agent/core');\nconst { createStandardYargs } = require('@agent/core/cli-utils');"
         );
         content = content.replace(
-          "const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');",
-          "const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');\nconst { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');"
+          "const { runAsyncSkill } = require('@agent/core');",
+          "const { runAsyncSkill } = require('@agent/core');\nconst { createStandardYargs } = require('@agent/core/cli-utils');"
         );
       }
       content = content.replace(
@@ -63,8 +63,8 @@ async function refactorFS() {
       if (!content.includes('fs-utils.cjs')) {
         console.log(`Adding fs-utils to: ${path.relative(rootDir, filePath)}`);
         content = content.replace(
-          "const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');",
-          "const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');\nconst { walk, getAllFiles } = require('../../scripts/lib/fs-utils.cjs');"
+          "const { runSkill } = require('@agent/core');",
+          "const { runSkill } = require('@agent/core');\nconst { walk, getAllFiles } = require('@agent/core/fs-utils');"
         );
       }
       modified = true;

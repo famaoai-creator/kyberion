@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 /**
  * environment-provisioner: Generates Infrastructure as Code from a service
  * definition file. Supports Terraform, Docker, and Kubernetes output formats
@@ -27,8 +27,8 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('input', {
@@ -152,14 +152,14 @@ function parseConfig(filePath) {
   if (ext === '.json') {
     try {
       return JSON.parse(content);
-    } catch (_err) {
+    } catch (err) {
       throw new Error(`Invalid JSON in ${filePath}: ${err.message}`);
     }
   }
 
   try {
     return yaml.load(content);
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Invalid YAML in ${filePath}: ${err.message}`);
   }
 }

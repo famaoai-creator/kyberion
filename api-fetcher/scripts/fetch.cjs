@@ -4,9 +4,9 @@
  * Modernized API fetcher using @agent/core network.
  */
 
-const fs = require('fs');
+const _fs = require('fs');
 const { runSkillAsync } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const { requireArgs, safeJsonParse } = require('@agent/core/validators');
 const { secureFetch } = require('@agent/core/network');
 

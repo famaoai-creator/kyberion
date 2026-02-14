@@ -1,4 +1,4 @@
-const { describe, it, assert } = require('../../scripts/lib/test-utils.cjs');
+const { describe, it, assert } = require('@agent/core/test-utils');
 const { execSync } = require('child_process');
 const path = require('path');
 

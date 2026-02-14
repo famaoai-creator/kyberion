@@ -3,7 +3,7 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { runSkill } = require('@agent/core');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs().option('dir', {
   alias: 'd',

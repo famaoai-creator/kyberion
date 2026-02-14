@@ -15,7 +15,7 @@ function test(name, fn) {
     console.log(`  pass  ${name}`);
     passed++;
   } catch (_err) {
-    console.error(`  FAIL  ${name}: ${err.message}`);
+    console.error(`  FAIL  ${name}: ${_err.message}`);
     failures.push(name);
     failed++;
   }

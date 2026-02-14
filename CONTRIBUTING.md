@@ -6,7 +6,7 @@
 git clone <repo-url>
 cd gemini-skills
 npm install
-npm run validate    # Verify all skills
+npm run doctor      # Verify ecosystem health
 npm run test:unit   # Run unit tests
 ```
 
@@ -46,12 +46,31 @@ gemini-skills/
 
 ## Skill Development Guidelines
 
+### SKILL.md Frontmatter
+
+Every skill must include a `SKILL.md` with YAML frontmatter. Use the `maturity` field to signal readiness:
+
+| Maturity | Meaning                                      |
+| -------- | -------------------------------------------- |
+| `alpha`  | Proof of concept, API may change             |
+| `beta`   | Feature-complete, needs production testing   |
+| `stable` | Battle-tested, safe for automation pipelines |
+
+```yaml
+---
+name: my-skill
+description: What it does
+status: implemented
+maturity: beta
+---
+```
+
 ### Use the Skill Wrapper
 
 All skills must use `runSkill()` or `runAsyncSkill()`:
 
 ```javascript
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('@agent/core');
 
 runSkill('my-skill', () => {
   // your logic here
@@ -62,7 +81,7 @@ runSkill('my-skill', () => {
 ### Use Input Validators
 
 ```javascript
-const { validateFilePath, safeJsonParse } = require('../../scripts/lib/validators.cjs');
+const { validateFilePath, safeJsonParse } = require('@agent/core/validators');
 
 runSkill('my-skill', () => {
   const file = validateFilePath(argv.input);
@@ -70,6 +89,20 @@ runSkill('my-skill', () => {
   return processData(data);
 });
 ```
+
+### Available `@agent/core` Modules
+
+| Import                    | Purpose                                   |
+| ------------------------- | ----------------------------------------- |
+| `@agent/core`             | `runSkill`, `runAsyncSkill`, `ui`         |
+| `@agent/core/validators`  | File/dir/JSON validation                  |
+| `@agent/core/secure-io`   | Atomic writes, safe exec, SSRF protection |
+| `@agent/core/tier-guard`  | Knowledge tier enforcement                |
+| `@agent/core/metrics`     | Execution metrics recording               |
+| `@agent/core/error-codes` | Standardized error codes                  |
+| `@agent/core/cli-utils`   | Standard yargs configuration              |
+| `@agent/core/fs-utils`    | Recursive file operations                 |
+| `@agent/core/core`        | Logging, caching, SRE utilities           |
 
 ### Use Yargs for CLI Arguments
 
@@ -90,7 +123,7 @@ const argv = yargs(hideBin(process.argv)).option('input', {
 - **confidential**: Internal use only
 - **personal**: User-specific, never share
 
-Use `tier-guard.cjs` to validate data flow between tiers.
+Use `@agent/core/tier-guard` to validate data flow between tiers.
 
 ## Testing
 

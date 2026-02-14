@@ -2,9 +2,9 @@
 const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const pathResolver = require('@agent/core/path-resolver');
 
 const argv = createStandardYargs().option('repo', {
   alias: 'r',

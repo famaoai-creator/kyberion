@@ -31,7 +31,7 @@ function installPlugin(packageName) {
 
   try {
     execSync(`npm install ${packageName}`, { cwd: rootDir, stdio: 'pipe' });
-  } catch (_err) {
+  } catch (err) {
     logger.error(`Failed to install ${packageName}: ${err.message}`);
     process.exit(1);
   }
@@ -115,7 +115,7 @@ function uninstallPlugin(nameOrPackage) {
   if (plugin.type === 'npm') {
     try {
       execSync(`npm uninstall ${plugin.package}`, { cwd: rootDir, stdio: 'pipe' });
-    } catch (_e) {
+    } catch (e) {
       logger.warn(`npm uninstall failed: ${e.message}`);
     }
   }

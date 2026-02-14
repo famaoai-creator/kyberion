@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { runAsyncSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runAsyncSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 const { execSync } = require('child_process');
 
 const argv = createStandardYargs()
@@ -53,7 +53,7 @@ runAsyncSkill('ux-visualizer', async () => {
       const svgPath = outPath.replace('.mmd', '.svg');
       execSync(`npx -y @mermaid-js/mermaid-cli -i "${outPath}" -o "${svgPath}"`, { stdio: 'inherit' });
       console.log(`\u2714 SVG saved: ${svgPath}`);
-    } catch (e) {
+    } catch (_e) {
       console.warn('  [!] Rendering failed.');
     }
   }

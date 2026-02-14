@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { logger, fileUtils } = require('../../scripts/lib/core.cjs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const { logger, fileUtils } = require('@agent/core/core');
+const { runSkill } = require('@agent/core');
+const pathResolver = require('@agent/core/path-resolver');
 
 /**
  * Skill Bundle Packager

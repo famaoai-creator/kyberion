@@ -287,9 +287,9 @@ class Cache {
           if (diskEntry.h) {
             const actualHash = this._generateHash(diskEntry.value);
             if (actualHash !== diskEntry.h) {
-              const { logger } = require('./core.cjs');
+              const { logger: _coreLogger } = require('./core.cjs');
               const isSampled = diskEntry.h.endsWith('S');
-              logger.warn(
+              _coreLogger.warn(
                 `[Cache] Integrity violation for ${key}. Method: ${isSampled ? 'Sampled' : 'Full'}. Expected ${diskEntry.h}, got ${actualHash}. Purging corrupted entry.`
               );
               this._stats.integrityFailures++;

@@ -1,5 +1,5 @@
 name: Auto-Project-Audit
-pipeline:
+steps:
   - skill: security-scanner
     params: { dir: '.' }
   - skill: project-health-check

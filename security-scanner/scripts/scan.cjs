@@ -4,14 +4,14 @@
  * Pure Engine - Decoupled from patterns and standards.
  */
 
-const fs = require('fs');
+const _fs = require('fs');
 const path = require('path');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pathResolver = require('@agent/core/path-resolver');
 const isBinaryPath = require('is-binary-path');
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
-const { getAllFilesAsync, mapAsync } = require('../../scripts/lib/fs-utils.cjs');
-const { safeReadFileAsync } = require('../../scripts/lib/secure-io.cjs');
+const { getAllFilesAsync, mapAsync } = require('@agent/core/fs-utils');
+const { safeReadFileAsync } = require('@agent/core/secure-io');
 
 runSkillAsync('security-scanner', async () => {
   const argv = requireArgs(['dir']);
@@ -64,7 +64,7 @@ runSkillAsync('security-scanner', async () => {
         }
       });
       return { content, findings: localFindings };
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   });

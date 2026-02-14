@@ -33,7 +33,7 @@ skillDirs.forEach((dir) => {
   const skillMdPath = path.join(rootDir, dir, 'SKILL.md');
   const gitDate = getGitDate(skillMdPath);
 
-  let content = fs.readFileSync(skillMdPath, 'utf8');
+  const content = fs.readFileSync(skillMdPath, 'utf8');
   // Safer regex for multiline matching
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
   if (!fmMatch) return;

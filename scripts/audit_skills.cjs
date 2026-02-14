@@ -13,7 +13,7 @@ const path = require('path');
 
 const rootDir = path.resolve(__dirname, '..');
 const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
-const unitTestPath = path.join(rootDir, 'tests/unit.test.cjs');
+const _unitTestPath = path.join(rootDir, 'tests/unit.test.cjs');
 const formatJson = process.argv.includes('--format') && process.argv.includes('json');
 
 function loadIndex() {

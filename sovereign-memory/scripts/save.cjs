@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 
 /**
  * sovereign-memory/scripts/save.cjs
  * Standardized Sovereign Memory Saver
  */
 
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { requireArgs } = require('../../scripts/lib/validators.cjs');
+const { runSkill } = require('@agent/core');
+const { requireArgs } = require('@agent/core/validators');
 const fs = require('fs');
 const path = require('path');
 
@@ -45,7 +45,7 @@ runSkill('sovereign-memory', () => {
       `# ${category.toUpperCase()} Memories (${tier.toUpperCase()})\n\n${entry}`
     );
   } else {
-    require('../../scripts/lib/secure-io.cjs').safeAppendFileSync(filePath, entry);
+    require('@agent/core/secure-io').safeAppendFileSync(filePath, entry);
   }
 
   return {

@@ -1,7 +1,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { logger } = require('../../scripts/lib/core.cjs');
+const { logger } = require('@agent/core/core');
 
 // 1. Load Secure Configuration
 const configPath = path.resolve(__dirname, '../../knowledge/personal/voice/config.json');

@@ -1,8 +1,8 @@
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const fs = require('fs');
+const { safeWriteFile } = require('@agent/core/secure-io');
+const _fs = require('fs');
 const path = require('path');
-const { logger } = require('../../scripts/lib/core.cjs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const { logger } = require('@agent/core/core');
+const { runSkill } = require('@agent/core');
 
 // Simulating session data for demonstration.
 // In a real scenario, this would read from `knowledge/personal/biometrics/session_logs.json`.

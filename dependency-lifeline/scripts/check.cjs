@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 /**
  * dependency-lifeline: Analyzes project dependencies for update availability,
  * risk assessment, and overall health scoring.
@@ -10,8 +10,8 @@ const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
 
 const fs = require('fs');
 const path = require('path');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('dir', {
@@ -212,7 +212,7 @@ runSkill('dependency-lifeline', () => {
   let pkgJson;
   try {
     pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-  } catch (_err) {
+  } catch (err) {
     throw new Error(`Failed to parse package.json: ${err.message}`);
   }
 

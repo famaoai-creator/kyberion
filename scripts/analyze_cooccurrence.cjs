@@ -41,7 +41,7 @@ function analyze() {
   for (const [skill, relatedSet] of Object.entries(graph)) {
     const skillMdPath = path.join(rootDir, skill, 'SKILL.md');
     if (fs.existsSync(skillMdPath)) {
-      let content = fs.readFileSync(skillMdPath, 'utf8');
+      const content = fs.readFileSync(skillMdPath, 'utf8');
       // Fix: Safer regex construction
       const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
       if (fmMatch) {

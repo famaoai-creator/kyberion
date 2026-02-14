@@ -4,12 +4,12 @@ const path = require('path');
 const { spawn } = require('child_process');
 const chalk = require('chalk');
 const chokidar = require('chokidar');
-const pulseGuard = require('../../scripts/lib/pulse-guard.cjs');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pulseGuard = require('@agent/core/pulse-guard');
+const pathResolver = require('@agent/core/path-resolver');
 
 const rootDir = path.resolve(__dirname, '../..');
 const tasksPath = path.join(rootDir, 'knowledge/operations/routine-tasks.json');
-const registryPath = pathResolver.shared('tasks/parallel_registry.json');
+const _registryPath = pathResolver.shared('tasks/parallel_registry.json');
 const inboxDir = pathResolver.shared('queue/inbox');
 
 /**

@@ -2,9 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const { classifyFile } = require('../../scripts/lib/classifier.cjs');
-const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { classifyFile } = require('@agent/core/classifier');
+const { runSkill } = require('@agent/core');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs().option('input', {
   alias: 'i',

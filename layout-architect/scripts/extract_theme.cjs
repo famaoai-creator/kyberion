@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const pathResolver = require('../../scripts/lib/path-resolver.cjs');
+const pathResolver = require('@agent/core/path-resolver');
 const { execSync } = require('child_process');
 const { runSkillAsync } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
+const { createStandardYargs } = require('@agent/core/cli-utils');
 
 const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true })

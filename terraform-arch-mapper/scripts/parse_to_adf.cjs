@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { runSkill } = require('@agent/core');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { safeWriteFile } = require('@agent/core/secure-io');
 
 runSkill('terraform-arch-mapper', () => {
   const dirIdx = process.argv.indexOf('--dir');

@@ -3,9 +3,9 @@ const fs = require('fs');
 const yaml = require('js-yaml');
 const Papa = require('papaparse');
 const { runSkill } = require('@agent/core');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { validateFilePath } = require('../../scripts/lib/validators.cjs');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { validateFilePath } = require('@agent/core/validators');
+const { safeWriteFile } = require('@agent/core/secure-io');
 
 const argv = createStandardYargs()
   .option('input', {

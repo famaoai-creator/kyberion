@@ -8,9 +8,9 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { runSkillAsync } = require('@agent/core');
-const { createStandardYargs } = require('../../scripts/lib/cli-utils.cjs');
-const { getAllFiles } = require('../../scripts/lib/fs-utils.cjs');
-const { safeWriteFile } = require('../../scripts/lib/secure-io.cjs');
+const { createStandardYargs } = require('@agent/core/cli-utils');
+const { getAllFiles } = require('@agent/core/fs-utils');
+const { safeWriteFile } = require('@agent/core/secure-io');
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Directory to check' })
@@ -39,7 +39,7 @@ function getRecentChanges(dir, since) {
 }
 
 async function checkDriftAsync(changedSourceFiles, docFiles, dir) {
-  const drifts = [];
+  const _drifts = [];
 
   // 1. Pre-calculate directory map for O(1) lookup
   const dirToSources = new Map();

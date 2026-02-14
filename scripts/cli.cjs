@@ -6,7 +6,7 @@ const rootDir = path.resolve(__dirname, '..');
 // --- Bootstrap Step ---
 try {
   require('./bootstrap.cjs');
-} catch (e) {
+} catch (_e) {
   console.warn('[CLI] Bootstrap failed, attempting to continue...');
 }
 // ----------------------
@@ -102,7 +102,7 @@ async function checkHealth(role) {
       try {
         console.log(chalk.dim('\n\u23f3  Checking knowledge integrity...'));
         execSync('node scripts/check_knowledge_integrity.cjs', { stdio: 'ignore', cwd: rootDir });
-      } catch (e) {
+      } catch (_e) {
         console.log(chalk.yellow(' \u26a0\ufe0f  Knowledge base has broken links or inconsistencies.'));
       }
     }
@@ -110,7 +110,7 @@ async function checkHealth(role) {
     if (p === 'pii' && role === 'Security Reviewer') {
       try {
         execSync('node scripts/scan_pii_in_docs.cjs', { stdio: 'ignore', cwd: rootDir });
-      } catch (e) {
+      } catch (_e) {
         console.log(chalk.red(' \ud83d\udea8  SECURITY ALERT: Sensitive tokens found in documentation!'));
       }
     }
@@ -119,7 +119,7 @@ async function checkHealth(role) {
       try {
         console.log(chalk.dim('\n\u23f3  Calculating technical debt...'));
         execSync('node scripts/generate_debt_report.cjs', { stdio: 'inherit', cwd: rootDir });
-      } catch (e) {
+      } catch (_e) {
         /* ignore */
       }
     }

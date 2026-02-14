@@ -42,7 +42,7 @@ console.log(`Scanning ${skillDirs.length} skills for unused dependencies...`);
 
 skillDirs.forEach((dir) => {
   const pkgPath = path.join(rootDir, dir.name, 'package.json');
-  let pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const scriptsDir = path.join(rootDir, dir.name, 'scripts');
   let modified = false;
 

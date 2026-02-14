@@ -12,3 +12,11 @@ knowledge/confidential/
 
 # Individual/Personal Knowledge (Non-Git)
 knowledge/personal/
+
+# Runtime artifacts
+work/
+tests/_tmp/
+tests/_tmp_integration/
+
+# Plugin runtime data
+*.jsonl

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { runSkill } = require('@agent/core');
-const fs = require('fs');
+const _fs = require('fs');
 const path = require('path');
 
 const { execSync } = require('child_process');
@@ -18,7 +18,7 @@ runSkill('license-auditor', () => {
   try {
     const raw = execSync('npm list --all --json', { cwd: rootDir, encoding: 'utf8' });
     npmList = JSON.parse(raw);
-  } catch (err) {
+  } catch (_err) {
     // If npm list fails, try a flatter version
     const raw = execSync('npm list --depth=0 --json', { cwd: rootDir, encoding: 'utf8' });
     npmList = JSON.parse(raw);

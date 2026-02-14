@@ -6,8 +6,8 @@
 
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs, validateFilePath } = require('@agent/core/validators');
-const fs = require('fs');
-const path = require('path');
+const _fs = require('fs');
+const _path = require('path');
 const textract = require('textract'); // Assuming textract is used based on skill name
 
 runSkillAsync('doc-to-text', async () => {

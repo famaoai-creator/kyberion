@@ -13,7 +13,7 @@ const dirs = fs.readdirSync(rootDir).filter((f) => {
       f !== 'scripts' &&
       f !== 'knowledge'
     );
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 });
@@ -37,7 +37,7 @@ for (const dir of dirs) {
       try {
         execSync(`node "${testPath}"`, { stdio: 'inherit', cwd: rootDir });
         passed++;
-      } catch (e) {
+      } catch (_e) {
         console.error(`[ERROR] Failed: ${dir}/${test}`);
         failed++;
       }

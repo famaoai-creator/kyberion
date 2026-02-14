@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
-const { ui, logger, fileUtils } = require('./lib/core.cjs');
+const { logger } = require('./lib/core.cjs');
 const aceCore = require('./lib/ace-core.cjs');
 const personaLoader = require('./lib/persona-loader.cjs');
 

@@ -57,7 +57,7 @@ function safeReadFile(filePath, options = {}) {
 
   // 1. Cache Check
   if (cache) {
-    const { fileUtils } = require('./core.cjs');
+    const { fileUtils: _fileUtils } = require('./core.cjs');
     // Note: readJson already uses caching, but raw file reads don't.
     // For raw files, we use a dedicated cache key.
     const cacheKey = `raw:${resolved}`;

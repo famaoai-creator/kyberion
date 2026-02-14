@@ -35,7 +35,7 @@ The wizard will ask you to choose your role:
 ## Step 2: Verify Your Environment
 
 ```bash
-bash scripts/troubleshoot_doctor.sh
+npm run doctor
 ```
 
 ## Step 3: Set Up Your Knowledge
@@ -92,4 +92,4 @@ Playbook: [`knowledge/orchestration/mission-playbooks/product-audit.md`](./knowl
 ---
 
 **Need Help?**
-See `README.md` for the full list of 125 skills, or ask Gemini: "Help me find the right skill for [your task]."
+See `README.md` for the full list of 131 skills, or ask Gemini: "Help me find the right skill for [your task]."
