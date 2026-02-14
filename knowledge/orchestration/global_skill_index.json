@@ -4,317 +4,228 @@
   "u": "2026-02-14T04:33:56.710Z",
   "s": [
     {
+      "n": "ux-visualizer",
+      "d": "Generates screen transition diagrams and state transition diagrams in Mermaid format from requirements or code.",
+      "s": "impl",
+      "m": "scripts/generate.cjs",
+      "t": ["design", "ux"]
+    },
+    {
       "n": "agent-activity-monitor",
       "d": "Collects and visualizes statistics regarding the agent's activities, including skill usage, execu...",
       "s": "impl",
       "m": "scripts/monitor.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["data-engineering", "gemini-skill", "observability"]
     },
     {
       "n": "ai-ethics-auditor",
       "d": "Audits AI systems for bias, fairness, and privacy. Analyzes prompts and datasets to ensure ethica...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill"]
     },
     {
       "n": "ai-model-orchestrator",
       "d": "Dynamically selects the optimal AI model based on task complexity, cost, and latency. Routes requ...",
       "s": "impl",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "api-doc-generator",
       "d": "Generate API documentation from OpenAPI specs or code.",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["automation", "documentation", "gemini-skill", "integration"]
     },
     {
       "n": "api-evolution-manager",
       "d": "Governs the evolution of public APIs. Detects breaking changes, manages deprecation cycles, and g...",
       "s": "impl",
       "m": "scripts/manage.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["automation", "gemini-skill", "integration"]
     },
     {
       "n": "api-fetcher",
       "d": "Fetch data from REST/GraphQL APIs securely.",
       "s": "impl",
       "m": "scripts/fetch.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration"]
     },
     {
       "n": "audio-transcriber",
       "d": "Transcribe audio/video files to text using OpenAI Whisper.",
       "s": "impl",
       "m": "scripts/transcribe.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "auto-context-mapper",
       "d": "Intelligently links related knowledge assets across tiers. Automatically fetches prerequisite dat...",
       "s": "impl",
       "m": "scripts/map.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "automated-support-architect",
       "d": "Generates high-quality user support assets (FAQs, Troubleshooting Guides, Chatbot Knowledge) dire...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "autonomous-skill-designer",
       "d": "The ultimate \"self-generation\" skill. Autonomously designs and implements new Gemini skills to so...",
       "s": "impl",
       "m": "scripts/design.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "backlog-connector",
       "d": "Specialized connector for Nulab Backlog API. Automatically resolves Project IDs and handles pagin...",
       "s": "impl",
       "m": "scripts/backlog.cjs",
-      "t": [
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["gemini-skill", "integration"]
     },
     {
       "n": "binary-archaeologist",
       "d": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. ...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "biometric-context-adapter",
       "d": "Infers user stress/energy levels from interaction patterns (typing speed, error rate). Adjusts re...",
       "s": "impl",
       "m": "scripts/generate_niko_niko.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "boilerplate-genie",
       "d": "Scaffolds new projects with best practices (CI/CD, Tests, Linting) pre-configured. Ensures a \"hea...",
       "s": "impl",
       "m": "scripts/main.cjs",
-      "t": [
-        "gemini-skill",
-        "integration",
-        "qa"
-      ]
+      "t": ["gemini-skill", "integration", "qa"]
     },
     {
       "n": "box-connector",
       "d": "Securely connects to Box using the Node.js SDK (JWT). downloads files, searches content, and mana...",
       "s": "impl",
       "m": "scripts/connect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "browser-navigator",
       "d": "Automates browser actions using Playwright CLI. Can record, replay, and generate browser automati...",
       "s": "impl",
       "m": "scripts/navigate.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "data-engineering",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "compliance", "data-engineering", "gemini-skill", "qa"]
     },
     {
       "n": "budget-variance-tracker",
       "d": "Compares actual spend and revenue against forecasts. Provides variance analysis and corrective in...",
       "s": "impl",
       "m": "scripts/track.cjs",
-      "t": [
-        "analytics",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "gemini-skill"]
     },
     {
       "n": "bug-predictor",
       "d": "Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns....",
       "s": "impl",
       "m": "scripts/predict.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "business-growth-planner",
       "d": "Helps define long-term business goals, market entry strategies, and revenue streams. Translates C...",
       "s": "impl",
       "m": "scripts/plan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "business-impact-analyzer",
       "d": "Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financi...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "chaos-monkey-orchestrator",
       "d": "Injects managed chaos into environments to test system resilience. Validates that self-healing an...",
       "s": "impl",
       "m": "scripts/chaos.cjs",
-      "t": [
-        "gemini-skill",
-        "observability",
-        "qa"
-      ]
+      "t": ["gemini-skill", "observability", "qa"]
     },
     {
       "n": "cloud-cost-estimator",
       "d": "Estimates monthly cloud infrastructure costs from IaC files (Terraform, CloudFormation). Helps al...",
       "s": "impl",
       "m": "scripts/estimate.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "cloud-waste-hunter",
       "d": "Actively identifies and eliminates unused or over-provisioned cloud resources. Goes beyond estima...",
       "s": "impl",
       "m": "scripts/hunt.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "code-lang-detector",
       "d": "Detect programming language of source code.",
       "s": "impl",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "codebase-mapper",
       "d": "Maps the directory structure of the project to help the AI understand the codebase layout.",
       "s": "impl",
       "m": "scripts/map.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "competitive-intel-strategist",
       "d": "Analyzes competitor releases and market trends to propose technical differentiation strategies. E...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "completeness-scorer",
       "d": "Evaluate text completeness based on criteria.",
       "s": "impl",
       "m": "scripts/score.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "compliance-officer",
       "d": "Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time complian...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["automation", "compliance", "gemini-skill"]
     },
     {
       "n": "connection-manager",
       "d": "Manages secure connections to external tools (AWS, Slack, Jira, Box). Validates credentials in th...",
       "s": "impl",
       "m": "scripts/diagnose.cjs",
-      "t": [
-        "cloud",
-        "communication",
-        "gemini-skill"
-      ]
+      "t": ["cloud", "communication", "gemini-skill"]
     },
     {
       "n": "context-injector",
       "d": "Inject knowledge into JSON data context.",
       "s": "impl",
       "m": "scripts/inject.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "crisis-manager",
       "d": "Provides rapid response during production incidents or critical security breaches. Coordinates di...",
       "s": "impl",
       "m": "scripts/diagnose.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration",
-        "security"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration", "security"]
     },
     {
       "n": "data-anonymizer",
@@ -328,735 +239,518 @@
       "d": "Fetches data from URLs (Web/API) and saves it to a local directory with metadata (timestamp, sour...",
       "s": "impl",
       "m": "scripts/collect.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration"]
     },
     {
       "n": "data-lineage-guardian",
       "d": "Tracks the flow and integrity of data across the entire stack. Monitors data quality, ensures \"Ri...",
       "s": "impl",
       "m": "scripts/trace.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["data-engineering", "gemini-skill", "observability"]
     },
     {
       "n": "data-transformer",
       "d": "Convert between CSV, JSON, and YAML formats.",
       "s": "impl",
       "m": "scripts/transform.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "dataset-curator",
       "d": "Prepares and audits high-quality datasets for AI/RAG applications. Cleans noise, structure data, ...",
       "s": "impl",
       "m": "scripts/curate.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill"]
     },
     {
       "n": "db-extractor",
       "d": "Extract schema and sample data from databases for analysis.",
       "s": "impl",
       "m": "scripts/extract.cjs",
-      "t": [
-        "analytics",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "data-engineering", "gemini-skill"]
     },
     {
       "n": "dependency-grapher",
       "d": "Generate dependency graphs (Mermaid/DOT) from project files.",
       "s": "impl",
       "m": "scripts/graph.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "dependency-lifeline",
       "d": "Proactively monitors and plans library updates. Assesses the risk of breaking changes and propose...",
       "s": "impl",
       "m": "scripts/check.cjs",
-      "t": [
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["gemini-skill", "observability"]
     },
     {
       "n": "diagram-renderer",
       "d": "Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful for visualizing text...",
       "s": "impl",
       "m": "scripts/main.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "diff-visualizer",
       "d": "Generate a visual difference report between two texts.",
       "s": "impl",
       "m": "scripts/diff.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "disaster-recovery-planner",
       "d": "Generates actionable Disaster Recovery (DR) runbooks from infrastructure and requirements. Valida...",
       "s": "impl",
       "m": "scripts/plan.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "doc-sync-sentinel",
       "d": "Automatically synchronizes documentation with code changes. Detects drift between source code and...",
       "s": "impl",
       "m": "scripts/check.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "doc-to-text",
       "d": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, a...",
       "s": "impl",
       "m": "scripts/extract.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "doc-type-classifier",
       "d": "Classify document type (meeting-notes, spec, etc).",
       "s": "impl",
       "m": "scripts/classify.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "document-generator",
       "d": "Unified gateway for all document generation tasks. Automatically routes to specialized artisan sk...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "domain-classifier",
       "d": "Classify domain (tech, finance, legal).",
       "s": "impl",
       "m": "scripts/classify.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "ecosystem-integration-test",
       "d": "Validates the interoperability between skills. Ensures that output formats (JSON/Markdown) from o...",
       "s": "impl",
       "m": "scripts/verify.cjs",
-      "t": [
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["gemini-skill", "qa"]
     },
     {
       "n": "encoding-detector",
       "d": "Detect file encoding and line endings.",
       "s": "impl",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "environment-provisioner",
       "d": "Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive requirements. The ...",
       "s": "impl",
       "m": "scripts/provision.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     },
     {
       "n": "excel-artisan",
       "d": "Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying ...",
       "s": "impl",
       "m": "scripts/html_to_excel.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "executive-reporting-maestro",
       "d": "Synthesizes technical data into professional external reports for PMOs and stakeholders. Focuses ...",
       "s": "impl",
       "m": "scripts/report.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "financial-modeling-maestro",
       "d": "Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms bus...",
       "s": "impl",
       "m": "scripts/model.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "format-detector",
       "d": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
       "s": "impl",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "github-repo-auditor",
       "d": "Audits and classifies GitHub repositories into business solutions.",
       "s": "plan",
       "m": "scripts/audit_repos.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "github-skills-manager",
       "d": "Comprehensive management suite for Gemini skills. Features an interactive dashboard to create, in...",
       "s": "impl",
       "m": "scripts/create_skill.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "glossary-resolver",
       "d": "Resolve terms using glossary.",
       "s": "impl",
       "m": "scripts/resolve.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "google-workspace-integrator",
       "d": "Automates Google Docs, Sheets, and Mail. Generates reports, tracks KPIs in spreadsheets, and draf...",
       "s": "impl",
       "m": "scripts/integrate.cjs",
-      "t": [
-        "automation",
-        "cloud",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "cloud", "documentation", "gemini-skill"]
     },
     {
       "n": "html-reporter",
       "d": "Generate standalone HTML reports from JSON/Markdown.",
       "s": "impl",
       "m": "scripts/report.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "intent-classifier",
       "d": "Classify intent of text (request, question, report).",
       "s": "impl",
       "m": "scripts/classify.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "investor-readiness-audit",
       "d": "Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, an...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "documentation", "gemini-skill"]
     },
     {
       "n": "ip-profitability-architect",
       "d": "Designs business and licensing models for internal intellectual property. Transforms IP from a pr...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "ip-strategist",
       "d": "Identifies and protects intellectual property within the codebase. Drafts initial patent applicat...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "issue-to-solution-bridge",
       "d": "Automates the entire lifecycle from issue detection to solution. Interprets bug reports or featur...",
       "s": "impl",
       "m": "scripts/solve.cjs",
-      "t": [
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["gemini-skill", "qa"]
     },
     {
       "n": "jira-agile-assistant",
       "d": "Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints, and synchronizes the ...",
       "s": "impl",
       "m": "scripts/assist.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "kernel-compiler",
       "d": "Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensure...",
       "s": "impl",
       "m": "scripts/compile.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-auditor",
       "d": "Audits the 3-tier knowledge base for consistency, freshness, and cross-tier contradictions. Ensur...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "knowledge-fetcher",
       "d": "Fetch knowledge from both public and confidential directories. Bridges general best practices wit...",
       "s": "impl",
       "m": "scripts/fetch.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-harvester",
       "d": "Clones external Git repositories and analyzes them to extract valuable knowledge. Converts discov...",
       "s": "impl",
       "m": "scripts/harvest.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-refiner",
       "d": "Maintains and consolidates the knowledge base. Cleans up unstructured data and merges it into str...",
       "s": "impl",
       "m": "scripts/refine.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "lang-detector",
       "d": "Detect natural language of text (ja, en, etc.).",
       "s": "impl",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "layout-architect",
       "d": "Converts visual designs (images/screenshots) into implementation code (CSS, Python-pptx, HTML). U...",
       "s": "impl",
       "m": "scripts/extract_images.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "license-auditor",
       "d": "Scans project dependencies for license compliance risks. Identifies restrictive licenses (GPL, AG...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["automation", "compliance", "gemini-skill"]
     },
     {
       "n": "local-reviewer",
       "d": "Retrieves git diff of staged files for pre-commit AI code review.",
       "s": "impl",
       "m": "scripts/review.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "localization-maestro",
       "d": "Manages global expansion by automating i18n workflows and auditing for cultural/regional appropri...",
       "s": "impl",
       "m": "scripts/localize.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "log-analyst",
       "d": "Reads the tail of a log file to help analyze recent errors or behavior.",
       "s": "impl",
       "m": "scripts/tail.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "log-to-requirement-bridge",
       "d": "Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Opera...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "mission-control",
       "d": "Orchestrates multiple skills to achieve high-level goals. Acts as the brain of the ecosystem to c...",
       "s": "impl",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "monitoring-config-auditor",
       "d": "Audits infrastructure code (Terraform, K8s) for monitoring compliance. Ensures alarms, thresholds...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["compliance", "gemini-skill", "observability"]
     },
     {
       "n": "nonfunctional-architect",
       "d": "Interactive guide for defining non-functional requirements based on IPA \"Non-Functional Requireme...",
       "s": "impl",
       "m": "scripts/assess.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["automation", "documentation", "gemini-skill", "security"]
     },
     {
       "n": "onboarding-wizard",
       "d": "Generates a personalized project guide for new members. Analyzes the codebase and skills to help ...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "operational-runbook-generator",
       "d": "Generates detailed, step-by-step operational runbooks for day-to-day tasks (scaling, patching, up...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "pdf-composer",
       "d": "Generate PDF documents from Markdown with headers/footers.",
       "s": "impl",
       "m": "scripts/compose.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     },
     {
       "n": "performance-monitor-analyst",
       "d": "Correlates performance targets with actual profiling results. Identifies bottlenecks and validate...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["gemini-skill", "observability"]
     },
     {
       "n": "pmo-governance-lead",
       "d": "Fulfills the role of a PMO by overseeing project quality gates, risks, and cross-skill alignment....",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "post-quantum-shield",
       "d": "Audits codebases for quantum-vulnerable cryptography and plans migration to Post-Quantum Cryptogr...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill", "security"]
     },
     {
       "n": "ppt-artisan",
       "d": "Create and convert PowerPoint presentations from Markdown using Marp. Use when the user wants to ...",
       "s": "impl",
       "m": "scripts/convert.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "pr-architect",
       "d": "Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain \"Why\", ...",
       "s": "impl",
       "m": "scripts/draft.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "project-health-check",
       "d": "Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and p...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["compliance", "gemini-skill", "qa"]
     },
     {
       "n": "prompt-optimizer",
       "d": "Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to...",
       "s": "impl",
       "m": "scripts/optimize.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "quality-scorer",
       "d": "Evaluates technical and textual quality based on IPA benchmarks and readability standards.",
       "s": "impl",
       "m": "dist/score.js",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "red-team-adversary",
       "d": "Performs active security \"war gaming\" by attempting to exploit identified vulnerabilities in a sa...",
       "s": "impl",
       "m": "scripts/simulate.cjs",
-      "t": [
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["gemini-skill", "security"]
     },
     {
       "n": "refactoring-engine",
       "d": "Executes large-scale architectural refactoring and technical debt reduction across the entire cod...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "release-note-crafter",
       "d": "Generates business-value-focused release notes by correlating Git logs with requirements. Focuses...",
       "s": "impl",
       "m": "scripts/main.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "requirements-wizard",
       "d": "Guide for creating and reviewing requirements definitions based on IPA standards. Provides best p...",
       "s": "impl",
       "m": "scripts/main.cjs",
-      "t": [
-        "analytics",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "data-engineering", "gemini-skill"]
     },
     {
       "n": "scenario-multiverse-orchestrator",
       "d": "Generates multiple business scenarios (Growth/Stability/Hybrid) from financial and strategic assu...",
       "s": "impl",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "schema-inspector",
       "d": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
       "s": "impl",
       "m": "scripts/inspect.cjs",
-      "t": [
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["gemini-skill", "integration"]
     },
     {
       "n": "schema-validator",
       "d": "Validate JSON against schemas and identify best match.",
       "s": "impl",
       "m": "scripts/validate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "security-scanner",
       "d": "Scans the codebase for security risks, including hardcoded secrets (API keys, tokens), dangerous ...",
       "s": "impl",
       "m": "scripts/scan.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "integration",
-        "security"
-      ]
+      "t": ["compliance", "gemini-skill", "integration", "security"]
     },
     {
       "n": "self-healing-orchestrator",
       "d": "Automatically repairs known production issues by applying patches, rollbacks, or config changes. ...",
       "s": "impl",
       "m": "scripts/heal.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sensitivity-detector",
       "d": "Detect PII and sensitive information in text.",
       "s": "impl",
       "m": "scripts/scan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sequence-mapper",
       "d": "Generate Mermaid sequence diagrams from source code function calls.",
       "s": "impl",
       "m": "scripts/map.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "skill-bundle-packager",
       "d": "Dynamically bundles mission-specific skills into specialized subsets. Optimizes agent performance...",
       "s": "impl",
       "m": "scripts/bundle.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "skill-evolution-engine",
       "d": "Enables skills to self-improve by analyzing execution logs and user feedback. Automatically refin...",
       "s": "impl",
       "m": "scripts/evolve.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "skill-quality-auditor",
       "d": "Self-audit tool for the Gemini Skills monorepo. Ensures SKILL.md quality, script functionality, a...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["compliance", "gemini-skill", "qa"]
     },
     {
       "n": "slack-communicator-pro",
       "d": "Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, aler...",
       "s": "impl",
       "m": "scripts/communicate.cjs",
-      "t": [
-        "communication",
-        "gemini-skill"
-      ]
+      "t": ["communication", "gemini-skill"]
     },
     {
       "n": "sovereign-memory",
@@ -1070,241 +764,168 @@
       "d": "Syncs specific knowledge tiers with external private repositories.",
       "s": "plan",
       "m": "scripts/sync.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "stakeholder-communicator",
       "d": "Translates technical decisions and architectural changes into clear, business-oriented language f...",
       "s": "impl",
       "m": "scripts/communicate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "strategic-roadmap-planner",
       "d": "Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic road...",
       "s": "impl",
       "m": "scripts/plan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sunset-architect",
       "d": "Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation...",
       "s": "impl",
       "m": "scripts/plan.cjs",
-      "t": [
-        "automation",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["automation", "data-engineering", "gemini-skill"]
     },
     {
       "n": "supply-chain-sentinel",
       "d": "Protects the software supply chain by generating SBoMs and auditing dependency provenance. Monito...",
       "s": "impl",
       "m": "scripts/scan.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["compliance", "gemini-skill", "observability"]
     },
     {
       "n": "sustainability-consultant",
       "d": "Estimates the environmental impact (Carbon Footprint) of code and infrastructure. Recommends opti...",
       "s": "impl",
       "m": "scripts/assess.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "synthetic-user-persona",
       "d": "Generates diverse AI user personas to autonomously test applications. Simulates beginners, power ...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "cloud",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "cloud", "gemini-skill", "qa"]
     },
     {
       "n": "talent-requirement-generator",
       "d": "Identifies the ideal human skills needed for the project's next phase. Analyzes technical debt, r...",
       "s": "impl",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "tech-dd-analyst",
       "d": "Performs Technical Due Diligence on startups. Analyzes code (if available) or evaluates public si...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "tech-stack-librarian",
       "d": "Autonomously researches and compiles best practices for specific tools (SaaS/OSS). Fetches offici...",
       "s": "impl",
       "m": "scripts/research.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "technology-porter",
       "d": "Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves l...",
       "s": "impl",
       "m": "scripts/port.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "telemetry-insight-engine",
       "d": "Analyzes real-world telemetry and usage data to identify feature gaps and usability issues. Feeds...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "template-renderer",
       "d": "Render text from templates (Mustache/EJS) and data.",
       "s": "impl",
       "m": "scripts/render.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "terraform-arch-mapper",
       "d": "Generates a system architecture diagram from Terraform code. It parses .tf files to identify reso...",
       "s": "impl",
       "m": "scripts/generate_diagram.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "test-genie",
       "d": "Executes the project's test suite and returns the output for AI analysis.",
       "s": "impl",
       "m": "scripts/run.cjs",
-      "t": [
-        "analytics",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["analytics", "gemini-skill", "qa"]
     },
     {
       "n": "test-suite-architect",
       "d": "Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. ...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "gemini-skill", "qa"]
     },
     {
       "n": "test-viewpoint-analyst",
       "d": "Generates and reviews test scenarios based on IPA non-functional grade standards. Analyzes system...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "qa",
-        "security"
-      ]
+      "t": ["automation", "gemini-skill", "qa", "security"]
     },
     {
       "n": "asset-token-economist",
       "d": "Minimizes token consumption and costs by optimizing data input. Performs smart summarization and ...",
       "s": "impl",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "data-engineering",
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "finops", "gemini-skill"]
     },
     {
       "n": "unit-economics-optimizer",
       "d": "Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer reten...",
       "s": "impl",
       "m": "scripts/optimize.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "ux-auditor",
       "d": "Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to...",
       "s": "impl",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "visionary-ethos-keeper",
       "d": "Ensures decisions and proposals align with company mission, values, and ethical guidelines. Check...",
       "s": "impl",
       "m": "scripts/check.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "voice-command-listener",
       "d": "Captures microphone input and transcribes it into text commands. Uses SoX for recording and OpenA...",
       "s": "impl",
       "m": "scripts/listen.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "voice-interface-maestro",
       "d": "Converts text responses into spoken audio (TTS). Supports multiple voice personas (Professional, ...",
       "s": "impl",
       "m": "scripts/chat_loop.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "word-artisan",
       "d": "Generate Word documents (.docx) from Markdown.",
       "s": "impl",
       "m": "scripts/convert.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     }
   ]
 }

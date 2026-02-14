@@ -44,7 +44,7 @@ const logger = {
     const ts = chalk.dim(new Date().toISOString());
     const mid = process.env.MISSION_ID ? chalk.magenta(` [${process.env.MISSION_ID}]`) : '';
     console.log(`${ts}${mid}${chalk.green(' [SUCCESS] ')}${msg}`);
-  }
+  },
 };
 
 /**
@@ -456,9 +456,16 @@ const fileUtils = {
    * @returns {string} The role name (e.g., 'Ecosystem Architect') or 'Unknown'
    */
   getCurrentRole: () => {
+    const config = fileUtils.getFullRoleConfig();
+    return config ? config.active_role || config.role : 'Unknown';
+  },
+  /**
+   * Gets the full role configuration.
+   * @returns {Object|null}
+   */
+  getFullRoleConfig: () => {
     const configPath = path.resolve(__dirname, '../../knowledge/personal/role-config.json');
-    const config = fileUtils.readJson(configPath);
-    return config ? (config.active_role || config.role) : 'Unknown';
+    return fileUtils.readJson(configPath);
   },
   /**
    * Ensure a directory exists, creating it recursively if needed.
