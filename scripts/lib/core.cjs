@@ -53,21 +53,44 @@ class Cache {
 
   /**
    * Get current cache statistics.
-   * @returns {{hits: number, misses: number, ratio: number}}
+   * @returns {{hits: number, misses: number, ratio: number, size: number, purges: number}}
    */
   getStats() {
     const total = this._stats.hits + this._stats.misses;
     return {
       ...this._stats,
+      size: this._map.size,
       ratio: total > 0 ? Math.round((this._stats.hits / total) * 100) : 0,
     };
+  }
+
+  /**
+   * Smartly purge entries to free up memory.
+   * @param {number} [fraction=0.5] - Fraction of entries to remove
+   */
+  purge(fraction = 0.5) {
+    if (this._map.size === 0) return;
+    
+    // Sort entries by expiration time (earliest first)
+    const entries = Array.from(this._map.entries()).map(([key, data]) => ({
+      key,
+      expiresAt: data.timestamp + data.ttl
+    })).sort((a, b) => a.expiresAt - b.expiresAt);
+
+    const countToRemove = Math.ceil(this._map.size * fraction);
+    for (let i = 0; i < countToRemove; i++) {
+      this._map.delete(entries[i].key);
+    }
+    
+    if (!this._stats.purges) this._stats.purges = 0;
+    this._stats.purges++;
   }
 
   /**
    * Reset cache statistics.
    */
   resetStats() {
-    this._stats = { hits: 0, misses: 0 };
+    this._stats = { hits: 0, misses: 0, purges: this._stats.purges || 0 };
   }
 
   /**
@@ -126,7 +149,7 @@ class Cache {
     if (process.env.NODE_ENV !== 'test') {
       const mem = process.memoryUsage();
       if (mem.heapUsed / mem.heapTotal > 0.8) {
-        this.clear(); // Emergency purge
+        this.purge(0.3); // Gradually remove 30% instead of total clear
       }
     }
 
