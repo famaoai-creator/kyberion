@@ -1,0 +1,7 @@
+stateDiagram-v2
+  [*] --> Pending
+  Pending --> Approved: 承認
+  Pending --> Rejected: 却下
+  Approved --> Completed: 実行完了
+  Rejected --> [*]
+  Completed --> [*]

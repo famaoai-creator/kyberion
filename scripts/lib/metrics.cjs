@@ -251,11 +251,13 @@ class MetricsCollector {
       // ROI Calculation (Business Value)
       // Heuristic manual effort based on skill name keywords
       let manualMs = 300000; // Default 5 mins
-      if (name.includes('audit') || name.includes('scan') || name.includes('check')) manualMs = 900000; // 15m
-      else if (name.includes('generate') || name.includes('create') || name.includes('artisan')) manualMs = 1800000; // 30m
+      if (name.includes('audit') || name.includes('scan') || name.includes('check'))
+        manualMs = 900000; // 15m
+      else if (name.includes('generate') || name.includes('create') || name.includes('artisan'))
+        manualMs = 1800000; // 30m
       else if (name.includes('analyze') || name.includes('optimize')) manualMs = 3600000; // 60m
-      
-      const savedMs = Math.max(0, (manualMs * s.count) - s.totalMs);
+
+      const savedMs = Math.max(0, manualMs * s.count - s.totalMs);
       const savedCost = Math.round((savedMs / 3600000) * 100); // $100/hr
 
       // Efficiency Score (historical baseline)
@@ -278,7 +280,7 @@ class MetricsCollector {
         // ROI Metrics
         manualMs,
         savedMs,
-        savedCost
+        savedCost,
       };
     });
 

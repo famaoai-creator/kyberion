@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { logger, fileUtils } = require('../../scripts/lib/core.cjs');
 const { runSkill } = require('../../scripts/lib/skill-wrapper.cjs');
+const pathResolver = require('../../scripts/lib/path-resolver.cjs');
 
 /**
  * Skill Bundle Packager
@@ -17,7 +18,7 @@ if (!missionName || selectedSkills.length === 0) {
 }
 
 const rootDir = path.resolve(__dirname, '../../');
-const bundleDir = path.join(rootDir, 'work/bundles', missionName);
+const bundleDir = path.join(pathResolver.shared('bundles'), missionName);
 const manifestFile = path.join(bundleDir, 'bundle.json');
 
 // Find matching playbook for this mission

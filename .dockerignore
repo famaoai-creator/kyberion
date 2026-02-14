@@ -6,8 +6,9 @@ coverage
 .github
 .vscode
 .gemini/tmp
-work/*.log
-work/*.json
+active/*.log
+active/*.json
+active/sessions/
 evidence
 test-results
 *.db

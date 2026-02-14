@@ -399,6 +399,22 @@ ${chalk.bold('EXAMPLES:')}
 }
 async function init() {
   const roleConfig = fileUtils.getFullRoleConfig() || { active_role: 'Unknown', persona: 'The Generic AI' };
+  
+  // Scoped Execution Check
+  const tokenArgIndex = args.indexOf('--token');
+  if (tokenArgIndex !== -1) {
+    const token = args[tokenArgIndex + 1];
+    const { validateToken } = require('./lib/pulse-guard.cjs');
+    const scopeData = validateToken(token);
+    if (!scopeData) {
+      logger.error('Invalid or expired Sovereign Token. Access denied.');
+      process.exit(1);
+    }
+    process.env.GEMINI_MISSION_ID = scopeData.missionId;
+    process.env.GEMINI_SCOPED_DIRS = scopeData.scope.allowedDirs.join(',');
+    logger.info(`Scoped Mode active for mission: ${scopeData.missionId}`);
+  }
+
   const currentRole = roleConfig.active_role;
   const personaName = roleConfig.persona;
   const mid = process.env.MISSION_ID || 'None';

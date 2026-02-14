@@ -12,7 +12,7 @@ const { execSync } = require('child_process');
 
 runSkill('license-auditor', () => {
   const rootDir = path.resolve(__dirname, '../..');
-  
+
   // 1. Run real license scan
   let npmList;
   try {
@@ -33,10 +33,10 @@ runSkill('license-auditor', () => {
     for (const [name, info] of Object.entries(deps)) {
       if (scanned.has(name)) continue;
       scanned.add(name);
-      
+
       const license = info.license || (info.licenses && info.licenses[0]?.type) || 'Unknown';
-      const isRisky = RISKY_PATTERNS.some(p => p.test(license));
-      
+      const isRisky = RISKY_PATTERNS.some((p) => p.test(license));
+
       if (isRisky) {
         findings.push({ name, license, version: info.version });
       }
@@ -50,11 +50,12 @@ runSkill('license-auditor', () => {
     status: findings.length > 0 ? 'warning' : 'compliant',
     summary: {
       total_packages: scanned.size,
-      risky_count: findings.length
+      risky_count: findings.length,
     },
     findings,
-    message: findings.length > 0 
-      ? `Alert: Found ${findings.length} packages with restrictive licenses.` 
-      : `Success: All ${scanned.size} packages comply with permissive license standards (MIT/Apache/BSD).`
+    message:
+      findings.length > 0
+        ? `Alert: Found ${findings.length} packages with restrictive licenses.`
+        : `Success: All ${scanned.size} packages comply with permissive license standards (MIT/Apache/BSD).`,
   };
 });

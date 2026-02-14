@@ -14,11 +14,16 @@ const outputFile = path.join(rootDir, 'PERFORMANCE_DASHBOARD.md');
 
 function generate() {
   if (!fs.existsSync(perfDir)) {
-    console.log(chalk.yellow('[WARN] No performance evidence found. Run check_performance.cjs first.'));
+    console.log(
+      chalk.yellow('[WARN] No performance evidence found. Run check_performance.cjs first.')
+    );
     return;
   }
 
-  const files = fs.readdirSync(perfDir).filter((f) => f.endsWith('.json')).sort();
+  const files = fs
+    .readdirSync(perfDir)
+    .filter((f) => f.endsWith('.json'))
+    .sort();
   if (files.length === 0) return;
 
   // Load and aggregate
@@ -59,7 +64,7 @@ function generate() {
 
   md += '## 💰 Business Impact & Strategic ROI\n\n';
   md += `> **Total Value Generated: $${totalSavedCost.toLocaleString()}** (Time Saved: ${totalSavedHours}h)\n\n`;
-  
+
   md += '### 🏗️ Reinvestment Potential\n\n';
   md += `- **Reinvestable Capacity**: ${strat.reinvestableHours} engineering hours\n`;
   md += `- **New Skills Potential**: 🚀 **${strat.potentialFeatures} additional features** possible\n`;

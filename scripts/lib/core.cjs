@@ -3,6 +3,7 @@ const path = require('path');
 const chalk = require('chalk');
 const crypto = require('crypto');
 const v8 = require('v8');
+const pathResolver = require('./path-resolver.cjs');
 
 /**
  * Shared Utility Core for Gemini Skills.
@@ -189,7 +190,7 @@ class Cache {
   constructor(maxSize = 100, ttlMs = 3600000, persistenceDir) {
     this._maxSize = maxSize;
     this._ttlMs = ttlMs;
-    this._persistenceDir = persistenceDir || path.join(process.cwd(), 'work/cache');
+    this._persistenceDir = persistenceDir || pathResolver.shared('cache');
     /** @type {Map<string, {value: *, timestamp: number, ttl: number, persistent: boolean}>} */
     this._map = new Map();
     this._stats = { hits: 0, misses: 0, integrityFailures: 0 };

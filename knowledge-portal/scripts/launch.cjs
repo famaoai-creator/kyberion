@@ -19,6 +19,17 @@ function launch(mode = 'dev') {
       execSync('npm install', { stdio: 'inherit', cwd: portalDir });
     }
 
+    // Start Bridge Server in background
+    const { spawn } = require('child_process');
+    const bridgeScript = path.join(portalDir, 'bridge.cjs');
+    console.log(chalk.yellow('    Starting Bridge Server...'));
+    const bridgeProcess = spawn('node', [bridgeScript], { 
+      detached: true, 
+      stdio: 'inherit',
+      cwd: portalDir
+    });
+    bridgeProcess.unref();
+
     execSync(cmd, { stdio: 'inherit', cwd: portalDir });
   } catch (err) {
     console.error(chalk.red(`Failed to launch portal: ${err.message}`));

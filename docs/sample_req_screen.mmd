@@ -1,0 +1,8 @@
+graph TD
+  Start((開始)) --> Login[ログイン画面]
+  Login -->|認証成功| Dashboard[ダッシュボード]
+  Login -->|認証失敗| Error[エラー表示]
+  Dashboard --> Profile[プロフィール編集]
+  Dashboard --> Settings[設定]
+  Profile -->|保存| Dashboard
+  Settings -->|ログアウト| Login

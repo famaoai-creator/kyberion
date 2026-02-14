@@ -105,7 +105,7 @@ function validateWritePermission(targetPath) {
 
 /**
  * Validate if reading from a path is allowed (Sandbox Security).
- * @param {string} targetPath 
+ * @param {string} targetPath
  * @returns {Object} { allowed: boolean, reason: string }
  */
 function validateReadPermission(targetPath) {

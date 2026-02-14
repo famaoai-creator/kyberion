@@ -152,7 +152,7 @@ async function main() {
     b.consecutive_breaches = count + 1;
     b.severity =
       b.consecutive_breaches >= 3 ? 'CRITICAL' : b.consecutive_breaches >= 2 ? 'WARN' : 'INFO';
-      
+
     // SRE: Auto-Quarantine for CRITICAL breaches
     if (b.severity === 'CRITICAL') {
       const skillMdPath = path.resolve(rootDir, b.skill, 'SKILL.md');
@@ -161,7 +161,11 @@ async function main() {
         if (!md.includes('status: unstable')) {
           md = md.replace(/status: .*/, 'status: unstable');
           fs.writeFileSync(skillMdPath, md);
-          console.log(chalk.red(`  [QUARANTINE] ${b.skill} has been marked as 'unstable' due to chronic SLO breaches.`));
+          console.log(
+            chalk.red(
+              `  [QUARANTINE] ${b.skill} has been marked as 'unstable' due to chronic SLO breaches.`
+            )
+          );
         }
       }
     }
