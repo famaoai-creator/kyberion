@@ -53,10 +53,17 @@ function generate() {
       md += `| **Cache Hit Ratio** | ${avgCacheHit}% | ⚡ High Speed |\n`;
       md += `| **Total Recoveries** | ${totalRecoveries} | ♻️ Self-Healing |\n\n`;
   
-      // --- SLO Breaches ---
-      if (latest.slo_breaches && latest.slo_breaches.length > 0) {
-        md += '## ⚠️ SRE Service Level Objective (SLO) Breaches\n\n';
-        md += '| Skill | Latency (Act/Tar) | Success (Act/Tar) | Status |\n';
+          // --- SLO Breaches ---
+  
+          if (latest.slo_breaches && latest.slo_breaches.length > 0) {
+  
+            md += '<a name="slo-breaches"></a>\n';
+  
+            md += '## ⚠️ SRE Service Level Objective (SLO) Breaches\n\n';
+  
+            md += '| Skill | Latency (Act/Tar) | Success (Act/Tar) | Status |\n';
+  
+      
         md += '| :--- | :--- | :--- | :--- |\n';
         latest.slo_breaches.forEach((b) => {
           md += `| **${b.skill}** | ${b.actual_latency}ms / ${b.target_latency}ms | ${b.actual_success}% / ${b.target_success}% | 🔴 BREACH |\n`;

@@ -18,26 +18,62 @@ const chalk = require('chalk');
 const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
 
 // --- UX: Proactive Health Check ---
+
 function checkHealth() {
-  const reportPath = path.join(rootDir, 'work/governance-report.json');
-  if (fs.existsSync(reportPath)) {
-    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-    const lastScan = new Date(report.timestamp);
-    const hoursSinceScan = (Date.now() - lastScan) / (1000 * 60 * 60);
+
+  const govPath = path.join(rootDir, 'work/governance-report.json');
+
+  const perfDir = path.join(rootDir, 'evidence/performance');
+
+  
+
+  // 1. Governance Status
+
+  if (fs.existsSync(govPath)) {
+
+    const report = JSON.parse(fs.readFileSync(govPath, 'utf8'));
 
     if (report.overall_status !== 'compliant') {
-      logger.warn(
-        'Ecosystem is currently NON-COMPLIANT. Run "node scripts/governance_check.cjs" for details.'
-      );
-    } else if (hoursSinceScan > 24) {
-      logger.info(
-        `Last governance check was ${Math.round(hoursSinceScan)}h ago. Consider running a fresh scan.`
-      );
+
+      logger.warn('Ecosystem is currently NON-COMPLIANT. Run "node scripts/governance_check.cjs" for details.');
+
     }
-  } else {
-    logger.warn('No governance report found. Initializing health check is recommended.');
+
   }
+
+
+
+  // 2. SRE: SLO Breach Alerts
+
+  if (fs.existsSync(perfDir)) {
+
+    const perfFiles = fs.readdirSync(perfDir).filter(f => f.endsWith('.json')).sort();
+
+    if (perfFiles.length > 0) {
+
+      const latestPerf = JSON.parse(fs.readFileSync(path.join(perfDir, perfFiles[perfFiles.length - 1]), 'utf8'));
+
+      if (latestPerf.slo_breaches && latestPerf.slo_breaches.length > 0) {
+
+        console.log(chalk.red.bold(`\n\u26a0\ufe0f  SLO BREACH DETECTED (${latestPerf.slo_breaches.length} skills)`));
+
+        latestPerf.slo_breaches.slice(0, 3).forEach(b => {
+
+          console.log(chalk.red(`   - ${b.skill}: Latency ${b.actual_latency}ms (Target ${b.target_latency}ms)`));
+
+        });
+
+        console.log(chalk.dim('   Run "node scripts/generate_performance_dashboard.cjs" for full report.\n'));
+
+      }
+
+    }
+
+  }
+
 }
+
+
 
 // --- Role Identity Display ---
 const currentRole = fileUtils.getCurrentRole();
