@@ -59,15 +59,26 @@ runSkill('mission-control', () => {
     const def = yaml.load(fs.readFileSync(pipelinePath, 'utf8'));
     const results = [];
     
-    for (const step of def.pipeline) {
+    console.log(chalk.bold.cyan(`\u25bc Pipeline: ${def.name}`));
+
+    for (let i = 0; i < def.pipeline.length; i++) {
+      const step = def.pipeline[i];
+      const isLast = i === def.pipeline.length - 1;
+      const prefix = isLast ? '\u2514\u2500\u2500' : '\u251c\u2500\u2500';
+      
       const finalParams = substituteVars(step.params, { dir: argv.dir }, results);
-      console.log(`[Mission Control] Executing step: ${step.skill}`);
+      process.stdout.write(`${chalk.dim(prefix)} ${chalk.white(step.skill)} ... `);
       
       const stepResult = runPipeline([{ skill: step.skill, params: finalParams }]);
-      results.push(stepResult.steps[0]);
+      const res = stepResult.steps[0];
+      results.push(res);
       
-      if (stepResult.steps[0].status === 'error' && !step.continueOnError) {
-        throw new Error(`Pipeline failed at step ${step.skill}: ${stepResult.steps[0].error?.message}`);
+      const statusIcon = res.status === 'success' ? chalk.green('\u2714') : chalk.red('\u2718');
+      process.stdout.write(`\r${chalk.dim(prefix)} ${chalk.white(step.skill.padEnd(25))} ${statusIcon}\n`);
+
+      if (res.status === 'error' && !step.continueOnError) {
+        console.log(chalk.red(`\n\u26a0\ufe0f  Mission aborted due to failure in ${step.skill}`));
+        throw new Error(res.error?.message);
       }
     }
 

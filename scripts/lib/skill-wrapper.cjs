@@ -229,28 +229,62 @@ function _addSuggestion(errorObj, skillName) {
 
 // --- Human-Readable Format ---
 
+function _getRank(score) {
+  if (score >= 95) return chalk.bgGreen.bold(' A+ ');
+  if (score >= 85) return chalk.green.bold(' A  ');
+  if (score >= 70) return chalk.yellow.bold(' B  ');
+  if (score >= 50) return chalk.orange ? chalk.orange(' C  ') : chalk.magenta(' C  ');
+  return chalk.bgRed.bold(' D  ');
+}
+
 function _formatHuman(output) {
+  const { ui } = require('./core.cjs');
   const chalk = require('chalk');
-  const status = output.status === 'success' ? chalk.green('\u2705') : chalk.red('\u274c');
-  const dur = output.metadata ? chalk.dim(`in ${output.metadata.duration_ms}ms`) : '';
-  console.log(`\n${status} ${chalk.bold(output.skill)} ${output.status} ${dur}\n`);
+  
+  const statusIcon = output.status === 'success' ? chalk.green('\u2714') : chalk.red('\u2718');
+  const duration = ui.formatDuration(output.metadata.duration_ms);
+  const mem = output.metadata.memory || { heapUsedMB: 0 };
+  const memColor = mem.heapUsedMB > 200 ? chalk.red : (mem.heapUsedMB > 100 ? chalk.yellow : chalk.green);
+  const rank = _getRank(output.metadata.efficiency_score || 100);
+
+  console.log(`\n${statusIcon} ${chalk.bold.cyan(output.skill.toUpperCase())} ${rank} ${chalk.dim(`(${duration}, `)}${memColor(mem.heapUsedMB + 'MB')}${chalk.dim(')')}`);
+  console.log(chalk.dim('\u2500'.repeat(50)));
 
   if (output.data) {
     if (typeof output.data === 'string') {
       console.log(output.data);
     } else {
-      console.log(JSON.stringify(output.data, null, 2));
+      // Intelligently format small objects, use JSON for large ones
+      const keys = Object.keys(output.data);
+      if (keys.length <= 5) {
+        keys.forEach(k => console.log(`${chalk.bold(k.padEnd(12))}: ${output.data[k]}`));
+      } else {
+        console.log(JSON.stringify(output.data, null, 2));
+      }
     }
   }
+
+  if (output.status === 'success') {
+    const suggestions = {
+      'security-scanner': 'Try "node scripts/cli.cjs html-reporter" to visualize these findings.',
+      'codebase-mapper': 'Run "api-doc-generator" next to document your endpoints.',
+      'mission-control': 'View the full timeline in "PERFORMANCE_DASHBOARD.md".'
+    };
+    const next = suggestions[output.skill];
+    if (next) {
+      console.log(chalk.green.bold('\n\u2139\ufe0f  Pro Tip: ') + chalk.green(next));
+    }
+  }
+
   if (output.error) {
     const retryIcon = output.error.retryable ? '\u21bb\ufe0f' : '\u26d4\ufe0f';
-    console.log(chalk.red.bold(`Error [${output.error.code}]: `) + output.error.message);
+    console.log(`\n${chalk.bgRed.white.bold(' ERROR ')} ${chalk.red(output.error.message)}`);
     if (output.error.suggestion) {
-      console.log(chalk.cyan.bold('\n\u2139\ufe0f  Next Steps:'));
-      console.log(chalk.cyan(`  ${output.error.suggestion}\n`));
+      console.log(`${chalk.cyan.bold('\u21aa Suggested Fix:')} ${chalk.cyan(output.error.suggestion)}`);
     }
-    console.log(chalk.dim(`${retryIcon} Retryable: ${output.error.retryable ? 'Yes' : 'No'}\n`));
+    console.log(chalk.dim(`${retryIcon} Retryable: ${output.error.retryable ? 'Yes' : 'No'}`));
   }
+  console.log('');
 }
 
 function _isHumanFormat() {

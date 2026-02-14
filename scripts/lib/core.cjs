@@ -59,6 +59,23 @@ const ui = {
    */
   generateMissionId: () => {
     return 'MSN-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+  },
+  /**
+   * Formats duration human-readably.
+   */
+  formatDuration: (ms) => {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  },
+  /**
+   * Simple ASCII Progress Bar.
+   */
+  progressBar: (current, total, width = 20) => {
+    const progress = Math.min(1, current / total);
+    const filled = Math.round(width * progress);
+    const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
+    const percent = Math.round(progress * 100);
+    return `[${chalk.cyan(bar)}] ${percent}%`;
   }
 };
 
