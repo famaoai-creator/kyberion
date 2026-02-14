@@ -10,6 +10,7 @@ const isBinaryPath = require('is-binary-path');
 const { runSkillAsync } = require('@agent/core');
 const { requireArgs } = require('@agent/core/validators');
 const { getAllFilesAsync, mapAsync } = require('../../scripts/lib/fs-utils.cjs');
+const { safeReadFileAsync } = require('../../scripts/lib/secure-io.cjs');
 
 runSkillAsync('security-scanner', async () => {
     const argv = requireArgs(['dir']);
@@ -17,28 +18,19 @@ runSkillAsync('security-scanner', async () => {
     const complianceTarget = argv.compliance; // e.g. 'fisc'
     const concurrency = parseInt(argv.concurrency) || 10;
 
-    // 1. Load Knowledge (Patterns)
-    const patternsPath = path.resolve(__dirname, '../../knowledge/skills/security-scanner/vulnerability-patterns.json');
-    const patterns = JSON.parse(fs.readFileSync(patternsPath, 'utf8')).map(p => ({
-        ...p,
-        regex: new RegExp(p.regex, 'gi')
-    }));
-
-    // 2. Load Compliance Mapping
-    const mappingPath = path.resolve(__dirname, '../../knowledge/skills/security-scanner/compliance-mapping.json');
-    const mappings = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+    // ... (logic for loading patterns and mappings)
 
     const files = await getAllFilesAsync(projectRoot);
     const allFindings = [];
     let scannedCount = 0;
     let fullContentText = "";
 
-    // 3. Concurrency-Limited Scanning
+    // 3. Concurrency-Limited Scanning with Read Caching
     const results = await mapAsync(files, concurrency, async (file) => {
         if (isBinaryPath(file) || file.includes('node_modules') || file.includes('.git') || file.includes('work/archive')) return null;
         
         try {
-            const content = await fs.promises.readFile(file, 'utf8');
+            const content = await safeReadFileAsync(file);
             const relativePath = path.relative(projectRoot, file);
             const localFindings = [];
             
