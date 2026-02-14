@@ -295,27 +295,34 @@ function infoCommand() {
   }
 }
 
-switch (command) {
-  case 'run':
-    runCommand();
-    break;
-  case 'list':
-    listCommand();
-    break;
-  case 'search':
-    searchCommand();
-    break;
-  case 'info':
-    infoCommand();
-    break;
-  default:
-    console.log(`
-Gemini Skills CLI
+function showHelp() {
+  console.log(`
+${chalk.bold.cyan('Gemini Ecosystem CLI')} ${chalk.dim('v1.1.0')}
 
-Usage:
-  node scripts/cli.cjs run <skill-name> [args...]    Run a skill
-  node scripts/cli.cjs list [status]                  List skills (filter by: implemented, planned)
-  node scripts/cli.cjs search <keyword>               Search skills by name or description
-  node scripts/cli.cjs info <skill-name>              Show skill details
+${chalk.bold('USAGE:')}
+  node scripts/cli.cjs ${chalk.cyan('<command>')} [options]
+
+${chalk.bold('COMMANDS:')}
+  ${chalk.cyan('run')} <skill> [args]   ${chalk.dim('\u25aa')} Execute a specific skill
+  ${chalk.cyan('list')} [status]        ${chalk.dim('\u25aa')} List available skills (implemented/planned)
+  ${chalk.cyan('search')} <keyword>     ${chalk.dim('\u25aa')} Find skills by name or description
+  ${chalk.cyan('info')} <skill>         ${chalk.dim('\u25aa')} Show detailed skill documentation
+
+${chalk.bold('GLOBAL OPTIONS:')}
+  -h, --help             ${chalk.dim('\u25aa')} Show this help message
+  -v, --verbose          ${chalk.dim('\u25aa')} Enable detailed logging
+  -y, --yes              ${chalk.dim('\u25aa')} Auto-confirm prompts
+
+${chalk.bold('EXAMPLES:')}
+  ${chalk.dim('$')} node scripts/cli.cjs run security-scanner --dir .
+  ${chalk.dim('$')} node scripts/cli.cjs list implemented
+  ${chalk.dim('$')} node scripts/cli.cjs info api-doc-generator
 `);
 }
+
+if (args.includes('-h') || args.includes('--help') || !command) {
+  showHelp();
+  process.exit(0);
+}
+
+switch (command) {

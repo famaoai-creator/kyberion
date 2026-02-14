@@ -3,11 +3,21 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const rootDir = process.cwd();
-const argv = require('yargs/yargs')(process.argv.slice(2)).option('fix', {
-  type: 'boolean',
-  default: false,
-  describe: 'Automatically fix repairable issues',
-}).argv;
+const argv = require('yargs/yargs')(process.argv.slice(2))
+  .option('fix', {
+    alias: 'f',
+    type: 'boolean',
+    default: false,
+    describe: 'Automatically fix repairable issues',
+  })
+  .option('verbose', {
+    alias: 'v',
+    type: 'boolean',
+    default: false,
+    describe: 'Show detailed health info',
+  })
+  .help('help')
+  .alias('h', 'help').argv;
 
 let issues = 0;
 let fixed = 0;
