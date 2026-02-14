@@ -1,9 +1,6 @@
 ---
 name: ip-strategist
-description: >-
-  Identifies and protects intellectual property within the codebase. Drafts
-  initial patent applications and IP reports for innovative algorithms or
-  designs.
+description: Identifies and protects intellectual property within the codebase. Drafts initial patent applications and IP reports for innovative algorithms or designs.
 status: implemented
 arguments:
   - name: dir
@@ -16,6 +13,8 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # IP Strategist

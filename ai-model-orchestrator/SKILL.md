@@ -1,9 +1,6 @@
 ---
 name: ai-model-orchestrator
-description: >-
-  Dynamically selects the optimal AI model based on task complexity, cost, and
-  latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize
-  efficiency.
+description: Dynamically selects the optimal AI model based on task complexity, cost, and latency. Routes requests to Gemini, GPT-4, Claude, or local LLMs to maximize efficiency.
 status: implemented
 arguments:
   - name: input
@@ -21,6 +18,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - finops
+  - gemini-skill
 ---
 
 # AI Model Orchestrator

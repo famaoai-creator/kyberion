@@ -1,11 +1,12 @@
 ---
 name: github-repo-auditor
 description: Audits and classifies GitHub repositories into business solutions.
-status: implemented
-  implemented Use when you need to group repositories by solution (IB, TrustId,
-  etc.) and identify stale repositories for archiving.
+status: implemented implemented Use when you need to group repositories by solution (IB, TrustId, etc.) and identify stale repositories for archiving.
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
 ---
 
 # GitHub Repo Auditor

@@ -1,12 +1,12 @@
 ---
 name: doc-to-text
-description: >-
-  Extract text content from various file formats. Supports PDF, Excel, Word,
-  Images (OCR), Email, and ZIP Archives. Use for summarizing or analyzing binary
-  files.
+description: Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, and ZIP Archives. Use for summarizing or analyzing binary files.
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - documentation
+  - gemini-skill
 ---
 
 # Document to Text Converter

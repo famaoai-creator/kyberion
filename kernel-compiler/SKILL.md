@@ -1,8 +1,6 @@
 ---
 name: kernel-compiler
-description: >-
-  Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime
-  dependencies. Ensures the ecosystem's "Self-Bootstrapping" capability.
+description: Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensures the ecosystem's "Self-Bootstrapping" capability.
 status: implemented
 arguments:
   - name: dir
@@ -22,6 +20,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Kernel Compiler

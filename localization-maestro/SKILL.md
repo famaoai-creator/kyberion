@@ -1,9 +1,6 @@
 ---
 name: localization-maestro
-description: >-
-  Manages global expansion by automating i18n workflows and auditing for
-  cultural/regional appropriateness. Handles formats, currency, and sensitive
-  localized expressions.
+description: Manages global expansion by automating i18n workflows and auditing for cultural/regional appropriateness. Handles formats, currency, and sensitive localized expressions.
 status: implemented
 arguments:
   - name: dir
@@ -20,6 +17,9 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
 ---
 
 # Localization Maestro

@@ -12,6 +12,9 @@ arguments:
     type: string
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Sequence Mapper

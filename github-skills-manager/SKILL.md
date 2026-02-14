@@ -1,12 +1,11 @@
 ---
 name: github-skills-manager
-description: >-
-  Comprehensive management suite for Gemini skills. Features an interactive
-  dashboard to create, install, sync (git), and manage dependencies for skills
-  in a monorepo or individual repositories.
+description: Comprehensive management suite for Gemini skills. Features an interactive dashboard to create, install, sync (git), and manage dependencies for skills in a monorepo or individual repositories.
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # GitHub Skills Manager

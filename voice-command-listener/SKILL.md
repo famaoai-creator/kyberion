@@ -1,12 +1,11 @@
 ---
 name: voice-command-listener
-description: >-
-  Captures microphone input and transcribes it into text commands. Uses SoX for
-  recording and OpenAI Whisper for high-accuracy transcription to control the
-  agent via voice.
+description: Captures microphone input and transcribes it into text commands. Uses SoX for recording and OpenAI Whisper for high-accuracy transcription to control the agent via voice.
 status: implemented
 category: Interface & AI
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Voice Command Listener

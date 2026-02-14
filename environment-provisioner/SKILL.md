@@ -1,8 +1,6 @@
 ---
 name: environment-provisioner
-description: >-
-  Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive
-  requirements. The creative counterpart to terraform-arch-mapper.
+description: Generates Infrastructure as Code (Terraform, Docker, K8s) based on interactive requirements. The creative counterpart to terraform-arch-mapper.
 status: implemented
 arguments:
   - name: input
@@ -24,6 +22,10 @@ arguments:
     description: Output file path for the report
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - documentation
+  - gemini-skill
 ---
 
 # Environment Provisioner

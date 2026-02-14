@@ -1,8 +1,6 @@
 ---
 name: investor-readiness-audit
-description: >-
-  Prepares documents and audits for fundraising or board meetings. Ensures
-  financial, technical, and compliance data is boardroom-ready.
+description: Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, and compliance data is boardroom-ready.
 status: implemented
 arguments:
   - name: dir
@@ -19,6 +17,11 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - data-engineering
+  - documentation
+  - gemini-skill
 ---
 
 # Investor Readiness Audit

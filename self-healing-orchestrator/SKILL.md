@@ -1,8 +1,6 @@
 ---
 name: self-healing-orchestrator
-description: >-
-  Automatically repairs known production issues by applying patches, rollbacks,
-  or config changes. The autonomous counterpart to crisis-manager.
+description: Automatically repairs known production issues by applying patches, rollbacks, or config changes. The autonomous counterpart to crisis-manager.
 status: implemented
 arguments:
   - name: input
@@ -19,6 +17,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Self-Healing Orchestrator

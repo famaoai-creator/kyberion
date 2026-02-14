@@ -1,9 +1,6 @@
 ---
 name: binary-archaeologist
-description: >-
-  Reverse engineers legacy binaries and "black box" executables to extract logic
-  and dependencies. Re-integrates lost institutional assets into modern
-  codebases.
+description: Reverse engineers legacy binaries and "black box" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.
 status: implemented
 arguments:
   - name: input
@@ -17,6 +14,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Binary Archaeologist

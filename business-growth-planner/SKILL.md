@@ -1,8 +1,6 @@
 ---
 name: business-growth-planner
-description: >-
-  Helps define long-term business goals, market entry strategies, and revenue
-  streams. Translates CEO vision into structured OKRs and growth pillars.
+description: Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,8 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Business Growth Planner

@@ -1,9 +1,6 @@
 ---
 name: crisis-manager
-description: >-
-  Provides rapid response during production incidents or critical security
-  breaches. Coordinates diagnostics, temporary fixes, and post-mortem data
-  collection.
+description: Provides rapid response during production incidents or critical security breaches. Coordinates diagnostics, temporary fixes, and post-mortem data collection.
 status: implemented
 arguments:
   - name: dir
@@ -24,6 +21,11 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
+  - integration
+  - security
 ---
 
 # Crisis Manager

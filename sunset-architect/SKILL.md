@@ -1,9 +1,6 @@
 ---
 name: sunset-architect
-description: >-
-  Manages the graceful decommissioning of underused or high-maintenance
-  features. Plans deprecation cycles, handles data archiving, and generates
-  migration paths for legacy users.
+description: Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation cycles, handles data archiving, and generates migration paths for legacy users.
 status: implemented
 arguments:
   - name: input
@@ -17,6 +14,10 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - data-engineering
+  - gemini-skill
 ---
 
 # Sunset Architect

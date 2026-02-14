@@ -49,13 +49,25 @@ try {
       let desc = descMatch ? descMatch[1].trim() : '';
       if (desc.length > 100) desc = desc.substring(0, 97) + '...';
 
-      // Get main script from package.json
+      // Get main script and tags from package.json/SKILL.md
       const pkgPath = path.join(rootDir, dir, 'package.json');
       let mainScript = '';
+      let tags = [];
+
       if (fs.existsSync(pkgPath)) {
         try {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           mainScript = pkg.main || '';
+        } catch (_) {}
+      }
+
+      // Extract tags from frontmatter
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        try {
+          const yaml = require('js-yaml');
+          const fm = yaml.load(fmMatch[1]);
+          tags = fm.tags || [];
         } catch (_) {}
       }
 
@@ -64,6 +76,7 @@ try {
         d: desc, // Compressed key: description
         s: statusMatch ? statusMatch[1].substring(0, 4) : 'plan', // status: impl/plan/conc
         m: mainScript, // Compressed key: main script path
+        t: tags, // Compressed key: tags
       });
     }
   }

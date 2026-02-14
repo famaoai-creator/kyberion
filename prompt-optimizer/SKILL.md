@@ -1,8 +1,6 @@
 ---
 name: prompt-optimizer
-description: >-
-  Self-improves agent instructions and context handling. Analyzes failed or
-  suboptimal responses to refine system prompts and prompt templates.
+description: Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,9 @@ arguments:
     description: Optional output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - performance
 ---
 
 # Prompt Optimizer

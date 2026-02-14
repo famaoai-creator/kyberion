@@ -1,8 +1,6 @@
 ---
 name: refactoring-engine
-description: >-
-  Executes large-scale architectural refactoring and technical debt reduction
-  across the entire codebase. Ensures consistency with modern design patterns.
+description: Executes large-scale architectural refactoring and technical debt reduction across the entire codebase. Ensures consistency with modern design patterns.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,8 @@ arguments:
     description: Optional output file path
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Refactoring Engine

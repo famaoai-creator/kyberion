@@ -1,8 +1,6 @@
 ---
 name: auto-context-mapper
-description: >-
-  Intelligently links related knowledge assets across tiers. Automatically
-  fetches prerequisite data and high-level mission context for any task.
+description: Intelligently links related knowledge assets across tiers. Automatically fetches prerequisite data and high-level mission context for any task.
 status: implemented
 arguments:
   - name: dir
@@ -19,6 +17,9 @@ arguments:
     description: Output file path
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
 ---
 
 # Auto-Context Mapper

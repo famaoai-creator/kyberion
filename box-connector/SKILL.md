@@ -1,8 +1,6 @@
 ---
 name: box-connector
-description: >-
-  Securely connects to Box using the Node.js SDK (JWT). downloads files,
-  searches content, and manages folder structures.
+description: Securely connects to Box using the Node.js SDK (JWT). downloads files, searches content, and manages folder structures.
 status: implemented
 arguments:
   - name: action
@@ -30,6 +28,8 @@ arguments:
     description: Output file path
 category: Integration & API
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Box Connector

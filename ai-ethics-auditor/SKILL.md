@@ -1,8 +1,6 @@
 ---
 name: ai-ethics-auditor
-description: >-
-  Audits AI systems for bias, fairness, and privacy. Analyzes prompts and
-  datasets to ensure ethical and safe AI implementation.
+description: Audits AI systems for bias, fairness, and privacy. Analyzes prompts and datasets to ensure ethical and safe AI implementation.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,10 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - data-engineering
+  - gemini-skill
 ---
 
 # AI Ethics Auditor

@@ -1,12 +1,13 @@
 ---
 name: agent-activity-monitor
-description: >-
-  Collects and visualizes statistics regarding the agent's activities, including
-  skill usage, execution success rates, and task duration. Provides a
-  data-driven dashboard for ecosystem health.
+description: Collects and visualizes statistics regarding the agent's activities, including skill usage, execution success rates, and task duration. Provides a data-driven dashboard for ecosystem health.
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
+  - observability
 ---
 
 # Agent Activity Monitor

@@ -1,9 +1,6 @@
 ---
 name: issue-to-solution-bridge
-description: >-
-  Automates the entire lifecycle from issue detection to solution. Interprets
-  bug reports or feature requests and orchestrates other skills to implement and
-  test the fix.
+description: Automates the entire lifecycle from issue detection to solution. Interprets bug reports or feature requests and orchestrates other skills to implement and test the fix.
 status: implemented
 arguments:
   - name: issue
@@ -23,6 +20,9 @@ arguments:
     description: Analysis only, no changes
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - qa
 ---
 
 # Issue-to-Solution Bridge

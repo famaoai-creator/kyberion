@@ -1,12 +1,12 @@
 ---
 name: excel-artisan
-description: >-
-  Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML
-  to Excel, modifying cell values, and applying basic formatting. Use when you
-  need to produce Excel reports or modify existing spreadsheets.
+description: Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying cell values, and applying basic formatting. Use when you need to produce Excel reports or modify existing spreadsheets.
 status: implemented
 category: Data & Content
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Excel Artisan

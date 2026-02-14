@@ -1,12 +1,12 @@
 ---
 name: knowledge-auditor
-description: >-
-  Audits the 3-tier knowledge base for consistency, freshness, and cross-tier
-  contradictions. Ensures that proprietary standards align with (or
-  intentionally override) public ones.
+description: Audits the 3-tier knowledge base for consistency, freshness, and cross-tier contradictions. Ensures that proprietary standards align with (or intentionally override) public ones.
 status: implemented
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
 ---
 
 # Knowledge Auditor

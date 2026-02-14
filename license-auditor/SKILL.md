@@ -1,9 +1,6 @@
 ---
 name: license-auditor
-description: >-
-  Scans project dependencies for license compliance risks. Identifies
-  restrictive licenses (GPL, AGPL) and generates mandatory attribution (NOTICE)
-  files.
+description: Scans project dependencies for license compliance risks. Identifies restrictive licenses (GPL, AGPL) and generates mandatory attribution (NOTICE) files.
 status: implemented
 arguments:
   - name: dir
@@ -17,6 +14,10 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - compliance
+  - gemini-skill
 ---
 
 # License Auditor

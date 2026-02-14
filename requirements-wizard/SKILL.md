@@ -1,12 +1,13 @@
 ---
 name: requirements-wizard
-description: >-
-  Guide for creating and reviewing requirements definitions based on IPA
-  standards. Provides best practices for business analysis, process mapping,
-  data modeling, and review checklists.
+description: Guide for creating and reviewing requirements definitions based on IPA standards. Provides best practices for business analysis, process mapping, data modeling, and review checklists.
 status: implemented
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - analytics
+  - data-engineering
+  - gemini-skill
 ---
 
 # Requirements Wizard (IPA-Standard)

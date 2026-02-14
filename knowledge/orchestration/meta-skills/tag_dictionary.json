@@ -1,0 +1,20 @@
+{
+  "rules": [
+    { "keyword": "test", "tag": "qa" },
+    { "keyword": "audit", "tag": "compliance" },
+    { "keyword": "security", "tag": "security" },
+    { "keyword": "doc", "tag": "documentation" },
+    { "keyword": "api", "tag": "integration" },
+    { "keyword": "monitor", "tag": "observability" },
+    { "keyword": "generate", "tag": "automation" },
+    { "keyword": "analysis", "tag": "analytics" },
+    { "keyword": "optimize", "tag": "performance" },
+    { "keyword": "google", "tag": "cloud" },
+    { "keyword": "aws", "tag": "cloud" },
+    { "keyword": "azure", "tag": "cloud" },
+    { "keyword": "slack", "tag": "communication" },
+    { "keyword": "cost", "tag": "finops" },
+    { "keyword": "data", "tag": "data-engineering" }
+  ],
+  "defaults": ["gemini-skill"]
+}

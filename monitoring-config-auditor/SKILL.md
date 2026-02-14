@@ -1,9 +1,6 @@
 ---
 name: monitoring-config-auditor
-description: >-
-  Audits infrastructure code (Terraform, K8s) for monitoring compliance. Ensures
-  alarms, thresholds, and notification paths are set up correctly according to
-  best practices.
+description: Audits infrastructure code (Terraform, K8s) for monitoring compliance. Ensures alarms, thresholds, and notification paths are set up correctly according to best practices.
 status: implemented
 arguments:
   - name: dir
@@ -16,6 +13,10 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
+  - observability
 ---
 
 # Monitoring Config Auditor

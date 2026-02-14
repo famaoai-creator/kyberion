@@ -1,8 +1,6 @@
 ---
 name: codebase-mapper
-description: >-
-  Maps the directory structure of the project to help the AI understand the
-  codebase layout.
+description: Maps the directory structure of the project to help the AI understand the codebase layout.
 status: implemented
 arguments:
   - name: directory
@@ -17,6 +15,8 @@ arguments:
     description: Max depth to traverse
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Codebase Mapper Skill

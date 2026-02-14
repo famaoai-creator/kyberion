@@ -1,9 +1,6 @@
 ---
 name: document-generator
-description: >-
-  Unified gateway for all document generation tasks. Automatically routes to
-  specialized artisan skills based on the requested format (PDF, DOCX, XLSX,
-  PPTX, HTML).
+description: Unified gateway for all document generation tasks. Automatically routes to specialized artisan skills based on the requested format (PDF, DOCX, XLSX, PPTX, HTML).
 status: implemented
 arguments:
   - name: format
@@ -12,6 +9,9 @@ arguments:
     required: true
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - documentation
+  - gemini-skill
 ---
 
 # Document Generator (Gateway)

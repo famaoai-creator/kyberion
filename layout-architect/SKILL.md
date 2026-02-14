@@ -1,12 +1,11 @@
 ---
 name: layout-architect
-description: >-
-  Converts visual designs (images/screenshots) into implementation code (CSS,
-  Python-pptx, HTML). Use when recreating slide layouts or UI designs from
-  images.
+description: Converts visual designs (images/screenshots) into implementation code (CSS, Python-pptx, HTML). Use when recreating slide layouts or UI designs from images.
 status: implemented
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Layout Architect

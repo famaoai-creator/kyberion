@@ -1,8 +1,6 @@
 ---
 name: red-team-adversary
-description: >-
-  Performs active security "war gaming" by attempting to exploit identified
-  vulnerabilities in a sandbox. Validates threat reality beyond static scans.
+description: Performs active security "war gaming" by attempting to exploit identified vulnerabilities in a sandbox. Validates threat reality beyond static scans.
 status: implemented
 arguments:
   - name: dir
@@ -19,6 +17,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - security
 ---
 
 # Red-Team Adversary

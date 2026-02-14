@@ -1,11 +1,13 @@
 ---
 name: project-health-check
-description: >-
-  Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests,
-  Quality Metrics) and provides a health score with improvement suggestions.
+description: Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and provides a health score with improvement suggestions.
 status: implemented
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
+  - qa
 ---
 
 # Project Health Check

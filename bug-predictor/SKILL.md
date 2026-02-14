@@ -1,8 +1,6 @@
 ---
 name: bug-predictor
-description: >-
-  Predicts future bug hotspots by analyzing code complexity, churn, and
-  historical defect patterns. Warns developers before a bug is even written.
+description: Predicts future bug hotspots by analyzing code complexity, churn, and historical defect patterns. Warns developers before a bug is even written.
 status: implemented
 arguments:
   - name: dir
@@ -23,6 +21,8 @@ arguments:
     description: Output file
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Bug Predictor

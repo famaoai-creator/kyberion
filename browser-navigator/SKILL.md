@@ -1,9 +1,6 @@
 ---
 name: browser-navigator
-description: >-
-  Automates browser actions using Playwright CLI. Can record, replay, and
-  generate browser automation scenarios stored in the knowledge base. Useful for
-  UI testing, data extraction, and visual auditing.
+description: Automates browser actions using Playwright CLI. Can record, replay, and generate browser automation scenarios stored in the knowledge base. Useful for UI testing, data extraction, and visual auditing.
 status: implemented
 arguments:
   - name: url
@@ -26,6 +23,12 @@ arguments:
     description: Output file path
 category: Integration & API
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - compliance
+  - data-engineering
+  - gemini-skill
+  - qa
 ---
 
 # Browser Navigator (Playwright-based)

@@ -1,9 +1,6 @@
 ---
 name: financial-modeling-maestro
-description: >-
-  Generates and analyzes financial models, P&L forecasts, and cash flow
-  projections. Transforms business assumptions into multi-year financial
-  statements.
+description: Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms business assumptions into multi-year financial statements.
 status: implemented
 arguments:
   - name: input
@@ -21,6 +18,9 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Financial Modeling Maestro

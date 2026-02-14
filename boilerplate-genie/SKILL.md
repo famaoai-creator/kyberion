@@ -1,9 +1,6 @@
 ---
 name: boilerplate-genie
-description: >-
-  Scaffolds new projects with best practices (CI/CD, Tests, Linting)
-  pre-configured. Ensures a "healthy" starting point for Next.js, FastAPI,
-  Node.js, and more.
+description: Scaffolds new projects with best practices (CI/CD, Tests, Linting) pre-configured. Ensures a "healthy" starting point for Next.js, FastAPI, Node.js, and more.
 status: implemented
 arguments:
   - name: name
@@ -22,6 +19,10 @@ arguments:
     description: Output directory (defaults to ./<name>)
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - integration
+  - qa
 ---
 
 # Boilerplate Genie

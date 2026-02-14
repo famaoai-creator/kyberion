@@ -1,12 +1,14 @@
 ---
 name: security-scanner
-description: >-
-  Scans the codebase for security risks, including hardcoded secrets (API keys,
-  tokens), dangerous code patterns (eval, shell injection), and insecure
-  configurations. Use to audit code before committing or reviewing.
+description: Scans the codebase for security risks, including hardcoded secrets (API keys, tokens), dangerous code patterns (eval, shell injection), and insecure configurations. Use to audit code before committing or reviewing.
 status: implemented
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
+  - integration
+  - security
 ---
 
 # Security Scanner

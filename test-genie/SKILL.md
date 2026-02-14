@@ -4,6 +4,10 @@ description: Executes the project's test suite and returns the output for AI ana
 status: implemented
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - analytics
+  - gemini-skill
+  - qa
 ---
 
 # Test Genie Skill

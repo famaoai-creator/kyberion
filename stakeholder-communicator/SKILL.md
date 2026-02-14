@@ -1,9 +1,6 @@
 ---
 name: stakeholder-communicator
-description: >-
-  Translates technical decisions and architectural changes into clear,
-  business-oriented language for non-technical stakeholders (Execs, Marketing,
-  Sales).
+description: Translates technical decisions and architectural changes into clear, business-oriented language for non-technical stakeholders (Execs, Marketing, Sales).
 status: implemented
 arguments:
   - name: input
@@ -25,6 +22,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Stakeholder Communicator

@@ -15,6 +15,10 @@ arguments:
     type: string
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - analytics
+  - data-engineering
+  - gemini-skill
 ---
 
 # Db Extractor

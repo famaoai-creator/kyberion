@@ -16,6 +16,9 @@ arguments:
     type: string
 category: Data & Content
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
 ---
 
 # Template Renderer

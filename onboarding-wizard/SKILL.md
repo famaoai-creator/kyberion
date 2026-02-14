@@ -1,8 +1,6 @@
 ---
 name: onboarding-wizard
-description: >-
-  Generates a personalized project guide for new members. Analyzes the codebase
-  and skills to help someone get productive in day one.
+description: Generates a personalized project guide for new members. Analyzes the codebase and skills to help someone get productive in day one.
 status: implemented
 arguments:
   - name: dir
@@ -11,6 +9,9 @@ arguments:
     description: Project directory
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Onboarding Wizard

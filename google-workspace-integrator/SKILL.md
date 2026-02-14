@@ -1,8 +1,6 @@
 ---
 name: google-workspace-integrator
-description: >-
-  Automates Google Docs, Sheets, and Mail. Generates reports, tracks KPIs in
-  spreadsheets, and drafts professional emails for stakeholders.
+description: Automates Google Docs, Sheets, and Mail. Generates reports, tracks KPIs in spreadsheets, and drafts professional emails for stakeholders.
 status: implemented
 arguments:
   - name: action
@@ -26,6 +24,11 @@ arguments:
     description: Output file path
 category: Integration & API
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - cloud
+  - documentation
+  - gemini-skill
 ---
 
 # Google Workspace Integrator

@@ -1,8 +1,6 @@
 ---
 name: chaos-monkey-orchestrator
-description: >-
-  Injects managed chaos into environments to test system resilience. Validates
-  that self-healing and monitoring systems work as expected under stress.
+description: Injects managed chaos into environments to test system resilience. Validates that self-healing and monitoring systems work as expected under stress.
 status: implemented
 arguments:
   - name: dir
@@ -22,6 +20,10 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - observability
+  - qa
 ---
 
 # Chaos Monkey Orchestrator

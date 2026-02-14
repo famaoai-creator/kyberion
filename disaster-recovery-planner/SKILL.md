@@ -1,8 +1,6 @@
 ---
 name: disaster-recovery-planner
-description: >-
-  Generates actionable Disaster Recovery (DR) runbooks from infrastructure and
-  requirements. Validates IaC for resilience (backups, redundancy).
+description: Generates actionable Disaster Recovery (DR) runbooks from infrastructure and requirements. Validates IaC for resilience (backups, redundancy).
 status: implemented
 arguments:
   - name: dir
@@ -21,6 +19,9 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Disaster Recovery Planner

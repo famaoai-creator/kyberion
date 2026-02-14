@@ -1,9 +1,6 @@
 ---
 name: automated-support-architect
-description: >-
-  Generates high-quality user support assets (FAQs, Troubleshooting Guides,
-  Chatbot Knowledge) directly from source code and requirements. Bridges the gap
-  between developers and end-users.
+description: Generates high-quality user support assets (FAQs, Troubleshooting Guides, Chatbot Knowledge) directly from source code and requirements. Bridges the gap between developers and end-users.
 status: implemented
 arguments:
   - name: dir
@@ -20,6 +17,9 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Automated Support Architect

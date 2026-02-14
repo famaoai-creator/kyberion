@@ -1,9 +1,6 @@
 ---
 name: data-collector
-description: >-
-  Fetches data from URLs (Web/API) and saves it to a local directory with
-  metadata (timestamp, source, hash) for traceability. Supports incremental
-  updates.
+description: Fetches data from URLs (Web/API) and saves it to a local directory with metadata (timestamp, source, hash) for traceability. Supports incremental updates.
 status: implemented
 arguments:
   - name: url
@@ -26,6 +23,10 @@ arguments:
     description: Force download ignoring cache/manifest
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
+  - integration
 ---
 
 # Data Collector

@@ -1,8 +1,6 @@
 ---
 name: compliance-officer
-description: >-
-  Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates
-  real-time compliance scores and audit-ready evidence reports.
+description: Maps technical state to regulatory standards (SOC2, ISO27001, etc.). Generates real-time compliance scores and audit-ready evidence reports.
 status: implemented
 arguments:
   - name: dir
@@ -19,6 +17,10 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - compliance
+  - gemini-skill
 ---
 
 # Compliance Officer

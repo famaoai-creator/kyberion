@@ -16,6 +16,8 @@ arguments:
     type: string
 category: Interface & AI
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Audio Transcriber

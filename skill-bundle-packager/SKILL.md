@@ -1,12 +1,12 @@
 ---
 name: skill-bundle-packager
-description: >-
-  Dynamically bundles mission-specific skills into specialized subsets.
-  Optimizes agent performance by focusing on relevant tools for specific
-  high-level tasks.
+description: Dynamically bundles mission-specific skills into specialized subsets. Optimizes agent performance by focusing on relevant tools for specific high-level tasks.
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - performance
 ---
 
 # Skill Bundle Packager

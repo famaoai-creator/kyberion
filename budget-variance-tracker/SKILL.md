@@ -1,8 +1,6 @@
 ---
 name: budget-variance-tracker
-description: >-
-  Compares actual spend and revenue against forecasts. Provides variance
-  analysis and corrective insights to ensure financial discipline.
+description: Compares actual spend and revenue against forecasts. Provides variance analysis and corrective insights to ensure financial discipline.
 status: implemented
 arguments:
   - name: input
@@ -20,6 +18,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - analytics
+  - gemini-skill
 ---
 
 # Budget Variance Tracker

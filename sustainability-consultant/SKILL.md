@@ -1,8 +1,6 @@
 ---
 name: sustainability-consultant
-description: >-
-  Estimates the environmental impact (Carbon Footprint) of code and
-  infrastructure. Recommends optimizations for energy efficiency and "GreenOps".
+description: Estimates the environmental impact (Carbon Footprint) of code and infrastructure. Recommends optimizations for energy efficiency and "GreenOps".
 status: implemented
 arguments:
   - name: dir
@@ -15,6 +13,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Sustainability Consultant (GreenOps)

@@ -1,8 +1,6 @@
 ---
 name: dependency-lifeline
-description: >-
-  Proactively monitors and plans library updates. Assesses the risk of breaking
-  changes and proposes safe update paths.
+description: Proactively monitors and plans library updates. Assesses the risk of breaking changes and proposes safe update paths.
 status: implemented
 arguments:
   - name: dir
@@ -15,6 +13,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - observability
 ---
 
 # Dependency Lifeline

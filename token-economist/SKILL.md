@@ -1,8 +1,6 @@
 ---
 name: asset-token-economist
-description: >-
-  Minimizes token consumption and costs by optimizing data input. Performs smart
-  summarization and chunking of large files without losing critical context.
+description: Minimizes token consumption and costs by optimizing data input. Performs smart summarization and chunking of large files without losing critical context.
 status: implemented
 arguments:
   - name: input
@@ -15,6 +13,10 @@ arguments:
     description: Raw text string to analyze
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - finops
+  - gemini-skill
 ---
 
 # Token Economist

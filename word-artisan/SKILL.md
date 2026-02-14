@@ -4,6 +4,10 @@ description: Generate Word documents (.docx) from Markdown.
 status: implemented
 category: Data & Content
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - documentation
+  - gemini-skill
 ---
 
 # Word Artisan

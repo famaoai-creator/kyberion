@@ -1,8 +1,6 @@
 ---
 name: mission-control
-description: >-
-  Orchestrates multiple skills to achieve high-level goals. Acts as the brain of
-  the ecosystem to coordinate complex workflows across the SDLC.
+description: Orchestrates multiple skills to achieve high-level goals. Acts as the brain of the ecosystem to coordinate complex workflows across the SDLC.
 status: implemented
 arguments:
   - name: pipeline
@@ -16,6 +14,8 @@ arguments:
     type: string
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Mission Control (Orchestrator)

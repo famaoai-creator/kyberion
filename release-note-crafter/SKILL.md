@@ -1,8 +1,6 @@
 ---
 name: release-note-crafter
-description: >-
-  Generates business-value-focused release notes by correlating Git logs with
-  requirements. Focuses on "what's new" for users and stakeholders.
+description: Generates business-value-focused release notes by correlating Git logs with requirements. Focuses on "what's new" for users and stakeholders.
 status: implemented
 arguments:
   - name: dir
@@ -21,6 +19,9 @@ arguments:
     description: Output file path for release notes
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Release Note Crafter

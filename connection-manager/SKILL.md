@@ -1,12 +1,13 @@
 ---
 name: connection-manager
-description: >-
-  Manages secure connections to external tools (AWS, Slack, Jira, Box).
-  Validates credentials in the Personal Tier and injects them into the execution
-  context.
+description: Manages secure connections to external tools (AWS, Slack, Jira, Box). Validates credentials in the Personal Tier and injects them into the execution context.
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - cloud
+  - communication
+  - gemini-skill
 ---
 
 # Connection Manager

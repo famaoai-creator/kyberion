@@ -40,6 +40,11 @@ const logger = {
   info: (msg) => logger._log('info', msg),
   warn: (msg) => logger._log('warn', msg),
   error: (msg) => logger._log('error', msg),
+  success: (msg) => {
+    const ts = chalk.dim(new Date().toISOString());
+    const mid = process.env.MISSION_ID ? chalk.magenta(` [${process.env.MISSION_ID}]`) : '';
+    console.log(`${ts}${mid}${chalk.green(' [SUCCESS] ')}${msg}`);
+  }
 };
 
 /**
@@ -438,7 +443,7 @@ const fileUtils = {
   getCurrentRole: () => {
     const configPath = path.resolve(__dirname, '../../knowledge/personal/role-config.json');
     const config = fileUtils.readJson(configPath);
-    return config ? config.role : 'Unknown';
+    return config ? (config.active_role || config.role) : 'Unknown';
   },
   /**
    * Ensure a directory exists, creating it recursively if needed.

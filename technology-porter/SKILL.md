@@ -1,9 +1,6 @@
 ---
 name: technology-porter
-description: >-
-  Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS
-  to Go). Preserves logic equivalence while optimizing for the target language's
-  idioms.
+description: Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves logic equivalence while optimizing for the target language's idioms.
 status: implemented
 arguments:
   - name: input
@@ -25,6 +22,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Technology Porter

@@ -1,8 +1,6 @@
 ---
 name: unit-economics-optimizer
-description: >-
-  Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing
-  and customer retention strategies to maximize unit margins.
+description: Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer retention strategies to maximize unit margins.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - performance
 ---
 
 # Unit Economics Optimizer

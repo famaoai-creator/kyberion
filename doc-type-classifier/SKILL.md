@@ -4,6 +4,9 @@ description: Classify document type (meeting-notes, spec, etc).
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - documentation
+  - gemini-skill
 ---
 
 # doc-type-classifier

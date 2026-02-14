@@ -1,8 +1,6 @@
 ---
 name: log-to-requirement-bridge
-description: >-
-  Analyzes runtime errors and logs to draft improvement requirements. Bridges
-  the gap between Operations and Development.
+description: Analyzes runtime errors and logs to draft improvement requirements. Bridges the gap between Operations and Development.
 status: implemented
 arguments:
   - name: input
@@ -12,6 +10,8 @@ arguments:
     description: Path to the log file to analyze
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Log-to-Requirement Bridge

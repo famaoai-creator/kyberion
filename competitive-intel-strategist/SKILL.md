@@ -1,9 +1,6 @@
 ---
 name: competitive-intel-strategist
-description: >-
-  Analyzes competitor releases and market trends to propose technical
-  differentiation strategies. Ensures our products stay ahead by leveraging our
-  unique code assets.
+description: Analyzes competitor releases and market trends to propose technical differentiation strategies. Ensures our products stay ahead by leveraging our unique code assets.
 status: implemented
 arguments:
   - name: input
@@ -17,6 +14,8 @@ arguments:
     description: Output file path
 category: Strategy & Leadership
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Competitive Intelligence Strategist

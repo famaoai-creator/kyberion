@@ -1,8 +1,6 @@
 ---
 name: visionary-ethos-keeper
-description: >-
-  Ensures decisions and proposals align with company mission, values, and
-  ethical guidelines. Checks for bias, privacy, and fairness concerns.
+description: Ensures decisions and proposals align with company mission, values, and ethical guidelines. Checks for bias, privacy, and fairness concerns.
 status: implemented
 arguments:
   - name: input
@@ -20,6 +18,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Visionary Ethos Keeper

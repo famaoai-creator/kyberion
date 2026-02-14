@@ -1,8 +1,6 @@
 ---
 name: ecosystem-integration-test
-description: >-
-  Validates the interoperability between skills. Ensures that output formats
-  (JSON/Markdown) from one skill are correctly consumed by the next in a chain.
+description: Validates the interoperability between skills. Ensures that output formats (JSON/Markdown) from one skill are correctly consumed by the next in a chain.
 status: implemented
 arguments:
   - name: dir
@@ -15,6 +13,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - qa
 ---
 
 # Ecosystem Integration Test

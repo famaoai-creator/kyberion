@@ -1,8 +1,6 @@
 ---
 name: jira-agile-assistant
-description: >-
-  Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints,
-  and synchronizes the backlog with the technical roadmap.
+description: Automates Jira operations (Cloud/On-prem). Creates issues, updates sprints, and synchronizes the backlog with the technical roadmap.
 status: implemented
 arguments:
   - name: action
@@ -26,6 +24,8 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Jira Agile Assistant

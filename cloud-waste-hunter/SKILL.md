@@ -1,8 +1,6 @@
 ---
 name: cloud-waste-hunter
-description: >-
-  Actively identifies and eliminates unused or over-provisioned cloud resources.
-  Goes beyond estimation to hunt for actual cost savings in live environments.
+description: Actively identifies and eliminates unused or over-provisioned cloud resources. Goes beyond estimation to hunt for actual cost savings in live environments.
 status: implemented
 arguments:
   - name: dir
@@ -11,6 +9,9 @@ arguments:
     description: Directory with cloud configs
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - finops
+  - gemini-skill
 ---
 
 # Cloud Waste Hunter

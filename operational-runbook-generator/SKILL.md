@@ -1,9 +1,6 @@
 ---
 name: operational-runbook-generator
-description: >-
-  Generates detailed, step-by-step operational runbooks for day-to-day tasks
-  (scaling, patching, updates). Ensures consistency and safety with built-in
-  rollback procedures.
+description: Generates detailed, step-by-step operational runbooks for day-to-day tasks (scaling, patching, updates). Ensures consistency and safety with built-in rollback procedures.
 status: implemented
 arguments:
   - name: service
@@ -21,6 +18,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # Operational Runbook Generator

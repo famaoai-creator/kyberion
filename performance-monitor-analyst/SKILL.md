@@ -1,8 +1,6 @@
 ---
 name: performance-monitor-analyst
-description: >-
-  Correlates performance targets with actual profiling results. Identifies
-  bottlenecks and validates against non-functional requirements.
+description: Correlates performance targets with actual profiling results. Identifies bottlenecks and validates against non-functional requirements.
 status: implemented
 arguments:
   - name: input
@@ -16,6 +14,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - observability
 ---
 
 # Performance Monitor Analyst

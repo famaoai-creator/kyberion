@@ -1,8 +1,6 @@
 ---
 name: knowledge-fetcher
-description: >-
-  Fetch knowledge from both public and confidential directories. Bridges general
-  best practices with proprietary internal standards.
+description: Fetch knowledge from both public and confidential directories. Bridges general best practices with proprietary internal standards.
 status: implemented
 arguments:
   - name: query
@@ -14,6 +12,8 @@ arguments:
     type: string
 category: Integration & API
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Knowledge Fetcher (Hybrid Bridge)

@@ -1,11 +1,12 @@
 ---
 name: schema-inspector
-description: >-
-  Automatically locates and displays schema definition files (SQL, Prisma,
-  OpenAPI, etc.).
+description: Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).
 status: implemented
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
+  - integration
 ---
 
 # Schema Inspector Skill

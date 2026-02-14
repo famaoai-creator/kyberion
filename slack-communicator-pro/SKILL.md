@@ -1,8 +1,6 @@
 ---
 name: slack-communicator-pro
-description: >-
-  Manages high-fidelity notifications and team engagement on Slack. Sends
-  automated summaries, alerts, and strategic announcements.
+description: Manages high-fidelity notifications and team engagement on Slack. Sends automated summaries, alerts, and strategic announcements.
 status: implemented
 arguments:
   - name: action
@@ -26,6 +24,9 @@ arguments:
     description: Output file path
 category: Integration & API
 last_updated: '2026-02-13'
+tags:
+  - communication
+  - gemini-skill
 ---
 
 # Slack Communicator Pro

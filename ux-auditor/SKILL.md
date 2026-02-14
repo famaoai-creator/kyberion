@@ -1,8 +1,6 @@
 ---
 name: ux-auditor
-description: >-
-  Performs visual and structural UX/Accessibility audits on web interfaces.
-  Analyzes screenshots to recommend improvements for usability and contrast.
+description: Performs visual and structural UX/Accessibility audits on web interfaces. Analyzes screenshots to recommend improvements for usability and contrast.
 status: implemented
 arguments:
   - name: dir
@@ -15,6 +13,9 @@ arguments:
     description: Output file path
 category: Governance & Security
 last_updated: '2026-02-13'
+tags:
+  - compliance
+  - gemini-skill
 ---
 
 # UX Auditor

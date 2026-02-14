@@ -324,7 +324,8 @@ function searchCommand() {
   const results = skills.filter(
     (s) =>
       (s.n || s.name).toLowerCase().includes(lowerKey) ||
-      (s.d || s.description).toLowerCase().includes(lowerKey)
+      (s.d || s.description).toLowerCase().includes(lowerKey) ||
+      (s.t || s.tags || []).some((tag) => tag.toLowerCase().includes(lowerKey))
   );
 
   if (results.length === 0) {

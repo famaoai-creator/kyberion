@@ -13,6 +13,8 @@ arguments:
     description: JSON file with required keywords
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Completeness Scorer

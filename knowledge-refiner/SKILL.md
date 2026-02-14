@@ -1,8 +1,6 @@
 ---
 name: knowledge-refiner
-description: >-
-  Maintains and consolidates the knowledge base. Cleans up unstructured data and
-  merges it into structured glossaries or patterns.
+description: Maintains and consolidates the knowledge base. Cleans up unstructured data and merges it into structured glossaries or patterns.
 status: implemented
 arguments:
   - name: dir
@@ -19,6 +17,9 @@ arguments:
     description: Output file path
 category: Utilities
 last_updated: '2026-02-13'
+tags:
+  - data-engineering
+  - gemini-skill
 ---
 
 # Knowledge Refiner

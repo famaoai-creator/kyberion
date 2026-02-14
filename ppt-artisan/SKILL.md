@@ -1,11 +1,12 @@
 ---
 name: ppt-artisan
-description: >-
-  Create and convert PowerPoint presentations from Markdown using Marp. Use when
-  the user wants to generate slides, manage themes, or convert MD to PPTX/PDF.
+description: Create and convert PowerPoint presentations from Markdown using Marp. Use when the user wants to generate slides, manage themes, or convert MD to PPTX/PDF.
 status: implemented
 category: Data & Content
 last_updated: '2026-02-13'
+tags:
+  - automation
+  - gemini-skill
 ---
 
 # PowerPoint Artisan (ppt-artisan)

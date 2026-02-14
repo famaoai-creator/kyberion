@@ -1,8 +1,6 @@
 ---
 name: quality-scorer
-description: >-
-  Evaluates technical and textual quality based on IPA benchmarks and
-  readability standards.
+description: Evaluates technical and textual quality based on IPA benchmarks and readability standards.
 status: implemented
 arguments:
   - name: input
@@ -11,6 +9,8 @@ arguments:
     description: Input file or directory path
 category: Engineering & DevOps
 last_updated: '2026-02-13'
+tags:
+  - gemini-skill
 ---
 
 # Quality Scorer
