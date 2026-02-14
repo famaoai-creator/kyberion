@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const crypto = require('crypto');
+const v8 = require('v8');
 
 /**
  * Shared Utility Core for Gemini Skills.
@@ -134,6 +135,26 @@ class Cache {
     if (!entry) {
       // Check disk if enabled
       const diskPath = this._getDiskPath(key);
+      const v8Path = diskPath.replace('.json', '.v8');
+      
+      // 1. Try V8 Serialization first (Faster)
+      if (fs.existsSync(v8Path)) {
+        try {
+          const v8Entry = v8.deserialize(fs.readFileSync(v8Path));
+          if (Date.now() - v8Entry.timestamp < v8Entry.ttl) {
+            // Integrity check for V8 (Full check since it's fast)
+            const actualHash = this._generateHash(v8Entry.value);
+            if (actualHash === v8Entry.h) {
+              this._stats.hits++;
+              this.set(key, v8Entry.value, v8Entry.ttl, false);
+              return v8Entry.value;
+            }
+          }
+          fs.unlinkSync(v8Path);
+        } catch (_) { /* ignore */ }
+      }
+
+      // 2. Fallback to JSON
       if (fs.existsSync(diskPath)) {
         try {
           const diskEntry = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
@@ -207,10 +228,15 @@ class Cache {
     // 3. Disk Storage
     if (persist) {
       const diskPath = this._getDiskPath(key);
+      const v8Path = diskPath.replace('.json', '.v8');
       try {
         if (!fs.existsSync(this._persistenceDir)) fs.mkdirSync(this._persistenceDir, { recursive: true });
         const hash = this._generateHash(value);
-        fs.writeFileSync(diskPath, JSON.stringify({ value, timestamp, ttl, h: hash }), 'utf8');
+        const entry = { value, timestamp, ttl, h: hash };
+        
+        // Save both for migration/transparency, but V8 is preferred on load
+        fs.writeFileSync(v8Path, v8.serialize(entry));
+        fs.writeFileSync(diskPath, JSON.stringify(entry), 'utf8');
       } catch (_) { /* ignore write errors */ }
     }
   }
