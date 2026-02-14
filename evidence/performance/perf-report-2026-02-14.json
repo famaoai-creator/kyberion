@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-02-14T01:58:56.249Z",
+  "timestamp": "2026-02-14T04:06:58.579Z",
   "summary": {
-    "total_records": 2906,
-    "unique_skills": 77
+    "total_records": 2919,
+    "unique_skills": 79
   },
   "regressions": [
     {
@@ -99,7 +99,9 @@
       "avgMs": 430,
       "minMs": 0,
       "maxMs": 1187,
-      "cacheHitRatio": 0
+      "cacheHitRatio": 0,
+      "sloCompliance": 76,
+      "efficiencyScore": 96
     },
     {
       "skill": "api-doc-generator",
@@ -109,7 +111,9 @@
       "avgMs": 3357,
       "minMs": 0,
       "maxMs": 30023,
-      "cacheHitRatio": 0
+      "cacheHitRatio": 0,
+      "sloCompliance": 6,
+      "efficiencyScore": 66
     },
     {
       "skill": "diagram-renderer",
@@ -119,7 +123,9 @@
       "avgMs": 624,
       "minMs": 0,
       "maxMs": 3775,
-      "cacheHitRatio": 0
+      "cacheHitRatio": 0,
+      "sloCompliance": 71,
+      "efficiencyScore": 94
     },
     {
       "skill": "doc-sync-sentinel",
@@ -129,7 +135,9 @@
       "avgMs": 978,
       "minMs": 83,
       "maxMs": 4502,
-      "cacheHitRatio": 0
+      "cacheHitRatio": 0,
+      "sloCompliance": 100,
+      "efficiencyScore": 90
     },
     {
       "skill": "ppt-artisan",
@@ -139,60 +147,261 @@
       "avgMs": 5712,
       "minMs": 2044,
       "maxMs": 9409,
-      "cacheHitRatio": 0
+      "cacheHitRatio": 0,
+      "sloCompliance": 7,
+      "efficiencyScore": 50
     }
   ],
-  "unstable_skills": [
+  "unstable_skills": [],
+  "efficiency_alerts": [
+    {
+      "skill": "api-doc-generator",
+      "executions": 36,
+      "errors": 34,
+      "errorRate": 94.4,
+      "avgMs": 3357,
+      "minMs": 0,
+      "maxMs": 30023,
+      "cacheHitRatio": 0,
+      "sloCompliance": 6,
+      "efficiencyScore": 66
+    },
+    {
+      "skill": "ppt-artisan",
+      "executions": 14,
+      "errors": 1,
+      "errorRate": 7.1,
+      "avgMs": 5712,
+      "minMs": 2044,
+      "maxMs": 9409,
+      "cacheHitRatio": 0,
+      "sloCompliance": 7,
+      "efficiencyScore": 50
+    }
+  ],
+  "slo_breaches": [
     {
       "skill": "encoding-detector",
-      "executions": 187,
-      "errors": 32,
-      "errorRate": 17.1,
-      "avgMs": 0,
-      "minMs": 0,
-      "maxMs": 1,
-      "cacheHitRatio": 0
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "82.9",
+      "target_success": 99
+    },
+    {
+      "skill": "format-detector",
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "97.9",
+      "target_success": 99
     },
     {
       "skill": "quality-scorer",
-      "executions": 96,
-      "errors": 8,
-      "errorRate": 8.3,
-      "avgMs": 17,
-      "minMs": 0,
-      "maxMs": 34,
-      "cacheHitRatio": 0
+      "actual_latency": 17,
+      "target_latency": 5000,
+      "actual_success": "91.7",
+      "target_success": 99
     },
     {
       "skill": "data-transformer",
-      "executions": 87,
-      "errors": 32,
-      "errorRate": 36.8,
-      "avgMs": 1,
-      "minMs": 0,
-      "maxMs": 2,
-      "cacheHitRatio": 0
+      "actual_latency": 1,
+      "target_latency": 5000,
+      "actual_success": "63.2",
+      "target_success": 99
     },
     {
       "skill": "environment-provisioner",
-      "executions": 86,
-      "errors": 26,
-      "errorRate": 30.2,
-      "avgMs": 0,
-      "minMs": 0,
-      "maxMs": 1,
-      "cacheHitRatio": 0
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "69.8",
+      "target_success": 99
     },
     {
       "skill": "cloud-cost-estimator",
-      "executions": 83,
-      "errors": 68,
-      "errorRate": 81.9,
-      "avgMs": 20,
-      "minMs": 0,
-      "maxMs": 35,
-      "cacheHitRatio": 0
+      "actual_latency": 20,
+      "target_latency": 5000,
+      "actual_success": "18.1",
+      "target_success": 99
+    },
+    {
+      "skill": "diff-visualizer",
+      "actual_latency": 1,
+      "target_latency": 5000,
+      "actual_success": "81.5",
+      "target_success": 99
+    },
+    {
+      "skill": "schema-validator",
+      "actual_latency": 5,
+      "target_latency": 5000,
+      "actual_success": "57.0",
+      "target_success": 99
+    },
+    {
+      "skill": "context-injector",
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "44.8",
+      "target_success": 99
+    },
+    {
+      "skill": "cloud-waste-hunter",
+      "actual_latency": 430,
+      "target_latency": 5000,
+      "actual_success": "75.8",
+      "target_success": 99
+    },
+    {
+      "skill": "dependency-lifeline",
+      "actual_latency": 1,
+      "target_latency": 5000,
+      "actual_success": "93.3",
+      "target_success": 99
+    },
+    {
+      "skill": "performance-monitor-analyst",
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "77.6",
+      "target_success": 99
+    },
+    {
+      "skill": "dependency-grapher",
+      "actual_latency": 18,
+      "target_latency": 5000,
+      "actual_success": "41.1",
+      "target_success": 99
+    },
+    {
+      "skill": "release-note-crafter",
+      "actual_latency": 13,
+      "target_latency": 5000,
+      "actual_success": "69.8",
+      "target_success": 99
+    },
+    {
+      "skill": "requirements-wizard",
+      "actual_latency": 20,
+      "target_latency": 5000,
+      "actual_success": "26.4",
+      "target_success": 99
+    },
+    {
+      "skill": "schema-inspector",
+      "actual_latency": 27,
+      "target_latency": 5000,
+      "actual_success": "76.9",
+      "target_success": 99
+    },
+    {
+      "skill": "onboarding-wizard",
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "68.0",
+      "target_success": 99
+    },
+    {
+      "skill": "html-reporter",
+      "actual_latency": 4,
+      "target_latency": 5000,
+      "actual_success": "66.7",
+      "target_success": 99
+    },
+    {
+      "skill": "security-scanner",
+      "actual_latency": 46,
+      "target_latency": 60000,
+      "actual_success": "89.7",
+      "target_success": 95
+    },
+    {
+      "skill": "api-doc-generator",
+      "actual_latency": 3357,
+      "target_latency": 30000,
+      "actual_success": "5.6"
+    },
+    {
+      "skill": "connection-manager",
+      "actual_latency": 20,
+      "target_latency": 5000,
+      "actual_success": "25.0",
+      "target_success": 99
+    },
+    {
+      "skill": "diagram-renderer",
+      "actual_latency": 624,
+      "target_latency": 5000,
+      "actual_success": "70.8",
+      "target_success": 99
+    },
+    {
+      "skill": "excel-artisan",
+      "actual_latency": 24,
+      "target_latency": 5000,
+      "actual_success": "82.6",
+      "target_success": 99
+    },
+    {
+      "skill": "doc-type-classifier",
+      "actual_latency": 17,
+      "target_latency": 5000,
+      "actual_success": "90.9",
+      "target_success": 99
+    },
+    {
+      "skill": "ppt-artisan",
+      "actual_latency": 5712,
+      "target_latency": 5000,
+      "actual_success": "92.9",
+      "target_success": 99
+    },
+    {
+      "skill": "knowledge-harvester",
+      "actual_latency": 102,
+      "target_latency": 5000,
+      "actual_success": "83.3",
+      "target_success": 99
+    },
+    {
+      "skill": "google-workspace-integrator",
+      "actual_latency": 2,
+      "target_latency": 5000,
+      "actual_success": "63.6",
+      "target_success": 99
+    },
+    {
+      "skill": "mission-control",
+      "actual_latency": 189,
+      "target_latency": 5000,
+      "actual_success": "66.7",
+      "target_success": 99
+    },
+    {
+      "skill": "mock-skill",
+      "actual_latency": 0,
+      "target_latency": 5000,
+      "actual_success": "50.0",
+      "target_success": 99
+    },
+    {
+      "skill": "terraform-arch-mapper",
+      "actual_latency": 10,
+      "target_latency": 5000,
+      "actual_success": "75.0",
+      "target_success": 99
+    },
+    {
+      "skill": "autonomous-skill-designer",
+      "actual_latency": 32,
+      "target_latency": 5000,
+      "actual_success": "50.0",
+      "target_success": 99
+    },
+    {
+      "skill": "browser-navigator",
+      "actual_latency": 1045,
+      "target_latency": 5000,
+      "actual_success": "0.0",
+      "target_success": 99
     }
-  ],
-  "efficiency_alerts": []
+  ]
 }

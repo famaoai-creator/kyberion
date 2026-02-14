@@ -205,6 +205,11 @@ class MetricsCollector {
   reportFromHistory() {
     const entries = this.loadHistory();
     const bySkill = {};
+    const sloPath = path.resolve(__dirname, '../../knowledge/orchestration/slo-targets.json');
+    const sloTargets = fs.existsSync(sloPath)
+      ? JSON.parse(fs.readFileSync(sloPath, 'utf8'))
+      : { default: { latency_ms: 5000, success_rate: 99 } };
+
     for (const entry of entries) {
       if (!bySkill[entry.skill]) {
         bySkill[entry.skill] = {
@@ -215,6 +220,7 @@ class MetricsCollector {
           maxMs: 0,
           cacheHits: 0,
           cacheMisses: 0,
+          sloPasses: 0,
         };
       }
       const s = bySkill[entry.skill];
@@ -224,6 +230,12 @@ class MetricsCollector {
       s.minMs = Math.min(s.minMs, entry.duration_ms || 0);
       s.maxMs = Math.max(s.maxMs, entry.duration_ms || 0);
 
+      // SRE: SLO Check for this data point
+      const target =
+        (sloTargets.critical_path && sloTargets.critical_path[entry.skill]) || sloTargets.default;
+      const isLatencyOk = (entry.duration_ms || 0) <= target.latency_ms;
+      if (isLatencyOk && entry.status !== 'error') s.sloPasses++;
+
       if (entry.cacheStats) {
         s.cacheHits += entry.cacheStats.hits || 0;
         s.cacheMisses += entry.cacheStats.misses || 0;
@@ -231,18 +243,28 @@ class MetricsCollector {
     }
 
     const skills = Object.entries(bySkill).map(([name, s]) => {
+      const avgMs = s.count > 0 ? Math.round(s.totalMs / s.count) : 0;
       const totalCache = s.cacheHits + s.cacheMisses;
       const cacheHitRatio = totalCache > 0 ? Math.round((s.cacheHits / totalCache) * 100) : 0;
+      const sloCompliance = s.count > 0 ? Math.round((s.sloPasses / s.count) * 100) : 0;
+
+      // Efficiency Score (historical baseline)
+      const TIME_BASE = 5000;
+      const timeImpact = Math.min(50, (avgMs / TIME_BASE) * 50);
+      const cacheBonus = Math.round((cacheHitRatio / 100) * 20);
+      const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - timeImpact + cacheBonus)));
 
       return {
         skill: name,
         executions: s.count,
         errors: s.errors,
         errorRate: s.count > 0 ? Math.round((s.errors / s.count) * 1000) / 10 : 0,
-        avgMs: s.count > 0 ? Math.round(s.totalMs / s.count) : 0,
+        avgMs,
         minMs: s.minMs === Infinity ? 0 : s.minMs,
         maxMs: s.maxMs,
         cacheHitRatio,
+        sloCompliance,
+        efficiencyScore,
       };
     });
 
