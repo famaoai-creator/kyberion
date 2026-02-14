@@ -28,6 +28,14 @@ skillDirs.forEach(dir => {
   if (pkg.author !== "Gemini Agent") { pkg.author = "Gemini Agent"; modified = true; }
   if (pkg.license !== "MIT") { pkg.license = "MIT"; modified = true; }
 
+  // 1.1 Node.js Engine
+  if (rootPkg.engines && rootPkg.engines.node) {
+    if (!pkg.engines || pkg.engines.node !== rootPkg.engines.node) {
+      pkg.engines = { node: rootPkg.engines.node };
+      modified = true;
+    }
+  }
+
   // 2. Normalize Dependencies
   if (pkg.dependencies) {
     for (const [name, version] of Object.entries(pkg.dependencies)) {

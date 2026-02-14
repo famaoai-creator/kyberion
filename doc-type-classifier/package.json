@@ -8,5 +8,8 @@
   "license": "MIT",
   "devDependencies": {
     "@agent/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
