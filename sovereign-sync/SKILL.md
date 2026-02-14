@@ -1,7 +1,7 @@
 ---
 name: sovereign-sync
 description: Syncs specific knowledge tiers with external private repositories.
-status: >-
+status: implemented
   implemented Acts as the "Import/Export" bridge for L3 (Confidential) data,
   allowing organization-wide sharing of maps and analysis.
 category: Utilities

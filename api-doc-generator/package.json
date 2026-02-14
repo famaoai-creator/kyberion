@@ -5,9 +5,6 @@
   "main": "scripts/generate.cjs",
   "author": "Gemini Agent",
   "license": "MIT",
-  "dependencies": {
-    "widdershins": "^4.0.1"
-  },
   "private": true,
   "devDependencies": {
     "@agent/core": "workspace:*"
