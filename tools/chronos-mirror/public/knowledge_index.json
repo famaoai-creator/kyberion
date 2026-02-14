@@ -1,0 +1,1112 @@
+[
+  {
+    "id": "ai-engineering/best_practices.md",
+    "title": "AIエンジニアリング・ベストプラクティス",
+    "path": "/knowledge_src/ai-engineering/best_practices.md",
+    "category": "ai-engineering"
+  },
+  {
+    "id": "ai-engineering/review_checklist.md",
+    "title": "AIシステム・レビューチェックリスト",
+    "path": "/knowledge_src/ai-engineering/review_checklist.md",
+    "category": "ai-engineering"
+  },
+  {
+    "id": "ai-engineering/strategy.md",
+    "title": "エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)",
+    "path": "/knowledge_src/ai-engineering/strategy.md",
+    "category": "ai-engineering"
+  },
+  {
+    "id": "architecture/distributed-systems.md",
+    "title": "分散システム ＆ アーキテクチャパターン",
+    "path": "/knowledge_src/architecture/distributed-systems.md",
+    "category": "architecture"
+  },
+  {
+    "id": "architecture/microservices-patterns.md",
+    "title": "Microservices Design Patterns",
+    "path": "/knowledge_src/architecture/microservices-patterns.md",
+    "category": "architecture"
+  },
+  {
+    "id": "ceo/ai-business-engineering.md",
+    "title": "AI-Driven Business Engineering: The Gemini Strategy",
+    "path": "/knowledge_src/ceo/ai-business-engineering.md",
+    "category": "ceo"
+  },
+  {
+    "id": "ceo/executive_briefing_standards.md",
+    "title": "Executive Briefing Standards",
+    "path": "/knowledge_src/ceo/executive_briefing_standards.md",
+    "category": "ceo"
+  },
+  {
+    "id": "ceo/finance/kpi_standards.md",
+    "title": "財務KPI標準基準 (Financial KPI Standards)",
+    "path": "/knowledge_src/ceo/finance/kpi_standards.md",
+    "category": "ceo/finance"
+  },
+  {
+    "id": "ceo/investment/tech_dd_standard.md",
+    "title": "技術デューデリジェンス (Tech DD) 標準基準",
+    "path": "/knowledge_src/ceo/investment/tech_dd_standard.md",
+    "category": "ceo/investment"
+  },
+  {
+    "id": "ceo/legal-tax-essentials-jp.md",
+    "title": "Corporate Legal & Tax Essentials (Japan context)",
+    "path": "/knowledge_src/ceo/legal-tax-essentials-jp.md",
+    "category": "ceo"
+  },
+  {
+    "id": "ceo/mission/corporate_purpose.md",
+    "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
+    "path": "/knowledge_src/ceo/mission/corporate_purpose.md",
+    "category": "ceo/mission"
+  },
+  {
+    "id": "ceo/planning/frameworks.md",
+    "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
+    "path": "/knowledge_src/ceo/planning/frameworks.md",
+    "category": "ceo/planning"
+  },
+  {
+    "id": "connections/setup_guide.md",
+    "title": "ユニバーサル接続設定ガイド (UCM Setup)",
+    "path": "/knowledge_src/connections/setup_guide.md",
+    "category": "connections"
+  },
+  {
+    "id": "devops/ci-cd-patterns.md",
+    "title": "CI/CD Pipeline Design Patterns",
+    "path": "/knowledge_src/devops/ci-cd-patterns.md",
+    "category": "devops"
+  },
+  {
+    "id": "devops/cloud-native.md",
+    "title": "クラウドネイティブ ＆ インフラ設計",
+    "path": "/knowledge_src/devops/cloud-native.md",
+    "category": "devops"
+  },
+  {
+    "id": "economics/it_cost_benchmarks.md",
+    "title": "IT Cost Benchmarks & Strategic ROI",
+    "path": "/knowledge_src/economics/it_cost_benchmarks.md",
+    "category": "economics"
+  },
+  {
+    "id": "evolution/biometric_privacy.md",
+    "title": "Biometric & Mood Data Privacy Protocol",
+    "path": "/knowledge_src/evolution/biometric_privacy.md",
+    "category": "evolution"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/architect.md",
+    "title": "ADR-001: Use Redis for Semantic Search Vector Storage",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/architect.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/build-error-resolver.md",
+    "title": "Build Error Resolver",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/build-error-resolver.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/code-reviewer.md",
+    "title": "code-reviewer",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/code-reviewer.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/database-reviewer.md",
+    "title": "Database Reviewer",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/database-reviewer.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/doc-updater.md",
+    "title": "Documentation & Codemap Specialist",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/doc-updater.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/e2e-runner.md",
+    "title": "E2E Test Runner",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/e2e-runner.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/go-build-resolver.md",
+    "title": "Go Build Error Resolver",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/go-build-resolver.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/go-reviewer.md",
+    "title": "Static analysis",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/go-reviewer.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/planner.md",
+    "title": "Implementation Plan: [Feature Name]",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/planner.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/python-reviewer.md",
+    "title": "Type checking",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/python-reviewer.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/refactor-cleaner.md",
+    "title": "Refactor & Dead Code Cleaner",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/refactor-cleaner.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/security-reviewer.md",
+    "title": "Security Reviewer",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/security-reviewer.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/agents/tdd-guide.md",
+    "title": "Test should fail - we haven't implemented yet",
+    "path": "/knowledge_src/external-wisdom/everything-claude/agents/tdd-guide.md",
+    "category": "external-wisdom/everything-claude/agents"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/agents.md",
+    "title": "Agent Orchestration",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/agents.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/coding-style.md",
+    "title": "Coding Style",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/coding-style.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/git-workflow.md",
+    "title": "Git Workflow",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/git-workflow.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/hooks.md",
+    "title": "Hooks System",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/hooks.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/patterns.md",
+    "title": "Common Patterns",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/patterns.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/performance.md",
+    "title": "Performance Optimization",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/performance.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/security.md",
+    "title": "Security Guidelines",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/security.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/common/testing.md",
+    "title": "Testing Requirements",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/testing.md",
+    "category": "external-wisdom/everything-claude/rules/common"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/golang/coding-style.md",
+    "title": "Go Coding Style",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/coding-style.md",
+    "category": "external-wisdom/everything-claude/rules/golang"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/golang/hooks.md",
+    "title": "Go Hooks",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/hooks.md",
+    "category": "external-wisdom/everything-claude/rules/golang"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/golang/patterns.md",
+    "title": "Go Patterns",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/patterns.md",
+    "category": "external-wisdom/everything-claude/rules/golang"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/golang/security.md",
+    "title": "Go Security",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/security.md",
+    "category": "external-wisdom/everything-claude/rules/golang"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/golang/testing.md",
+    "title": "Go Testing",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/testing.md",
+    "category": "external-wisdom/everything-claude/rules/golang"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/python/coding-style.md",
+    "title": "Python Coding Style",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/coding-style.md",
+    "category": "external-wisdom/everything-claude/rules/python"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/python/hooks.md",
+    "title": "Python Hooks",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/hooks.md",
+    "category": "external-wisdom/everything-claude/rules/python"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/python/patterns.md",
+    "title": "Python Patterns",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/patterns.md",
+    "category": "external-wisdom/everything-claude/rules/python"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/python/security.md",
+    "title": "Python Security",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/security.md",
+    "category": "external-wisdom/everything-claude/rules/python"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/python/testing.md",
+    "title": "Python Testing",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/testing.md",
+    "category": "external-wisdom/everything-claude/rules/python"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/typescript/coding-style.md",
+    "title": "TypeScript/JavaScript Coding Style",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/coding-style.md",
+    "category": "external-wisdom/everything-claude/rules/typescript"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/typescript/hooks.md",
+    "title": "TypeScript/JavaScript Hooks",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/hooks.md",
+    "category": "external-wisdom/everything-claude/rules/typescript"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/typescript/patterns.md",
+    "title": "TypeScript/JavaScript Patterns",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/patterns.md",
+    "category": "external-wisdom/everything-claude/rules/typescript"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/typescript/security.md",
+    "title": "TypeScript/JavaScript Security",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/security.md",
+    "category": "external-wisdom/everything-claude/rules/typescript"
+  },
+  {
+    "id": "external-wisdom/everything-claude/rules/typescript/testing.md",
+    "title": "TypeScript/JavaScript Testing",
+    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/testing.md",
+    "category": "external-wisdom/everything-claude/rules/typescript"
+  },
+  {
+    "id": "fisc-compliance/aws_fisc_standard.md",
+    "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
+    "path": "/knowledge_src/fisc-compliance/aws_fisc_standard.md",
+    "category": "fisc-compliance"
+  },
+  {
+    "id": "fisc-compliance/blea_fisc_reference.md",
+    "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
+    "path": "/knowledge_src/fisc-compliance/blea_fisc_reference.md",
+    "category": "fisc-compliance"
+  },
+  {
+    "id": "frameworks/conceptual-frameworks.md",
+    "title": "Conceptual Frameworks Reference",
+    "path": "/knowledge_src/frameworks/conceptual-frameworks.md",
+    "category": "frameworks"
+  },
+  {
+    "id": "nonfunctional/test-viewpoints/ipa_grade_2018.md",
+    "title": "非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)",
+    "path": "/knowledge_src/nonfunctional/test-viewpoints/ipa_grade_2018.md",
+    "category": "nonfunctional/test-viewpoints"
+  },
+  {
+    "id": "onboarding/learning_paths.md",
+    "title": "ロール別教育ロードマップ (Learning Paths by Role)",
+    "path": "/knowledge_src/onboarding/learning_paths.md",
+    "category": "onboarding"
+  },
+  {
+    "id": "operations/availability_best_practices.md",
+    "title": "Availability & Disaster Recovery Best Practices",
+    "path": "/knowledge_src/operations/availability_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/incident_knowledge_loop.md",
+    "title": "Incident Knowledge Loop: Learning from Failures",
+    "path": "/knowledge_src/operations/incident_knowledge_loop.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/modern_sre_best_practices.md",
+    "title": "Modern SRE Best Practices (Advanced Operations)",
+    "path": "/knowledge_src/operations/modern_sre_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/monitoring/best_practices.md",
+    "title": "監視設定ベストプラクティス・チェックリスト",
+    "path": "/knowledge_src/operations/monitoring/best_practices.md",
+    "category": "operations/monitoring"
+  },
+  {
+    "id": "operations/monitoring/datadog_best_practices.md",
+    "title": "Datadog 導入・運用ベストプラクティス",
+    "path": "/knowledge_src/operations/monitoring/datadog_best_practices.md",
+    "category": "operations/monitoring"
+  },
+  {
+    "id": "operations/monitoring/newrelic_best_practices.md",
+    "title": "New Relic 導入・運用ベストプラクティス",
+    "path": "/knowledge_src/operations/monitoring/newrelic_best_practices.md",
+    "category": "operations/monitoring"
+  },
+  {
+    "id": "operations/monitoring_best_practices.md",
+    "title": "Monitoring & Observability Best Practices",
+    "path": "/knowledge_src/operations/monitoring_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/pagerduty_best_practices.md",
+    "title": "PagerDuty Best Practices",
+    "path": "/knowledge_src/operations/pagerduty_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/runbook_best_practices.md",
+    "title": "Runbook & Playbook Best Practices (AI-Native Operations)",
+    "path": "/knowledge_src/operations/runbook_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "operations/runbooks/standard.md",
+    "title": "運用ランブック（手順書）標準構成",
+    "path": "/knowledge_src/operations/runbooks/standard.md",
+    "category": "operations/runbooks"
+  },
+  {
+    "id": "operations/slo_dashboard_best_practices.md",
+    "title": "SLO & Dashboard Best Practices",
+    "path": "/knowledge_src/operations/slo_dashboard_best_practices.md",
+    "category": "operations"
+  },
+  {
+    "id": "orchestration/advanced-development-flow.md",
+    "title": "高度な自律開発標準ワークフロー (Advanced Development Flow)",
+    "path": "/knowledge_src/orchestration/advanced-development-flow.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/autonomous-agent-protocol.md",
+    "title": "Sovereign Autonomous Agent Protocol (SAAP)",
+    "path": "/knowledge_src/orchestration/autonomous-agent-protocol.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/autonomous-debug-loop.md",
+    "title": "自律型デバッグ・ループ (Autonomous Debug Loop)",
+    "path": "/knowledge_src/orchestration/autonomous-debug-loop.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/context-extraction-rules.md",
+    "title": "コンテキスト抽出・要約ルール (Context Extraction Rules)",
+    "path": "/knowledge_src/orchestration/context-extraction-rules.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/corporate-env-guide.md",
+    "title": "企業内ネットワーク環境セットアップガイド",
+    "path": "/knowledge_src/orchestration/corporate-env-guide.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/data-handover-specs.md",
+    "title": "スキル間データ受け渡し仕様 (Data Handover Specs)",
+    "path": "/knowledge_src/orchestration/data-handover-specs.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/directives-protocol.md",
+    "title": "Cross-Role Directive Protocol (CRDP)",
+    "path": "/knowledge_src/orchestration/directives-protocol.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/fusion-protocols/learning_loop.md",
+    "title": "Continuous Learning Loop Protocol",
+    "path": "/knowledge_src/orchestration/fusion-protocols/learning_loop.md",
+    "category": "orchestration/fusion-protocols"
+  },
+  {
+    "id": "orchestration/git-flow-standards.md",
+    "title": "自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)",
+    "path": "/knowledge_src/orchestration/git-flow-standards.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/hybrid-development-flow.md",
+    "title": "ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)",
+    "path": "/knowledge_src/orchestration/hybrid-development-flow.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/knowledge-protocol.md",
+    "title": "ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)",
+    "path": "/knowledge_src/orchestration/knowledge-protocol.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/mission-playbooks/ceo-strategy.md",
+    "title": "ミッション・プレイブック：CEO戦略的意思決定",
+    "path": "/knowledge_src/orchestration/mission-playbooks/ceo-strategy.md",
+    "category": "orchestration/mission-playbooks"
+  },
+  {
+    "id": "orchestration/mission-playbooks/product-audit.md",
+    "title": "ミッション・プレイブック：プロダクト健全性 ＆ リリース監査",
+    "path": "/knowledge_src/orchestration/mission-playbooks/product-audit.md",
+    "category": "orchestration/mission-playbooks"
+  },
+  {
+    "id": "orchestration/mission-playbooks/saas-roi.md",
+    "title": "ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定",
+    "path": "/knowledge_src/orchestration/mission-playbooks/saas-roi.md",
+    "category": "orchestration/mission-playbooks"
+  },
+  {
+    "id": "orchestration/onboarding-directives/01_eng_to_steward.md",
+    "title": "MISSION: Infrastructure & Environment Mapping",
+    "path": "/knowledge_src/orchestration/onboarding-directives/01_eng_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/02_ceo_to_steward.md",
+    "title": "MISSION: Strategic Vision Harvesting",
+    "path": "/knowledge_src/orchestration/onboarding-directives/02_ceo_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/03_arch_to_steward.md",
+    "title": "MISSION: Skill Usage & Performance Audit",
+    "path": "/knowledge_src/orchestration/onboarding-directives/03_arch_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/04_steward_self_map.md",
+    "title": "MISSION: External System Connection Mapping",
+    "path": "/knowledge_src/orchestration/onboarding-directives/04_steward_self_map.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/05_sol_to_steward.md",
+    "title": "MISSION: Competitive Edge & ROI Benchmarking",
+    "path": "/knowledge_src/orchestration/onboarding-directives/05_sol_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/06_sre_to_steward.md",
+    "title": "MISSION: Incident Response & SRE Wisdom",
+    "path": "/knowledge_src/orchestration/onboarding-directives/06_sre_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/07_legal_to_steward.md",
+    "title": "MISSION: Legal Guardrails & IP Portfolio",
+    "path": "/knowledge_src/orchestration/onboarding-directives/07_legal_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/08_qa_to_steward.md",
+    "title": "MISSION: Testing Standards & Bug Analytics",
+    "path": "/knowledge_src/orchestration/onboarding-directives/08_qa_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/09_pmo_to_steward.md",
+    "title": "MISSION: Project Governance & Standards Alignment",
+    "path": "/knowledge_src/orchestration/onboarding-directives/09_pmo_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/10_manager_to_steward.md",
+    "title": "MISSION: Organizational Map & Approval History",
+    "path": "/knowledge_src/orchestration/onboarding-directives/10_manager_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/11_marketing_to_steward.md",
+    "title": "MISSION: Brand Assets & Trend Harvesting",
+    "path": "/knowledge_src/orchestration/onboarding-directives/11_marketing_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/12_cs_to_steward.md",
+    "title": "MISSION: Voice of Customer (VoC) Data Collection",
+    "path": "/knowledge_src/orchestration/onboarding-directives/12_cs_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/13_hr_to_steward.md",
+    "title": "MISSION: Culture Archetypes & Talent Specs",
+    "path": "/knowledge_src/orchestration/onboarding-directives/13_hr_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/14_pdm_to_steward.md",
+    "title": "MISSION: Product Roadmap & Feature Backlog",
+    "path": "/knowledge_src/orchestration/onboarding-directives/14_pdm_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/15_designer_to_steward.md",
+    "title": "MISSION: UI/UX Asset & Persona Templates",
+    "path": "/knowledge_src/orchestration/onboarding-directives/15_designer_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/16_finance_to_steward.md",
+    "title": "MISSION: Financial P&L & Cost Analysis",
+    "path": "/knowledge_src/orchestration/onboarding-directives/16_finance_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/17_sec_to_steward.md",
+    "title": "MISSION: Threat Intelligence & Vulnerability Feed",
+    "path": "/knowledge_src/orchestration/onboarding-directives/17_sec_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/18_sales_to_steward.md",
+    "title": "MISSION: Sales Pipelines & Deal Insights",
+    "path": "/knowledge_src/orchestration/onboarding-directives/18_sales_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/19_dev_to_steward.md",
+    "title": "MISSION: Technical Blueprint Discovery",
+    "path": "/knowledge_src/orchestration/onboarding-directives/19_dev_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/20_owner_to_steward.md",
+    "title": "MISSION: Market Dynamics & P&L Sensitivity",
+    "path": "/knowledge_src/orchestration/onboarding-directives/20_owner_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/onboarding-directives/21_assistant_to_steward.md",
+    "title": "MISSION: Executive Support & Templates",
+    "path": "/knowledge_src/orchestration/onboarding-directives/21_assistant_to_steward.md",
+    "category": "orchestration/onboarding-directives"
+  },
+  {
+    "id": "orchestration/optimization-standards.md",
+    "title": "自律型シナジー標準基準 (Autonomous Synergy Standards)",
+    "path": "/knowledge_src/orchestration/optimization-standards.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/polyglot-roadmap.md",
+    "title": "Polyglot Core Transformation Roadmap (Sidecar Architecture)",
+    "path": "/knowledge_src/orchestration/polyglot-roadmap.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/proposal-pipeline.md",
+    "title": "Professional Proposal Pipeline (Orchestration Pattern)",
+    "path": "/knowledge_src/orchestration/proposal-pipeline.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/quality-management-flow.md",
+    "title": "エンタープライズ品質管理フロー (Quality Management Flow)",
+    "path": "/knowledge_src/orchestration/quality-management-flow.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/sentinel-operations.md",
+    "title": "Autonomous Sentinel Operations",
+    "path": "/knowledge_src/orchestration/sentinel-operations.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/asset-token-economy-protocol.md",
+    "title": "トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)",
+    "path": "/knowledge_src/orchestration/asset-token-economy-protocol.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/voice-interface-protocol.md",
+    "title": "Voice Interface Protocol (VIP) - Integrated Flow Edition",
+    "path": "/knowledge_src/orchestration/voice-interface-protocol.md",
+    "category": "orchestration"
+  },
+  {
+    "id": "personalities/matrix.md",
+    "title": "ペルソナ・マトリクス (Persona Matrix)",
+    "path": "/knowledge_src/personalities/matrix.md",
+    "category": "personalities"
+  },
+  {
+    "id": "pmo/standard/ipa_nfr_bridge.md",
+    "title": "PMO Bridge to IPA Non-Functional Grade",
+    "path": "/knowledge_src/pmo/standard/ipa_nfr_bridge.md",
+    "category": "pmo/standard"
+  },
+  {
+    "id": "pmo/standard/pmbok_v7.md",
+    "title": "PMBOK v7 Project Management Principles",
+    "path": "/knowledge_src/pmo/standard/pmbok_v7.md",
+    "category": "pmo/standard"
+  },
+  {
+    "id": "pmo/standard/stakeholder_management.md",
+    "title": "Stakeholder Management Framework",
+    "path": "/knowledge_src/pmo/standard/stakeholder_management.md",
+    "category": "pmo/standard"
+  },
+  {
+    "id": "pmo/standards/governance.md",
+    "title": "PMO ガバナンス標準基準 (Governance Standard)",
+    "path": "/knowledge_src/pmo/standards/governance.md",
+    "category": "pmo/standards"
+  },
+  {
+    "id": "pmo/templates/external_status_report.md",
+    "title": "対外報告用ステータスレポート・テンプレート",
+    "path": "/knowledge_src/pmo/templates/external_status_report.md",
+    "category": "pmo/templates"
+  },
+  {
+    "id": "public/standards/aws_fisc_standard.md",
+    "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
+    "path": "/knowledge_src/public/standards/aws_fisc_standard.md",
+    "category": "public/standards"
+  },
+  {
+    "id": "public/standards/blea_fisc_reference.md",
+    "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
+    "path": "/knowledge_src/public/standards/blea_fisc_reference.md",
+    "category": "public/standards"
+  },
+  {
+    "id": "public/templates/ss_ppt_theme.md",
+    "title": "ss_ppt_theme",
+    "path": "/knowledge_src/public/templates/ss_ppt_theme.md",
+    "category": "public/templates"
+  },
+  {
+    "id": "quality-management/metrics_standards.md",
+    "title": "定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)",
+    "path": "/knowledge_src/quality-management/metrics_standards.md",
+    "category": "quality-management"
+  },
+  {
+    "id": "quality-management/test_viewpoints_catalog.md",
+    "title": "Test Viewpoint Catalog: Non-Functional Excellence",
+    "path": "/knowledge_src/quality-management/test_viewpoints_catalog.md",
+    "category": "quality-management"
+  },
+  {
+    "id": "requirements-guide/ipa_best_practices.md",
+    "title": "要件定義ガイド (IPA準拠)",
+    "path": "/knowledge_src/requirements-guide/ipa_best_practices.md",
+    "category": "requirements-guide"
+  },
+  {
+    "id": "requirements-guide/review_checklist.md",
+    "title": "要件定義ドキュメント・レビューチェックリスト",
+    "path": "/knowledge_src/requirements-guide/review_checklist.md",
+    "category": "requirements-guide"
+  },
+  {
+    "id": "roles/business_owner/mission.md",
+    "title": "Business Owner (事業責任者) ミッション声明",
+    "path": "/knowledge_src/roles/business_owner/mission.md",
+    "category": "roles/business_owner"
+  },
+  {
+    "id": "roles/ceo/finance/kpi_standards.md",
+    "title": "財務KPI標準基準 (Financial KPI Standards)",
+    "path": "/knowledge_src/roles/ceo/finance/kpi_standards.md",
+    "category": "roles/ceo/finance"
+  },
+  {
+    "id": "roles/ceo/investment/tech_dd_standard.md",
+    "title": "技術デューデリジェンス (Tech DD) 標準基準",
+    "path": "/knowledge_src/roles/ceo/investment/tech_dd_standard.md",
+    "category": "roles/ceo/investment"
+  },
+  {
+    "id": "roles/ceo/memories/strategic_vision.md",
+    "title": "STRATEGIC_VISION Memories (ROLES)",
+    "path": "/knowledge_src/roles/ceo/memories/strategic_vision.md",
+    "category": "roles/ceo/memories"
+  },
+  {
+    "id": "roles/ceo/mission/corporate_purpose.md",
+    "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
+    "path": "/knowledge_src/roles/ceo/mission/corporate_purpose.md",
+    "category": "roles/ceo/mission"
+  },
+  {
+    "id": "roles/ceo/planning/frameworks.md",
+    "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
+    "path": "/knowledge_src/roles/ceo/planning/frameworks.md",
+    "category": "roles/ceo/planning"
+  },
+  {
+    "id": "roles/customer_success/mission.md",
+    "title": "Customer Success (カスタマーサクセス) ミッション声明",
+    "path": "/knowledge_src/roles/customer_success/mission.md",
+    "category": "roles/customer_success"
+  },
+  {
+    "id": "roles/cyber_security/mission.md",
+    "title": "Cyber Security Lead (セキュリティ責任者) ミッション声明",
+    "path": "/knowledge_src/roles/cyber_security/mission.md",
+    "category": "roles/cyber_security"
+  },
+  {
+    "id": "roles/designer/mission.md",
+    "title": "Experience Designer (デザイナー) ミッション声明",
+    "path": "/knowledge_src/roles/designer/mission.md",
+    "category": "roles/designer"
+  },
+  {
+    "id": "roles/ecosystem_architect/guidelines.md",
+    "title": "Ecosystem Architect 行動指針 (Operational Guidelines)",
+    "path": "/knowledge_src/roles/ecosystem_architect/guidelines.md",
+    "category": "roles/ecosystem_architect"
+  },
+  {
+    "id": "roles/executive_assistant/mission.md",
+    "title": "Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明",
+    "path": "/knowledge_src/roles/executive_assistant/mission.md",
+    "category": "roles/executive_assistant"
+  },
+  {
+    "id": "roles/finance_controller/mission.md",
+    "title": "Finance Controller (財務・経理責任者) ミッション声明",
+    "path": "/knowledge_src/roles/finance_controller/mission.md",
+    "category": "roles/finance_controller"
+  },
+  {
+    "id": "roles/incident_commander/mission.md",
+    "title": "Incident Commander (インシデント・コマンダー) ミッション声明",
+    "path": "/knowledge_src/roles/incident_commander/mission.md",
+    "category": "roles/incident_commander"
+  },
+  {
+    "id": "roles/integration_steward/mission.md",
+    "title": "Role: Integration Steward",
+    "path": "/knowledge_src/roles/integration_steward/mission.md",
+    "category": "roles/integration_steward"
+  },
+  {
+    "id": "roles/knowledge_steward/mission.md",
+    "title": "Knowledge Steward (ナレッジ・スチュワード) ミッション声明",
+    "path": "/knowledge_src/roles/knowledge_steward/mission.md",
+    "category": "roles/knowledge_steward"
+  },
+  {
+    "id": "roles/legal_strategist/mission.md",
+    "title": "Legal & IP Strategist (法務・知財戦略) ミッション声明",
+    "path": "/knowledge_src/roles/legal_strategist/mission.md",
+    "category": "roles/legal_strategist"
+  },
+  {
+    "id": "roles/line_manager/mission.md",
+    "title": "Line Manager (ラインマネージャー) ミッション声明",
+    "path": "/knowledge_src/roles/line_manager/mission.md",
+    "category": "roles/line_manager"
+  },
+  {
+    "id": "roles/marketing_growth/mission.md",
+    "title": "Marketing & Growth (マーケティング & 成長戦略) ミッション声明",
+    "path": "/knowledge_src/roles/marketing_growth/mission.md",
+    "category": "roles/marketing_growth"
+  },
+  {
+    "id": "roles/performance_engineer/guidelines.md",
+    "title": "Performance Engineer 行動指針 (Operational Guidelines)",
+    "path": "/knowledge_src/roles/performance_engineer/guidelines.md",
+    "category": "roles/performance_engineer"
+  },
+  {
+    "id": "roles/performance_engineer/knowledge_base.md",
+    "title": "Performance Evaluation Knowledge Base",
+    "path": "/knowledge_src/roles/performance_engineer/knowledge_base.md",
+    "category": "roles/performance_engineer"
+  },
+  {
+    "id": "roles/pmo_governance/mission.md",
+    "title": "PMO Governance (PMO/ガバナンス) ミッション声明",
+    "path": "/knowledge_src/roles/pmo_governance/mission.md",
+    "category": "roles/pmo_governance"
+  },
+  {
+    "id": "roles/pmo_governance/quality_gates.md",
+    "title": "品質ゲート (Quality Gates) 運用基準",
+    "path": "/knowledge_src/roles/pmo_governance/quality_gates.md",
+    "category": "roles/pmo_governance"
+  },
+  {
+    "id": "roles/product_manager/mission.md",
+    "title": "Product Manager (プロダクトマネージャー) ミッション声明",
+    "path": "/knowledge_src/roles/product_manager/mission.md",
+    "category": "roles/product_manager"
+  },
+  {
+    "id": "roles/qa_lead/mission.md",
+    "title": "Quality Assurance (QA/QC) ミッション声明",
+    "path": "/knowledge_src/roles/qa_lead/mission.md",
+    "category": "roles/qa_lead"
+  },
+  {
+    "id": "roles/qa_lead/qa_checkpoints.md",
+    "title": "QA/QC 重点チェックポイント：非同期通信と物理制約",
+    "path": "/knowledge_src/roles/qa_lead/qa_checkpoints.md",
+    "category": "roles/qa_lead"
+  },
+  {
+    "id": "roles/reliability_engineer/mission.md",
+    "title": "Reliability Engineer (SRE/運用責任者) ミッション声明",
+    "path": "/knowledge_src/roles/reliability_engineer/mission.md",
+    "category": "roles/reliability_engineer"
+  },
+  {
+    "id": "roles/software_developer/mission.md",
+    "title": "Software Developer (ソフトウェア開発者) ミッション声明",
+    "path": "/knowledge_src/roles/software_developer/mission.md",
+    "category": "roles/software_developer"
+  },
+  {
+    "id": "roles/solution_architect/mission.md",
+    "title": "Solution Architect (ソリューション・アーキテクト) ミッション声明",
+    "path": "/knowledge_src/roles/solution_architect/mission.md",
+    "category": "roles/solution_architect"
+  },
+  {
+    "id": "roles/strategic_sales/mission.md",
+    "title": "Strategic Sales (営業・事業開発) ミッション声明",
+    "path": "/knowledge_src/roles/strategic_sales/mission.md",
+    "category": "roles/strategic_sales"
+  },
+  {
+    "id": "roles/talent_culture/mission.md",
+    "title": "Talent & Culture (採用 & 組織文化) ミッション声明",
+    "path": "/knowledge_src/roles/talent_culture/mission.md",
+    "category": "roles/talent_culture"
+  },
+  {
+    "id": "sdlc/design_standard_nablarch.md",
+    "title": "アプリケーション方式設計標準 (Nablarch/AWS参考)",
+    "path": "/knowledge_src/sdlc/design_standard_nablarch.md",
+    "category": "sdlc"
+  },
+  {
+    "id": "sdlc/waterfall_standard.md",
+    "title": "ウォーターフォール開発標準：工程と成果物 (SDLC Standard)",
+    "path": "/knowledge_src/sdlc/waterfall_standard.md",
+    "category": "sdlc"
+  },
+  {
+    "id": "security/security-best-practices.md",
+    "title": "Security Best Practices",
+    "path": "/knowledge_src/security/security-best-practices.md",
+    "category": "security"
+  },
+  {
+    "id": "skills/ux-visualizer/methodology.md",
+    "title": "Methodology: High-Fidelity SPA Reverse Engineering",
+    "path": "/knowledge_src/skills/ux-visualizer/methodology.md",
+    "category": "skills/ux-visualizer"
+  },
+  {
+    "id": "software-design/patterns.md",
+    "title": "ソフトウェアデザインパターン & 設計原則",
+    "path": "/knowledge_src/software-design/patterns.md",
+    "category": "software-design"
+  },
+  {
+    "id": "standards/ai-native/gemini-coding-standard.md",
+    "title": "Gemini AI-Native Coding Standard",
+    "path": "/knowledge_src/standards/ai-native/gemini-coding-standard.md",
+    "category": "standards/ai-native"
+  },
+  {
+    "id": "standards/engineering/code-analysis-protocol.md",
+    "title": "Source Code Analysis Protocol (SCAP)",
+    "path": "/knowledge_src/standards/engineering/code-analysis-protocol.md",
+    "category": "standards/engineering"
+  },
+  {
+    "id": "standards/engineering/reverse-design-protocol.md",
+    "title": "Reverse Design Protocol (RDP)",
+    "path": "/knowledge_src/standards/engineering/reverse-design-protocol.md",
+    "category": "standards/engineering"
+  },
+  {
+    "id": "standards/fisc/security-controls.md",
+    "title": "FISC-Aligned Security Standard (Cloud Infrastructure)",
+    "path": "/knowledge_src/standards/fisc/security-controls.md",
+    "category": "standards/fisc"
+  },
+  {
+    "id": "standards/ipa/requirements-checklist.md",
+    "title": "IPA-Aligned Requirements Engineering Standard",
+    "path": "/knowledge_src/standards/ipa/requirements-checklist.md",
+    "category": "standards/ipa"
+  },
+  {
+    "id": "standards/sdlc/methodologies.md",
+    "title": "Software Development Life Cycle (SDLC) Methodologies",
+    "path": "/knowledge_src/standards/sdlc/methodologies.md",
+    "category": "standards/sdlc"
+  },
+  {
+    "id": "strategy/winning-proposal-standards.md",
+    "title": "Winning Proposal Standards (Strategic Communication)",
+    "path": "/knowledge_src/strategy/winning-proposal-standards.md",
+    "category": "strategy"
+  },
+  {
+    "id": "tech-stack/atlassian/jira_best_practices.md",
+    "title": "Jira 運用ベストプラクティス",
+    "path": "/knowledge_src/tech-stack/atlassian/jira_best_practices.md",
+    "category": "tech-stack/atlassian"
+  },
+  {
+    "id": "tech-stack/aws_unified_operations_support.md",
+    "title": "AWS Unified Operations Team (Premium Support Extension)",
+    "path": "/knowledge_src/tech-stack/aws_unified_operations_support.md",
+    "category": "tech-stack"
+  },
+  {
+    "id": "tech-stack/box_api.md",
+    "title": "Box API 連携ガイド (Node.js SDK)",
+    "path": "/knowledge_src/tech-stack/box_api.md",
+    "category": "tech-stack"
+  },
+  {
+    "id": "tech-stack/box_cli.md",
+    "title": "Box CLI 活用ガイド",
+    "path": "/knowledge_src/tech-stack/box_cli.md",
+    "category": "tech-stack"
+  },
+  {
+    "id": "tech-stack/google/workspace_best_practices.md",
+    "title": "Google Workspace 連携ベストプラクティス",
+    "path": "/knowledge_src/tech-stack/google/workspace_best_practices.md",
+    "category": "tech-stack/google"
+  },
+  {
+    "id": "tech-stack/macos/voice_control_guide.md",
+    "title": "macOS 音声コントロール ＆ 音声入力活用ガイド",
+    "path": "/knowledge_src/tech-stack/macos/voice_control_guide.md",
+    "category": "tech-stack/macos"
+  },
+  {
+    "id": "tech-stack/mcp-integration-guide.md",
+    "title": "MCP (Model Context Protocol) Integration Guide",
+    "path": "/knowledge_src/tech-stack/mcp-integration-guide.md",
+    "category": "tech-stack"
+  },
+  {
+    "id": "tech-stack/voltmx/architecture.md",
+    "title": "VoltMX Architecture Overview",
+    "path": "/knowledge_src/tech-stack/voltmx/architecture.md",
+    "category": "tech-stack/voltmx"
+  },
+  {
+    "id": "tech-stack/voltmx/best_practices.md",
+    "title": "VoltMX Development Best Practices",
+    "path": "/knowledge_src/tech-stack/voltmx/best_practices.md",
+    "category": "tech-stack/voltmx"
+  },
+  {
+    "id": "tech-stack/voltmx/migration/mapping_rules.md",
+    "title": "VoltMX to React Technical Mapping Rules",
+    "path": "/knowledge_src/tech-stack/voltmx/migration/mapping_rules.md",
+    "category": "tech-stack/voltmx/migration"
+  },
+  {
+    "id": "tech-stack/voltmx/migration/strategy.md",
+    "title": "VoltMX to React Migration Strategy",
+    "path": "/knowledge_src/tech-stack/voltmx/migration/strategy.md",
+    "category": "tech-stack/voltmx/migration"
+  },
+  {
+    "id": "tech-stack/voltmx/troubleshooting.md",
+    "title": "VoltMX Troubleshooting Guide",
+    "path": "/knowledge_src/tech-stack/voltmx/troubleshooting.md",
+    "category": "tech-stack/voltmx"
+  },
+  {
+    "id": "templates/themes/excel_design_guide.md",
+    "title": "プロフェッショナル・エクセル設計書テーマガイド",
+    "path": "/knowledge_src/templates/themes/excel_design_guide.md",
+    "category": "templates/themes"
+  },
+  {
+    "id": "templates/themes/marp_theme_guide.md",
+    "title": "Marp テーマ作成 ＆ スタイリング完全ガイド",
+    "path": "/knowledge_src/templates/themes/marp_theme_guide.md",
+    "category": "templates/themes"
+  },
+  {
+    "id": "templates/themes/theme_design_guide.md",
+    "title": "プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)",
+    "path": "/knowledge_src/templates/themes/theme_design_guide.md",
+    "category": "templates/themes"
+  },
+  {
+    "id": "templates/themes/visual_harmony_guide.md",
+    "title": "ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition",
+    "path": "/knowledge_src/templates/themes/visual_harmony_guide.md",
+    "category": "templates/themes"
+  },
+  {
+    "id": "testing/test_item_specification.md",
+    "title": "テスト項目表・実施結果標準仕様 (Test Item Specification)",
+    "path": "/knowledge_src/testing/test_item_specification.md",
+    "category": "testing"
+  },
+  {
+    "id": "testing/viewpoint-catalogs/tis_catalog_v1_6.md",
+    "title": "テスト観点カタログ (TIS株式会社 公開版 v1.6)",
+    "path": "/knowledge_src/testing/viewpoint-catalogs/tis_catalog_v1_6.md",
+    "category": "testing/viewpoint-catalogs"
+  },
+  {
+    "id": "voice/persona_definitions.md",
+    "title": "音声ペルソナ定義 (Voice Persona Definitions)",
+    "path": "/knowledge_src/voice/persona_definitions.md",
+    "category": "voice"
+  }
+]

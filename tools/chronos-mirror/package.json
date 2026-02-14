@@ -1,0 +1,15 @@
+{
+  "name": "gemini-deepwiki",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "slidev --open",
+    "build": "slidev build",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "latest",
+    "@slidev/theme-default": "latest",
+    "marked": "^17.0.2",
+    "playwright-chromium": "latest"
+  }
+}
