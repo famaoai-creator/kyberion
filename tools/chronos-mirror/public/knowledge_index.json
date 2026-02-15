@@ -1188,6 +1188,30 @@
     "category": "tech-stack/voltmx"
   },
   {
+    "id": "templates/reporting/audience_strategy.md",
+    "title": "Audience Strategy for Executive Reporting",
+    "path": "/knowledge_src/templates/reporting/audience_strategy.md",
+    "category": "templates/reporting"
+  },
+  {
+    "id": "templates/reporting/master_slide_structure.md",
+    "title": "Master Slide Structure (Marp Standard)",
+    "path": "/knowledge_src/templates/reporting/master_slide_structure.md",
+    "category": "templates/reporting"
+  },
+  {
+    "id": "templates/reporting/project_management_plan_13.md",
+    "title": "Project Management Plan (PMP) - 13 Standard Items",
+    "path": "/knowledge_src/templates/reporting/project_management_plan_13.md",
+    "category": "templates/reporting"
+  },
+  {
+    "id": "templates/reporting/project_plan_master.md",
+    "title": "Project Plan Master Template (Consulting Standard)",
+    "path": "/knowledge_src/templates/reporting/project_plan_master.md",
+    "category": "templates/reporting"
+  },
+  {
     "id": "templates/themes/excel_design_guide.md",
     "title": "プロフェッショナル・エクセル設計書テーマガイド",
     "path": "/knowledge_src/templates/themes/excel_design_guide.md",

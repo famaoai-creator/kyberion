@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*Last Updated: 2026-02-14T18:19:20.712Z*
+*Last Updated: 2026-02-15T05:43:55.153Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md)
@@ -385,6 +385,12 @@
 ## 📁 tech-stack/voltmx/migration
 - [VoltMX to React Technical Mapping Rules](./tech-stack/voltmx/migration/mapping_rules.md)
 - [VoltMX to React Migration Strategy](./tech-stack/voltmx/migration/strategy.md)
+
+## 📁 templates/reporting
+- [Audience Strategy for Executive Reporting](./templates/reporting/audience_strategy.md)
+- [Master Slide Structure (Marp Standard)](./templates/reporting/master_slide_structure.md)
+- [Project Management Plan (PMP) - 13 Standard Items](./templates/reporting/project_management_plan_13.md)
+- [Project Plan Master Template (Consulting Standard)](./templates/reporting/project_plan_master.md)
 
 ## 📁 templates/themes
 - [プロフェッショナル・エクセル設計書テーマガイド](./templates/themes/excel_design_guide.md)
