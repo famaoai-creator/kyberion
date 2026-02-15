@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*Last Updated: 2026-02-15T05:43:55.153Z*
+*Last Updated: 2026-02-15T11:24:45.794Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md)
@@ -133,6 +133,7 @@
 - [運用ランブック（手順書）標準構成](./operations/runbooks/standard.md)
 
 ## 📁 orchestration
+- [Active Inquiry Protocol: The Power of Questioning](./orchestration/active_inquiry_protocol.md)
 - [高度な自律開発標準ワークフロー (Advanced Development Flow)](./orchestration/advanced-development-flow.md)
 - [Sovereign Autonomous Agent Protocol (SAAP)](./orchestration/autonomous-agent-protocol.md)
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./orchestration/autonomous-debug-loop.md)
@@ -151,7 +152,7 @@
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./orchestration/self-refinement-protocol.md)
 - [Autonomous Sentinel Operations](./orchestration/sentinel-operations.md)
 - [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./orchestration/token-economy-protocol.md)
-- [Voice Interface Protocol (VIP) - Integrated Flow Edition](./orchestration/voice-interface-protocol.md)
+- [Voice Interface Protocol (VIP)](./orchestration/voice-interface-protocol.md)
 
 ## 📁 orchestration/fusion-protocols
 - [Continuous Learning Loop Protocol](./orchestration/fusion-protocols/learning_loop.md)

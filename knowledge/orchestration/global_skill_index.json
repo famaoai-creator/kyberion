@@ -4,6 +4,13 @@
   "u": "2026-02-14T04:33:56.710Z",
   "s": [
     {
+      "n": "mobile-test-generator",
+      "d": "Automatically generates Maestro YAML test flows based on provided scenarios and mobile automation best practices.",
+      "s": "impl",
+      "m": "scripts/generate.cjs",
+      "t": ["testing"]
+    },
+    {
       "n": "source-importer",
       "d": "Securely imports external source code into the ecosystem's quarantine area with mandatory security scanning.",
       "s": "impl",

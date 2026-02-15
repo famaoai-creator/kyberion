@@ -444,6 +444,12 @@
     "category": "operations"
   },
   {
+    "id": "orchestration/active_inquiry_protocol.md",
+    "title": "Active Inquiry Protocol: The Power of Questioning",
+    "path": "/knowledge_src/orchestration/active_inquiry_protocol.md",
+    "category": "orchestration"
+  },
+  {
     "id": "orchestration/advanced-development-flow.md",
     "title": "高度な自律開発標準ワークフロー (Advanced Development Flow)",
     "path": "/knowledge_src/orchestration/advanced-development-flow.md",
@@ -703,7 +709,7 @@
   },
   {
     "id": "orchestration/voice-interface-protocol.md",
-    "title": "Voice Interface Protocol (VIP) - Integrated Flow Edition",
+    "title": "Voice Interface Protocol (VIP)",
     "path": "/knowledge_src/orchestration/voice-interface-protocol.md",
     "category": "orchestration"
   },
