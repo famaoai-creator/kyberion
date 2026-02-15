@@ -1,26 +1,23 @@
-# Voice Interface Protocol (VIP) - Integrated Flow Edition
+# Voice Interface Protocol (VIP)
 
-Gemini CLI における「統合型」ハンズフリー操作の標準プロトコル。
+音声による対話を通じて、エコシステムの操作と意思決定を迅速化するためのプロトコル。
 
-## 1. 動作モデル：統合ターミナル・フロー
+## 1. 音声対話の美学 (Voice Aesthetics)
+- **簡潔さ (Brevity)**: 音声応答は、原則として 3フレーズ（約30秒以内）に収める。詳細なデータは「Chronos Mirror をご覧ください」と誘導する。
+- **即応性 (Low Latency)**: ローカル LLM (Gemma) を活用し、思考の待ち時間を 1秒以内に抑える。
+- **確認の徹底 (Confirmation)**: 破壊的な操作（ファイルの削除、高額APIの実行）は、必ず「実行してよろしいですか？」と音声で再確認する。
 
-従来の外部ループスクリプト（chat_loop）を廃止し、標準のターミナル対話の中でエージェントが自律的にマイクを制御する。
+## 2. 技術スタック (The Sensory Stack)
+| 機能 | 採用技術 | 特徴 |
+| :--- | :--- | :--- |
+| **Ear (STT)** | OpenAI Whisper (Local) | オフラインで動作。高精度な日本語認識。 |
+| **Brain (LLM)** | Gemma 2 (Ollama) | ローカル実行。高速かつ日本語に強い。 |
+| **Mouth (TTS)** | macOS `say` / ElevenLabs | `say` は即時性、ElevenLabs は感情表現に優れる。 |
 
-- **入力**: ユーザーが音声入力（Dictation）でプロンプトを入力し、Enter で送信。
-- **処理中**: Enter 送信により OS 側で音声入力が自動 OFF になる。
-- **回答出力**: エージェントが回答を表示。
-- **フィードバック**: 回答終了時に `speak.cjs` で音声を生成。
-- **次ターンの準備**: 読み上げ完了後、エージェントが `osascript` でマイクを再度 ON にする。
+## 3. 音声コマンドの拡張
+- 「お疲れ様」→ `task_manager.cjs` の退勤処理を起動。
+- 「今の状況は？」→ `PERFORMANCE_DASHBOARD` の要約を読み上げ。
+- 「資料を作って」→ `Executive Reporting Maestro` を召喚。
 
-## 2. 実装の役割分担
-
-- **エージェントの責務**:
-  - 全てのターンの最後に `speak.cjs` と `osascript (keycode: 176)` を実行する。
-  - 長い回答やコードブロックを適切にクリーンアップして発話させる。
-- **スキルの責務**:
-  - `voice-interface-maestro` は、OS 状態に依存しないクリーンな発話エンジンを提供すること。
-
-## 3. 設定の優先順位
-
-1. `knowledge/personal/voice/config.json` の `dictationKeycode` を絶対的なトリガーとする。
-2. 音声ペルソナは言語自動判定に基づいて選択する。
+---
+*Created: 2026-02-14 | Voice Interface Architect*

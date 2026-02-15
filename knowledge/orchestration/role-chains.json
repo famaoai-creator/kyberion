@@ -1,0 +1,23 @@
+{
+  "chains": {
+    "migration": [
+      { "role": "Architect", "objective": "Define migration strategy and identify risks." },
+      { "role": "Focused Craftsman", "objective": "Implement the code conversion based on strategy." },
+      { "role": "Security Reviewer", "objective": "Audit the converted code for vulnerabilities." },
+      { "role": "Executive Reporting Maestro", "objective": "Generate completion report and slides." }
+    ],
+    "refactoring": [
+      { "role": "Architect", "objective": "Analyze complexity and propose structural changes." },
+      { "role": "Focused Craftsman", "objective": "Apply refactoring patterns." },
+      { "role": "Rigorous Validator", "objective": "Run regression tests to ensure stability." }
+    ],
+    "incident": [
+      { "role": "Resilient Commander", "objective": "Triage the incident and stabilize the system." },
+      { "role": "Reliability Engineer", "objective": "Analyze root cause and fix the leak." },
+      { "role": "Executive Reporting Maestro", "objective": "Draft the incident report for stakeholders." }
+    ],
+    "default": [
+      { "role": "Autonomous Agent", "objective": "Execute the request." }
+    ]
+  }
+}
