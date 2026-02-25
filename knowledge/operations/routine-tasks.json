@@ -34,6 +34,7 @@
       "frequency": "daily",
       "schedule": "anytime",
       "description": "リンク切れや用語の不整合を自動スキャンします。",
+      "skill": "knowledge-auditor",
       "required_role": "Ecosystem Architect"
     },
     {

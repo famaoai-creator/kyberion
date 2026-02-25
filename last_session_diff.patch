@@ -1,0 +1,3176 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index eaa8f67..8b34f06 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -66,7 +66,7 @@ jobs:
+     needs: lint-and-validate
+     strategy:
+       matrix:
+-        test-suite: [smoke, unit, integration, plugins]
++        test-suite: [smoke, unit, integration, plugins, ts-skills]
+         include:
+           - test-suite: smoke
+             command: npm test
+@@ -76,6 +76,8 @@ jobs:
+             command: npm run test:integration
+           - test-suite: plugins
+             command: npm run test:plugins
++          - test-suite: ts-skills
++            command: npm run test:ts
+     steps:
+       - uses: actions/checkout@v4
+ 
+diff --git a/dependency-graph.mmd b/dependency-graph.mmd
+index 4bd6a10..09c9295 100644
+--- a/dependency-graph.mmd
++++ b/dependency-graph.mmd
+@@ -1,160 +1,167 @@
+ graph TD
+-    subgraph Shared_Library
+-        Lib[scripts/lib/]
++  subgraph Ecosystem ["Gemini Skills Ecosystem"]
++    subgraph audit ["📂 AUDIT"]
++      ai_ethics_auditor["ai-ethics-auditor"]
++      bug_predictor["bug-predictor"]
++      compliance_officer["compliance-officer"]
++      license_auditor["license-auditor"]
++      monitoring_config_auditor["monitoring-config-auditor"]
++      post_quantum_shield["post-quantum-shield"]
++      project_health_check["project-health-check"]
++      quality_scorer["quality-scorer"]
++      red_team_adversary["red-team-adversary"]
++      security_scanner["security-scanner"]
++      skill_quality_auditor["skill-quality-auditor"]
++      supply_chain_sentinel["supply-chain-sentinel"]
+     end
+-
+-    agent_activity_monitor[agent-activity-monitor]
+-    ai_ethics_auditor[ai-ethics-auditor]
+-    ai_model_orchestrator[ai-model-orchestrator]
+-    api_doc_generator[api-doc-generator]
+-    api_doc_generator --> Lib
+-    api_evolution_manager[api-evolution-manager]
+-    api_fetcher[api-fetcher]
+-    audio_transcriber[audio-transcriber]
+-    auto_context_mapper[auto-context-mapper]
+-    automated_support_architect[automated-support-architect]
+-    autonomous_skill_designer[autonomous-skill-designer]
+-    backlog_connector[backlog-connector]
+-    binary_archaeologist[binary-archaeologist]
+-    biometric_context_adapter[biometric-context-adapter]
+-    boilerplate_genie[boilerplate-genie]
+-    box_connector[box-connector]
+-    browser_navigator[browser-navigator]
+-    budget_variance_tracker[budget-variance-tracker]
+-    bug_predictor[bug-predictor]
+-    bug_predictor --> Lib
+-    business_growth_planner[business-growth-planner]
+-    business_impact_analyzer[business-impact-analyzer]
+-    chaos_monkey_orchestrator[chaos-monkey-orchestrator]
+-    cloud_cost_estimator[cloud-cost-estimator]
+-    cloud_waste_hunter[cloud-waste-hunter]
+-    code_lang_detector[code-lang-detector]
+-    codebase_mapper[codebase-mapper]
+-    competitive_intel_strategist[competitive-intel-strategist]
+-    completeness_scorer[completeness-scorer]
+-    completeness_scorer --> Lib
+-    compliance_officer[compliance-officer]
+-    connection_manager[connection-manager]
+-    context_injector[context-injector]
+-    crisis_manager[crisis-manager]
+-    data_anonymizer[data-anonymizer]
+-    data_collector[data-collector]
+-    data_lineage_guardian[data-lineage-guardian]
+-    data_transformer[data-transformer]
+-    data_transformer --> Lib
+-    dataset_curator[dataset-curator]
+-    db_extractor[db-extractor]
+-    dependency_grapher[dependency-grapher]
+-    dependency_grapher --> Lib
+-    dependency_lifeline[dependency-lifeline]
+-    diagram_renderer[diagram-renderer]
+-    diff_visualizer[diff-visualizer]
+-    disaster_recovery_planner[disaster-recovery-planner]
+-    doc_sync_sentinel[doc-sync-sentinel]
+-    doc_to_text[doc-to-text]
+-    doc_type_classifier[doc-type-classifier]
+-    doc_type_classifier --> Lib
+-    document_generator[document-generator]
+-    domain_classifier[domain-classifier]
+-    domain_classifier --> Lib
+-    ecosystem_integration_test[ecosystem-integration-test]
+-    encoding_detector[encoding-detector]
+-    environment_provisioner[environment-provisioner]
+-    excel_artisan[excel-artisan]
+-    executive_reporting_maestro[executive-reporting-maestro]
+-    financial_modeling_maestro[financial-modeling-maestro]
+-    format_detector[format-detector]
+-    github_repo_auditor[github-repo-auditor]
+-    github_skills_manager[github-skills-manager]
+-    glossary_resolver[glossary-resolver]
+-    glossary_resolver --> Lib
+-    google_workspace_integrator[google-workspace-integrator]
+-    html_reporter[html-reporter]
+-    intent_classifier[intent-classifier]
+-    investor_readiness_audit[investor-readiness-audit]
+-    ip_profitability_architect[ip-profitability-architect]
+-    ip_strategist[ip-strategist]
+-    issue_to_solution_bridge[issue-to-solution-bridge]
+-    jira_agile_assistant[jira-agile-assistant]
+-    kernel_compiler[kernel-compiler]
+-    knowledge_auditor[knowledge-auditor]
+-    knowledge_fetcher[knowledge-fetcher]
+-    knowledge_harvester[knowledge-harvester]
+-    knowledge_portal[knowledge-portal]
+-    knowledge_refiner[knowledge-refiner]
+-    lang_detector[lang-detector]
+-    layout_architect[layout-architect]
+-    license_auditor[license-auditor]
+-    local_reviewer[local-reviewer]
+-    localization_maestro[localization-maestro]
+-    log_analyst[log-analyst]
+-    log_to_requirement_bridge[log-to-requirement-bridge]
+-    mission_control[mission-control]
+-    monitoring_config_auditor[monitoring-config-auditor]
+-    nonfunctional_architect[nonfunctional-architect]
+-    onboarding_wizard[onboarding-wizard]
+-    operational_runbook_generator[operational-runbook-generator]
+-    pdf_composer[pdf-composer]
+-    performance_monitor_analyst[performance-monitor-analyst]
+-    pmo_governance_lead[pmo-governance-lead]
+-    post_quantum_shield[post-quantum-shield]
+-    ppt_artisan[ppt-artisan]
+-    pr_architect[pr-architect]
+-    project_health_check[project-health-check]
+-    project_health_check --> Lib
+-    prompt_optimizer[prompt-optimizer]
+-    quality_scorer[quality-scorer]
+-    red_team_adversary[red-team-adversary]
+-    refactoring_engine[refactoring-engine]
+-    release_note_crafter[release-note-crafter]
+-    release_note_crafter --> Lib
+-    requirements_wizard[requirements-wizard]
+-    requirements_wizard --> Lib
+-    scenario_multiverse_orchestrator[scenario-multiverse-orchestrator]
+-    schema_inspector[schema-inspector]
+-    schema_validator[schema-validator]
+-    schema_validator --> Lib
+-    security_scanner[security-scanner]
+-    security_scanner --> Lib
+-    self_evolution[self-evolution]
+-    self_evolution --> Lib
+-    self_healing_orchestrator[self-healing-orchestrator]
+-    sensitivity_detector[sensitivity-detector]
+-    sensitivity_detector --> Lib
+-    sequence_mapper[sequence-mapper]
+-    shadow_dispatcher[shadow-dispatcher]
+-    shadow_dispatcher --> Lib
+-    skill_bundle_packager[skill-bundle-packager]
+-    skill_evolution_engine[skill-evolution-engine]
+-    skill_quality_auditor[skill-quality-auditor]
+-    slack_communicator_pro[slack-communicator-pro]
+-    source_importer[source-importer]
+-    source_importer --> Lib
+-    sovereign_memory[sovereign-memory]
+-    sovereign_sync[sovereign-sync]
+-    stakeholder_communicator[stakeholder-communicator]
+-    strategic_roadmap_planner[strategic-roadmap-planner]
+-    sunset_architect[sunset-architect]
+-    supply_chain_sentinel[supply-chain-sentinel]
+-    sustainability_consultant[sustainability-consultant]
+-    synthetic_user_persona[synthetic-user-persona]
+-    talent_requirement_generator[talent-requirement-generator]
+-    tech_dd_analyst[tech-dd-analyst]
+-    tech_stack_librarian[tech-stack-librarian]
+-    technology_porter[technology-porter]
+-    telemetry_insight_engine[telemetry-insight-engine]
+-    template_renderer[template-renderer]
+-    template_renderer --> Lib
+-    terraform_arch_mapper[terraform-arch-mapper]
+-    test_genie[test-genie]
+-    test_genie --> Lib
+-    test_suite_architect[test-suite-architect]
+-    test_viewpoint_analyst[test-viewpoint-analyst]
+-    token_economist[asset-token-economist]
+-    unit_economics_optimizer[unit-economics-optimizer]
+-    ux_auditor[ux-auditor]
+-    ux_visualizer[ux-visualizer]
+-    visionary_ethos_keeper[visionary-ethos-keeper]
+-    voice_command_listener[voice-command-listener]
+-    voice_interface_maestro[voice-interface-maestro]
+-    word_artisan[word-artisan]
++    subgraph business ["📂 BUSINESS"]
++      business_growth_planner["business-growth-planner"]
++      business_impact_analyzer["business-impact-analyzer"]
++      competitive_intel_strategist["competitive-intel-strategist"]
++      executive_reporting_maestro["executive-reporting-maestro"]
++      financial_modeling_maestro["financial-modeling-maestro"]
++      investor_readiness_audit["investor-readiness-audit"]
++      ip_profitability_architect["ip-profitability-architect"]
++      ip_strategist["ip-strategist"]
++      pmo_governance_lead["pmo-governance-lead"]
++      scenario_multiverse_orchestrator["scenario-multiverse-orchestrator"]
++      stakeholder_communicator["stakeholder-communicator"]
++      strategic_roadmap_planner["strategic-roadmap-planner"]
++      sunset_architect["sunset-architect"]
++      talent_requirement_generator["talent-requirement-generator"]
++      tech_dd_analyst["tech-dd-analyst"]
++      unit_economics_optimizer["unit-economics-optimizer"]
++    end
++    subgraph connector ["📂 CONNECTOR"]
++      backlog_connector["backlog-connector"]
++      box_connector["box-connector"]
++      connection_manager["connection-manager"]
++      github_repo_auditor["github-repo-auditor"]
++      github_skills_manager["github-skills-manager"]
++      google_workspace_integrator["google-workspace-integrator"]
++      jira_agile_assistant["jira-agile-assistant"]
++      slack_communicator_pro["slack-communicator-pro"]
++    end
++    subgraph core ["📂 CORE"]
++      intent_classifier["intent-classifier"]
++      mission_control["mission-control"]
++      prompt_optimizer["prompt-optimizer"]
++      self_evolution["self-evolution"]
++      self_healing_orchestrator["self-healing-orchestrator"]
++      skill_evolution_engine["skill-evolution-engine"]
++    end
++    subgraph engineering ["📂 ENGINEERING"]
++      binary_archaeologist["binary-archaeologist"]
++      code_lang_detector["code-lang-detector"]
++      codebase_mapper["codebase-mapper"]
++      dependency_grapher["dependency-grapher"]
++      dependency_lifeline["dependency-lifeline"]
++      kernel_compiler["kernel-compiler"]
++      local_reviewer["local-reviewer"]
++      mobile_test_generator["mobile-test-generator"]
++      pr_architect["pr-architect"]
++      refactoring_engine["refactoring-engine"]
++      schema_inspector["schema-inspector"]
++      sequence_mapper["sequence-mapper"]
++      technology_porter["technology-porter"]
++      test_genie["test-genie"]
++      test_suite_architect["test-suite-architect"]
++    end
++    subgraph intelligence ["📂 INTELLIGENCE"]
++      auto_context_mapper["auto-context-mapper"]
++      data_collector["data-collector"]
++      data_transformer["data-transformer"]
++      dataset_curator["dataset-curator"]
++      db_extractor["db-extractor"]
++      glossary_resolver["glossary-resolver"]
++      knowledge_auditor["knowledge-auditor"]
++      knowledge_fetcher["knowledge-fetcher"]
++      knowledge_harvester["knowledge-harvester"]
++      knowledge_refiner["knowledge-refiner"]
++      source_importer["source-importer"]
++      sovereign_memory["sovereign-memory"]
++      sovereign_sync["sovereign-sync"]
++    end
++    subgraph media ["📂 MEDIA"]
++      audio_transcriber["audio-transcriber"]
++      diagram_renderer["diagram-renderer"]
++      doc_to_text["doc-to-text"]
++      excel_artisan["excel-artisan"]
++      html_reporter["html-reporter"]
++      layout_architect["layout-architect"]
++      pdf_composer["pdf-composer"]
++      ppt_artisan["ppt-artisan"]
++      word_artisan["word-artisan"]
++    end
++    subgraph utilities ["📂 UTILITIES"]
++      agent_activity_monitor["agent-activity-monitor"]
++      ai_model_orchestrator["ai-model-orchestrator"]
++      api_doc_generator["api-doc-generator"]
++      api_evolution_manager["api-evolution-manager"]
++      api_fetcher["api-fetcher"]
++      automated_support_architect["automated-support-architect"]
++      autonomous_skill_designer["autonomous-skill-designer"]
++      boilerplate_genie["boilerplate-genie"]
++      browser_navigator["browser-navigator"]
++      budget_variance_tracker["budget-variance-tracker"]
++      chaos_monkey_orchestrator["chaos-monkey-orchestrator"]
++      cloud_cost_estimator["cloud-cost-estimator"]
++      cloud_waste_hunter["cloud-waste-hunter"]
++      completeness_scorer["completeness-scorer"]
++      context_injector["context-injector"]
++      crisis_manager["crisis-manager"]
++      data_anonymizer["data-anonymizer"]
++      data_lineage_guardian["data-lineage-guardian"]
++      diff_visualizer["diff-visualizer"]
++      disaster_recovery_planner["disaster-recovery-planner"]
++      doc_sync_sentinel["doc-sync-sentinel"]
++      doc_type_classifier["doc-type-classifier"]
++      document_generator["document-generator"]
++      domain_classifier["domain-classifier"]
++      ecosystem_integration_test["ecosystem-integration-test"]
++      encoding_detector["encoding-detector"]
++      environment_provisioner["environment-provisioner"]
++      format_detector["format-detector"]
++      issue_to_solution_bridge["issue-to-solution-bridge"]
++      lang_detector["lang-detector"]
++      log_analyst["log-analyst"]
++      log_to_requirement_bridge["log-to-requirement-bridge"]
++      nonfunctional_architect["nonfunctional-architect"]
++      onboarding_wizard["onboarding-wizard"]
++      operational_runbook_generator["operational-runbook-generator"]
++      performance_monitor_analyst["performance-monitor-analyst"]
++      release_note_crafter["release-note-crafter"]
++      requirements_wizard["requirements-wizard"]
++      schema_validator["schema-validator"]
++      sensitivity_detector["sensitivity-detector"]
++      shadow_dispatcher["shadow-dispatcher"]
++      skill_bundle_packager["skill-bundle-packager"]
++      sustainability_consultant["sustainability-consultant"]
++      tech_stack_librarian["tech-stack-librarian"]
++      telemetry_insight_engine["telemetry-insight-engine"]
++      template_renderer["template-renderer"]
++      terraform_arch_mapper["terraform-arch-mapper"]
++      test_viewpoint_analyst["test-viewpoint-analyst"]
++      token_economist["asset-token-economist"]
++      visionary_ethos_keeper["visionary-ethos-keeper"]
++    end
++    subgraph ux ["📂 UX"]
++      biometric_context_adapter["biometric-context-adapter"]
++      localization_maestro["localization-maestro"]
++      synthetic_user_persona["synthetic-user-persona"]
++      ux_auditor["ux-auditor"]
++      ux_visualizer["ux-visualizer"]
++      voice_command_listener["voice-command-listener"]
++      voice_interface_maestro["voice-interface-maestro"]
++    end
++  end
++  Infrastructure["🏛️ @agent/core (libs/core)"]
++  audit -.-> Infrastructure
++  business -.-> Infrastructure
++  connector -.-> Infrastructure
++  core -.-> Infrastructure
++  engineering -.-> Infrastructure
++  intelligence -.-> Infrastructure
++  media -.-> Infrastructure
++  utilities -.-> Infrastructure
++  ux -.-> Infrastructure
+diff --git a/eslint.config.js b/eslint.config.js
+index 80d624d..6eb2c2e 100644
+--- a/eslint.config.js
++++ b/eslint.config.js
+@@ -1,38 +1,32 @@
++const globals = require('globals');
++const tseslint = require('typescript-eslint');
++
+ module.exports = [
+   {
+     ignores: [
+       'node_modules/',
+       '**/node_modules/',
+       'dist/',
++      '**/dist/',
+       'coverage/',
+       'evidence/',
+       'active/shared/',
+-      '**/*.ts',
+       'scripts/_archive/',
+       '.gemini/',
++      'vault/',
++      'tests/',
++      'libs/core/*.ts', 
++      '**/*.d.ts',
+     ],
+   },
++  // JS Config
+   {
+-    files: ['**/*.cjs', '**/*.js'],
++    files: ['**/*.cjs', '**/*.js', '**/*.mjs'],
+     languageOptions: {
+       ecmaVersion: 2022,
+       sourceType: 'commonjs',
+       globals: {
+-        // Node.js globals
+-        require: 'readonly',
+-        module: 'readonly',
+-        exports: 'readonly',
+-        __dirname: 'readonly',
+-        __filename: 'readonly',
+-        process: 'readonly',
+-        console: 'readonly',
+-        Buffer: 'readonly',
+-        setTimeout: 'readonly',
+-        clearTimeout: 'readonly',
+-        setInterval: 'readonly',
+-        clearInterval: 'readonly',
+-        setImmediate: 'readonly',
+-        URL: 'readonly',
++        ...globals.node,
+       },
+     },
+     rules: {
+@@ -62,4 +56,25 @@ module.exports = [
+       'no-use-before-define': ['warn', { functions: false, classes: true }],
+     },
+   },
++  // TS Config
++  ...tseslint.configs.recommended.map(config => ({
++    ...config,
++    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
++  })),
++  {
++    files: ['**/*.ts', '**/*.tsx'],
++    languageOptions: {
++      globals: {
++        ...globals.node,
++      },
++    },
++    rules: {
++      '@typescript-eslint/no-explicit-any': 'warn',
++      '@typescript-eslint/no-unused-vars': [
++        'warn',
++        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
++      ],
++      '@typescript-eslint/no-require-imports': 'warn',
++    },
++  },
+ ];
+diff --git a/knowledge/_index.md b/knowledge/_index.md
+index 912c8d9..ce3ead2 100644
+--- a/knowledge/_index.md
++++ b/knowledge/_index.md
+@@ -1,410 +1,417 @@
+ # Ecosystem Knowledge Base Index
+ 
+-*Last Updated: 2026-02-15T11:24:45.794Z*
++*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-16T16:58:23.917Z*
+ 
+ ## 📁 ai-engineering
+-- [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md)
+-- [AIシステム・レビューチェックリスト](./ai-engineering/review_checklist.md)
+-- [エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)](./ai-engineering/strategy.md)
++- [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
++- [AIシステム・レビューチェックリスト](./ai-engineering/review_checklist.md) (public | Unknown)
++- [エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)](./ai-engineering/strategy.md) (public | Unknown)
+ 
+ ## 📁 architecture
+-- [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md)
+-- [Microservices Design Patterns](./architecture/microservices-patterns.md)
++- [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Unknown)
++- [Microservices Design Patterns](./architecture/microservices-patterns.md) (public | Unknown)
+ 
+ ## 📁 ceo
+-- [AI-Driven Business Engineering: The Gemini Strategy](./ceo/ai-business-engineering.md)
+-- [Executive Briefing Standards](./ceo/executive_briefing_standards.md)
+-- [Corporate Legal & Tax Essentials (Japan context)](./ceo/legal-tax-essentials-jp.md)
++- [AI-Driven Business Engineering: The Gemini Strategy](./ceo/ai-business-engineering.md) (public | Unknown)
++- [Executive Briefing Standards](./ceo/executive_briefing_standards.md) (public | Unknown)
++- [Corporate Legal & Tax Essentials (Japan context)](./ceo/legal-tax-essentials-jp.md) (public | Unknown)
+ 
+ ## 📁 ceo/finance
+-- [財務KPI標準基準 (Financial KPI Standards)](./ceo/finance/kpi_standards.md)
++- [財務KPI標準基準 (Financial KPI Standards)](./ceo/finance/kpi_standards.md) (public | Unknown)
+ 
+ ## 📁 ceo/investment
+-- [技術デューデリジェンス (Tech DD) 標準基準](./ceo/investment/tech_dd_standard.md)
++- [技術デューデリジェンス (Tech DD) 標準基準](./ceo/investment/tech_dd_standard.md) (public | Unknown)
+ 
+ ## 📁 ceo/mission
+-- [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./ceo/mission/corporate_purpose.md)
++- [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./ceo/mission/corporate_purpose.md) (public | Unknown)
+ 
+ ## 📁 ceo/planning
+-- [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./ceo/planning/frameworks.md)
++- [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./ceo/planning/frameworks.md) (public | Unknown)
+ 
+ ## 📁 connections
+-- [ユニバーサル接続設定ガイド (UCM Setup)](./connections/setup_guide.md)
++- [ユニバーサル接続設定ガイド (UCM Setup)](./connections/setup_guide.md) (public | Unknown)
+ 
+ ## 📁 design/brand
+-- [Brand & Visual Identity Engineering](./design/brand/visual_identity.md)
++- [Brand & Visual Identity Engineering](./design/brand/visual_identity.md) (public | Unknown)
+ 
+ ## 📁 devops
+-- [CI/CD Pipeline Design Patterns](./devops/ci-cd-patterns.md)
+-- [クラウドネイティブ ＆ インフラ設計](./devops/cloud-native.md)
++- [CI/CD Pipeline Design Patterns](./devops/ci-cd-patterns.md) (public | Unknown)
++- [クラウドネイティブ ＆ インフラ設計](./devops/cloud-native.md) (public | Unknown)
+ 
+ ## 📁 economics
+-- [IT Cost Benchmarks & Strategic ROI](./economics/it_cost_benchmarks.md)
++- [IT Cost Benchmarks & Strategic ROI](./economics/it_cost_benchmarks.md) (public | Unknown)
+ 
+ ## 📁 economics/finops
+-- [Cloud FinOps & Unit Economics Standard](./economics/finops/cloud_optimization.md)
++- [Cloud FinOps & Unit Economics Standard](./economics/finops/cloud_optimization.md) (public | Unknown)
+ 
+ ## 📁 ethics
+-- [Data Ethics & AI Bias Mitigation Standard](./ethics/ai_bias_mitigation.md)
++- [Data Ethics & AI Bias Mitigation Standard](./ethics/ai_bias_mitigation.md) (public | Unknown)
+ 
+ ## 📁 evolution
+-- [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md)
++- [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md) (public | Unknown)
+ 
+ ## 📁 external-wisdom/everything-claude/agents
+-- [ADR-001: Use Redis for Semantic Search Vector Storage](./external-wisdom/everything-claude/agents/architect.md)
+-- [Build Error Resolver](./external-wisdom/everything-claude/agents/build-error-resolver.md)
+-- [code-reviewer](./external-wisdom/everything-claude/agents/code-reviewer.md)
+-- [Database Reviewer](./external-wisdom/everything-claude/agents/database-reviewer.md)
+-- [Documentation & Codemap Specialist](./external-wisdom/everything-claude/agents/doc-updater.md)
+-- [E2E Test Runner](./external-wisdom/everything-claude/agents/e2e-runner.md)
+-- [Go Build Error Resolver](./external-wisdom/everything-claude/agents/go-build-resolver.md)
+-- [Static analysis](./external-wisdom/everything-claude/agents/go-reviewer.md)
+-- [Implementation Plan: [Feature Name]](./external-wisdom/everything-claude/agents/planner.md)
+-- [Type checking](./external-wisdom/everything-claude/agents/python-reviewer.md)
+-- [Refactor & Dead Code Cleaner](./external-wisdom/everything-claude/agents/refactor-cleaner.md)
+-- [Security Reviewer](./external-wisdom/everything-claude/agents/security-reviewer.md)
+-- [Test should fail - we haven't implemented yet](./external-wisdom/everything-claude/agents/tdd-guide.md)
++- [ADR-001: Use Redis for Semantic Search Vector Storage](./external-wisdom/everything-claude/agents/architect.md) (public | Unknown)
++- [Build Error Resolver](./external-wisdom/everything-claude/agents/build-error-resolver.md) (public | Unknown)
++- [code-reviewer](./external-wisdom/everything-claude/agents/code-reviewer.md) (public | Unknown)
++- [Database Reviewer](./external-wisdom/everything-claude/agents/database-reviewer.md) (public | Unknown)
++- [Documentation & Codemap Specialist](./external-wisdom/everything-claude/agents/doc-updater.md) (public | Unknown)
++- [E2E Test Runner](./external-wisdom/everything-claude/agents/e2e-runner.md) (public | Unknown)
++- [Go Build Error Resolver](./external-wisdom/everything-claude/agents/go-build-resolver.md) (public | Unknown)
++- [Static analysis](./external-wisdom/everything-claude/agents/go-reviewer.md) (public | Unknown)
++- [Implementation Plan: [Feature Name]](./external-wisdom/everything-claude/agents/planner.md) (public | Unknown)
++- [Type checking](./external-wisdom/everything-claude/agents/python-reviewer.md) (public | Unknown)
++- [Refactor & Dead Code Cleaner](./external-wisdom/everything-claude/agents/refactor-cleaner.md) (public | Unknown)
++- [Security Reviewer](./external-wisdom/everything-claude/agents/security-reviewer.md) (public | Unknown)
++- [Test should fail - we haven't implemented yet](./external-wisdom/everything-claude/agents/tdd-guide.md) (public | Unknown)
+ 
+ ## 📁 external-wisdom/everything-claude/rules/common
+-- [Agent Orchestration](./external-wisdom/everything-claude/rules/common/agents.md)
+-- [Coding Style](./external-wisdom/everything-claude/rules/common/coding-style.md)
+-- [Git Workflow](./external-wisdom/everything-claude/rules/common/git-workflow.md)
+-- [Hooks System](./external-wisdom/everything-claude/rules/common/hooks.md)
+-- [Common Patterns](./external-wisdom/everything-claude/rules/common/patterns.md)
+-- [Performance Optimization](./external-wisdom/everything-claude/rules/common/performance.md)
+-- [Security Guidelines](./external-wisdom/everything-claude/rules/common/security.md)
+-- [Testing Requirements](./external-wisdom/everything-claude/rules/common/testing.md)
++- [Agent Orchestration](./external-wisdom/everything-claude/rules/common/agents.md) (public | Unknown)
++- [Coding Style](./external-wisdom/everything-claude/rules/common/coding-style.md) (public | Unknown)
++- [Git Workflow](./external-wisdom/everything-claude/rules/common/git-workflow.md) (public | Unknown)
++- [Hooks System](./external-wisdom/everything-claude/rules/common/hooks.md) (public | Unknown)
++- [Common Patterns](./external-wisdom/everything-claude/rules/common/patterns.md) (public | Unknown)
++- [Performance Optimization](./external-wisdom/everything-claude/rules/common/performance.md) (public | Unknown)
++- [Security Guidelines](./external-wisdom/everything-claude/rules/common/security.md) (public | Unknown)
++- [Testing Requirements](./external-wisdom/everything-claude/rules/common/testing.md) (public | Unknown)
+ 
+ ## 📁 external-wisdom/everything-claude/rules/golang
+-- [Go Coding Style](./external-wisdom/everything-claude/rules/golang/coding-style.md)
+-- [Go Hooks](./external-wisdom/everything-claude/rules/golang/hooks.md)
+-- [Go Patterns](./external-wisdom/everything-claude/rules/golang/patterns.md)
+-- [Go Security](./external-wisdom/everything-claude/rules/golang/security.md)
+-- [Go Testing](./external-wisdom/everything-claude/rules/golang/testing.md)
++- [Go Coding Style](./external-wisdom/everything-claude/rules/golang/coding-style.md) (public | Unknown)
++- [Go Hooks](./external-wisdom/everything-claude/rules/golang/hooks.md) (public | Unknown)
++- [Go Patterns](./external-wisdom/everything-claude/rules/golang/patterns.md) (public | Unknown)
++- [Go Security](./external-wisdom/everything-claude/rules/golang/security.md) (public | Unknown)
++- [Go Testing](./external-wisdom/everything-claude/rules/golang/testing.md) (public | Unknown)
+ 
+ ## 📁 external-wisdom/everything-claude/rules/python
+-- [Python Coding Style](./external-wisdom/everything-claude/rules/python/coding-style.md)
+-- [Python Hooks](./external-wisdom/everything-claude/rules/python/hooks.md)
+-- [Python Patterns](./external-wisdom/everything-claude/rules/python/patterns.md)
+-- [Python Security](./external-wisdom/everything-claude/rules/python/security.md)
+-- [Python Testing](./external-wisdom/everything-claude/rules/python/testing.md)
++- [Python Coding Style](./external-wisdom/everything-claude/rules/python/coding-style.md) (public | Unknown)
++- [Python Hooks](./external-wisdom/everything-claude/rules/python/hooks.md) (public | Unknown)
++- [Python Patterns](./external-wisdom/everything-claude/rules/python/patterns.md) (public | Unknown)
++- [Python Security](./external-wisdom/everything-claude/rules/python/security.md) (public | Unknown)
++- [Python Testing](./external-wisdom/everything-claude/rules/python/testing.md) (public | Unknown)
+ 
+ ## 📁 external-wisdom/everything-claude/rules/typescript
+-- [TypeScript/JavaScript Coding Style](./external-wisdom/everything-claude/rules/typescript/coding-style.md)
+-- [TypeScript/JavaScript Hooks](./external-wisdom/everything-claude/rules/typescript/hooks.md)
+-- [TypeScript/JavaScript Patterns](./external-wisdom/everything-claude/rules/typescript/patterns.md)
+-- [TypeScript/JavaScript Security](./external-wisdom/everything-claude/rules/typescript/security.md)
+-- [TypeScript/JavaScript Testing](./external-wisdom/everything-claude/rules/typescript/testing.md)
++- [TypeScript/JavaScript Coding Style](./external-wisdom/everything-claude/rules/typescript/coding-style.md) (public | Unknown)
++- [TypeScript/JavaScript Hooks](./external-wisdom/everything-claude/rules/typescript/hooks.md) (public | Unknown)
++- [TypeScript/JavaScript Patterns](./external-wisdom/everything-claude/rules/typescript/patterns.md) (public | Unknown)
++- [TypeScript/JavaScript Security](./external-wisdom/everything-claude/rules/typescript/security.md) (public | Unknown)
++- [TypeScript/JavaScript Testing](./external-wisdom/everything-claude/rules/typescript/testing.md) (public | Unknown)
+ 
+ ## 📁 fisc-compliance
+-- [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./fisc-compliance/aws_fisc_standard.md)
+-- [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./fisc-compliance/blea_fisc_reference.md)
++- [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./fisc-compliance/aws_fisc_standard.md) (public | Unknown)
++- [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./fisc-compliance/blea_fisc_reference.md) (public | Unknown)
+ 
+ ## 📁 frameworks
+-- [Conceptual Frameworks Reference](./frameworks/conceptual-frameworks.md)
++- [Conceptual Frameworks Reference](./frameworks/conceptual-frameworks.md) (public | Unknown)
+ 
+ ## 📁 future
+-- [Future-Proofing: Quantum-Safe & Sustainability](./future/quantum_sustainability.md)
++- [Future-Proofing: Quantum-Safe & Sustainability](./future/quantum_sustainability.md) (public | Unknown)
++
++## 📁 governance
++- [Dual-Key Policy: ロール管理と決定権限の標準規約](./governance/dual-key-policy.md) (public | Unknown)
+ 
+ ## 📁 legal/ip
+-- [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md)
++- [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md) (public | Unknown)
++
++## 📁 nonfunctional
++- [Non-Functional Requirements Definition](./nonfunctional/nonfunctional_requirements.md) (public | Unknown)
+ 
+ ## 📁 nonfunctional/test-viewpoints
+-- [非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)](./nonfunctional/test-viewpoints/ipa_grade_2018.md)
++- [非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)](./nonfunctional/test-viewpoints/ipa_grade_2018.md) (public | Unknown)
+ 
+ ## 📁 onboarding
+-- [ロール別教育ロードマップ (Learning Paths by Role)](./onboarding/learning_paths.md)
++- [ロール別教育ロードマップ (Learning Paths by Role)](./onboarding/learning_paths.md) (public | Unknown)
+ 
+ ## 📁 operations
+-- [Availability & Disaster Recovery Best Practices](./operations/availability_best_practices.md)
+-- [Incident Knowledge Loop: Learning from Failures](./operations/incident_knowledge_loop.md)
+-- [Modern SRE Best Practices (Advanced Operations)](./operations/modern_sre_best_practices.md)
+-- [Monitoring & Observability Best Practices](./operations/monitoring_best_practices.md)
+-- [PagerDuty Best Practices](./operations/pagerduty_best_practices.md)
+-- [Runbook & Playbook Best Practices (AI-Native Operations)](./operations/runbook_best_practices.md)
+-- [SLO & Dashboard Best Practices](./operations/slo_dashboard_best_practices.md)
++- [Availability & Disaster Recovery Best Practices](./operations/availability_best_practices.md) (public | Unknown)
++- [Incident Knowledge Loop: Learning from Failures](./operations/incident_knowledge_loop.md) (public | Unknown)
++- [Modern SRE Best Practices (Advanced Operations)](./operations/modern_sre_best_practices.md) (public | Unknown)
++- [Monitoring & Observability Best Practices](./operations/monitoring_best_practices.md) (public | Unknown)
++- [PagerDuty Best Practices](./operations/pagerduty_best_practices.md) (public | Unknown)
++- [Runbook & Playbook Best Practices (AI-Native Operations)](./operations/runbook_best_practices.md) (public | Unknown)
++- [SLO & Dashboard Best Practices](./operations/slo_dashboard_best_practices.md) (public | Unknown)
+ 
+ ## 📁 operations/monitoring
+-- [監視設定ベストプラクティス・チェックリスト](./operations/monitoring/best_practices.md)
+-- [Datadog 導入・運用ベストプラクティス](./operations/monitoring/datadog_best_practices.md)
+-- [New Relic 導入・運用ベストプラクティス](./operations/monitoring/newrelic_best_practices.md)
++- [監視設定ベストプラクティス・チェックリスト](./operations/monitoring/best_practices.md) (public | Unknown)
++- [Datadog 導入・運用ベストプラクティス](./operations/monitoring/datadog_best_practices.md) (public | Unknown)
++- [New Relic 導入・運用ベストプラクティス](./operations/monitoring/newrelic_best_practices.md) (public | Unknown)
+ 
+ ## 📁 operations/runbooks
+-- [運用ランブック（手順書）標準構成](./operations/runbooks/standard.md)
++- [運用ランブック（手順書）標準構成](./operations/runbooks/standard.md) (public | Unknown)
+ 
+ ## 📁 orchestration
+-- [Active Inquiry Protocol: The Power of Questioning](./orchestration/active_inquiry_protocol.md)
+-- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./orchestration/advanced-development-flow.md)
+-- [Sovereign Autonomous Agent Protocol (SAAP)](./orchestration/autonomous-agent-protocol.md)
+-- [自律型デバッグ・ループ (Autonomous Debug Loop)](./orchestration/autonomous-debug-loop.md)
+-- [ACE (Autonomous Consensus Engine) Operating Standard](./orchestration/consensus-protocol.md)
+-- [コンテキスト抽出・要約ルール (Context Extraction Rules)](./orchestration/context-extraction-rules.md)
+-- [企業内ネットワーク環境セットアップガイド](./orchestration/corporate-env-guide.md)
+-- [スキル間データ受け渡し仕様 (Data Handover Specs)](./orchestration/data-handover-specs.md)
+-- [Cross-Role Directive Protocol (CRDP)](./orchestration/directives-protocol.md)
+-- [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./orchestration/git-flow-standards.md)
+-- [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./orchestration/hybrid-development-flow.md)
+-- [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./orchestration/knowledge-protocol.md)
+-- [自律型シナジー標準基準 (Autonomous Synergy Standards)](./orchestration/optimization-standards.md)
+-- [Polyglot Core Transformation Roadmap (Sidecar Architecture)](./orchestration/polyglot-roadmap.md)
+-- [Professional Proposal Pipeline (Orchestration Pattern)](./orchestration/proposal-pipeline.md)
+-- [エンタープライズ品質管理フロー (Quality Management Flow)](./orchestration/quality-management-flow.md)
+-- [Self-Refinement Protocol: The Path to Perpetual Growth](./orchestration/self-refinement-protocol.md)
+-- [Autonomous Sentinel Operations](./orchestration/sentinel-operations.md)
+-- [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./orchestration/asset-token-economy-protocol.md)
+-- [Voice Interface Protocol (VIP)](./orchestration/voice-interface-protocol.md)
++- [Active Inquiry Protocol: The Power of Questioning](./orchestration/active_inquiry_protocol.md) (public | Unknown)
++- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./orchestration/advanced-development-flow.md) (public | Unknown)
++- [Sovereign Autonomous Agent Protocol (SAAP)](./orchestration/autonomous-agent-protocol.md) (public | Unknown)
++- [自律型デバッグ・ループ (Autonomous Debug Loop)](./orchestration/autonomous-debug-loop.md) (public | Unknown)
++- [ACE (Autonomous Consensus Engine) Operating Standard](./orchestration/consensus-protocol.md) (public | Unknown)
++- [コンテキスト抽出・要約ルール (Context Extraction Rules)](./orchestration/context-extraction-rules.md) (public | Unknown)
++- [企業内ネットワーク環境セットアップガイド](./orchestration/corporate-env-guide.md) (public | Unknown)
++- [スキル間データ受け渡し仕様 (Data Handover Specs)](./orchestration/data-handover-specs.md) (public | Unknown)
++- [Cross-Role Directive Protocol (CRDP)](./orchestration/directives-protocol.md) (public | Unknown)
++- [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./orchestration/git-flow-standards.md) (public | Unknown)
++- [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./orchestration/hybrid-development-flow.md) (public | Unknown)
++- [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./orchestration/knowledge-protocol.md) (public | Unknown)
++- [ミッション実行規程 (Mission Execution Protocol v1.0)](./orchestration/mission-execution-protocol.md) (public | Unknown)
++- [自律型シナジー標準基準 (Autonomous Synergy Standards)](./orchestration/optimization-standards.md) (public | Unknown)
++- [Polyglot Core Transformation Roadmap (Sidecar Architecture)](./orchestration/polyglot-roadmap.md) (public | Unknown)
++- [Professional Proposal Pipeline (Orchestration Pattern)](./orchestration/proposal-pipeline.md) (public | Unknown)
++- [エンタープライズ品質管理フロー (Quality Management Flow)](./orchestration/quality-management-flow.md) (public | Unknown)
++- [Self-Refinement Protocol: The Path to Perpetual Growth](./orchestration/self-refinement-protocol.md) (public | Unknown)
++- [Autonomous Sentinel Operations](./orchestration/sentinel-operations.md) (public | Unknown)
++- [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./orchestration/asset-token-economy-protocol.md) (public | Unknown)
++- [Voice Interface Protocol (VIP)](./orchestration/voice-interface-protocol.md) (public | Unknown)
+ 
+ ## 📁 orchestration/fusion-protocols
+-- [Continuous Learning Loop Protocol](./orchestration/fusion-protocols/learning_loop.md)
++- [Continuous Learning Loop Protocol](./orchestration/fusion-protocols/learning_loop.md) (public | Unknown)
+ 
+ ## 📁 orchestration/mission-playbooks
+-- [ミッション・プレイブック：CEO戦略的意思決定](./orchestration/mission-playbooks/ceo-strategy.md)
+-- [ミッション・プレイブック：プロダクト健全性 ＆ リリース監査](./orchestration/mission-playbooks/product-audit.md)
+-- [ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定](./orchestration/mission-playbooks/saas-roi.md)
++- [ミッション・プレイブック：CEO戦略的意思決定](./orchestration/mission-playbooks/ceo-strategy.md) (public | Unknown)
++- [ミッション・プレイブック：プロダクト健全性 ＆ リリース監査](./orchestration/mission-playbooks/product-audit.md) (public | Unknown)
++- [ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定](./orchestration/mission-playbooks/saas-roi.md) (public | Unknown)
+ 
+ ## 📁 orchestration/onboarding-directives
+-- [MISSION: Infrastructure & Environment Mapping](./orchestration/onboarding-directives/01_eng_to_steward.md)
+-- [MISSION: Strategic Vision Harvesting](./orchestration/onboarding-directives/02_ceo_to_steward.md)
+-- [MISSION: Skill Usage & Performance Audit](./orchestration/onboarding-directives/03_arch_to_steward.md)
+-- [MISSION: External System Connection Mapping](./orchestration/onboarding-directives/04_steward_self_map.md)
+-- [MISSION: Competitive Edge & ROI Benchmarking](./orchestration/onboarding-directives/05_sol_to_steward.md)
+-- [MISSION: Incident Response & SRE Wisdom](./orchestration/onboarding-directives/06_sre_to_steward.md)
+-- [MISSION: Legal Guardrails & IP Portfolio](./orchestration/onboarding-directives/07_legal_to_steward.md)
+-- [MISSION: Testing Standards & Bug Analytics](./orchestration/onboarding-directives/08_qa_to_steward.md)
+-- [MISSION: Project Governance & Standards Alignment](./orchestration/onboarding-directives/09_pmo_to_steward.md)
+-- [MISSION: Organizational Map & Approval History](./orchestration/onboarding-directives/10_manager_to_steward.md)
+-- [MISSION: Brand Assets & Trend Harvesting](./orchestration/onboarding-directives/11_marketing_to_steward.md)
+-- [MISSION: Voice of Customer (VoC) Data Collection](./orchestration/onboarding-directives/12_cs_to_steward.md)
+-- [MISSION: Culture Archetypes & Talent Specs](./orchestration/onboarding-directives/13_hr_to_steward.md)
+-- [MISSION: Product Roadmap & Feature Backlog](./orchestration/onboarding-directives/14_pdm_to_steward.md)
+-- [MISSION: UI/UX Asset & Persona Templates](./orchestration/onboarding-directives/15_designer_to_steward.md)
+-- [MISSION: Financial P&L & Cost Analysis](./orchestration/onboarding-directives/16_finance_to_steward.md)
+-- [MISSION: Threat Intelligence & Vulnerability Feed](./orchestration/onboarding-directives/17_sec_to_steward.md)
+-- [MISSION: Sales Pipelines & Deal Insights](./orchestration/onboarding-directives/18_sales_to_steward.md)
+-- [MISSION: Technical Blueprint Discovery](./orchestration/onboarding-directives/19_dev_to_steward.md)
+-- [MISSION: Market Dynamics & P&L Sensitivity](./orchestration/onboarding-directives/20_owner_to_steward.md)
+-- [MISSION: Executive Support & Templates](./orchestration/onboarding-directives/21_assistant_to_steward.md)
++- [MISSION: Infrastructure & Environment Mapping](./orchestration/onboarding-directives/01_eng_to_steward.md) (public | Unknown)
++- [MISSION: Strategic Vision Harvesting](./orchestration/onboarding-directives/02_ceo_to_steward.md) (public | Unknown)
++- [MISSION: Skill Usage & Performance Audit](./orchestration/onboarding-directives/03_arch_to_steward.md) (public | Unknown)
++- [MISSION: External System Connection Mapping](./orchestration/onboarding-directives/04_steward_self_map.md) (public | Unknown)
++- [MISSION: Competitive Edge & ROI Benchmarking](./orchestration/onboarding-directives/05_sol_to_steward.md) (public | Unknown)
++- [MISSION: Incident Response & SRE Wisdom](./orchestration/onboarding-directives/06_sre_to_steward.md) (public | Unknown)
++- [MISSION: Legal Guardrails & IP Portfolio](./orchestration/onboarding-directives/07_legal_to_steward.md) (public | Unknown)
++- [MISSION: Testing Standards & Bug Analytics](./orchestration/onboarding-directives/08_qa_to_steward.md) (public | Unknown)
++- [MISSION: Project Governance & Standards Alignment](./orchestration/onboarding-directives/09_pmo_to_steward.md) (public | Unknown)
++- [MISSION: Organizational Map & Approval History](./orchestration/onboarding-directives/10_manager_to_steward.md) (public | Unknown)
++- [MISSION: Brand Assets & Trend Harvesting](./orchestration/onboarding-directives/11_marketing_to_steward.md) (public | Unknown)
++- [MISSION: Voice of Customer (VoC) Data Collection](./orchestration/onboarding-directives/12_cs_to_steward.md) (public | Unknown)
++- [MISSION: Culture Archetypes & Talent Specs](./orchestration/onboarding-directives/13_hr_to_steward.md) (public | Unknown)
++- [MISSION: Product Roadmap & Feature Backlog](./orchestration/onboarding-directives/14_pdm_to_steward.md) (public | Unknown)
++- [MISSION: UI/UX Asset & Persona Templates](./orchestration/onboarding-directives/15_designer_to_steward.md) (public | Unknown)
++- [MISSION: Financial P&L & Cost Analysis](./orchestration/onboarding-directives/16_finance_to_steward.md) (public | Unknown)
++- [MISSION: Threat Intelligence & Vulnerability Feed](./orchestration/onboarding-directives/17_sec_to_steward.md) (public | Unknown)
++- [MISSION: Sales Pipelines & Deal Insights](./orchestration/onboarding-directives/18_sales_to_steward.md) (public | Unknown)
++- [MISSION: Technical Blueprint Discovery](./orchestration/onboarding-directives/19_dev_to_steward.md) (public | Unknown)
++- [MISSION: Market Dynamics & P&L Sensitivity](./orchestration/onboarding-directives/20_owner_to_steward.md) (public | Unknown)
++- [MISSION: Executive Support & Templates](./orchestration/onboarding-directives/21_assistant_to_steward.md) (public | Unknown)
+ 
+ ## 📁 organization
+-- [Cultural Alignment & Change Management Protocol](./organization/change_management.md)
++- [Cultural Alignment & Change Management Protocol](./organization/change_management.md) (public | Unknown)
+ 
+ ## 📁 personalities
+-- [ペルソナ・マトリクス (Persona Matrix)](./personalities/matrix.md)
++- [ペルソナ・マトリクス (Persona Matrix)](./personalities/matrix.md) (personal | Unknown)
+ 
+ ## 📁 pmo/standard
+-- [PMO Bridge to IPA Non-Functional Grade](./pmo/standard/ipa_nfr_bridge.md)
+-- [PMBOK v7 Project Management Principles](./pmo/standard/pmbok_v7.md)
+-- [Stakeholder Management Framework](./pmo/standard/stakeholder_management.md)
++- [PMO Bridge to IPA Non-Functional Grade](./pmo/standard/ipa_nfr_bridge.md) (public | Unknown)
++- [PMBOK v7 Project Management Principles](./pmo/standard/pmbok_v7.md) (public | Unknown)
++- [Stakeholder Management Framework](./pmo/standard/stakeholder_management.md) (public | Unknown)
+ 
+ ## 📁 pmo/standards
+-- [PMO ガバナンス標準基準 (Governance Standard)](./pmo/standards/governance.md)
++- [PMO ガバナンス標準基準 (Governance Standard)](./pmo/standards/governance.md) (public | Unknown)
+ 
+ ## 📁 pmo/templates
+-- [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md)
++- [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Unknown)
+ 
+ ## 📁 public/standards
+-- [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md)
+-- [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md)
++- [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md) (public | Unknown)
++- [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Unknown)
+ 
+ ## 📁 public/templates
+-- [ss_ppt_theme](./public/templates/ss_ppt_theme.md)
++- [ss_ppt_theme](./public/templates/ss_ppt_theme.md) (public | Unknown)
+ 
+ ## 📁 quality-management
+-- [定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)](./quality-management/metrics_standards.md)
+-- [Test Viewpoint Catalog: Non-Functional Excellence](./quality-management/test_viewpoints_catalog.md)
++- [定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)](./quality-management/metrics_standards.md) (public | Unknown)
++- [Test Viewpoint Catalog: Non-Functional Excellence](./quality-management/test_viewpoints_catalog.md) (public | Unknown)
+ 
+ ## 📁 requirements-guide
+-- [要件定義ガイド (IPA準拠)](./requirements-guide/ipa_best_practices.md)
+-- [要件定義ドキュメント・レビューチェックリスト](./requirements-guide/review_checklist.md)
++- [要件定義ガイド (IPA準拠)](./requirements-guide/ipa_best_practices.md) (public | Unknown)
++- [要件定義ドキュメント・レビューチェックリスト](./requirements-guide/review_checklist.md) (public | Unknown)
+ 
+ ## 📁 roles/business_owner
+-- [Business Owner (事業責任者) ミッション声明](./roles/business_owner/mission.md)
++- [Business Owner (事業責任者) ミッション声明](./roles/business_owner/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/ceo/finance
+-- [財務KPI標準基準 (Financial KPI Standards)](./roles/ceo/finance/kpi_standards.md)
++- [財務KPI標準基準 (Financial KPI Standards)](./roles/ceo/finance/kpi_standards.md) (public | Unknown)
+ 
+ ## 📁 roles/ceo/investment
+-- [技術デューデリジェンス (Tech DD) 標準基準](./roles/ceo/investment/tech_dd_standard.md)
++- [技術デューデリジェンス (Tech DD) 標準基準](./roles/ceo/investment/tech_dd_standard.md) (public | Unknown)
+ 
+ ## 📁 roles/ceo/memories
+-- [STRATEGIC_VISION Memories (ROLES)](./roles/ceo/memories/strategic_vision.md)
++- [STRATEGIC_VISION Memories (ROLES)](./roles/ceo/memories/strategic_vision.md) (public | Unknown)
+ 
+ ## 📁 roles/ceo/mission
+-- [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./roles/ceo/mission/corporate_purpose.md)
++- [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./roles/ceo/mission/corporate_purpose.md) (public | Unknown)
+ 
+ ## 📁 roles/ceo/planning
+-- [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./roles/ceo/planning/frameworks.md)
++- [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./roles/ceo/planning/frameworks.md) (public | Unknown)
+ 
+ ## 📁 roles/customer_success
+-- [Customer Success (カスタマーサクセス) ミッション声明](./roles/customer_success/mission.md)
++- [Customer Success (カスタマーサクセス) ミッション声明](./roles/customer_success/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/cyber_security
+-- [Cyber Security Lead (セキュリティ責任者) ミッション声明](./roles/cyber_security/mission.md)
++- [Cyber Security Lead (セキュリティ責任者) ミッション声明](./roles/cyber_security/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/designer
+-- [Experience Designer (デザイナー) ミッション声明](./roles/designer/mission.md)
++- [Experience Designer (デザイナー) ミッション声明](./roles/designer/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/ecosystem_architect
+-- [Ecosystem Architect 行動指針 (Operational Guidelines)](./roles/ecosystem_architect/guidelines.md)
++- [Ecosystem Architect 行動指針 (Operational Guidelines)](./roles/ecosystem_architect/guidelines.md) (public | Unknown)
+ 
+ ## 📁 roles/executive_assistant
+-- [Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明](./roles/executive_assistant/mission.md)
++- [Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明](./roles/executive_assistant/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/finance_controller
+-- [Finance Controller (財務・経理責任者) ミッション声明](./roles/finance_controller/mission.md)
++- [Finance Controller (財務・経理責任者) ミッション声明](./roles/finance_controller/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/incident_commander
+-- [Incident Commander (インシデント・コマンダー) ミッション声明](./roles/incident_commander/mission.md)
++- [Incident Commander (インシデント・コマンダー) ミッション声明](./roles/incident_commander/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/integration_steward
+-- [Role: Integration Steward](./roles/integration_steward/mission.md)
++- [Role: Integration Steward](./roles/integration_steward/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/knowledge_steward
+-- [Knowledge Steward (ナレッジ・スチュワード) ミッション声明](./roles/knowledge_steward/mission.md)
++- [Knowledge Steward (ナレッジ・スチュワード) ミッション声明](./roles/knowledge_steward/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/legal_strategist
+-- [Legal & IP Strategist (法務・知財戦略) ミッション声明](./roles/legal_strategist/mission.md)
++- [Legal & IP Strategist (法務・知財戦略) ミッション声明](./roles/legal_strategist/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/line_manager
+-- [Line Manager (ラインマネージャー) ミッション声明](./roles/line_manager/mission.md)
++- [Line Manager (ラインマネージャー) ミッション声明](./roles/line_manager/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/marketing_growth
+-- [Marketing & Growth (マーケティング & 成長戦略) ミッション声明](./roles/marketing_growth/mission.md)
++- [Marketing & Growth (マーケティング & 成長戦略) ミッション声明](./roles/marketing_growth/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/performance_engineer
+-- [Performance Engineer 行動指針 (Operational Guidelines)](./roles/performance_engineer/guidelines.md)
+-- [Performance Evaluation Knowledge Base](./roles/performance_engineer/knowledge_base.md)
++- [Performance Engineer 行動指針 (Operational Guidelines)](./roles/performance_engineer/guidelines.md) (public | Unknown)
++- [Performance Evaluation Knowledge Base](./roles/performance_engineer/knowledge_base.md) (public | Unknown)
+ 
+ ## 📁 roles/pmo_governance
+-- [PMO Governance (PMO/ガバナンス) ミッション声明](./roles/pmo_governance/mission.md)
+-- [品質ゲート (Quality Gates) 運用基準](./roles/pmo_governance/quality_gates.md)
++- [PMO Governance (PMO/ガバナンス) ミッション声明](./roles/pmo_governance/mission.md) (public | Unknown)
++- [品質ゲート (Quality Gates) 運用基準](./roles/pmo_governance/quality_gates.md) (public | Unknown)
+ 
+ ## 📁 roles/product_manager
+-- [Product Manager (プロダクトマネージャー) ミッション声明](./roles/product_manager/mission.md)
++- [Product Manager (プロダクトマネージャー) ミッション声明](./roles/product_manager/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/qa_lead
+-- [Quality Assurance (QA/QC) ミッション声明](./roles/qa_lead/mission.md)
+-- [QA/QC 重点チェックポイント：非同期通信と物理制約](./roles/qa_lead/qa_checkpoints.md)
++- [Quality Assurance (QA/QC) ミッション声明](./roles/qa_lead/mission.md) (public | Unknown)
++- [QA/QC 重点チェックポイント：非同期通信と物理制約](./roles/qa_lead/qa_checkpoints.md) (public | Unknown)
+ 
+ ## 📁 roles/reliability_engineer
+-- [Reliability Engineer (SRE/運用責任者) ミッション声明](./roles/reliability_engineer/mission.md)
++- [Reliability Engineer (SRE/運用責任者) ミッション声明](./roles/reliability_engineer/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/software_developer
+-- [Software Developer (ソフトウェア開発者) ミッション声明](./roles/software_developer/mission.md)
++- [Software Developer (ソフトウェア開発者) ミッション声明](./roles/software_developer/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/solution_architect
+-- [Solution Architect (ソリューション・アーキテクト) ミッション声明](./roles/solution_architect/mission.md)
++- [Solution Architect (ソリューション・アーキテクト) ミッション声明](./roles/solution_architect/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/strategic_sales
+-- [Strategic Sales (営業・事業開発) ミッション声明](./roles/strategic_sales/mission.md)
++- [Strategic Sales (営業・事業開発) ミッション声明](./roles/strategic_sales/mission.md) (public | Unknown)
+ 
+ ## 📁 roles/talent_culture
+-- [Talent & Culture (採用 & 組織文化) ミッション声明](./roles/talent_culture/mission.md)
++- [Talent & Culture (採用 & 組織文化) ミッション声明](./roles/talent_culture/mission.md) (public | Unknown)
+ 
+ ## 📁 sdlc
+-- [アプリケーション方式設計標準 (Nablarch/AWS参考)](./sdlc/design_standard_nablarch.md)
+-- [ウォーターフォール開発標準：工程と成果物 (SDLC Standard)](./sdlc/waterfall_standard.md)
++- [アプリケーション方式設計標準 (Nablarch/AWS参考)](./sdlc/design_standard_nablarch.md) (public | Unknown)
++- [ウォーターフォール開発標準：工程と成果物 (SDLC Standard)](./sdlc/waterfall_standard.md) (public | Unknown)
+ 
+ ## 📁 security
+-- [Security Best Practices](./security/security-best-practices.md)
++- [Security Best Practices](./security/security-best-practices.md) (public | Unknown)
+ 
+ ## 📁 security/advanced
+-- [Diff-Based Security Scanning Strategy](./security/advanced/diff_based_scanning.md)
++- [Diff-Based Security Scanning Strategy](./security/advanced/diff_based_scanning.md) (public | Unknown)
+ 
+ ## 📁 skills/ux-visualizer
+-- [Methodology: High-Fidelity SPA Reverse Engineering](./skills/ux-visualizer/methodology.md)
++- [Methodology: High-Fidelity SPA Reverse Engineering](./skills/ux-visualizer/methodology.md) (public | Unknown)
+ 
+ ## 📁 software-design
+-- [ソフトウェアデザインパターン & 設計原則](./software-design/patterns.md)
++- [ソフトウェアデザインパターン & 設計原則](./software-design/patterns.md) (public | Unknown)
+ 
+ ## 📁 standards/adr
+-- [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md)
++- [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md) (public | Unknown)
+ 
+ ## 📁 standards/ai-native
+-- [Gemini AI-Native Coding Standard](./standards/ai-native/gemini-coding-standard.md)
++- [Gemini AI-Native Coding Standard](./standards/ai-native/gemini-coding-standard.md) (public | Unknown)
+ 
+ ## 📁 standards/bcp
+-- [Disaster Recovery & BCP Playbook](./standards/bcp/dr_playbook.md)
++- [Disaster Recovery & BCP Playbook](./standards/bcp/dr_playbook.md) (public | Unknown)
+ 
+ ## 📁 standards/contract
+-- [Contract & SLA Negotiation Guardrails](./standards/contract/negotiation_guardrails.md)
++- [Contract & SLA Negotiation Guardrails](./standards/contract/negotiation_guardrails.md) (public | Unknown)
+ 
+ ## 📁 standards/engineering
+-- [Source Code Analysis Protocol (SCAP)](./standards/engineering/code-analysis-protocol.md)
+-- [Reverse Design Protocol (RDP)](./standards/engineering/reverse-design-protocol.md)
++- [Source Code Analysis Protocol (SCAP)](./standards/engineering/code-analysis-protocol.md) (public | Unknown)
++- [Reverse Design Protocol (RDP)](./standards/engineering/reverse-design-protocol.md) (public | Unknown)
+ 
+ ## 📁 standards/fisc
+-- [FISC-Aligned Security Standard (Cloud Infrastructure)](./standards/fisc/security-controls.md)
++- [FISC-Aligned Security Standard (Cloud Infrastructure)](./standards/fisc/security-controls.md) (public | Unknown)
+ 
+ ## 📁 standards/ipa
+-- [IPA-Aligned Requirements Engineering Standard](./standards/ipa/requirements-checklist.md)
++- [IPA-Aligned Requirements Engineering Standard](./standards/ipa/requirements-checklist.md) (public | Unknown)
+ 
+ ## 📁 standards/sdlc
+-- [Software Development Life Cycle (SDLC) Methodologies](./standards/sdlc/methodologies.md)
++- [Software Development Life Cycle (SDLC) Methodologies](./standards/sdlc/methodologies.md) (public | Unknown)
+ 
+ ## 📁 standards/security
+-- [OWASP Top 10 for LLM Applications](./standards/security/owasp_llm_top10.md)
++- [OWASP Top 10 for LLM Applications](./standards/security/owasp_llm_top10.md) (public | Unknown)
+ 
+ ## 📁 standards/testing
+-- [Test Automation Best Practices](./standards/testing/best_practices.md)
+-- [Mobile Test Automation Standard](./standards/testing/mobile_automation.md)
+-- [Web Test Automation Standard](./standards/testing/web_automation.md)
++- [Test Automation Best Practices](./standards/testing/best_practices.md) (public | Unknown)
++- [Mobile Test Automation Standard (Deep-Dive Edition)](./standards/testing/mobile_automation.md) (public | Unknown)
++- [Web Test Automation Standard](./standards/testing/web_automation.md) (public | Unknown)
+ 
+ ## 📁 standards/ux
+-- [Cognitive Load Principles for UX Design](./standards/ux/cognitive_load_principles.md)
++- [Cognitive Load Principles for UX Design](./standards/ux/cognitive_load_principles.md) (public | Unknown)
+ 
+ ## 📁 strategy
+-- [Winning Proposal Standards (Strategic Communication)](./strategy/winning-proposal-standards.md)
++- [Winning Proposal Standards (Strategic Communication)](./strategy/winning-proposal-standards.md) (public | Unknown)
+ 
+ ## 📁 tech-stack
+-- [AWS Unified Operations Team (Premium Support Extension)](./tech-stack/aws_unified_operations_support.md)
+-- [Box API 連携ガイド (Node.js SDK)](./tech-stack/box_api.md)
+-- [Box CLI 活用ガイド](./tech-stack/box_cli.md)
+-- [MCP (Model Context Protocol) Integration Guide](./tech-stack/mcp-integration-guide.md)
++- [AWS Unified Operations Team (Premium Support Extension)](./tech-stack/aws_unified_operations_support.md) (public | Unknown)
++- [Box API 連携ガイド (Node.js SDK)](./tech-stack/box_api.md) (public | Unknown)
++- [Box CLI 活用ガイド](./tech-stack/box_cli.md) (public | Unknown)
++- [MCP (Model Context Protocol) Integration Guide](./tech-stack/mcp-integration-guide.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/atlassian
+-- [Jira 運用ベストプラクティス](./tech-stack/atlassian/jira_best_practices.md)
++- [Jira 運用ベストプラクティス](./tech-stack/atlassian/jira_best_practices.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/cloud
+-- [The Rosetta Stone of Cloud (Multi-Cloud Mapping)](./tech-stack/cloud/rosetta_stone.md)
++- [The Rosetta Stone of Cloud (Multi-Cloud Mapping)](./tech-stack/cloud/rosetta_stone.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/google
+-- [Google Workspace 連携ベストプラクティス](./tech-stack/google/workspace_best_practices.md)
++- [Google Workspace 連携ベストプラクティス](./tech-stack/google/workspace_best_practices.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/java/terasoluna
+-- [TERASOLUNA Layered Architecture Standard](./tech-stack/java/terasoluna/architecture.md)
+-- [TERASOLUNA Implementation Standards](./tech-stack/java/terasoluna/implementation_standards.md)
++- [TERASOLUNA Layered Architecture Standard](./tech-stack/java/terasoluna/architecture.md) (public | Unknown)
++- [TERASOLUNA Implementation Standards](./tech-stack/java/terasoluna/implementation_standards.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/macos
+-- [macOS 音声コントロール ＆ 音声入力活用ガイド](./tech-stack/macos/voice_control_guide.md)
++- [macOS 音声コントロール ＆ 音声入力活用ガイド](./tech-stack/macos/voice_control_guide.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/voltmx
+-- [VoltMX Architecture Overview](./tech-stack/voltmx/architecture.md)
+-- [VoltMX Development Best Practices](./tech-stack/voltmx/best_practices.md)
+-- [VoltMX Troubleshooting Guide](./tech-stack/voltmx/troubleshooting.md)
++- [VoltMX Architecture Overview](./tech-stack/voltmx/architecture.md) (public | Unknown)
++- [VoltMX Development Best Practices](./tech-stack/voltmx/best_practices.md) (public | Unknown)
++- [VoltMX Troubleshooting Guide](./tech-stack/voltmx/troubleshooting.md) (public | Unknown)
+ 
+ ## 📁 tech-stack/voltmx/migration
+-- [VoltMX to React Technical Mapping Rules](./tech-stack/voltmx/migration/mapping_rules.md)
+-- [VoltMX to React Migration Strategy](./tech-stack/voltmx/migration/strategy.md)
++- [VoltMX to React Technical Mapping Rules](./tech-stack/voltmx/migration/mapping_rules.md) (public | Unknown)
++- [VoltMX to React Migration Strategy](./tech-stack/voltmx/migration/strategy.md) (public | Unknown)
+ 
+ ## 📁 templates/reporting
+-- [Audience Strategy for Executive Reporting](./templates/reporting/audience_strategy.md)
+-- [Master Slide Structure (Marp Standard)](./templates/reporting/master_slide_structure.md)
+-- [Project Management Plan (PMP) - 13 Standard Items](./templates/reporting/project_management_plan_13.md)
+-- [Project Plan Master Template (Consulting Standard)](./templates/reporting/project_plan_master.md)
++- [Audience Strategy for Executive Reporting](./templates/reporting/audience_strategy.md) (public | Unknown)
++- [Master Slide Structure (Marp Standard)](./templates/reporting/master_slide_structure.md) (public | Unknown)
++- [Project Management Plan (PMP) - 13 Standard Items](./templates/reporting/project_management_plan_13.md) (public | Unknown)
++- [Project Plan Master Template (Consulting Standard)](./templates/reporting/project_plan_master.md) (public | Unknown)
+ 
+ ## 📁 templates/themes
+-- [プロフェッショナル・エクセル設計書テーマガイド](./templates/themes/excel_design_guide.md)
+-- [Marp テーマ作成 ＆ スタイリング完全ガイド](./templates/themes/marp_theme_guide.md)
+-- [プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)](./templates/themes/theme_design_guide.md)
+-- [ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition](./templates/themes/visual_harmony_guide.md)
++- [プロフェッショナル・エクセル設計書テーマガイド](./templates/themes/excel_design_guide.md) (public | Unknown)
++- [Marp テーマ作成 ＆ スタイリング完全ガイド](./templates/themes/marp_theme_guide.md) (public | Unknown)
++- [プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)](./templates/themes/theme_design_guide.md) (public | Unknown)
++- [ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition](./templates/themes/visual_harmony_guide.md) (public | Unknown)
+ 
+ ## 📁 testing
+-- [テスト項目表・実施結果標準仕様 (Test Item Specification)](./testing/test_item_specification.md)
++- [テスト項目表・実施結果標準仕様 (Test Item Specification)](./testing/test_item_specification.md) (public | Unknown)
+ 
+ ## 📁 testing/viewpoint-catalogs
+-- [テスト観点カタログ (TIS株式会社 公開版 v1.6)](./testing/viewpoint-catalogs/tis_catalog_v1_6.md)
++- [テスト観点カタログ (TIS株式会社 公開版 v1.6)](./testing/viewpoint-catalogs/tis_catalog_v1_6.md) (public | Unknown)
+ 
+ ## 📁 voice
+-- [音声ペルソナ定義 (Voice Persona Definitions)](./voice/persona_definitions.md)
++- [音声ペルソナ定義 (Voice Persona Definitions)](./voice/persona_definitions.md) (public | Unknown)
+ 
+diff --git a/knowledge/operations/routine-tasks.json b/knowledge/operations/routine-tasks.json
+index fecc3d5..7c7f94e 100644
+--- a/knowledge/operations/routine-tasks.json
++++ b/knowledge/operations/routine-tasks.json
+@@ -34,6 +34,7 @@
+       "frequency": "daily",
+       "schedule": "anytime",
+       "description": "リンク切れや用語の不整合を自動スキャンします。",
++      "skill": "knowledge-auditor",
+       "required_role": "Ecosystem Architect"
+     },
+     {
+diff --git a/tools/chronos-mirror/bridge.cjs b/tools/chronos-mirror/bridge.cjs
+index 130574d..0707eff 100644
+--- a/tools/chronos-mirror/bridge.cjs
++++ b/tools/chronos-mirror/bridge.cjs
+@@ -4,10 +4,18 @@ const fs = require('fs');
+ const path = require('path');
+ const crypto = require('crypto');
+ const pathResolver = require('@agent/core/path-resolver');
++const { safeJsonParse } = require('@agent/core/validators');
+ 
+ const PORT = 3030;
+-const _rootDir = path.resolve(__dirname, '../..');
++const _rootDir = pathResolver.rootDir();
+ const queueDir = pathResolver.shared('queue');
++const inboxDir = path.join(queueDir, 'inbox');
++const outboxDir = path.join(queueDir, 'outbox');
++
++// Ensure queue directories exist
++[inboxDir, outboxDir].forEach(dir => {
++  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
++});
+ 
+ const server = http.createServer((req, res) => {
+   res.setHeader('Access-Control-Allow-Origin', '*');
+@@ -16,43 +24,57 @@ const server = http.createServer((req, res) => {
+ 
+   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+ 
+-  // 1. 依頼のキューイング (Browser -> Agent)
++  const sendJson = (status, data) => {
++    res.writeHead(status, { 'Content-Type': 'application/json' });
++    res.end(JSON.stringify(data));
++  };
++
++  // 1. Request Queueing (Browser -> Agent)
+   if (req.method === 'POST' && req.url === '/request') {
+     let body = '';
+     req.on('data', chunk => { body += chunk.toString(); });
+     req.on('end', () => {
+-      const msgId = `REQ-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+-      const payload = JSON.parse(body);
+-      
+-      const message = {
+-        id: msgId,
+-        intent: payload.intent,
+-        timestamp: new Date().toISOString(),
+-        status: 'pending'
+-      };
+-      
+-      fs.writeFileSync(path.join(queueDir, 'inbox', `${msgId}.json`), JSON.stringify(message, null, 2));
+-      console.log(`[Queue] Queued: ${msgId} - ${message.intent}`);
+-      
+-      res.writeHead(202); // Accepted
+-      res.end(JSON.stringify({ status: 'accepted', id: msgId }));
++      try {
++        const payload = safeJsonParse(body, 'Bridge Request');
++        
++        // Simple manual validation (Architecture v1)
++        if (!payload.intent) {
++          return sendJson(400, { error: 'Missing required field: intent' });
++        }
++
++        const msgId = `REQ-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
++        const message = {
++          id: msgId,
++          intent: payload.intent,
++          context: payload.context || {},
++          params: payload.params || {},
++          timestamp: new Date().toISOString(),
++          status: 'pending'
++        };
++        
++        fs.writeFileSync(path.join(inboxDir, `${msgId}.json`), JSON.stringify(message, null, 2));
++        console.log(`[Queue] Queued: ${msgId} - ${message.intent}`);
++        
++        sendJson(202, { status: 'accepted', id: msgId });
++      } catch (err) {
++        sendJson(400, { error: `Invalid Request: ${err.message}` });
++      }
+     });
+   } 
+-  // 2. 全レスポンスの取得 (Agent -> Browser)
++  // 2. Fetch Responses (Agent -> Browser)
+   else if (req.method === 'GET' && req.url === '/responses') {
+-    const outboxDir = path.join(queueDir, 'outbox');
+-    const files = fs.readdirSync(outboxDir).filter(f => f.endsWith('.json'));
+-    const responses = files.map(f => JSON.parse(fs.readFileSync(path.join(outboxDir, f), 'utf8')));
+-    
+-    // 時系列でソートして返す
+-    responses.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+-    
+-    res.writeHead(200, { 'Content-Type': 'application/json' });
+-    res.end(JSON.stringify(responses));
++    try {
++      const files = fs.readdirSync(outboxDir).filter(f => f.endsWith('.json'));
++      const responses = files.map(f => JSON.parse(fs.readFileSync(path.join(outboxDir, f), 'utf8')));
++      responses.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
++      sendJson(200, responses);
++    } catch (err) {
++      sendJson(500, { error: 'Failed to fetch responses' });
++    }
+   }
+-  // 3. ACE審議レポートの取得 (Mission Evidence -> Browser)
++  // 3. Fetch ACE Reports (Evidence -> Browser)
+   else if (req.method === 'GET' && req.url === '/ace-reports') {
+-    const missionsDir = path.resolve(_rootDir, 'active/missions');
++    const missionsDir = path.join(_rootDir, 'active/missions');
+     const reports = [];
+     
+     if (fs.existsSync(missionsDir)) {
+@@ -60,32 +82,36 @@ const server = http.createServer((req, res) => {
+       missions.forEach(mission => {
+         const reportPath = path.join(missionsDir, mission, 'ace-report.json');
+         if (fs.existsSync(reportPath)) {
+-          reports.push(JSON.parse(fs.readFileSync(reportPath, 'utf8')));
++          try {
++            reports.push(JSON.parse(fs.readFileSync(reportPath, 'utf8')));
++          } catch (_) { /* ignore corrupted */ }
+         }
+       });
+     }
+-    
+-    res.writeHead(200, { 'Content-Type': 'application/json' });
+-    res.end(JSON.stringify(reports));
++    sendJson(200, reports);
+   }
+-  // 4. スキル階層構造の取得 (Skills Namespace -> Browser)
++  // 4. Fetch Skills Tree (Namespace -> Browser)
+   else if (req.method === 'GET' && req.url === '/skills-tree') {
+-    const skillsRootDir = path.resolve(_rootDir, 'skills');
++    const skillsRootDir = path.join(_rootDir, 'skills');
+     const tree = {};
+     
+     if (fs.existsSync(skillsRootDir)) {
+-      const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
++      const categories = fs.readdirSync(skillsRootDir).filter(f => {
++        const full = path.join(skillsRootDir, f);
++        return fs.lstatSync(full).isDirectory() && !f.startsWith('.');
++      });
+       categories.forEach(cat => {
+         const catPath = path.join(skillsRootDir, cat);
+-        const skills = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
++        const skills = fs.readdirSync(catPath).filter(f => {
++          const full = path.join(catPath, f);
++          return fs.lstatSync(full).isDirectory() && !f.startsWith('.');
++        });
+         tree[cat] = skills;
+       });
+     }
+-    
+-    res.writeHead(200, { 'Content-Type': 'application/json' });
+-    res.end(JSON.stringify(tree));
++    sendJson(200, tree);
+   }
+-  // 5. 実行中プロセス一覧の取得 (Pulse -> Browser)
++  // 5. Active Registry (Pulse -> Browser)
+   else if (req.method === 'GET' && req.url === '/registry') {
+     const registryPath = pathResolver.shared('tasks/parallel_registry.json');
+     if (fs.existsSync(registryPath)) {
+@@ -93,12 +119,14 @@ const server = http.createServer((req, res) => {
+       res.writeHead(200, { 'Content-Type': 'application/json' });
+       res.end(registry);
+     } else {
+-      res.writeHead(200, { 'Content-Type': 'application/json' });
+-      res.end(JSON.stringify({ active: [] }));
++      sendJson(200, { active: [] });
+     }
+   }
++  else {
++    sendJson(404, { error: 'Not Found' });
++  }
+ });
+ 
+ server.listen(PORT, () => {
+-  console.log(`\n\u26d3 Gemini Omni-Queue active on http://localhost:${PORT}`);
++  console.log(`\n\u26d3 Gemini Omni-Queue Bridge active on http://localhost:${PORT}`);
+ });
+diff --git a/tools/chronos-mirror/public/knowledge_index.json b/tools/chronos-mirror/public/knowledge_index.json
+index 4bbf3e9..6c04fd9 100644
+--- a/tools/chronos-mirror/public/knowledge_index.json
++++ b/tools/chronos-mirror/public/knowledge_index.json
+@@ -2,1261 +2,1705 @@
+   {
+     "id": "ai-engineering/best_practices.md",
+     "title": "AIエンジニアリング・ベストプラクティス",
+-    "path": "/knowledge_src/ai-engineering/best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ai-engineering"
+   },
+   {
+     "id": "ai-engineering/review_checklist.md",
+     "title": "AIシステム・レビューチェックリスト",
+-    "path": "/knowledge_src/ai-engineering/review_checklist.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ai-engineering"
+   },
+   {
+     "id": "ai-engineering/strategy.md",
+     "title": "エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)",
+-    "path": "/knowledge_src/ai-engineering/strategy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ai-engineering"
+   },
+   {
+     "id": "architecture/distributed-systems.md",
+     "title": "分散システム ＆ アーキテクチャパターン",
+-    "path": "/knowledge_src/architecture/distributed-systems.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "architecture"
+   },
+   {
+     "id": "architecture/microservices-patterns.md",
+     "title": "Microservices Design Patterns",
+-    "path": "/knowledge_src/architecture/microservices-patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "architecture"
+   },
+   {
+     "id": "ceo/ai-business-engineering.md",
+     "title": "AI-Driven Business Engineering: The Gemini Strategy",
+-    "path": "/knowledge_src/ceo/ai-business-engineering.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo"
+   },
+   {
+     "id": "ceo/executive_briefing_standards.md",
+     "title": "Executive Briefing Standards",
+-    "path": "/knowledge_src/ceo/executive_briefing_standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo"
+   },
+   {
+     "id": "ceo/finance/kpi_standards.md",
+     "title": "財務KPI標準基準 (Financial KPI Standards)",
+-    "path": "/knowledge_src/ceo/finance/kpi_standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo/finance"
+   },
+   {
+     "id": "ceo/investment/tech_dd_standard.md",
+     "title": "技術デューデリジェンス (Tech DD) 標準基準",
+-    "path": "/knowledge_src/ceo/investment/tech_dd_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo/investment"
+   },
+   {
+     "id": "ceo/legal-tax-essentials-jp.md",
+     "title": "Corporate Legal & Tax Essentials (Japan context)",
+-    "path": "/knowledge_src/ceo/legal-tax-essentials-jp.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo"
+   },
+   {
+     "id": "ceo/mission/corporate_purpose.md",
+     "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
+-    "path": "/knowledge_src/ceo/mission/corporate_purpose.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo/mission"
+   },
+   {
+     "id": "ceo/planning/frameworks.md",
+     "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
+-    "path": "/knowledge_src/ceo/planning/frameworks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ceo/planning"
+   },
+   {
+     "id": "connections/setup_guide.md",
+     "title": "ユニバーサル接続設定ガイド (UCM Setup)",
+-    "path": "/knowledge_src/connections/setup_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "connections"
+   },
+   {
+     "id": "design/brand/visual_identity.md",
+     "title": "Brand & Visual Identity Engineering",
+-    "path": "/knowledge_src/design/brand/visual_identity.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "design/brand"
+   },
+   {
+     "id": "devops/ci-cd-patterns.md",
+     "title": "CI/CD Pipeline Design Patterns",
+-    "path": "/knowledge_src/devops/ci-cd-patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "devops"
+   },
+   {
+     "id": "devops/cloud-native.md",
+     "title": "クラウドネイティブ ＆ インフラ設計",
+-    "path": "/knowledge_src/devops/cloud-native.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "devops"
+   },
+   {
+     "id": "economics/finops/cloud_optimization.md",
+     "title": "Cloud FinOps & Unit Economics Standard",
+-    "path": "/knowledge_src/economics/finops/cloud_optimization.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "economics/finops"
+   },
+   {
+     "id": "economics/it_cost_benchmarks.md",
+     "title": "IT Cost Benchmarks & Strategic ROI",
+-    "path": "/knowledge_src/economics/it_cost_benchmarks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "economics"
+   },
+   {
+     "id": "ethics/ai_bias_mitigation.md",
+     "title": "Data Ethics & AI Bias Mitigation Standard",
+-    "path": "/knowledge_src/ethics/ai_bias_mitigation.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "ethics"
+   },
+   {
+     "id": "evolution/biometric_privacy.md",
+     "title": "Biometric & Mood Data Privacy Protocol",
+-    "path": "/knowledge_src/evolution/biometric_privacy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "evolution"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/architect.md",
+     "title": "ADR-001: Use Redis for Semantic Search Vector Storage",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/architect.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/build-error-resolver.md",
+     "title": "Build Error Resolver",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/build-error-resolver.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/code-reviewer.md",
+     "title": "code-reviewer",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/code-reviewer.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/database-reviewer.md",
+     "title": "Database Reviewer",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/database-reviewer.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/doc-updater.md",
+     "title": "Documentation & Codemap Specialist",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/doc-updater.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/e2e-runner.md",
+     "title": "E2E Test Runner",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/e2e-runner.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/go-build-resolver.md",
+     "title": "Go Build Error Resolver",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/go-build-resolver.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/go-reviewer.md",
+     "title": "Static analysis",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/go-reviewer.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/planner.md",
+     "title": "Implementation Plan: [Feature Name]",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/planner.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/python-reviewer.md",
+     "title": "Type checking",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/python-reviewer.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/refactor-cleaner.md",
+     "title": "Refactor & Dead Code Cleaner",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/refactor-cleaner.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/security-reviewer.md",
+     "title": "Security Reviewer",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/security-reviewer.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/agents/tdd-guide.md",
+     "title": "Test should fail - we haven't implemented yet",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/agents/tdd-guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/agents"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/agents.md",
+     "title": "Agent Orchestration",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/agents.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/coding-style.md",
+     "title": "Coding Style",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/coding-style.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/git-workflow.md",
+     "title": "Git Workflow",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/git-workflow.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/hooks.md",
+     "title": "Hooks System",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/hooks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/patterns.md",
+     "title": "Common Patterns",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/performance.md",
+     "title": "Performance Optimization",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/performance.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/security.md",
+     "title": "Security Guidelines",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/security.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/common/testing.md",
+     "title": "Testing Requirements",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/common/testing.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/common"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/golang/coding-style.md",
+     "title": "Go Coding Style",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/coding-style.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/golang"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/golang/hooks.md",
+     "title": "Go Hooks",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/hooks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/golang"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/golang/patterns.md",
+     "title": "Go Patterns",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/golang"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/golang/security.md",
+     "title": "Go Security",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/security.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/golang"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/golang/testing.md",
+     "title": "Go Testing",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/golang/testing.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/golang"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/python/coding-style.md",
+     "title": "Python Coding Style",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/coding-style.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/python"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/python/hooks.md",
+     "title": "Python Hooks",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/hooks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/python"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/python/patterns.md",
+     "title": "Python Patterns",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/python"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/python/security.md",
+     "title": "Python Security",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/security.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/python"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/python/testing.md",
+     "title": "Python Testing",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/python/testing.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/python"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/typescript/coding-style.md",
+     "title": "TypeScript/JavaScript Coding Style",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/coding-style.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/typescript"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/typescript/hooks.md",
+     "title": "TypeScript/JavaScript Hooks",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/hooks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/typescript"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/typescript/patterns.md",
+     "title": "TypeScript/JavaScript Patterns",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/typescript"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/typescript/security.md",
+     "title": "TypeScript/JavaScript Security",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/security.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/typescript"
+   },
+   {
+     "id": "external-wisdom/everything-claude/rules/typescript/testing.md",
+     "title": "TypeScript/JavaScript Testing",
+-    "path": "/knowledge_src/external-wisdom/everything-claude/rules/typescript/testing.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "external-wisdom/everything-claude/rules/typescript"
+   },
+   {
+     "id": "fisc-compliance/aws_fisc_standard.md",
+     "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
+-    "path": "/knowledge_src/fisc-compliance/aws_fisc_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "fisc-compliance"
+   },
+   {
+     "id": "fisc-compliance/blea_fisc_reference.md",
+     "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
+-    "path": "/knowledge_src/fisc-compliance/blea_fisc_reference.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "fisc-compliance"
+   },
+   {
+     "id": "frameworks/conceptual-frameworks.md",
+     "title": "Conceptual Frameworks Reference",
+-    "path": "/knowledge_src/frameworks/conceptual-frameworks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "frameworks"
+   },
+   {
+     "id": "future/quantum_sustainability.md",
+     "title": "Future-Proofing: Quantum-Safe & Sustainability",
+-    "path": "/knowledge_src/future/quantum_sustainability.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "future"
+   },
++  {
++    "id": "governance/dual-key-policy.md",
++    "title": "Dual-Key Policy: ロール管理と決定権限の標準規約",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
++    "category": "governance"
++  },
+   {
+     "id": "legal/ip/patent_strategy.md",
+     "title": "Legal & Intellectual Property Strategy",
+-    "path": "/knowledge_src/legal/ip/patent_strategy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "legal/ip"
+   },
++  {
++    "id": "nonfunctional/nonfunctional_requirements.md",
++    "title": "Non-Functional Requirements Definition",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
++    "category": "nonfunctional"
++  },
+   {
+     "id": "nonfunctional/test-viewpoints/ipa_grade_2018.md",
+     "title": "非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)",
+-    "path": "/knowledge_src/nonfunctional/test-viewpoints/ipa_grade_2018.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "nonfunctional/test-viewpoints"
+   },
+   {
+     "id": "onboarding/learning_paths.md",
+     "title": "ロール別教育ロードマップ (Learning Paths by Role)",
+-    "path": "/knowledge_src/onboarding/learning_paths.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "onboarding"
+   },
+   {
+     "id": "operations/availability_best_practices.md",
+     "title": "Availability & Disaster Recovery Best Practices",
+-    "path": "/knowledge_src/operations/availability_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/incident_knowledge_loop.md",
+     "title": "Incident Knowledge Loop: Learning from Failures",
+-    "path": "/knowledge_src/operations/incident_knowledge_loop.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/modern_sre_best_practices.md",
+     "title": "Modern SRE Best Practices (Advanced Operations)",
+-    "path": "/knowledge_src/operations/modern_sre_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/monitoring/best_practices.md",
+     "title": "監視設定ベストプラクティス・チェックリスト",
+-    "path": "/knowledge_src/operations/monitoring/best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations/monitoring"
+   },
+   {
+     "id": "operations/monitoring/datadog_best_practices.md",
+     "title": "Datadog 導入・運用ベストプラクティス",
+-    "path": "/knowledge_src/operations/monitoring/datadog_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations/monitoring"
+   },
+   {
+     "id": "operations/monitoring/newrelic_best_practices.md",
+     "title": "New Relic 導入・運用ベストプラクティス",
+-    "path": "/knowledge_src/operations/monitoring/newrelic_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations/monitoring"
+   },
+   {
+     "id": "operations/monitoring_best_practices.md",
+     "title": "Monitoring & Observability Best Practices",
+-    "path": "/knowledge_src/operations/monitoring_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/pagerduty_best_practices.md",
+     "title": "PagerDuty Best Practices",
+-    "path": "/knowledge_src/operations/pagerduty_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/runbook_best_practices.md",
+     "title": "Runbook & Playbook Best Practices (AI-Native Operations)",
+-    "path": "/knowledge_src/operations/runbook_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "operations/runbooks/standard.md",
+     "title": "運用ランブック（手順書）標準構成",
+-    "path": "/knowledge_src/operations/runbooks/standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations/runbooks"
+   },
+   {
+     "id": "operations/slo_dashboard_best_practices.md",
+     "title": "SLO & Dashboard Best Practices",
+-    "path": "/knowledge_src/operations/slo_dashboard_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "operations"
+   },
+   {
+     "id": "orchestration/active_inquiry_protocol.md",
+     "title": "Active Inquiry Protocol: The Power of Questioning",
+-    "path": "/knowledge_src/orchestration/active_inquiry_protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/advanced-development-flow.md",
+     "title": "高度な自律開発標準ワークフロー (Advanced Development Flow)",
+-    "path": "/knowledge_src/orchestration/advanced-development-flow.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/autonomous-agent-protocol.md",
+     "title": "Sovereign Autonomous Agent Protocol (SAAP)",
+-    "path": "/knowledge_src/orchestration/autonomous-agent-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/autonomous-debug-loop.md",
+     "title": "自律型デバッグ・ループ (Autonomous Debug Loop)",
+-    "path": "/knowledge_src/orchestration/autonomous-debug-loop.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/consensus-protocol.md",
+     "title": "ACE (Autonomous Consensus Engine) Operating Standard",
+-    "path": "/knowledge_src/orchestration/consensus-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/context-extraction-rules.md",
+     "title": "コンテキスト抽出・要約ルール (Context Extraction Rules)",
+-    "path": "/knowledge_src/orchestration/context-extraction-rules.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/corporate-env-guide.md",
+     "title": "企業内ネットワーク環境セットアップガイド",
+-    "path": "/knowledge_src/orchestration/corporate-env-guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/data-handover-specs.md",
+     "title": "スキル間データ受け渡し仕様 (Data Handover Specs)",
+-    "path": "/knowledge_src/orchestration/data-handover-specs.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/directives-protocol.md",
+     "title": "Cross-Role Directive Protocol (CRDP)",
+-    "path": "/knowledge_src/orchestration/directives-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/fusion-protocols/learning_loop.md",
+     "title": "Continuous Learning Loop Protocol",
+-    "path": "/knowledge_src/orchestration/fusion-protocols/learning_loop.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/fusion-protocols"
+   },
+   {
+     "id": "orchestration/git-flow-standards.md",
+     "title": "自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)",
+-    "path": "/knowledge_src/orchestration/git-flow-standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/hybrid-development-flow.md",
+     "title": "ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)",
+-    "path": "/knowledge_src/orchestration/hybrid-development-flow.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/knowledge-protocol.md",
+     "title": "ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)",
+-    "path": "/knowledge_src/orchestration/knowledge-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
++    "category": "orchestration"
++  },
++  {
++    "id": "orchestration/mission-execution-protocol.md",
++    "title": "ミッション実行規程 (Mission Execution Protocol v1.0)",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/mission-playbooks/ceo-strategy.md",
+     "title": "ミッション・プレイブック：CEO戦略的意思決定",
+-    "path": "/knowledge_src/orchestration/mission-playbooks/ceo-strategy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/mission-playbooks"
+   },
+   {
+     "id": "orchestration/mission-playbooks/product-audit.md",
+     "title": "ミッション・プレイブック：プロダクト健全性 ＆ リリース監査",
+-    "path": "/knowledge_src/orchestration/mission-playbooks/product-audit.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/mission-playbooks"
+   },
+   {
+     "id": "orchestration/mission-playbooks/saas-roi.md",
+     "title": "ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定",
+-    "path": "/knowledge_src/orchestration/mission-playbooks/saas-roi.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/mission-playbooks"
+   },
+   {
+     "id": "orchestration/onboarding-directives/01_eng_to_steward.md",
+     "title": "MISSION: Infrastructure & Environment Mapping",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/01_eng_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/02_ceo_to_steward.md",
+     "title": "MISSION: Strategic Vision Harvesting",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/02_ceo_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/03_arch_to_steward.md",
+     "title": "MISSION: Skill Usage & Performance Audit",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/03_arch_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/04_steward_self_map.md",
+     "title": "MISSION: External System Connection Mapping",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/04_steward_self_map.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/05_sol_to_steward.md",
+     "title": "MISSION: Competitive Edge & ROI Benchmarking",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/05_sol_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/06_sre_to_steward.md",
+     "title": "MISSION: Incident Response & SRE Wisdom",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/06_sre_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/07_legal_to_steward.md",
+     "title": "MISSION: Legal Guardrails & IP Portfolio",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/07_legal_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/08_qa_to_steward.md",
+     "title": "MISSION: Testing Standards & Bug Analytics",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/08_qa_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/09_pmo_to_steward.md",
+     "title": "MISSION: Project Governance & Standards Alignment",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/09_pmo_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/10_manager_to_steward.md",
+     "title": "MISSION: Organizational Map & Approval History",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/10_manager_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/11_marketing_to_steward.md",
+     "title": "MISSION: Brand Assets & Trend Harvesting",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/11_marketing_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/12_cs_to_steward.md",
+     "title": "MISSION: Voice of Customer (VoC) Data Collection",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/12_cs_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/13_hr_to_steward.md",
+     "title": "MISSION: Culture Archetypes & Talent Specs",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/13_hr_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/14_pdm_to_steward.md",
+     "title": "MISSION: Product Roadmap & Feature Backlog",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/14_pdm_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/15_designer_to_steward.md",
+     "title": "MISSION: UI/UX Asset & Persona Templates",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/15_designer_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/16_finance_to_steward.md",
+     "title": "MISSION: Financial P&L & Cost Analysis",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/16_finance_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/17_sec_to_steward.md",
+     "title": "MISSION: Threat Intelligence & Vulnerability Feed",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/17_sec_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/18_sales_to_steward.md",
+     "title": "MISSION: Sales Pipelines & Deal Insights",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/18_sales_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/19_dev_to_steward.md",
+     "title": "MISSION: Technical Blueprint Discovery",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/19_dev_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/20_owner_to_steward.md",
+     "title": "MISSION: Market Dynamics & P&L Sensitivity",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/20_owner_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/onboarding-directives/21_assistant_to_steward.md",
+     "title": "MISSION: Executive Support & Templates",
+-    "path": "/knowledge_src/orchestration/onboarding-directives/21_assistant_to_steward.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration/onboarding-directives"
+   },
+   {
+     "id": "orchestration/optimization-standards.md",
+     "title": "自律型シナジー標準基準 (Autonomous Synergy Standards)",
+-    "path": "/knowledge_src/orchestration/optimization-standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/polyglot-roadmap.md",
+     "title": "Polyglot Core Transformation Roadmap (Sidecar Architecture)",
+-    "path": "/knowledge_src/orchestration/polyglot-roadmap.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/proposal-pipeline.md",
+     "title": "Professional Proposal Pipeline (Orchestration Pattern)",
+-    "path": "/knowledge_src/orchestration/proposal-pipeline.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/quality-management-flow.md",
+     "title": "エンタープライズ品質管理フロー (Quality Management Flow)",
+-    "path": "/knowledge_src/orchestration/quality-management-flow.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/self-refinement-protocol.md",
+     "title": "Self-Refinement Protocol: The Path to Perpetual Growth",
+-    "path": "/knowledge_src/orchestration/self-refinement-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/sentinel-operations.md",
+     "title": "Autonomous Sentinel Operations",
+-    "path": "/knowledge_src/orchestration/sentinel-operations.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/asset-token-economy-protocol.md",
+     "title": "トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)",
+-    "path": "/knowledge_src/orchestration/asset-token-economy-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "orchestration/voice-interface-protocol.md",
+     "title": "Voice Interface Protocol (VIP)",
+-    "path": "/knowledge_src/orchestration/voice-interface-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "orchestration"
+   },
+   {
+     "id": "organization/change_management.md",
+     "title": "Cultural Alignment & Change Management Protocol",
+-    "path": "/knowledge_src/organization/change_management.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "organization"
+   },
+   {
+     "id": "personalities/matrix.md",
+     "title": "ペルソナ・マトリクス (Persona Matrix)",
+-    "path": "/knowledge_src/personalities/matrix.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "personal",
+     "category": "personalities"
+   },
+   {
+     "id": "pmo/standard/ipa_nfr_bridge.md",
+     "title": "PMO Bridge to IPA Non-Functional Grade",
+-    "path": "/knowledge_src/pmo/standard/ipa_nfr_bridge.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "pmo/standard"
+   },
+   {
+     "id": "pmo/standard/pmbok_v7.md",
+     "title": "PMBOK v7 Project Management Principles",
+-    "path": "/knowledge_src/pmo/standard/pmbok_v7.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "pmo/standard"
+   },
+   {
+     "id": "pmo/standard/stakeholder_management.md",
+     "title": "Stakeholder Management Framework",
+-    "path": "/knowledge_src/pmo/standard/stakeholder_management.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "pmo/standard"
+   },
+   {
+     "id": "pmo/standards/governance.md",
+     "title": "PMO ガバナンス標準基準 (Governance Standard)",
+-    "path": "/knowledge_src/pmo/standards/governance.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "pmo/standards"
+   },
+   {
+     "id": "pmo/templates/external_status_report.md",
+     "title": "対外報告用ステータスレポート・テンプレート",
+-    "path": "/knowledge_src/pmo/templates/external_status_report.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "pmo/templates"
+   },
+   {
+     "id": "public/standards/aws_fisc_standard.md",
+     "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
+-    "path": "/knowledge_src/public/standards/aws_fisc_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "public/standards"
+   },
+   {
+     "id": "public/standards/blea_fisc_reference.md",
+     "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
+-    "path": "/knowledge_src/public/standards/blea_fisc_reference.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "public/standards"
+   },
+   {
+     "id": "public/templates/ss_ppt_theme.md",
+     "title": "ss_ppt_theme",
+-    "path": "/knowledge_src/public/templates/ss_ppt_theme.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "public/templates"
+   },
+   {
+     "id": "quality-management/metrics_standards.md",
+     "title": "定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)",
+-    "path": "/knowledge_src/quality-management/metrics_standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "quality-management"
+   },
+   {
+     "id": "quality-management/test_viewpoints_catalog.md",
+     "title": "Test Viewpoint Catalog: Non-Functional Excellence",
+-    "path": "/knowledge_src/quality-management/test_viewpoints_catalog.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "quality-management"
+   },
+   {
+     "id": "requirements-guide/ipa_best_practices.md",
+     "title": "要件定義ガイド (IPA準拠)",
+-    "path": "/knowledge_src/requirements-guide/ipa_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "requirements-guide"
+   },
+   {
+     "id": "requirements-guide/review_checklist.md",
+     "title": "要件定義ドキュメント・レビューチェックリスト",
+-    "path": "/knowledge_src/requirements-guide/review_checklist.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "requirements-guide"
+   },
+   {
+     "id": "roles/business_owner/mission.md",
+     "title": "Business Owner (事業責任者) ミッション声明",
+-    "path": "/knowledge_src/roles/business_owner/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/business_owner"
+   },
+   {
+     "id": "roles/ceo/finance/kpi_standards.md",
+     "title": "財務KPI標準基準 (Financial KPI Standards)",
+-    "path": "/knowledge_src/roles/ceo/finance/kpi_standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ceo/finance"
+   },
+   {
+     "id": "roles/ceo/investment/tech_dd_standard.md",
+     "title": "技術デューデリジェンス (Tech DD) 標準基準",
+-    "path": "/knowledge_src/roles/ceo/investment/tech_dd_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ceo/investment"
+   },
+   {
+     "id": "roles/ceo/memories/strategic_vision.md",
+     "title": "STRATEGIC_VISION Memories (ROLES)",
+-    "path": "/knowledge_src/roles/ceo/memories/strategic_vision.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ceo/memories"
+   },
+   {
+     "id": "roles/ceo/mission/corporate_purpose.md",
+     "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
+-    "path": "/knowledge_src/roles/ceo/mission/corporate_purpose.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ceo/mission"
+   },
+   {
+     "id": "roles/ceo/planning/frameworks.md",
+     "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
+-    "path": "/knowledge_src/roles/ceo/planning/frameworks.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ceo/planning"
+   },
+   {
+     "id": "roles/customer_success/mission.md",
+     "title": "Customer Success (カスタマーサクセス) ミッション声明",
+-    "path": "/knowledge_src/roles/customer_success/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/customer_success"
+   },
+   {
+     "id": "roles/cyber_security/mission.md",
+     "title": "Cyber Security Lead (セキュリティ責任者) ミッション声明",
+-    "path": "/knowledge_src/roles/cyber_security/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/cyber_security"
+   },
+   {
+     "id": "roles/designer/mission.md",
+     "title": "Experience Designer (デザイナー) ミッション声明",
+-    "path": "/knowledge_src/roles/designer/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/designer"
+   },
+   {
+     "id": "roles/ecosystem_architect/guidelines.md",
+     "title": "Ecosystem Architect 行動指針 (Operational Guidelines)",
+-    "path": "/knowledge_src/roles/ecosystem_architect/guidelines.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/ecosystem_architect"
+   },
+   {
+     "id": "roles/executive_assistant/mission.md",
+     "title": "Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明",
+-    "path": "/knowledge_src/roles/executive_assistant/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/executive_assistant"
+   },
+   {
+     "id": "roles/finance_controller/mission.md",
+     "title": "Finance Controller (財務・経理責任者) ミッション声明",
+-    "path": "/knowledge_src/roles/finance_controller/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/finance_controller"
+   },
+   {
+     "id": "roles/incident_commander/mission.md",
+     "title": "Incident Commander (インシデント・コマンダー) ミッション声明",
+-    "path": "/knowledge_src/roles/incident_commander/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/incident_commander"
+   },
+   {
+     "id": "roles/integration_steward/mission.md",
+     "title": "Role: Integration Steward",
+-    "path": "/knowledge_src/roles/integration_steward/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/integration_steward"
+   },
+   {
+     "id": "roles/knowledge_steward/mission.md",
+     "title": "Knowledge Steward (ナレッジ・スチュワード) ミッション声明",
+-    "path": "/knowledge_src/roles/knowledge_steward/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/knowledge_steward"
+   },
+   {
+     "id": "roles/legal_strategist/mission.md",
+     "title": "Legal & IP Strategist (法務・知財戦略) ミッション声明",
+-    "path": "/knowledge_src/roles/legal_strategist/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/legal_strategist"
+   },
+   {
+     "id": "roles/line_manager/mission.md",
+     "title": "Line Manager (ラインマネージャー) ミッション声明",
+-    "path": "/knowledge_src/roles/line_manager/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/line_manager"
+   },
+   {
+     "id": "roles/marketing_growth/mission.md",
+     "title": "Marketing & Growth (マーケティング & 成長戦略) ミッション声明",
+-    "path": "/knowledge_src/roles/marketing_growth/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/marketing_growth"
+   },
+   {
+     "id": "roles/performance_engineer/guidelines.md",
+     "title": "Performance Engineer 行動指針 (Operational Guidelines)",
+-    "path": "/knowledge_src/roles/performance_engineer/guidelines.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/performance_engineer"
+   },
+   {
+     "id": "roles/performance_engineer/knowledge_base.md",
+     "title": "Performance Evaluation Knowledge Base",
+-    "path": "/knowledge_src/roles/performance_engineer/knowledge_base.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/performance_engineer"
+   },
+   {
+     "id": "roles/pmo_governance/mission.md",
+     "title": "PMO Governance (PMO/ガバナンス) ミッション声明",
+-    "path": "/knowledge_src/roles/pmo_governance/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/pmo_governance"
+   },
+   {
+     "id": "roles/pmo_governance/quality_gates.md",
+     "title": "品質ゲート (Quality Gates) 運用基準",
+-    "path": "/knowledge_src/roles/pmo_governance/quality_gates.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/pmo_governance"
+   },
+   {
+     "id": "roles/product_manager/mission.md",
+     "title": "Product Manager (プロダクトマネージャー) ミッション声明",
+-    "path": "/knowledge_src/roles/product_manager/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/product_manager"
+   },
+   {
+     "id": "roles/qa_lead/mission.md",
+     "title": "Quality Assurance (QA/QC) ミッション声明",
+-    "path": "/knowledge_src/roles/qa_lead/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/qa_lead"
+   },
+   {
+     "id": "roles/qa_lead/qa_checkpoints.md",
+     "title": "QA/QC 重点チェックポイント：非同期通信と物理制約",
+-    "path": "/knowledge_src/roles/qa_lead/qa_checkpoints.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/qa_lead"
+   },
+   {
+     "id": "roles/reliability_engineer/mission.md",
+     "title": "Reliability Engineer (SRE/運用責任者) ミッション声明",
+-    "path": "/knowledge_src/roles/reliability_engineer/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/reliability_engineer"
+   },
+   {
+     "id": "roles/software_developer/mission.md",
+     "title": "Software Developer (ソフトウェア開発者) ミッション声明",
+-    "path": "/knowledge_src/roles/software_developer/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/software_developer"
+   },
+   {
+     "id": "roles/solution_architect/mission.md",
+     "title": "Solution Architect (ソリューション・アーキテクト) ミッション声明",
+-    "path": "/knowledge_src/roles/solution_architect/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/solution_architect"
+   },
+   {
+     "id": "roles/strategic_sales/mission.md",
+     "title": "Strategic Sales (営業・事業開発) ミッション声明",
+-    "path": "/knowledge_src/roles/strategic_sales/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/strategic_sales"
+   },
+   {
+     "id": "roles/talent_culture/mission.md",
+     "title": "Talent & Culture (採用 & 組織文化) ミッション声明",
+-    "path": "/knowledge_src/roles/talent_culture/mission.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "roles/talent_culture"
+   },
+   {
+     "id": "sdlc/design_standard_nablarch.md",
+     "title": "アプリケーション方式設計標準 (Nablarch/AWS参考)",
+-    "path": "/knowledge_src/sdlc/design_standard_nablarch.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "sdlc"
+   },
+   {
+     "id": "sdlc/waterfall_standard.md",
+     "title": "ウォーターフォール開発標準：工程と成果物 (SDLC Standard)",
+-    "path": "/knowledge_src/sdlc/waterfall_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "sdlc"
+   },
+   {
+     "id": "security/advanced/diff_based_scanning.md",
+     "title": "Diff-Based Security Scanning Strategy",
+-    "path": "/knowledge_src/security/advanced/diff_based_scanning.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "security/advanced"
+   },
+   {
+     "id": "security/security-best-practices.md",
+     "title": "Security Best Practices",
+-    "path": "/knowledge_src/security/security-best-practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "security"
+   },
+   {
+     "id": "skills/ux-visualizer/methodology.md",
+     "title": "Methodology: High-Fidelity SPA Reverse Engineering",
+-    "path": "/knowledge_src/skills/ux-visualizer/methodology.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "skills/ux-visualizer"
+   },
+   {
+     "id": "software-design/patterns.md",
+     "title": "ソフトウェアデザインパターン & 設計原則",
+-    "path": "/knowledge_src/software-design/patterns.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "software-design"
+   },
+   {
+     "id": "standards/adr/adr_standard.md",
+     "title": "Architecture Decision Record (ADR) Standard",
+-    "path": "/knowledge_src/standards/adr/adr_standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/adr"
+   },
+   {
+     "id": "standards/ai-native/gemini-coding-standard.md",
+     "title": "Gemini AI-Native Coding Standard",
+-    "path": "/knowledge_src/standards/ai-native/gemini-coding-standard.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/ai-native"
+   },
+   {
+     "id": "standards/bcp/dr_playbook.md",
+     "title": "Disaster Recovery & BCP Playbook",
+-    "path": "/knowledge_src/standards/bcp/dr_playbook.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/bcp"
+   },
+   {
+     "id": "standards/contract/negotiation_guardrails.md",
+     "title": "Contract & SLA Negotiation Guardrails",
+-    "path": "/knowledge_src/standards/contract/negotiation_guardrails.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/contract"
+   },
+   {
+     "id": "standards/engineering/code-analysis-protocol.md",
+     "title": "Source Code Analysis Protocol (SCAP)",
+-    "path": "/knowledge_src/standards/engineering/code-analysis-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/engineering"
+   },
+   {
+     "id": "standards/engineering/reverse-design-protocol.md",
+     "title": "Reverse Design Protocol (RDP)",
+-    "path": "/knowledge_src/standards/engineering/reverse-design-protocol.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/engineering"
+   },
+   {
+     "id": "standards/fisc/security-controls.md",
+     "title": "FISC-Aligned Security Standard (Cloud Infrastructure)",
+-    "path": "/knowledge_src/standards/fisc/security-controls.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/fisc"
+   },
+   {
+     "id": "standards/ipa/requirements-checklist.md",
+     "title": "IPA-Aligned Requirements Engineering Standard",
+-    "path": "/knowledge_src/standards/ipa/requirements-checklist.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/ipa"
+   },
+   {
+     "id": "standards/sdlc/methodologies.md",
+     "title": "Software Development Life Cycle (SDLC) Methodologies",
+-    "path": "/knowledge_src/standards/sdlc/methodologies.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/sdlc"
+   },
+   {
+     "id": "standards/security/owasp_llm_top10.md",
+     "title": "OWASP Top 10 for LLM Applications",
+-    "path": "/knowledge_src/standards/security/owasp_llm_top10.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/security"
+   },
+   {
+     "id": "standards/testing/best_practices.md",
+     "title": "Test Automation Best Practices",
+-    "path": "/knowledge_src/standards/testing/best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/testing"
+   },
+   {
+     "id": "standards/testing/mobile_automation.md",
+-    "title": "Mobile Test Automation Standard",
+-    "path": "/knowledge_src/standards/testing/mobile_automation.md",
++    "title": "Mobile Test Automation Standard (Deep-Dive Edition)",
++    "author": "Unknown",
++    "last_updated": "2026-02-16",
++    "tier": "public",
+     "category": "standards/testing"
+   },
+   {
+     "id": "standards/testing/web_automation.md",
+     "title": "Web Test Automation Standard",
+-    "path": "/knowledge_src/standards/testing/web_automation.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/testing"
+   },
+   {
+     "id": "standards/ux/cognitive_load_principles.md",
+     "title": "Cognitive Load Principles for UX Design",
+-    "path": "/knowledge_src/standards/ux/cognitive_load_principles.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "standards/ux"
+   },
+   {
+     "id": "strategy/winning-proposal-standards.md",
+     "title": "Winning Proposal Standards (Strategic Communication)",
+-    "path": "/knowledge_src/strategy/winning-proposal-standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "strategy"
+   },
+   {
+     "id": "tech-stack/atlassian/jira_best_practices.md",
+     "title": "Jira 運用ベストプラクティス",
+-    "path": "/knowledge_src/tech-stack/atlassian/jira_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/atlassian"
+   },
+   {
+     "id": "tech-stack/aws_unified_operations_support.md",
+     "title": "AWS Unified Operations Team (Premium Support Extension)",
+-    "path": "/knowledge_src/tech-stack/aws_unified_operations_support.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack"
+   },
+   {
+     "id": "tech-stack/box_api.md",
+     "title": "Box API 連携ガイド (Node.js SDK)",
+-    "path": "/knowledge_src/tech-stack/box_api.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack"
+   },
+   {
+     "id": "tech-stack/box_cli.md",
+     "title": "Box CLI 活用ガイド",
+-    "path": "/knowledge_src/tech-stack/box_cli.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack"
+   },
+   {
+     "id": "tech-stack/cloud/rosetta_stone.md",
+     "title": "The Rosetta Stone of Cloud (Multi-Cloud Mapping)",
+-    "path": "/knowledge_src/tech-stack/cloud/rosetta_stone.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/cloud"
+   },
+   {
+     "id": "tech-stack/google/workspace_best_practices.md",
+     "title": "Google Workspace 連携ベストプラクティス",
+-    "path": "/knowledge_src/tech-stack/google/workspace_best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/google"
+   },
+   {
+     "id": "tech-stack/java/terasoluna/architecture.md",
+     "title": "TERASOLUNA Layered Architecture Standard",
+-    "path": "/knowledge_src/tech-stack/java/terasoluna/architecture.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/java/terasoluna"
+   },
+   {
+     "id": "tech-stack/java/terasoluna/implementation_standards.md",
+     "title": "TERASOLUNA Implementation Standards",
+-    "path": "/knowledge_src/tech-stack/java/terasoluna/implementation_standards.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/java/terasoluna"
+   },
+   {
+     "id": "tech-stack/macos/voice_control_guide.md",
+     "title": "macOS 音声コントロール ＆ 音声入力活用ガイド",
+-    "path": "/knowledge_src/tech-stack/macos/voice_control_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/macos"
+   },
+   {
+     "id": "tech-stack/mcp-integration-guide.md",
+     "title": "MCP (Model Context Protocol) Integration Guide",
+-    "path": "/knowledge_src/tech-stack/mcp-integration-guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack"
+   },
+   {
+     "id": "tech-stack/voltmx/architecture.md",
+     "title": "VoltMX Architecture Overview",
+-    "path": "/knowledge_src/tech-stack/voltmx/architecture.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/voltmx"
+   },
+   {
+     "id": "tech-stack/voltmx/best_practices.md",
+     "title": "VoltMX Development Best Practices",
+-    "path": "/knowledge_src/tech-stack/voltmx/best_practices.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/voltmx"
+   },
+   {
+     "id": "tech-stack/voltmx/migration/mapping_rules.md",
+     "title": "VoltMX to React Technical Mapping Rules",
+-    "path": "/knowledge_src/tech-stack/voltmx/migration/mapping_rules.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/voltmx/migration"
+   },
+   {
+     "id": "tech-stack/voltmx/migration/strategy.md",
+     "title": "VoltMX to React Migration Strategy",
+-    "path": "/knowledge_src/tech-stack/voltmx/migration/strategy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/voltmx/migration"
+   },
+   {
+     "id": "tech-stack/voltmx/troubleshooting.md",
+     "title": "VoltMX Troubleshooting Guide",
+-    "path": "/knowledge_src/tech-stack/voltmx/troubleshooting.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "tech-stack/voltmx"
+   },
+   {
+     "id": "templates/reporting/audience_strategy.md",
+     "title": "Audience Strategy for Executive Reporting",
+-    "path": "/knowledge_src/templates/reporting/audience_strategy.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "templates/reporting"
+   },
+   {
+     "id": "templates/reporting/master_slide_structure.md",
+     "title": "Master Slide Structure (Marp Standard)",
+-    "path": "/knowledge_src/templates/reporting/master_slide_structure.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "templates/reporting"
+   },
+   {
+     "id": "templates/reporting/project_management_plan_13.md",
+     "title": "Project Management Plan (PMP) - 13 Standard Items",
+-    "path": "/knowledge_src/templates/reporting/project_management_plan_13.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "templates/reporting"
+   },
+   {
+     "id": "templates/reporting/project_plan_master.md",
+     "title": "Project Plan Master Template (Consulting Standard)",
+-    "path": "/knowledge_src/templates/reporting/project_plan_master.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "templates/reporting"
+   },
+   {
+     "id": "templates/themes/excel_design_guide.md",
+     "title": "プロフェッショナル・エクセル設計書テーマガイド",
+-    "path": "/knowledge_src/templates/themes/excel_design_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "templates/themes"
+   },
+   {
+     "id": "templates/themes/marp_theme_guide.md",
+     "title": "Marp テーマ作成 ＆ スタイリング完全ガイド",
+-    "path": "/knowledge_src/templates/themes/marp_theme_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "templates/themes"
+   },
+   {
+     "id": "templates/themes/theme_design_guide.md",
+     "title": "プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)",
+-    "path": "/knowledge_src/templates/themes/theme_design_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "templates/themes"
+   },
+   {
+     "id": "templates/themes/visual_harmony_guide.md",
+     "title": "ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition",
+-    "path": "/knowledge_src/templates/themes/visual_harmony_guide.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-15",
++    "tier": "public",
+     "category": "templates/themes"
+   },
+   {
+     "id": "testing/test_item_specification.md",
+     "title": "テスト項目表・実施結果標準仕様 (Test Item Specification)",
+-    "path": "/knowledge_src/testing/test_item_specification.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "testing"
+   },
+   {
+     "id": "testing/viewpoint-catalogs/tis_catalog_v1_6.md",
+     "title": "テスト観点カタログ (TIS株式会社 公開版 v1.6)",
+-    "path": "/knowledge_src/testing/viewpoint-catalogs/tis_catalog_v1_6.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "testing/viewpoint-catalogs"
+   },
+   {
+     "id": "voice/persona_definitions.md",
+     "title": "音声ペルソナ定義 (Voice Persona Definitions)",
+-    "path": "/knowledge_src/voice/persona_definitions.md",
++    "author": "Unknown",
++    "last_updated": "2026-02-14",
++    "tier": "public",
+     "category": "voice"
+   }
+ ]
+\ No newline at end of file
