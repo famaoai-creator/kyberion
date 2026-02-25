@@ -20,3 +20,4 @@ tests/_tmp_integration/
 
 # Plugin runtime data
 *.jsonl
+last_session_diff.patch
