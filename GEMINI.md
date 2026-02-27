@@ -39,7 +39,8 @@ I MUST operate based on the active role defined in `knowledge/personal/role-conf
 All development follows an AI-augmented workflow where human intent drives the goals and AI handles execution:
 
 1. **Intent Declaration**: The human expresses the goal in natural language.
-2. **Skill Routing**: `intent-classifier` maps the goal to a skill chain via `intent_mapping.yaml`.
+2. **Context Ranking**: AI uses `scripts/context_ranker.cjs` to identify the TOP-7 most relevant knowledge files from the 191+ available docs to minimize noise and maximize precision.
+3. **Skill Routing**: `intent-classifier` maps the goal to a skill chain via `intent_mapping.yaml`.
 3. **Orchestrated Execution**: `mission-control` invokes the skill chain sequentially or in parallel, with retry logic and data passing between steps.
 4. **Quality Gate**: Output passes through `skill-wrapper.cjs` for schema validation, metric recording, and plugin hooks.
 5. **Human Review**: Results are presented for review before committing or delivering.
