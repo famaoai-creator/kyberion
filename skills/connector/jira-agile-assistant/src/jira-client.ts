@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,7 +13,7 @@ export class JiraClient {
     if (!fs.existsSync(configPath)) {
       throw new Error('Jira config not found');
     }
-    this.config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    this.config = JSON.parse(safeReadFile(configPath, 'utf8'));
     this.auth = Buffer.from(this.config.email + ':' + this.config.api_token).toString('base64');
     this.hostname = this.config.host.replace('https://', '');
   }

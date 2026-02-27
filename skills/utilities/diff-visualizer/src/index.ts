@@ -15,8 +15,8 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('diff-visualizer', () => {
     const oldPath = validateFilePath(argv.old as string, 'old file');
     const newPath = validateFilePath(argv.new as string, 'new file');
-    const oldText = fs.readFileSync(oldPath, 'utf8');
-    const newText = fs.readFileSync(newPath, 'utf8');
+    const oldText = safeReadFile(oldPath, 'utf8');
+    const newText = safeReadFile(newPath, 'utf8');
 
     const diff = generateDiff(argv.old as string, argv.new as string, oldText, newText);
 

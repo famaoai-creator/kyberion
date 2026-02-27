@@ -26,7 +26,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('data-transformer', () => {
     requireArgs(argv as any, ['input', 'to']);
     const inputPath = validateFilePath(argv.input as string, 'input');
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
     const inputFormat = detectFormat(inputPath);
 
     const data = parseData(content, inputFormat);

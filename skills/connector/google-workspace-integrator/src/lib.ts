@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -24,11 +25,11 @@ export function draftEmail(inputPath: string | undefined, to: string | undefined
     body = '';
   if (inputPath && fs.existsSync(inputPath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
+      const data = JSON.parse(safeReadFile(inputPath, 'utf8'));
       subject = data.subject || data.title || 'Update';
       body = data.body || data.content || JSON.stringify(data, null, 2);
     } catch {
-      body = fs.readFileSync(inputPath, 'utf8');
+      body = safeReadFile(inputPath, 'utf8');
     }
   }
   return {

@@ -114,7 +114,7 @@ function getInstalledVersion(projectDir: string, pkgName: string): string | null
   const pkgJsonPath = path.join(projectDir, 'node_modules', pkgName, 'package.json');
   if (!fs.existsSync(pkgJsonPath)) return null;
   try {
-    const content = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    const content = JSON.parse(safeReadFile(pkgJsonPath, 'utf8'));
     return content.version || null;
   } catch (_e) {
     return null;
@@ -183,7 +183,7 @@ export function analyzeDependencies(projectDir: string, outputFile?: string): Li
 
   let pkgJson;
   try {
-    pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    pkgJson = JSON.parse(safeReadFile(pkgJsonPath, 'utf8'));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Failed to parse package.json: ${msg}`);

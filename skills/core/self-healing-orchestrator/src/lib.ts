@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 
 export interface HealingRule {
@@ -104,7 +105,7 @@ export const HEALING_RUNBOOK: HealingRule[] = [
 ];
 
 export function parseInput(inputPath: string): string[] {
-  const content = fs.readFileSync(inputPath, 'utf8');
+  const content = safeReadFile(inputPath, 'utf8');
 
   try {
     const json = JSON.parse(content);

@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import fs from 'fs';
 import path from 'path';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -75,7 +76,7 @@ export function scanForIP(dir: string): IPFinding[] {
     }
 
     try {
-      const content = fs.readFileSync(full, 'utf8');
+      const content = safeReadFile(full, 'utf8');
       for (const indicator of IP_INDICATORS) {
         const matches = content.match(indicator.pattern);
         if (matches && matches.length > 0) {
@@ -104,7 +105,7 @@ export function checkLicenseProtection(dir: string): LicenseProtection {
     return { protected: false, license: null, risk: 'high' };
   }
 
-  const content = fs.readFileSync(path.join(dir, licenseFile), 'utf8');
+  const content = safeReadFile(path.join(dir, licenseFile), 'utf8');
   let type = 'unknown';
   if (/MIT/i.test(content)) type = 'MIT (permissive)';
   else if (/Apache/i.test(content)) type = 'Apache 2.0 (permissive with patent grant)';

@@ -15,7 +15,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     );
     if (!fs.existsSync(configPath)) throw new Error('Config not found');
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const config = JSON.parse(safeReadFile(configPath, 'utf8'));
     const ORG = config.org;
 
     const rawData = execSync(

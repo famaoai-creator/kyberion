@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -38,7 +39,7 @@ export function analyzeSkillHealth(skillDir: string): SkillHealth {
       .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
     health.hasScript = scripts.length > 0;
     if (health.hasScript) {
-      const content = fs.readFileSync(path.join(scriptsDir, scripts[0]), 'utf8');
+      const content = safeReadFile(path.join(scriptsDir, scripts[0]), 'utf8');
       health.scriptSize = content.split(new RegExp('\\r?\\n')).length;
       const fnCount = (content.match(/function\s+\w+/g) || []).length;
       health.complexity = fnCount > 10 ? 'high' : fnCount > 5 ? 'medium' : 'low';
@@ -94,7 +95,7 @@ export function checkWorkLogs(dir: string, skillName: string): WorkLog[] {
     for (const full of allFiles) {
       if (!full.endsWith('.json')) continue;
       try {
-        const data = JSON.parse(fs.readFileSync(full, 'utf8'));
+        const data = JSON.parse(safeReadFile(full, 'utf8'));
         if (data.skill === skillName) {
           logs.push({
             file: path.relative(dir, full),

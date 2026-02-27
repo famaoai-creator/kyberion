@@ -4,7 +4,7 @@ const path = require('path');
 const chalk = require('chalk');
 
 /**
- * Skill Quality Audit v2.0 - Hierarchical & Governance Aware
+ * Skill Quality Audit v2.1 - Architecture & TS Aware
  */
 
 const rootDir = path.resolve(__dirname, '..');
@@ -20,8 +20,8 @@ function checkSkill(skillName, skillRelPath) {
   const checks = {
     packageJson: false,
     skillWrapper: false,
-    secureIo: false, // NEW: Checks if it uses secure-io for governance
-    governanceTags: false, // NEW: Namespace-specific keywords
+    secureIo: false,
+    governanceTags: false,
     skillMd: false,
     unitTests: false,
   };
@@ -30,15 +30,22 @@ function checkSkill(skillName, skillRelPath) {
   checks.packageJson = fs.existsSync(path.join(skillDir, 'package.json'));
 
   // 2. Code Analysis (Wrapper & Secure-IO)
-  const scriptsDir = path.join(skillDir, 'scripts');
-  if (fs.existsSync(scriptsDir)) {
-    const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.(cjs|js|mjs)$/.test(f));
-    for (const script of scripts) {
-      const content = fs.readFileSync(path.join(scriptsDir, script), 'utf8');
-      if (content.includes('runSkill') || content.includes('runSkillAsync'))
-        checks.skillWrapper = true;
-      if (content.includes('secure-io') || content.includes('safeWriteFile'))
-        checks.secureIo = true;
+  const codeDirs = [path.join(skillDir, 'scripts'), path.join(skillDir, 'src')];
+  for (const cDir of codeDirs) {
+    if (fs.existsSync(cDir)) {
+      const files = fs.readdirSync(cDir).filter((f) => /\.(cjs|js|mjs|ts)$/.test(f));
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(cDir, file), 'utf8');
+        if (content.includes('runSkill') || content.includes('runAsyncSkill'))
+          checks.skillWrapper = true;
+        if (
+          content.includes('secure-io') ||
+          content.includes('safeWriteFile') ||
+          content.includes('safeReadFile') ||
+          content.includes('safeExec')
+        )
+          checks.secureIo = true;
+      }
     }
   }
 
@@ -47,7 +54,8 @@ function checkSkill(skillName, skillRelPath) {
   if (fs.existsSync(skillMd)) {
     const content = fs.readFileSync(skillMd, 'utf8');
     const hasName = /name:\s*.+$/m.test(content);
-    const hasDesc = /description:\s*.+$/m.test(content);
+    // Flexible description check for block scalars
+    const hasDesc = /description:\s*/m.test(content);
     checks.skillMd = hasName && hasDesc;
 
     // Check for IPA/FISC if in audit or business category
@@ -64,13 +72,19 @@ function checkSkill(skillName, skillRelPath) {
     }
   }
 
-  // 4. Unit Tests presence
+  // 4. Unit Tests presence (Modern & Legacy paths)
   const testFiles = [
     path.join(rootDir, 'tests/unit.test.cjs'),
     path.join(skillDir, 'tests/unit.test.cjs'),
+    path.join(skillDir, 'src/lib.test.ts'),
+    path.join(skillDir, 'src/index.test.ts'),
   ];
   for (const tPath of testFiles) {
     if (fs.existsSync(tPath)) {
+      if (tPath.includes('src/')) {
+        checks.unitTests = true; // Local TS test found
+        break;
+      }
       const testContent = fs.readFileSync(tPath, 'utf8');
       if (testContent.includes(skillName)) {
         checks.unitTests = true;
@@ -108,7 +122,7 @@ if (formatJson) {
   console.log(JSON.stringify(results, null, 2));
 } else {
   console.log(
-    chalk.bold.cyan(`\nSkill Quality Audit v2.0 - ${results.length} implemented skills\n`)
+    chalk.bold.cyan(`\nSkill Quality Audit v2.1 - ${results.length} implemented skills\n`)
   );
   console.log(
     '  ' + 'Skill'.padEnd(35) + 'NS'.padEnd(12) + 'Wrapper  SecureIO  SKILL.md  Tests  Score'

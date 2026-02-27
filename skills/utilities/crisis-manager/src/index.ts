@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
@@ -16,7 +17,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     if (!fs.existsSync(logPath)) throw new Error('Log not found');
 
     const nl = String.fromCharCode(10);
-    const lines = fs.readFileSync(logPath, 'utf8').split(nl);
+    const lines = safeReadFile(logPath, 'utf8').split(nl);
     const analysis = analyzeLogLines(lines);
 
     return { status: 'analyzed', analysis };

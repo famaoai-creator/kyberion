@@ -19,7 +19,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('prompt-optimizer', () => {
     requireArgs(argv as any, ['input']);
     const inputPath = validateFilePath(argv.input as string, 'input');
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
 
     const result = optimizePrompt(content, inputPath);
 

@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import yaml from 'js-yaml';
@@ -12,7 +13,7 @@ export function loadRules(rulesPath: string): IntentRules {
   if (!fs.existsSync(rulesPath)) {
     throw new Error(`Rules file not found: ${rulesPath}`);
   }
-  const content = fs.readFileSync(rulesPath, 'utf8');
+  const content = safeReadFile(rulesPath, 'utf8');
   return yaml.load(content) as IntentRules;
 }
 

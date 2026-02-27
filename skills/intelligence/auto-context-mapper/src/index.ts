@@ -18,7 +18,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     let skills: string[] = [];
     const indexPath = path.join(targetDir, 'knowledge/orchestration/global_skill_index.json');
     if (fs.existsSync(indexPath)) {
-      const idx = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+      const idx = JSON.parse(safeReadFile(indexPath, 'utf8'));
       skills = (idx.skills || idx).map((s: any) => s.name || s.n);
     }
 

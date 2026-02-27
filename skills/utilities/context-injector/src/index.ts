@@ -21,7 +21,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const data = readJsonFile(argv.data as string, 'data');
     const knowledgePath = validateFilePath(argv.knowledge as string, 'knowledge');
     const outputTier = argv['output-tier'] as string;
-    const knowledgeContent = fs.readFileSync(knowledgePath, 'utf8');
+    const knowledgeContent = safeReadFile(knowledgePath, 'utf8');
 
     const result = injectContext(data, knowledgeContent, knowledgePath, outputTier);
 

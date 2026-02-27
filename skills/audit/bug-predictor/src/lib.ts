@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 /**
  * TypeScript version of the bug-predictor skill.
  *
@@ -121,7 +122,7 @@ export function estimateComplexity(filePath: string, dir: string): ComplexityMet
   if (!fs.existsSync(fullPath)) return { lines: 0, complexity: 0 };
 
   try {
-    const content = fs.readFileSync(fullPath, 'utf8');
+    const content = safeReadFile(fullPath, 'utf8');
     const lines = content.split('\n').length;
 
     let complexity = 0;
@@ -228,7 +229,7 @@ export function predict(repoDir: string, options: PredictOptions = {}): Predicti
   const report = buildReport(churnData, repoDir, options);
 
   if (options.outPath) {
-    fs.writeFileSync(options.outPath, JSON.stringify(report, null, 2));
+    safeWriteFile(options.outPath, JSON.stringify(report, null, 2));
   }
 
   return report;

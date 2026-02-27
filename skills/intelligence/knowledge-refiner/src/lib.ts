@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -39,7 +40,7 @@ export function scanKnowledge(dir: string): KnowledgeFile[] {
     if (['.md', '.json', '.yaml', '.yml', '.txt'].includes(path.extname(full).toLowerCase())) {
       try {
         const stat = fs.statSync(full);
-        const content = fs.readFileSync(full, 'utf8');
+        const content = safeReadFile(full, 'utf8');
         files.push({
           path: path.relative(dir, full),
           size: stat.size,

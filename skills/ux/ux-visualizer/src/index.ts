@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runAsyncSkill } from '@agent/core';
@@ -15,7 +16,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const mermaid = generateMermaidUX(title, argv.fidelity as string);
 
     const outPath = (argv.output as string) || path.join(process.cwd(), 'ux_output.mmd');
-    fs.writeFileSync(outPath, mermaid);
+    safeWriteFile(outPath, mermaid);
 
     return { fidelity: argv.fidelity, output: outPath };
   });

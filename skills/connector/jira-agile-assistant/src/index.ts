@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import { runSkillAsync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -22,7 +23,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     let actionResult: any;
 
     const inputData = argv.input
-      ? JSON.parse(fs.readFileSync(path.resolve(argv.input as string), 'utf8'))
+      ? JSON.parse(safeReadFile(path.resolve(argv.input as string), 'utf8'))
       : {};
 
     switch (argv.action) {

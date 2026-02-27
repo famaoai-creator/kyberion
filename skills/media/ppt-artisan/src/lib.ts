@@ -36,12 +36,12 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
   if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
   const inputPath = path.join(tempDir, `${markdown.title.replace(/\s+/g, '_')}.md`);
-  fs.writeFileSync(inputPath, markdownBody);
+  safeWriteFile(inputPath, markdownBody);
 
   let themePath: string | undefined;
   if (themeBody) {
     themePath = path.join(tempDir, `${theme?.title.replace(/\s+/g, '_') || 'custom'}.css`);
-    fs.writeFileSync(themePath, themeBody);
+    safeWriteFile(themePath, themeBody);
   }
 
   const localMarp = path.resolve(process.cwd(), 'node_modules/.bin/marp');

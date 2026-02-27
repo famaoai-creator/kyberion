@@ -10,7 +10,7 @@ const argv = createStandardYargs().parseSync();
 runSkill('asset-token-economist', () => {
   let text = '';
   if (argv.input) {
-    text = fs.readFileSync(path.resolve(argv.input as string), 'utf8');
+    text = safeReadFile(path.resolve(argv.input as string), 'utf8');
   }
 
   const type = detectContentType(text);

@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -41,7 +42,7 @@ export async function collectData(
   let manifest: Manifest = {};
   if (fs.existsSync(manifestPath)) {
     try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      manifest = JSON.parse(safeReadFile(manifestPath, 'utf8'));
     } catch (_e) {
       // ignore
     }
@@ -64,7 +65,7 @@ export async function collectData(
   } else {
     let localPath = url.startsWith('file://') ? new URL(url).pathname : url;
     if (!fs.existsSync(localPath)) throw new Error(`File not found: ${localPath}`);
-    data = fs.readFileSync(localPath);
+    data = safeReadFile(localPath);
     contentType = (mime.lookup(localPath) as string) || 'application/octet-stream';
     statusCode = 200;
   }
@@ -88,7 +89,7 @@ export async function collectData(
   }
 
   const savePath = path.join(outDir, filename);
-  fs.writeFileSync(savePath, Buffer.from(data));
+  safeWriteFile(savePath, Buffer.from(data));
 
   const newEntry: ManifestEntry = {
     timestamp: new Date().toISOString(),
@@ -103,7 +104,7 @@ export async function collectData(
   history.history.push(newEntry);
   manifest[url] = history;
 
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
 
   return { url, savedTo: savePath, size: newEntry.size, contentType, hash: currentHash };
 }

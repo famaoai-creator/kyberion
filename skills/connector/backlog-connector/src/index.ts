@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkillAsync } from '@agent/core';
@@ -11,10 +12,10 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const rootDir = pathResolver.rootDir();
 
     const configPath = path.join(rootDir, 'knowledge/skills/backlog-connector/config.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const config = JSON.parse(safeReadFile(configPath, 'utf8'));
 
     const inventoryPath = path.join(rootDir, 'knowledge/confidential/connections/inventory.json');
-    const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+    const inventory = JSON.parse(safeReadFile(inventoryPath, 'utf8'));
 
     const credsPath = path.join(rootDir, 'knowledge/personal/connections/backlog.md');
     const apiKey = getBacklogApiKey(credsPath, config.credential_pattern);

@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -63,7 +64,7 @@ export function assessCodeQuality(dir: string): CodeQualityStats {
     const ext = path.extname(full).toLowerCase();
     if (targetExts.includes(ext)) {
       try {
-        const content = fs.readFileSync(full, 'utf8');
+        const content = safeReadFile(full, 'utf8');
         totalLines += content.split('\n').length;
         totalFiles++;
         languages[ext] = (languages[ext] || 0) + 1;

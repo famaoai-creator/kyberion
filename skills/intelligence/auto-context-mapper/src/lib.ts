@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -46,7 +47,7 @@ export function buildContextMap(
   const allFiles = Object.values(tiers).flat();
   for (const file of allFiles) {
     try {
-      const content = fs.readFileSync(path.join(projectRoot, file.path), 'utf8').toLowerCase();
+      const content = safeReadFile(path.join(projectRoot, file.path), 'utf8').toLowerCase();
       for (const skill of skills) {
         if (content.includes(skill.toLowerCase())) {
           links.push({ source: file.path, target: skill, tier: file.tier, type: 'references' });

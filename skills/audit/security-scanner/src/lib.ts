@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -87,7 +88,7 @@ export function scanProject(projectRoot: string): { scannedFiles: number; findin
     if (['.png', '.jpg', '.pdf', '.exe', '.bin'].includes(ext)) continue;
 
     try {
-      const content = fs.readFileSync(filePath, 'utf8');
+      const content = safeReadFile(filePath, 'utf8');
       const fileFindings = scanFile(path.relative(projectRoot, filePath), content);
       findings.push(...fileFindings);
       scannedFiles++;

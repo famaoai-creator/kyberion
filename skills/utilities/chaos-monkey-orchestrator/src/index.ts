@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runAsyncSkill } from '@agent/core';
@@ -35,7 +36,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     if (!fs.existsSync(path.dirname(configPath))) {
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
     }
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    safeWriteFile(configPath, JSON.stringify(config, null, 2));
 
     return { status: 'chaos_deployed', config };
   });

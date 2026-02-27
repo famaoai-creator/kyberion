@@ -45,7 +45,7 @@ export function analyzeProject(dir: string): ProjectAnalysis {
   const pkgPath = path.join(dir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      const pkg = JSON.parse(safeReadFile(pkgPath, 'utf8'));
       if (pkg.main) analysis.entryPoints.push(pkg.main);
       if (pkg.bin) {
         const bins = typeof pkg.bin === 'string' ? { default: pkg.bin } : pkg.bin;

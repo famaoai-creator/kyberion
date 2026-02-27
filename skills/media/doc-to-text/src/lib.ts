@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -39,7 +40,7 @@ async function extractPagedFromPPTX(pptxPath: string): Promise<string> {
 
   let pagedMarkdown = '';
   for (const file of slideFiles) {
-    const content = fs.readFileSync(path.join(slidesDir, file), 'utf8');
+    const content = safeReadFile(path.join(slidesDir, file), 'utf8');
     const textMatches = content.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [];
     const slideText = textMatches
       .map((m) => m.replace(/<a:t>/, '').replace(/<\/a:t>/, ''))
@@ -72,7 +73,7 @@ export function extractDesignMetadata(pptxPath: string): any {
     const metadata: any = { colors: {} };
 
     if (fs.existsSync(themeFile)) {
-      const content = fs.readFileSync(themeFile, 'utf8');
+      const content = safeReadFile(themeFile, 'utf8');
       const dk1 = content.match(/<a:dk1>.*?lastClr="([^"]+)"/);
       const lt1 = content.match(/<a:lt1>.*?lastClr="([^"]+)"/);
       const accent1 = content.match(/<a:accent1>.*?val="([^"]+)"/);

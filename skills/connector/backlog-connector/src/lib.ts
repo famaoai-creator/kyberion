@@ -1,10 +1,11 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 
 export function getBacklogApiKey(credsPath: string, pattern: string): string {
   if (!fs.existsSync(credsPath)) throw new Error('Backlog credentials not found');
-  const content = fs.readFileSync(credsPath, 'utf8');
+  const content = safeReadFile(credsPath, 'utf8');
   const match = content.match(new RegExp(pattern));
   if (!match || !match[1]) throw new Error('API Key not found in credentials');
   return match[1];

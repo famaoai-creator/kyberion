@@ -14,7 +14,7 @@ const argv = createStandardYargs().option('input', {
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('ai-ethics-auditor', () => {
     const inputPath = path.resolve(argv.input as string);
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
     const findings = auditEthics(content);
 
     const result = { source: path.basename(inputPath), findings };

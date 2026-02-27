@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -41,7 +42,7 @@ export async function importSource(repoUrl: string, name?: string): Promise<Sour
   }
 
   const registry: Registry = fs.existsSync(registryPath)
-    ? JSON.parse(fs.readFileSync(registryPath, 'utf8'))
+    ? JSON.parse(safeReadFile(registryPath, 'utf8'))
     : { sources: [] };
 
   const entry: SourceEntry = {
@@ -60,7 +61,7 @@ export async function importSource(repoUrl: string, name?: string): Promise<Sour
   if (!fs.existsSync(path.dirname(registryPath))) {
     fs.mkdirSync(path.dirname(registryPath), { recursive: true });
   }
-  fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
+  safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
 
   return entry;
 }

@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -47,7 +48,7 @@ export function searchKnowledge(
       searchKnowledge(fullPath, query, options, results, depth + 1);
     } else if (stat.isFile() && stat.size <= maxFileSize) {
       try {
-        const content = fs.readFileSync(fullPath, 'utf8');
+        const content = safeReadFile(fullPath, 'utf8');
         if (
           file.toLowerCase().includes(query.toLowerCase()) ||
           content.toLowerCase().includes(query.toLowerCase())

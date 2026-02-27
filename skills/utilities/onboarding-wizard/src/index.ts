@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
@@ -24,7 +25,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     let projectName = path.basename(projectDir);
     if (fs.existsSync(pkgPath)) {
       try {
-        projectName = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).name || projectName;
+        projectName = JSON.parse(safeReadFile(pkgPath, 'utf8')).name || projectName;
       } catch {}
     }
 

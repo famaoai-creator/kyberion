@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -38,7 +39,7 @@ export function generateMermaidGraph(rootDir: string): GraphResult {
           const files = fs.readdirSync(srcDir);
           for (const file of files) {
             if (file.endsWith('.ts') || file.endsWith('.js') || file.endsWith('.cjs')) {
-              const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+              const content = safeReadFile(path.join(srcDir, file), 'utf8');
               if (content.includes('@agent/core')) {
                 mermaid += `    ${skillId} --> Lib\n`;
                 break;

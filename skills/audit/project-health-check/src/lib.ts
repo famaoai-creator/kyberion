@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -121,7 +122,7 @@ export function checkPackageJson(projectRoot: string, type: string): boolean {
   if (!fs.existsSync(pkgPath)) return false;
 
   try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const pkg = JSON.parse(safeReadFile(pkgPath, 'utf8'));
     const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
     const scripts = pkg.scripts || {};
 

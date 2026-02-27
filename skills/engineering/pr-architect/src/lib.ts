@@ -123,7 +123,7 @@ export function generateDescription(
   const govReportPath = path.resolve(repoDir, 'work/governance-report.json');
   if (fs.existsSync(govReportPath)) {
     try {
-      const report = JSON.parse(fs.readFileSync(govReportPath, 'utf8'));
+      const report = JSON.parse(safeReadFile(govReportPath, 'utf8'));
       sections.push('\\n## Governance Evidence (Verified by Ecosystem Architect)');
       sections.push(
         `**Status**: ${report.overall_status === 'compliant' ? '✅ COMPLIANT' : '❌ NON-COMPLIANT'}`

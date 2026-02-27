@@ -8,7 +8,7 @@ import { generateTestCases } from './lib.js';
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('test-viewpoint-analyst', () => {
     const argv = requireArgs(['input', 'out']);
-    const reqAdf = JSON.parse(fs.readFileSync(path.resolve(argv.input as string), 'utf8'));
+    const reqAdf = JSON.parse(safeReadFile(path.resolve(argv.input as string), 'utf8'));
 
     const testCases = generateTestCases(reqAdf);
 

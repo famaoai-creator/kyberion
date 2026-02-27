@@ -11,7 +11,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('sequence-mapper', () => {
     const inputPath = argv.input as string;
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
     const mermaid = generateSequenceDiagram(content);
 
     if (argv.out) {

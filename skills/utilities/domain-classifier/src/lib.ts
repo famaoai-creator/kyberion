@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import yaml from 'js-yaml';
 import { classifyFile } from '@agent/core/classifier';
 
@@ -8,7 +9,7 @@ export interface DomainRules {
 
 export function loadDomainRules(rulesPath: string): DomainRules {
   const fs = require('node:fs');
-  const content = fs.readFileSync(rulesPath, 'utf8');
+  const content = safeReadFile(rulesPath, 'utf8');
   return yaml.load(content) as DomainRules;
 }
 

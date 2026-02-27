@@ -1,0 +1,8 @@
+{
+  "active": true,
+  "target": "*",
+  "mode": "aws-fis",
+  "intensity": 0.5,
+  "experimentId": "exp-h5opfdu9",
+  "timestamp": "2026-02-27T19:18:28.107Z"
+}

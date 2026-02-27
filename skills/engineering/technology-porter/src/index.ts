@@ -28,7 +28,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const resolved = path.resolve(argv.input as string);
     if (!fs.existsSync(resolved)) throw new Error(`File not found: ${resolved}`);
 
-    const content = fs.readFileSync(resolved, 'utf8');
+    const content = safeReadFile(resolved, 'utf8');
     const fromLang = (argv.from as string) || detectLanguage(resolved);
     const toLang = argv.to as string;
 

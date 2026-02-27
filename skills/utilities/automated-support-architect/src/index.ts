@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
@@ -12,7 +13,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const readmePath = path.join(targetDir, 'README.md');
     let faqs: any[] = [];
     if (fs.existsSync(readmePath)) {
-      faqs = extractFAQsFromMarkdown(fs.readFileSync(readmePath, 'utf8'));
+      faqs = extractFAQsFromMarkdown(safeReadFile(readmePath, 'utf8'));
     }
     return { directory: targetDir, faqs };
   });

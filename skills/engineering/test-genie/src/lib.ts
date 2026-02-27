@@ -90,7 +90,7 @@ export function checkDetection(detection: DetectionRule, targetDir: string): boo
       try {
         const pkgPath = path.join(targetDir, 'package.json');
         if (!fs.existsSync(pkgPath)) return false;
-        const pkg: Record<string, unknown> = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const pkg: Record<string, unknown> = JSON.parse(safeReadFile(pkgPath, 'utf8'));
         const scripts = (pkg.scripts ?? {}) as Record<string, string>;
         return detection.script !== undefined && Boolean(scripts[detection.script]);
       } catch {
@@ -101,7 +101,7 @@ export function checkDetection(detection: DetectionRule, targetDir: string): boo
       try {
         const pkgPath = path.join(targetDir, 'package.json');
         if (!fs.existsSync(pkgPath)) return false;
-        const pkg: Record<string, unknown> = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        const pkg: Record<string, unknown> = JSON.parse(safeReadFile(pkgPath, 'utf8'));
         const deps = (pkg.dependencies ?? {}) as Record<string, string>;
         const devDeps = (pkg.devDependencies ?? {}) as Record<string, string>;
         const allDeps: Record<string, string> = { ...deps, ...devDeps };

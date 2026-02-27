@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -97,7 +98,7 @@ export function analyzeCodeComplexity(dir: string): CodeComplexityStats {
     if (!targetExts.includes(ext)) continue;
 
     try {
-      const content = fs.readFileSync(full, 'utf8');
+      const content = safeReadFile(full, 'utf8');
       const lines = content.split('\n').filter((line) => line.trim().length > 0).length;
       stats.totalFiles++;
       stats.totalLines += lines;
@@ -123,7 +124,7 @@ export function detectTechDebt(dir: string): TechDebtResult {
   for (const full of allFiles) {
     if (path.basename(full).match(/\.(js|cjs|mjs|ts|tsx|py|go|rs|java)$/)) {
       try {
-        const content = fs.readFileSync(full, 'utf8');
+        const content = safeReadFile(full, 'utf8');
         const lower = content.toLowerCase();
         const todos = (lower.match(/\btodo\b/g) || []).length;
         const hacks = (lower.match(/\bhack\b/g) || []).length;

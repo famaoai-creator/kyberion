@@ -14,7 +14,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('dataset-curator', () => {
     const inputPath = validateFilePath(argv.input as string);
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
     const format = (argv.format as 'json' | 'csv' | 'text') || detectFormat(inputPath, content);
 
     const curateResult = format === 'json' ? curateJson(content) : curateText(content);

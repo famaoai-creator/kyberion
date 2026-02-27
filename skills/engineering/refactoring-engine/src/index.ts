@@ -18,7 +18,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('refactoring-engine', () => {
     requireArgs(argv, ['input']);
     const inputPath = validateFilePath(argv.input as string, 'input');
-    const content = fs.readFileSync(inputPath, 'utf8');
+    const content = safeReadFile(inputPath, 'utf8');
 
     const result = analyzeCode(content, inputPath);
 

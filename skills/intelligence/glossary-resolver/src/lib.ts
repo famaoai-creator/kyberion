@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 
 export type Glossary = Record<string, string>;
@@ -39,11 +40,11 @@ export function resolveGlossaryFile(
   glossary: Glossary,
   outPath?: string
 ): ResolveResult {
-  const content = fs.readFileSync(inputPath, 'utf8');
+  const content = safeReadFile(inputPath, 'utf8');
   const resolved = resolveGlossary(content, glossary);
 
   if (outPath) {
-    fs.writeFileSync(outPath, resolved.content);
+    safeWriteFile(outPath, resolved.content);
     return { output: outPath, resolvedTerms: resolved.resolvedTerms };
   }
 

@@ -14,7 +14,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('template-renderer', () => {
     const templatePath = validateFilePath(argv.template as string, 'template');
-    const template = fs.readFileSync(templatePath, 'utf8');
+    const template = safeReadFile(templatePath, 'utf8');
     const data = readJsonFile(argv.data as string, 'template data');
 
     const output = renderTemplate(template, data);

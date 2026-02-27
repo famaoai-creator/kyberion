@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
@@ -16,7 +17,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     for (const full of allFiles) {
       if (!['.js', '.ts', '.py'].includes(path.extname(full))) continue;
       try {
-        const content = fs.readFileSync(full, 'utf8');
+        const content = safeReadFile(full, 'utf8');
         results.push(...scanForDataFlows(content, path.relative(targetDir, full)));
       } catch {}
     }

@@ -13,7 +13,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('environment-provisioner', () => {
     const inputPath = path.resolve(argv.input as string);
-    const config = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
+    const config = JSON.parse(safeReadFile(inputPath, 'utf8'));
 
     const nl = String.fromCharCode(10);
     const hcl = config.services.map(generateTerraformAWS).join(nl + nl);

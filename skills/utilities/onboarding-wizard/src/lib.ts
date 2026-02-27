@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -25,7 +26,7 @@ export function generateSetupSteps(dir: string): string[] {
 
   if (fileExists('package.json')) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+      const pkg = JSON.parse(safeReadFile(path.join(dir, 'package.json'), 'utf8'));
       const manager = fileExists('pnpm-lock.yaml')
         ? 'pnpm'
         : fileExists('yarn.lock')

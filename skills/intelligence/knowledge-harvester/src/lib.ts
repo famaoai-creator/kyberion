@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -41,7 +42,7 @@ export async function harvestRepository(repoUrl: string): Promise<HarvestResult>
     skills.sort().forEach((s) => {
       md += `- **${s}**: [Documentation](../${s}/SKILL.md)\n`;
     });
-    fs.writeFileSync(indexFile, md);
+    safeWriteFile(indexFile, md);
 
     result.local_sync = { updated: 'knowledge/_index.md', skills_indexed: skills.length };
   }

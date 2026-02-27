@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
@@ -15,7 +16,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
       throw new Error('Inventory not found');
     }
 
-    const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+    const inventory = JSON.parse(safeReadFile(inventoryPath, 'utf8'));
     return diagnoseConnection(args.system as string, inventory, rootDir);
   });
 }

@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn, SpawnOptions } from 'node:child_process';
@@ -71,7 +72,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
     throw new Error(`MissionContract not found: ${resolvedContractPath}`);
   }
 
-  const contract = JSON.parse(fs.readFileSync(resolvedContractPath, 'utf8')) as MissionContract;
+  const contract = JSON.parse(safeReadFile(resolvedContractPath, 'utf8')) as MissionContract;
   const missionId = contract.mission_id || `mission-${Date.now()}`;
   const missionDir = pathResolver.missionDir(missionId);
   const evidenceDir = path.join(missionDir, 'evidence');
@@ -87,7 +88,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
 
   // 2. Resolve Skill
   const indexPath = path.join(process.cwd(), 'knowledge/orchestration/global_skill_index.json');
-  const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+  const index = JSON.parse(safeReadFile(indexPath, 'utf8'));
   const skillMeta = index.s.find((s: any) => s.n === contract.skill);
   if (!skillMeta) {
     throw new Error(`SKILL_NOT_FOUND: ${contract.skill}`);
@@ -106,7 +107,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
     if (staticParams.depth) args.push('--depth', String(staticParams.depth));
   } else {
     const tempInput = path.join(evidenceDir, 'input_task.json');
-    fs.writeFileSync(tempInput, JSON.stringify(staticParams, null, 2));
+    safeWriteFile(tempInput, JSON.stringify(staticParams, null, 2));
     args.push('--input', tempInput);
   }
 
@@ -123,8 +124,8 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
     if (jsonStart === -1) throw new Error('No JSON output found from skill execution');
     const outputJson = stdout.substring(jsonStart);
 
-    fs.writeFileSync(path.join(evidenceDir, 'contract.json'), JSON.stringify(contract, null, 2));
-    fs.writeFileSync(path.join(evidenceDir, 'output.json'), outputJson);
+    safeWriteFile(path.join(evidenceDir, 'contract.json'), JSON.stringify(contract, null, 2));
+    safeWriteFile(path.join(evidenceDir, 'output.json'), outputJson);
 
     console.log(`[MC] Mission ${missionId} completed.`);
     return JSON.parse(outputJson);
@@ -132,7 +133,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
     const errorMsg = `${err.message}
 STDERR: ${err.stderr || ''}
 STDOUT: ${err.stdout || ''}`;
-    fs.writeFileSync(path.join(evidenceDir, 'error.log'), errorMsg);
+    safeWriteFile(path.join(evidenceDir, 'error.log'), errorMsg);
     console.error(`[MC] Execution Failed: ${err.message}`);
     throw err;
   }

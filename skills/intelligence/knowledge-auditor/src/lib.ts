@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { validateSovereignBoundary, validateWritePermission } from '@agent/core/tier-guard';
@@ -38,7 +39,7 @@ export function performAudit(targetDir: string, config: AuditConfig): AuditResul
     if (config.exclusions.some((pattern) => relPath.includes(pattern.replace('*', '')))) return;
 
     try {
-      const content = fs.readFileSync(file, 'utf8');
+      const content = safeReadFile(file, 'utf8');
       const leakGuard = validateSovereignBoundary(content);
 
       if (!leakGuard.safe) {

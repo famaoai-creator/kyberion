@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as fs from 'node:fs';
 
 export interface WebhookStatus {
@@ -10,7 +11,7 @@ export function checkSlackWebhook(): WebhookStatus {
   for (const p of paths) {
     if (fs.existsSync(p)) {
       try {
-        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const data = JSON.parse(safeReadFile(p, 'utf8'));
         return { configured: true, url: data.url };
       } catch {}
     }

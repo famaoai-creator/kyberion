@@ -1,3 +1,4 @@
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import { DocumentArtifact } from '@agent/core/shared-business-types';
@@ -12,7 +13,7 @@ export function loadVoiceConfig(configPath: string): VoiceConfig {
   const defaultConfig: VoiceConfig = { engine: 'macos', voice: 'Kyoko', apiKey: null };
   if (fs.existsSync(configPath)) {
     try {
-      const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const userConfig = JSON.parse(safeReadFile(configPath, 'utf8'));
       return { ...defaultConfig, ...userConfig };
     } catch (_e) {
       return defaultConfig;

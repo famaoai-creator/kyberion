@@ -1,3 +1,4 @@
+const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
@@ -15,7 +16,7 @@ export function createShadowTasks(
 
   if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
 
-  fs.writeFileSync(path.join(inboxDir, idA + '.json'), JSON.stringify(taskA));
-  fs.writeFileSync(path.join(inboxDir, idB + '.json'), JSON.stringify(taskB));
+  safeWriteFile(path.join(inboxDir, idA + '.json'), JSON.stringify(taskA));
+  safeWriteFile(path.join(inboxDir, idB + '.json'), JSON.stringify(taskB));
   return { idA, idB };
 }
