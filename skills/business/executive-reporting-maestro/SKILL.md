@@ -49,3 +49,4 @@ This skill translates the complex internal state of the ecosystem into a polishe
 ## Knowledge Protocol
 
 - This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.

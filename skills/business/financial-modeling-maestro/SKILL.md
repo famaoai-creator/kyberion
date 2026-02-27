@@ -49,3 +49,4 @@ This skill provides the CEO with a "Financial Simulator" for the company.
 ## Knowledge Protocol
 
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.

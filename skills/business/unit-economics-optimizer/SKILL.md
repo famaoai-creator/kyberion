@@ -46,3 +46,4 @@ This skill ensures that the company's core business model is fundamentally sound
 
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.
 - References [IT Cost Benchmarks](../knowledge/economics/it_cost_benchmarks.md) for SaaS/Software sector spending standards.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.

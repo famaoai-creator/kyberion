@@ -51,3 +51,4 @@ This skill helps the CEO prepare for the "Moment of Truth" (Fundraising or IPO).
 ## Knowledge Protocol
 
 - Adheres to `knowledge/orchestration/knowledge-protocol.md`.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.

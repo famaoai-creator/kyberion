@@ -3,6 +3,7 @@ import * as path from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { runSkill } from '@agent/core';
+import { safeReadFile } from '@agent/core/secure-io';
 import { validateFilePath } from '@agent/core/validators';
 import { calculateScore, ScoringRules, DEFAULT_RULES } from './lib.js';
 
@@ -18,7 +19,7 @@ const argv = yargs(hideBin(process.argv))
 
 runSkill('quality-scorer', () => {
   const inputPath = validateFilePath(argv.input as string);
-  const content = fs.readFileSync(inputPath, 'utf8');
+  const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
 
   // 1. Load Knowledge
   let scoring_rules: ScoringRules = DEFAULT_RULES;

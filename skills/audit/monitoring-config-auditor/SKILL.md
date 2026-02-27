@@ -45,3 +45,4 @@ This skill provides a proactive audit of your "Observability" setup before it go
 - References [SLO & Dashboard Best Practices](../knowledge/operations/slo_dashboard_best_practices.md) for service level management and visualization standards.
 - References [Modern SRE Best Practices](../knowledge/operations/modern_sre_best_practices.md) for IaC monitoring and synthetic testing standards.
 - References [PagerDuty Best Practices](../knowledge/operations/pagerduty_best_practices.md) for alerting standards.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.

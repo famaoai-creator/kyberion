@@ -50,3 +50,4 @@ This skill acts as your "Technical Investigator" for investment decisions.
 ## Knowledge Protocol
 
 - Adheres to `knowledge/ceo/investment/tech_dd_standard.md`.
+\n## Governance Alignment\n\n- This skill aligns with **IPA** non-functional standards and **FISC** security guidelines to ensure enterprise-grade compliance.
