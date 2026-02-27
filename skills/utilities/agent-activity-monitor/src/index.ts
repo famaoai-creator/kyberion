@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import { runSkill } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import { getAgentActivity } from './lib.js';

@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import * as path from 'node:path';
 import { runSkill } from '@agent/core';
 import { requireArgs } from '@agent/core/validators';

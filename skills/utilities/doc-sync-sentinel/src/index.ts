@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import * as path from 'node:path';
 import { runSkillAsync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';

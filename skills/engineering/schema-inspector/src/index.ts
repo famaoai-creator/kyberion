@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import path from 'path';
 import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';

@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { generatePersonas } from './lib.js';

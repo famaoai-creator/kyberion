@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { runSkill } from '@agent/core';
+import { runAsyncSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { safeWriteFile } from '@agent/core/secure-io';
-import { parseInput, matchRunbook } from './lib.js';
+import { parseInput, matchRunbook, autoHealTestFailure } from './lib.js';
 
 const argv = createStandardYargs()
   .option('input', {
@@ -11,6 +11,10 @@ const argv = createStandardYargs()
     type: 'string',
     demandOption: true,
     description: 'Path to error log or JSON error report',
+  })
+  .option('auto-heal', {
+    type: 'string',
+    description: 'Path to source code to auto-heal based on the input test log'
   })
   .option('dry-run', {
     type: 'boolean',
@@ -26,10 +30,15 @@ const argv = createStandardYargs()
   .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-  runSkill('self-healing-orchestrator', () => {
+  runAsyncSkill('self-healing-orchestrator', async () => {
     const resolved = path.resolve(argv.input as string);
     if (!fs.existsSync(resolved)) {
       throw new Error(`File not found: ${resolved}`);
+    }
+
+    if (argv['auto-heal']) {
+      const sourcePath = path.resolve(argv['auto-heal'] as string);
+      return await autoHealTestFailure(resolved, sourcePath);
     }
 
     const errors = parseInput(resolved);

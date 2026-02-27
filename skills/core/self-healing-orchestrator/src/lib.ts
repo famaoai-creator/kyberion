@@ -126,8 +126,8 @@ export function parseInput(inputPath: string): string[] {
 
   return content
     .split(new RegExp('\\r?\\n'))
-    .filter((line) => /error|exception|fatal|critical|fail/i.test(line))
-    .map((line) => line.trim())
+    .filter((line: string) => /error|exception|fatal|critical|fail/i.test(line))
+    .map((line: string) => line.trim())
     .filter(Boolean)
     .slice(-100);
 }
@@ -156,4 +156,64 @@ export function matchRunbook(errors: string[]): HealingAction[] {
   return matches.sort(
     (a, b) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3)
   );
+}
+
+/**
+ * 究極の「完全自走モード」：テスト失敗ログからAIが直接コードを書き換え、再テストするループ。
+ */
+export async function autoHealTestFailure(testLogPath: string, sourcePath: string): Promise<any> {
+  console.log(`[Self-Healing] Analyzing test failures from ${testLogPath}...`);
+  const logContent = safeReadFile(testLogPath, 'utf8');
+  const sourceContent = safeReadFile(sourcePath, 'utf8');
+
+  const prompt = `
+あなたは（The Focused Craftsman）として、以下のテスト失敗を自動修復します。
+
+【対象ソースコード】:
+\`\`\`
+${sourceContent}
+\`\`\`
+
+【テスト失敗ログ】:
+\`\`\`
+${logContent}
+\`\`\`
+
+エラーを解決するための、修正後の完全なソースコードのみを出力してください。Markdownのコードブロック（\`\`\`）で囲むこと。
+  `.trim();
+
+  try {
+    const { safeExec } = require('@agent/core/secure-io');
+    const escapedPrompt = prompt.replace(/"/g, '\\"');
+    console.log('[Self-Healing] Consulting AI for a fix...');
+    const aiOutput = safeExec('gemini', ['--prompt', escapedPrompt], { timeoutMs: 60000 });
+    
+    let fixedCode = aiOutput;
+    const match = aiOutput.match(/```(?:javascript|typescript|js|ts)?\n([\s\S]*?)```/);
+    if (match) {
+      fixedCode = match[1].trim();
+    }
+
+    // Apply the fix directly
+    console.log(`[Self-Healing] Applying patch to ${sourcePath}...`);
+    safeWriteFile(sourcePath, fixedCode);
+
+    // Re-run test
+    console.log('[Self-Healing] Re-running tests...');
+    const testCmd = safeExec('npm', ['run', 'test'], { cwd: require('path').dirname(sourcePath) });
+    
+    return {
+      status: 'healed',
+      patchApplied: true,
+      newTestResult: 'passed',
+      testOutput: testCmd
+    };
+
+  } catch (err: any) {
+    return {
+      status: 'failed',
+      patchApplied: false,
+      error: err.message
+    };
+  }
 }

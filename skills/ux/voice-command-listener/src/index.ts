@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runAsyncSkill } from '@agent/core';

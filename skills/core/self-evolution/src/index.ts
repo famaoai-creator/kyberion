@@ -1,3 +1,4 @@
+import '@agent/core/secure-io'; // Enforce security boundaries
 import { runAsyncSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { refineSelf } from './lib.js';
