@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-27T20:30:50.270Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-27T20:36:00.752Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -37,6 +37,7 @@
 ## 📁 devops
 - [CI/CD Pipeline Design Patterns](./devops/ci-cd-patterns.md) (public | Unknown)
 - [クラウドネイティブ ＆ インフラ設計](./devops/cloud-native.md) (public | Unknown)
+- [DevSecOps Pipeline Standards: Automating Trust](./devops/devsecops-pipeline-standards.md) (public | Unknown)
 
 ## 📁 economics
 - [IT Cost Benchmarks & Strategic ROI](./economics/it_cost_benchmarks.md) (public | Unknown)
@@ -313,10 +314,13 @@
 - [Talent & Culture (採用 & 組織文化) ミッション声明](./roles/talent_culture/mission.md) (public | Unknown)
 
 ## 📁 sdlc
+- [AIDLC Standards: AI Development Life Cycle](./sdlc/aidlc-standards.md) (public | Unknown)
 - [アプリケーション方式設計標準 (Nablarch/AWS参考)](./sdlc/design_standard_nablarch.md) (public | Unknown)
+- [Modern SDLC Standards: Agile, Shift-Left & Quality-First](./sdlc/modern-sdlc-standards.md) (public | Unknown)
 - [ウォーターフォール開発標準：工程と成果物 (SDLC Standard)](./sdlc/waterfall_standard.md) (public | Unknown)
 
 ## 📁 security
+- [AISMS Framework: AI Security Management System](./security/aisms-framework.md) (public | Unknown)
 - [Security Best Practices](./security/security-best-practices.md) (public | Unknown)
 - [Security By Design Standard](./security/security-by-design.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./security/supply-chain-governance.md) (public | Unknown)

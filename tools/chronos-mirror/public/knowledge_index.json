@@ -128,6 +128,14 @@
     "category": "devops"
   },
   {
+    "id": "devops/devsecops-pipeline-standards.md",
+    "title": "DevSecOps Pipeline Standards: Automating Trust",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
+    "tier": "public",
+    "category": "devops"
+  },
+  {
     "id": "economics/finops/cloud_optimization.md",
     "title": "Cloud FinOps & Unit Economics Standard",
     "author": "Unknown",
@@ -1348,6 +1356,14 @@
     "title": "アプリケーション方式設計標準 (Nablarch/AWS参考)",
     "author": "Unknown",
     "last_updated": "2026-02-14",
+    "tier": "public",
+    "category": "sdlc"
+  },
+  {
+    "id": "sdlc/modern-sdlc-standards.md",
+    "title": "Modern SDLC Standards: Agile, Shift-Left & Quality-First",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
     "tier": "public",
     "category": "sdlc"
   },

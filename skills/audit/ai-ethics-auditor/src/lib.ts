@@ -30,6 +30,22 @@ export const ETHICS_CONTROLS = [
     severity: 'critical',
     standard: 'OWASP Top 10 for LLM',
     remediation: 'Implement robust output sanitization and prompt-shielding.'
+  },
+  {
+    id: 'aisms-data-poisoning',
+    pattern: /\b(label-manipulation|poison|adversarial-data|trigger-insertion)\b/gi,
+    category: 'security',
+    severity: 'high',
+    standard: 'AISMS / ISO 42001',
+    remediation: 'Implement data provenance tracking and anomaly detection in training sets.'
+  },
+  {
+    id: 'aidlc-drift-monitoring',
+    pattern: /\b(drift|distribution-shift|degradation|stale-model)\b/gi,
+    category: 'lifecycle',
+    severity: 'medium',
+    standard: 'AIDLC Standard',
+    remediation: 'Establish Continuous Monitoring and automated re-training triggers.'
   }
 ];
 
@@ -37,7 +53,7 @@ export function auditEthics(content: string): any {
   const findings: any = { 
     compliance_score: 100,
     issues: [],
-    standards_referenced: ['EU AI Act', 'NIST AI RMF', 'IPA Guidelines', 'OWASP LLM']
+    standards_referenced: ['EU AI Act', 'NIST AI RMF', 'IPA Guidelines', 'OWASP LLM', 'AISMS', 'AIDLC']
   };
 
   for (const control of ETHICS_CONTROLS) {
