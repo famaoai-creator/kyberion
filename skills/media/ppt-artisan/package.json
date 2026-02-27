@@ -2,7 +2,7 @@
   "name": "ppt-artisan",
   "version": "0.1.0",
   "description": "Create and convert PowerPoint presentations from Markdown using Marp.",
-  "main": "dist/index.js",
+  "main": "scripts/convert.cjs",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,
@@ -19,7 +19,8 @@
     "typescript": "^5.3.3",
     "@types/node": "^20.11.16",
     "vitest": "^1.2.2",
-    "@types/yargs": "^17.0.32"
+    "@types/yargs": "^17.0.32",
+    "@agent/core": "workspace:*"
   },
   "engines": {
     "node": ">=20.0.0"

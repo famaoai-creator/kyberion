@@ -9,7 +9,7 @@ export function extractEndpoints(spec: any): Endpoint[] {
   const endpoints: Endpoint[] = [];
   const paths = spec.paths || {};
   for (const [p, methods] of Object.entries(paths)) {
-    for (const [method, config] of Object.entries(methods as any)) {
+    for (const [method, config] of Object.entries<any>(methods as any)) {
       endpoints.push({
         path: p,
         method: method.toUpperCase(),

@@ -5,7 +5,7 @@ const reports = ref([]);
 
 const fetchReports = async () => {
   try {
-    const res = await fetch('http://localhost:3030/ace-reports');
+    const res = await fetch('http://localhost:3031/ace-reports');
     reports.value = await res.json();
   } catch (e) {
     console.error('Failed to fetch ACE reports');

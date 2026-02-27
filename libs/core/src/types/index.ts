@@ -1,1 +1,4 @@
-export * from './bridge-request';\nexport * from './mission-contract';\nexport * from './skill-input';\nexport * from './skill-output';\n
+export * from './bridge-request';
+export * from './mission-contract';
+export * from './skill-input';
+export * from './skill-output';

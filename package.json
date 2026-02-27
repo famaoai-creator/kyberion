@@ -46,7 +46,8 @@
     "ci": "npm run validate && npm run test:all && npm run typecheck",
     "archive": "node scripts/archive_missions.cjs",
     "generate:types": "node scripts/generate_types.cjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && npm run dev"
   },
   "lint-staged": {
     "knowledge/**/*.md": [

@@ -9,7 +9,7 @@ const sendToAgent = async () => {
   if (!intent.value) return;
   isSending.value = true;
 
-  await fetch('http://localhost:3030/request', {
+  await fetch('http://localhost:3031/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ intent: intent.value }),
@@ -21,7 +21,7 @@ const sendToAgent = async () => {
 
 const fetchTimeline = async () => {
   try {
-    const res = await fetch('http://localhost:3030/responses');
+    const res = await fetch('http://localhost:3031/responses');
     timeline.value = await res.json();
   } catch (e) {
     console.error('Failed to fetch timeline');

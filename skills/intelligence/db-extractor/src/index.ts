@@ -6,7 +6,7 @@ import { extractFromDB } from './lib.js';
 const argv = createStandardYargs()
   .option('db', { alias: 'd', type: 'string', demandOption: true })
   .option('query', { alias: 'q', type: 'string', default: 'SELECT * FROM sqlite_master' })
-  .option('out', { alias: 'o', type: 'string' }).argv;
+  .option('out', { alias: 'o', type: 'string' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('db-extractor', async () => {

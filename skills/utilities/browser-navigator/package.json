@@ -14,7 +14,10 @@
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^1.2.0",
-    "@types/js-yaml": "^4.0.9"
+    "@types/js-yaml": "^4.0.9",
+    "@agent/core": "workspace:*"
   },
-  "private": true
+  "private": true,
+  "author": "Gemini Agent",
+  "license": "MIT"
 }

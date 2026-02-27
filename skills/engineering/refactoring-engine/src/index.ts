@@ -12,7 +12,7 @@ const argv = createStandardYargs()
     demandOption: true,
     describe: 'Path to source file to analyze',
   })
-  .option('out', { alias: 'o', type: 'string', describe: 'Optional output file path' }).argv;
+  .option('out', { alias: 'o', type: 'string', describe: 'Optional output file path' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('refactoring-engine', () => {

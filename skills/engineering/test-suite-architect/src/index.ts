@@ -22,7 +22,7 @@ const argv = createStandardYargs()
     return true;
   })
   .strict()
-  .help().argv;
+  .help().parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('test-suite-architect', () => {

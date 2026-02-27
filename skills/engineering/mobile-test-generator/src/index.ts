@@ -7,7 +7,7 @@ import { generateMaestroYaml } from './lib.js';
 const argv = createStandardYargs()
   .option('app-id', { alias: 'a', type: 'string', demandOption: true })
   .option('scenario', { alias: 's', type: 'string', demandOption: true })
-  .option('out', { alias: 'o', type: 'string' }).argv;
+  .option('out', { alias: 'o', type: 'string' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('mobile-test-generator', async () => {

@@ -15,9 +15,12 @@
   "devDependencies": {
     "typescript": "^5.9.3",
     "@types/node": "^20.0.0",
-    "vitest": "^1.2.0"
+    "vitest": "^1.2.0",
+    "@agent/core": "workspace:*"
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "author": "Gemini Agent",
+  "license": "MIT"
 }

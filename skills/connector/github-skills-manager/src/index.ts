@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getGitStatus } from './lib.js';
 
-const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).argv;
+const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('github-skills-manager', () => {

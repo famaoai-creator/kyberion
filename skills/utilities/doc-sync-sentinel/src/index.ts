@@ -6,7 +6,7 @@ import { getRecentChanges } from './lib.js';
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.' })
-  .option('since', { alias: 's', type: 'string', default: '7 days ago' }).argv;
+  .option('since', { alias: 's', type: 'string', default: '7 days ago' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('doc-sync-sentinel', async () => {

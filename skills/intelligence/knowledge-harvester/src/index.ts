@@ -7,7 +7,7 @@ const argv = createStandardYargs().option('repo', {
   type: 'string',
   demandOption: true,
   description: 'Git repository URL',
-}).argv;
+}).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('knowledge-harvester', async () => {

@@ -1,0 +1,69 @@
+{
+  "intent": "SRE 監視設定 改善",
+  "timestamp": "2026-02-27T18:25:33.162Z",
+  "top_matches": [
+    {
+      "id": "operations/modern_sre_best_practices.md",
+      "title": "Modern SRE Best Practices (Advanced Operations)",
+      "author": "Unknown",
+      "last_updated": "2026-02-09",
+      "tier": "public",
+      "category": "operations",
+      "score": 17
+    },
+    {
+      "id": "orchestration/onboarding-directives/06_sre_to_steward.md",
+      "title": "MISSION: Incident Response & SRE Wisdom",
+      "author": "Unknown",
+      "last_updated": "2026-02-14",
+      "tier": "public",
+      "category": "orchestration/onboarding-directives",
+      "score": 17
+    },
+    {
+      "id": "operations/monitoring/best_practices.md",
+      "title": "監視設定ベストプラクティス・チェックリスト",
+      "author": "Unknown",
+      "last_updated": "2026-02-14",
+      "tier": "public",
+      "category": "operations/monitoring",
+      "score": 12
+    },
+    {
+      "id": "roles/reliability_engineer/mission.md",
+      "title": "Reliability Engineer (SRE/運用責任者) ミッション声明",
+      "author": "Unknown",
+      "last_updated": "2026-02-14",
+      "tier": "public",
+      "category": "roles/reliability_engineer",
+      "score": 12
+    },
+    {
+      "id": "governance/dual-key-policy.md",
+      "title": "Dual-Key Policy: ロール管理と決定権限の標準規約",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
+      "tier": "public",
+      "category": "governance",
+      "score": 7
+    },
+    {
+      "id": "orchestration/active_inquiry_protocol.md",
+      "title": "Active Inquiry Protocol: The Power of Questioning",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
+      "tier": "public",
+      "category": "orchestration",
+      "score": 7
+    },
+    {
+      "id": "orchestration/autonomous-agent-protocol.md",
+      "title": "Sovereign Autonomous Agent Protocol (SAAP)",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
+      "tier": "public",
+      "category": "orchestration",
+      "score": 7
+    }
+  ]
+}

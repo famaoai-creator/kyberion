@@ -8,7 +8,7 @@ const argv = createStandardYargs().option('current', {
   alias: 'c',
   type: 'string',
   demandOption: true,
-}).argv;
+}).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('api-evolution-manager', () => {

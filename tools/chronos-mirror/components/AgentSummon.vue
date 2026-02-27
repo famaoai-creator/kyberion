@@ -17,7 +17,7 @@ const summonAgent = async () => {
   error.value = '';
 
   try {
-    const response = await fetch('http://localhost:3030/summon', {
+    const response = await fetch('http://localhost:3031/summon', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

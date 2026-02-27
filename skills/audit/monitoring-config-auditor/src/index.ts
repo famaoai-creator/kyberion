@@ -5,7 +5,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditMonitoringContent } from './lib.js';
 
-const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).argv;
+const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('monitoring-config-auditor', () => {

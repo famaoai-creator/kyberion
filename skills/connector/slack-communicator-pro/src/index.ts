@@ -13,7 +13,7 @@ const argv = createStandardYargs()
   .option('channel', { alias: 'c', type: 'string', default: '#general' })
   .option('input', { alias: 'i', type: 'string' })
   .option('dry-run', { type: 'boolean', default: true })
-  .option('out', { alias: 'o', type: 'string' }).argv;
+  .option('out', { alias: 'o', type: 'string' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('slack-communicator-pro', () => {

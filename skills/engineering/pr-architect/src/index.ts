@@ -8,7 +8,7 @@ const argv = createStandardYargs().option('dir', {
   type: 'string',
   default: '.',
   description: 'Git repository directory',
-}).argv;
+}).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('pr-architect', () => {

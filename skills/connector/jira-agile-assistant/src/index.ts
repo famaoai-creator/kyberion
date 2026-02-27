@@ -13,7 +13,7 @@ const argv = createStandardYargs()
   })
   .option('input', { alias: 'i', type: 'string' })
   .option('issue-key', { type: 'string' })
-  .option('dry-run', { type: 'boolean', default: false }).argv;
+  .option('dry-run', { type: 'boolean', default: false }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('jira-agile-assistant', async () => {

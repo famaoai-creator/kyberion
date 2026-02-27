@@ -9,7 +9,7 @@ import { detectFormat, curateJson, curateText } from './lib.js';
 const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true })
   .option('out', { alias: 'o', type: 'string' })
-  .option('format', { alias: 'f', type: 'string', choices: ['json', 'csv', 'text'] }).argv;
+  .option('format', { alias: 'f', type: 'string', choices: ['json', 'csv', 'text'] }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('dataset-curator', () => {

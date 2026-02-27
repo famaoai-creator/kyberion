@@ -18,7 +18,7 @@ const argv = createStandardYargs()
     choices: ['node', 'python', 'generic'],
     demandOption: true,
   })
-  .option('out', { alias: 'o', type: 'string' }).argv;
+  .option('out', { alias: 'o', type: 'string' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('boilerplate-genie', () => {

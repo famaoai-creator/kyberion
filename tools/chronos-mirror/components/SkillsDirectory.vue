@@ -5,7 +5,7 @@ const tree = ref({});
 
 const fetchSkills = async () => {
   try {
-    const res = await fetch('http://localhost:3030/skills-tree');
+    const res = await fetch('http://localhost:3031/skills-tree');
     tree.value = await res.json();
   } catch (e) {
     console.error('Failed to fetch skills tree');

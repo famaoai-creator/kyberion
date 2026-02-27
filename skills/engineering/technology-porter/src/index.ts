@@ -21,7 +21,7 @@ const argv = createStandardYargs()
     description: 'Target language',
   })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
-  .help().argv;
+  .help().parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('technology-porter', () => {

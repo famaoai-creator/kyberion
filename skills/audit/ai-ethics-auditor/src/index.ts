@@ -9,7 +9,7 @@ const argv = createStandardYargs().option('input', {
   alias: 'i',
   type: 'string',
   demandOption: true,
-}).argv;
+}).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('ai-ethics-auditor', () => {

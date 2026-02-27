@@ -2,7 +2,7 @@
   "name": "diagram-renderer",
   "version": "1.0.0",
   "description": "Converts diagram code (Mermaid, PlantUML) into image files (PNG/SVG). Useful for visualizing text-based architecture diagrams, flowcharts, and sequence diagrams.",
-  "main": "dist/index.js",
+  "main": "scripts/main.cjs",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
@@ -19,7 +19,8 @@
     "typescript": "^5.3.3",
     "@types/node": "^20.11.16",
     "vitest": "^1.2.2",
-    "@types/yargs": "^17.0.32"
+    "@types/yargs": "^17.0.32",
+    "@agent/core": "workspace:*"
   },
   "engines": {
     "node": ">=20.0.0"

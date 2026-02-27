@@ -12,12 +12,12 @@ const fetchData = async () => {
   try {
     // 1. Fetch Parallel Registry (Active Missions)
     // Bridge Server need a new endpoint for this
-    const regRes = await fetch('http://localhost:3030/registry');
+    const regRes = await fetch('http://localhost:3031/registry');
     const regData = await regRes.json();
     activeMissions.value = regData.active || [];
 
     // 2. Fetch Latest Metrics
-    const resRes = await fetch('http://localhost:3030/responses');
+    const resRes = await fetch('http://localhost:3031/responses');
     const resData = await resRes.json();
     // Simulated logic to derive metrics from responses
     metrics.value.efficiency = 58;

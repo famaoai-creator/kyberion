@@ -23,7 +23,7 @@ const argv = createStandardYargs()
     }
     return true;
   })
-  .help().argv;
+  .help().parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('dependency-lifeline', () => {

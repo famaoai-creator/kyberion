@@ -12,7 +12,7 @@ const argvBuilder = createStandardYargs().option('scenario', {
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('browser-navigator', async () => {
-    const argv = await argvBuilder.argv;
+    const argv = await argvBuilder.parseSync();
     const scenarioPath = argv.scenario as string;
 
     if (scenarioPath.endsWith('.yaml') || scenarioPath.endsWith('.yml')) {

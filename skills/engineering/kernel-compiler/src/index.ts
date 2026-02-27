@@ -16,7 +16,7 @@ const argv = createStandardYargs()
   })
   .option('dry-run', { type: 'boolean', default: true, description: 'Analyze without compiling' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
-  .help().argv;
+  .help().parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('kernel-compiler', () => {

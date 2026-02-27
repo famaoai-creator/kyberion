@@ -4,7 +4,7 @@ import { importSource } from './lib.js';
 
 const argv = createStandardYargs()
   .option('repo', { alias: 'r', type: 'string', description: 'Repository URL', demandOption: true })
-  .option('name', { alias: 'n', type: 'string', description: 'Local name' }).argv;
+  .option('name', { alias: 'n', type: 'string', description: 'Local name' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('source-importer', async () => {

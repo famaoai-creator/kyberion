@@ -4,7 +4,7 @@ import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { auditCompliance } from './lib.js';
 
-const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).argv;
+const argv = createStandardYargs().option('dir', { alias: 'd', type: 'string', default: '.' }).parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('compliance-officer', () => {
