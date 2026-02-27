@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-27T20:17:50.248Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-27T20:25:47.526Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -123,6 +123,7 @@
 
 ## 📁 operations
 - [Availability & Disaster Recovery Best Practices](./operations/availability_best_practices.md) (public | Unknown)
+- [Incident Management & RCA Excellence Handbook](./operations/incident-management-excellence.md) (public | Unknown)
 - [Incident Knowledge Loop: Learning from Failures](./operations/incident_knowledge_loop.md) (public | Unknown)
 - [Modern SRE Best Practices (Advanced Operations)](./operations/modern_sre_best_practices.md) (public | Unknown)
 - [Monitoring & Observability Best Practices](./operations/monitoring_best_practices.md) (public | Unknown)
@@ -341,7 +342,9 @@
 - [Contract & SLA Negotiation Guardrails](./standards/contract/negotiation_guardrails.md) (public | Unknown)
 
 ## 📁 standards/engineering
+- [API Compatibility & Evolution Standards](./standards/engineering/api-compatibility-standards.md) (public | Unknown)
 - [Source Code Analysis Protocol (SCAP)](./standards/engineering/code-analysis-protocol.md) (public | Unknown)
+- [Logging Design & Observability Standards](./standards/engineering/logging-design-standards.md) (public | Unknown)
 - [Reverse Design Protocol (RDP)](./standards/engineering/reverse-design-protocol.md) (public | Unknown)
 
 ## 📁 standards/fisc

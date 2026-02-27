@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 215,
-  "u": "2026-02-27T20:17:50.248Z",
+  "t": 216,
+  "u": "2026-02-27T20:22:55.369Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -528,6 +528,14 @@
       "title": "Availability & Disaster Recovery Best Practices",
       "author": "Unknown",
       "last_updated": "2026-02-09",
+      "tier": "public",
+      "category": "operations"
+    },
+    {
+      "id": "operations/incident-management-excellence.md",
+      "title": "Incident Management & RCA Excellence Handbook",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "operations"
     },

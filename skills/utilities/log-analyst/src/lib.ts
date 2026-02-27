@@ -31,3 +31,42 @@ export function tailFile(logFile: string, linesToRead: number): TailResult {
     content: lastLines.join(String.fromCharCode(10)),
   };
 }
+
+export interface LogValidation {
+  totalLines: number;
+  validJsonCount: number;
+  invalidLines: string[];
+  missingFields: Record<string, number>;
+}
+
+/**
+ * Validates that log lines are structured JSON and contain required fields.
+ */
+export function validateLogStructure(content: string): LogValidation {
+  const lines = content.split('\n').filter(Boolean);
+  const result: LogValidation = {
+    totalLines: lines.length,
+    validJsonCount: 0,
+    invalidLines: [],
+    missingFields: {}
+  };
+
+  const requiredFields = ['timestamp', 'level', 'message'];
+
+  for (const line of lines) {
+    try {
+      const json = JSON.parse(line);
+      result.validJsonCount++;
+      
+      for (const field of requiredFields) {
+        if (!json[field]) {
+          result.missingFields[field] = (result.missingFields[field] || 0) + 1;
+        }
+      }
+    } catch (e) {
+      result.invalidLines.push(line.substring(0, 100));
+    }
+  }
+
+  return result;
+}

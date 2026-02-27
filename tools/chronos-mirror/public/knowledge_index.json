@@ -528,6 +528,14 @@
     "category": "operations"
   },
   {
+    "id": "operations/incident-management-excellence.md",
+    "title": "Incident Management & RCA Excellence Handbook",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
+    "tier": "public",
+    "category": "operations"
+  },
+  {
     "id": "operations/incident_knowledge_loop.md",
     "title": "Incident Knowledge Loop: Learning from Failures",
     "author": "Unknown",
