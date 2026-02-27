@@ -20,7 +20,8 @@ export function checkGoogleAuth(rootDir: string): AuthStatus {
 }
 
 export function draftEmail(inputPath: string | undefined, to: string | undefined): any {
-  let subject = 'Update', body = '';
+  let subject = 'Update',
+    body = '';
   if (inputPath && fs.existsSync(inputPath)) {
     try {
       const data = JSON.parse(fs.readFileSync(inputPath, 'utf8'));

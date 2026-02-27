@@ -14,18 +14,25 @@ function generateReport() {
   const perfDir = path.join(rootDir, 'evidence/performance');
   if (!fs.existsSync(perfDir)) return;
 
-  const files = fs.readdirSync(perfDir).filter(f => f.endsWith('.json')).sort();
+  const files = fs
+    .readdirSync(perfDir)
+    .filter((f) => f.endsWith('.json'))
+    .sort();
   if (files.length === 0) return;
 
   const latest = JSON.parse(fs.readFileSync(path.join(perfDir, files[files.length - 1]), 'utf8'));
   const breaches = latest.slo_breaches || [];
 
-  console.log(chalk.bold.yellow(`
+  console.log(
+    chalk.bold.yellow(`
 --- 📉 Strategic Debt & Risk Report ---
-`));
+`)
+  );
 
   if (breaches.length === 0) {
-    console.log(chalk.green('  ✅ No technical debt detected. All systems are operating within SLO targets.'));
+    console.log(
+      chalk.green('  ✅ No technical debt detected. All systems are operating within SLO targets.')
+    );
     return;
   }
 
@@ -37,10 +44,10 @@ function generateReport() {
 `);
 
   console.log(chalk.bold('Top Risks:'));
-  breaches.slice(0, 10).forEach(b => {
+  breaches.slice(0, 10).forEach((b) => {
     const isLatencyBreach = b.actual_latency > b.target_latency;
     const isSuccessBreach = parseFloat(b.actual_success) < b.target_success;
-    
+
     let detail = '';
     if (isLatencyBreach) {
       detail = `Latency Gap: +${b.actual_latency - b.target_latency}ms`;
@@ -50,13 +57,16 @@ function generateReport() {
       detail = `Consecutive: ${b.consecutive_breaches}`;
     }
 
-    const risk = b.severity === 'CRITICAL' ? chalk.bgRed.white(' CRITICAL ') : chalk.yellow('Medium');
+    const risk =
+      b.severity === 'CRITICAL' ? chalk.bgRed.white(' CRITICAL ') : chalk.yellow('Medium');
     console.log(`  - ${chalk.bold(b.skill.padEnd(25))} | Risk: ${risk.padEnd(15)} | ${detail}`);
   });
 
-  console.log(chalk.dim(`
+  console.log(
+    chalk.dim(`
 Recommendation: Reinvest saved hours into refactoring the chronic breaches above.
-`));
+`)
+  );
 }
 
 generateReport();

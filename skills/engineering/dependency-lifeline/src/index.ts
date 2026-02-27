@@ -26,9 +26,9 @@ const argv = createStandardYargs()
   .help().argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-    runSkill('dependency-lifeline', () => {
-        const dir = path.resolve((argv.dir as string) || '.');
-        const out = argv.out as string | undefined;
-        return analyzeDependencies(dir, out);
-    });
+  runSkill('dependency-lifeline', () => {
+    const dir = path.resolve((argv.dir as string) || '.');
+    const out = argv.out as string | undefined;
+    return analyzeDependencies(dir, out);
+  });
 }

@@ -23,7 +23,7 @@ async function checkHealth(role) {
     'Ecosystem Architect': ['integrity', 'governance', 'debt'],
     'Reliability Engineer': ['performance', 'governance'],
     'Security Reviewer': ['pii', 'governance'],
-    'CEO': ['debt', 'governance', 'performance'],
+    CEO: ['debt', 'governance', 'performance'],
   };
 
   const myPriorities = priorities[role] || ['governance', 'performance'];
@@ -39,7 +39,11 @@ async function checkHealth(role) {
             ? JSON.parse(fs.readFileSync(recipePath, 'utf8'))
             : {};
           if (recipes.NON_COMPLIANT) {
-            console.log(chalk.cyan(`\n\u2699\ufe0f  Auto-healing triggered: ${recipes.NON_COMPLIANT.description}`));
+            console.log(
+              chalk.cyan(
+                `\n\u2699\ufe0f  Auto-healing triggered: ${recipes.NON_COMPLIANT.description}`
+              )
+            );
             console.log(chalk.dim(`    Executing: ${recipes.NON_COMPLIANT.command}\n`));
             try {
               execSync(recipes.NON_COMPLIANT.command, { stdio: 'inherit', cwd: rootDir });
@@ -103,7 +107,9 @@ async function checkHealth(role) {
         console.log(chalk.dim('\n\u23f3  Checking knowledge integrity...'));
         execSync('node scripts/check_knowledge_integrity.cjs', { stdio: 'ignore', cwd: rootDir });
       } catch (_e) {
-        console.log(chalk.yellow(' \u26a0\ufe0f  Knowledge base has broken links or inconsistencies.'));
+        console.log(
+          chalk.yellow(' \u26a0\ufe0f  Knowledge base has broken links or inconsistencies.')
+        );
       }
     }
 
@@ -111,7 +117,9 @@ async function checkHealth(role) {
       try {
         execSync('node scripts/scan_pii_in_docs.cjs', { stdio: 'ignore', cwd: rootDir });
       } catch (_e) {
-        console.log(chalk.red(' \ud83d\udea8  SECURITY ALERT: Sensitive tokens found in documentation!'));
+        console.log(
+          chalk.red(' \ud83d\udea8  SECURITY ALERT: Sensitive tokens found in documentation!')
+        );
       }
     }
 
@@ -179,15 +187,15 @@ async function runCommand() {
   const skill = skills.find((s) => (s.n || s.name) === targetSkill);
   if (!skill) {
     logger.error(`Skill "${targetSkill}" not found in index`);
-    
+
     // [PdM] Add Intelligent Suggestions
     const { suggest } = require('./suggest_skill.cjs');
     const suggestions = suggest(targetSkill);
     if (suggestions.length > 0) {
       console.log(chalk.cyan(`\n💡 Did you mean one of these?`));
-      suggestions.forEach(s => console.log(`   - ${chalk.bold(s.name)}: ${s.description}`));
+      suggestions.forEach((s) => console.log(`   - ${chalk.bold(s.name)}: ${s.description}`));
     }
-    
+
     process.exit(1);
   }
 
@@ -218,8 +226,10 @@ async function runCommand() {
   // --------------------------------------------------
 
   const skillNameResolved = skill.n || skill.name;
-  const skillDir = skill.path ? path.join(rootDir, skill.path) : path.join(rootDir, skillNameResolved);
-  
+  const skillDir = skill.path
+    ? path.join(rootDir, skill.path)
+    : path.join(rootDir, skillNameResolved);
+
   // Use pre-resolved main path if available
   let script = null;
   const mainPath = skill.m || skill.main;
@@ -400,7 +410,7 @@ function infoCommand() {
     process.exit(1);
   }
   const index = loadIndex();
-  const skill = (index.s || index.skills).find(s => (s.n || s.name) === skillName);
+  const skill = (index.s || index.skills).find((s) => (s.n || s.name) === skillName);
   const sPath = skill?.path || skillName;
   const skillDir = path.join(rootDir, sPath);
   const skillMd = path.join(skillDir, 'SKILL.md');
@@ -436,8 +446,11 @@ ${chalk.bold('EXAMPLES:')}
 `);
 }
 async function init() {
-  const roleConfig = fileUtils.getFullRoleConfig() || { active_role: 'Unknown', persona: 'The Generic AI' };
-  
+  const roleConfig = fileUtils.getFullRoleConfig() || {
+    active_role: 'Unknown',
+    persona: 'The Generic AI',
+  };
+
   // Scoped Execution Check
   const tokenArgIndex = args.indexOf('--token');
   if (tokenArgIndex !== -1) {
@@ -459,14 +472,32 @@ async function init() {
 
   // UX: Personality Header
   const themes = {
-    'Ecosystem Architect': { color: chalk.bgCyan.black, viewpoint: 'Can this scale to 100+ skills?' },
-    'Reliability Engineer': { color: chalk.bgRed.white, viewpoint: 'Is the system stable and performing?' },
-    'Security Reviewer': { color: chalk.bgBlack.yellow, viewpoint: 'Where are the hidden vulnerabilities?' },
-    'CEO': { color: chalk.bgGold?.black || chalk.bgYellow.black, viewpoint: 'What is the ROI and long-term value?' },
-    'Integration Steward': { color: chalk.bgMagenta.white, viewpoint: 'Are the interfaces consistent?' },
+    'Ecosystem Architect': {
+      color: chalk.bgCyan.black,
+      viewpoint: 'Can this scale to 100+ skills?',
+    },
+    'Reliability Engineer': {
+      color: chalk.bgRed.white,
+      viewpoint: 'Is the system stable and performing?',
+    },
+    'Security Reviewer': {
+      color: chalk.bgBlack.yellow,
+      viewpoint: 'Where are the hidden vulnerabilities?',
+    },
+    CEO: {
+      color: chalk.bgGold?.black || chalk.bgYellow.black,
+      viewpoint: 'What is the ROI and long-term value?',
+    },
+    'Integration Steward': {
+      color: chalk.bgMagenta.white,
+      viewpoint: 'Are the interfaces consistent?',
+    },
   };
 
-  const theme = themes[currentRole] || { color: chalk.bgBlue.white, viewpoint: 'How can I assist today?' };
+  const theme = themes[currentRole] || {
+    color: chalk.bgBlue.white,
+    viewpoint: 'How can I assist today?',
+  };
 
   console.log(
     `\n ${theme.color(` ${currentRole.toUpperCase()} MODE `)} ${chalk.bold(personaName)} ${chalk.dim(`(Mission: ${mid})`)}`
@@ -478,15 +509,21 @@ async function init() {
     const { analyzePulse } = require('./pulse.cjs');
     const p = analyzePulse();
     const pulseIcon = p.status === 'HEALTHY' ? chalk.green('💓') : chalk.yellow('⚠️');
-    console.log(` ${pulseIcon}  Pulse: ${p.color(p.status)} (${p.errorRate}% error rate) | Integrity: ${p.isChainValid ? chalk.green('OK') : chalk.red('FAIL')}\n`);
-  } catch (_e) { /* ignore */ }
+    console.log(
+      ` ${pulseIcon}  Pulse: ${p.color(p.status)} (${p.errorRate}% error rate) | Integrity: ${p.isChainValid ? chalk.green('OK') : chalk.red('FAIL')}\n`
+    );
+  } catch (_e) {
+    /* ignore */
+  }
 
   // Routine Tasks Check
   const { getPendingTasks } = require('./task_manager.cjs');
   const pending = await getPendingTasks(currentRole);
   if (pending.length > 0) {
     console.log(chalk.bgMagenta.white.bold(` \u23f0 PENDING ROUTINES: ${pending.length} tasks `));
-    pending.forEach(t => console.log(`   ${chalk.magenta('\u25aa')} ${t.name} ${chalk.dim(`(${t.layer})`)}`));
+    pending.forEach((t) =>
+      console.log(`   ${chalk.magenta('\u25aa')} ${t.name} ${chalk.dim(`(${t.layer})`)}`)
+    );
     console.log(chalk.dim('   Run "node scripts/task_manager.cjs" to process them.\n'));
   }
 
@@ -497,8 +534,12 @@ async function init() {
     const { analyzePulse } = require('./pulse.cjs');
     const p = analyzePulse();
     const pulseIcon = p.status === 'HEALTHY' ? '💓' : '⚠️';
-    console.log(` ${pulseIcon}  Pulse: ${p.color(p.status)} (${p.errorRate}% error rate) | Integrity: ${p.isChainValid ? chalk.green('OK') : chalk.red('FAIL')}\n`);
-  } catch (_e) { /* ignore */ }
+    console.log(
+      ` ${pulseIcon}  Pulse: ${p.color(p.status)} (${p.errorRate}% error rate) | Integrity: ${p.isChainValid ? chalk.green('OK') : chalk.red('FAIL')}\n`
+    );
+  } catch (_e) {
+    /* ignore */
+  }
 
   if (args.includes('-h') || args.includes('--help') || !command) {
     showHelp(currentRole);

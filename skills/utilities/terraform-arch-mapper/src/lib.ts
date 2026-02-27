@@ -9,7 +9,7 @@ export interface TFEdge {
   to: string;
 }
 
-export function parseTerraformContent(content: string): { nodes: TFNode[], edges: TFEdge[] } {
+export function parseTerraformContent(content: string): { nodes: TFNode[]; edges: TFEdge[] } {
   const nodes: TFNode[] = [];
   const edges: TFEdge[] = [];
 

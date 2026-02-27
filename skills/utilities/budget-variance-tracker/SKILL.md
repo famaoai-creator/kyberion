@@ -1,24 +1,24 @@
 ---
 name: budget-variance-tracker
 description: >-
-  
+
 status: implemented
 arguments:
   - name: input
     short: i
     type: string
     required: true
-    description: 
+    description:
   - name: threshold
     short: t
     type: number
     required: false
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

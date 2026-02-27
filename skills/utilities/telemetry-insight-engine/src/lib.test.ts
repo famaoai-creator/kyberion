@@ -5,7 +5,7 @@ describe('telemetry-insight-engine lib', () => {
   it('should calculate stats correctly', () => {
     const events = [
       { feature: 'auth', status: 'success', duration: 100 },
-      { feature: 'auth', status: 'error', duration: 200 }
+      { feature: 'auth', status: 'error', duration: 200 },
     ];
     const stats = analyzeTelemetry(events);
     expect(stats.auth.count).toBe(2);

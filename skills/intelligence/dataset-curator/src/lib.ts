@@ -62,15 +62,19 @@ export function curateJson(content: string): CurateResult {
     cleanedCount: cleaned.length,
     removed: originalCount - cleaned.length,
     columns: cleaned.length > 0 && typeof cleaned[0] === 'object' ? Object.keys(cleaned[0]) : [],
-    qualityReport: { nulls: nullCount, duplicates: originalCount - cleaned.length - nullCount, issues },
+    qualityReport: {
+      nulls: nullCount,
+      duplicates: originalCount - cleaned.length - nullCount,
+      issues,
+    },
   };
 }
 
 export function curateText(content: string): CurateResult {
   const lines = content.split(new RegExp('\\r?\\n'));
   const originalCount = lines.length;
-  const cleaned = Array.from(new Set(lines.map(l => l.trim()).filter(l => l.length > 0)));
-  
+  const cleaned = Array.from(new Set(lines.map((l) => l.trim()).filter((l) => l.length > 0)));
+
   return {
     records: cleaned,
     originalCount,

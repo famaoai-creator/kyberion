@@ -20,12 +20,12 @@ function suggest(query) {
   const searchTerms = query.toLowerCase().split(/[\s-]+/);
   const results = [];
 
-  skills.forEach(s => {
+  skills.forEach((s) => {
     const name = (s.n || s.name).toLowerCase();
     const desc = (s.d || s.description || '').toLowerCase();
     let score = 0;
 
-    searchTerms.forEach(term => {
+    searchTerms.forEach((term) => {
       if (term.length < 3) return; // Skip too short terms
       if (name.includes(term)) score += 20; // Name matches are high value
       if (desc.includes(term)) score += 5;
@@ -33,9 +33,9 @@ function suggest(query) {
 
     if (score > 0) {
       results.push({
-        name: (s.n || s.name),
-        description: (s.d || s.description),
-        score
+        name: s.n || s.name,
+        description: s.d || s.description,
+        score,
       });
     }
   });
@@ -52,20 +52,26 @@ Usage: node scripts/suggest_skill.cjs <your-problem-or-goal>`);
     process.exit(0);
   }
 
-  console.log(chalk.cyan(`
-🔍 Searching for skills related to: "${query}"...`));
+  console.log(
+    chalk.cyan(`
+🔍 Searching for skills related to: "${query}"...`)
+  );
   const suggestions = suggest(query);
 
   if (suggestions.length === 0) {
     console.log(chalk.yellow('  No direct matches found. Try using different keywords.'));
   } else {
-    console.log(chalk.green(`  Found ${suggestions.length} relevant skills:
-`));
-    suggestions.forEach(s => {
+    console.log(
+      chalk.green(`  Found ${suggestions.length} relevant skills:
+`)
+    );
+    suggestions.forEach((s) => {
       console.log(`  - ${chalk.bold(s.name.padEnd(25))} ${chalk.dim(s.description)}`);
     });
-    console.log(chalk.cyan(`
-  Run: node scripts/cli.cjs run ${suggestions[0].name} --help`));
+    console.log(
+      chalk.cyan(`
+  Run: node scripts/cli.cjs run ${suggestions[0].name} --help`)
+    );
   }
 }
 

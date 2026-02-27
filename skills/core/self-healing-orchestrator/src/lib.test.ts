@@ -23,7 +23,7 @@ FATAL: disk full`;
   it('should match runbook rules correctly and sort by severity', () => {
     const errors = ['Error: MODULE_NOT_FOUND', 'Connection refused by peer'];
     const actions = matchRunbook(errors);
-    
+
     expect(actions).toHaveLength(2);
     // econnrefused (high) should be before npm-missing-module (medium)
     expect(actions[0].ruleId).toBe('econnrefused');

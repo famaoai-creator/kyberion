@@ -12,7 +12,9 @@ describe('pr-architect', () => {
   });
 
   it('getRecentCommits parses log output', () => {
-    vi.mocked(secureIo.safeExec).mockReturnValue('abc1234 feat: new feature\\ndef5678 fix: bug fix');
+    vi.mocked(secureIo.safeExec).mockReturnValue(
+      'abc1234 feat: new feature\\ndef5678 fix: bug fix'
+    );
     const commits = getRecentCommits('.');
     expect(commits).toHaveLength(2);
     expect(commits[0]).toEqual({ hash: 'abc1234', message: 'feat: new feature' });

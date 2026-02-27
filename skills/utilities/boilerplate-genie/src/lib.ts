@@ -19,7 +19,9 @@ function writeFile(filePath: string, content: string) {
 export function generateNodeProject(name: string, outDir: string): string[] {
   const files: string[] = [];
   const pkg = {
-    name, version: '1.0.0', main: 'src/index.js',
+    name,
+    version: '1.0.0',
+    main: 'src/index.js',
     scripts: { start: 'node src/index.js', test: 'jest', lint: 'eslint src/' },
     devDependencies: { jest: '^29.0.0', eslint: '^8.0.0' },
   };
@@ -32,7 +34,10 @@ export function generateNodeProject(name: string, outDir: string): string[] {
   writeFile(path.join(outDir, '.gitignore'), `node_modules/\\ndist/\\n`);
   files.push('.gitignore');
 
-  writeFile(path.join(outDir, 'src', 'index.js'), `'use strict';\\nconsole.log('Hello from ${name}!');\\n`);
+  writeFile(
+    path.join(outDir, 'src', 'index.js'),
+    `'use strict';\\nconsole.log('Hello from ${name}!');\\n`
+  );
   files.push('src/index.js');
 
   return files;
@@ -55,7 +60,10 @@ export function generateGenericProject(name: string, outDir: string): string[] {
   const files: string[] = [];
   writeFile(path.join(outDir, 'README.md'), `# ${name}\\n\\nA project.\\n`);
   files.push('README.md');
-  writeFile(path.join(outDir, 'Makefile'), `# ${name} Makefile\\nall: build\\nbuild:\\n\\t@echo "Building..."\\n`);
+  writeFile(
+    path.join(outDir, 'Makefile'),
+    `# ${name} Makefile\\nall: build\\nbuild:\\n\\t@echo "Building..."\\n`
+  );
   files.push('Makefile');
   return files;
 }

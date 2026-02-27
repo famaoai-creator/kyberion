@@ -101,10 +101,10 @@ export function checkExistence(projectRoot: string, patterns: string[]): string 
       try {
         const searchDir = path.join(projectRoot, dir === '.' ? '' : dir);
         if (fs.existsSync(searchDir)) {
-            const files = fs.readdirSync(searchDir);
-            const regex = new RegExp('^' + base.replace(/\./g, '\.').replace(/\*/g, '.*') + '$');
-            const match = files.find((f) => regex.test(f));
-            if (match) return match;
+          const files = fs.readdirSync(searchDir);
+          const regex = new RegExp('^' + base.replace(/\./g, '\.').replace(/\*/g, '.*') + '$');
+          const match = files.find((f) => regex.test(f));
+          if (match) return match;
         }
       } catch (_e) {
         /* directory does not exist or error */

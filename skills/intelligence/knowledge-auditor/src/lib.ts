@@ -72,8 +72,9 @@ export function performAudit(targetDir: string, config: AuditConfig): AuditResul
     total_scanned: scannedCount,
     violation_count: violations.length,
     violations,
-    recommendations: violations.length > 0
-      ? ['Remove sensitive tokens immediately.', 'Check Personal tier for high-entropy strings.']
-      : ['Public knowledge base is sovereignty-compliant.'],
+    recommendations:
+      violations.length > 0
+        ? ['Remove sensitive tokens immediately.', 'Check Personal tier for high-entropy strings.']
+        : ['Public knowledge base is sovereignty-compliant.'],
   };
 }

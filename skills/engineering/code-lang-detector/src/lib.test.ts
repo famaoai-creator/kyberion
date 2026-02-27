@@ -11,7 +11,7 @@ describe('detectLanguage', () => {
   it('should detect language by content keywords', () => {
     const pyCode = 'def hello():\\n    print("world")';
     const jsCode = 'const x = 1;\\nconsole.log(x);';
-    
+
     expect(detectLanguage('unknown.txt', pyCode).lang).toBe('python');
     expect(detectLanguage('unknown.txt', jsCode).lang).toBe('javascript');
   });

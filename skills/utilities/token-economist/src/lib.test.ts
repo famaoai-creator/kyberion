@@ -8,7 +8,7 @@ describe('asset-token-economist lib', () => {
     expect(detectContentType(code)).toBe('code');
   });
   it('should estimate tokens', () => {
-    const text = 'hello world'; 
-    expect(estimateTokens(text, 'prose')).toBe(3); 
+    const text = 'hello world';
+    expect(estimateTokens(text, 'prose')).toBe(3);
   });
 });

@@ -68,10 +68,29 @@ export interface RoadmapResult {
 }
 
 export function analyzeCodeComplexity(dir: string): CodeComplexityStats {
-  const stats: CodeComplexityStats = { totalFiles: 0, totalLines: 0, avgFileSize: 0, largeFiles: [], languages: {} };
+  const stats: CodeComplexityStats = {
+    totalFiles: 0,
+    totalLines: 0,
+    avgFileSize: 0,
+    largeFiles: [],
+    languages: {},
+  };
   const allFiles = getAllFiles(dir, { maxDepth: 5 });
-  
-  const targetExts = ['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.go', '.rs', '.java', '.rb', '.php'];
+
+  const targetExts = [
+    '.js',
+    '.cjs',
+    '.mjs',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.py',
+    '.go',
+    '.rs',
+    '.java',
+    '.rb',
+    '.php',
+  ];
 
   for (const full of allFiles) {
     const ext = path.extname(full).toLowerCase();
@@ -79,14 +98,16 @@ export function analyzeCodeComplexity(dir: string): CodeComplexityStats {
 
     try {
       const content = fs.readFileSync(full, 'utf8');
-      const lines = content.split('\n').filter(line => line.trim().length > 0).length;
+      const lines = content.split('\n').filter((line) => line.trim().length > 0).length;
       stats.totalFiles++;
       stats.totalLines += lines;
       stats.languages[ext] = (stats.languages[ext] || 0) + 1;
       if (lines > 300) {
         stats.largeFiles.push({ file: path.relative(dir, full), lines });
       }
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
   stats.avgFileSize = stats.totalFiles > 0 ? Math.round(stats.totalLines / stats.totalFiles) : 0;
@@ -118,7 +139,9 @@ export function detectTechDebt(dir: string): TechDebtResult {
             deprecated,
           });
         }
-      } catch (_e) { /* ignore */ }
+      } catch (_e) {
+        /* ignore */
+      }
     }
   }
 
@@ -132,7 +155,7 @@ export function detectTechDebt(dir: string): TechDebtResult {
     totalFixmes,
     debtScore: Math.min(100, totalTodos * 2 + totalHacks * 5 + totalFixmes * 3),
     hotspots: indicators
-      .sort((a, b) => (b.todos + b.hacks + b.fixmes) - (a.todos + a.hacks + a.fixmes))
+      .sort((a, b) => b.todos + b.hacks + b.fixmes - (a.todos + a.hacks + a.fixmes))
       .slice(0, 10),
   };
 }
@@ -162,7 +185,11 @@ export function checkInfrastructure(dir: string): InfrastructureChecks {
   return {
     hasCICD: exists('.github/workflows') || exists('.gitlab-ci.yml') || exists('Jenkinsfile'),
     hasTests: exists('tests') || exists('test') || exists('__tests__') || exists('spec'),
-    hasLinting: exists('.eslintrc.js') || exists('.eslintrc.json') || exists('eslint.config.mjs') || exists('.pylintrc'),
+    hasLinting:
+      exists('.eslintrc.js') ||
+      exists('.eslintrc.json') ||
+      exists('eslint.config.mjs') ||
+      exists('.pylintrc'),
     hasTypeChecking: exists('tsconfig.json') || exists('mypy.ini') || exists('pyrightconfig.json'),
     hasDocumentation: exists('README.md') || exists('docs'),
     hasContainerization: exists('Dockerfile') || exists('docker-compose.yml'),
@@ -191,53 +218,58 @@ export function generateRoadmap(
   // Phase 2
   const p2Items: string[] = [];
   if (!infra.hasTypeChecking) p2Items.push('Add type checking for improved maintainability');
-  if (complexity.largeFiles.length > 0) p2Items.push(`Refactor ${complexity.largeFiles.length} large files (>300 lines)`);
+  if (complexity.largeFiles.length > 0)
+    p2Items.push(`Refactor ${complexity.largeFiles.length} large files (>300 lines)`);
   if (!infra.hasDocumentation) p2Items.push('Create/improve project documentation');
   p2Items.push('Feature development sprint based on backlog priority');
   phases.push({ month: 2, phase: 'Growth & Feature Development', items: p2Items });
 
   // Remaining
   for (let m = 3; m <= months; m++) {
-    const items = ['Performance optimization and monitoring', 'Security hardening and dependency updates'];
-    if (!infra.hasContainerization && m === 3) items.push('Containerization and deployment automation');
+    const items = [
+      'Performance optimization and monitoring',
+      'Security hardening and dependency updates',
+    ];
+    if (!infra.hasContainerization && m === 3)
+      items.push('Containerization and deployment automation');
     items.push('Technical roadmap review and adjustment');
     phases.push({ month: m, phase: `Scaling & Optimization (Month ${m})`, items });
   }
 
   // Dynamic Priority Logic
   if (debt.debtScore > 50 || (velocity.avgPerWeek < 3 && debt.debtScore > 20)) {
-    priorities.push({ 
-        priority: 'critical', 
-        action: `Tech debt inhibiting velocity (Score: ${debt.debtScore}) - allocate 40% capacity to debt reduction`,
-        area: 'Engineering Excellence'
+    priorities.push({
+      priority: 'critical',
+      action: `Tech debt inhibiting velocity (Score: ${debt.debtScore}) - allocate 40% capacity to debt reduction`,
+      area: 'Engineering Excellence',
     });
   } else if (debt.debtScore > 30) {
-    priorities.push({ 
-        priority: 'high', 
-        action: `Significant tech debt (Score: ${debt.debtScore}) - allocate 20% capacity to maintenance`,
-        area: 'Engineering Excellence'
+    priorities.push({
+      priority: 'high',
+      action: `Significant tech debt (Score: ${debt.debtScore}) - allocate 20% capacity to maintenance`,
+      area: 'Engineering Excellence',
     });
   }
-  
+
   if (velocity.avgPerWeek < 5 && velocity.avgPerWeek > 0) {
-    priorities.push({ 
-        priority: 'high', 
-        action: 'Low velocity detected - review CI/CD bottlenecks and process efficiency',
-        area: 'Process Optimization'
+    priorities.push({
+      priority: 'high',
+      action: 'Low velocity detected - review CI/CD bottlenecks and process efficiency',
+      area: 'Process Optimization',
     });
   } else if (velocity.avgPerWeek === 0) {
-    priorities.push({ 
-        priority: 'critical', 
-        action: 'Stalled velocity - immediate investigation of project blockers required',
-        area: 'Process Optimization'
+    priorities.push({
+      priority: 'critical',
+      action: 'Stalled velocity - immediate investigation of project blockers required',
+      area: 'Process Optimization',
     });
   }
 
   if (complexity.avgFileSize > 200) {
-    priorities.push({ 
-        priority: 'medium', 
-        action: `Average file size ${complexity.avgFileSize} lines - consider modularization`,
-        area: 'Architecture'
+    priorities.push({
+      priority: 'medium',
+      action: `Average file size ${complexity.avgFileSize} lines - consider modularization`,
+      area: 'Architecture',
     });
   }
 

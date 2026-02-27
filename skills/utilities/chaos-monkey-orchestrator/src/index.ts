@@ -18,7 +18,11 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('chaos-monkey-orchestrator', () => {
     const configPath = path.resolve(process.cwd(), 'work/chaos-config.json');
-    const config = createChaosConfig(argv.target as string, argv.mode as ChaosConfig['mode'], argv.intensity as number);
+    const config = createChaosConfig(
+      argv.target as string,
+      argv.mode as ChaosConfig['mode'],
+      argv.intensity as number
+    );
 
     if (!fs.existsSync(path.dirname(configPath))) {
       fs.mkdirSync(path.dirname(configPath), { recursive: true });

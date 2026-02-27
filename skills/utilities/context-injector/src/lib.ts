@@ -6,7 +6,12 @@ export interface InjectResult {
   outputTier: string;
 }
 
-export function injectContext(data: any, knowledgeContent: string, knowledgePath: string, outputTier: string): InjectResult {
+export function injectContext(
+  data: any,
+  knowledgeContent: string,
+  knowledgePath: string,
+  outputTier: string
+): InjectResult {
   const tierCheck = validateInjection(knowledgePath, outputTier);
   if (!tierCheck.allowed) {
     throw new Error(`Tier violation: \${tierCheck.reason}`);
@@ -15,7 +20,9 @@ export function injectContext(data: any, knowledgeContent: string, knowledgePath
   if (outputTier === 'public') {
     const scan = scanForConfidentialMarkers(knowledgeContent);
     if (scan.hasMarkers) {
-      throw new Error(`Confidential markers detected in public output: \${scan.markers.join(', ')}`);
+      throw new Error(
+        `Confidential markers detected in public output: \${scan.markers.join(', ')}`
+      );
     }
   }
 

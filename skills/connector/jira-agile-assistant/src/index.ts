@@ -13,8 +13,7 @@ const argv = createStandardYargs()
   })
   .option('input', { alias: 'i', type: 'string' })
   .option('issue-key', { type: 'string' })
-  .option('dry-run', { type: 'boolean', default: false })
-  .argv;
+  .option('dry-run', { type: 'boolean', default: false }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('jira-agile-assistant', async () => {
@@ -22,7 +21,9 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const client = new JiraClient(rootDir);
     let actionResult: any;
 
-    const inputData = argv.input ? JSON.parse(fs.readFileSync(path.resolve(argv.input as string), 'utf8')) : {};
+    const inputData = argv.input
+      ? JSON.parse(fs.readFileSync(path.resolve(argv.input as string), 'utf8'))
+      : {};
 
     switch (argv.action) {
       case 'get-issue':

@@ -139,7 +139,7 @@ _No significant memory pressure detected._
 | **context-injector**          | `[#####-----]` 45%  | ⚠️ Volatile  |
 | **log-to-requirement-bridge** | `[##########]` 100% | 💎 Stable    |
 | **cloud-waste-hunter**        | `[########--]` 76%  | ⚠️ Volatile  |
-| **asset-token-economist**           | `[##########]` 100% | 💎 Stable    |
+| **asset-token-economist**     | `[##########]` 100% | 💎 Stable    |
 
 ---
 

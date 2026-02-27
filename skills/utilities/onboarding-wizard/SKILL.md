@@ -1,7 +1,7 @@
 ---
 name: onboarding-wizard
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir

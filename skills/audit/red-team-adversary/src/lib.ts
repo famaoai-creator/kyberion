@@ -1,6 +1,14 @@
 export const ATTACK_VECTORS = [
-  { id: 'hardcoded-secrets', pattern: /(?:password|secret|api_key|token)\s*[:=]\s*['"][^'"]{8,}/gi, severity: 'critical' },
-  { id: 'sql-injection', pattern: /(?:query|execute|raw)\s*\(\s*[`'"].*\$\{|(?:\+\s*req\.|concat)/gi, severity: 'critical' }
+  {
+    id: 'hardcoded-secrets',
+    pattern: /(?:password|secret|api_key|token)\s*[:=]\s*['"][^'"]{8,}/gi,
+    severity: 'critical',
+  },
+  {
+    id: 'sql-injection',
+    pattern: /(?:query|execute|raw)\s*\(\s*[`'"].*\$\{|(?:\+\s*req\.|concat)/gi,
+    severity: 'critical',
+  },
 ];
 
 export function staticAnalysis(content: string, fileName: string): any[] {

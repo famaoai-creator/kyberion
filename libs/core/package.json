@@ -6,15 +6,42 @@
   "main": "skill-wrapper.cjs",
   "types": "skill-wrapper.d.cts",
   "exports": {
-    ".": { "types": "./skill-wrapper.d.cts", "default": "./skill-wrapper.cjs" },
-    "./validators": { "types": "./validators.d.cts", "default": "./validators.cjs" },
-    "./fs-utils": { "types": "./fs-utils.d.ts", "default": "./fs-utils.cjs" },
-    "./cli-utils": { "types": "./cli-utils.d.ts", "default": "./cli-utils.cjs" },
-    "./secure-io": { "types": "./secure-io.d.ts", "default": "./secure-io.cjs" },
-    "./classifier": { "types": "./classifier.d.ts", "default": "./classifier.cjs" },
-    "./path-resolver": { "types": "./path-resolver.d.ts", "default": "./path-resolver.cjs" },
-    "./tier-guard": { "types": "./tier-guard.d.ts", "default": "./tier-guard.cjs" },
-    "./network": { "types": "./network.d.ts", "default": "./network.cjs" },
+    ".": {
+      "types": "./skill-wrapper.d.cts",
+      "default": "./skill-wrapper.cjs"
+    },
+    "./validators": {
+      "types": "./validators.d.cts",
+      "default": "./validators.cjs"
+    },
+    "./fs-utils": {
+      "types": "./fs-utils.d.ts",
+      "default": "./fs-utils.cjs"
+    },
+    "./cli-utils": {
+      "types": "./cli-utils.d.ts",
+      "default": "./cli-utils.cjs"
+    },
+    "./secure-io": {
+      "types": "./secure-io.d.ts",
+      "default": "./secure-io.cjs"
+    },
+    "./classifier": {
+      "types": "./classifier.d.ts",
+      "default": "./classifier.cjs"
+    },
+    "./path-resolver": {
+      "types": "./path-resolver.d.ts",
+      "default": "./path-resolver.cjs"
+    },
+    "./tier-guard": {
+      "types": "./tier-guard.d.ts",
+      "default": "./tier-guard.cjs"
+    },
+    "./network": {
+      "types": "./network.d.ts",
+      "default": "./network.cjs"
+    },
     "./core": "./core.cjs",
     "./logger": "./logger.cjs",
     "./metrics": "./metrics.cjs",
@@ -25,7 +52,10 @@
     "./secret-guard": "./secret-guard.cjs",
     "./test-utils": "./test-utils.cjs",
     "./pulse-guard": "./pulse-guard.cjs",
-    "./shared-business-types": { "types": "./shared-business-types.ts", "default": "./shared-business-types.ts" }
+    "./shared-business-types": {
+      "types": "./shared-business-types.ts",
+      "default": "./shared-business-types.ts"
+    }
   },
   "dependencies": {
     "chalk": "^4.1.2",

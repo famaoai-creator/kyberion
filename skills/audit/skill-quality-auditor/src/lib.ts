@@ -5,17 +5,17 @@ export function auditSkillQuality(skillDir: string): any {
   const checks: any[] = [];
   const skillMdPath = path.join(skillDir, 'SKILL.md');
   const skillMdExists = fs.existsSync(skillMdPath);
-  
+
   checks.push({
     name: 'skill-md-exists',
-    passed: skillMdExists
+    passed: skillMdExists,
   });
 
   const pkgExists = fs.existsSync(path.join(skillDir, 'package.json'));
   checks.push({
     name: 'package-json-exists',
-    passed: pkgExists
+    passed: pkgExists,
   });
 
-  return { checks, score: checks.filter(c => c.passed).length };
+  return { checks, score: checks.filter((c) => c.passed).length };
 }

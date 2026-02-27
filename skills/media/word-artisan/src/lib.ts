@@ -28,7 +28,10 @@ export interface WordMasterSpecs {
 /**
  * Generates a Word document Buffer from a DocumentArtifact (Markdown).
  */
-export async function generateWordArtifact(artifact: DocumentArtifact, specs: WordMasterSpecs): Promise<Buffer> {
+export async function generateWordArtifact(
+  artifact: DocumentArtifact,
+  specs: WordMasterSpecs
+): Promise<Buffer> {
   const htmlBody = await marked.parse(artifact.body);
   const t = specs.typography;
 

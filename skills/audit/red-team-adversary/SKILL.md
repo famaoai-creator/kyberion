@@ -1,14 +1,14 @@
 ---
 name: red-team-adversary
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
     required: false
-    description: 
+    description:
 category: Audit
 last_updated: '2026-02-16'
 tags:

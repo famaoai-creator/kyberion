@@ -7,12 +7,12 @@ arguments:
     short: i
     type: string
     required: true
-    description: 
+    description:
   - name: schema
     short: s
     type: string
     required: true
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

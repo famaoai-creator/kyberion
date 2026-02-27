@@ -1,7 +1,7 @@
 ---
 name: sovereign-memory
 description: >-
-  
+
 status: implemented
 category: Intelligence
 tags:

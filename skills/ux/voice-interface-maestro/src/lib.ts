@@ -33,7 +33,10 @@ export function cleanTextForSpeech(text: string): string {
 /**
  * Speaks the content of a DocumentArtifact.
  */
-export function speakArtifact(artifact: DocumentArtifact, config: VoiceConfig): { method: string; success: boolean } {
+export function speakArtifact(
+  artifact: DocumentArtifact,
+  config: VoiceConfig
+): { method: string; success: boolean } {
   return speakText(artifact.body, config);
 }
 

@@ -26,10 +26,14 @@ let fixed = 0;
 const skills = [];
 const skillsRootDir = path.join(rootDir, 'skills');
 if (fs.existsSync(skillsRootDir)) {
-  const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+  const categories = fs
+    .readdirSync(skillsRootDir)
+    .filter((f) => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
   for (const cat of categories) {
     const catPath = path.join(skillsRootDir, cat);
-    const skillDirs = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
+    const skillDirs = fs
+      .readdirSync(catPath)
+      .filter((f) => fs.lstatSync(path.join(catPath, f)).isDirectory());
     for (const dir of skillDirs) {
       skills.push({ name: dir, path: path.join('skills', cat, dir) });
     }

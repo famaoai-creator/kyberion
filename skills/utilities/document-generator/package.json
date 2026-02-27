@@ -2,8 +2,16 @@
   "name": "document-generator",
   "version": "0.1.0",
   "main": "dist/index.js",
-  "scripts": { "build": "tsc", "test": "vitest run" },
-  "dependencies": { "@agent/core": "*" },
-  "devDependencies": { "typescript": "^5.9.3", "vitest": "^1.2.0" },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^1.2.0"
+  },
   "private": true
 }

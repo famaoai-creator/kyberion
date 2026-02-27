@@ -1,19 +1,19 @@
 ---
 name: auto-context-mapper
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
     required: false
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Intelligence
 last_updated: '2026-02-16'
 tags:

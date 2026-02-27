@@ -8,8 +8,8 @@ export async function buildTreeLinesAsync(dir: string, maxDepth: number = 3): Pr
   const paths: string[] = [];
   try {
     for await (const file of walkAsync(dir, { maxDepth })) {
-        const relative = path.relative(dir, file);
-        paths.push(relative);
+      const relative = path.relative(dir, file);
+      paths.push(relative);
     }
   } catch (error) {
     throw error;
@@ -23,7 +23,7 @@ export async function buildTreeLinesAsync(dir: string, maxDepth: number = 3): Pr
     [key: string]: TreeNode;
   }
   const rootNode: TreeNode = {};
-  
+
   for (const p of paths) {
     const parts = p.split(path.sep);
     let current = rootNode;
@@ -42,9 +42,9 @@ export async function buildTreeLinesAsync(dir: string, maxDepth: number = 3): Pr
       const key = keys[i];
       const isLastItem = i === keys.length - 1;
       const marker = isLastItem ? '└── ' : '├── ';
-      
+
       lines.push(`${prefix}${marker}${key}`);
-      
+
       const childPrefix = prefix + (isLastItem ? '    ' : '│   ');
       // Only recurse if not empty (it's a directory or has content)
       if (Object.keys(node[key]).length > 0) {
@@ -54,7 +54,7 @@ export async function buildTreeLinesAsync(dir: string, maxDepth: number = 3): Pr
   }
 
   printNode(rootNode, '');
-  
+
   if (lines.length === 0) {
     lines.push('(No files found)');
   }

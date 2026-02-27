@@ -7,8 +7,8 @@ export function generateSequenceDiagram(code: string): string {
     // Check for logical DSL: A -> B: Message
     const dslMatch = line.match(/^(\w+)\s*->>?\s*(\w+)\s*:\s*(.+)$/);
     if (dslMatch) {
-        mermaid += `    ${dslMatch[1]}->>${dslMatch[2]}: ${dslMatch[3]}\n`;
-        return;
+      mermaid += `    ${dslMatch[1]}->>${dslMatch[2]}: ${dslMatch[3]}\n`;
+      return;
     }
 
     const funcDef = line.match(/function\s+(\w+)/);
@@ -23,6 +23,6 @@ export function generateSequenceDiagram(code: string): string {
       mermaid += `    ${currentFunction}->>${target}: ${target}()\n`;
     }
   });
-  
+
   return mermaid;
 }

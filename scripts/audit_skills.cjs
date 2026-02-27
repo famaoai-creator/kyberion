@@ -23,7 +23,7 @@ function checkSkill(skillName, skillRelPath) {
     secureIo: false, // NEW: Checks if it uses secure-io for governance
     governanceTags: false, // NEW: Namespace-specific keywords
     skillMd: false,
-    unitTests: false
+    unitTests: false,
   };
 
   // 1. Has package.json?
@@ -35,8 +35,10 @@ function checkSkill(skillName, skillRelPath) {
     const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.(cjs|js|mjs)$/.test(f));
     for (const script of scripts) {
       const content = fs.readFileSync(path.join(scriptsDir, script), 'utf8');
-      if (content.includes('runSkill') || content.includes('runSkillAsync')) checks.skillWrapper = true;
-      if (content.includes('secure-io') || content.includes('safeWriteFile')) checks.secureIo = true;
+      if (content.includes('runSkill') || content.includes('runSkillAsync'))
+        checks.skillWrapper = true;
+      if (content.includes('secure-io') || content.includes('safeWriteFile'))
+        checks.secureIo = true;
     }
   }
 
@@ -50,7 +52,11 @@ function checkSkill(skillName, skillRelPath) {
 
     // Check for IPA/FISC if in audit or business category
     if (skillRelPath.includes('/audit/') || skillRelPath.includes('/business/')) {
-      if (content.toUpperCase().includes('IPA') || content.toUpperCase().includes('FISC') || content.includes('governance')) {
+      if (
+        content.toUpperCase().includes('IPA') ||
+        content.toUpperCase().includes('FISC') ||
+        content.includes('governance')
+      ) {
         checks.governanceTags = true;
       }
     } else {
@@ -83,7 +89,9 @@ function checkSkill(skillName, skillRelPath) {
 // Main
 const index = loadIndex();
 const skills = index.s || index.skills;
-const implemented = skills.filter(s => (s.s || s.status) === 'impl' || (s.s || s.status) === 'implemented');
+const implemented = skills.filter(
+  (s) => (s.s || s.status) === 'impl' || (s.s || s.status) === 'implemented'
+);
 const results = [];
 
 for (const skill of implemented) {
@@ -99,14 +107,19 @@ results.sort((a, b) => a.score - b.score);
 if (formatJson) {
   console.log(JSON.stringify(results, null, 2));
 } else {
-  console.log(chalk.bold.cyan(`\nSkill Quality Audit v2.0 - ${results.length} implemented skills\n`));
-  console.log('  ' + 'Skill'.padEnd(35) + 'NS'.padEnd(12) + 'Wrapper  SecureIO  SKILL.md  Tests  Score');
+  console.log(
+    chalk.bold.cyan(`\nSkill Quality Audit v2.0 - ${results.length} implemented skills\n`)
+  );
+  console.log(
+    '  ' + 'Skill'.padEnd(35) + 'NS'.padEnd(12) + 'Wrapper  SecureIO  SKILL.md  Tests  Score'
+  );
   console.log('  ' + '─'.repeat(95));
 
   for (const r of results) {
     const mark = (v) => (v ? chalk.green('  Y  ') : chalk.red('  -  '));
-    const scoreColor = r.score === r.maxScore ? chalk.green : (r.score < 4 ? chalk.red : chalk.yellow);
-    
+    const scoreColor =
+      r.score === r.maxScore ? chalk.green : r.score < 4 ? chalk.red : chalk.yellow;
+
     console.log(
       '  ' +
         r.name.padEnd(35) +

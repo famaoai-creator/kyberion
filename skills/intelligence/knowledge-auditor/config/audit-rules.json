@@ -1,1 +1,1 @@
-{"retention_days": 180, "duplicate_threshold": 0.8, "target_categories": ["strategy", "archived"]}
+{ "retention_days": 180, "duplicate_threshold": 0.8, "target_categories": ["strategy", "archived"] }

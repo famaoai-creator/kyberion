@@ -18,22 +18,23 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for sustainability report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('sustainability-consultant', () => {
-    const targetDir = path.resolve(argv.input as string);
-    if (!fs.existsSync(targetDir)) throw new Error('Directory not found: ' + targetDir);
+  const targetDir = path.resolve(argv.input as string);
+  if (!fs.existsSync(targetDir)) throw new Error('Directory not found: ' + targetDir);
 
-    const energy = assessInfraEnergy(targetDir);
-    const result = {
-      directory: targetDir,
-      carbonFootprint: energy,
-      greenScore: Math.max(0, 100 - energy.totalKwh / 5),
-    };
+  const energy = assessInfraEnergy(targetDir);
+  const result = {
+    directory: targetDir,
+    carbonFootprint: energy,
+    greenScore: Math.max(0, 100 - energy.totalKwh / 5),
+  };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
 
-    return result;
+  return result;
 });

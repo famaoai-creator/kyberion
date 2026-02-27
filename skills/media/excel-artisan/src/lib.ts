@@ -47,13 +47,17 @@ export function extractRowsFromArtifact(artifact: DocumentArtifact): string[][] 
   return rows;
 }
 
-export function applySpecsToWorkbook(workbook: ExcelJS.Workbook, sheets: ExcelSheetDef[], specs: ExcelMasterSpecs): void {
+export function applySpecsToWorkbook(
+  workbook: ExcelJS.Workbook,
+  sheets: ExcelSheetDef[],
+  specs: ExcelMasterSpecs
+): void {
   sheets.forEach((sheetDef) => {
     let sheet = workbook.getWorksheet(sheetDef.name);
     if (!sheet) {
       sheet = workbook.addWorksheet(sheetDef.name);
     }
-    
+
     if (specs.layout.hide_gridlines) {
       sheet.views = [{ showGridLines: false }];
     }

@@ -4,13 +4,13 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { runSkill } from '@agent/core';
 import { safeWriteFile } from '@agent/core/secure-io';
-import { 
-  analyzeCodeComplexity, 
-  detectTechDebt, 
-  getRecentVelocity, 
-  checkInfrastructure, 
-  generateRoadmap, 
-  RoadmapResult 
+import {
+  analyzeCodeComplexity,
+  detectTechDebt,
+  getRecentVelocity,
+  checkInfrastructure,
+  generateRoadmap,
+  RoadmapResult,
 } from './lib.js';
 
 const argv = yargs(hideBin(process.argv))

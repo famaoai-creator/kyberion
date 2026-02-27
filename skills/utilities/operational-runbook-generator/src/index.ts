@@ -12,7 +12,8 @@ const argv = createStandardYargs()
     choices: ['deploy', 'rollback', 'incident', 'scaling'],
     default: 'deploy',
   })
-  .option('out', { alias: 'o', type: 'string' }).parseSync();
+  .option('out', { alias: 'o', type: 'string' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('operational-runbook-generator', () => {

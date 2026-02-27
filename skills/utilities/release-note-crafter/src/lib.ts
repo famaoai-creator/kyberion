@@ -25,8 +25,12 @@ export function stripPrefix(subject: string): string {
 export function getGitCommits(repoDir: string, since: string): Commit[] {
   const gitCmd = `git log --pretty=format:"%H|%s|%an|%ad" --date=short --since="${since}"`;
   const logOutput = execSync(gitCmd, { cwd: repoDir, encoding: 'utf8' });
-  return logOutput.trim().split(new RegExp('\\\\r?\\\\n')).filter(l => l.length > 0).map(line => {
-    const [hash, subject, author, date] = line.split('|');
-    return { hash, subject, author, date };
-  });
+  return logOutput
+    .trim()
+    .split(new RegExp('\\\\r?\\\\n'))
+    .filter((l) => l.length > 0)
+    .map((line) => {
+      const [hash, subject, author, date] = line.split('|');
+      return { hash, subject, author, date };
+    });
 }

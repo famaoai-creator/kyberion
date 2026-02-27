@@ -1,23 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { categorizeResult, extractHighlights, processReport, generateMarkdown, SkillResult } from './lib.js';
+import {
+  categorizeResult,
+  extractHighlights,
+  processReport,
+  generateMarkdown,
+  SkillResult,
+} from './lib.js';
 
 describe('executive-reporting-maestro lib', () => {
   const mockResults: SkillResult[] = [
     {
       skill: 'security-scanner',
       status: 'success',
-      data: { score: 95, grade: 'A', recommendations: ['Keep it up'] }
+      data: { score: 95, grade: 'A', recommendations: ['Keep it up'] },
     },
     {
       skill: 'quality-scorer',
       status: 'success',
-      data: { score: 75, grade: 'C', recommendations: [{ action: 'Improve tests', priority: 'high' }] }
+      data: {
+        score: 75,
+        grade: 'C',
+        recommendations: [{ action: 'Improve tests', priority: 'high' }],
+      },
     },
     {
       skill: 'project-health-check',
       status: 'error',
-      error: { message: 'Database connection failed' }
-    }
+      error: { message: 'Database connection failed' },
+    },
   ];
 
   it('should categorize results by domain', () => {
@@ -30,9 +40,9 @@ describe('executive-reporting-maestro lib', () => {
     const { highlights, risks } = extractHighlights(mockResults);
     expect(highlights).toHaveLength(1); // security-scanner score 95
     expect(highlights[0].skill).toBe('security-scanner');
-    expect(risks.some(r => r.type === 'concern')).toBe(true); // quality-scorer score 75
-    expect(risks.some(r => r.type === 'error')).toBe(true); // project-health-check error
-    expect(risks.some(r => r.type === 'recommendation')).toBe(true); // Improve tests
+    expect(risks.some((r) => r.type === 'concern')).toBe(true); // quality-scorer score 75
+    expect(risks.some((r) => r.type === 'error')).toBe(true); // project-health-check error
+    expect(risks.some((r) => r.type === 'recommendation')).toBe(true); // Improve tests
   });
 
   it('should process full report summary', () => {
@@ -55,10 +65,10 @@ describe('executive-reporting-maestro lib', () => {
 
   it('should handle partial invalid results gracefully', () => {
     const mixedResults: any[] = [
-        ...mockResults,
-        { something: 'else' }, // Missing skill name
-        null,
-        undefined
+      ...mockResults,
+      { something: 'else' }, // Missing skill name
+      null,
+      undefined,
     ];
     const report = processReport('Mixed Report', mixedResults);
     expect(report.totalResults).toBe(3); // Only valid mockResults are processed

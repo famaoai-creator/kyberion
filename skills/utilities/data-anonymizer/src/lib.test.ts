@@ -6,7 +6,7 @@ describe('data-anonymizer lib', () => {
     const input = {
       username: 'user1',
       email: 'user1@example.com',
-      apiKey: 'secret-key-123'
+      apiKey: 'secret-key-123',
     };
     const result = anonymize(input);
     expect(result.username).toBe('user1');
@@ -19,10 +19,10 @@ describe('data-anonymizer lib', () => {
       user: {
         id: 1,
         details: {
-          password: 'my-password'
-        }
+          password: 'my-password',
+        },
       },
-      status: 'active'
+      status: 'active',
     };
     const result = anonymize(input);
     expect(result.user.details.password).toBe('***MASKED***');
@@ -32,7 +32,7 @@ describe('data-anonymizer lib', () => {
   it('should mask fields in an array of objects', () => {
     const input = [
       { id: 1, token: 'token1' },
-      { id: 2, token: 'token2' }
+      { id: 2, token: 'token2' },
     ];
     const result = anonymize(input);
     expect(result[0].token).toBe('***MASKED***');
@@ -44,7 +44,7 @@ describe('data-anonymizer lib', () => {
       user: 'alice',
       salary: 5000,
       client_secret: 'x123',
-      nested: { balance: 10000 }
+      nested: { balance: 10000 },
     };
     const result = anonymize(input);
     expect(result.salary).toBe('***MASKED***');
@@ -61,7 +61,7 @@ describe('data-anonymizer lib', () => {
   it('should wrap anonymized data in a DocumentArtifact', () => {
     const input = { user: 'bob', email: 'bob@ex.com' };
     const artifact = anonymizeArtifact('User Data', input);
-    
+
     expect(artifact.title).toBe('User Data');
     expect(artifact.body).toContain('***MASKED***');
     expect(artifact.body).not.toContain('bob@ex.com');

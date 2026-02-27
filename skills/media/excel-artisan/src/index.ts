@@ -6,11 +6,11 @@ import { hideBin } from 'yargs/helpers';
 import ExcelJS from 'exceljs';
 import { runAsyncSkill } from '@agent/core';
 import { validateFilePath } from '@agent/core/validators';
-import { 
-  createWorkbookFromHTML, 
-  applySpecsToWorkbook, 
-  ExcelSheetDef, 
-  ExcelMasterSpecs 
+import {
+  createWorkbookFromHTML,
+  applySpecsToWorkbook,
+  ExcelSheetDef,
+  ExcelMasterSpecs,
 } from './lib.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,8 +46,11 @@ runAsyncSkill('excel-artisan', async () => {
     // Assume JSON (ADF)
     const adf = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
     const sheets = adf.sheets as ExcelSheetDef[];
-    
-    const specsPath = path.resolve(__dirname, '../../../knowledge/standards/design/excel-master-specs.json');
+
+    const specsPath = path.resolve(
+      __dirname,
+      '../../../knowledge/standards/design/excel-master-specs.json'
+    );
     if (!fs.existsSync(specsPath)) {
       throw new Error(`Excel master specs missing: ${specsPath}`);
     }
@@ -58,6 +61,6 @@ runAsyncSkill('excel-artisan', async () => {
   }
 
   await workbook.xlsx.writeFile(outputPath);
-  
+
   return { input: inputPath, output: outputPath };
 });

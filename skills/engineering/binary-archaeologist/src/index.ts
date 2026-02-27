@@ -19,33 +19,34 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for forensic report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('binary-archaeologist', () => {
-    const target = path.resolve(argv.input as string);
-    if (!fs.existsSync(target)) throw new Error(`Target not found: ${target}`);
+  const target = path.resolve(argv.input as string);
+  if (!fs.existsSync(target)) throw new Error(`Target not found: ${target}`);
 
-    const results: any[] = [];
-    
-    if (fs.statSync(target).isDirectory()) {
-        const allFiles = getAllFiles(target, { maxDepth: 5 });
-        for (const f of allFiles) {
-            // Basic heuristic for binary: not markdown, json, ts, etc.
-            if (!f.match(/\.(ts|js|json|md|txt|yaml|yml|tf|sh|cjs|mjs)$/)) {
-                try {
-                    results.push({ file: path.relative(target, f), ...analyzeBinaryFile(f) });
-                } catch {}
-            }
-        }
-    } else {
-        results.push({ file: path.basename(target), ...analyzeBinaryFile(target) });
+  const results: any[] = [];
+
+  if (fs.statSync(target).isDirectory()) {
+    const allFiles = getAllFiles(target, { maxDepth: 5 });
+    for (const f of allFiles) {
+      // Basic heuristic for binary: not markdown, json, ts, etc.
+      if (!f.match(/\.(ts|js|json|md|txt|yaml|yml|tf|sh|cjs|mjs)$/)) {
+        try {
+          results.push({ file: path.relative(target, f), ...analyzeBinaryFile(f) });
+        } catch {}
+      }
     }
+  } else {
+    results.push({ file: path.basename(target), ...analyzeBinaryFile(target) });
+  }
 
-    const output = { target, results, timestamp: new Date().toISOString() };
+  const output = { target, results, timestamp: new Date().toISOString() };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(output, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(output, null, 2));
+  }
 
-    return output;
+  return output;
 });

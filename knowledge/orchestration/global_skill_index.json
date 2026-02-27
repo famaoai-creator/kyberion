@@ -10,11 +10,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill"]
     },
     {
       "n": "bug-predictor",
@@ -23,9 +19,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/predict.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "compliance-officer",
@@ -34,11 +28,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["automation", "compliance", "gemini-skill"]
     },
     {
       "n": "license-auditor",
@@ -47,11 +37,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["automation", "compliance", "gemini-skill"]
     },
     {
       "n": "monitoring-config-auditor",
@@ -60,11 +46,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["compliance", "gemini-skill", "observability"]
     },
     {
       "n": "post-quantum-shield",
@@ -73,12 +55,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill", "security"]
     },
     {
       "n": "project-health-check",
@@ -87,11 +64,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["compliance", "gemini-skill", "qa"]
     },
     {
       "n": "quality-scorer",
@@ -100,9 +73,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/score.ts",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "red-team-adversary",
@@ -111,10 +82,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/simulate.cjs",
-      "t": [
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["gemini-skill", "security"]
     },
     {
       "n": "security-scanner",
@@ -123,12 +91,7 @@
       "s": "impl",
       "r": "high",
       "m": "scripts/scan.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "integration",
-        "security"
-      ]
+      "t": ["compliance", "gemini-skill", "integration", "security"]
     },
     {
       "n": "skill-quality-auditor",
@@ -137,11 +100,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["compliance", "gemini-skill", "qa"]
     },
     {
       "n": "supply-chain-sentinel",
@@ -150,11 +109,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/scan.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["compliance", "gemini-skill", "observability"]
     },
     {
       "n": "business-growth-planner",
@@ -163,9 +118,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/plan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "business-impact-analyzer",
@@ -174,9 +127,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "competitive-intel-strategist",
@@ -185,9 +136,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "executive-reporting-maestro",
@@ -196,10 +145,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/report.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "financial-modeling-maestro",
@@ -208,10 +154,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/model.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "investor-readiness-audit",
@@ -220,12 +163,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "documentation", "gemini-skill"]
     },
     {
       "n": "ip-profitability-architect",
@@ -234,10 +172,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "ip-strategist",
@@ -246,9 +181,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "pmo-governance-lead",
@@ -257,9 +190,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "scenario-multiverse-orchestrator",
@@ -268,10 +199,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "stakeholder-communicator",
@@ -280,9 +208,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/communicate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "strategic-roadmap-planner",
@@ -291,9 +217,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/plan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sunset-architect",
@@ -302,11 +226,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/plan.cjs",
-      "t": [
-        "automation",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["automation", "data-engineering", "gemini-skill"]
     },
     {
       "n": "talent-requirement-generator",
@@ -315,10 +235,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "tech-dd-analyst",
@@ -327,9 +244,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "unit-economics-optimizer",
@@ -338,10 +253,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/optimize.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "backlog-connector",
@@ -350,10 +262,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/backlog.cjs",
-      "t": [
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["gemini-skill", "integration"]
     },
     {
       "n": "box-connector",
@@ -362,9 +271,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/connect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "connection-manager",
@@ -373,11 +280,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/diagnose.cjs",
-      "t": [
-        "cloud",
-        "communication",
-        "gemini-skill"
-      ]
+      "t": ["cloud", "communication", "gemini-skill"]
     },
     {
       "n": "github-repo-auditor",
@@ -386,10 +289,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit_repos.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "github-skills-manager",
@@ -398,9 +298,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/create_skill.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "google-workspace-integrator",
@@ -409,12 +307,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/integrate.cjs",
-      "t": [
-        "automation",
-        "cloud",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "cloud", "documentation", "gemini-skill"]
     },
     {
       "n": "jira-agile-assistant",
@@ -423,9 +316,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/assist.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "slack-communicator-pro",
@@ -434,10 +325,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/communicate.cjs",
-      "t": [
-        "communication",
-        "gemini-skill"
-      ]
+      "t": ["communication", "gemini-skill"]
     },
     {
       "n": "intent-classifier",
@@ -446,9 +334,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/classify.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "mission-control",
@@ -457,9 +343,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "prompt-optimizer",
@@ -468,10 +352,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/optimize.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "self-evolution",
@@ -489,9 +370,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/heal.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "skill-evolution-engine",
@@ -500,9 +379,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/evolve.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "binary-archaeologist",
@@ -511,9 +388,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "code-lang-detector",
@@ -522,9 +397,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "codebase-mapper",
@@ -533,9 +406,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/map.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "dependency-grapher",
@@ -544,10 +415,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/graph.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "dependency-lifeline",
@@ -556,10 +424,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/check.cjs",
-      "t": [
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["gemini-skill", "observability"]
     },
     {
       "n": "kernel-compiler",
@@ -568,9 +433,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/compile.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "local-reviewer",
@@ -579,9 +442,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/review.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "mobile-test-generator",
@@ -599,9 +460,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/draft.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "refactoring-engine",
@@ -610,9 +469,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "schema-inspector",
@@ -621,10 +478,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/inspect.cjs",
-      "t": [
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["gemini-skill", "integration"]
     },
     {
       "n": "sequence-mapper",
@@ -633,10 +487,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/map.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "technology-porter",
@@ -645,9 +496,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/port.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "test-genie",
@@ -656,11 +505,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/run.cjs",
-      "t": [
-        "analytics",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["analytics", "gemini-skill", "qa"]
     },
     {
       "n": "test-suite-architect",
@@ -669,11 +514,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "gemini-skill", "qa"]
     },
     {
       "n": "auto-context-mapper",
@@ -682,10 +523,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/map.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "data-collector",
@@ -694,11 +532,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/collect.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration"]
     },
     {
       "n": "data-transformer",
@@ -707,10 +541,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/transform.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "dataset-curator",
@@ -719,11 +550,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/curate.cjs",
-      "t": [
-        "compliance",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "data-engineering", "gemini-skill"]
     },
     {
       "n": "db-extractor",
@@ -732,11 +559,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/extract.cjs",
-      "t": [
-        "analytics",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "data-engineering", "gemini-skill"]
     },
     {
       "n": "glossary-resolver",
@@ -745,9 +568,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/resolve.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-auditor",
@@ -756,10 +577,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "knowledge-fetcher",
@@ -768,9 +586,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/fetch.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-harvester",
@@ -779,9 +595,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/harvest.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "knowledge-refiner",
@@ -790,10 +604,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/refine.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "source-importer",
@@ -802,10 +613,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/import.cjs",
-      "t": [
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["gemini-skill", "security"]
     },
     {
       "n": "sovereign-memory",
@@ -814,9 +622,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/save.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sovereign-sync",
@@ -825,9 +631,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/sync.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "audio-transcriber",
@@ -836,9 +640,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/transcribe.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "diagram-renderer",
@@ -847,9 +649,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/main.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "doc-to-text",
@@ -858,10 +658,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/extract.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "excel-artisan",
@@ -870,10 +667,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/html_to_excel.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "html-reporter",
@@ -882,10 +676,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/report.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "layout-architect",
@@ -894,9 +685,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/extract_images.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "pdf-composer",
@@ -905,11 +694,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/compose.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     },
     {
       "n": "ppt-artisan",
@@ -918,10 +703,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/convert.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "word-artisan",
@@ -930,11 +712,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/convert.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     },
     {
       "n": "agent-activity-monitor",
@@ -943,11 +721,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/monitor.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["data-engineering", "gemini-skill", "observability"]
     },
     {
       "n": "ai-model-orchestrator",
@@ -956,10 +730,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/orchestrate.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "api-doc-generator",
@@ -968,12 +739,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["automation", "documentation", "gemini-skill", "integration"]
     },
     {
       "n": "api-evolution-manager",
@@ -982,11 +748,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/manage.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["automation", "gemini-skill", "integration"]
     },
     {
       "n": "api-fetcher",
@@ -995,11 +757,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/fetch.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration"]
     },
     {
       "n": "automated-support-architect",
@@ -1008,10 +766,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "autonomous-skill-designer",
@@ -1020,9 +775,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/design.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "boilerplate-genie",
@@ -1031,11 +784,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/main.cjs",
-      "t": [
-        "gemini-skill",
-        "integration",
-        "qa"
-      ]
+      "t": ["gemini-skill", "integration", "qa"]
     },
     {
       "n": "browser-navigator",
@@ -1044,13 +793,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/navigate.cjs",
-      "t": [
-        "automation",
-        "compliance",
-        "data-engineering",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "compliance", "data-engineering", "gemini-skill", "qa"]
     },
     {
       "n": "budget-variance-tracker",
@@ -1059,10 +802,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/track.cjs",
-      "t": [
-        "analytics",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "gemini-skill"]
     },
     {
       "n": "chaos-monkey-orchestrator",
@@ -1071,11 +811,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/chaos.cjs",
-      "t": [
-        "gemini-skill",
-        "observability",
-        "qa"
-      ]
+      "t": ["gemini-skill", "observability", "qa"]
     },
     {
       "n": "cloud-cost-estimator",
@@ -1084,10 +820,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/estimate.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "cloud-waste-hunter",
@@ -1096,10 +829,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/hunt.cjs",
-      "t": [
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["finops", "gemini-skill"]
     },
     {
       "n": "completeness-scorer",
@@ -1108,9 +838,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/score.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "context-injector",
@@ -1119,10 +847,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/inject.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "crisis-manager",
@@ -1131,12 +856,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/diagnose.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "integration",
-        "security"
-      ]
+      "t": ["data-engineering", "gemini-skill", "integration", "security"]
     },
     {
       "n": "data-anonymizer",
@@ -1145,10 +865,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/main.ts",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "data-lineage-guardian",
@@ -1157,11 +874,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/trace.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["data-engineering", "gemini-skill", "observability"]
     },
     {
       "n": "diff-visualizer",
@@ -1170,10 +883,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/diff.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "disaster-recovery-planner",
@@ -1182,10 +892,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/plan.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "doc-sync-sentinel",
@@ -1194,10 +901,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/check.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "doc-type-classifier",
@@ -1206,10 +910,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/classify.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "document-generator",
@@ -1218,10 +919,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "domain-classifier",
@@ -1230,9 +928,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/classify.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "ecosystem-integration-test",
@@ -1241,10 +937,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/verify.cjs",
-      "t": [
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["gemini-skill", "qa"]
     },
     {
       "n": "encoding-detector",
@@ -1253,9 +946,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "environment-provisioner",
@@ -1264,11 +955,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/provision.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "documentation", "gemini-skill"]
     },
     {
       "n": "format-detector",
@@ -1277,9 +964,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "issue-to-solution-bridge",
@@ -1288,10 +973,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/solve.cjs",
-      "t": [
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["gemini-skill", "qa"]
     },
     {
       "n": "lang-detector",
@@ -1300,9 +982,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/detect.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "log-analyst",
@@ -1311,9 +991,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/tail.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "log-to-requirement-bridge",
@@ -1322,9 +1000,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "nonfunctional-architect",
@@ -1333,12 +1009,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/assess.cjs",
-      "t": [
-        "automation",
-        "documentation",
-        "gemini-skill",
-        "security"
-      ]
+      "t": ["automation", "documentation", "gemini-skill", "security"]
     },
     {
       "n": "onboarding-wizard",
@@ -1347,10 +1018,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "operational-runbook-generator",
@@ -1359,10 +1027,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "performance-monitor-analyst",
@@ -1371,10 +1036,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "gemini-skill",
-        "observability"
-      ]
+      "t": ["gemini-skill", "observability"]
     },
     {
       "n": "release-note-crafter",
@@ -1383,10 +1045,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/main.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "requirements-wizard",
@@ -1395,11 +1054,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/main.cjs",
-      "t": [
-        "analytics",
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["analytics", "data-engineering", "gemini-skill"]
     },
     {
       "n": "schema-validator",
@@ -1408,9 +1063,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/validate.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "sensitivity-detector",
@@ -1419,9 +1072,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/scan.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "shadow-dispatcher",
@@ -1439,10 +1090,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/bundle.cjs",
-      "t": [
-        "gemini-skill",
-        "performance"
-      ]
+      "t": ["gemini-skill", "performance"]
     },
     {
       "n": "sustainability-consultant",
@@ -1451,9 +1099,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/assess.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "tech-stack-librarian",
@@ -1462,10 +1108,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/research.cjs",
-      "t": [
-        "documentation",
-        "gemini-skill"
-      ]
+      "t": ["documentation", "gemini-skill"]
     },
     {
       "n": "telemetry-insight-engine",
@@ -1474,10 +1117,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "template-renderer",
@@ -1486,10 +1126,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/render.cjs",
-      "t": [
-        "data-engineering",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "gemini-skill"]
     },
     {
       "n": "terraform-arch-mapper",
@@ -1498,10 +1135,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate_diagram.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "test-viewpoint-analyst",
@@ -1510,12 +1144,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "automation",
-        "gemini-skill",
-        "qa",
-        "security"
-      ]
+      "t": ["automation", "gemini-skill", "qa", "security"]
     },
     {
       "n": "asset-token-economist",
@@ -1524,11 +1153,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/analyze.cjs",
-      "t": [
-        "data-engineering",
-        "finops",
-        "gemini-skill"
-      ]
+      "t": ["data-engineering", "finops", "gemini-skill"]
     },
     {
       "n": "visionary-ethos-keeper",
@@ -1537,9 +1162,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/check.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "biometric-context-adapter",
@@ -1548,9 +1171,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate_niko_niko.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "localization-maestro",
@@ -1559,10 +1180,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/localize.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "synthetic-user-persona",
@@ -1571,12 +1189,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "cloud",
-        "gemini-skill",
-        "qa"
-      ]
+      "t": ["automation", "cloud", "gemini-skill", "qa"]
     },
     {
       "n": "ux-auditor",
@@ -1585,10 +1198,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/audit.cjs",
-      "t": [
-        "compliance",
-        "gemini-skill"
-      ]
+      "t": ["compliance", "gemini-skill"]
     },
     {
       "n": "ux-visualizer",
@@ -1597,10 +1207,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/generate.cjs",
-      "t": [
-        "automation",
-        "gemini-skill"
-      ]
+      "t": ["automation", "gemini-skill"]
     },
     {
       "n": "voice-command-listener",
@@ -1609,9 +1216,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/listen.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     },
     {
       "n": "voice-interface-maestro",
@@ -1620,9 +1225,7 @@
       "s": "impl",
       "r": "low",
       "m": "scripts/chat_loop.cjs",
-      "t": [
-        "gemini-skill"
-      ]
+      "t": ["gemini-skill"]
     }
   ]
 }

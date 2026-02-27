@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { assessCodeQuality, assessArchitecture, calculateDDScore, processTechDD, assessTeamMaturity } from './lib.js';
+import {
+  assessCodeQuality,
+  assessArchitecture,
+  calculateDDScore,
+  processTechDD,
+  assessTeamMaturity,
+} from './lib.js';
 import * as fsUtils from '@agent/core/fs-utils';
 
 vi.mock('child_process', () => ({
-  execSync: vi.fn().mockReturnValue(' 10 Alice\n 5 Bob\n 2 Charlie')
+  execSync: vi.fn().mockReturnValue(' 10 Alice\n 5 Bob\n 2 Charlie'),
 }));
 
 describe('tech-dd-analyst lib', () => {
@@ -25,9 +31,9 @@ describe('tech-dd-analyst lib', () => {
 
   it('should detect architecture signals', () => {
     vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
-        const pathStr = typeof p === 'string' ? p : '';
-        if (pathStr.includes('docker-compose.yml') || pathStr.includes('jest.config.js')) return true;
-        return false;
+      const pathStr = typeof p === 'string' ? p : '';
+      if (pathStr.includes('docker-compose.yml') || pathStr.includes('jest.config.js')) return true;
+      return false;
     });
 
     const arch = assessArchitecture('/test');
@@ -39,10 +45,17 @@ describe('tech-dd-analyst lib', () => {
   it('should calculate DD score correctly', () => {
     const code = { totalFiles: 50, totalLines: 5000, avgFileSize: 100, languages: {} };
     const team = { contributors: 10, topContributors: [], busFactor: 4, risk: 'low' as const };
-    const arch = { 
-        languages: [], frameworks: [], tools: [], 
-        hasMonorepo: false, hasMicroservices: false, hasDockerCompose: false, hasTerraform: false, hasK8s: false, 
-        testFramework: 'vitest', cicd: 'github-actions' 
+    const arch = {
+      languages: [],
+      frameworks: [],
+      tools: [],
+      hasMonorepo: false,
+      hasMicroservices: false,
+      hasDockerCompose: false,
+      hasTerraform: false,
+      hasK8s: false,
+      testFramework: 'vitest',
+      cicd: 'github-actions',
     };
 
     const score = calculateDDScore(code, team, arch);

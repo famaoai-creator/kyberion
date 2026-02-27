@@ -16,11 +16,11 @@ const skills = [];
 
 for (const s of skillsData) {
   if ((s.s || s.status) !== 'impl' && (s.s || s.status) !== 'implemented') continue;
-  
+
   const sPath = s.path || s.n;
   const scriptsDir = path.join(rootDir, sPath, 'scripts');
   if (!fs.existsSync(scriptsDir)) continue;
-  
+
   const files = fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
   if (files.length > 0) {
     skills.push({ name: s.n, script: path.join(scriptsDir, files[0]) });

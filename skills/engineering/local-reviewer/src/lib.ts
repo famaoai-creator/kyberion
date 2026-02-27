@@ -10,9 +10,13 @@ export interface ReviewContext {
 export function getStagedDiff(): ReviewContext {
   try {
     const diff = safeExec('git', ['diff', '--staged', '--unified=3']);
-    
+
     if (!diff.trim()) {
-      return { status: 'no_changes', message: "No staged changes found. Did you run 'git add'?", diff: '' };
+      return {
+        status: 'no_changes',
+        message: "No staged changes found. Did you run 'git add'?",
+        diff: '',
+      };
     }
 
     return {

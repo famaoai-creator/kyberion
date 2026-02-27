@@ -1,6 +1,6 @@
 export const SUSPICIOUS_PATTERNS = [
   { pattern: /postinstall.*curl|wget|fetch/i, risk: 'Network call in postinstall' },
-  { pattern: /eval\s*\(\s*(?:Buffer|atob|decode)/i, risk: 'Obfuscated code execution' }
+  { pattern: /eval\s*\(\s*(?:Buffer|atob|decode)/i, risk: 'Obfuscated code execution' },
 ];
 
 export function scanForSuspicious(content: string, fileName: string): any[] {
@@ -19,7 +19,11 @@ export function parsePackageJson(content: string): any[] {
     const pkg = JSON.parse(content);
     const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
     for (const [name, version] of Object.entries(allDeps)) {
-      components.push({ name, version: (version as string).replace(/[\^~>=<]/g, ''), ecosystem: 'npm' });
+      components.push({
+        name,
+        version: (version as string).replace(/[\^~>=<]/g, ''),
+        ecosystem: 'npm',
+      });
     }
   } catch {}
   return components;

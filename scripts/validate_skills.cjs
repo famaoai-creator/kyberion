@@ -26,11 +26,15 @@ const SKIP_DIRS = new Set([
 ]);
 
 const skillsRootDir = path.join(rootDir, 'skills');
-const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+const categories = fs
+  .readdirSync(skillsRootDir)
+  .filter((f) => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
 
 for (const cat of categories) {
   const catPath = path.join(skillsRootDir, cat);
-  const skillDirs = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
+  const skillDirs = fs
+    .readdirSync(catPath)
+    .filter((f) => fs.lstatSync(path.join(catPath, f)).isDirectory());
 
   for (const dir of skillDirs) {
     const skillFullDir = path.join(catPath, dir);
@@ -67,6 +71,28 @@ for (const cat of categories) {
       }
     }
 
+    // --- Structural Integrity Checks ---
+    const pkgPath = path.join(skillFullDir, 'package.json');
+    if (!fs.existsSync(pkgPath)) {
+      logger.error(`${cat}/${dir}: Missing package.json`);
+      errors++;
+    }
+
+    const srcIndexTsPath = path.join(skillFullDir, 'src/index.ts');
+    const scriptsLegacyPath = path.join(skillFullDir, `scripts/${dir}.cjs`);
+    const scriptsLegacyPath2 = path.join(skillFullDir, `scripts/main.cjs`);
+
+    // We expect either a modern src/index.ts or at least some entry point.
+    if (
+      !fs.existsSync(srcIndexTsPath) &&
+      !fs.existsSync(scriptsLegacyPath) &&
+      !fs.existsSync(scriptsLegacyPath2) &&
+      !fs.existsSync(path.join(skillFullDir, 'scripts'))
+    ) {
+      logger.error(`${cat}/${dir}: Missing standard entry point (src/index.ts or scripts/)`);
+      errors++;
+    }
+
     // --- Architectural Integrity Checks ---
     const scriptDir = path.join(skillFullDir, 'scripts');
     if (fs.existsSync(scriptDir)) {
@@ -87,7 +113,9 @@ for (const cat of categories) {
 
         // Enforce common CLI utils
         if (scriptContent.includes('yargs(hideBin(process.argv))')) {
-          logger.error(`${cat}/${dir}: Legacy yargs setup found in ${script}. Migrate to cli-utils.cjs`);
+          logger.error(
+            `${cat}/${dir}: Legacy yargs setup found in ${script}. Migrate to cli-utils.cjs`
+          );
           errors++;
         }
       }

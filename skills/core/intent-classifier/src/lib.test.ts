@@ -29,15 +29,13 @@ categories:
   it('should call classifyFile with correct parameters', () => {
     const rules = {
       resultKey: 'intent',
-      categories: { request: ['do'] }
+      categories: { request: ['do'] },
     };
-    
+
     classifyIntent('test.txt', rules);
-    
-    expect(classifier.classifyFile).toHaveBeenCalledWith(
-      'test.txt',
-      rules.categories,
-      { resultKey: 'intent' }
-    );
+
+    expect(classifier.classifyFile).toHaveBeenCalledWith('test.txt', rules.categories, {
+      resultKey: 'intent',
+    });
   });
 });

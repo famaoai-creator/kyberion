@@ -52,7 +52,7 @@ export function analyzeGaps(ourProduct: Product, competitors: Product[]): GapAna
           .filter((c) => (c.features || []).includes(f))
           .map((c) => c.name);
         // Only add each gap once
-        if (!gaps.some(g => g.feature === f)) {
+        if (!gaps.some((g) => g.feature === f)) {
           gaps.push({ feature: f, offeredBy: competitorsWithFeature });
         }
       }
@@ -165,7 +165,8 @@ export function generateStrategy(
     strategies.push({
       area: 'Market Research',
       priority: 'high',
-      action: 'No competitors identified. Focus on identifying potential indirect competitors or market substitutes to validate positioning.',
+      action:
+        'No competitors identified. Focus on identifying potential indirect competitors or market substitutes to validate positioning.',
     });
   }
 
@@ -178,12 +179,7 @@ export function processCompetitiveAnalysis(input: CompetitiveInput): Competitive
 
   const gapAnalysis = analyzeGaps(ourProduct, competitors);
   const pricingAnalysis = analyzePricing(ourProduct, competitors);
-  const strategies = generateStrategy(
-    ourProduct,
-    competitors,
-    gapAnalysis,
-    pricingAnalysis
-  );
+  const strategies = generateStrategy(ourProduct, competitors, gapAnalysis, pricingAnalysis);
 
   return {
     ourProduct: ourProduct.name,

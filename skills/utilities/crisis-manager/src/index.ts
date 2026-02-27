@@ -4,9 +4,11 @@ import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { analyzeLogLines } from './lib.js';
 
-const argv = createStandardYargs()
-  .option('log', { alias: 'l', type: 'string', demandOption: true })
-  .argv;
+const argv = createStandardYargs().option('log', {
+  alias: 'l',
+  type: 'string',
+  demandOption: true,
+}).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('crisis-manager', () => {

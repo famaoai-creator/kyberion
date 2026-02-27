@@ -5,6 +5,6 @@ describe('ux-auditor lib', () => {
   it('should detect missing alt tags', () => {
     const content = '<img src="test.png">';
     const findings = auditHtmlContent(content);
-    expect(findings.find(f => f.id === 'img-alt')).toBeDefined();
+    expect(findings.find((f) => f.id === 'img-alt')).toBeDefined();
   });
 });

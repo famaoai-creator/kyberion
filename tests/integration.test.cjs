@@ -2249,7 +2249,10 @@ test('asset-token-economist recommendations vary by input size', () => {
   const smallContent = 'Hello world.';
   const smallFile = writeTemp('chain20_small.txt', smallContent);
 
-  const smallTokenEnv = runAndParse('asset-token-economist/scripts/analyze.cjs', `-i "${smallFile}"`);
+  const smallTokenEnv = runAndParse(
+    'asset-token-economist/scripts/analyze.cjs',
+    `-i "${smallFile}"`
+  );
   assert(smallTokenEnv.data.estimatedTokens > 0, 'Small file should still have tokens');
   assert(
     Array.isArray(smallTokenEnv.data.recommendations),

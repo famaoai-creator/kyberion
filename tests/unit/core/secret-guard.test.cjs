@@ -13,7 +13,10 @@ test('secretGuard retrieves from env', () => {
 test('secretGuard registers secret for masking', () => {
   // getSecret already called above
   const secrets = secretGuard.getActiveSecrets();
-  assert(secrets.includes('super-secret-value-123'), 'Active secrets should include retrieved value');
+  assert(
+    secrets.includes('super-secret-value-123'),
+    'Active secrets should include retrieved value'
+  );
 });
 
 test('tierGuard masks secret retrieved via secretGuard', () => {
@@ -26,7 +29,7 @@ test('tierGuard masks secret retrieved via secretGuard', () => {
 test('secretGuard identifies secret paths', () => {
   const isSecret = secretGuard.isSecretPath('vault/secrets/keys.json');
   assert(isSecret === true, 'Should identify vault/secrets as secret path');
-  
+
   const notSecret = secretGuard.isSecretPath('skills/core/foo.js');
   assert(notSecret === false, 'Should not identify other paths');
 });

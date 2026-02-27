@@ -16,7 +16,7 @@ describe('auto-context-mapper lib', () => {
     vi.mocked(fsUtils.getAllFiles).mockReturnValue([
       '/root/knowledge/public/doc.md',
       '/root/knowledge/personal/secrets.json',
-      '/root/knowledge/confidential/client.yaml'
+      '/root/knowledge/confidential/client.yaml',
     ]);
 
     const tiers = scanKnowledgeTiers('/root');

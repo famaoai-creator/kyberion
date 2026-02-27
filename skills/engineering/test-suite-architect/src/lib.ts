@@ -3,9 +3,24 @@ import * as path from 'path';
 import { getAllFiles } from '@agent/core/fs-utils';
 
 export const SOURCE_EXTENSIONS = new Set([
-  '.js', '.jsx', '.ts', '.tsx', '.cjs', '.mjs', '.py', '.rb',
-  '.go', '.rs', '.java', '.cs', '.php', '.swift', '.kt', '.scala',
-  '.vue', '.svelte',
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.cjs',
+  '.mjs',
+  '.py',
+  '.rb',
+  '.go',
+  '.rs',
+  '.java',
+  '.cs',
+  '.php',
+  '.swift',
+  '.kt',
+  '.scala',
+  '.vue',
+  '.svelte',
 ]);
 
 export const TEST_PATTERNS = [
@@ -16,7 +31,13 @@ export const TEST_PATTERNS = [
   /\.tests\.[a-z]+$/i,
 ];
 
-export const TEST_DIR_PATTERNS = [/^tests?$/i, /^__tests__$/i, /^spec$/i, /^specs$/i, /^test-suite$/i];
+export const TEST_DIR_PATTERNS = [
+  /^tests?$/i,
+  /^__tests__$/i,
+  /^spec$/i,
+  /^specs$/i,
+  /^test-suite$/i,
+];
 
 export interface FrameworkDetector {
   name: string;
@@ -197,15 +218,15 @@ export function detectFrameworks(projectDir: string, allFiles: string[]): string
         if (found) break;
       }
     }
-    
+
     // Check file pattern
     if (!found && detector.filePattern) {
-        for (const file of basenames) {
-            if (detector.filePattern.test(file)) {
-                found = true;
-                break;
-            }
+      for (const file of basenames) {
+        if (detector.filePattern.test(file)) {
+          found = true;
+          break;
         }
+      }
     }
 
     if (found) {
@@ -216,7 +237,11 @@ export function detectFrameworks(projectDir: string, allFiles: string[]): string
   return detected;
 }
 
-export function findUntestedFiles(sourceFiles: string[], testFiles: string[], projectDir: string): string[] {
+export function findUntestedFiles(
+  sourceFiles: string[],
+  testFiles: string[],
+  projectDir: string
+): string[] {
   const testBasenames = new Set();
   for (const tf of testFiles) {
     const bn = path.basename(tf);
@@ -239,9 +264,15 @@ export function findUntestedFiles(sourceFiles: string[], testFiles: string[], pr
   return untested;
 }
 
-export function generateStrategy(frameworks: string[], testRatio: number, untested: string[], sourceFiles: string[], testFiles: string[]): TestStrategy {
+export function generateStrategy(
+  frameworks: string[],
+  testRatio: number,
+  untested: string[],
+  sourceFiles: string[],
+  testFiles: string[]
+): TestStrategy {
   let recommendedFramework = 'jest';
-  
+
   if (frameworks.length > 0) {
     recommendedFramework = frameworks[0];
   } else {
@@ -270,7 +301,7 @@ export function generateStrategy(frameworks: string[], testRatio: number, untest
   } else if (testRatio >= 0.5) {
     coverageTarget = 90;
   }
-  
+
   if (untested.length > 20) estimatedEffort = 'high';
   else if (untested.length > 5) estimatedEffort = 'medium';
 

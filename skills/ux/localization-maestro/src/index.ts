@@ -18,24 +18,25 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for localization audit report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('localization-maestro', () => {
-    const targetDir = path.resolve(argv.input as string);
-    if (!fs.existsSync(targetDir)) throw new Error('Directory not found: ' + targetDir);
+  const targetDir = path.resolve(argv.input as string);
+  if (!fs.existsSync(targetDir)) throw new Error('Directory not found: ' + targetDir);
 
-    const mockFindings = { i18nReady: false };
-    const audit = generateI18nAudit(mockFindings);
-    
-    const result = {
-      directory: targetDir,
-      i18nReadiness: { score: calculateReadinessScore(mockFindings) },
-      audit
-    };
+  const mockFindings = { i18nReady: false };
+  const audit = generateI18nAudit(mockFindings);
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  const result = {
+    directory: targetDir,
+    i18nReadiness: { score: calculateReadinessScore(mockFindings) },
+    audit,
+  };
 
-    return result;
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
+
+  return result;
 });

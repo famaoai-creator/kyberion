@@ -61,7 +61,7 @@ function ensureNamespaceStructure(category) {
   if (!fs.existsSync(catDir)) {
     fs.mkdirSync(catDir, { recursive: true });
   }
-  
+
   // Ensure scripts/node_modules symlinks exist in the category dir
   // We use relative symlinks so they work even if the monorepo is moved
   const scriptsLink = path.join(catDir, 'scripts');
@@ -69,15 +69,19 @@ function ensureNamespaceStructure(category) {
     try {
       fs.symlinkSync('../../scripts', scriptsLink, 'dir');
       logger.info(`Created scripts symlink for category "${category}"`);
-    } catch (_e) { /* already exists or permission error */ }
+    } catch (_e) {
+      /* already exists or permission error */
+    }
   }
-  
+
   const nmLink = path.join(catDir, 'node_modules');
   if (!fs.existsSync(nmLink)) {
     try {
       fs.symlinkSync('../../node_modules', nmLink, 'dir');
       logger.info(`Created node_modules symlink for category "${category}"`);
-    } catch (_e) { /* already exists or permission error */ }
+    } catch (_e) {
+      /* already exists or permission error */
+    }
   }
 }
 

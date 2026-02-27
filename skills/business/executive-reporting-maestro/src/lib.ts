@@ -34,21 +34,29 @@ export interface ExecutiveReport {
   domainSummary: DomainSummary[];
 }
 
-export function categorizeResult(result: SkillResult): { domain: string; skill: string; status: string } {
+export function categorizeResult(result: SkillResult): {
+  domain: string;
+  skill: string;
+  status: string;
+} {
   const skill = result.skill || 'unknown';
   const status = result.status || 'unknown';
 
   if (skill.match(/security|scanner|vulnerability/i)) return { domain: 'Security', skill, status };
   if (skill.match(/quality|score|completeness/i)) return { domain: 'Quality', skill, status };
   if (skill.match(/health|audit|governance/i)) return { domain: 'Project Health', skill, status };
-  if (skill.match(/cost|financial|budget|economics/i)) return { domain: 'Financial', skill, status };
+  if (skill.match(/cost|financial|budget|economics/i))
+    return { domain: 'Financial', skill, status };
   if (skill.match(/performance|monitor/i)) return { domain: 'Performance', skill, status };
   if (skill.match(/ux|accessibility/i)) return { domain: 'UX & Accessibility', skill, status };
   if (skill.match(/dependency|license/i)) return { domain: 'Dependencies', skill, status };
   return { domain: 'Other', skill, status };
 }
 
-export function extractHighlights(results: SkillResult[]): { highlights: Highlight[]; risks: Highlight[] } {
+export function extractHighlights(results: SkillResult[]): {
+  highlights: Highlight[];
+  risks: Highlight[];
+} {
   const highlights: Highlight[] = [];
   const risks: Highlight[] = [];
 
@@ -78,9 +86,10 @@ export function extractHighlights(results: SkillResult[]): { highlights: Highlig
     if (Array.isArray(data.recommendations) || Array.isArray(data.strategies)) {
       const items: any[] = data.recommendations || data.strategies;
       // Filter high priority items
-      const highPriority = items.filter(i => i.priority === 'high' || i.priority === 'critical');
-      
-      for (const item of highPriority.slice(0, 3)) { // Top 3 high priority only
+      const highPriority = items.filter((i) => i.priority === 'high' || i.priority === 'critical');
+
+      for (const item of highPriority.slice(0, 3)) {
+        // Top 3 high priority only
         const action = item.action || item.recommendation; // fallback for legacy
         if (action) {
           risks.push({
@@ -89,7 +98,12 @@ export function extractHighlights(results: SkillResult[]): { highlights: Highlig
             message: action,
             priority: item.priority,
             action: action,
-            severity: item.priority === 'critical' ? 'critical' : item.priority === 'high' ? 'high' : 'medium'
+            severity:
+              item.priority === 'critical'
+                ? 'critical'
+                : item.priority === 'high'
+                  ? 'high'
+                  : 'medium',
           });
         }
       }
@@ -104,14 +118,19 @@ export function extractHighlights(results: SkillResult[]): { highlights: Highlig
             skill: result.skill,
             message: risk.risk,
             severity: risk.severity,
-            category: risk.category
+            category: risk.category,
           });
         }
       }
     }
 
     if (result.status === 'error' && result.error) {
-      risks.push({ type: 'error', skill: result.skill, message: result.error.message, severity: 'critical' });
+      risks.push({
+        type: 'error',
+        skill: result.skill,
+        message: result.error.message,
+        severity: 'critical',
+      });
     }
   }
 
@@ -120,8 +139,8 @@ export function extractHighlights(results: SkillResult[]): { highlights: Highlig
 
 export function processReport(title: string, results: SkillResult[]): ExecutiveReport {
   // Filter out invalid or empty results to prevent downstream errors
-  const validResults = results.filter(r => r && typeof r === 'object' && r.skill);
-  
+  const validResults = results.filter((r) => r && typeof r === 'object' && r.skill);
+
   const categorized = validResults.map(categorizeResult);
   const { highlights, risks } = extractHighlights(validResults);
 
@@ -133,7 +152,7 @@ export function processReport(title: string, results: SkillResult[]): ExecutiveR
       domainMap[cat.domain] = { domain: cat.domain, skills: [], successCount: 0, total: 0 };
     }
     if (!domainMap[cat.domain].skills.includes(cat.skill)) {
-        domainMap[cat.domain].skills.push(cat.skill);
+      domainMap[cat.domain].skills.push(cat.skill);
     }
     domainMap[cat.domain].total++;
     if (res.status === 'success') {
@@ -176,7 +195,7 @@ export function generateMarkdown(report: ExecutiveReport): string {
       if (r.type === 'error') icon = '🚨';
       else if (r.severity === 'critical') icon = '🔥';
       else if (r.severity === 'high') icon = '⚠️';
-      
+
       const prefix = r.skill ? `**${r.skill}**: ` : '';
       lines.push(`- ${icon} ${prefix}${r.message}`);
     }

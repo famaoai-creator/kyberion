@@ -7,17 +7,21 @@ export interface ApiEndpoint {
   source_of_truth: string;
 }
 
-export async function extractExpressRoutes(targetDir: string, patterns: any): Promise<Record<string, ApiEndpoint>> {
+export async function extractExpressRoutes(
+  targetDir: string,
+  patterns: any
+): Promise<Record<string, ApiEndpoint>> {
   const apiSpecs: Record<string, ApiEndpoint> = {};
   const expressPattern = new RegExp(patterns.frameworks.express.route_regex, 'g');
 
-  const files = fs.readdirSync(targetDir, { withFileTypes: true })
+  const files = fs
+    .readdirSync(targetDir, { withFileTypes: true })
     .filter((e) => e.isFile() && (e.name.endsWith('.js') || e.name.endsWith('.cjs')))
     .map((e) => e.name);
 
   const tasks = files.map(async (file) => {
     const filePath = path.join(targetDir, file);
-    const content = await safeReadFileAsync(filePath) as string;
+    const content = (await safeReadFileAsync(filePath)) as string;
     const matches = content.matchAll(expressPattern);
 
     for (const match of matches) {

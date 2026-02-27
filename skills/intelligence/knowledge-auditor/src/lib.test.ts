@@ -12,7 +12,7 @@ describe('knowledge-auditor lib', () => {
   const mockConfig: AuditConfig = {
     audit_name: 'Test Audit',
     exclusions: ['node_modules'],
-    severity_mapping: { personal_leak: 'HIGH' }
+    severity_mapping: { personal_leak: 'HIGH' },
   };
 
   beforeEach(() => {
@@ -22,7 +22,10 @@ describe('knowledge-auditor lib', () => {
   it('should detect sovereignty violations', () => {
     vi.mocked(fsUtils.getAllFiles).mockReturnValue(['/root/test.md']);
     vi.mocked(fs.readFileSync).mockReturnValue('secret data');
-    vi.mocked(tierGuard.validateSovereignBoundary).mockReturnValue({ safe: false, detected: ['secret'] });
+    vi.mocked(tierGuard.validateSovereignBoundary).mockReturnValue({
+      safe: false,
+      detected: ['secret'],
+    });
     vi.mocked(tierGuard.validateWritePermission).mockReturnValue({ allowed: true });
 
     const result = performAudit('/root', mockConfig);

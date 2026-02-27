@@ -117,7 +117,7 @@ export function generateCSSArtifact(specs: MasterSlideSpecs): DocumentArtifact {
     title: `${specs.master_name} Theme`,
     body: css,
     format: 'text', // CSS source
-    metadata: { master_name: specs.master_name }
+    metadata: { master_name: specs.master_name },
   };
 }
 
@@ -126,11 +126,13 @@ export function auditLayoutCSS(css: string): string[] {
   if (!css.includes('@theme')) warnings.push('Marp theme metadata missing');
   if (!css.includes('section')) warnings.push('Base "section" styling missing');
   if (!css.includes('h1')) warnings.push('Base "h1" styling missing');
-  
+
   const importantCount = (css.match(/!important/g) || []).length;
   if (importantCount > 5) {
-    warnings.push(`High use of !important (${importantCount} found). This may cause specificity issues.`);
+    warnings.push(
+      `High use of !important (${importantCount} found). This may cause specificity issues.`
+    );
   }
-  
+
   return warnings;
 }

@@ -13,13 +13,19 @@ test('pathResolver finds project root', () => {
 test('pathResolver resolves skill directory via index', () => {
   // Assuming security-scanner exists and is indexed
   const dir = pathResolver.skillDir('security-scanner');
-  assert(dir.includes('skills/audit/security-scanner'), `Should resolve to audit namespace, got ${dir}`);
+  assert(
+    dir.includes('skills/audit/security-scanner'),
+    `Should resolve to audit namespace, got ${dir}`
+  );
 });
 
 test('pathResolver resolves logical skill:// protocol', () => {
   const logical = 'skill://security-scanner/scripts/scan.cjs';
   const physical = pathResolver.resolve(logical);
-  assert(physical.includes('skills/audit/security-scanner/scripts/scan.cjs'), `Should resolve logical path, got ${physical}`);
+  assert(
+    physical.includes('skills/audit/security-scanner/scripts/scan.cjs'),
+    `Should resolve logical path, got ${physical}`
+  );
 });
 
 test('pathResolver handles absolute paths correctly', () => {

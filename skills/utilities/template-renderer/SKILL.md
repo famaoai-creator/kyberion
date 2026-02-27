@@ -7,17 +7,17 @@ arguments:
     short: t
     type: string
     required: true
-    description: 
+    description:
   - name: data
     short: d
     type: string
     required: true
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

@@ -57,8 +57,8 @@ export function detectLanguage(inputPath: string, content: string): DetectResult
   }
 
   if (maxScore > 0) {
-      return { lang: bestLang, confidence: 0.8, method: 'keyword' };
+    return { lang: bestLang, confidence: 0.8, method: 'keyword' };
   }
-  
+
   return { lang: 'unknown', confidence: 0, method: 'unknown' };
 }

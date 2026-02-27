@@ -8,7 +8,8 @@ import { renderTemplate } from './lib.js';
 const argv = createStandardYargs()
   .option('template', { alias: 't', type: 'string', demandOption: true })
   .option('data', { alias: 'd', type: 'string', demandOption: true })
-  .option('out', { alias: 'o', type: 'string' }).parseSync();
+  .option('out', { alias: 'o', type: 'string' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('template-renderer', () => {

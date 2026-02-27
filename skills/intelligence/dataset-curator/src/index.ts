@@ -9,8 +9,7 @@ import { detectFormat, curateJson, curateText } from './lib.js';
 const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true })
   .option('out', { alias: 'o', type: 'string' })
-  .option('format', { alias: 'f', type: 'string', choices: ['json', 'csv', 'text'] })
-  .argv;
+  .option('format', { alias: 'f', type: 'string', choices: ['json', 'csv', 'text'] }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('dataset-curator', () => {
@@ -31,9 +30,10 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
 
     if (argv.out) {
       const outPath = path.resolve(argv.out as string);
-      const outputContent = format === 'json' 
-        ? JSON.stringify(curateResult.records, null, 2) 
-        : curateResult.records.join('\n') + '\n';
+      const outputContent =
+        format === 'json'
+          ? JSON.stringify(curateResult.records, null, 2)
+          : curateResult.records.join('\n') + '\n';
       safeWriteFile(outPath, outputContent);
     }
 

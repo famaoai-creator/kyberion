@@ -13,7 +13,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runAsyncSkill('data-collector', async () => {
     return await collectData(argv.url as string, argv.out as string, {
       name: argv.name as string,
-      force: argv.force as boolean
+      force: argv.force as boolean,
     });
   });
 }

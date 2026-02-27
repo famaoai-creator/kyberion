@@ -13,9 +13,10 @@ export function analyzeVariance(category: any, threshold: number): CategoryAnaly
   const actual = category.actual || 0;
   const variance = actual - forecast;
   const variancePercent = forecast !== 0 ? Math.round((variance / forecast) * 10000) / 100 : 0;
-  
-  const isOverBudget = (variance > 0 && category.name.toLowerCase().includes('cost')) ||
-                       (variance > 0 && !category.name.toLowerCase().includes('revenue'));
+
+  const isOverBudget =
+    (variance > 0 && category.name.toLowerCase().includes('cost')) ||
+    (variance > 0 && !category.name.toLowerCase().includes('revenue'));
   const isUnderRevenue = variance < 0 && category.name.toLowerCase().includes('revenue');
 
   let status = 'on_track';

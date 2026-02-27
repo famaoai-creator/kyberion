@@ -54,15 +54,15 @@ This is not a generic tool collection. It is a system where **you define your pe
 
 - **`active/`**: Ongoing missions, projects, and mission-specific evidence.
 - **`skills/`**: The core ecosystem organized by domain:
-    - **`core/`**: Fundamental orchestrators (Mission Control, Intent Classifier, Self-Evolution).
-    - **`engineering/`**: Development and implementation tools.
-    - **`audit/`**: Security, quality, and compliance scanning.
-    - **`connector/`**: External service integrations.
-    - **`media/`**: Document generation and processing.
-    - **`intelligence/`**: Knowledge management and data processing.
-    - **`ux/`: User experience, visual, and voice interfaces.
-    - **`business/`**: Strategy, P&L, and stakeholder reporting.
-    - **`utilities/`**: Shared helpers and background daemons.
+  - **`core/`**: Fundamental orchestrators (Mission Control, Intent Classifier, Self-Evolution).
+  - **`engineering/`**: Development and implementation tools.
+  - **`audit/`**: Security, quality, and compliance scanning.
+  - **`connector/`**: External service integrations.
+  - **`media/`**: Document generation and processing.
+  - **`intelligence/`**: Knowledge management and data processing.
+  - \*\*`ux/`: User experience, visual, and voice interfaces.
+  - **`business/`**: Strategy, P&L, and stakeholder reporting.
+  - **`utilities/`**: Shared helpers and background daemons.
 - **`knowledge/`**: The 3-tier sovereign knowledge base (Public, Confidential, Personal).
 - **`vault/`**: Read-only source/reference materials (External assets).
 - **`scripts/`**: Global system scripts and shared utilities.
@@ -170,51 +170,67 @@ Each skill has a `status` field in its `SKILL.md` frontmatter:
 The ecosystem is now organized into functional namespaces for better governance, performance, and scalability.
 
 ### 🧩 Core & Orchestration (`skills/core/`)
+
 Fundamental orchestrators that manage the agent's reasoning and execution logic.
+
 - **`mission-control`**: Central workflow orchestration with pipeline support.
 - **`intent-classifier`**: Maps natural language to skill chains.
 - **`self-evolution`**: Enables the agent to propose improvements to its own core.
 
 ### 🛠️ Engineering & DevOps (`skills/engineering/`)
+
 Tools for code analysis, testing, and structural refactoring.
+
 - **`codebase-mapper`**: Multi-depth directory mapping.
 - **`test-genie`**: Autonomous test execution and analysis.
 - **`refactoring-engine`**: Large-scale technical debt reduction.
 - **`pr-architect`**: High-fidelity Pull Request generation.
 
 ### 🛡️ Audit, Security & Compliance (`skills/audit/`)
+
 Scanning and auditing tools to ensure safety and regulatory adherence.
+
 - **`security-scanner`**: Secret detection and vulnerability scanning.
 - **`compliance-officer`**: Regulatory mapping (SOC2, ISO, FISC).
 - **`quality-scorer`**: IPA-based technical and textual quality evaluation.
 - **`license-auditor`**: Dependency license risk assessment.
 
 ### 🔌 Service Connectors (`skills/connector/`)
+
 High-fidelity integrations with enterprise collaboration and project tools.
+
 - **`jira-agile-assistant`**: Sprint and issue management.
 - **`slack-communicator-pro`**: Automated team notifications.
 - **`google-workspace-integrator`**: Docs, Sheets, and Mail automation.
 
 ### 📄 Media & Content Production (`skills/media/`)
+
 Universal document extraction and professional asset generation.
+
 - **`pdf-composer` / `ppt-artisan` / `word-artisan`**: Professional document creation.
 - **`doc-to-text`**: OCR-capable universal file extractor.
 - **`diagram-renderer`**: Logic-to-Diagram (Mermaid) visualization.
 
 ### 🧠 Intelligence & Knowledge Management (`skills/intelligence/`)
+
 The engine for the 3-tier sovereign knowledge base.
+
 - **`knowledge-harvester`**: Automated pattern extraction from repositories.
 - **`sovereign-memory`**: Persistent cross-mission fact management.
 - **`dataset-curator`**: AI-ready data cleaning and structuring.
 
 ### 🎨 UX, Interface & Voice (`skills/ux/`)
+
 Human-centric interaction and visual design auditing.
+
 - **`ux-auditor`**: Visual and structural accessibility audits.
 - **`voice-interface-maestro`**: Full TTS/STT voice control loop.
 - **`synthetic-user-persona`**: Automated persona-based UI testing.
 
 ### 📊 Business Strategy & Executive Reporting (`skills/business/`)
+
 Translating technical state into business value and strategic roadmaps.
+
 - **`strategic-roadmap-planner`**: ROI-driven technology planning.
 - **`financial-modeling-maestro`**: P&L and cash flow simulation.
 - **`pmo-governance-lead`**: Cross-project risk and quality oversight.

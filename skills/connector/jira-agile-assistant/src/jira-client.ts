@@ -25,15 +25,15 @@ export class JiraClient {
         method: method,
         timeout: 10000,
         headers: {
-          'Authorization': 'Basic ' + this.auth,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+          Authorization: 'Basic ' + this.auth,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
       };
 
       const req = https.request(options, (res) => {
         let data = '';
-        res.on('data', (c) => data += c);
+        res.on('data', (c) => (data += c));
         res.on('end', () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             try {

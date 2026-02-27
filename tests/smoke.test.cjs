@@ -16,15 +16,17 @@ const IMPLEMENTED_SKILLS = [];
 
 for (const skill of skills) {
   if ((skill.s || skill.status) !== 'impl' && (skill.s || skill.status) !== 'implemented') continue;
-  
+
   const skillName = skill.n || skill.name;
   const skillPath = skill.path || skillName;
   const skillFullDir = path.join(rootDir, skillPath);
-  
+
   // Find script path (reuse logic from cli.cjs or simplified)
   const scriptsDir = path.join(skillFullDir, 'scripts');
   if (fs.existsSync(scriptsDir)) {
-    const scripts = fs.readdirSync(scriptsDir).filter(f => f.endsWith('.cjs') || f.endsWith('.js'));
+    const scripts = fs
+      .readdirSync(scriptsDir)
+      .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'));
     if (scripts.length > 0) {
       IMPLEMENTED_SKILLS.push({ name: skillName, path: skillPath, script: scripts[0] });
     }

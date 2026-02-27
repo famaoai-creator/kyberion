@@ -5,6 +5,6 @@ describe('monitoring-config-auditor lib', () => {
   it('should detect configured endpoints', () => {
     const content = 'app.get("/health", ...);';
     const results = auditMonitoringContent(content);
-    expect(results.find(r => r.id === 'health-endpoint').status).toBe('configured');
+    expect(results.find((r) => r.id === 'health-endpoint').status).toBe('configured');
   });
 });

@@ -6,9 +6,9 @@ describe('glossary-resolver lib', () => {
     const content = 'We use API and SDK for development.';
     const glossary = {
       API: 'Application Programming Interface',
-      SDK: 'Software Development Kit'
+      SDK: 'Software Development Kit',
     };
-    
+
     const result = resolveGlossary(content, glossary);
     expect(result.resolvedTerms).toBe(2);
     expect(result.content).toContain('API (Application Programming Interface)');
@@ -18,7 +18,7 @@ describe('glossary-resolver lib', () => {
   it('should respect word boundaries', () => {
     const content = 'APIs are not API.';
     const glossary = { API: 'Interface' };
-    
+
     const result = resolveGlossary(content, glossary);
     // Should match 'API' but not 'APIs'
     expect(result.resolvedTerms).toBe(1);

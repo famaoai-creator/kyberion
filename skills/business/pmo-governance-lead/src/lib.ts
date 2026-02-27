@@ -47,16 +47,32 @@ export const QUALITY_GATES: Record<string, QualityGate> = {
   requirements: {
     name: 'Requirements Phase',
     evidence: [
-      { type: 'file', patterns: ['**/requirements*.md', '**/PRD*.md', '**/specs/**', '**/requirements*.yaml'], label: 'Requirements Document' },
-      { type: 'file', patterns: ['**/stakeholder*', '**/meeting-notes*'], label: 'Stakeholder Sign-off' },
+      {
+        type: 'file',
+        patterns: ['**/requirements*.md', '**/PRD*.md', '**/specs/**', '**/requirements*.yaml'],
+        label: 'Requirements Document',
+      },
+      {
+        type: 'file',
+        patterns: ['**/stakeholder*', '**/meeting-notes*'],
+        label: 'Stakeholder Sign-off',
+      },
     ],
     weight: 20,
   },
   design: {
     name: 'Design Phase',
     evidence: [
-      { type: 'file', patterns: ['**/design*.md', '**/architecture*.md', '**/diagrams/**', '**/ADR*'], label: 'Design Document / ADR' },
-      { type: 'file', patterns: ['**/schema*', '**/erd*', '**/openapi*', '**/swagger*'], label: 'Schema / API Design' },
+      {
+        type: 'file',
+        patterns: ['**/design*.md', '**/architecture*.md', '**/diagrams/**', '**/ADR*'],
+        label: 'Design Document / ADR',
+      },
+      {
+        type: 'file',
+        patterns: ['**/schema*', '**/erd*', '**/openapi*', '**/swagger*'],
+        label: 'Schema / API Design',
+      },
     ],
     weight: 20,
   },
@@ -65,31 +81,60 @@ export const QUALITY_GATES: Record<string, QualityGate> = {
     evidence: [
       { type: 'dir', patterns: ['src/', 'lib/', 'app/', 'scripts/'], label: 'Source Code' },
       { type: 'file', patterns: ['.gitignore', '.editorconfig'], label: 'Development Standards' },
-      { type: 'file', patterns: ['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'], label: 'Contributing Guidelines' },
+      {
+        type: 'file',
+        patterns: ['CONTRIBUTING.md', 'CODE_OF_CONDUCT.md'],
+        label: 'Contributing Guidelines',
+      },
     ],
     weight: 20,
   },
   testing: {
     name: 'Testing Phase',
     evidence: [
-      { type: 'dir', patterns: ['tests/', 'test/', '__tests__/', 'spec/', 'e2e/'], label: 'Test Suite' },
-      { type: 'file', patterns: ['jest.config*', 'vitest.config*', 'pytest.ini', '.rspec', 'cypress.config*'], label: 'Test Configuration' },
-      { type: 'file', patterns: ['**/coverage/**', '.c8rc*', '.nycrc*', 'codecov*'], label: 'Coverage Configuration' },
+      {
+        type: 'dir',
+        patterns: ['tests/', 'test/', '__tests__/', 'spec/', 'e2e/'],
+        label: 'Test Suite',
+      },
+      {
+        type: 'file',
+        patterns: ['jest.config*', 'vitest.config*', 'pytest.ini', '.rspec', 'cypress.config*'],
+        label: 'Test Configuration',
+      },
+      {
+        type: 'file',
+        patterns: ['**/coverage/**', '.c8rc*', '.nycrc*', 'codecov*'],
+        label: 'Coverage Configuration',
+      },
     ],
     weight: 20,
   },
   deployment: {
     name: 'Deployment Phase',
     evidence: [
-      { type: 'file', patterns: ['.github/workflows/*', '.gitlab-ci.yml', 'Jenkinsfile', 'azure-pipelines.yml'], label: 'CI/CD Pipeline' },
-      { type: 'file', patterns: ['Dockerfile', 'docker-compose*', 'k8s/**', 'terraform/**'], label: 'Infrastructure Config' },
+      {
+        type: 'file',
+        patterns: ['.github/workflows/*', '.gitlab-ci.yml', 'Jenkinsfile', 'azure-pipelines.yml'],
+        label: 'CI/CD Pipeline',
+      },
+      {
+        type: 'file',
+        patterns: ['Dockerfile', 'docker-compose*', 'k8s/**', 'terraform/**'],
+        label: 'Infrastructure Config',
+      },
       { type: 'file', patterns: ['CHANGELOG.md', 'RELEASE*'], label: 'Release Documentation' },
     ],
     weight: 20,
   },
 };
 
-export function searchRecursive(dir: string, filePattern: string, maxDepth: number, depth = 0): string[] {
+export function searchRecursive(
+  dir: string,
+  filePattern: string,
+  maxDepth: number,
+  depth = 0
+): string[] {
   if (depth > maxDepth) return [];
   const results: string[] = [];
   const regex = new RegExp('^' + filePattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
@@ -100,10 +145,14 @@ export function searchRecursive(dir: string, filePattern: string, maxDepth: numb
       if (entry.isFile() && regex.test(entry.name)) {
         results.push(path.join(dir, entry.name));
       } else if (entry.isDirectory()) {
-        results.push(...searchRecursive(path.join(dir, entry.name), filePattern, maxDepth, depth + 1));
+        results.push(
+          ...searchRecursive(path.join(dir, entry.name), filePattern, maxDepth, depth + 1)
+        );
       }
     }
-  } catch (_e) { /* skip */ }
+  } catch (_e) {
+    /* skip */
+  }
   return results;
 }
 
@@ -126,14 +175,17 @@ export function simpleGlob(dir: string, pattern: string): string[] {
   }
 }
 
-export function checkEvidence(dir: string, evidence: EvidenceConfig): { found: boolean; match: string | null; quality?: 'low' | 'high' } {
+export function checkEvidence(
+  dir: string,
+  evidence: EvidenceConfig
+): { found: boolean; match: string | null; quality?: 'low' | 'high' } {
   for (const pattern of evidence.patterns) {
     if (evidence.type === 'dir') {
       const dirPath = path.join(dir, pattern.replace('/', ''));
       if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
         const stats = fs.statSync(dirPath);
         // Simple quality check: recently updated?
-        const isRecent = (Date.now() - stats.mtimeMs) < 30 * 24 * 60 * 60 * 1000; // 30 days
+        const isRecent = Date.now() - stats.mtimeMs < 30 * 24 * 60 * 60 * 1000; // 30 days
         return { found: true, match: pattern, quality: isRecent ? 'high' : 'low' };
       }
     } else {
@@ -141,7 +193,11 @@ export function checkEvidence(dir: string, evidence: EvidenceConfig): { found: b
       if (matches.length > 0) {
         const stats = fs.statSync(matches[0]);
         const isSignificant = stats.size > 100; // More than 100 bytes
-        return { found: true, match: path.relative(dir, matches[0]), quality: isSignificant ? 'high' : 'low' };
+        return {
+          found: true,
+          match: path.relative(dir, matches[0]),
+          quality: isSignificant ? 'high' : 'low',
+        };
       }
     }
   }
@@ -163,7 +219,8 @@ export function auditPhase(dir: string, phaseKey: string): PhaseResult {
     if (check.found) passed++;
   }
 
-  const completion = gate.evidence.length > 0 ? Math.round((passed / gate.evidence.length) * 100) : 0;
+  const completion =
+    gate.evidence.length > 0 ? Math.round((passed / gate.evidence.length) * 100) : 0;
 
   return {
     phase: gate.name,
@@ -183,7 +240,7 @@ export function identifyRisks(phaseResults: PhaseResult[]): GovernanceRisk[] {
         severity: 'high',
         phase: phase.phase,
         risk: `${phase.phase} has insufficient evidence (${phase.completion}% complete)`,
-        impact: 'Increased risk of project failure or quality degradation.'
+        impact: 'Increased risk of project failure or quality degradation.',
       });
     }
     const missing = phase.evidence.filter((e) => e.status === 'missing');
@@ -193,7 +250,7 @@ export function identifyRisks(phaseResults: PhaseResult[]): GovernanceRisk[] {
         severity: phase.completion < 50 ? 'high' : 'medium',
         phase: phase.phase,
         risk: `Missing evidence for: ${m.label}`,
-        impact: 'Traceability gap in SDLC.'
+        impact: 'Traceability gap in SDLC.',
       });
     }
   }
@@ -206,9 +263,10 @@ export function processGovernanceAudit(dir: string, phaseFilter: string): Govern
   const phaseResults = phases.map((p) => internals.auditPhase(dir, p));
   const risks = internals.identifyRisks(phaseResults);
 
-  const totalCompletion = phaseResults.length > 0
-    ? Math.round(phaseResults.reduce((s, p) => s + p.completion, 0) / phaseResults.length)
-    : 0;
+  const totalCompletion =
+    phaseResults.length > 0
+      ? Math.round(phaseResults.reduce((s, p) => s + p.completion, 0) / phaseResults.length)
+      : 0;
 
   let overallStatus: GovernanceResult['overallStatus'] = 'not_ready';
   if (totalCompletion >= 80) overallStatus = 'ready';

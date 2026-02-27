@@ -16,7 +16,7 @@ describe('ip-profitability-architect lib', () => {
       development_cost: 20000,
       annual_maintenance: 5000,
       potential_annual_revenue: 10000,
-    }
+    },
   ];
 
   it('should analyze IP assets and calculate ROI', () => {
@@ -44,12 +44,14 @@ describe('ip-profitability-architect lib', () => {
   });
 
   it('should handle assets with zero development cost', () => {
-    const freeAsset: IPAsset[] = [{
+    const freeAsset: IPAsset[] = [
+      {
         name: 'OSS Library',
         development_cost: 0,
         annual_maintenance: 100,
-        potential_annual_revenue: 5000
-    }];
+        potential_annual_revenue: 5000,
+      },
+    ];
     const result = analyzeIPAssets(freeAsset);
     expect(result[0].roi).toBe(9999);
     expect(result[0].profitability).toBe('high');

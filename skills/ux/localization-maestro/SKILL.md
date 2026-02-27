@@ -1,14 +1,14 @@
 ---
 name: localization-maestro
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir
     short: d
     type: string
     required: false
-    description: 
+    description:
 category: Ux
 last_updated: '2026-02-16'
 tags:

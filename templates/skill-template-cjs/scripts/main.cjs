@@ -6,7 +6,10 @@
 
 const { runSkill } = require('@agent/core');
 const { requireArgs: _requireArgs } = require('@agent/core/validators');
-const { safeWriteFile: _safeWriteFile, safeReadFile: _safeReadFile } = require('@agent/core/secure-io');
+const {
+  safeWriteFile: _safeWriteFile,
+  safeReadFile: _safeReadFile,
+} = require('@agent/core/secure-io');
 
 runSkill('{{SKILL_NAME}}', () => {
   // 1. Argument Validation

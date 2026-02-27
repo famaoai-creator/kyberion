@@ -7,17 +7,17 @@ arguments:
     short: i
     type: string
     required: true
-    description: 
+    description:
   - name: glossary
     short: g
     type: string
     required: true
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Intelligence
 last_updated: '2026-02-16'
 tags:

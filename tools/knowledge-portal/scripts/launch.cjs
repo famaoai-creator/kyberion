@@ -23,10 +23,10 @@ function launch(mode = 'dev') {
     const { spawn } = require('child_process');
     const bridgeScript = path.join(portalDir, 'bridge.cjs');
     console.log(chalk.yellow('    Starting Bridge Server...'));
-    const bridgeProcess = spawn('node', [bridgeScript], { 
-      detached: true, 
+    const bridgeProcess = spawn('node', [bridgeScript], {
+      detached: true,
       stdio: 'inherit',
-      cwd: portalDir
+      cwd: portalDir,
     });
     bridgeProcess.unref();
 

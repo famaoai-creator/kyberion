@@ -1,7 +1,7 @@
 ---
 name: license-auditor
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir

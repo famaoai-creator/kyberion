@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { TechStackInfo, StrategicAction, DocumentArtifact } from '@agent/core/shared-business-types';
+import {
+  TechStackInfo,
+  StrategicAction,
+  DocumentArtifact,
+} from '@agent/core/shared-business-types';
 
 export type RoleType = 'engineer' | 'senior-engineer' | 'tech-lead' | 'devops' | 'qa';
 
@@ -32,17 +36,23 @@ export function detectTechStack(dir: string): TechStackInfo {
       const deps = Object.keys(pkg.dependencies || {});
       stack.languages.push('JavaScript/TypeScript');
       if (deps.includes('react') || deps.includes('next')) stack.frameworks.push('React');
-      if (deps.includes('express') || deps.includes('fastify')) stack.frameworks.push('Node.js backend');
+      if (deps.includes('express') || deps.includes('fastify'))
+        stack.frameworks.push('Node.js backend');
       if (deps.includes('prisma') || deps.includes('sequelize')) stack.tools.push('ORM');
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
-  if (fs.existsSync(path.join(dir, 'requirements.txt')) || fs.existsSync(path.join(dir, 'pyproject.toml'))) {
+  if (
+    fs.existsSync(path.join(dir, 'requirements.txt')) ||
+    fs.existsSync(path.join(dir, 'pyproject.toml'))
+  ) {
     stack.languages.push('Python');
   }
   if (fs.existsSync(path.join(dir, 'go.mod'))) stack.languages.push('Go');
   if (fs.existsSync(path.join(dir, 'Cargo.toml'))) stack.languages.push('Rust');
-  
+
   if (fs.existsSync(path.join(dir, '.github/workflows'))) stack.tools.push('GitHub Actions');
   if (fs.existsSync(path.join(dir, 'Dockerfile'))) stack.tools.push('Docker');
   if (fs.existsSync(path.join(dir, 'terraform'))) stack.tools.push('Terraform');
@@ -57,7 +67,7 @@ export function generateJobDescription(role: string, stack: TechStackInfo): JobD
     'tech-lead': 'Technical Lead',
     devops: 'DevOps Engineer',
     qa: 'QA Engineer',
-    default: 'Software Development Professional'
+    default: 'Software Development Professional',
   };
 
   const requirements: Record<string, { experience: string; skills: string[]; nice: string[] }> = {
@@ -73,7 +83,13 @@ export function generateJobDescription(role: string, stack: TechStackInfo): JobD
     },
     'tech-lead': {
       experience: '7+ years',
-      skills: [...stack.languages, 'Architecture', 'Team leadership', 'Code review', 'Project planning'],
+      skills: [
+        ...stack.languages,
+        'Architecture',
+        'Team leadership',
+        'Code review',
+        'Project planning',
+      ],
       nice: ['Cross-team coordination'],
     },
     devops: {
@@ -89,13 +105,13 @@ export function generateJobDescription(role: string, stack: TechStackInfo): JobD
     default: {
       experience: '3+ years',
       skills: [...stack.languages, 'Problem solving', 'Agile methodology'],
-      nice: [...stack.frameworks, ...stack.tools]
-    }
+      nice: [...stack.frameworks, ...stack.tools],
+    },
   };
 
   const req = requirements[role] || requirements.default;
   const title = titles[role] || titles.default;
-  
+
   const body = `
 # ${title}
 ## Requirements
@@ -105,12 +121,12 @@ export function generateJobDescription(role: string, stack: TechStackInfo): JobD
 - ${req.nice.join(', ')}
   `.trim();
 
-  return { 
-    title, 
-    body, 
-    format: 'markdown', 
-    ...req, 
-    techStack: stack 
+  return {
+    title,
+    body,
+    format: 'markdown',
+    ...req,
+    techStack: stack,
   };
 }
 
@@ -127,15 +143,16 @@ export function processTalentRequirements(dir: string, role: string): TalentResu
       {
         action: `Finalize and post ${jd.title} job description`,
         priority: 'high',
-        area: 'Hiring'
+        area: 'Hiring',
       },
       {
-        action: stack.languages.length === 0 
-            ? 'Manually verify tech stack - auto-detection failed' 
+        action:
+          stack.languages.length === 0
+            ? 'Manually verify tech stack - auto-detection failed'
             : `Search for candidates with ${stack.languages[0]} expertise`,
         priority: stack.languages.length === 0 ? 'medium' : 'low',
-        area: 'Recruitment'
-      }
+        area: 'Recruitment',
+      },
     ],
   };
 }

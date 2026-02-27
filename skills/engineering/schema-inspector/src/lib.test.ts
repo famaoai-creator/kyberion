@@ -17,10 +17,13 @@ describe('inspectSchemas', () => {
     });
 
     const result = inspectSchemas('/root');
-    
+
     expect(result.count).toBe(2);
     expect(result.schemas).toContainEqual({ name: 'schema.sql', path: 'db/schema.sql' });
-    expect(result.schemas).toContainEqual({ name: 'openapi.schema.json', path: 'api/openapi.schema.json' });
+    expect(result.schemas).toContainEqual({
+      name: 'openapi.schema.json',
+      path: 'api/openapi.schema.json',
+    });
   });
 
   it('returns empty list if no schemas found', () => {

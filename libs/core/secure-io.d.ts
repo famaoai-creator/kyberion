@@ -43,17 +43,28 @@ export function safeReadFile(filePath: string, options?: SafeReadOptions): strin
 /**
  * Read a file asynchronously with size validation and caching.
  */
-export function safeReadFileAsync(filePath: string, options?: SafeReadOptions): Promise<string | Buffer>;
+export function safeReadFileAsync(
+  filePath: string,
+  options?: SafeReadOptions
+): Promise<string | Buffer>;
 
 /**
  * Write a file safely using atomic operations (write to temp -> rename).
  */
-export function safeWriteFile(filePath: string, data: string | Buffer, options?: SafeWriteOptions): void;
+export function safeWriteFile(
+  filePath: string,
+  data: string | Buffer,
+  options?: SafeWriteOptions
+): void;
 
 /**
  * Append to a file safely with role-based write control.
  */
-export function safeAppendFileSync(filePath: string, data: string | Buffer, encoding?: BufferEncoding): void;
+export function safeAppendFileSync(
+  filePath: string,
+  data: string | Buffer,
+  encoding?: BufferEncoding
+): void;
 
 /**
  * Unlink a file safely with role-based write control.
@@ -73,7 +84,11 @@ export function safeExec(command: string, args?: string[], options?: SafeExecOpt
 /**
  * Execute a command safely using spawnSync with output streaming.
  */
-export function safeSpawn(command: string, args?: string[], options?: SafeExecOptions): SafeSpawnResult;
+export function safeSpawn(
+  command: string,
+  args?: string[],
+  options?: SafeExecOptions
+): SafeSpawnResult;
 
 /**
  * Sanitize a string for safe use in file paths.

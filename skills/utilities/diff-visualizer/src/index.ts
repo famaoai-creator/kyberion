@@ -8,7 +8,8 @@ import { generateDiff } from './lib.js';
 const argv = createStandardYargs()
   .option('old', { alias: 'a', type: 'string', demandOption: true })
   .option('new', { alias: 'b', type: 'string', demandOption: true })
-  .option('out', { alias: 'o', type: 'string' }).parseSync();
+  .option('out', { alias: 'o', type: 'string' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('diff-visualizer', () => {

@@ -11,8 +11,8 @@ const argv = createStandardYargs().option('dir', {
 }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-    runSkill('pr-architect', () => {
-        const repoDir = path.resolve((argv.dir as string) || '.');
-        return draftPR(repoDir);
-    });
+  runSkill('pr-architect', () => {
+    const repoDir = path.resolve((argv.dir as string) || '.');
+    return draftPR(repoDir);
+  });
 }

@@ -15,16 +15,21 @@ describe('voice-command-listener lib', () => {
     vi.mocked(execSync).mockReturnValue('sox: SoX v14.4.2' as any);
     expect(checkSoXInstalled()).toBe(true);
 
-    vi.mocked(execSync).mockImplementation(() => { throw new Error(); });
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error();
+    });
     expect(checkSoXInstalled()).toBe(false);
   });
 
   it('should throw error if SoX is not installed when starting recording', () => {
-    vi.mocked(execSync).mockImplementation(() => { throw new Error(); });
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error();
+    });
     vi.mocked(fs.existsSync).mockReturnValue(true);
 
-    expect(() => startRecording({ workDir: '/test', audioFile: 'test.wav' }))
-      .toThrow('SoX ("rec" command) is not installed');
+    expect(() => startRecording({ workDir: '/test', audioFile: 'test.wav' })).toThrow(
+      'SoX ("rec" command) is not installed'
+    );
   });
 
   it('should start recording process with correct arguments', () => {

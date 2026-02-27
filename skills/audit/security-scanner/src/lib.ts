@@ -71,9 +71,7 @@ export function scanFile(filePath: string, content: string): Finding[] {
   return findings;
 }
 
-const IGNORE_DIRS = [
-  'node_modules', 'dist', 'build', 'coverage', '.git',
-];
+const IGNORE_DIRS = ['node_modules', 'dist', 'build', 'coverage', '.git'];
 
 export function scanProject(projectRoot: string): { scannedFiles: number; findings: Finding[] } {
   const allFiles = getAllFiles(projectRoot);
@@ -82,8 +80,8 @@ export function scanProject(projectRoot: string): { scannedFiles: number; findin
 
   for (const filePath of allFiles) {
     // Skip ignored dirs
-    if (IGNORE_DIRS.some(dir => filePath.includes(`${path.sep}${dir}${path.sep}`))) continue;
-    
+    if (IGNORE_DIRS.some((dir) => filePath.includes(`${path.sep}${dir}${path.sep}`))) continue;
+
     // Simple binary check by extension
     const ext = path.extname(filePath).toLowerCase();
     if (['.png', '.jpg', '.pdf', '.exe', '.bin'].includes(ext)) continue;

@@ -11,11 +11,13 @@ describe('getStagedDiff', () => {
 
   it('should return diff when changes exist', () => {
     // Avoid newline literal issues in write_file
-    const fakeDiff = ['diff --git a/file.txt b/file.txt', 'index 123..456', '+++ b/file.txt'].join('\n');
+    const fakeDiff = ['diff --git a/file.txt b/file.txt', 'index 123..456', '+++ b/file.txt'].join(
+      '\n'
+    );
     vi.mocked(secureIo.safeExec).mockReturnValue(fakeDiff);
 
     const result = getStagedDiff();
-    
+
     expect(result.status).toBe('has_changes');
     expect(result.diff).toBe(fakeDiff);
     expect(result.instructions).toBeDefined();
@@ -26,7 +28,7 @@ describe('getStagedDiff', () => {
     vi.mocked(secureIo.safeExec).mockReturnValue('   ');
 
     const result = getStagedDiff();
-    
+
     expect(result.status).toBe('no_changes');
     expect(result.message).toContain('No staged changes');
   });
@@ -37,7 +39,7 @@ describe('getStagedDiff', () => {
     });
 
     const result = getStagedDiff();
-    
+
     expect(result.status).toBe('error');
     expect(result.message).toContain('git command failed');
   });

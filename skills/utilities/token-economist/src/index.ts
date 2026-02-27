@@ -8,19 +8,19 @@ import { detectContentType, estimateTokens } from './lib.js';
 const argv = createStandardYargs().parseSync();
 
 runSkill('asset-token-economist', () => {
-    let text = '';
-    if (argv.input) {
-      text = fs.readFileSync(path.resolve(argv.input as string), 'utf8');
-    }
-    
-    const type = detectContentType(text);
-    const tokens = estimateTokens(text, type);
-    
-    const result = { tokens, contentType: type };
+  let text = '';
+  if (argv.input) {
+    text = fs.readFileSync(path.resolve(argv.input as string), 'utf8');
+  }
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  const type = detectContentType(text);
+  const tokens = estimateTokens(text, type);
 
-    return result;
+  const result = { tokens, contentType: type };
+
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
+
+  return result;
 });

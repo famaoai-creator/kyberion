@@ -4,16 +4,39 @@ import { safeWriteFile } from '@agent/core/secure-io';
 
 // Known deprecated packages
 const DEPRECATED_PACKAGES = new Set([
-  'request', 'request-promise', 'request-promise-native', 'tslint', 'istanbul',
-  'nomnom', 'coffee-script', 'jade', 'bower', 'grunt-cli', 'gulp-util',
-  'domutils', 'natives', 'left-pad', 'merge',
+  'request',
+  'request-promise',
+  'request-promise-native',
+  'tslint',
+  'istanbul',
+  'nomnom',
+  'coffee-script',
+  'jade',
+  'bower',
+  'grunt-cli',
+  'gulp-util',
+  'domutils',
+  'natives',
+  'left-pad',
+  'merge',
 ]);
 
 // Security-related packages
 const SECURITY_PACKAGES = new Set([
-  'helmet', 'cors', 'csurf', 'express-rate-limit', 'jsonwebtoken',
-  'bcrypt', 'bcryptjs', 'crypto-js', 'passport', 'express-session',
-  'cookie-parser', 'hpp', 'xss-clean', 'express-mongo-sanitize',
+  'helmet',
+  'cors',
+  'csurf',
+  'express-rate-limit',
+  'jsonwebtoken',
+  'bcrypt',
+  'bcryptjs',
+  'crypto-js',
+  'passport',
+  'express-session',
+  'cookie-parser',
+  'hpp',
+  'xss-clean',
+  'express-mongo-sanitize',
 ]);
 
 export interface DependencyResult {
@@ -42,7 +65,9 @@ export interface LifelineReport {
   recommendations: string[];
 }
 
-export function parseSemver(version: string): { major: number; minor: number; patch: string } | null {
+export function parseSemver(
+  version: string
+): { major: number; minor: number; patch: string } | null {
   if (!version) return null;
   const cleaned = version.replace(/^[~^>=<\s]+/, '');
   const match = cleaned.match(/^(\d+)\.(\d+)\.(.+)$/);
@@ -54,7 +79,10 @@ export function parseSemver(version: string): { major: number; minor: number; pa
   };
 }
 
-export function compareVersions(specified: string, installed: string): { status: string; risk: string; updateType: string | null } {
+export function compareVersions(
+  specified: string,
+  installed: string
+): { status: string; risk: string; updateType: string | null } {
   const specParsed = parseSemver(specified);
   const instParsed = parseSemver(installed);
 
@@ -62,11 +90,15 @@ export function compareVersions(specified: string, installed: string): { status:
     return { status: 'unknown', risk: 'unknown', updateType: null };
   }
 
-  if (instParsed.major > specParsed.major) return { status: 'outdated', risk: 'high', updateType: 'major' };
-  if (instParsed.major < specParsed.major) return { status: 'outdated', risk: 'high', updateType: 'major' }; // Downgrade or mismatch
+  if (instParsed.major > specParsed.major)
+    return { status: 'outdated', risk: 'high', updateType: 'major' };
+  if (instParsed.major < specParsed.major)
+    return { status: 'outdated', risk: 'high', updateType: 'major' }; // Downgrade or mismatch
 
-  if (instParsed.minor > specParsed.minor) return { status: 'outdated', risk: 'medium', updateType: 'minor' };
-  if (instParsed.minor < specParsed.minor) return { status: 'outdated', risk: 'medium', updateType: 'minor' };
+  if (instParsed.minor > specParsed.minor)
+    return { status: 'outdated', risk: 'medium', updateType: 'minor' };
+  if (instParsed.minor < specParsed.minor)
+    return { status: 'outdated', risk: 'medium', updateType: 'minor' };
 
   const specPatch = parseInt(specParsed.patch, 10);
   const instPatch = parseInt(instParsed.patch, 10);
@@ -89,7 +121,10 @@ function getInstalledVersion(projectDir: string, pkgName: string): string | null
   }
 }
 
-function generateRecommendations(depResults: DependencyResult[], counts: Record<string, number>): string[] {
+function generateRecommendations(
+  depResults: DependencyResult[],
+  counts: Record<string, number>
+): string[] {
   const recommendations: string[] = [];
 
   if (counts.majorUpdates > 0) {
@@ -161,7 +196,7 @@ export function analyzeDependencies(projectDir: string, outputFile?: string): Li
     if (pkgJson[source] && typeof pkgJson[source] === 'object') {
       for (const [name, version] of Object.entries(pkgJson[source])) {
         if (typeof version === 'string') {
-            allDeps[name] = { version, source };
+          allDeps[name] = { version, source };
         }
       }
     }

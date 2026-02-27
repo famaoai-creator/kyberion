@@ -17,7 +17,7 @@ const secretGuard = {
   /**
    * Retrieve a secret by key from vault or environment.
    * Automatically registers the value for output masking.
-   * 
+   *
    * @param {string} key - Secret key (e.g. 'OPENAI_API_KEY')
    * @returns {string|null} The secret value
    */
@@ -29,7 +29,9 @@ const secretGuard = {
       try {
         const secrets = JSON.parse(fs.readFileSync(SECRETS_FILE, 'utf8'));
         value = secrets[key];
-      } catch (_e) { /* ignore */ }
+      } catch (_e) {
+        /* ignore */
+      }
     }
 
     if (value && typeof value === 'string') {
@@ -54,7 +56,7 @@ const secretGuard = {
   isSecretPath: (filePath) => {
     const resolved = path.resolve(filePath);
     return resolved.startsWith(path.join(rootDir, 'vault/secrets'));
-  }
+  },
 };
 
 module.exports = secretGuard;

@@ -8,12 +8,12 @@ arguments:
     short: q
     type: string
     required: true
-    description: 
+    description:
   - name: type
     short: t
     type: string
     required: false
-    description: 
+    description:
 category: Intelligence
 last_updated: '2026-02-16'
 tags:

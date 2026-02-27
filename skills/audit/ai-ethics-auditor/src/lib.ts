@@ -1,6 +1,10 @@
 export const BIAS_INDICATORS = [
   { pattern: /\b(gender|sex|male|female|man|woman)\b/gi, category: 'gender', severity: 'medium' },
-  { pattern: /\b(race|ethnic|black|white|asian|hispanic|latino)\b/gi, category: 'racial', severity: 'high' }
+  {
+    pattern: /\b(race|ethnic|black|white|asian|hispanic|latino)\b/gi,
+    category: 'racial',
+    severity: 'high',
+  },
 ];
 
 export function auditEthics(content: string): any {

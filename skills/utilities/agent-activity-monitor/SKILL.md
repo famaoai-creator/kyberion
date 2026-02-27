@@ -1,7 +1,7 @@
 ---
 name: agent-activity-monitor
 description: >-
-  
+
 status: implemented
 category: Utilities
 last_updated: '2026-02-16'

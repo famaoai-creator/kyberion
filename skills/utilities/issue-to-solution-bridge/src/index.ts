@@ -18,24 +18,25 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for implementation ticket',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('issue-to-solution-bridge', () => {
-    const title = (argv.input as string);
-    const body = (argv.input as string);
+  const title = argv.input as string;
+  const body = argv.input as string;
 
-    const analysis = analyzeIssue(title, body);
+  const analysis = analyzeIssue(title, body);
 
-    const result = {
-      issue: 'custom',
-      title,
-      analysis,
-      timestamp: new Date().toISOString()
-    };
+  const result = {
+    issue: 'custom',
+    title,
+    analysis,
+    timestamp: new Date().toISOString(),
+  };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
 
-    return result;
+  return result;
 });

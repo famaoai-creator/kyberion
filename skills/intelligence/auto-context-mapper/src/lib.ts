@@ -37,7 +37,11 @@ export function scanKnowledgeTiers(dir: string): Record<string, KnowledgeAsset[]
   return tiers;
 }
 
-export function buildContextMap(tiers: Record<string, KnowledgeAsset[]>, skills: string[], projectRoot: string): ContextLink[] {
+export function buildContextMap(
+  tiers: Record<string, KnowledgeAsset[]>,
+  skills: string[],
+  projectRoot: string
+): ContextLink[] {
   const links: ContextLink[] = [];
   const allFiles = Object.values(tiers).flat();
   for (const file of allFiles) {

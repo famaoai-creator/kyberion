@@ -22,7 +22,7 @@ describe('mission-control lib', () => {
     const mockContract = {
       skill: 'test-skill',
       action: 'run',
-      safety_gate: { require_sudo: true }
+      safety_gate: { require_sudo: true },
     };
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockContract));

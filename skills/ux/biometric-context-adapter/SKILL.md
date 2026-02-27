@@ -1,7 +1,7 @@
 ---
 name: biometric-context-adapter
 description: >-
-  
+
 status: implemented
 category: Ux
 last_updated: '2026-02-16'

@@ -9,7 +9,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('connection-manager', () => {
     const args = requireArgs(['system']);
     const rootDir = pathResolver.rootDir();
-    
+
     const inventoryPath = path.join(rootDir, 'knowledge/confidential/connections/inventory.json');
     if (!fs.existsSync(inventoryPath)) {
       throw new Error('Inventory not found');

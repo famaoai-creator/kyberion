@@ -12,11 +12,7 @@ describe('buildTreeLinesAsync', () => {
 
   it('should generate a correct tree structure', async () => {
     const rootDir = '/app';
-    const mockFiles = [
-      '/app/README.md',
-      '/app/src/index.ts',
-      '/app/src/utils/helper.ts'
-    ];
+    const mockFiles = ['/app/README.md', '/app/src/index.ts', '/app/src/utils/helper.ts'];
 
     // Mock implementation of walkAsync
     vi.mocked(fsUtils.walkAsync).mockImplementation(async function* (_dir, _opts) {
@@ -33,7 +29,7 @@ describe('buildTreeLinesAsync', () => {
     //     ├── index.ts
     //     └── utils
     //         └── helper.ts
-    
+
     expect(lines).toContain('├── README.md');
     expect(lines).toContain('└── src');
     expect(lines).toContain('    ├── index.ts');
@@ -45,7 +41,7 @@ describe('buildTreeLinesAsync', () => {
     vi.mocked(fsUtils.walkAsync).mockImplementation(async function* () {
       // yield nothing
     });
-    
+
     const lines = await buildTreeLinesAsync('/empty');
     expect(lines).toEqual(['(No files found)']);
   });

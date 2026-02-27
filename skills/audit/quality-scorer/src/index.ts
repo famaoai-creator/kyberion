@@ -13,21 +13,22 @@ const argv = yargs(hideBin(process.argv))
     demandOption: true,
     description: 'Path to content to score',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('quality-scorer', () => {
-    const inputPath = validateFilePath(argv.input as string);
-    const content = fs.readFileSync(inputPath, 'utf8');
+  const inputPath = validateFilePath(argv.input as string);
+  const content = fs.readFileSync(inputPath, 'utf8');
 
-    // 1. Load Knowledge
-    let scoring_rules: ScoringRules = DEFAULT_RULES;
-    const result = calculateScore(content, scoring_rules);
+  // 1. Load Knowledge
+  let scoring_rules: ScoringRules = DEFAULT_RULES;
+  const result = calculateScore(content, scoring_rules);
 
-    return {
-        status: 'scored',
-        score: result.score,
-        metrics: result.metrics,
-        compliance: 'SCAP-Layer-2',
-        issues: result.issues,
-    };
+  return {
+    status: 'scored',
+    score: result.score,
+    metrics: result.metrics,
+    compliance: 'SCAP-Layer-2',
+    issues: result.issues,
+  };
 });

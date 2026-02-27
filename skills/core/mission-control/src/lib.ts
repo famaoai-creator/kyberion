@@ -17,24 +17,33 @@ export interface MissionContract {
   knowledge_injections?: string[];
 }
 
-export function executeCommand(cmd: string, args: string[], options: SpawnOptions, timeoutMs: number): Promise<string> {
+export function executeCommand(
+  cmd: string,
+  args: string[],
+  options: SpawnOptions,
+  timeoutMs: number
+): Promise<string> {
   return new Promise((resolve, reject) => {
     console.log(`[MC] Executing: ${cmd} ${args.join(' ')}`);
     const child = spawn(cmd, args, options);
-    
+
     let stdout = '';
     let stderr = '';
-    
+
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`Command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     if (child.stdout) {
-      child.stdout.on('data', (data) => { stdout += data; });
+      child.stdout.on('data', (data) => {
+        stdout += data;
+      });
     }
     if (child.stderr) {
-      child.stderr.on('data', (data) => { stderr += data; });
+      child.stderr.on('data', (data) => {
+        stderr += data;
+      });
     }
 
     child.on('close', (code) => {
@@ -61,7 +70,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
   if (!fs.existsSync(resolvedContractPath)) {
     throw new Error(`MissionContract not found: ${resolvedContractPath}`);
   }
-  
+
   const contract = JSON.parse(fs.readFileSync(resolvedContractPath, 'utf8')) as MissionContract;
   const missionId = contract.mission_id || `mission-${Date.now()}`;
   const missionDir = pathResolver.missionDir(missionId);
@@ -72,7 +81,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
 
   // 1. Safety Gate
   const safety = contract.safety_gate || {};
-  if ((safety.risk_level && safety.risk_level >= 4 || safety.require_sudo) && !approved) {
+  if (((safety.risk_level && safety.risk_level >= 4) || safety.require_sudo) && !approved) {
     throw new Error(`SUDO_REQUIRED: Mission ${missionId} requires sovereign approval.`);
   }
 
@@ -103,12 +112,17 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
 
   // 4. Async Execution
   try {
-    const stdout = await executeCommand('node', args, { env, stdio: ['pipe', 'pipe', 'pipe'] }, 30000);
+    const stdout = await executeCommand(
+      'node',
+      args,
+      { env, stdio: ['pipe', 'pipe', 'pipe'] },
+      30000
+    );
 
     const jsonStart = stdout.indexOf('{');
-    if (jsonStart === -1) throw new Error("No JSON output found from skill execution");
+    if (jsonStart === -1) throw new Error('No JSON output found from skill execution');
     const outputJson = stdout.substring(jsonStart);
-    
+
     fs.writeFileSync(path.join(evidenceDir, 'contract.json'), JSON.stringify(contract, null, 2));
     fs.writeFileSync(path.join(evidenceDir, 'output.json'), outputJson);
 

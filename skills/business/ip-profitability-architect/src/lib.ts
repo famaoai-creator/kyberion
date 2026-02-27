@@ -1,4 +1,8 @@
-import { ProjectIdentity, FinancialMetrics, StrategicAction } from '@agent/core/shared-business-types';
+import {
+  ProjectIdentity,
+  FinancialMetrics,
+  StrategicAction,
+} from '@agent/core/shared-business-types';
 
 export interface IPAsset extends ProjectIdentity {
   type?: string;
@@ -44,7 +48,7 @@ export function analyzeIPAssets(assets: IPAsset[]): IPAnalysisResult[] {
     const developmentCost = Math.max(0, asset.development_cost || 0);
     const annualMaintenance = Math.max(0, asset.annual_maintenance || 0);
     const potentialRevenue = Math.max(0, asset.potential_annual_revenue || 0);
-    
+
     // Calculate ROI, handle zero development cost case (infinity ROI capped at 9999%)
     let roi = 0;
     if (developmentCost > 0) {
@@ -52,7 +56,7 @@ export function analyzeIPAssets(assets: IPAsset[]): IPAnalysisResult[] {
     } else if (potentialRevenue > annualMaintenance) {
       roi = 9999; // Capped representative high ROI
     }
-    
+
     let profitability: IPAnalysisResult['profitability'] = 'negative';
     if (roi > 100) profitability = 'high';
     else if (roi > 50) profitability = 'medium';
@@ -103,10 +107,14 @@ export function processIPStrategy(assets: IPAsset[]): Omit<IPStrategyResult, 'so
   const analyzedAssets = analyzeIPAssets(assets);
   const licensing = designLicensingModels(analyzedAssets);
 
-  const totalCost = analyzedAssets.reduce((s, a) => s + (a.development_cost || 0) + (a.annual_maintenance || 0), 0);
+  const totalCost = analyzedAssets.reduce(
+    (s, a) => s + (a.development_cost || 0) + (a.annual_maintenance || 0),
+    0
+  );
   const totalPotential = analyzedAssets.reduce((s, a) => s + (a.potential_annual_revenue || 0), 0);
-  
-  const portfolioROI = totalCost > 0 ? Math.round(((totalPotential - totalCost) / totalCost) * 100) : 0;
+
+  const portfolioROI =
+    totalCost > 0 ? Math.round(((totalPotential - totalCost) / totalCost) * 100) : 0;
 
   return {
     assetCount: analyzedAssets.length,
@@ -123,7 +131,7 @@ export function processIPStrategy(assets: IPAsset[]): Omit<IPStrategyResult, 'so
         action: `Prioritize commercialization of ${a.name} (ROI ${a.roi}%)`,
         priority: 'high',
         area: 'Commercialization',
-        expectedImpact: `Potential annual revenue up to ${a.potential_annual_revenue}`
+        expectedImpact: `Potential annual revenue up to ${a.potential_annual_revenue}`,
       })),
   };
 }

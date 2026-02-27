@@ -7,9 +7,9 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('autonomous-skill-designer', () => {
     const args = requireArgs(['name', 'description']);
     const rootDir = pathResolver.rootDir();
-    
+
     const path = createSkillStructure(args.name as string, args.description as string, rootDir);
-    
+
     return { status: 'created', path };
   });
 }

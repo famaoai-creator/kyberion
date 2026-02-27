@@ -13,8 +13,8 @@ services:
     environment:
       - NODE_ENV=development
       # Pass through host credentials if needed, or use vault/secrets
-    entrypoint: ["node", "scripts/cli.cjs"]
-    command: ["list", "implemented"]
+    entrypoint: ['node', 'scripts/cli.cjs']
+    command: ['list', 'implemented']
 
 volumes:
   node_modules_data:

@@ -14,10 +14,10 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('environment-provisioner', () => {
     const inputPath = path.resolve(argv.input as string);
     const config = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-    
+
     const nl = String.fromCharCode(10);
     const hcl = config.services.map(generateTerraformAWS).join(nl + nl);
-    
+
     if (argv.out) {
       safeWriteFile(argv.out as string, hcl);
     }

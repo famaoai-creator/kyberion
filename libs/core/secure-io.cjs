@@ -55,7 +55,7 @@ function safeReadFile(filePath, options = {}) {
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
-  
+
   // 0. Logical path resolution & Tier Guard
   const resolved = pathResolver.resolve(filePath);
   const guard = validateReadPermission(resolved);
@@ -66,7 +66,9 @@ function safeReadFile(filePath, options = {}) {
   // 0.1 Secret Guard: Block direct access to vault/secrets/
   const secretGuard = require('./secret-guard.cjs');
   if (secretGuard.isSecretPath(resolved)) {
-    throw new Error(`[SECURITY] Direct access to secrets is forbidden. Use secret-guard.getSecret() instead.`);
+    throw new Error(
+      `[SECURITY] Direct access to secrets is forbidden. Use secret-guard.getSecret() instead.`
+    );
   }
 
   // 1. Cache Check
@@ -399,7 +401,7 @@ function writeArtifact(filePath, data, format) {
     hash,
     format,
     size_bytes: data.length,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 }
 
@@ -413,9 +415,11 @@ function readArtifact(pointer) {
   const crypto = require('crypto');
   const data = safeReadFile(pointer.path);
   const currentHash = crypto.createHash('sha256').update(data).digest('hex');
-  
+
   if (currentHash !== pointer.hash) {
-    throw new Error(`[SECURITY] Artifact integrity violation! Expected ${pointer.hash}, but got ${currentHash}. File: ${pointer.path}`);
+    throw new Error(
+      `[SECURITY] Artifact integrity violation! Expected ${pointer.hash}, but got ${currentHash}. File: ${pointer.path}`
+    );
   }
   return data;
 }

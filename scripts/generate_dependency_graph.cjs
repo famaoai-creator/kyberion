@@ -16,28 +16,31 @@ function generate() {
   md += '  subgraph Ecosystem ["Gemini Skills Ecosystem"]\n';
 
   const namespaces = {};
-  skills.forEach(s => {
+  skills.forEach((s) => {
     const sPath = s.path || s.n;
     const cat = sPath.split('/')[1] || 'General';
     if (!namespaces[cat]) namespaces[cat] = [];
     namespaces[cat].push(s.n);
   });
 
-  Object.keys(namespaces).sort().forEach(ns => {
-    md += `    subgraph ${ns} ["📂 ${ns.toUpperCase()}"]\n`;
-    namespaces[ns].forEach(skill => {
-      md += `      ${skill.replace(/-/g, '_')}["${skill}"]\n`;
+  Object.keys(namespaces)
+    .sort()
+    .forEach((ns) => {
+      md += `    subgraph ${ns} ["📂 ${ns.toUpperCase()}"]\n`;
+      namespaces[ns].forEach((skill) => {
+        md += `      ${skill.replace(/-/g, '_')}["${skill}"]\n`;
+      });
+      md += '    end\n';
     });
-    md += '    end\n';
-  });
   md += '  end\n';
 
   md += '  Infrastructure["🏛️ @agent/core (libs/core)"]\n';
-  Object.keys(namespaces).forEach(ns => {
+  Object.keys(namespaces).forEach((ns) => {
     md += `  ${ns} -.-> Infrastructure\n`;
   });
 
-  if (!fs.existsSync(path.dirname(outputPath))) fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  if (!fs.existsSync(path.dirname(outputPath)))
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, md);
   fs.writeFileSync(path.join(rootDir, 'dependency-graph.mmd'), md);
 

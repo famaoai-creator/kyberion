@@ -5,12 +5,12 @@ describe('html-reporter lib', () => {
   const mockInput = {
     title: 'Input Title',
     body: '# Test Report\n- Item 1\n- Item 2',
-    format: 'markdown' as const
+    format: 'markdown' as const,
   };
 
   it('should generate valid HTML DocumentArtifact from markdown input', async () => {
     const artifact = await generateHTMLArtifact(mockInput, { title: 'My Report' });
-    
+
     expect(artifact.format).toBe('html');
     expect(artifact.title).toBe('My Report');
     expect(artifact.body).toContain('<!DOCTYPE html>');
@@ -22,7 +22,7 @@ describe('html-reporter lib', () => {
   it('should support custom styles', async () => {
     const customStyles = 'body { background: red; }';
     const artifact = await generateHTMLArtifact(mockInput, { styles: customStyles });
-    
+
     expect(artifact.body).toContain(customStyles);
   });
 

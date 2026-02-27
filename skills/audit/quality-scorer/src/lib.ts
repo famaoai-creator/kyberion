@@ -42,7 +42,7 @@ export function calculateScore(content: string, rules: ScoringRules = DEFAULT_RU
     score -= rules.min_length.penalty;
     issues.push(rules.min_length.message);
   }
-  
+
   if (rules.max_length && charCount > rules.max_length.threshold) {
     score -= rules.max_length.penalty;
     issues.push(rules.max_length.message);

@@ -24,8 +24,25 @@ export const THRESHOLDS = {
 };
 
 const MAGIC_NUMBER_EXCEPTIONS = new Set([
-  '0', '1', '-1', '2', '100', '1000', '0.0', '1.0', '0.5',
-  '200', '201', '204', '301', '302', '400', '401', '403', '404', '500',
+  '0',
+  '1',
+  '-1',
+  '2',
+  '100',
+  '1000',
+  '0.0',
+  '1.0',
+  '0.5',
+  '200',
+  '201',
+  '204',
+  '301',
+  '302',
+  '400',
+  '401',
+  '403',
+  '404',
+  '500',
 ]);
 
 export function detectLongFunctions(lines: string[]): Smell[] {
@@ -96,7 +113,7 @@ export function detectDeepNesting(lines: string[]): Smell[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Also check brace-based nesting
     if (nestingKeywords.test(line) || line.trim().endsWith('{')) {
       let braceDepth = 0;
@@ -151,7 +168,11 @@ export function detectDuplicatePatterns(lines: string[]): Smell[] {
     const key = block.join('\\n');
     if (seen.has(key)) {
       const firstOccurrence = seen.get(key)!;
-      if (!smells.some((s) => s.type === 'duplicate-code' && s.detail.includes(`lines ${firstOccurrence}`))) {
+      if (
+        !smells.some(
+          (s) => s.type === 'duplicate-code' && s.detail.includes(`lines ${firstOccurrence}`)
+        )
+      ) {
         smells.push({
           type: 'duplicate-code',
           line: i + 1,
@@ -204,7 +225,10 @@ export function detectMissingErrorHandling(lines: string[]): Smell[] {
   const smells: Smell[] = [];
   const riskyPatterns = [
     { pattern: /JSON\.parse\s*\(/, label: 'JSON.parse()' },
-    { pattern: /fs\.(readFileSync|writeFileSync|unlinkSync|mkdirSync)\s*\(/, label: 'synchronous fs operation' },
+    {
+      pattern: /fs\.(readFileSync|writeFileSync|unlinkSync|mkdirSync)\s*\(/,
+      label: 'synchronous fs operation',
+    },
     { pattern: /require\s*\(\s*[^)]+\)/, label: 'require()' },
   ];
 
@@ -262,7 +286,7 @@ export function detectConsoleLogs(lines: string[]): Smell[] {
 
 export function analyzeCode(content: string, filePath: string): AnalysisResult {
   const lines = content.split(/\r?\n/);
-  
+
   const allSmells = [
     ...detectLongFunctions(lines),
     ...detectDeepNesting(lines),

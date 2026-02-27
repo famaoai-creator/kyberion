@@ -28,7 +28,7 @@ runSkill('unit-economics-optimizer', () => {
 
   const inputContent = fs.readFileSync(resolved, 'utf8');
   const data = JSON.parse(inputContent) as { segments: CustomerSegment[] };
-  
+
   if (!data.segments || !Array.isArray(data.segments) || data.segments.length === 0) {
     throw new Error('Input must contain a "segments" array with at least one customer segment');
   }

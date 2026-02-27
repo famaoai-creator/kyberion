@@ -17,7 +17,9 @@ describe('project-health-check', () => {
 
   it('checkPackageJson finds deps', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ devDependencies: { jest: '1.0' } }));
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ devDependencies: { jest: '1.0' } })
+    );
     expect(checkPackageJson('.', 'test')).toBe(true);
     expect(checkPackageJson('.', 'lint')).toBe(false);
   });
@@ -34,7 +36,11 @@ describe('project-health-check', () => {
     const result = performAudit('.');
     // Should find test (via package.json) and docs (via README.md)
     expect(result.score).toBeGreaterThan(0);
-    expect(result.checks).toContainEqual(expect.objectContaining({ check: 'Testing Framework', status: 'found' }));
-    expect(result.checks).toContainEqual(expect.objectContaining({ check: 'Documentation', status: 'found' }));
+    expect(result.checks).toContainEqual(
+      expect.objectContaining({ check: 'Testing Framework', status: 'found' })
+    );
+    expect(result.checks).toContainEqual(
+      expect.objectContaining({ check: 'Documentation', status: 'found' })
+    );
   });
 });

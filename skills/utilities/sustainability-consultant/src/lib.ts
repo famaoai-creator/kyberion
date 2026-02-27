@@ -12,7 +12,7 @@ export function assessInfraEnergy(dir: string): EnergyUsage {
 
   if (exists('docker-compose.yml')) totalKwh += 50;
   if (exists('k8s') || exists('kubernetes')) totalKwh += 200;
-  
+
   return {
     totalKwh,
     co2Kg: Math.round(totalKwh * 0.4 * 10) / 10,

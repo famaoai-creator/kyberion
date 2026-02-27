@@ -37,7 +37,8 @@ export interface IPStrategyResult {
 
 export const IP_INDICATORS = [
   {
-    pattern: /(?:algorithm|heuristic|model|neural|machine.learning|deep.learning|transformer|inference|optimization)/gi,
+    pattern:
+      /(?:algorithm|heuristic|model|neural|machine.learning|deep.learning|transformer|inference|optimization)/gi,
     category: 'Algorithm/Model',
     patentable: true,
   },
@@ -57,7 +58,8 @@ export const IP_INDICATORS = [
     patentable: true,
   },
   {
-    pattern: /(?:protocol|specification|standard|format|interface.standard|specification.compliance)/gi,
+    pattern:
+      /(?:protocol|specification|standard|format|interface.standard|specification.compliance)/gi,
     category: 'Protocol/Standard',
     patentable: true,
   },
@@ -131,12 +133,12 @@ export function processIPStrategy(dir: string): IPStrategyResult {
       category: 'Legal',
       severity: 'critical',
       risk: 'Intellectual property is unprotected due to missing LICENSE file.',
-      impact: 'Risk of uncontrolled redistribution or loss of proprietary rights.'
+      impact: 'Risk of uncontrolled redistribution or loss of proprietary rights.',
     });
     recommendations.push({
       action: 'Create a LICENSE file immediately (Proprietary or OSS)',
       priority: 'critical',
-      area: 'Legal'
+      area: 'Legal',
     });
   }
 
@@ -145,7 +147,7 @@ export function processIPStrategy(dir: string): IPStrategyResult {
       action: `Perform IP review for ${patentable.length} potentially patentable items`,
       priority: 'high',
       area: 'IP Strategy',
-      expectedImpact: 'Protection of core innovation and competitive advantage.'
+      expectedImpact: 'Protection of core innovation and competitive advantage.',
     });
   }
 
@@ -161,6 +163,6 @@ export function processIPStrategy(dir: string): IPStrategyResult {
       tradeSecrets: findings.filter((f) => f.category === 'Trade Secret').length,
     },
     recommendations,
-    risks
+    risks,
   };
 }

@@ -23,7 +23,7 @@ export function detectInfrastructure(dir: string): InfraAnalysis {
   if (exists('package.json')) {
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-      const deps = Object.keys({...pkg.dependencies, ...pkg.devDependencies}).join(' ');
+      const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).join(' ');
       if (/postgres|mysql|sqlite/i.test(deps)) infra.databases.push('relational');
       if (/mongo/i.test(deps)) infra.databases.push('mongodb');
     } catch {}

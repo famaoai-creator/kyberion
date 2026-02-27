@@ -21,12 +21,14 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
   const { markdown, outputPath, theme } = options;
 
   // Resolve content: either from 'body' or from secure hashed 'pointer'
-  const markdownBody = markdown.pointer 
-    ? (readArtifact as any)(markdown.pointer).toString() 
+  const markdownBody = markdown.pointer
+    ? (readArtifact as any)(markdown.pointer).toString()
     : markdown.body;
 
-  const themeBody = theme 
-    ? (theme.pointer ? (readArtifact as any)(theme.pointer).toString() : theme.body)
+  const themeBody = theme
+    ? theme.pointer
+      ? (readArtifact as any)(theme.pointer).toString()
+      : theme.body
     : undefined;
 
   // For Marp CLI, we must write artifacts to temp files if they aren't already on disk
@@ -53,14 +55,21 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
 
   try {
     execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] });
-    return { status: 'success', output: outputPath, theme: theme ? theme.title : 'default', cached: false };
+    return {
+      status: 'success',
+      output: outputPath,
+      theme: theme ? theme.title : 'default',
+      cached: false,
+    };
   } catch (err: any) {
     const stderr = err.stderr ? err.stderr.toString() : '';
     let diagnostic = 'Marp CLI failed to generate PPTX.';
-    
-    if (stderr.includes('not found')) diagnostic = 'Marp CLI not found. Please ensure dependencies are installed.';
+
+    if (stderr.includes('not found'))
+      diagnostic = 'Marp CLI not found. Please ensure dependencies are installed.';
     if (stderr.includes('theme')) diagnostic = `Theme invalid or missing: ${theme?.title}`;
-    if (stderr.includes('Permission denied')) diagnostic = `Permission denied writing to: ${outputPath}`;
+    if (stderr.includes('Permission denied'))
+      diagnostic = `Permission denied writing to: ${outputPath}`;
 
     throw new Error(`${diagnostic}\nDetails: ${stderr || err.message}`);
   } finally {
@@ -68,6 +77,8 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
     try {
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
       if (themePath && fs.existsSync(themePath)) fs.unlinkSync(themePath);
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
   }
 }

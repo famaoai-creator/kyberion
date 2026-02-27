@@ -1,19 +1,19 @@
 ---
 name: asset-token-economist
 description: >-
-  
+
 status: implemented
 arguments:
   - name: input
     short: i
     type: string
     required: false
-    description: 
+    description:
   - name: text
     short: t
     type: string
     required: false
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

@@ -19,7 +19,8 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const result = {
       directory: targetDir,
       infrastructure: infra,
-      recommendations: infra.databases.length > 0 ? ['Ensure daily offsite backups'] : ['Standard backup policy'],
+      recommendations:
+        infra.databases.length > 0 ? ['Ensure daily offsite backups'] : ['Standard backup policy'],
     };
 
     if (argv.out) safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));

@@ -14,7 +14,10 @@ export const LANG_DETECTION: Record<string, string> = {
   '.php': 'php',
 };
 
-export const IDIOM_MAP: Record<string, Array<{ from: RegExp; to: string | ((m: string) => string) }>> = {
+export const IDIOM_MAP: Record<
+  string,
+  Array<{ from: RegExp; to: string | ((m: string) => string) }>
+> = {
   'javascript->python': [
     { from: /const\s+(\w+)\s*=\s*/g, to: '$1 = ' },
     { from: /let\s+(\w+)\s*=\s*/g, to: '$1 = ' },
@@ -82,7 +85,11 @@ export function analyzeSource(content: string, language: string): SourceAnalysis
   return analysis;
 }
 
-export function estimateMigration(analysis: SourceAnalysis, from: string, to: string): MigrationEstimate {
+export function estimateMigration(
+  analysis: SourceAnalysis,
+  from: string,
+  to: string
+): MigrationEstimate {
   const idioms = IDIOM_MAP[`${from}->${to}`] || [];
   return {
     idiomRulesAvailable: idioms.length,

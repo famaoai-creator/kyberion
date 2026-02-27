@@ -1,7 +1,7 @@
 ---
 name: connection-manager
 description: >-
-  
+
 status: implemented
 category: Connector
 last_updated: '2026-02-16'

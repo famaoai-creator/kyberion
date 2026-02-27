@@ -25,10 +25,10 @@ export interface FinancialMetrics {
   monthlyBurn?: number;
   cashOnHand?: number;
   growthRate?: number; // Monthly decimal (e.g., 0.05 for 5%)
-  churnRate?: number;  // Monthly decimal
+  churnRate?: number; // Monthly decimal
   grossMargin?: number; // Decimal (e.g., 0.8 for 80%)
-  cac?: number;        // Customer Acquisition Cost
-  ltv?: number;        // Lifetime Value
+  cac?: number; // Customer Acquisition Cost
+  ltv?: number; // Lifetime Value
 }
 
 /**
@@ -68,9 +68,9 @@ export interface StrategicAction {
  * Used in ADF to maintain audit trails without bloating JSON payloads.
  */
 export interface ArtifactPointer {
-  path: string;      // Physical location relative to project root
-  hash: string;      // SHA-256 integrity hash
-  format: string;    // e.g., 'markdown', 'json', 'pdf'
+  path: string; // Physical location relative to project root
+  hash: string; // SHA-256 integrity hash
+  format: string; // e.g., 'markdown', 'json', 'pdf'
   size_bytes: number;
   metadata?: Record<string, any>;
 }

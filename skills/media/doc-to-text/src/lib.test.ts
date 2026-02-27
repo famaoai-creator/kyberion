@@ -5,8 +5,8 @@ import { extractTextFromFile } from './lib.js';
 
 vi.mock('textract', () => ({
   default: {
-    fromFileWithPath: vi.fn()
-  }
+    fromFileWithPath: vi.fn(),
+  },
 }));
 
 describe('doc-to-text lib', () => {
@@ -32,13 +32,13 @@ describe('doc-to-text lib', () => {
       callback(new Error('Unknown internal error'), '');
     });
 
-    await expect(extractTextFromFile('/test/fail.pdf'))
-      .rejects.toThrow('Extraction failed for fail.pdf');
+    await expect(extractTextFromFile('/test/fail.pdf')).rejects.toThrow(
+      'Extraction failed for fail.pdf'
+    );
   });
 
   it('should throw error for unsupported file formats', async () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    await expect(extractTextFromFile('/test/image.exe'))
-      .rejects.toThrow('Unsupported file format');
+    await expect(extractTextFromFile('/test/image.exe')).rejects.toThrow('Unsupported file format');
   });
 });

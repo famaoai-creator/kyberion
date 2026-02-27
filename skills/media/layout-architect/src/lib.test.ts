@@ -6,21 +6,27 @@ describe('layout-architect lib', () => {
     master_name: 'TestTheme',
     typography: {
       body: { font_family: 'Arial', size: '20px', line_height: '1.5', color: '#000' },
-      heading: { font_family: 'Helvetica', size: '40px', line_height: '1.2', color: '#333', weight: 'bold' }
+      heading: {
+        font_family: 'Helvetica',
+        size: '40px',
+        line_height: '1.2',
+        color: '#333',
+        weight: 'bold',
+      },
     },
     color_palette: {
       background_main: '#fff',
       brand_accent: '#ff0000',
-      border_muted: '#ccc'
+      border_muted: '#ccc',
     },
     layout_specs: {
       padding: '40px',
-      accent_border_width: '10px'
+      accent_border_width: '10px',
     },
     slide_variants: {
       lead: { bg_gradient: 'linear-gradient(to bottom, #000, #333)', title_color: '#fff' },
-      divider: { bg_color: '#eee' }
-    }
+      divider: { bg_color: '#eee' },
+    },
   };
 
   it('should generate Marp CSS with correct theme name', () => {

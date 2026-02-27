@@ -67,7 +67,9 @@ export function assessCodeQuality(dir: string): CodeQualityStats {
         totalLines += content.split('\n').length;
         totalFiles++;
         languages[ext] = (languages[ext] || 0) + 1;
-      } catch (_e) { /* ignore */ }
+      } catch (_e) {
+        /* ignore */
+      }
     }
   }
 
@@ -105,9 +107,8 @@ export function assessTeamMaturity(dir: string): TeamMaturity {
       if (acc >= busFactorThreshold) break;
     }
 
-    const topContributorShare = totalCommits > 0 
-      ? Math.round((contributors[0].commits / totalCommits) * 100) 
-      : 0;
+    const topContributorShare =
+      totalCommits > 0 ? Math.round((contributors[0].commits / totalCommits) * 100) : 0;
 
     let risk: TeamMaturity['risk'] = 'low';
     if (busFactor <= 1 || topContributorShare > 70) risk = 'critical';
@@ -170,7 +171,11 @@ export function assessArchitecture(dir: string): ArchitectureSignals {
   return signals;
 }
 
-export function calculateDDScore(code: CodeQualityStats, team: TeamMaturity, arch: ArchitectureSignals): number {
+export function calculateDDScore(
+  code: CodeQualityStats,
+  team: TeamMaturity,
+  arch: ArchitectureSignals
+): number {
   let score = 50;
   if (code.totalFiles > 10) score += 5;
   if (code.avgFileSize < 300) score += 5;
@@ -194,21 +199,21 @@ export function processTechDD(dir: string): DDResult {
 
   const risks: DDRisk[] = [];
   if (team.risk === 'critical') {
-    risks.push({ 
-        category: 'Team', 
-        severity: 'critical', 
-        risk: `Bus factor is ${team.busFactor} - key person dependency`,
-        area: 'Human Resources',
-        impact: 'High risk of knowledge loss if key members leave.'
+    risks.push({
+      category: 'Team',
+      severity: 'critical',
+      risk: `Bus factor is ${team.busFactor} - key person dependency`,
+      area: 'Human Resources',
+      impact: 'High risk of knowledge loss if key members leave.',
     });
   }
   if (arch.testFramework === 'none') {
-    risks.push({ 
-        category: 'Quality', 
-        severity: 'high', 
-        risk: 'No test framework detected',
-        area: 'Engineering',
-        impact: 'Lack of automated verification increases regression risk.'
+    risks.push({
+      category: 'Quality',
+      severity: 'high',
+      risk: 'No test framework detected',
+      area: 'Engineering',
+      impact: 'Lack of automated verification increases regression risk.',
     });
   }
 

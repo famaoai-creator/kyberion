@@ -10,6 +10,7 @@ title: Chronos Mirror - Gemini Reality Interface
 ---
 
 # Chronos Mirror
+
 ### Gemini Reality-Mirroring Interface v1.0
 
 <div class="pt-8">
@@ -23,16 +24,17 @@ title: Chronos Mirror - Gemini Reality Interface
 </div>
 
 ---
-layout: center
----
+
+## layout: center
 
 <TemporalSlider />
 
 ---
-layout: center
----
+
+## layout: center
 
 # 🏗️ 移行戦略: VoltMX to React
+
 `Strangler Fig Pattern Implementation`
 
 <div class="grid grid-cols-3 gap-4 mt-8">
@@ -52,10 +54,11 @@ layout: center
 </div>
 
 ---
-layout: center
----
+
+## layout: center
 
 # 🛡️ Governance & Audit Trail
+
 `Evidence-based Decision Making`
 
 <div class="grid grid-cols-2 gap-8 mt-8">
@@ -79,10 +82,11 @@ layout: center
 </div>
 
 ---
-layout: center
----
+
+## layout: center
 
 # 🌐 Ecosystem Mapping
+
 `Hierarchical Namespace Architecture`
 
 <div class="mt-4">
@@ -111,6 +115,7 @@ layout: center
 ---
 
 # ⚖️ ACE 意思決定アーカイブ (Consensus Log)
+
 `work/committee/minutes.md`
 
 <div class="space-y-4">
@@ -136,6 +141,7 @@ layout: center
 ---
 
 # 🛡️ PMO ガバナンス・スタンダード
+
 `PMBOK v7 & IPA Bridge`
 
 <div class="grid grid-cols-2 gap-8 text-left mt-4">
@@ -161,6 +167,7 @@ layout: center
 ---
 
 # 🎨 UI/UX 設計図 (ux-visualizer)
+
 `PetStore-FrontEnd Analysis`
 
 <div class="flex gap-4 items-center justify-center">
@@ -177,6 +184,7 @@ layout: center
 ---
 
 # ⏰ オペレーション状況 (Routine Tasks)
+
 `work/tasks/status.json`
 
 <div class="grid grid-cols-2 gap-4 mt-4">
@@ -198,19 +206,21 @@ layout: center
 </div>
 
 ---
-layout: center
----
+
+## layout: center
 
 # 🔎 ナレッジ・エクスプローラー
+
 `knowledge/` 配下の全191ドキュメントを動的に探索
 
 <KnowledgeBrowser />
 
 ---
-layout: center
----
+
+## layout: center
 
 # 🧠 エージェント・インタラクション・ハブ
+
 ブラウザからエージェントの「思考」と「行動」を指揮
 
 <AgentConverse />
@@ -222,11 +232,14 @@ layout: center
 </div>
 
 ---
+
 layout: center
 class: text-center
+
 ---
 
 # 🚀 Next Evolution
+
 ## Reality-Mirroring Interface
 
 <div class="mt-12 text-sm text-gray-400 italic">

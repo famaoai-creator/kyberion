@@ -9,7 +9,11 @@ describe('ai-model-orchestrator lib', () => {
   });
 
   it('should select model based on complexity', () => {
-    const complexity: any = { hardness: 'low', requiredCapabilities: ['text'], estimatedTokens: 100 };
+    const complexity: any = {
+      hardness: 'low',
+      requiredCapabilities: ['text'],
+      estimatedTokens: 100,
+    };
     const model = selectModel(complexity, 'economy');
     expect(model.tier).toBe('economy');
   });

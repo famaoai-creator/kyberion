@@ -23,7 +23,7 @@ const evidenceChain = {
     const content = fs.readFileSync(filePath);
     const hash = crypto.createHash('sha256').update(content).digest('hex');
     const id = `EVD-${hash.substring(0, 8).toUpperCase()}`;
-    
+
     const entry = {
       id,
       path: path.relative(pathResolver.activeRoot(), filePath),
@@ -31,13 +31,13 @@ const evidenceChain = {
       agentId,
       parentId,
       context,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // Load & Append
     const registry = evidenceChain._loadRegistry();
     // 重複チェック
-    if (!registry.chain.find(e => e.hash === hash)) {
+    if (!registry.chain.find((e) => e.hash === hash)) {
       registry.chain.push(entry);
       fs.writeFileSync(evidenceChain.registryPath, JSON.stringify(registry, null, 2));
     }
@@ -54,7 +54,7 @@ const evidenceChain = {
     let currentId = evidenceId;
 
     while (currentId) {
-      const entry = registry.chain.find(e => e.id === currentId);
+      const entry = registry.chain.find((e) => e.id === currentId);
       if (!entry) break;
       lineage.push(entry);
       currentId = entry.parentId;
@@ -70,7 +70,7 @@ const evidenceChain = {
       return { chain: [] };
     }
     return JSON.parse(fs.readFileSync(evidenceChain.registryPath, 'utf8'));
-  }
+  },
 };
 
 module.exports = evidenceChain;

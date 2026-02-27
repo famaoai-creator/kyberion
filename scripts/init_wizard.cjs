@@ -447,7 +447,7 @@ async function main() {
     const missionName = `${roleName.toLowerCase().replace(/ /g, '-').replace(/&/g, 'and')}-starter`;
     const skillArgs = roleConfig.skills.join(' ');
     logger.info(`Generating starter bundle "${missionName}"...`);
-    
+
     // Use cli.cjs instead of direct path to resolve hierarchical location
     execSync(`node scripts/cli.cjs run skill-bundle-packager -- ${missionName} ${skillArgs}`, {
       stdio: 'inherit',

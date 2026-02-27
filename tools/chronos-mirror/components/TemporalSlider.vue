@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue';
 
-const history = ref([])
-const currentIndex = ref(2) // デフォルトは最新
+const history = ref([]);
+const currentIndex = ref(2); // デフォルトは最新
 
 onMounted(async () => {
-  const res = await fetch('/history.json')
-  history.value = await res.json()
-  currentIndex.value = history.value.length - 1
-})
+  const res = await fetch('/history.json');
+  history.value = await res.json();
+  currentIndex.value = history.value.length - 1;
+});
 
 const currentState = computed(() => {
-  return history.value[currentIndex.value] || { efficiency: 0, reliability: 0, date: '', note: '' }
-})
+  return history.value[currentIndex.value] || { efficiency: 0, reliability: 0, date: '', note: '' };
+});
 </script>
 
 <template>
@@ -25,18 +25,21 @@ const currentState = computed(() => {
     </div>
 
     <!-- スライダー -->
-    <input 
-      type="range" 
-      min="0" 
-      :max="history.length - 1" 
-      v-model="currentIndex" 
+    <input
+      type="range"
+      min="0"
+      :max="history.length - 1"
+      v-model="currentIndex"
       class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 mb-8"
     />
 
     <div class="grid grid-cols-2 gap-6">
       <div class="text-center">
         <p class="text-xs text-gray-500 uppercase tracking-widest mb-1">Efficiency</p>
-        <p class="text-5xl font-black text-white transition-all duration-500 transform scale-110" :style="{ color: currentState.efficiency > 50 ? '#4ade80' : '#fbbf24' }">
+        <p
+          class="text-5xl font-black text-white transition-all duration-500 transform scale-110"
+          :style="{ color: currentState.efficiency > 50 ? '#4ade80' : '#fbbf24' }"
+        >
           {{ currentState.efficiency }}<span class="text-sm font-normal text-gray-500">/100</span>
         </p>
       </div>

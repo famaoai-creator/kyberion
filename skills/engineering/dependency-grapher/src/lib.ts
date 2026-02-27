@@ -24,7 +24,8 @@ export function generateMermaidGraph(rootDir: string): GraphResult {
     const items = fs.readdirSync(dir);
     for (const item of items) {
       const fullPath = path.join(dir, item);
-      if (!fs.statSync(fullPath).isDirectory() || item === 'node_modules' || item === 'core') continue;
+      if (!fs.statSync(fullPath).isDirectory() || item === 'node_modules' || item === 'core')
+        continue;
 
       if (fs.existsSync(path.join(fullPath, 'SKILL.md'))) {
         skillCount++;

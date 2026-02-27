@@ -8,7 +8,7 @@ arguments:
     short: i
     type: string
     required: true
-    description: 
+    description:
 category: Audit
 last_updated: '2026-02-16'
 tags:

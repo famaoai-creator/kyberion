@@ -10,8 +10,14 @@ export function getBacklogApiKey(credsPath: string, pattern: string): string {
   return match[1];
 }
 
-export function fetchBacklogIssues(spaceUrl: string, endpoint: string, apiKey: string, projectId: string): any[] {
-  const url = spaceUrl + endpoint + '?apiKey=' + apiKey + '&projectId[]=' + projectId + '&count=100';
+export function fetchBacklogIssues(
+  spaceUrl: string,
+  endpoint: string,
+  apiKey: string,
+  projectId: string
+): any[] {
+  const url =
+    spaceUrl + endpoint + '?apiKey=' + apiKey + '&projectId[]=' + projectId + '&count=100';
   const response = execSync('curl -s "' + url + '"', { encoding: 'utf8' });
   return JSON.parse(response);
 }

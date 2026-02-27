@@ -19,23 +19,24 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for license report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('license-auditor', () => {
-    const rootDir = path.resolve(argv.input as string);
-    let npmList: any;
-    try {
-      npmList = JSON.parse(execSync('npm list --all --json', { cwd: rootDir, encoding: 'utf8' }));
-    } catch {
-      npmList = JSON.parse(execSync('npm list --depth=0 --json', { cwd: rootDir, encoding: 'utf8' }));
-    }
+  const rootDir = path.resolve(argv.input as string);
+  let npmList: any;
+  try {
+    npmList = JSON.parse(execSync('npm list --all --json', { cwd: rootDir, encoding: 'utf8' }));
+  } catch {
+    npmList = JSON.parse(execSync('npm list --depth=0 --json', { cwd: rootDir, encoding: 'utf8' }));
+  }
 
-    const findings = scanDepsForRiskyLicenses(npmList.dependencies);
-    const result = { status: findings.length > 0 ? 'warning' : 'compliant', findings };
+  const findings = scanDepsForRiskyLicenses(npmList.dependencies);
+  const result = { status: findings.length > 0 ? 'warning' : 'compliant', findings };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
 
-    return result;
+  return result;
 });

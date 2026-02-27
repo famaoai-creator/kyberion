@@ -146,7 +146,7 @@ export function generateROIRecommendations(
       action: 'Improve CI/CD pipeline to increase deployment frequency',
       estimatedSavings: Math.round(impact.monthlyDowntimeCost * 0.5),
       priority: 'high',
-      area: 'DevOps'
+      area: 'DevOps',
     });
   }
 
@@ -155,7 +155,7 @@ export function generateROIRecommendations(
       action: `Allocate sprint capacity to reduce ${quality.tech_debt_hours}h tech debt backlog`,
       estimatedSavings: Math.round(impact.techDebtMonthlyCost * 0.3),
       priority: 'high',
-      area: 'Technical Debt'
+      area: 'Technical Debt',
     });
   }
 
@@ -164,7 +164,7 @@ export function generateROIRecommendations(
       action: `Increase test coverage from ${Math.round((quality.test_coverage || 0) * 100)}% to 80%+`,
       estimatedSavings: Math.round(impact.monthlyErrorCost * 0.4),
       priority: impact.coverageRisk === 'critical' ? 'critical' : 'medium',
-      area: 'Quality'
+      area: 'Quality',
     });
   }
 
@@ -173,7 +173,7 @@ export function generateROIRecommendations(
       action: 'Implement better observability (structured logging, alerting) to reduce MTTR',
       estimatedSavings: Math.round(impact.monthlyDowntimeCost * 0.3),
       priority: 'medium',
-      area: 'Observability'
+      area: 'Observability',
     });
   }
 
@@ -190,9 +190,27 @@ export function processImpactAnalysis(input: AnalysisInput): AnalysisResult {
   const recommendations = generateROIRecommendations(doraClassification, impact, quality);
 
   // Add data integrity warnings to recommendations
-  if (!input.dora) recommendations.push({ action: 'Collect DORA metrics for more accurate downtime impact analysis', estimatedSavings: 0, priority: 'medium', area: 'Data Quality' });
-  if (!input.quality) recommendations.push({ action: 'Integrate quality/debt metrics to quantify maintenance overhead', estimatedSavings: 0, priority: 'medium', area: 'Data Quality' });
-  if (!business.hourly_revenue) recommendations.push({ action: 'Define hourly revenue to calculate financial ROI', estimatedSavings: 0, priority: 'high', area: 'Data Quality' });
+  if (!input.dora)
+    recommendations.push({
+      action: 'Collect DORA metrics for more accurate downtime impact analysis',
+      estimatedSavings: 0,
+      priority: 'medium',
+      area: 'Data Quality',
+    });
+  if (!input.quality)
+    recommendations.push({
+      action: 'Integrate quality/debt metrics to quantify maintenance overhead',
+      estimatedSavings: 0,
+      priority: 'medium',
+      area: 'Data Quality',
+    });
+  if (!business.hourly_revenue)
+    recommendations.push({
+      action: 'Define hourly revenue to calculate financial ROI',
+      estimatedSavings: 0,
+      priority: 'high',
+      area: 'Data Quality',
+    });
 
   return {
     doraClassification,

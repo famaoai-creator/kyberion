@@ -105,7 +105,12 @@ export function generateTitle(commits: Commit[]): string {
   return latest.length > 72 ? latest.substring(0, 69) + '...' : latest;
 }
 
-export function generateDescription(commits: Commit[], changedFiles: ChangedFile[], categories: Categories, repoDir: string): string {
+export function generateDescription(
+  commits: Commit[],
+  changedFiles: ChangedFile[],
+  categories: Categories,
+  repoDir: string
+): string {
   const sections: string[] = [];
 
   sections.push('## Summary');
@@ -126,35 +131,37 @@ export function generateDescription(commits: Commit[], changedFiles: ChangedFile
       sections.push(`**Timestamp**: ${report.timestamp}`);
       sections.push('\\n| Check | Status | Duration |');
       sections.push('| :--- | :--- | :--- |');
-      
+
       if (Array.isArray(report.results)) {
         report.results.forEach((r: any) => {
-            sections.push(
+          sections.push(
             `| ${r.name} | ${r.status === 'passed' ? '✅ PASSED' : '❌ FAILED'} | ${r.duration}s |`
-            );
+          );
         });
 
         const perfResult = report.results.find((r: any) => r.name === 'Performance Regression');
         if (perfResult) {
-            if (perfResult.regressions && perfResult.regressions.length > 0) {
+          if (perfResult.regressions && perfResult.regressions.length > 0) {
             sections.push('\\n### 📉 Performance Regressions Detected');
             perfResult.regressions.forEach((r: any) => {
-                sections.push(
+              sections.push(
                 `- **${r.skill}**: ${r.lastDuration}ms (avg ${r.historicalAvg}ms, ${r.increaseRate}x slower)`
-                );
+              );
             });
-            }
-            if (perfResult.efficiency_alerts && perfResult.efficiency_alerts.length > 0) {
-            const improving = perfResult.efficiency_alerts.filter((s: any) => s.trend === 'improving');
+          }
+          if (perfResult.efficiency_alerts && perfResult.efficiency_alerts.length > 0) {
+            const improving = perfResult.efficiency_alerts.filter(
+              (s: any) => s.trend === 'improving'
+            );
             if (improving.length > 0) {
-                sections.push('\\n### 📈 Performance Improvements');
-                improving.forEach((s: any) => {
+              sections.push('\\n### 📈 Performance Improvements');
+              improving.forEach((s: any) => {
                 sections.push(
-                    `- **${s.skill}**: Score improved to ${s.efficiencyScore} (from ${s.prevScore})`
+                  `- **${s.skill}**: Score improved to ${s.efficiencyScore} (from ${s.prevScore})`
                 );
-                });
+              });
             }
-            }
+          }
         }
       }
     } catch (_e) {

@@ -85,7 +85,7 @@ export function assessImpact(feature: FeatureData): ImpactAssessment {
   const users = feature.active_users || 0;
   const revenue = feature.monthly_revenue || 0;
   const dependencies = feature.dependencies || [];
-  
+
   let risk: ImpactAssessment['risk'] = 'low';
   if (users > 1000 || revenue > 5000) risk = 'high';
   else if (users > 100 || revenue > 500) risk = 'medium';
@@ -96,7 +96,8 @@ export function assessImpact(feature: FeatureData): ImpactAssessment {
     dependencyCount: dependencies.length,
     dependencies,
     risk,
-    migrationComplexity: dependencies.length > 3 ? 'high' : dependencies.length > 0 ? 'medium' : 'low',
+    migrationComplexity:
+      dependencies.length > 3 ? 'high' : dependencies.length > 0 ? 'medium' : 'low',
   };
 }
 
@@ -110,20 +111,22 @@ export function processSunsetPlans(features: FeatureData[]): Omit<SunsetResult, 
 
   const recommendations: StrategicAction[] = [];
 
-  plans.filter((p) => p.impact.risk === 'high').forEach((p) => {
-    recommendations.push({
-      action: `Careful migration needed for "${p.feature}" due to high active user count (${p.impact.activeUsers})`,
-      priority: 'high',
-      area: 'User Retention'
+  plans
+    .filter((p) => p.impact.risk === 'high')
+    .forEach((p) => {
+      recommendations.push({
+        action: `Careful migration needed for "${p.feature}" due to high active user count (${p.impact.activeUsers})`,
+        priority: 'high',
+        area: 'User Retention',
+      });
     });
-  });
 
   // Schedule density check
   if (plans.length > 3) {
     recommendations.push({
       action: `Manage communication overhead for simultaneous sunset of ${plans.length} features`,
       priority: 'medium',
-      area: 'Customer Communication'
+      area: 'Customer Communication',
     });
   }
 
@@ -131,10 +134,10 @@ export function processSunsetPlans(features: FeatureData[]): Omit<SunsetResult, 
     recommendations.push({
       action: 'Execute 12-week standard deprecation timeline for all selected features',
       priority: 'low',
-      area: 'SDLC'
+      area: 'SDLC',
     });
   }
-  
+
   return {
     featureCount: plans.length,
     plans,

@@ -27,7 +27,7 @@ const pulseGuard = {
       const [base64Payload, signature] = token.split('.');
       const secret = process.env.GEMINI_SOVEREIGN_SECRET || 'default-secret';
       const payload = Buffer.from(base64Payload, 'base64').toString();
-      
+
       const expectedHmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
       if (signature !== expectedHmac) return null;
 
@@ -39,7 +39,7 @@ const pulseGuard = {
     } catch (_e) {
       return null;
     }
-  }
+  },
 };
 
 module.exports = pulseGuard;

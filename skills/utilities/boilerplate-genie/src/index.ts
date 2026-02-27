@@ -3,13 +3,22 @@ import * as path from 'node:path';
 import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { requireArgs } from '@agent/core/validators';
-import { generateNodeProject, generatePythonProject, generateGenericProject, ProjectType } from './lib.js';
+import {
+  generateNodeProject,
+  generatePythonProject,
+  generateGenericProject,
+  ProjectType,
+} from './lib.js';
 
 const argv = createStandardYargs()
   .option('name', { alias: 'n', type: 'string', demandOption: true })
-  .option('type', { alias: 'T', type: 'string', choices: ['node', 'python', 'generic'], demandOption: true })
-  .option('out', { alias: 'o', type: 'string' })
-  .argv;
+  .option('type', {
+    alias: 'T',
+    type: 'string',
+    choices: ['node', 'python', 'generic'],
+    demandOption: true,
+  })
+  .option('out', { alias: 'o', type: 'string' }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('boilerplate-genie', () => {
@@ -22,10 +31,17 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
 
     let files: string[];
     switch (projectType) {
-      case 'node': files = generateNodeProject(projectName, outDir); break;
-      case 'python': files = generatePythonProject(projectName, outDir); break;
-      case 'generic': files = generateGenericProject(projectName, outDir); break;
-      default: throw new Error(`Unsupported type: ${projectType}`);
+      case 'node':
+        files = generateNodeProject(projectName, outDir);
+        break;
+      case 'python':
+        files = generatePythonProject(projectName, outDir);
+        break;
+      case 'generic':
+        files = generateGenericProject(projectName, outDir);
+        break;
+      default:
+        throw new Error(`Unsupported type: ${projectType}`);
     }
 
     return { name: projectName, type: projectType, files, directory: outDir };

@@ -14,8 +14,7 @@ const argv = createStandardYargs()
   .option('query', { alias: 'q', type: 'string' })
   .option('config', { alias: 'c', type: 'string' })
   .option('dry-run', { type: 'boolean', default: true })
-  .option('out', { alias: 'o', type: 'string' })
-  .argv;
+  .option('out', { alias: 'o', type: 'string' }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('box-connector', () => {
@@ -26,7 +25,11 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
       throw new Error('Box config not found.');
     }
 
-    const actionResult = simulateBoxAction(argv.action as string, argv.folder as string, argv.query as string);
+    const actionResult = simulateBoxAction(
+      argv.action as string,
+      argv.folder as string,
+      argv.query as string
+    );
     const result = {
       action: argv.action,
       mode: isDryRun ? 'dry-run' : 'live',

@@ -15,7 +15,10 @@ export interface FeatureStats {
 }
 
 export function analyzeTelemetry(events: TelemetryEvent[]): Record<string, FeatureStats> {
-  const features: Record<string, { count: number; errors: number; totalDuration: number; durationCount: number }> = {};
+  const features: Record<
+    string,
+    { count: number; errors: number; totalDuration: number; durationCount: number }
+  > = {};
 
   for (const event of events) {
     const name = event.feature || event.action || event.name || 'unknown';

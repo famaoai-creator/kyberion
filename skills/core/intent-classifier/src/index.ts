@@ -3,11 +3,13 @@ import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { loadRules, classifyIntent } from './lib.js';
 
-const argv = createStandardYargs().option('input', {
-  alias: 'i',
-  type: 'string',
-  demandOption: true,
-}).parseSync();
+const argv = createStandardYargs()
+  .option('input', {
+    alias: 'i',
+    type: 'string',
+    demandOption: true,
+  })
+  .parseSync();
 
 // In Node16 with CommonJS output, __dirname is still available
 const rulesPath = path.resolve(__dirname, '../../../knowledge/classifiers/intent-rules.yml');

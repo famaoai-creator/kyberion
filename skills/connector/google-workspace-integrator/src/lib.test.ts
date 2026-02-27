@@ -17,7 +17,9 @@ describe('google-workspace-integrator lib', () => {
 
   it('should draft email from input', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ subject: 'Test', content: 'Hello' }));
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ subject: 'Test', content: 'Hello' })
+    );
     const draft = draftEmail('in.json', 'to@test.com');
     expect(draft.subject).toBe('Test');
     expect(draft.to).toBe('to@test.com');

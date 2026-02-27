@@ -38,14 +38,14 @@ describe('voice-interface-maestro lib', () => {
   it('should call say command for macos engine', () => {
     const config = { engine: 'macos', voice: 'Alex' };
     speakText('Hello world', config as any);
-    
+
     expect(execSync).toHaveBeenCalledWith(expect.stringContaining('say -v Alex "Hello world"'));
   });
 
   it('should use fallback for non-macos engines', () => {
     const config = { engine: 'elevenlabs', voice: 'Bella' };
     const result = speakText('Hi', config as any);
-    
+
     expect(result.method).toBe('api-elevenlabs');
     expect(result.success).toBe(true);
     expect(execSync).not.toHaveBeenCalled();
@@ -55,7 +55,7 @@ describe('voice-interface-maestro lib', () => {
     const artifact = { title: 'Note', body: 'Hello artifact', format: 'text' as const };
     const config = { engine: 'macos', voice: 'Alex' };
     const result = speakArtifact(artifact, config as any);
-    
+
     expect(result.success).toBe(true);
     expect(execSync).toHaveBeenCalledWith(expect.stringContaining('say -v Alex "Hello artifact"'));
   });

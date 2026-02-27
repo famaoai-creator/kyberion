@@ -26,24 +26,30 @@ export function startRecording(options: VoiceListenerOptions): ChildProcess {
   if (!fs.existsSync(options.workDir)) {
     fs.mkdirSync(options.workDir, { recursive: true });
   }
-  
+
   if (!checkSoXInstalled()) {
-    throw new Error('SoX ("rec" command) is not installed. Please install it using "brew install sox" or equivalent.');
+    throw new Error(
+      'SoX ("rec" command) is not installed. Please install it using "brew install sox" or equivalent.'
+    );
   }
 
   const rec = spawn('rec', ['-q', '-c', '1', '-r', '16000', options.audioFile]);
-  
+
   // Basic signal handling for the child process
   const cleanup = () => {
     if (!rec.killed) rec.kill('SIGKILL');
     if (fs.existsSync(options.audioFile)) {
-        try { fs.unlinkSync(options.audioFile); } catch (_e) { /* ignore */ }
+      try {
+        fs.unlinkSync(options.audioFile);
+      } catch (_e) {
+        /* ignore */
+      }
     }
   };
 
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
-  
+
   rec.on('exit', () => {
     process.off('SIGINT', cleanup);
     process.off('SIGTERM', cleanup);
@@ -69,7 +75,7 @@ export function mapCommandToAction(command: string): StrategicAction {
   return {
     action: command,
     priority,
-    area
+    area,
   };
 }
 

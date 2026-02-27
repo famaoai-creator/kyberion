@@ -4,7 +4,7 @@ const path = require('path');
 const SKILLS_DIR = path.join(__dirname, '../skills');
 
 function getCategories() {
-  return fs.readdirSync(SKILLS_DIR).filter(f => {
+  return fs.readdirSync(SKILLS_DIR).filter((f) => {
     const p = path.join(SKILLS_DIR, f);
     return fs.statSync(p).isDirectory() && f !== 'core';
   });
@@ -40,7 +40,7 @@ function syncSkill(category, name) {
     while ((match = optRegex.exec(indexContent)) !== null) {
       const argName = match[1];
       const optBody = match[2];
-      
+
       const aliasMatch = optBody.match(/alias:\s*'([^']+)'/);
       const typeMatch = optBody.match(/type:\s*'([^']+)'/);
       const descMatch = optBody.match(/description:\s*'([^']+)'/);
@@ -51,19 +51,21 @@ function syncSkill(category, name) {
         short: aliasMatch ? aliasMatch[1] : undefined,
         type: typeMatch ? typeMatch[1] : 'string',
         required: !!demandMatch,
-        description: descMatch ? descMatch[2] : ''
+        description: descMatch ? descMatch[2] : '',
       });
     }
 
     if (args.length > 0) {
-      const argsYaml = args.map(a => {
-        let lines = [`  - name: ${a.name}`];
-        if (a.short) lines.push(`    short: ${a.short}`);
-        lines.push(`    type: ${a.type}`);
-        lines.push(`    required: ${a.required}`);
-        lines.push(`    description: ${a.description}`);
-        return lines.join('\n');
-      }).join('\n');
+      const argsYaml = args
+        .map((a) => {
+          let lines = [`  - name: ${a.name}`];
+          if (a.short) lines.push(`    short: ${a.short}`);
+          lines.push(`    type: ${a.type}`);
+          lines.push(`    required: ${a.required}`);
+          lines.push(`    description: ${a.description}`);
+          return lines.join('\n');
+        })
+        .join('\n');
 
       const argsPattern = /arguments:\n([\s\S]*?)category:/;
       if (argsPattern.test(skillMd)) {
@@ -77,10 +79,12 @@ function syncSkill(category, name) {
 }
 
 const categories = getCategories();
-categories.forEach(cat => {
+categories.forEach((cat) => {
   const catPath = path.join(SKILLS_DIR, cat);
-  const skills = fs.readdirSync(catPath).filter(f => fs.statSync(path.join(catPath, f)).isDirectory());
-  skills.forEach(skill => syncSkill(cat, skill));
+  const skills = fs
+    .readdirSync(catPath)
+    .filter((f) => fs.statSync(path.join(catPath, f)).isDirectory());
+  skills.forEach((skill) => syncSkill(cat, skill));
 });
 
 console.log('[Sync] Complete.');

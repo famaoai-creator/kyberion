@@ -19,7 +19,8 @@ const argv = createStandardYargs()
     demandOption: true,
     description: 'Target format',
   })
-  .option('out', { alias: 'o', type: 'string', description: 'Output file path (optional)' }).parseSync();
+  .option('out', { alias: 'o', type: 'string', description: 'Output file path (optional)' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('data-transformer', () => {
@@ -27,7 +28,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const inputPath = validateFilePath(argv.input as string, 'input');
     const content = fs.readFileSync(inputPath, 'utf8');
     const inputFormat = detectFormat(inputPath);
-    
+
     const data = parseData(content, inputFormat);
     const output = stringifyData(data, argv.to as DataFormat);
 

@@ -113,7 +113,10 @@ export function analyzeRunway(monthly: MonthlyProjection[]): RunwayAnalysis {
   };
 }
 
-export function generateScenarios(assumptions: FinancialAssumptions, years: number): Record<string, PnLResult> {
+export function generateScenarios(
+  assumptions: FinancialAssumptions,
+  years: number
+): Record<string, PnLResult> {
   const base = generatePnL(assumptions, years);
 
   // Optimistic

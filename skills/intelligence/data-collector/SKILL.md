@@ -1,29 +1,29 @@
 ---
 name: data-collector
 description: >-
-  
+
 status: implemented
 arguments:
   - name: url
     short: u
     type: string
     required: true
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: true
-    description: 
+    description:
   - name: name
     short: n
     type: string
     required: false
-    description: 
+    description:
   - name: force
     short: f
     type: boolean
     required: false
-    description: 
+    description:
 category: Intelligence
 last_updated: '2026-02-16'
 tags:

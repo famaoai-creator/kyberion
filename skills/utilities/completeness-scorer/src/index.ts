@@ -10,13 +10,14 @@ const argv = createStandardYargs()
     alias: 'c',
     type: 'string',
     description: 'JSON file with required keywords',
-  }).parseSync();
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('completeness-scorer', () => {
     const inputPath = validateFilePath(argv.input as string, 'input');
     const content = fs.readFileSync(inputPath, 'utf8');
-    
+
     let requiredKeywords: string[] = [];
     if (argv.criteria) {
       const criteria = readJsonFile(argv.criteria as string, 'criteria');

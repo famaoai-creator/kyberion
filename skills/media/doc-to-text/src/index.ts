@@ -24,13 +24,17 @@ runAsyncSkill('doc-to-text', async () => {
   // Define logical artifact location
   const artifactDir = path.resolve('active/missions/mission-pptx-remaster/artifacts');
   if (!fs.existsSync(artifactDir)) fs.mkdirSync(artifactDir, { recursive: true });
-  
+
   const artifactPath = path.join(artifactDir, path.basename(inputPath) + '.md');
-  
+
   // Use HAP (Hashed Artifact Pointer) protocol
   const pointer = (writeArtifact as any)(artifactPath, text, 'markdown');
 
-  const result = createDocumentArtifact(path.basename(inputPath), 'Full content stored in hashed artifact.', design);
+  const result = createDocumentArtifact(
+    path.basename(inputPath),
+    'Full content stored in hashed artifact.',
+    design
+  );
   result.pointer = pointer;
 
   return result;

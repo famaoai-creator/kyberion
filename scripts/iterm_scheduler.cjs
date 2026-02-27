@@ -34,12 +34,18 @@ async function scheduleTask() {
         end tell
       `;
 
-      const result = execSync(`osascript -e '${findSessionScript.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
+      const result = execSync(`osascript -e '${findSessionScript.replace(/'/g, "'\\''")}'`, {
+        encoding: 'utf8',
+      }).trim();
 
-      if (result !== "NOT_FOUND") {
+      if (result !== 'NOT_FOUND') {
         const [winId, sessionId] = result.split(':');
-        console.log(chalk.green(`\ud83d\ude80 Found Gemini in Win:${winId}, Session:${sessionId}. Sending prompt...`));
-        
+        console.log(
+          chalk.green(
+            `\ud83d\ude80 Found Gemini in Win:${winId}, Session:${sessionId}. Sending prompt...`
+          )
+        );
+
         const sendScript = `
           tell application "iTerm2"
             tell (first window whose id is ${winId})
@@ -56,7 +62,7 @@ async function scheduleTask() {
     } catch (e) {
       console.log(chalk.red(`Error: ${e.message}`));
     }
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise((r) => setTimeout(r, 5000));
   }
 }
 

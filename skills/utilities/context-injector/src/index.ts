@@ -13,7 +13,8 @@ const argv = createStandardYargs()
     type: 'string',
     default: 'public',
     choices: ['personal', 'confidential', 'public'],
-  }).parseSync();
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('context-injector', () => {

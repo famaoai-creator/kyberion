@@ -8,7 +8,10 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('doc-type-classifier', () => {
     const argv = requireArgs(['input']);
     const inputPath = path.resolve(argv.input as string);
-    const rulesPath = path.resolve(__dirname, '../../../knowledge/skills/doc-type-classifier/rules.json');
+    const rulesPath = path.resolve(
+      __dirname,
+      '../../../knowledge/skills/doc-type-classifier/rules.json'
+    );
 
     if (!fs.existsSync(inputPath)) throw new Error(`Input not found: ${inputPath}`);
     const rules = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));

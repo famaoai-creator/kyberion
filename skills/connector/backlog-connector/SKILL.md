@@ -1,7 +1,7 @@
 ---
 name: backlog-connector
 description: >-
-  
+
 status: implemented
 arguments:
   - name: project

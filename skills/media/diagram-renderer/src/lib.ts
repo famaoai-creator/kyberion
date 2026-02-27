@@ -64,6 +64,6 @@ export function renderDiagramArtifact(title: string, adf: ADF, iconMap: IconMap)
     title,
     body: mmd,
     format: 'text', // Mermaid is plain text source
-    metadata: { adf }
+    metadata: { adf },
   };
 }

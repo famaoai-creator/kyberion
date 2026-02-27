@@ -28,12 +28,12 @@ runSkill('sunset-architect', () => {
 
   const inputContent = fs.readFileSync(resolved, 'utf8');
   const data = JSON.parse(inputContent);
-  
+
   // Handle both single feature and array of features
-  const features: FeatureData[] = Array.isArray(data.features) 
-    ? data.features 
-    : Array.isArray(data) 
-      ? data 
+  const features: FeatureData[] = Array.isArray(data.features)
+    ? data.features
+    : Array.isArray(data)
+      ? data
       : [data as FeatureData];
 
   const result = processSunsetPlans(features);

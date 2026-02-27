@@ -23,7 +23,13 @@ describe('technology-porter', () => {
   });
 
   it('estimates migration effort', () => {
-    const analysis = { lines: 100, functions: 5, classes: 1, imports: 2, complexity: 'low' as const };
+    const analysis = {
+      lines: 100,
+      functions: 5,
+      classes: 1,
+      imports: 2,
+      complexity: 'low' as const,
+    };
     const estimate = estimateMigration(analysis, 'javascript', 'python');
     expect(estimate.idiomRulesAvailable).toBeGreaterThan(0);
     expect(estimate.estimatedEffort).toBe('straightforward');

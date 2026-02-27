@@ -490,7 +490,7 @@ function buildOutput(skillName, status, dataOrError, startTime) {
       role: currentRole,
       execution_tier: detectTier(process.cwd()), // Current working context tier
       mission_id: process.env.MISSION_ID || null,
-      user_preferences: prefs.forSkill(skillName) // [PdM] Injected user preference
+      user_preferences: prefs.forSkill(skillName), // [PdM] Injected user preference
     },
   };
 
@@ -531,7 +531,7 @@ function buildOutput(skillName, status, dataOrError, startTime) {
   }
 
   const { validateOutput, validateSkillData } = require('./validate.cjs');
-  
+
   // Validate output against common envelope schema
   _validateOutput(base);
 
@@ -540,15 +540,17 @@ function buildOutput(skillName, status, dataOrError, startTime) {
     const deepGuard = validateSkillData(skillName, base.data);
     if (!deepGuard.valid) {
       const { logger } = require('./core.cjs');
-      logger.error(`[${skillName}] Deep Data Contract Violation: ${JSON.stringify(deepGuard.errors)}`);
+      logger.error(
+        `[${skillName}] Deep Data Contract Violation: ${JSON.stringify(deepGuard.errors)}`
+      );
       return {
         skill: skillName,
         status: 'error',
-        error: { 
-          code: 'CONTRACT_VIOLATION', 
-          message: `Deep Data Contract Violation: ${deepGuard.errors.map(e => `${e.field} ${e.message}`).join(', ')}` 
+        error: {
+          code: 'CONTRACT_VIOLATION',
+          message: `Deep Data Contract Violation: ${deepGuard.errors.map((e) => `${e.field} ${e.message}`).join(', ')}`,
         },
-        metadata: base.metadata
+        metadata: base.metadata,
       };
     }
   }
@@ -560,7 +562,7 @@ function buildOutput(skillName, status, dataOrError, startTime) {
       status: status,
       mission_id: mid,
       role: currentRole,
-      duration_ms: base.metadata.duration_ms
+      duration_ms: base.metadata.duration_ms,
     });
   } catch (_e) {
     /* Non-blocking ledger error */
@@ -630,12 +632,16 @@ function _checkBuildDrift(skillName) {
     try {
       const srcStat = fs.statSync(srcDir);
       const distStat = fs.statSync(distDir);
-      
+
       // If src directory itself (or a sample file inside) is newer than dist
       if (srcStat.mtimeMs > distStat.mtimeMs) {
         const { logger: coreLogger } = require('./core.cjs');
         const chalk = require('chalk');
-        coreLogger.warn(chalk.yellow.bold(`[BUILD GUARD] Potential drift detected in ${skillName}! src/ is newer than dist/. Please run 'npm run build' in ${skillDir}.`));
+        coreLogger.warn(
+          chalk.yellow.bold(
+            `[BUILD GUARD] Potential drift detected in ${skillName}! src/ is newer than dist/. Please run 'npm run build' in ${skillDir}.`
+          )
+        );
       }
     } catch (_) {}
   }

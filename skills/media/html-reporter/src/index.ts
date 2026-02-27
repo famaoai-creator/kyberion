@@ -31,7 +31,7 @@ const argv = yargs(hideBin(process.argv))
 runAsyncSkill('html-reporter', async () => {
   const inputPath = validateFilePath(argv.input as string, 'input markdown');
   const outputPath = path.resolve(argv.out as string);
-  
+
   const mdContent = fs.readFileSync(inputPath, 'utf8');
   const html = await generateHTML(mdContent, { title: argv.title as string });
 

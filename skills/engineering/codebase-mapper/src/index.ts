@@ -24,18 +24,19 @@ const argv = yargs(hideBin(process.argv))
     default: 3,
     description: 'Max tree depth',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkillAsync('codebase-mapper', async () => {
-    const rootDir = path.resolve(argv.input as string);
-    if (rootDir === '/') throw new Error('Refusing to map root directory /');
+  const rootDir = path.resolve(argv.input as string);
+  if (rootDir === '/') throw new Error('Refusing to map root directory /');
 
-    const tree = await buildTreeLinesAsync(rootDir, argv.depth as number);
-    const result = { root: rootDir, tree };
+  const tree = await buildTreeLinesAsync(rootDir, argv.depth as number);
+  const result = { root: rootDir, tree };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
 
-    return result;
+  return result;
 });

@@ -25,8 +25,8 @@ const argv = createStandardYargs()
   .help().argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-    runSkill('test-suite-architect', () => {
-        const projectDir = path.resolve(argv.dir as string);
-        return analyzeTestSuite(projectDir);
-    });
+  runSkill('test-suite-architect', () => {
+    const projectDir = path.resolve(argv.dir as string);
+    return analyzeTestSuite(projectDir);
+  });
 }

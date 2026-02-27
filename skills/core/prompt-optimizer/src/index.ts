@@ -12,14 +12,15 @@ const argv = createStandardYargs()
     demandOption: true,
     describe: 'Path to SKILL.md file to analyze',
   })
-  .option('out', { alias: 'o', type: 'string', describe: 'Optional output file path' }).parseSync();
+  .option('out', { alias: 'o', type: 'string', describe: 'Optional output file path' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('prompt-optimizer', () => {
     requireArgs(argv as any, ['input']);
     const inputPath = validateFilePath(argv.input as string, 'input');
     const content = fs.readFileSync(inputPath, 'utf8');
-    
+
     const result = optimizePrompt(content, inputPath);
 
     if (argv.out) {

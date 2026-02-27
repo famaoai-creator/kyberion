@@ -4,8 +4,8 @@ import { composePDF } from './lib.js';
 
 vi.mock('puppeteer', () => ({
   default: {
-    launch: vi.fn()
-  }
+    launch: vi.fn(),
+  },
 }));
 
 describe('pdf-composer lib', () => {
@@ -26,11 +26,16 @@ describe('pdf-composer lib', () => {
 
     const artifact = { title: 'Test', body: '# Hello PDF', format: 'markdown' as const };
     const result = await composePDF(artifact, { outputPath: '/test/out.pdf' });
-    
+
     expect(result.output).toBe('/test/out.pdf');
     expect(puppeteer.launch).toHaveBeenCalled();
-    expect(mockPage.setContent).toHaveBeenCalledWith(expect.stringContaining('<h1>Hello PDF</h1>'), expect.any(Object));
-    expect(mockPage.pdf).toHaveBeenCalledWith(expect.objectContaining({ path: '/test/out.pdf', format: 'A4' }));
+    expect(mockPage.setContent).toHaveBeenCalledWith(
+      expect.stringContaining('<h1>Hello PDF</h1>'),
+      expect.any(Object)
+    );
+    expect(mockPage.pdf).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/test/out.pdf', format: 'A4' })
+    );
     expect(mockBrowser.close).toHaveBeenCalled();
   });
 
@@ -45,7 +50,9 @@ describe('pdf-composer lib', () => {
     vi.mocked(puppeteer.launch).mockResolvedValue(mockBrowser as any);
 
     const artifact = { title: 'Fail', body: '# Fail', format: 'markdown' as const };
-    await expect(composePDF(artifact, { outputPath: '/test/fail.pdf' })).rejects.toThrow('Render error');
+    await expect(composePDF(artifact, { outputPath: '/test/fail.pdf' })).rejects.toThrow(
+      'Render error'
+    );
     expect(mockBrowser.close).toHaveBeenCalled();
   });
 });

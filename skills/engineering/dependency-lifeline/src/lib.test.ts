@@ -42,26 +42,26 @@ describe('analyzeDependencies', () => {
     // Mock package.json
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockImplementation((p) => {
-        const pStr = p.toString();
-        if (pStr.endsWith('package.json') && !pStr.includes('node_modules')) {
-            return JSON.stringify({
-                dependencies: {
-                    'lproject_a-a': '1.0.0',
-                    'lproject_a-b': '^2.0.0'
-                }
-            });
-        }
-        if (pStr.includes('lproject_a-a/package.json')) {
-            return JSON.stringify({ version: '1.1.0' }); // Minor update
-        }
-        if (pStr.includes('lproject_a-b/package.json')) {
-            return JSON.stringify({ version: '3.0.0' }); // Major update
-        }
-        return '{}';
+      const pStr = p.toString();
+      if (pStr.endsWith('package.json') && !pStr.includes('node_modules')) {
+        return JSON.stringify({
+          dependencies: {
+            'lproject_a-a': '1.0.0',
+            'lproject_a-b': '^2.0.0',
+          },
+        });
+      }
+      if (pStr.includes('lproject_a-a/package.json')) {
+        return JSON.stringify({ version: '1.1.0' }); // Minor update
+      }
+      if (pStr.includes('lproject_a-b/package.json')) {
+        return JSON.stringify({ version: '3.0.0' }); // Major update
+      }
+      return '{}';
     });
 
     const report = analyzeDependencies(projectDir);
-    
+
     expect(report.totalDeps).toBe(2);
     expect(report.minorUpdates).toBe(1); // lproject_a-a
     expect(report.majorUpdates).toBe(1); // lproject_a-b

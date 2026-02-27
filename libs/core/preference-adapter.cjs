@@ -20,7 +20,7 @@ const preferenceAdapter = {
     try {
       if (!fs.existsSync(PREF_PATH)) return defaultValue;
       const prefs = JSON.parse(fs.readFileSync(PREF_PATH, 'utf8'));
-      
+
       const parts = key.split('.');
       let current = prefs;
       for (const part of parts) {
@@ -38,10 +38,8 @@ const preferenceAdapter = {
    */
   set: (key, value) => {
     try {
-      const prefs = fs.existsSync(PREF_PATH) 
-        ? JSON.parse(fs.readFileSync(PREF_PATH, 'utf8')) 
-        : {};
-      
+      const prefs = fs.existsSync(PREF_PATH) ? JSON.parse(fs.readFileSync(PREF_PATH, 'utf8')) : {};
+
       const parts = key.split('.');
       let current = prefs;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -63,7 +61,7 @@ const preferenceAdapter = {
    */
   forSkill: (skillName) => {
     return preferenceAdapter.get(skillName, {});
-  }
+  },
 };
 
 module.exports = preferenceAdapter;

@@ -3,19 +3,22 @@
 ## 1. 動作レイヤーの分離定義
 
 ### 1.1 大脳レイヤー (Reasoning: AI Persona)
+
 - **入力**: ユーザーの意図、Publicナレッジ、実行ログ。
 - **処理**: ロールに基づく戦略立案、パラメータの特定、`MissionContract` の生成。
 - **制約**: コンテキストウィンドウの肥大化を防ぐため、決定的なログやバイナリデータは保持しない。
 
 ### 1.2 脊髄レイヤー (Reflex: Mission Control / Scripts)
+
 - **入力**: `MissionContract` (JSON), Confidential/Personalナレッジ。
-- **処理**: 
-    1. `knowledge_injections` に基づく動的変数（Secrets等）の注入。
-    2. スクリプトの決定的実行。
-    3. 結果の物理的な検証（Victory Conditionの確認）。
+- **処理**:
+  1. `knowledge_injections` に基づく動的変数（Secrets等）の注入。
+  2. スクリプトの決定的実行。
+  3. 結果の物理的な検証（Victory Conditionの確認）。
 - **制約**: 独自の「思考」は行わず、受け取った契約の範囲内でのみ執行する。
 
 ## 2. MissionContract スキーマ (標準インターフェース)
+
 大脳が脊髄へ渡すデータ構造。
 
 ```json
@@ -28,9 +31,7 @@
     "summary": "Example issue",
     "description": "..."
   },
-  "knowledge_injections": [
-    "personal/connections/jira.json:api_token"
-  ],
+  "knowledge_injections": ["personal/connections/jira.json:api_token"],
   "safety_gate": {
     "risk_level": 3,
     "require_sudo": false
@@ -39,12 +40,15 @@
 ```
 
 ## 3. 特権昇格 (sudo) プロトコル
+
 以下の条件時、脊髄は大脳へ「人間への介入」を要求する。
+
 1. `risk_level` が 4（本番変更）以上の場合。
 2. 注入パスが現在のロールに許可されていない場合。
 3. 未知のエラーが発生し、大脳による再戦略が必要な場合。
 
 ## 4. 自律修復と学習 (Self-Healing & Learning)
+
 実行失敗時、大脳は以下の順序で「反射の正常化」を試みる。
 
 1.  **パラメータ再調整 (Re-Configuration)**:

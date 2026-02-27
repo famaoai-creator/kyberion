@@ -19,32 +19,34 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for waste report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('cloud-waste-hunter', () => {
-    const scanDir = path.resolve(argv.input as string);
-    if (!fs.existsSync(scanDir)) throw new Error('Directory not found: ' + scanDir);
+  const scanDir = path.resolve(argv.input as string);
+  if (!fs.existsSync(scanDir)) throw new Error('Directory not found: ' + scanDir);
 
-    const allFiles = getAllFiles(scanDir, { maxDepth: 10 });
-    const findings: any[] = [];
+  const allFiles = getAllFiles(scanDir, { maxDepth: 10 });
+  const findings: any[] = [];
 
-    for (const filePath of allFiles) {
-      if (!filePath.endsWith('.tf') && !filePath.endsWith('.yaml') && !filePath.endsWith('.yml')) continue;
-      try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        findings.push(...checkOversizedInstances(content, path.relative(scanDir, filePath)));
-      } catch {}
-    }
+  for (const filePath of allFiles) {
+    if (!filePath.endsWith('.tf') && !filePath.endsWith('.yaml') && !filePath.endsWith('.yml'))
+      continue;
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      findings.push(...checkOversizedInstances(content, path.relative(scanDir, filePath)));
+    } catch {}
+  }
 
-    const result = {
-      findings,
-      totalFiles: allFiles.length,
-      wasteScore: calculateWasteScore(findings),
-    };
+  const result = {
+    findings,
+    totalFiles: allFiles.length,
+    wasteScore: calculateWasteScore(findings),
+  };
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
 
-    return result;
+  return result;
 });

@@ -32,26 +32,25 @@ export function generateMaestroYaml(options: TestGenOptions): string {
   try {
     // Escape prompt for shell
     const escapedPrompt = systemPrompt.replace(/"/g, '"');
-    
+
     // Call gemini command using safeExec (assuming gemini is in PATH)
     // Note: This relies on the host environment having 'gemini' installed.
     // In a real agent environment, this might call an internal API instead.
-    const output = safeExec('gemini', ['--prompt', escapedPrompt], { 
+    const output = safeExec('gemini', ['--prompt', escapedPrompt], {
       timeoutMs: 60000,
       // Pass through GEMINI_FORMAT env if needed, but safeExec env handling might be restricted.
       // Assuming gemini outputs text to stdout.
     });
-    
+
     let yamlOutput = output;
-    
+
     // Clean up code blocks if present
     const match = yamlOutput.match(/appId:[\s\S]+/);
     if (match) {
-        yamlOutput = match[0].replace(/```yaml|```/g, '').trim();
+      yamlOutput = match[0].replace(/```yaml|```/g, '').trim();
     }
 
     return yamlOutput.trim();
-
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(`Failed to generate YAML: ${msg}`);

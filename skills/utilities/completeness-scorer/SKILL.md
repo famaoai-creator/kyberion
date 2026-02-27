@@ -7,7 +7,7 @@ arguments:
     short: i
     type: string
     required: true
-    description: 
+    description:
   - name: criteria
     short: c
     type: string

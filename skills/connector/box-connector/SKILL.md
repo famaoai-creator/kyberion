@@ -1,38 +1,38 @@
 ---
 name: box-connector
 description: >-
-  
+
 status: implemented
 arguments:
   - name: action
     short: a
     type: string
     required: false
-    description: 
+    description:
   - name: folder
     short: f
     type: string
     required: false
-    description: 
+    description:
   - name: query
     short: q
     type: string
     required: false
-    description: 
+    description:
   - name: config
     short: c
     type: string
     required: false
-    description: 
+    description:
   - name: dry-run
     type: boolean
     required: false
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Connector
 last_updated: '2026-02-16'
 tags:

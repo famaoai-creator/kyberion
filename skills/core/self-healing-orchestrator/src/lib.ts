@@ -152,5 +152,7 @@ export function matchRunbook(errors: string[]): HealingAction[] {
   }
 
   const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-  return matches.sort((a, b) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3));
+  return matches.sort(
+    (a, b) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3)
+  );
 }

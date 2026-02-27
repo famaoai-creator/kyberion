@@ -8,7 +8,7 @@ arguments:
     short: d
     type: string
     required: true
-    description: 
+    description:
 category: Engineering
 last_updated: '2026-02-16'
 tags:

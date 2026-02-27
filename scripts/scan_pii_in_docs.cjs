@@ -18,34 +18,22 @@ const FORBIDDEN_PATTERNS = [
 ];
 
 function scanDocs() {
-
   const violations = [];
 
   const personalDir = path.join(knowledgeDir, 'personal');
 
-  
-
   function walk(dir) {
-
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-
       const p = path.join(dir, entry.name);
-
-      
 
       // Security: Skip personal tier from scanning (intended secrets)
 
       if (p.startsWith(personalDir)) continue;
 
-
-
       if (entry.isDirectory()) walk(p);
-
       else if (entry.name.endsWith('.md') || entry.name.endsWith('.json')) {
-
-
         const content = fs.readFileSync(p, 'utf8');
         FORBIDDEN_PATTERNS.forEach((pattern) => {
           if (pattern.regex.test(content)) {

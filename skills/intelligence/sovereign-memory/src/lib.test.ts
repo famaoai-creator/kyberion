@@ -23,8 +23,8 @@ describe('sovereign-memory lib', () => {
     const mockRegistry = {
       facts: [
         { fact: 'Apple is a fruit', category: 'food' },
-        { fact: 'Gemini is an agent', category: 'ai' }
-      ]
+        { fact: 'Gemini is an agent', category: 'ai' },
+      ],
     };
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockRegistry));

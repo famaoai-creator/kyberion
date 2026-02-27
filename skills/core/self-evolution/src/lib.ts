@@ -27,7 +27,7 @@ export async function refineSelf(target: string, reason: string): Promise<Refine
 
   // 2. Propose refinement via PR
   const branchName = `feat/self-refinement-${timestamp.substring(0, 10)}`;
-  
+
   try {
     // In a test environment, git might not be available or initialized
     execSync(`git checkout -b ${branchName}`, { cwd: rootDir, stdio: 'ignore' });
@@ -39,6 +39,6 @@ export async function refineSelf(target: string, reason: string): Promise<Refine
     target,
     backup: backupPath,
     branch: branchName,
-    reason
+    reason,
   };
 }

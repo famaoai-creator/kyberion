@@ -19,14 +19,14 @@ const ledger = {
   record: (type, data) => {
     const timestamp = new Date().toISOString();
     const lastHash = ledger._getLastHash();
-    
+
     const entry = {
       timestamp,
       type,
       role: data.role || 'Unknown',
       mission_id: data.mission_id || 'None',
       payload: data,
-      parent_hash: lastHash
+      parent_hash: lastHash,
     };
 
     // Calculate current hash for immutability (without the hash field itself)
@@ -63,12 +63,15 @@ const ledger = {
       try {
         const entry = JSON.parse(line);
         const { hash, ...dataWithoutHash } = entry;
-        
+
         // Verify parent hash link
         if (entry.parent_hash !== expectedParentHash) return false;
 
         // Verify current hash (re-calculate using data without hash field)
-        const actualHash = crypto.createHash('sha256').update(JSON.stringify(dataWithoutHash)).digest('hex');
+        const actualHash = crypto
+          .createHash('sha256')
+          .update(JSON.stringify(dataWithoutHash))
+          .digest('hex');
         if (hash !== actualHash) return false;
 
         expectedParentHash = hash;
@@ -77,7 +80,7 @@ const ledger = {
       }
     }
     return true;
-  }
+  },
 };
 
 module.exports = ledger;

@@ -16,7 +16,10 @@
  * @returns Resolved absolute path
  * @throws {Error} If the path is missing, not found, or not a regular file
  */
-export declare function validateFilePath(filePath: string | undefined | null, label?: string): string;
+export declare function validateFilePath(
+  filePath: string | undefined | null,
+  label?: string
+): string;
 /**
  * Validate that a directory path exists and points to a directory.
  *

@@ -16,9 +16,9 @@ describe('self-evolution lib', () => {
 
   it('should create a backup and return result', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    
+
     const result = await refineSelf('GEMINI.md', 'Add new protocols');
-    
+
     expect(result.target).toBe('GEMINI.md');
     expect(result.reason).toBe('Add new protocols');
     expect(fs.copyFileSync).toHaveBeenCalled();
@@ -27,7 +27,7 @@ describe('self-evolution lib', () => {
 
   it('should throw if target file not found', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    
+
     await expect(refineSelf('ghost.md', 'none')).rejects.toThrow('Target file ghost.md not found.');
   });
 });

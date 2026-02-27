@@ -6,7 +6,7 @@ import { fetchApi } from './lib.js';
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('api-fetcher', async () => {
     const args = requireArgs(['url']);
-    
+
     const options = {
       method: args.method,
       headers: args.headers ? safeJsonParse(args.headers as string, 'headers') : undefined,
@@ -14,7 +14,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     };
 
     const data = await fetchApi(args.url as string, options);
-    
+
     if (args.out) {
       safeWriteFile(args.out as string, JSON.stringify(data, null, 2));
     }

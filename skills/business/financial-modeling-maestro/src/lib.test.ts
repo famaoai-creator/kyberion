@@ -30,7 +30,7 @@ describe('financial-modeling-maestro lib', () => {
       ...mockAssumptions,
       growthRate: 0,
       costs: { ...mockAssumptions.costs!, initial_monthly_cost: 20000 },
-      cashOnHand: 10000
+      cashOnHand: 10000,
     };
     const projections = generatePnL(poorAssumptions, 1);
     const runway = analyzeRunway(projections.monthly);
@@ -43,16 +43,20 @@ describe('financial-modeling-maestro lib', () => {
     expect(scenarios.base).toBeDefined();
     expect(scenarios.optimistic).toBeDefined();
     expect(scenarios.pessimistic).toBeDefined();
-    expect(scenarios.optimistic.yearly[0].annualRevenue).toBeGreaterThan(scenarios.base.yearly[0].annualRevenue);
-    expect(scenarios.pessimistic.yearly[0].annualRevenue).toBeLessThan(scenarios.base.yearly[0].annualRevenue);
+    expect(scenarios.optimistic.yearly[0].annualRevenue).toBeGreaterThan(
+      scenarios.base.yearly[0].annualRevenue
+    );
+    expect(scenarios.pessimistic.yearly[0].annualRevenue).toBeLessThan(
+      scenarios.base.yearly[0].annualRevenue
+    );
   });
 
   it('should clamp invalid inputs to sensible ranges', () => {
     const invalidInput: FinancialAssumptions = {
-        mrr: -1000,
-        growthRate: 10,
-        churnRate: 2,
-        costs: { headcount: -5 }
+      mrr: -1000,
+      growthRate: 10,
+      churnRate: 2,
+      costs: { headcount: -5 },
     };
     const result = generatePnL(invalidInput, 1);
     expect(result.monthly[0].mrr).toBeGreaterThanOrEqual(0);

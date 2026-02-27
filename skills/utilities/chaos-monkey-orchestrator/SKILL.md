@@ -1,23 +1,23 @@
 ---
 name: chaos-monkey-orchestrator
 description: >-
-  
+
 status: implemented
 arguments:
   - name: target
     short: t
     type: string
     required: false
-    description: 
+    description:
   - name: mode
     short: m
     type: string
     required: false
-    description: 
+    description:
   - name: intensity
     type: number
     required: false
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

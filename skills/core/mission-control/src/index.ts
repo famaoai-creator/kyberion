@@ -3,7 +3,7 @@ import { orchestrate } from './lib.js';
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('mission-control', async () => {
-    const contractPath = process.argv.find(arg => arg.endsWith('.json'));
+    const contractPath = process.argv.find((arg) => arg.endsWith('.json'));
     if (!contractPath) {
       throw new Error('MissionContract JSON file path is required');
     }

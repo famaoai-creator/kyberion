@@ -18,14 +18,17 @@ export interface PDFResult {
 /**
  * composes a PDF from a DocumentArtifact (Markdown or HTML).
  */
-export async function composePDF(artifact: DocumentArtifact, options: PDFOptions): Promise<PDFResult> {
+export async function composePDF(
+  artifact: DocumentArtifact,
+  options: PDFOptions
+): Promise<PDFResult> {
   let htmlBody = '';
   if (artifact.format === 'html') {
     htmlBody = artifact.body;
   } else {
     htmlBody = await marked.parse(artifact.body);
   }
-  
+
   const cssStyle = options.theme ? options.theme.body : '';
 
   const htmlContent = `
@@ -40,11 +43,11 @@ export async function composePDF(artifact: DocumentArtifact, options: PDFOptions
 </body>
 </html>`;
 
-  const browser = await puppeteer.launch({ 
+  const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
-  
+
   try {
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });

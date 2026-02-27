@@ -1,24 +1,24 @@
 ---
 name: dataset-curator
 description: >-
-  
+
 status: implemented
 arguments:
   - name: input
     short: i
     type: string
     required: true
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
   - name: format
     short: f
     type: string
     required: false
-    description: 
+    description:
 category: Intelligence
 last_updated: '2026-02-16'
 tags:

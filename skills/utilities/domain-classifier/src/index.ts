@@ -3,11 +3,13 @@ import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { loadDomainRules, classifyDomain } from './lib.js';
 
-const argv = createStandardYargs().option('input', {
-  alias: 'i',
-  type: 'string',
-  demandOption: true,
-}).parseSync();
+const argv = createStandardYargs()
+  .option('input', {
+    alias: 'i',
+    type: 'string',
+    demandOption: true,
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('domain-classifier', () => {

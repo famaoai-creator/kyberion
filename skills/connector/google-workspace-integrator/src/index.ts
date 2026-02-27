@@ -14,8 +14,7 @@ const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string' })
   .option('to', { alias: 't', type: 'string' })
   .option('dry-run', { type: 'boolean', default: true })
-  .option('out', { alias: 'o', type: 'string' })
-  .argv;
+  .option('out', { alias: 'o', type: 'string' }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('google-workspace-integrator', async () => {
@@ -29,7 +28,9 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
         actionResult = draftEmail(argv.input as string, argv.to as string);
         break;
       case 'list-events':
-        actionResult = isDryRun ? [{ summary: 'Mock Event', start: new Date().toISOString() }] : { message: 'Live mode not fully implemented in TS yet' };
+        actionResult = isDryRun
+          ? [{ summary: 'Mock Event', start: new Date().toISOString() }]
+          : { message: 'Live mode not fully implemented in TS yet' };
         break;
       default:
         actionResult = { message: 'Google Workspace connection ready' };

@@ -27,30 +27,32 @@ This skill automates complex web browser workflows. It has been evolved into a *
 Scenarios are stored as `.yaml` files. They define a sequence of actions to be performed.
 
 ```yaml
-name: "Scenario Name"
+name: 'Scenario Name'
 steps:
-  - action: "goto"
-    url: "https://example.com"
-  - action: "login"
-    credentials: "connection_id" # Refers to knowledge/personal/connections/{id}.json
-  - action: "loop_approve"
-    selector: "a"
-    item_filter_keywords: ["{YYYY}/{MM}"]
-    button: "Approve"
+  - action: 'goto'
+    url: 'https://example.com'
+  - action: 'login'
+    credentials: 'connection_id' # Refers to knowledge/personal/connections/{id}.json
+  - action: 'loop_approve'
+    selector: 'a'
+    item_filter_keywords: ['{YYYY}/{MM}']
+    button: 'Approve'
 ```
 
 ## 2. Available Actions
 
-| Action | Description | Parameters |
-| :--- | :--- | :--- |
-| `goto` | Navigates to a URL. | `url` |
-| `login` | Performs login using managed credentials. | `credentials` (connection ID) |
-| `click_robust` | Clicks an element by text or selector across all frames. | `text` or `selector` |
-| `loop_approve` | Iterates through a list, opens details, and performs an action. | See below |
-| `wait` | Pauses execution. | `timeout` (ms) |
+| Action         | Description                                                     | Parameters                    |
+| :------------- | :-------------------------------------------------------------- | :---------------------------- |
+| `goto`         | Navigates to a URL.                                             | `url`                         |
+| `login`        | Performs login using managed credentials.                       | `credentials` (connection ID) |
+| `click_robust` | Clicks an element by text or selector across all frames.        | `text` or `selector`          |
+| `loop_approve` | Iterates through a list, opens details, and performs an action. | See below                     |
+| `wait`         | Pauses execution.                                               | `timeout` (ms)                |
 
 ### `loop_approve` Details
+
 This is a high-level action for processing lists (e.g., approval queues).
+
 - `selector`: Selector for items in the list.
 - `item_filter_keywords`: Only process items containing these strings.
 - `item_filter_re`: Regex pattern for filtering items.

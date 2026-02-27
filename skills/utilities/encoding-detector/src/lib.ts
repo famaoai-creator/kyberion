@@ -11,7 +11,7 @@ export function detectEncoding(buffer: Buffer): EncodingResult {
   const result = jschardet.detect(buffer);
   const content = buffer.toString();
   let lineEnding: EncodingResult['lineEnding'] = 'unknown';
-  
+
   if (content.includes('\r\n')) lineEnding = 'CRLF';
   else if (content.includes('\n')) lineEnding = 'LF';
   else if (content.includes('\r')) lineEnding = 'CR';

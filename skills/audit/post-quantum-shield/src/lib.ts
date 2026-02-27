@@ -1,6 +1,6 @@
 export const VULNERABLE_CRYPTO = [
   { pattern: /\b(RSA|rsa)\b/g, algorithm: 'RSA' },
-  { pattern: /\b(MD5|md5)\b/g, algorithm: 'MD5' }
+  { pattern: /\b(MD5|md5)\b/g, algorithm: 'MD5' },
 ];
 
 export function scanCryptoContent(content: string, fileName: string): any[] {

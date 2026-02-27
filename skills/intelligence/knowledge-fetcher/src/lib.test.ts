@@ -12,7 +12,11 @@ describe('knowledge-fetcher lib', () => {
   it('should find files containing the query in content', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readdirSync).mockReturnValue(['test.md'] as any);
-    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false, isFile: () => true, size: 100 } as any);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      size: 100,
+    } as any);
     vi.mocked(fs.readFileSync).mockReturnValue('This is a test knowledge content.');
 
     const results = searchKnowledge('/knowledge', 'test');
@@ -23,7 +27,11 @@ describe('knowledge-fetcher lib', () => {
   it('should find files containing the query in filename', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readdirSync).mockReturnValue(['query-match.txt'] as any);
-    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false, isFile: () => true, size: 100 } as any);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      size: 100,
+    } as any);
     vi.mocked(fs.readFileSync).mockReturnValue('No match here.');
 
     const results = searchKnowledge('/knowledge', 'query');

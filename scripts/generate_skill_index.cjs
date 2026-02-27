@@ -13,7 +13,9 @@ const indexFile = path.join(rootDir, 'knowledge/orchestration/global_skill_index
 try {
   const skills = [];
   const skillsRootDir = path.join(rootDir, 'skills');
-  const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+  const categories = fs
+    .readdirSync(skillsRootDir)
+    .filter((f) => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
 
   // Pre-compile regex for performance
   const descRegex = /^description:\s*(.*)$/m;
@@ -22,7 +24,7 @@ try {
 
   for (const cat of categories) {
     const catPath = path.join(skillsRootDir, cat);
-    const skillDirs = fs.readdirSync(catPath).filter(f => {
+    const skillDirs = fs.readdirSync(catPath).filter((f) => {
       const fullPath = path.join(catPath, f);
       return fs.statSync(fullPath).isDirectory(); // statSync follows links by default
     });
@@ -31,7 +33,7 @@ try {
       const skillPhysicalPath = path.join('skills', cat, dir);
       const skillFullDir = path.join(rootDir, skillPhysicalPath);
       const skillPath = path.join(skillFullDir, 'SKILL.md');
-      
+
       if (fs.existsSync(skillPath)) {
         const content = fs.readFileSync(skillPath, 'utf8');
         const descMatch = content.match(descRegex);
@@ -68,7 +70,11 @@ try {
           n: dir, // Compressed key: name
           path: skillPhysicalPath, // Physical path in hierarchical structure
           d: desc, // Compressed key: description
-          s: statusMatch ? (statusMatch[1] === 'implemented' ? 'impl' : statusMatch[1].substring(0, 4)) : 'plan',
+          s: statusMatch
+            ? statusMatch[1] === 'implemented'
+              ? 'impl'
+              : statusMatch[1].substring(0, 4)
+            : 'plan',
           r: riskMatch ? riskMatch[1] : 'low', // NEW: risk_level
           m: mainScript, // Compressed key: main script path
           t: tags, // Compressed key: tags

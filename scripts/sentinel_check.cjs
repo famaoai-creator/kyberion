@@ -29,4 +29,6 @@ checks.forEach((check) => {
 });
 
 fs.writeFileSync('active/shared/sentinel-report.json', JSON.stringify(results, null, 2));
-console.log('--- Sentinel Analysis Complete. Report saved to active/shared/sentinel-report.json ---');
+console.log(
+  '--- Sentinel Analysis Complete. Report saved to active/shared/sentinel-report.json ---'
+);

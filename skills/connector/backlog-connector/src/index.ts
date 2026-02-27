@@ -22,7 +22,12 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const projectInfo = inventory.systems.backlog.projects[argv.project as string];
     if (!projectInfo) throw new Error('Project ' + argv.project + ' not found in inventory.');
 
-    const data = fetchBacklogIssues(inventory.systems.backlog.space_url, config.endpoints.issues, apiKey, projectInfo.id);
+    const data = fetchBacklogIssues(
+      inventory.systems.backlog.space_url,
+      config.endpoints.issues,
+      apiKey,
+      projectInfo.id
+    );
 
     return { project: argv.project, count: data.length };
   });

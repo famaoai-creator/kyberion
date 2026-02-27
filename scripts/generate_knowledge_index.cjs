@@ -18,7 +18,7 @@ function extractMetadata(content, filePath) {
     title: '',
     author: 'Unknown',
     last_updated: '',
-    tier: detectTier(filePath)
+    tier: detectTier(filePath),
   };
 
   // Extract Title
@@ -67,7 +67,7 @@ function walk(dir, fileList = []) {
       fileList.push({
         id: relPath,
         ...metadata,
-        category: path.dirname(relPath)
+        category: path.dirname(relPath),
       });
     }
   });
@@ -80,12 +80,12 @@ try {
 
   // 1. Generate SSoT JSON index
   const ssotData = {
-    v: "2.0.0",
+    v: '2.0.0',
     t: index.length,
     u: new Date().toISOString(),
-    items: index
+    items: index,
   };
-  
+
   if (!fs.existsSync(path.dirname(jsonPath)))
     fs.mkdirSync(path.dirname(jsonPath), { recursive: true });
   fs.writeFileSync(jsonPath, JSON.stringify(ssotData, null, 2));

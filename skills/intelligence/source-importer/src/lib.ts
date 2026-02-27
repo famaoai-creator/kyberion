@@ -28,17 +28,20 @@ export async function importSource(repoUrl: string, name?: string): Promise<Sour
     execSync(`git clone --depth 1 ${repoUrl} ${quarantineDir}`, { stdio: 'ignore' });
   }
 
-  let scanResult = "Not scanned";
+  let scanResult = 'Not scanned';
   try {
     // Invoke security-scanner via CLI (Architecture standard for intra-skill calling)
-    const scanOutput = execSync(`node scripts/cli.cjs run security-scanner --dir ${quarantineDir}`, { encoding: 'utf8' });
+    const scanOutput = execSync(
+      `node scripts/cli.cjs run security-scanner --dir ${quarantineDir}`,
+      { encoding: 'utf8' }
+    );
     scanResult = scanOutput.includes('findingCount: 0') ? 'Passed' : 'Warning: Issues Found';
   } catch (_e) {
     // Scan tool failed
   }
 
-  const registry: Registry = fs.existsSync(registryPath) 
-    ? JSON.parse(fs.readFileSync(registryPath, 'utf8')) 
+  const registry: Registry = fs.existsSync(registryPath)
+    ? JSON.parse(fs.readFileSync(registryPath, 'utf8'))
     : { sources: [] };
 
   const entry: SourceEntry = {
@@ -47,10 +50,10 @@ export async function importSource(repoUrl: string, name?: string): Promise<Sour
     importedAt: new Date().toISOString(),
     status: scanResult === 'Passed' ? 'verified' : 'quarantined',
     scanResult,
-    localPath: quarantineDir
+    localPath: quarantineDir,
   };
 
-  const existingIdx = registry.sources.findIndex(s => s.id === repoName);
+  const existingIdx = registry.sources.findIndex((s) => s.id === repoName);
   if (existingIdx !== -1) registry.sources[existingIdx] = entry;
   else registry.sources.push(entry);
 

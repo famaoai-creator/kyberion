@@ -16,7 +16,7 @@ export interface HarvestResult {
 export async function harvestRepository(repoUrl: string): Promise<HarvestResult> {
   const tmpDir = path.join(pathResolver.shared('tmp'), 'harvest_' + Date.now());
   fs.mkdirSync(tmpDir, { recursive: true });
-  
+
   try {
     execSync(`git clone --depth 1 ${repoUrl} ${tmpDir}`, { stdio: 'ignore' });
   } catch (_e) {
@@ -31,11 +31,11 @@ export async function harvestRepository(repoUrl: string): Promise<HarvestResult>
 
   const rootDir = pathResolver.rootDir();
   const indexFile = path.join(rootDir, 'knowledge/_index.md');
-  
+
   if (fs.existsSync(rootDir)) {
-    const skills = fs.readdirSync(rootDir).filter((f) => 
-      fs.existsSync(path.join(rootDir, f, 'SKILL.md'))
-    );
+    const skills = fs
+      .readdirSync(rootDir)
+      .filter((f) => fs.existsSync(path.join(rootDir, f, 'SKILL.md')));
 
     let md = `# Ecosystem Knowledge Base\n\n## Available Skills\n\n`;
     skills.sort().forEach((s) => {

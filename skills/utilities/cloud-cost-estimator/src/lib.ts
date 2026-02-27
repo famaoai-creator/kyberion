@@ -3,7 +3,11 @@ export interface CostEstimateResult {
   findings: any[];
 }
 
-export function estimateCosts(adf: any, instancePricing: any, optimizationRules: any[]): CostEstimateResult {
+export function estimateCosts(
+  adf: any,
+  instancePricing: any,
+  optimizationRules: any[]
+): CostEstimateResult {
   let totalMonthlyCost = 0;
   const findings: any[] = [];
 

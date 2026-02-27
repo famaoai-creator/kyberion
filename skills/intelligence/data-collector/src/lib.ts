@@ -26,10 +26,14 @@ export function calculateHash(buffer: Buffer | ArrayBuffer): string {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
-export async function collectData(url: string, outDir: string, options: { name?: string; force?: boolean } = {}): Promise<any> {
+export async function collectData(
+  url: string,
+  outDir: string,
+  options: { name?: string; force?: boolean } = {}
+): Promise<any> {
   const { name, force = false } = options;
   const manifestPath = path.join(outDir, 'manifest.json');
-  
+
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }

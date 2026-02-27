@@ -7,14 +7,13 @@ import { scanKnowledgeTiers, buildContextMap } from './lib.js';
 
 const argv = createStandardYargs()
   .option('dir', { alias: 'd', type: 'string', default: '.' })
-  .option('out', { alias: 'o', type: 'string' })
-  .argv;
+  .option('out', { alias: 'o', type: 'string' }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('auto-context-mapper', () => {
     const targetDir = path.resolve(argv.dir as string);
     const tiers = scanKnowledgeTiers(targetDir);
-    
+
     // Get skill names from index
     let skills: string[] = [];
     const indexPath = path.join(targetDir, 'knowledge/orchestration/global_skill_index.json');
@@ -24,7 +23,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     }
 
     const links = buildContextMap(tiers, skills, targetDir);
-    
+
     const result = {
       directory: targetDir,
       knowledgeAssets: {

@@ -16,7 +16,10 @@ export function scanDepsForRiskyLicenses(deps: any): LicenseFinding[] {
       if (scanned.has(name)) continue;
       scanned.add(name);
 
-      const license = (info as any).license || ((info as any).licenses && (info as any).licenses[0]?.type) || 'Unknown';
+      const license =
+        (info as any).license ||
+        ((info as any).licenses && (info as any).licenses[0]?.type) ||
+        'Unknown';
       const isRisky = RISKY_PATTERNS.some((p) => p.test(license));
 
       if (isRisky) {

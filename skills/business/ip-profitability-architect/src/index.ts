@@ -28,9 +28,9 @@ runSkill('ip-profitability-architect', () => {
 
   const inputContent = fs.readFileSync(resolved, 'utf8');
   const rawData = JSON.parse(inputContent);
-  
+
   let assets: IPAsset[] = [];
-  
+
   // Synergy Logic: If input is from ip-strategist, map findings to assets
   if (rawData.data && rawData.data.findings) {
     assets = rawData.data.findings
@@ -39,7 +39,7 @@ runSkill('ip-profitability-architect', () => {
         name: f.file,
         type: f.category,
         development_cost: 50000,
-        potential_annual_revenue: f.matchCount * 10000
+        potential_annual_revenue: f.matchCount * 10000,
       }));
   } else if (rawData.assets) {
     assets = rawData.assets;

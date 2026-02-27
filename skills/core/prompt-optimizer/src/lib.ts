@@ -16,8 +16,16 @@ export interface OptimizationResult {
 const REQUIRED_SECTIONS = ['Usage', 'Troubleshooting', 'Options'];
 
 const CLARITY_INDICATORS = [
-  'must', 'should', 'returns', 'outputs', 'requires', 'provides',
-  'accepts', 'generates', 'validates', 'ensures',
+  'must',
+  'should',
+  'returns',
+  'outputs',
+  'requires',
+  'provides',
+  'accepts',
+  'generates',
+  'validates',
+  'ensures',
 ];
 
 const ACTIONABLE_PATTERNS = [
@@ -25,8 +33,16 @@ const ACTIONABLE_PATTERNS = [
 ];
 
 const VAGUE_WORDS = [
-  'stuff', 'things', 'somehow', 'maybe', 'possibly', 'etc',
-  'various', 'certain', 'some kind of', 'sort of',
+  'stuff',
+  'things',
+  'somehow',
+  'maybe',
+  'possibly',
+  'etc',
+  'various',
+  'certain',
+  'some kind of',
+  'sort of',
 ];
 
 export function parseFrontmatter(content: string): Record<string, string> {
@@ -94,9 +110,13 @@ export function optimizePrompt(content: string, filePath: string): OptimizationR
   checks.push({
     name: 'description-length',
     passed: descLengthOk,
-    detail: descLength > 0 ? `Description is ${descLength} chars (ideal: 20-200)` : 'No description to evaluate',
+    detail:
+      descLength > 0
+        ? `Description is ${descLength} chars (ideal: 20-200)`
+        : 'No description to evaluate',
   });
-  if (descLength > 0 && descLength < 20) suggestions.push('Expand the description to at least 20 characters.');
+  if (descLength > 0 && descLength < 20)
+    suggestions.push('Expand the description to at least 20 characters.');
   if (descLength > 200) suggestions.push('Shorten the description to 200 characters or less.');
 
   // Check 4-6: Required sections
@@ -128,7 +148,9 @@ export function optimizePrompt(content: string, filePath: string): OptimizationR
   checks.push({
     name: 'actionable-language',
     passed: hasActionableLanguage,
-    detail: hasActionableLanguage ? `Found actionable language patterns (${actionableCount})` : 'No actionable verb patterns found',
+    detail: hasActionableLanguage
+      ? `Found actionable language patterns (${actionableCount})`
+      : 'No actionable verb patterns found',
   });
 
   // Check 9: No vague words
@@ -141,7 +163,9 @@ export function optimizePrompt(content: string, filePath: string): OptimizationR
   checks.push({
     name: 'no-vague-words',
     passed: noVagueWords,
-    detail: noVagueWords ? 'No vague language detected' : `Found vague words: ${vagueFound.join(', ')}`,
+    detail: noVagueWords
+      ? 'No vague language detected'
+      : `Found vague words: ${vagueFound.join(', ')}`,
   });
 
   // Check 10: Knowledge Protocol
@@ -149,13 +173,16 @@ export function optimizePrompt(content: string, filePath: string): OptimizationR
   checks.push({
     name: 'knowledge-protocol',
     passed: hasKnowledgeProtocol,
-    detail: hasKnowledgeProtocol ? 'Knowledge Protocol reference found' : 'No Knowledge Protocol reference found',
+    detail: hasKnowledgeProtocol
+      ? 'Knowledge Protocol reference found'
+      : 'No Knowledge Protocol reference found',
   });
 
   // Check 11: Has examples
-  const hasExamples = new RegExp('```[\\s\\S]*?```').test(body) || 
-                      new RegExp('^\\s*[-*]\\s+"[^"]+"', 'm').test(body) || 
-                      new RegExp('^\\s*[-*]\\s+`[^`]+`', 'm').test(body);
+  const hasExamples =
+    new RegExp('```[\\s\\S]*?```').test(body) ||
+    new RegExp('^\\s*[-*]\\s+"[^"]+"', 'm').test(body) ||
+    new RegExp('^\\s*[-*]\\s+`[^`]+`', 'm').test(body);
   checks.push({
     name: 'has-examples',
     passed: hasExamples,

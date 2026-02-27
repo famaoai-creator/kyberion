@@ -5,9 +5,9 @@ describe('schema-validator lib', () => {
   const schema = {
     type: 'object',
     properties: {
-      name: { type: 'string' }
+      name: { type: 'string' },
     },
-    required: ['name']
+    required: ['name'],
   };
 
   it('should return valid true for correct data', () => {

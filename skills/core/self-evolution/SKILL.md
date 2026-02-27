@@ -19,17 +19,20 @@ arguments:
 # self-evolution
 
 ## Capabilities
+
 - **Incident Analysis**: Reads `knowledge/incidents/` to identify recurring patterns.
 - **Auto-Backup**: Creates `.bak` files in `active/archive/backups/` before any changes.
 - **Draft Refinement**: Proposes instruction updates via a new Git branch and PR.
 
 ## Arguments
-| Name | Type | Description |
-| :--- | :--- | :--- |
+
+| Name     | Type   | Description                                         |
+| :------- | :----- | :-------------------------------------------------- |
 | --target | string | (Optional) File to refine. Defaults to 'GEMINI.md'. |
-| --reason | string | (Required) Reason for the self-correction. |
+| --reason | string | (Required) Reason for the self-correction.          |
 
 ## Usage
+
 ```bash
 node scripts/cli.cjs run self-evolution --target GEMINI.md --reason "Simplify bootstrap instructions"
 ```

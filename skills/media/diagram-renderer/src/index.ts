@@ -38,7 +38,10 @@ runSkill('diagram-renderer', () => {
 
   // Icon map path relative to this skill's source/dist
   // Knowledge is at knowledge/skills/diagram-renderer/icon-map.json
-  const iconMapPath = path.resolve(__dirname, '../../../knowledge/skills/diagram-renderer/icon-map.json');
+  const iconMapPath = path.resolve(
+    __dirname,
+    '../../../knowledge/skills/diagram-renderer/icon-map.json'
+  );
   if (!fs.existsSync(iconMapPath)) {
     throw new Error(`Icon map knowledge missing: ${iconMapPath}`);
   }

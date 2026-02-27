@@ -174,13 +174,20 @@ export function processBusinessPlan(input: BusinessInput): BusinessPlanResult {
   const pillars = createGrowthPillars();
 
   const recommendations = [
-    okrs.length === 0 ? 'Define clear objectives in your input to generate OKRs' : `${okrs.length} OKRs generated`,
-    marketStrategies.length === 0 ? 'Provide target market data for entry strategy analysis' : `${marketStrategies.length} market entry strategies identified`,
-    revenueStreams.length === 0 ? 'Specify a business model to map revenue streams' : `${revenueStreams.length} revenue streams mapped`,
+    okrs.length === 0
+      ? 'Define clear objectives in your input to generate OKRs'
+      : `${okrs.length} OKRs generated`,
+    marketStrategies.length === 0
+      ? 'Provide target market data for entry strategy analysis'
+      : `${marketStrategies.length} market entry strategies identified`,
+    revenueStreams.length === 0
+      ? 'Specify a business model to map revenue streams'
+      : `${revenueStreams.length} revenue streams mapped`,
   ];
 
   if (!input.name) recommendations.push('Provide company name for a more personalized plan');
-  if (!input.vision) recommendations.push('Define a vision to align growth pillars with long-term goals');
+  if (!input.vision)
+    recommendations.push('Define a vision to align growth pillars with long-term goals');
 
   return {
     company: input.name || 'Unknown Entity',

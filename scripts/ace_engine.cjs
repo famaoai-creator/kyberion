@@ -19,7 +19,7 @@ async function runACE(topic, evidencePath, missionId = null) {
 
   // 1. Load Personas
   const personas = personaLoader.loadPersonas(matrixPath);
-  
+
   // 2. Select Committee Members Dynamically
   const committee = selectCommittee(topic, Object.keys(personas));
   logger.info(`Summoned experts: ${committee.join(', ')}`);
@@ -30,7 +30,7 @@ async function runACE(topic, evidencePath, missionId = null) {
     const persona = personas[roleName];
     const vote = simulatePersonaInsight(roleName, persona, topic);
     results.push(vote);
-    
+
     console.log(chalk.yellow(`\n--- [${roleName}] Assessment ---`));
     console.log(chalk.dim(`Viewpoint: ${persona.viewpoint || persona.role}`));
     console.log(`Score: ${vote.score} | Analysis: ${vote.analysis}`);
@@ -38,9 +38,14 @@ async function runACE(topic, evidencePath, missionId = null) {
 
   // 4. Final Decision Algorithm (Standard MSC)
   const decision = evaluateMSC(results);
-  
+
   console.log(chalk.bold(`\n--- Final Decision ---`));
-  const theme = decision.status === 'GO' ? chalk.bgGreen.black : (decision.status === 'YELLOW-CARD' ? chalk.bgYellow.black : chalk.bgRed.white);
+  const theme =
+    decision.status === 'GO'
+      ? chalk.bgGreen.black
+      : decision.status === 'YELLOW-CARD'
+        ? chalk.bgYellow.black
+        : chalk.bgRed.white;
   console.log(theme(` RESULT: ${decision.status} `));
   console.log(chalk.dim(`Rationale: ${decision.rationale}`));
 
@@ -54,17 +59,17 @@ async function runACE(topic, evidencePath, missionId = null) {
 
 function selectCommittee(topic, availableRoles) {
   const committee = ['The Ecosystem Architect', 'The ECC Security Reviewer']; // Permanent seats
-  
+
   // Dynamic seat based on topic
   const domainMap = {
-    'UI': 'The Empathetic CXO',
-    'UX': 'The Empathetic CXO',
-    'Money': 'The Capital Strategist',
-    'Finance': 'The Capital Strategist',
-    'Refactor': 'The Efficiency Optimizer',
-    'Code': 'The Focused Craftsman',
-    'Legal': 'The Guardian of Ethics & IP',
-    'Strategy': 'The Pragmatic CTO'
+    UI: 'The Empathetic CXO',
+    UX: 'The Empathetic CXO',
+    Money: 'The Capital Strategist',
+    Finance: 'The Capital Strategist',
+    Refactor: 'The Efficiency Optimizer',
+    Code: 'The Focused Craftsman',
+    Legal: 'The Guardian of Ethics & IP',
+    Strategy: 'The Pragmatic CTO',
   };
 
   for (const [key, role] of Object.entries(domainMap)) {
@@ -81,21 +86,21 @@ function selectCommittee(topic, availableRoles) {
 }
 
 function simulatePersonaInsight(role, persona, topic) {
-  // Normally this would be a prompt to an AI model. 
+  // Normally this would be a prompt to an AI model.
   // In script-mode, we generate a protocol-compliant object.
   const isSecurity = role.includes('Security');
   const score = isSecurity ? 'S4' : 'U1'; // Optimized for current mission flow
-  
+
   return {
     role: role,
     score: score,
-    analysis: `Analyzed topic "${topic}" based on ${role} constraints. No critical violations found.`
+    analysis: `Analyzed topic "${topic}" based on ${role} constraints. No critical violations found.`,
   };
 }
 
 function evaluateMSC(results) {
   let hasCritical = false;
-  results.forEach(r => {
+  results.forEach((r) => {
     if (r.score.startsWith('S1')) hasCritical = true;
   });
 
@@ -112,7 +117,7 @@ function saveEvidence(missionId, topic, results, status) {
     topic: topic,
     decision: status,
     participants: results,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
   const reportPath = path.join(missionDir, 'ace-report.json');

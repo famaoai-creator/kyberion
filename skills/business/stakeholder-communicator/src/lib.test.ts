@@ -24,15 +24,15 @@ describe('stakeholder-communicator lib', () => {
 
   it('should extract key points like metrics and impact', () => {
     const points = extractKeyPoints(technicalContent);
-    expect(points.some(p => p.type === 'metric' && p.value.includes('99.9%'))).toBe(true);
-    expect(points.some(p => p.type === 'metric' && p.value.includes('200ms'))).toBe(true);
-    expect(points.some(p => p.type === 'impact')).toBe(true);
+    expect(points.some((p) => p.type === 'metric' && p.value.includes('99.9%'))).toBe(true);
+    expect(points.some((p) => p.type === 'metric' && p.value.includes('200ms'))).toBe(true);
+    expect(points.some((p) => p.type === 'impact')).toBe(true);
   });
 
   it('should generate audience-specific output', () => {
     const points = extractKeyPoints(technicalContent);
     const { translations } = translateContent(technicalContent);
-    
+
     const output = generateOutput(technicalContent, 'executive', 'email', points, translations);
     expect(output.headline).toContain('Executive Team');
     expect(output.structure.subject).toContain('[Update]');

@@ -10,8 +10,11 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const targetDir = path.resolve(argv.dir as string);
     const outputPath = path.resolve(argv.out as string);
 
-    const patternsPath = path.resolve(__dirname, '../../../knowledge/skills/api-doc-generator/patterns.json');
-    const patterns = JSON.parse(await safeReadFileAsync(patternsPath) as string);
+    const patternsPath = path.resolve(
+      __dirname,
+      '../../../knowledge/skills/api-doc-generator/patterns.json'
+    );
+    const patterns = JSON.parse((await safeReadFileAsync(patternsPath)) as string);
 
     const apiSpecs = await extractExpressRoutes(targetDir, patterns);
 

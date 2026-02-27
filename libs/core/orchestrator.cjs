@@ -27,7 +27,7 @@ const skillIndex = path.join(rootDir, 'knowledge/orchestration/global_skill_inde
 function resolveSkillScript(skillName) {
   const index = JSON.parse(fs.readFileSync(skillIndex, 'utf8'));
   const skills = index.s || index.skills;
-  
+
   let skill;
   if (skillName.includes('/')) {
     // Priority 1: Exact path match (e.g. "audit/security-scanner")
@@ -51,7 +51,8 @@ function resolveSkillScript(skillName) {
 
   // Fallback to legacy discovery
   const scriptsDir = path.join(skillDir, 'scripts');
-  if (!fs.existsSync(scriptsDir)) throw new Error(`No scripts/ directory for "${skillName}" at ${skillDir}`);
+  if (!fs.existsSync(scriptsDir))
+    throw new Error(`No scripts/ directory for "${skillName}" at ${skillDir}`);
   const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.cjs$/.test(f));
   if (scripts.length === 0) throw new Error(`No .cjs scripts found for "${skillName}"`);
   return path.join(scriptsDir, scripts[0]);

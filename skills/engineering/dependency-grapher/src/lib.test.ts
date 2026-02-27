@@ -26,29 +26,29 @@ describe('generateMermaidGraph', () => {
   it('should include a skill if SKILL.md exists', () => {
     const rootDir = '/fake/root';
     const skillName = 'my-skill';
-    
+
     // Mock readdirSync to handle recursive calls
     vi.mocked(fs.readdirSync).mockImplementation((dir) => {
-        const d = dir.toString();
-        if (d === rootDir) return [skillName] as any;
-        if (d.includes('scripts')) return ['script.ts'] as any;
-        return [] as any;
+      const d = dir.toString();
+      if (d === rootDir) return [skillName] as any;
+      if (d.includes('scripts')) return ['script.ts'] as any;
+      return [] as any;
     });
 
     // Mock existsSync
     vi.mocked(fs.existsSync).mockImplementation((p) => {
-        const pStr = p.toString();
-        // Check if path ends with expected segments
-        if (pStr.endsWith(skillName)) return true; // directory exists
-        if (pStr.endsWith('SKILL.md')) return true; // SKILL.md exists
-        if (pStr.endsWith('scripts')) return true; // scripts dir exists
-        if (pStr.endsWith('src')) return false; // src dir does not exist
-        return false;
+      const pStr = p.toString();
+      // Check if path ends with expected segments
+      if (pStr.endsWith(skillName)) return true; // directory exists
+      if (pStr.endsWith('SKILL.md')) return true; // SKILL.md exists
+      if (pStr.endsWith('scripts')) return true; // scripts dir exists
+      if (pStr.endsWith('src')) return false; // src dir does not exist
+      return false;
     });
 
     // Mock statSync to always say it's a directory (for skill folder)
     vi.mocked(fs.statSync).mockReturnValue({
-        isDirectory: () => true
+      isDirectory: () => true,
     } as any);
 
     // Mock readFileSync to simulate file content with dependency

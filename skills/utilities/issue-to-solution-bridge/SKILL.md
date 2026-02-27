@@ -1,7 +1,7 @@
 ---
 name: issue-to-solution-bridge
 description: >-
-  
+
 status: implemented
 arguments:
   - name: issue

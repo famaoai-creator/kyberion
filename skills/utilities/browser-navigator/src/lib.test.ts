@@ -12,6 +12,9 @@ describe('browser-navigator lib', () => {
   it('should call playwright cli', () => {
     vi.mocked(execSync).mockReturnValue('{"ok": true}');
     runBrowserScenario('test.spec.ts', '/root');
-    expect(execSync).toHaveBeenCalledWith(expect.stringContaining('playwright test'), expect.any(Object));
+    expect(execSync).toHaveBeenCalledWith(
+      expect.stringContaining('playwright test'),
+      expect.any(Object)
+    );
   });
 });

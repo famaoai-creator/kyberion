@@ -14,7 +14,7 @@ describe('log-analyst lib', () => {
     vi.mocked(fs.openSync).mockReturnValue(1);
     vi.mocked(fs.readSync).mockReturnValue(100);
     // Buffer.toString will be called on the mock buffer
-    
+
     const result = tailFile('test.log', 10);
     expect(result.logFile).toBe('test.log');
     expect(result.totalSize).toBe(100);

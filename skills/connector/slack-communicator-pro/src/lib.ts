@@ -18,10 +18,17 @@ export function checkSlackWebhook(): WebhookStatus {
   return { configured: false };
 }
 
-export function formatSlackMessage(action: string, input: string | undefined, channel: string): any {
+export function formatSlackMessage(
+  action: string,
+  input: string | undefined,
+  channel: string
+): any {
   const message: any = { channel, blocks: [] };
   if (action === 'alert') {
-    message.blocks = [{ type: 'header', text: { type: 'plain_text', text: 'ALERT' } }, { type: 'section', text: { type: 'mrkdwn', text: input || 'Alert!' } }];
+    message.blocks = [
+      { type: 'header', text: { type: 'plain_text', text: 'ALERT' } },
+      { type: 'section', text: { type: 'mrkdwn', text: input || 'Alert!' } },
+    ];
   } else {
     message.blocks = [{ type: 'section', text: { type: 'mrkdwn', text: input || 'Hello!' } }];
   }

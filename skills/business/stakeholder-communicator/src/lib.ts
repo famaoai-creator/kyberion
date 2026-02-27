@@ -50,12 +50,22 @@ export const AUDIENCE_PROFILES: Record<string, AudienceProfile> = {
   },
   marketing: {
     label: 'Marketing Team',
-    focus: ['user benefits', 'competitive advantage', 'messaging opportunities', 'timeline for announcements'],
+    focus: [
+      'user benefits',
+      'competitive advantage',
+      'messaging opportunities',
+      'timeline for announcements',
+    ],
     avoid: ['backend architecture', 'database changes'],
   },
   sales: {
     label: 'Sales Team',
-    focus: ['customer value', 'feature differentiation', 'talking points', 'competitive positioning'],
+    focus: [
+      'customer value',
+      'feature differentiation',
+      'talking points',
+      'competitive positioning',
+    ],
     avoid: ['internal refactoring', 'tech debt'],
   },
   'all-hands': {
@@ -89,7 +99,10 @@ export const TECH_TO_BIZ: TranslationRule[] = [
   { tech: /encryption|TLS/gi, biz: 'data protection protocols' },
 ];
 
-export function translateContent(content: string): { translated: string; translations: { from: string; to: string }[] } {
+export function translateContent(content: string): {
+  translated: string;
+  translations: { from: string; to: string }[];
+} {
   let translated = content;
   const translations: { from: string; to: string }[] = [];
   for (const rule of TECH_TO_BIZ) {
@@ -112,7 +125,8 @@ export function extractKeyPoints(content: string): KeyPoint[] {
   }
 
   // Impact
-  const impactPatterns = /(?:improve|reduce|increase|decrease|save|eliminate|enable|prevent)[\w\s]{5,60}/gi;
+  const impactPatterns =
+    /(?:improve|reduce|increase|decrease|save|eliminate|enable|prevent)[\w\s]{5,60}/gi;
   const impacts = content.match(impactPatterns);
   if (impacts) {
     points.push(...impacts.slice(0, 3).map((i) => ({ type: 'impact' as const, value: i.trim() })));
@@ -152,7 +166,10 @@ export function generateOutput(
     sections.structure = {
       slide1: { title: sections.headline, bullets: keyPoints.slice(0, 3).map((p) => p.value) },
       slide2: { title: 'Impact & Benefits', bullets: profile.focus },
-      slide3: { title: 'Next Steps', bullets: ['Review timeline', 'Align resources', 'Schedule follow-up'] },
+      slide3: {
+        title: 'Next Steps',
+        bullets: ['Review timeline', 'Align resources', 'Schedule follow-up'],
+      },
     };
   } else if (format === 'memo') {
     sections.structure = {

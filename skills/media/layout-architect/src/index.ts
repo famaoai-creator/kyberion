@@ -25,7 +25,10 @@ const argv = yargs(hideBin(process.argv))
 
 runSkill('layout-architect', () => {
   // Default specs path relative to project structure
-  const defaultSpecsPath = path.resolve(__dirname, '../../../knowledge/standards/design/master-slide-specs.json');
+  const defaultSpecsPath = path.resolve(
+    __dirname,
+    '../../../knowledge/standards/design/master-slide-specs.json'
+  );
   const specsPath = argv.input ? path.resolve(argv.input as string) : defaultSpecsPath;
 
   if (!fs.existsSync(specsPath)) {
@@ -36,7 +39,10 @@ runSkill('layout-architect', () => {
   const css = generateMarpCSS(specs);
 
   // Default output path if not specified
-  const defaultOutPath = path.resolve(__dirname, `../../../knowledge/templates/themes/${specs.master_name.toLowerCase()}.css`);
+  const defaultOutPath = path.resolve(
+    __dirname,
+    `../../../knowledge/templates/themes/${specs.master_name.toLowerCase()}.css`
+  );
   const outPath = argv.out ? path.resolve(argv.out as string) : defaultOutPath;
 
   safeWriteFile(outPath, css);

@@ -42,4 +42,5 @@
     - ミッションフォルダ（`active/missions/`）に最終成果物を保存した直後、当該ミッションに関する全ての短期記憶を消去する。継承は物理的な「蒸留知（Distilled Knowledge）」を通じてのみ行われる。
 
 ---
-*Approved by ACE | Ecosystem Architect | 2026-02-16*
+
+_Approved by ACE | Ecosystem Architect | 2026-02-16_

@@ -1,33 +1,33 @@
 ---
 name: google-workspace-integrator
 description: >-
-  
+
 status: implemented
 arguments:
   - name: action
     short: a
     type: string
     required: false
-    description: 
+    description:
   - name: input
     short: i
     type: string
     required: false
-    description: 
+    description:
   - name: to
     short: t
     type: string
     required: false
-    description: 
+    description:
   - name: dry-run
     type: boolean
     required: false
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
 category: Connector
 last_updated: '2026-02-16'
 tags:

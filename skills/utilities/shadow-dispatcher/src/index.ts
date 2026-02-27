@@ -15,15 +15,21 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runAsyncSkill('shadow-dispatcher', async () => {
     const inboxDir = pathResolver.shared('queue/inbox');
     const outboxDir = pathResolver.shared('queue/outbox');
-    const { idA, idB } = createShadowTasks(argv.intent as string, argv.personaA as string, argv.personaB as string, inboxDir);
+    const { idA, idB } = createShadowTasks(
+      argv.intent as string,
+      argv.personaA as string,
+      argv.personaB as string,
+      inboxDir
+    );
 
-    let resultA = null, resultB = null;
+    let resultA = null,
+      resultB = null;
     while (!resultA || !resultB) {
       const resAPath = path.join(outboxDir, 'RES-' + idA + '.json');
       const resBPath = path.join(outboxDir, 'RES-' + idB + '.json');
       if (fs.existsSync(resAPath)) resultA = JSON.parse(fs.readFileSync(resAPath, 'utf8'));
       if (fs.existsSync(resBPath)) resultB = JSON.parse(fs.readFileSync(resBPath, 'utf8'));
-      if (!resultA || !resultB) await new Promise(r => setTimeout(r, 1000));
+      if (!resultA || !resultB) await new Promise((r) => setTimeout(r, 1000));
     }
 
     return { status: 'complete', results: [resultA, resultB] };

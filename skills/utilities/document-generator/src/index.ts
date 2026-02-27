@@ -4,12 +4,14 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as pathResolver from '@agent/core/path-resolver';
 import { routeDocumentGeneration } from './lib.js';
 
-const argv = createStandardYargs().option('format', {
-  alias: 'f',
-  type: 'string',
-  choices: ['pdf', 'docx', 'xlsx', 'pptx', 'html'],
-  demandOption: true,
-}).parseSync();
+const argv = createStandardYargs()
+  .option('format', {
+    alias: 'f',
+    type: 'string',
+    choices: ['pdf', 'docx', 'xlsx', 'pptx', 'html'],
+    demandOption: true,
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('document-generator', async () => {

@@ -7,21 +7,21 @@ arguments:
     short: d
     type: string
     required: true
-    description: 
+    description:
   - name: knowledge
     short: k
     type: string
     required: true
-    description: 
+    description:
   - name: out
     short: o
     type: string
     required: false
-    description: 
+    description:
   - name: output-tier
     type: string
     required: false
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

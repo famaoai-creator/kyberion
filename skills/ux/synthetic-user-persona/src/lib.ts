@@ -12,7 +12,7 @@ export function generatePersonas(count: number, product: string): Persona[] {
       id: 'persona-' + (i + 1),
       name: 'User ' + (i + 1),
       archetype: 'Beginner',
-      testScenarios: [{ scenario: 'First-time ' + product + ' setup' }]
+      testScenarios: [{ scenario: 'First-time ' + product + ' setup' }],
     });
   }
   return personas;

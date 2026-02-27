@@ -13,21 +13,22 @@ describe('ppt-artisan lib', () => {
   const mockMD = { title: 'Test Presentation', body: '# Slide 1', format: 'markdown' as const };
 
   it('should call execSync with correct Marp arguments using DocumentArtifact', async () => {
-    // existsSync will be called multiple times: 
+    // existsSync will be called multiple times:
     // 1. local marp check (false)
     // 2. temp dir check (false)
     // 3. cleanup checks (true)
-    const existsSpy = vi.spyOn(fs, 'existsSync')
-        .mockReturnValueOnce(false) // marp bin
-        .mockReturnValueOnce(false) // temp dir
-        .mockReturnValue(true);     // cleanup
-    
+    const existsSpy = vi
+      .spyOn(fs, 'existsSync')
+      .mockReturnValueOnce(false) // marp bin
+      .mockReturnValueOnce(false) // temp dir
+      .mockReturnValue(true); // cleanup
+
     const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
     const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
     const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
-    
+
     await convertToPPTX({ markdown: mockMD, outputPath: 'out.pptx' });
-    
+
     expect(writeSpy).toHaveBeenCalled();
     expect(execSync).toHaveBeenCalledWith(
       expect.stringContaining('--pptx --pptx-editable -o "out.pptx"'),
@@ -42,24 +43,22 @@ describe('ppt-artisan lib', () => {
   });
 
   it('should include theme artifact in command if provided', async () => {
-    const existsSpy = vi.spyOn(fs, 'existsSync')
-        .mockReturnValueOnce(true)  // marp bin
-        .mockReturnValueOnce(true)  // temp dir
-        .mockReturnValue(true);     // cleanup
-    
+    const existsSpy = vi
+      .spyOn(fs, 'existsSync')
+      .mockReturnValueOnce(true) // marp bin
+      .mockReturnValueOnce(true) // temp dir
+      .mockReturnValue(true); // cleanup
+
     const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
     const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
     const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
 
     const mockTheme = { title: 'Brand', body: 'section { color: red; }', format: 'text' as const };
-    
+
     await convertToPPTX({ markdown: mockMD, outputPath: 'out.pptx', theme: mockTheme });
-    
+
     expect(writeSpy).toHaveBeenCalledTimes(2); // MD and CSS
-    expect(execSync).toHaveBeenCalledWith(
-      expect.stringContaining('--theme'),
-      expect.any(Object)
-    );
+    expect(execSync).toHaveBeenCalledWith(expect.stringContaining('--theme'), expect.any(Object));
 
     existsSpy.mockRestore();
     writeSpy.mockRestore();
@@ -74,12 +73,17 @@ describe('ppt-artisan lib', () => {
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
 
     vi.mocked(execSync).mockImplementation(() => {
-        const err = new Error('Command failed') as any;
-        err.stderr = Buffer.from('Error: theme file not found');
-        throw err;
+      const err = new Error('Command failed') as any;
+      err.stderr = Buffer.from('Error: theme file not found');
+      throw err;
     });
 
-    await expect(convertToPPTX({ markdown: mockMD, outputPath: 'o.pptx', theme: { title: 'Bad', body: '', format: 'text' as const } }))
-      .rejects.toThrow('Theme invalid or missing: Bad');
+    await expect(
+      convertToPPTX({
+        markdown: mockMD,
+        outputPath: 'o.pptx',
+        theme: { title: 'Bad', body: '', format: 'text' as const },
+      })
+    ).rejects.toThrow('Theme invalid or missing: Bad');
   });
 });

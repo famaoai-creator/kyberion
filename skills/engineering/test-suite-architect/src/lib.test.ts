@@ -19,14 +19,22 @@ describe('test-suite-architect', () => {
 
   it('detects frameworks from package.json', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ devDependencies: { jest: '^29.0.0' } }));
-    
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ devDependencies: { jest: '^29.0.0' } })
+    );
+
     const frameworks = detectFrameworks('.', ['jest.config.js']);
     expect(frameworks).toContain('jest');
   });
 
   it('generates strategy', () => {
-    const strategy = generateStrategy([], 0.2, ['src/app.ts'], ['src/app.ts'], ['src/util.test.ts']);
+    const strategy = generateStrategy(
+      [],
+      0.2,
+      ['src/app.ts'],
+      ['src/app.ts'],
+      ['src/util.test.ts']
+    );
     expect(strategy.recommendedFramework).toBe('jest');
     expect(strategy.coverageTarget).toBe(70);
   });

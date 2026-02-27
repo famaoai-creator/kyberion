@@ -31,7 +31,10 @@ runAsyncSkill('word-artisan', async () => {
   const outputPath = path.resolve(argv.out as string);
 
   // 1. Load Master Specs
-  const specsPath = path.resolve(__dirname, '../../../knowledge/standards/design/word-master-specs.json');
+  const specsPath = path.resolve(
+    __dirname,
+    '../../../knowledge/standards/design/word-master-specs.json'
+  );
   if (!fs.existsSync(specsPath)) {
     throw new Error(`Word master specs missing at: ${specsPath}`);
   }

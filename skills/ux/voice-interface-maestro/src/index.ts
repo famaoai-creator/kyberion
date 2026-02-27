@@ -23,9 +23,9 @@ runSkill('voice-interface-maestro', () => {
   const config = loadVoiceConfig(configPath);
 
   logger.info(`Maestro initialized. Engine: ${config.engine}, Voice: ${config.voice}`);
-  
+
   const result = speakText(argv.text as string, config);
-  
+
   if (result.success) {
     logger.success(`Spoken successfully via ${result.method}`);
   } else {

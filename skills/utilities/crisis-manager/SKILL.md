@@ -1,14 +1,14 @@
 ---
 name: crisis-manager
 description: >-
-  
+
 status: implemented
 arguments:
   - name: log
     short: l
     type: string
     required: true
-    description: 
+    description:
 category: Utilities
 last_updated: '2026-02-16'
 tags:

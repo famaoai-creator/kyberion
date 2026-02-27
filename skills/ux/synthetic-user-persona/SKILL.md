@@ -1,19 +1,19 @@
 ---
 name: synthetic-user-persona
 description: >-
-  
+
 status: implemented
 arguments:
   - name: count
     short: n
     type: number
     required: false
-    description: 
+    description:
   - name: product
     short: p
     type: string
     required: false
-    description: 
+    description:
 category: Ux
 last_updated: '2026-02-16'
 tags:

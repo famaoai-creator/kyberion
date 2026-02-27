@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { calculateLTV, analyzeSegment, generateRecommendations, processUnitEconomics, CustomerSegment } from './lib.js';
+import {
+  calculateLTV,
+  analyzeSegment,
+  generateRecommendations,
+  processUnitEconomics,
+  CustomerSegment,
+} from './lib.js';
 
 describe('unit-economics-optimizer lib', () => {
   const mockSegments: CustomerSegment[] = [
@@ -9,7 +15,7 @@ describe('unit-economics-optimizer lib', () => {
       cac: 200,
       churnRate: 0.1,
       grossMargin: 0.8,
-      customer_count: 100
+      customer_count: 100,
     },
     {
       name: 'Enterprise',
@@ -17,8 +23,8 @@ describe('unit-economics-optimizer lib', () => {
       cac: 1000,
       churnRate: 0.02,
       grossMargin: 0.9,
-      customer_count: 10
-    }
+      customer_count: 10,
+    },
   ];
 
   it('should calculate LTV correctly', () => {
@@ -42,8 +48,8 @@ describe('unit-economics-optimizer lib', () => {
   it('should generate recommendations for risky segments', () => {
     const analyses = mockSegments.map(analyzeSegment);
     const recs = generateRecommendations(analyses);
-    expect(recs.some(r => r.segment === 'Basic' && r.priority === 'critical')).toBe(true);
-    expect(recs.some(r => r.segment === 'Portfolio')).toBe(true);
+    expect(recs.some((r) => r.segment === 'Basic' && r.priority === 'critical')).toBe(true);
+    expect(recs.some((r) => r.segment === 'Portfolio')).toBe(true);
   });
 
   it('should process full unit economics portfolio', () => {
@@ -55,10 +61,10 @@ describe('unit-economics-optimizer lib', () => {
 
   it('should cap LTV when churn is zero or near zero', () => {
     const perfectSegment: CustomerSegment = {
-        name: 'Perfect',
-        monthly_price: 100,
-        churnRate: 0, // Should be capped at 0.001
-        grossMargin: 1.0
+      name: 'Perfect',
+      monthly_price: 100,
+      churnRate: 0, // Should be capped at 0.001
+      grossMargin: 1.0,
     };
     const ltv = calculateLTV(perfectSegment);
     expect(ltv).toBe(100000); // 100 * 1.0 * (1 / 0.001)

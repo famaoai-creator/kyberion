@@ -14,7 +14,7 @@ describe('sunset-architect lib', () => {
       active_users: 10,
       monthly_revenue: 0,
       dependencies: [],
-    }
+    },
   ];
 
   it('should generate a 12-week deprecation timeline', () => {
@@ -40,14 +40,17 @@ describe('sunset-architect lib', () => {
     expect(result.featureCount).toBe(2);
     expect(result.totalAffectedUsers).toBe(1510);
     expect(result.totalRevenueImpact).toBe(6000);
-    expect(result.recommendations.some(r => r.priority === 'high')).toBe(true);
+    expect(result.recommendations.some((r) => r.priority === 'high')).toBe(true);
   });
 
   it('should warn when many features are sunset simultaneously', () => {
     const manyFeatures: FeatureData[] = [
-        { name: 'F1' }, { name: 'F2' }, { name: 'F3' }, { name: 'F4' }
+      { name: 'F1' },
+      { name: 'F2' },
+      { name: 'F3' },
+      { name: 'F4' },
     ];
     const result = processSunsetPlans(manyFeatures);
-    expect(result.recommendations.some(r => r.area === 'Customer Communication')).toBe(true);
+    expect(result.recommendations.some((r) => r.area === 'Customer Communication')).toBe(true);
   });
 });

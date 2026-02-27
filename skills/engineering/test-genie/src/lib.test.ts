@@ -32,8 +32,8 @@ describe('detectTestRunner', () => {
     {
       name: 'jest',
       detection: [{ type: 'file_exists', path: 'jest.config.js' }],
-      command: 'jest'
-    }
+      command: 'jest',
+    },
   ];
 
   it('returns matching runner', () => {

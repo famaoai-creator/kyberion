@@ -5,22 +5,20 @@ describe('diagram-renderer lib', () => {
   const mockADF: ADF = {
     nodes: [
       { id: 'app-service', type: 'service', name: 'App Service' },
-      { id: 'db.main', type: 'database', name: 'Main DB' }
+      { id: 'db.main', type: 'database', name: 'Main DB' },
     ],
-    edges: [
-      { from: 'app-service', to: 'db.main', label: 'queries' }
-    ]
+    edges: [{ from: 'app-service', to: 'db.main', label: 'queries' }],
   };
 
   const mockIconMap: IconMap = {
     default: '?',
     service: '⚙️',
-    database: '🗄️'
+    database: '🗄️',
   };
 
   it('should transform ADF to Mermaid syntax correctly', () => {
     const mmd = adfToMermaid(mockADF, mockIconMap);
-    
+
     expect(mmd).toContain('graph LR');
     expect(mmd).toContain('app_service("⚙️ App Service")');
     expect(mmd).toContain('db_main("🗄️ Main DB")');
@@ -29,8 +27,8 @@ describe('diagram-renderer lib', () => {
 
   it('should handle missing types with default icon', () => {
     const adfWithUnknown: ADF = {
-        nodes: [{ id: 'unknown-node', type: 'weird', name: 'Unknown' }],
-        edges: []
+      nodes: [{ id: 'unknown-node', type: 'weird', name: 'Unknown' }],
+      edges: [],
     };
     const mmd = adfToMermaid(adfWithUnknown, mockIconMap);
     expect(mmd).toContain('unknown_node("? Unknown")');

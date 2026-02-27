@@ -35,12 +35,14 @@ function checkRoutineTasks() {
 // 2. 即時キュー監視
 const watcher = chokidar.watch(inboxDir, {
   ignored: /(^|[\/\\])\../,
-  persistent: true
+  persistent: true,
 });
 
 watcher.on('add', (filePath) => {
   if (filePath.endsWith('.json')) {
-    console.log(chalk.yellow(`\n\ud83d\udce9 [Pulse] New Message Detected: ${path.basename(filePath)}`));
+    console.log(
+      chalk.yellow(`\n\ud83d\udce9 [Pulse] New Message Detected: ${path.basename(filePath)}`)
+    );
     dispatchAgent('queue');
   }
 });
@@ -55,7 +57,7 @@ function dispatchAgent(type, skillId = null) {
   // --- Scoped Execution Logic ---
   const scope = {
     allowedDirs: [mDir, path.join(rootDir, 'knowledge')],
-    allowedSkills: skillId ? [skillId] : ['all']
+    allowedSkills: skillId ? [skillId] : ['all'],
   };
   const token = pulseGuard.createToken(missionId, scope);
 
@@ -67,7 +69,7 @@ function dispatchAgent(type, skillId = null) {
   const agentProcess = spawn('node', args, {
     cwd: rootDir,
     detached: true,
-    stdio: ['ignore', out, out]
+    stdio: ['ignore', out, out],
   });
 
   agentProcess.unref();

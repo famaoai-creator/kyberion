@@ -12,8 +12,15 @@ describe('context-injector lib', () => {
   it('should inject knowledge into data', () => {
     const data: any = { original: true };
     const knowledge = 'some knowledge';
-    vi.mocked(tierGuard.validateInjection).mockReturnValue({ allowed: true, sourceTier: 'public', outputTier: 'public' });
-    vi.mocked(tierGuard.scanForConfidentialMarkers).mockReturnValue({ hasMarkers: false, markers: [] });
+    vi.mocked(tierGuard.validateInjection).mockReturnValue({
+      allowed: true,
+      sourceTier: 'public',
+      outputTier: 'public',
+    });
+    vi.mocked(tierGuard.scanForConfidentialMarkers).mockReturnValue({
+      hasMarkers: false,
+      markers: [],
+    });
 
     const result = injectContext(data, knowledge, 'k.md', 'public');
     expect(result.injected).toBe(true);

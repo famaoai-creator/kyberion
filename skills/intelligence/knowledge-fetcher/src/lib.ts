@@ -48,7 +48,10 @@ export function searchKnowledge(
     } else if (stat.isFile() && stat.size <= maxFileSize) {
       try {
         const content = fs.readFileSync(fullPath, 'utf8');
-        if (file.toLowerCase().includes(query.toLowerCase()) || content.toLowerCase().includes(query.toLowerCase())) {
+        if (
+          file.toLowerCase().includes(query.toLowerCase()) ||
+          content.toLowerCase().includes(query.toLowerCase())
+        ) {
           results.push({ path: fullPath, content: content });
         }
       } catch (_e) {

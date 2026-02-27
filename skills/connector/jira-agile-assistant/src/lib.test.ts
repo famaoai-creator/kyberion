@@ -13,7 +13,9 @@ describe('jira-agile-assistant lib', () => {
 
   it('should initialize client if config exists', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ email: 'a@b.com', api_token: 'tk', host: 'https://h.atlassian.net' }));
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ email: 'a@b.com', api_token: 'tk', host: 'https://h.atlassian.net' })
+    );
     const client = new JiraClient('/root');
     expect(client).toBeDefined();
   });

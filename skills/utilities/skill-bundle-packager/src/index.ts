@@ -8,7 +8,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('skill-bundle-packager', () => {
     const missionName = process.argv[2];
     const selectedSkills = process.argv.slice(3);
-    
+
     if (!missionName) throw new Error('Mission name required');
 
     const rootDir = pathResolver.rootDir();
@@ -21,7 +21,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const bundle = {
       mission: missionName,
       created_at: new Date().toISOString(),
-      skills: selectedSkills.map(name => ({ name, path: './' + name + '/' })),
+      skills: selectedSkills.map((name) => ({ name, path: './' + name + '/' })),
       playbook: playbook ? playbook.path : null,
     };
 

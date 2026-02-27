@@ -14,25 +14,26 @@ const argv = yargs(hideBin(process.argv))
     description: 'Project directory to scan',
   })
   .option('out', { alias: 'o', type: 'string' })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('security-scanner', () => {
-    const projectRoot = path.resolve((argv.input as string) || '.');
-    if (!fs.existsSync(projectRoot)) {
-        throw new Error(`Directory not found: ${projectRoot}`);
-    }
+  const projectRoot = path.resolve((argv.input as string) || '.');
+  if (!fs.existsSync(projectRoot)) {
+    throw new Error(`Directory not found: ${projectRoot}`);
+  }
 
-    const result = scanProject(projectRoot);
-    
-    const output = {
-        projectRoot,
-        ...result,
-        findingCount: result.findings.length
-    };
+  const result = scanProject(projectRoot);
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(output, null, 2));
-    }
+  const output = {
+    projectRoot,
+    ...result,
+    findingCount: result.findings.length,
+  };
 
-    return output;
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(output, null, 2));
+  }
+
+  return output;
 });

@@ -6,7 +6,7 @@ export const TEMPLATES: any = {
   rollback: {
     overview: (service: string) => 'Emergency rollback procedure for **' + service + '**.',
     steps: ['Identify version', 'Trigger rollback', 'Verify health'],
-  }
+  },
 };
 
 export function generateRunbookMarkdown(service: string, type: string, template: any): string {
@@ -15,7 +15,7 @@ export function generateRunbookMarkdown(service: string, type: string, template:
   md += '## Overview\\n\\n' + template.overview(service) + '\\n\\n';
   md += '## Steps\\n\\n';
   template.steps.forEach((step: string, i: number) => {
-    md += (i + 1) + '. ' + step + '\\n';
+    md += i + 1 + '. ' + step + '\\n';
   });
   return md;
 }

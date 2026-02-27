@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-16T16:58:23.917Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-02-27T17:31:18.120Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -158,7 +158,7 @@
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./orchestration/quality-management-flow.md) (public | Unknown)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./orchestration/self-refinement-protocol.md) (public | Unknown)
 - [Autonomous Sentinel Operations](./orchestration/sentinel-operations.md) (public | Unknown)
-- [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./orchestration/asset-token-economy-protocol.md) (public | Unknown)
+- [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./orchestration/token-economy-protocol.md) (public | Unknown)
 - [Voice Interface Protocol (VIP)](./orchestration/voice-interface-protocol.md) (public | Unknown)
 
 ## 📁 orchestration/fusion-protocols
@@ -197,6 +197,9 @@
 
 ## 📁 personalities
 - [ペルソナ・マトリクス (Persona Matrix)](./personalities/matrix.md) (personal | Unknown)
+
+## 📁 pmo/hall-of-fame
+- [Hall of Fame: Ecosystem Viability Marathon](./pmo/hall-of-fame/mission-marathon-proof.md) (public | Unknown)
 
 ## 📁 pmo/standard
 - [PMO Bridge to IPA Non-Functional Grade](./pmo/standard/ipa_nfr_bridge.md) (public | Unknown)

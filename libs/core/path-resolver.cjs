@@ -10,7 +10,10 @@ const fs = require('fs');
 function findProjectRoot(startDir) {
   let current = startDir;
   while (current !== path.parse(current).root) {
-    if (fs.existsSync(path.join(current, 'package.json')) && fs.existsSync(path.join(current, 'skills'))) {
+    if (
+      fs.existsSync(path.join(current, 'package.json')) &&
+      fs.existsSync(path.join(current, 'skills'))
+    ) {
       return current;
     }
     current = path.dirname(current);
@@ -28,14 +31,14 @@ const pathResolver = {
 
   /**
    * Resolve a skill's physical directory via the global index
-   * @param {string} skillName 
+   * @param {string} skillName
    */
   skillDir: (skillName) => {
     if (!fs.existsSync(INDEX_PATH)) return path.join(rootDir, 'skills/utilities', skillName); // Guess fallback
 
     const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
-    const skill = (index.s || index.skills).find(s => (s.n || s.name) === skillName);
-    
+    const skill = (index.s || index.skills).find((s) => (s.n || s.name) === skillName);
+
     if (skill && skill.path) {
       return path.join(rootDir, skill.path);
     }
@@ -84,7 +87,7 @@ const pathResolver = {
    */
   rootResolve: (relativePath) => {
     return path.isAbsolute(relativePath) ? relativePath : path.join(rootDir, relativePath);
-  }
+  },
 };
 
 module.exports = pathResolver;

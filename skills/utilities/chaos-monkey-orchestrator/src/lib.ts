@@ -6,7 +6,11 @@ export interface ChaosConfig {
   timestamp: string;
 }
 
-export function createChaosConfig(target: string, mode: ChaosConfig['mode'], intensity: number): ChaosConfig {
+export function createChaosConfig(
+  target: string,
+  mode: ChaosConfig['mode'],
+  intensity: number
+): ChaosConfig {
   return {
     active: true,
     target: target || '*',

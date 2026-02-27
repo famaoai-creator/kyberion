@@ -22,16 +22,16 @@ class JiraClient {
         method: method,
         timeout: 10000, // 10 seconds timeout
         headers: {
-          'Authorization': `Basic ${this.auth}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Basic ${this.auth}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
       };
 
       const req = https.request(options, (res) => {
         console.log(`[DEBUG] Jira API Response received. Status: ${res.statusCode}`);
         let data = '';
-        res.on('data', (c) => data += c);
+        res.on('data', (c) => (data += c));
         res.on('end', () => {
           console.log(`[DEBUG] Jira API Request finished.`);
           if (res.statusCode >= 200 && res.statusCode < 300) {

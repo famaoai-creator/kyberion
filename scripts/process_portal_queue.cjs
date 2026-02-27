@@ -19,12 +19,16 @@ const outboxDir = path.join(queueDir, 'outbox');
 async function processQueue() {
   if (!fs.existsSync(inboxDir)) return;
 
-  const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.json') && !f.startsWith('LOCK-'));
+  const files = fs
+    .readdirSync(inboxDir)
+    .filter((f) => f.endsWith('.json') && !f.startsWith('LOCK-'));
   if (files.length === 0) return;
 
   // Load chains config
   const chainsPath = path.join(rootDir, 'knowledge/orchestration/role-chains.json');
-  const chainsConfig = fs.existsSync(chainsPath) ? JSON.parse(fs.readFileSync(chainsPath, 'utf8')) : { chains: { default: [{ role: "Agent", objective: "Process" }] } };
+  const chainsConfig = fs.existsSync(chainsPath)
+    ? JSON.parse(fs.readFileSync(chainsPath, 'utf8'))
+    : { chains: { default: [{ role: 'Agent', objective: 'Process' }] } };
 
   for (const file of files) {
     const filePath = path.join(inboxDir, file);
@@ -33,11 +37,13 @@ async function processQueue() {
     try {
       if (!fs.existsSync(filePath)) continue;
       fs.renameSync(filePath, lockPath);
-    } catch (e) { continue; }
+    } catch (e) {
+      continue;
+    }
 
     const request = safeJsonParse(fs.readFileSync(lockPath, 'utf8'), 'Queue Request');
     const msgId = request.id;
-    
+
     // 1. Mission Context Detection
     let chainType = 'default';
     let chainStep = 0;
@@ -66,8 +72,10 @@ async function processQueue() {
     const missionId = msgId.startsWith('REQ-') ? `MSN-${msgId.slice(4)}` : msgId;
     const missionDir = pathResolver.missionDir(missionId);
     const handoffPath = path.join(missionDir, 'handoff.md');
-    
-    let handoffContext = fs.existsSync(handoffPath) ? fs.readFileSync(handoffPath, 'utf8') : "None (New mission)";
+
+    let handoffContext = fs.existsSync(handoffPath)
+      ? fs.readFileSync(handoffPath, 'utf8')
+      : 'None (New mission)';
 
     console.log(chalk.bold.magenta(`\n\ud83e\udde0 [${msgId}] Awakening: ${currentRole}`));
     console.log(chalk.dim(`    Objective: ${currentObjective}`));
@@ -91,30 +99,30 @@ ${handoffContext}
 `.trim();
 
     // 4. Execution
-    let agentOutput = "";
+    let agentOutput = '';
     try {
       console.log(chalk.dim(`    Processing as ${currentRole}...`));
-      agentOutput = execSync(`gemini --prompt "${systemPrompt.replace(/"/g, '\\"')}"`, { 
-        encoding: 'utf8', 
-        cwd: rootDir, 
-        env: { ...process.env, MISSION_ID: missionId, GEMINI_FORMAT: 'text' } 
+      agentOutput = execSync(`gemini --prompt "${systemPrompt.replace(/"/g, '\\"')}"`, {
+        encoding: 'utf8',
+        cwd: rootDir,
+        env: { ...process.env, MISSION_ID: missionId, GEMINI_FORMAT: 'text' },
       });
     } catch (e) {
       agentOutput = `Error during execution: ${e.message}\n${e.stdout || ''}`;
     }
 
     // 5. Update Evidence & Check for Next Step
-    const response = { 
-      id: msgId, 
+    const response = {
+      id: msgId,
       mission_id: missionId,
       role: currentRole,
-      status: 'complete', 
-      result: agentOutput, 
-      timestamp: new Date().toISOString() 
+      status: 'complete',
+      result: agentOutput,
+      timestamp: new Date().toISOString(),
     };
 
     fs.writeFileSync(path.join(outboxDir, `RES-${msgId}.json`), JSON.stringify(response, null, 2));
-    
+
     // Update handoff for next possible step
     const handoffUpdate = `\n### Step ${chainStep + 1}: ${currentRole}\n> ${new Date().toISOString()}\n\n${agentOutput.substring(0, 500)}...\n`;
     fs.appendFileSync(handoffPath, handoffUpdate);
@@ -125,9 +133,12 @@ ${handoffContext}
       const nextRequest = {
         id: nextMsgId,
         intent: `[Chain: ${chainType}:${chainStep + 1}] ${intent}`,
-        status: 'pending'
+        status: 'pending',
       };
-      fs.writeFileSync(path.join(inboxDir, `${nextMsgId}.json`), JSON.stringify(nextRequest, null, 2));
+      fs.writeFileSync(
+        path.join(inboxDir, `${nextMsgId}.json`),
+        JSON.stringify(nextRequest, null, 2)
+      );
       console.log(chalk.cyan(`  \u21aa Auto-queued next step: ${chain[chainStep + 1].role}`));
     }
 

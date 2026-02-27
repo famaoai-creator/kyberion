@@ -57,17 +57,17 @@ function syncSkill(cat, dir) {
   const codeArgs = extractArgsFromCode(mainScript);
   const originalContent = fs.readFileSync(skillMdPath, 'utf8');
   const fmMatch = originalContent.match(/^---\n([\s\S]*?)\n---/m);
-  
+
   if (fmMatch) {
     try {
       const fm = yaml.load(fmMatch[1]);
-      
+
       // Update arguments from code
       if (codeArgs.length > 0) fm.arguments = codeArgs;
-      
+
       // Update category from directory
       fm.category = cat.charAt(0).toUpperCase() + cat.slice(1);
-      
+
       // Update last_updated
       fm.last_updated = new Date().toISOString().split('T')[0];
 
@@ -102,15 +102,21 @@ function syncSkill(cat, dir) {
 
 try {
   console.log(chalk.bold.cyan('\n🔄 Synchronizing Ecosystem Metadata...'));
-  
-  const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
-  categories.forEach(cat => {
+
+  const categories = fs
+    .readdirSync(skillsRootDir)
+    .filter((f) => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+  categories.forEach((cat) => {
     const catPath = path.join(skillsRootDir, cat);
-    const skillDirs = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
-    skillDirs.forEach(dir => syncSkill(cat, dir));
+    const skillDirs = fs
+      .readdirSync(catPath)
+      .filter((f) => fs.lstatSync(path.join(catPath, f)).isDirectory());
+    skillDirs.forEach((dir) => syncSkill(cat, dir));
   });
 
-  console.log(chalk.bold.green('\n✨ All skill metadata is now consistent across MD, JS, and JSON.\n'));
+  console.log(
+    chalk.bold.green('\n✨ All skill metadata is now consistent across MD, JS, and JSON.\n')
+  );
 } catch (err) {
   console.error(chalk.red(`Fatal: ${err.message}`));
 }

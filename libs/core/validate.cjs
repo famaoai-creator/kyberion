@@ -81,14 +81,14 @@ function validate(data, schemaName) {
 
 /**
  * [NEW] Validate specific skill data against its own contract.json if it exists.
- * @param {string} skillName 
- * @param {Object} data 
+ * @param {string} skillName
+ * @param {Object} data
  */
 function validateSkillData(skillName, data) {
   try {
     const skillDir = pathResolver.skillDir(skillName);
     const contractPath = path.join(skillDir, 'contract.json');
-    
+
     if (!fs.existsSync(contractPath)) {
       return { valid: true, errors: [], info: 'No contract.json found' };
     }
@@ -118,4 +118,11 @@ function validateOutput(data) {
   return validate(data, 'skill-output');
 }
 
-module.exports = { validate, validateInput, validateOutput, loadSchema, validateSkillData, validateAgainstSchema };
+module.exports = {
+  validate,
+  validateInput,
+  validateOutput,
+  loadSchema,
+  validateSkillData,
+  validateAgainstSchema,
+};

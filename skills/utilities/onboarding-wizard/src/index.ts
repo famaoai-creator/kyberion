@@ -4,12 +4,14 @@ import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { detectPrerequisites, generateSetupSteps } from './lib.js';
 
-const argv = createStandardYargs().option('dir', {
-  alias: 'd',
-  type: 'string',
-  default: '.',
-  description: 'Project directory',
-}).parseSync();
+const argv = createStandardYargs()
+  .option('dir', {
+    alias: 'd',
+    type: 'string',
+    default: '.',
+    description: 'Project directory',
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('onboarding-wizard', () => {

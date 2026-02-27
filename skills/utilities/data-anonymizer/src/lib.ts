@@ -46,9 +46,7 @@ export function anonymize(obj: any): any {
     const maskedObj: any = {};
 
     for (const [key, value] of Object.entries(obj)) {
-      const isSensitive = SENSITIVE_KEYS.some((sk) =>
-        key.toLowerCase().includes(sk.toLowerCase())
-      );
+      const isSensitive = SENSITIVE_KEYS.some((sk) => key.toLowerCase().includes(sk.toLowerCase()));
 
       if (isSensitive) {
         maskedObj[key] = '***MASKED***';
@@ -70,6 +68,6 @@ export function anonymizeArtifact(title: string, data: any): DocumentArtifact {
     title,
     body: JSON.stringify(anonymized, null, 2),
     format: 'text', // JSON is stored as text in body
-    metadata: { anonymized: true, original_title: title }
+    metadata: { anonymized: true, original_title: title },
   };
 }

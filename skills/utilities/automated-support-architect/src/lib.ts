@@ -7,8 +7,8 @@ export interface FAQ {
 export function extractFAQsFromMarkdown(content: string): FAQ[] {
   const faqs: FAQ[] = [];
   const nl = String.fromCharCode(10);
-  const sections = content.split(new RegExp('^##\\\\s+', 'm')).filter(s => s.trim().length > 0);
-  
+  const sections = content.split(new RegExp('^##\\\\s+', 'm')).filter((s) => s.trim().length > 0);
+
   for (const s of sections) {
     const lines = s.split(nl);
     const title = lines[0].trim();

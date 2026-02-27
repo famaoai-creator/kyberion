@@ -26,13 +26,13 @@ const aceCore = {
     // Calculate previous hash (last 1000 chars to ensure context)
     const prevHash = aceCore.calculateHash(content);
     const timestamp = new Date().toISOString();
-    
+
     const entryHeader = `
 ### [${role}] @${timestamp} | PREV_HASH: ${prevHash.substring(0, 8)} | HASH: `;
     const entryBody = `
 > ${thought}
 `;
-    
+
     // Calculate hash of the new entry itself
     const entryHash = aceCore.calculateHash(entryHeader + entryBody);
     const finalEntry = entryHeader + entryHash.substring(0, 8) + entryBody;
@@ -49,7 +49,7 @@ const aceCore = {
     const content = fs.readFileSync(minutesPath, 'utf8');
     const lines = content.split('\n');
     let lastHash = '';
-    
+
     for (const line of lines) {
       const match = line.match(/HASH: ([a-f0-9]{8})/);
       if (match) {
@@ -58,7 +58,7 @@ const aceCore = {
     }
     // Simple log for debugging
     console.log(`[Integrity] Last chain hash: ${lastHash}`);
-    return true; 
+    return true;
   },
 
   /**
@@ -66,37 +66,41 @@ const aceCore = {
    * @param {Array} votes - Array of { role, securityScore(S1-4), urgencyScore(U1-4), comment }
    */
   evaluateDecision: (votes) => {
-    const securityRisk = votes.find(v => v.securityScore === 'S1');
-    const highUrgency = votes.some(v => v.urgencyScore === 'U1');
+    const securityRisk = votes.find((v) => v.securityScore === 'S1');
+    const highUrgency = votes.some((v) => v.urgencyScore === 'U1');
 
     if (securityRisk) {
-      return { 
-        decision: 'NO-GO', 
+      return {
+        decision: 'NO-GO',
         reason: `Critical Security Risk (S1) detected by ${securityRisk.role}.`,
-        allowYellowCard: false 
+        allowYellowCard: false,
       };
     }
 
-    const s2Risk = votes.find(v => v.securityScore === 'S2');
+    const s2Risk = votes.find((v) => v.securityScore === 'S2');
     if (s2Risk) {
       if (highUrgency) {
-        return { 
-          decision: 'YELLOW-CARD', 
+        return {
+          decision: 'YELLOW-CARD',
           reason: `High Security Risk (S2) detected, but U1 Urgency allows conditional approval.`,
           allowYellowCard: true,
-          debtAction: s2Risk.comment
+          debtAction: s2Risk.comment,
         };
       } else {
-        return { 
-          decision: 'NO-GO', 
+        return {
+          decision: 'NO-GO',
           reason: `High Security Risk (S2) and insufficient urgency for bypass.`,
-          allowYellowCard: false 
+          allowYellowCard: false,
         };
       }
     }
 
-    return { decision: 'GO', reason: 'All evaluations within acceptable limits.', allowYellowCard: false };
-  }
+    return {
+      decision: 'GO',
+      reason: 'All evaluations within acceptable limits.',
+      allowYellowCard: false,
+    };
+  },
 };
 
 module.exports = aceCore;

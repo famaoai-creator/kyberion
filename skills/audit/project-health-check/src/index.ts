@@ -18,19 +18,20 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Output path for audit report',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 runSkill('project-health-check', () => {
-    const projectRoot = path.resolve(argv.input as string);
-    if (!fs.existsSync(projectRoot)) {
-        throw new Error(`Directory not found: ${projectRoot}`);
-    }
-    
-    const result = performAudit(projectRoot);
+  const projectRoot = path.resolve(argv.input as string);
+  if (!fs.existsSync(projectRoot)) {
+    throw new Error(`Directory not found: ${projectRoot}`);
+  }
 
-    if (argv.out) {
-        safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-    }
+  const result = performAudit(projectRoot);
 
-    return result;
+  if (argv.out) {
+    safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+  }
+
+  return result;
 });

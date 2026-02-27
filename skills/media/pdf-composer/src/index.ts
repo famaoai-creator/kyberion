@@ -30,7 +30,7 @@ runAsyncSkill('pdf-composer', async () => {
   const outputPath = path.resolve(argv.out as string);
 
   const mdContent = fs.readFileSync(inputPath, 'utf8');
-  
+
   // Default theme path
   const themePath = path.resolve(__dirname, '../../../knowledge/templates/themes/standard.css');
 

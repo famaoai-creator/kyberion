@@ -19,16 +19,16 @@ const argv = createStandardYargs()
   .help().argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-    runSkill('kernel-compiler', () => {
-        const targetDir = path.resolve(argv.dir as string);
-        if (!fs.existsSync(targetDir)) throw new Error(`Directory not found: ${targetDir}`);
-        
-        const result = runCompiler(targetDir, argv.target as string, argv['dry-run'] as boolean);
-        
-        if (argv.out) {
-            safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-        }
-        
-        return result;
-    });
+  runSkill('kernel-compiler', () => {
+    const targetDir = path.resolve(argv.dir as string);
+    if (!fs.existsSync(targetDir)) throw new Error(`Directory not found: ${targetDir}`);
+
+    const result = runCompiler(targetDir, argv.target as string, argv['dry-run'] as boolean);
+
+    if (argv.out) {
+      safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+    }
+
+    return result;
+  });
 }

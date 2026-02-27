@@ -1,7 +1,7 @@
 ---
 name: knowledge-harvester
 description: >-
-  
+
 status: implemented
 arguments:
   - name: repo

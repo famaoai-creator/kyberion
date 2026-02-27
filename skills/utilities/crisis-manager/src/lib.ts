@@ -15,5 +15,10 @@ export function analyzeLogLines(lines: string[]): any {
     }
   }
 
-  return { errorCount: errors.length, topPatterns: Object.entries(patterns).sort((a, b) => b[1] - a[1]).slice(0, 3) };
+  return {
+    errorCount: errors.length,
+    topPatterns: Object.entries(patterns)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3),
+  };
 }

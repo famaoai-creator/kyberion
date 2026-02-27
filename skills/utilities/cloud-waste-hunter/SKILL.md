@@ -1,7 +1,7 @@
 ---
 name: cloud-waste-hunter
 description: >-
-  
+
 status: implemented
 arguments:
   - name: dir

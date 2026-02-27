@@ -4,11 +4,13 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { validateFilePath } from '@agent/core/validators';
 import { detectFormat } from './lib.js';
 
-const argv = createStandardYargs().option('input', {
-  alias: 'i',
-  type: 'string',
-  demandOption: true,
-}).parseSync();
+const argv = createStandardYargs()
+  .option('input', {
+    alias: 'i',
+    type: 'string',
+    demandOption: true,
+  })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('format-detector', () => {

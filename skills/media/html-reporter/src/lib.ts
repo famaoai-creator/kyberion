@@ -18,19 +18,26 @@ export const DEFAULT_STYLES = `
 `;
 
 export function escapeHTML(str: string): string {
-  return str.replace(/[&<>"']/g, (m) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[m] || m));
+  return str.replace(
+    /[&<>"']/g,
+    (m) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[m] || m
+  );
 }
 
 /**
  * Generates an HTML DocumentArtifact from a Markdown DocumentArtifact.
  */
-export async function generateHTMLArtifact(input: DocumentArtifact, config: Partial<ReportConfig> = {}): Promise<DocumentArtifact> {
+export async function generateHTMLArtifact(
+  input: DocumentArtifact,
+  config: Partial<ReportConfig> = {}
+): Promise<DocumentArtifact> {
   const body = await marked.parse(input.body);
   const title = escapeHTML(config.title || input.title);
   const lang = config.lang || 'ja';
@@ -59,6 +66,6 @@ ${styles}
     title,
     body: html,
     format: 'html',
-    metadata: { source: input.title, lang }
+    metadata: { source: input.title, lang },
   };
 }

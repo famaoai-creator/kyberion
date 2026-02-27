@@ -172,7 +172,7 @@ function _collectTokensFromDir(dir) {
         const matches = text.match(/[A-Za-z0-9\-_]{64,}/g);
         if (matches) {
           // Filter out patterns that look like paths or generic technical strings
-          const filtered = matches.filter(m => !m.includes('/') && !m.includes('\\'));
+          const filtered = matches.filter((m) => !m.includes('/') && !m.includes('\\'));
           tokens.push(...filtered);
         }
       }
@@ -188,7 +188,7 @@ function _getForbiddenTokens() {
   if (_sovereignTokenCache && now < _sovereignTokenCacheExpiry) {
     return _sovereignTokenCache;
   }
-  
+
   // 1. Static scan of personal/confidential dirs
   const staticTokens = [
     ..._collectTokensFromDir(PERSONAL_DIR),
@@ -200,7 +200,9 @@ function _getForbiddenTokens() {
   try {
     const secretGuard = require('./secret-guard.cjs');
     dynamicSecrets = secretGuard.getActiveSecrets();
-  } catch (_e) { /* ignore circular */ }
+  } catch (_e) {
+    /* ignore circular */
+  }
 
   const tokens = [...staticTokens, ...dynamicSecrets];
   _sovereignTokenCache = [...new Set(tokens)];

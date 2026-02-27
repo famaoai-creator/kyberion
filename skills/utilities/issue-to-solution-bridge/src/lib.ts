@@ -32,13 +32,31 @@ export function analyzeIssue(title: string, body: string): IssueAnalysis {
 
   switch (analysis.type) {
     case 'bug':
-      analysis.suggestedActions = ['Reproduce the issue', 'Identify root cause with codebase-mapper', 'Write regression test with test-genie', 'Implement fix', 'Run security-scanner'];
+      analysis.suggestedActions = [
+        'Reproduce the issue',
+        'Identify root cause with codebase-mapper',
+        'Write regression test with test-genie',
+        'Implement fix',
+        'Run security-scanner',
+      ];
       break;
     case 'feature':
-      analysis.suggestedActions = ['Define acceptance criteria', 'Map affected modules with codebase-mapper', 'Create implementation plan', 'Write tests first (TDD) with test-genie', 'Implement feature'];
+      analysis.suggestedActions = [
+        'Define acceptance criteria',
+        'Map affected modules with codebase-mapper',
+        'Create implementation plan',
+        'Write tests first (TDD) with test-genie',
+        'Implement feature',
+      ];
       break;
     case 'refactoring':
-      analysis.suggestedActions = ['Analyze current code with local-reviewer', 'Identify refactoring targets', 'Ensure test coverage', 'Execute refactoring', 'Verify no regressions'];
+      analysis.suggestedActions = [
+        'Analyze current code with local-reviewer',
+        'Identify refactoring targets',
+        'Ensure test coverage',
+        'Execute refactoring',
+        'Verify no regressions',
+      ];
       break;
     default:
       analysis.suggestedActions = ['Analyze issue', 'Plan implementation', 'Execute', 'Verify'];
@@ -53,7 +71,7 @@ export function fetchIssueFromGH(issueRef: string, repo?: string): { title: stri
     args.push('-R', repo);
   }
   args.push('--json', 'title,body');
-  
+
   const output = safeExec('gh', args);
   return JSON.parse(output);
 }

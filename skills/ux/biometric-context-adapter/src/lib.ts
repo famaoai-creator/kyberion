@@ -7,13 +7,23 @@ export interface Session {
 
 export function generateNikoNikoMarkdown(sessions: Session[]): string {
   const nl = String.fromCharCode(10);
-  let markdown = "# 📅 Niko-Niko Calendar (Biometric Feedback)" + nl + nl;
-  markdown += "Analysis of your interaction patterns." + nl + nl;
-  markdown += "| Date | Mood | State | Insights |" + nl;
-  markdown += "| :--- | :---: | :--- | :--- |" + nl;
+  let markdown = '# 📅 Niko-Niko Calendar (Biometric Feedback)' + nl + nl;
+  markdown += 'Analysis of your interaction patterns.' + nl + nl;
+  markdown += '| Date | Mood | State | Insights |' + nl;
+  markdown += '| :--- | :---: | :--- | :--- |' + nl;
 
   sessions.forEach((session) => {
-    markdown += "| " + session.date + " | " + session.icon + " | **" + session.mood + "** | " + session.note + " |" + nl;
+    markdown +=
+      '| ' +
+      session.date +
+      ' | ' +
+      session.icon +
+      ' | **' +
+      session.mood +
+      '** | ' +
+      session.note +
+      ' |' +
+      nl;
   });
 
   markdown += nl + "## 💡 Agent's Observation" + nl;

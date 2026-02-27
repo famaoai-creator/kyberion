@@ -14,13 +14,14 @@ const argv = createStandardYargs()
   })
   .option('dir', { alias: 'd', type: 'string', default: '.', description: 'Project root' })
   .option('out', { alias: 'o', type: 'string', description: 'Output file path' })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('skill-evolution-engine', () => {
     const targetDir = path.resolve(argv.dir as string);
     const skillDir = path.join(targetDir, argv.skill as string);
-    
+
     if (!fs.existsSync(skillDir)) {
       throw new Error(`Skill directory not found: ${skillDir}`);
     }
@@ -28,7 +29,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const health = analyzeSkillHealth(skillDir);
     const suggestions = suggestEvolutions(argv.skill as string, health);
     const logs = checkWorkLogs(targetDir, argv.skill as string);
-    
+
     const successRate =
       logs.length > 0
         ? Math.round((logs.filter((l) => l.status === 'success').length / logs.length) * 100)

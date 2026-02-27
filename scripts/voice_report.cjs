@@ -17,21 +17,20 @@ async function voiceReport() {
   console.log(chalk.cyan(`\n\ud83e\udde0 Thinking about: "${prompt}"...`));
 
   try {
-    const output = execSync(`gemini --prompt "${prompt.replace(/"/g, '\\"')}"`, { 
+    const output = execSync(`gemini --prompt "${prompt.replace(/"/g, '\\"')}"`, {
       encoding: 'utf8',
-      env: { ...process.env, GEMINI_FORMAT: 'text' }
+      env: { ...process.env, GEMINI_FORMAT: 'text' },
     });
 
     console.log(chalk.green('\n--- Agent Output ---'));
     console.log(output);
 
-    const speechText = output.substring(0, 500).replace(/[*#`]/g, ''); 
+    const speechText = output.substring(0, 500).replace(/[*#`]/g, '');
 
     console.log(chalk.magenta('\n\ud83d\udce2 Reading out results...'));
 
     // spawn で非同期に実行して終了を待たない
     spawn('say', ['-v', 'Kyoko', '-r', '180', speechText], { detached: true, stdio: 'ignore' });
-
   } catch (e) {
     console.error(chalk.red(`Error: ${e.message}`));
   }

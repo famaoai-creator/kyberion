@@ -26,10 +26,14 @@ export function generateSetupSteps(dir: string): string[] {
   if (fileExists('package.json')) {
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-      const manager = fileExists('pnpm-lock.yaml') ? 'pnpm' : fileExists('yarn.lock') ? 'yarn' : 'npm';
-      steps.push((steps.length + 1) + '. Install dependencies: `' + manager + ' install`');
+      const manager = fileExists('pnpm-lock.yaml')
+        ? 'pnpm'
+        : fileExists('yarn.lock')
+          ? 'yarn'
+          : 'npm';
+      steps.push(steps.length + 1 + '. Install dependencies: `' + manager + ' install`');
       if (pkg.scripts?.dev) {
-        steps.push((steps.length + 1) + '. Start dev server: `npm run dev`');
+        steps.push(steps.length + 1 + '. Start dev server: `npm run dev`');
       }
     } catch {}
   }

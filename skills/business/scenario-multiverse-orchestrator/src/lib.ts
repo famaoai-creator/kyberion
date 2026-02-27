@@ -56,7 +56,8 @@ export interface ComparisonResult {
 export const SCENARIO_TEMPLATES: Record<string, ScenarioTemplate> = {
   aggressive_growth: {
     label: 'Aggressive Growth',
-    description: 'Maximize growth at the cost of higher burn. Hire aggressively, invest in marketing.',
+    description:
+      'Maximize growth at the cost of higher burn. Hire aggressively, invest in marketing.',
     revenue_multiplier: 1.5,
     cost_multiplier: 1.8,
     headcount_growth: 0.5,
@@ -101,7 +102,11 @@ export const SCENARIO_TEMPLATES: Record<string, ScenarioTemplate> = {
   },
 };
 
-export function projectScenario(base: BaseAssumptions, template: ScenarioTemplate, months: number): ScenarioResult {
+export function projectScenario(
+  base: BaseAssumptions,
+  template: ScenarioTemplate,
+  months: number
+): ScenarioResult {
   const mrr = base.mrr || 10000;
   const burn = base.monthlyBurn || 50000;
   const cash = base.cashOnHand || 100000;
@@ -134,7 +139,7 @@ export function projectScenario(base: BaseAssumptions, template: ScenarioTemplat
 
   const finalHeadcount = Math.round(headcount * (1 + template.headcount_growth));
   let runwayMonths: number | 'infinite' = 0;
-  
+
   if (currentMRR >= currentBurn) {
     runwayMonths = 'infinite';
   } else if (currentCash > 0) {
@@ -195,10 +200,13 @@ export function compareScenarios(scenarios: ScenarioResult[]): ComparisonResult 
 
   // Improved Recommendation Logic:
   // Prefer 'medium' risk if runway > 12 months, otherwise prefer 'low' risk (stability)
-  const balanced = scenarios.find(s => s.riskLevel === 'medium');
-  const stability = scenarios.find(s => s.riskLevel === 'low');
-  
-  if (balanced && (balanced.endState.runwayMonths === 'infinite' || balanced.endState.runwayMonths > 12)) {
+  const balanced = scenarios.find((s) => s.riskLevel === 'medium');
+  const stability = scenarios.find((s) => s.riskLevel === 'low');
+
+  if (
+    balanced &&
+    (balanced.endState.runwayMonths === 'infinite' || balanced.endState.runwayMonths > 12)
+  ) {
     comparison.recommended = balanced.scenario;
   } else {
     comparison.recommended = stability ? stability.scenario : scenarios[0].scenario;

@@ -50,7 +50,7 @@ runSkill('data-anonymizer', () => {
     input: argv.find((a: string) => !a.startsWith('--')),
     out: argv.indexOf('--out') !== -1 ? argv[argv.indexOf('--out') + 1] : undefined,
   };
-  
+
   if (!args.input) {
     console.error('Error: Input file path is required');
     process.exit(1);

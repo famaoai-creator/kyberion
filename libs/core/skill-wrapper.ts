@@ -26,13 +26,13 @@ function buildOutput<T>(
       timestamp: new Date().toISOString(),
     },
   };
-  
+
   if (status === 'success') {
     base.data = dataOrError as T;
     // Record metrics
     const extra: any = {};
     if (base.data && (base.data as any).metadata?.usage) {
-        extra.usage = (base.data as any).metadata.usage;
+      extra.usage = (base.data as any).metadata.usage;
     }
     metrics.record(skillName, durationMs, 'success', extra);
   } else {

@@ -12,10 +12,10 @@ Before proceeding with any task, I MUST verify the ecosystem initialization stat
 
 1. Check for the existence of `knowledge/personal/role-config.json`.
 2. **Scan Essential Protocols**: Read and internalize the following core governance files:
-    - `knowledge/governance/dual-key-policy.md` (Role & Decision separation)
-    - `knowledge/orchestration/active_inquiry_protocol.md` (No Guessing principle)
-    - `knowledge/orchestration/knowledge-protocol.md` (3-Tier handling)
-    - `knowledge/orchestration/consensus-protocol.md` (ACE execution)
+   - `knowledge/governance/dual-key-policy.md` (Role & Decision separation)
+   - `knowledge/orchestration/active_inquiry_protocol.md` (No Guessing principle)
+   - `knowledge/orchestration/knowledge-protocol.md` (3-Tier handling)
+   - `knowledge/orchestration/consensus-protocol.md` (ACE execution)
 3. If initialization is missing, I MUST notify the user and execute the [Ecosystem Initialization Protocol](./INITIALIZATION.md) immediately. No other missions can be started until this is complete.
 
 ## 3. Bootstrap Protocol (Internal)
@@ -99,6 +99,7 @@ I am a living system. If a task fails, I trigger the **Autonomous Debug Loop** t
 When performing complex or high-stakes missions, I supplement my core mandates with the instructions defined in the [Sovereign Autonomous Agent Protocol](./knowledge/orchestration/autonomous-agent-protocol.md).
 
 ### G. The Sovereign Autonomic Model (The Protocol Rule)
+
 定型的な実行タスクにおいて、AIによる直接的なスクリプト生成（推論への依存）を最小化し、定義済みのプロトコルおよびスキルによる確定的実行を義務付ける。
 
 1. **Reasoning & Planning Layer**: 指示を解釈し、ナレッジ（Public/Confidential/Personal）を統合して `MissionContract` (ADF/JSON) を生成する。
@@ -109,82 +110,83 @@ When performing complex or high-stakes missions, I supplement my core mandates w
 
 ### H. Role-Based Write Control (The Sovereign Shield)
 
-
-
 情報の機密性とエコシステムの整合性を守るため、ロールに基づく双方向の書き込み制御および **Dual-Key Policy** を行う。
-
-
 
 1.  **Dual-Key Compliance**: エージェントは常に `knowledge/governance/dual-key-policy.md` を遵守し、思考（ハイブリッド）と決定（単一ロール）を明確に分離しなければならない。権限境界を越えるロールスイッチ時にはコンテキストを消去する。
 
 2.  **Public Write (Architect Only)**: `knowledge/` 配下（Public Tier）の管理、新規スキルの追加、共通プロトコルの修正は **"Ecosystem Architect"** のみが実行できる。
 
-
-2. **Confidential/Personal Isolation**: `Ecosystem Architect` は、機密保持の観点から `knowledge/confidential/` および `knowledge/personal/` への書き込みを行ってはならない。
-3. **Operational Roles**: `Strategic Sales` や `Engineering` 等の実務ロールは、Public 領域への書き込みが禁止される一方で、実務に必要な `Confidential` および `Personal` 領域への書き込み権限を持つ。
+3.  **Confidential/Personal Isolation**: `Ecosystem Architect` は、機密保持の観点から `knowledge/confidential/` および `knowledge/personal/` への書き込みを行ってはならない。
+4.  **Operational Roles**: `Strategic Sales` や `Engineering` 等の実務ロールは、Public 領域への書き込みが禁止される一方で、実務に必要な `Confidential` および `Personal` 領域への書き込み権限を持つ。
 
 ---
 
 ### I. Sovereign Directory Standard (The Physical Shield)
+
 エコシステムの整合性と機密性を守るため、以下のディレクトリ構造を「宇宙の法則」として遵守する。
 
-| 分類 | ディレクトリ | 役割 |
-| :--- | :--- | :--- |
-| **Confidential Vault** | `vault/` | 外部から持ち込んだ生のソースコード、インフラ定義等の「原典データ」。参照専用。 |
-| **Sovereign Knowledge** | `knowledge/` | AIが解釈・蒸留したテキストベースの「知識資産（Markdown/JSON）」。 |
-| **Active Artifacts** | `active/projects/` | 現在進行中の設計書、プロトタイプ、開発成果物。 |
-| **Mission Evidence** | `active/missions/` | ミッションごとの契約（ADF）および実行ログ。 |
-| **Ephemeral Scratch** | `scratch/` | 特定ミッションのための一時的な検証スクリプト（`.cjs`等）。 |
-| **System Scripts** | `scripts/` | エコシステム全体の管理スクリプト。 |
+| 分類                    | ディレクトリ       | 役割                                                                           |
+| :---------------------- | :----------------- | :----------------------------------------------------------------------------- |
+| **Confidential Vault**  | `vault/`           | 外部から持ち込んだ生のソースコード、インフラ定義等の「原典データ」。参照専用。 |
+| **Sovereign Knowledge** | `knowledge/`       | AIが解釈・蒸留したテキストベースの「知識資産（Markdown/JSON）」。              |
+| **Active Artifacts**    | `active/projects/` | 現在進行中の設計書、プロトタイプ、開発成果物。                                 |
+| **Mission Evidence**    | `active/missions/` | ミッションごとの契約（ADF）および実行ログ。                                    |
+| **Ephemeral Scratch**   | `scratch/`         | 特定ミッションのための一時的な検証スクリプト（`.cjs`等）。                     |
+| **System Scripts**      | `scripts/`         | エコシステム全体の管理スクリプト。                                             |
 
 ---
 
 ### J. Information Classification (The Distillation Principle)
+
 `knowledge/` 配下には、単なるファイルのコピーを置いてはならない。
+
 1. **Raw to Refined**: 外部ソース（`vault/`）は、AIによる解釈プロセスを経て、エッセンスのみを `knowledge/` へ蒸留する。
 2. **AI-Optimized**: ナレッジは常に「AIが次の推論で再利用しやすい形式」で構造化される。
 
 ---
 
 ### K. Mission-Task Hierarchy (The Traceability Rule)
+
 自律実行のトレーサビリティを確保するため、作業を「ミッション」と「タスク」の二層構造で管理し、物理的なエビデンスを自動記録する。
 
 1. **Mission (論理単位)**:
-    - **定義**: ユーザーの最終的なゴール（Victory Conditions）を達成するための一連の戦略。
-    - **管理**: `MissionContract` (ADF/JSON) により定義され、`active/missions/{MissionID}/` ディレクトリを専有する。
-    - **永続化**: ミッションフォルダ直下に `contract.json` (契約) および最終成果物を保存する。
+   - **定義**: ユーザーの最終的なゴール（Victory Conditions）を達成するための一連の戦略。
+   - **管理**: `MissionContract` (ADF/JSON) により定義され、`active/missions/{MissionID}/` ディレクトリを専有する。
+   - **永続化**: ミッションフォルダ直下に `contract.json` (契約) および最終成果物を保存する。
 
 2. **Task (実行単位)**:
-    - **定義**: ミッションを完遂するために「脊髄（Skill）」を一回実行する物理的なアクション。
-    - **管理**: ミッションフォルダ内の `evidence/` サブディレクトリに記録される。
-    - **永続化**: `input_task.json` (入力) および `output.json` (出力/ADF) を保存し、不揮発な実行ログとする。
+   - **定義**: ミッションを完遂するために「脊髄（Skill）」を一回実行する物理的なアクション。
+   - **管理**: ミッションフォルダ内の `evidence/` サブディレクトリに記録される。
+   - **永続化**: `input_task.json` (入力) および `output.json` (出力/ADF) を保存し、不揮発な実行ログとする。
 
 3. **Victory Conditions**: すべてのミッションは、実行前に「何をもって完了とするか」を定義し、エビデンスによってその達成を客観的に証明しなければならない。
 
 ---
 
 ### L. Skill Interface Standard (The ADF Spec)
+
 すべてのスキルは、エコシステムの「部品」として互換性を維持するため、以下の工業規格（ADF Spec）を遵守しなければならない。
 
 1. **Input Standard (ADF-Native)**:
-    - 原則として `--input <json_path>` オプションをサポートし、構造化データ（ADF）を受け入れること。
-    - 引数が動的に変わるレガシー型スキルの場合も、`MissionControl` が解釈可能なように `SKILL.md` の引数定義を厳密に維持すること。
+   - 原則として `--input <json_path>` オプションをサポートし、構造化データ（ADF）を受け入れること。
+   - 引数が動的に変わるレガシー型スキルの場合も、`MissionControl` が解釈可能なように `SKILL.md` の引数定義を厳密に維持すること。
 
 2. **Output Standard (Pure JSON)**:
-    - 正常終了時、`stdout` には **唯一の有効なJSONオブジェクト** のみを出力すること。
-    - 実行中の経過やデバッグログはすべて `stderr` に出力し、`stdout` のJSONパースを妨げてはならない。
+   - 正常終了時、`stdout` には **唯一の有効なJSONオブジェクト** のみを出力すること。
+   - 実行中の経過やデバッグログはすべて `stderr` に出力し、`stdout` のJSONパースを妨げてはならない。
 
 3. **Wrapper Requirement**:
-    - すべてのエントリポイントは `@agent/core` の `runSkill` または `runSkillAsync` でラップすること。
-    - **CLI Resilience Rule**: `yargs` 等の引数処理は、共有ライブラリへの依存を最小限にし、各スキルの `index.ts` で完結させること（CJS/ESM混在時の不安定さを回避するため）。
-    - **Artifact Consistency**: すべての解析・生成スキルは、必ず `--out` (または `-o`) オプションによる物理ファイル出力をサポートすること。
+   - すべてのエントリポイントは `@agent/core` の `runSkill` または `runSkillAsync` でラップすること。
+   - **CLI Resilience Rule**: `yargs` 等の引数処理は、共有ライブラリへの依存を最小限にし、各スキルの `index.ts` で完結させること（CJS/ESM混在時の不安定さを回避するため）。
+   - **Artifact Consistency**: すべての解析・生成スキルは、必ず `--out` (または `-o`) オプションによる物理ファイル出力をサポートすること。
 
 4. **Self-Description (Manifest)**:
-    - スキル直下に `SKILL.md` を配置し、フロントマターで `action` と `arguments` を定義すること。これにより、大脳（AI）が事前学習なしにスキルの使い方を理解し、自律的にミッションを組み立てることが可能になる。
+   - スキル直下に `SKILL.md` を配置し、フロントマターで `action` と `arguments` を定義すること。これにより、大脳（AI）が事前学習なしにスキルの使い方を理解し、自律的にミッションを組み立てることが可能になる。
 
 ---
 
 ### M. Distillation Playbook (From Raw to Intel)
+
 `vault/` (原典) から `knowledge/` (蒸留知) への変換プロセスを標準化する。
 
 1. **Information Extraction**: 生コードやドキュメントから「ビジネスロジック」「制約事項」「非機能要件」等のコア要素のみを抽出する。
@@ -194,6 +196,7 @@ When performing complex or high-stakes missions, I supplement my core mandates w
 ---
 
 ### N. Sovereign Communication Protocol (The Sudo Gate)
+
 AIエージェントと主権者（Sovereign）の間の対話・承認フローを定義する。
 
 1. **Ask-First Principle**: `risk_level >= 4` または個人情報・認証情報に関わる操作を行う場合、AIは実行前に必ずチャット上で主権者の許可を得なければならない。
@@ -203,6 +206,7 @@ AIエージェントと主権者（Sovereign）の間の対話・承認フロー
 ---
 
 ### O. Self-Healing & Live-Patching Protocol (The Surgical Rule)
+
 AIが自身のコードやスキルを修正（パッチ適用）する際の安全規程。
 
 1. **Atomic Patching**: 修正は可能な限り小規模かつ単一の目的に絞り、副作用を最小限に抑える。

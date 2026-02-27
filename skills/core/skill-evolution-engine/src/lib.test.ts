@@ -28,10 +28,10 @@ function test2() {}`);
       hasPackageJson: false,
       scriptSize: 500,
       complexity: 'high' as const,
-      functionCount: 15
+      functionCount: 15,
     };
     const suggestions = suggestEvolutions('test-skill', health);
-    expect(suggestions.some(s => s.type === 'refactor')).toBe(true);
-    expect(suggestions.some(s => s.type === 'structure')).toBe(true);
+    expect(suggestions.some((s) => s.type === 'refactor')).toBe(true);
+    expect(suggestions.some((s) => s.type === 'structure')).toBe(true);
   });
 });

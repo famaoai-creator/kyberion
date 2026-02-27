@@ -9,11 +9,13 @@ describe('talent-requirement-generator lib', () => {
 
   it('should detect tech stack from project files', () => {
     vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
-        const pathStr = typeof p === 'string' ? p : '';
-        if (pathStr.includes('package.json') || pathStr.includes('Dockerfile')) return true;
-        return false;
+      const pathStr = typeof p === 'string' ? p : '';
+      if (pathStr.includes('package.json') || pathStr.includes('Dockerfile')) return true;
+      return false;
     });
-    vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify({ dependencies: { react: '18.0.0', express: '4.18.0' } }));
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ dependencies: { react: '18.0.0', express: '4.18.0' } })
+    );
 
     const stack = detectTechStack('/test');
     expect(stack.languages).toContain('JavaScript/TypeScript');
@@ -25,7 +27,7 @@ describe('talent-requirement-generator lib', () => {
   it('should generate correct JD for senior engineer', () => {
     const stack = { languages: ['Python'], frameworks: ['Django'], tools: ['Terraform'] };
     const jd = generateJobDescription('senior-engineer', stack);
-    
+
     expect(jd.title).toBe('Senior Software Engineer');
     expect(jd.experience).toBe('5-8 years');
     expect(jd.skills).toContain('Python');

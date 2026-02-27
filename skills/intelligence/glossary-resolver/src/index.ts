@@ -6,7 +6,8 @@ import { resolveGlossaryFile, Glossary } from './lib.js';
 const argv = createStandardYargs()
   .option('input', { alias: 'i', type: 'string', demandOption: true })
   .option('glossary', { alias: 'g', type: 'string', demandOption: true })
-  .option('out', { alias: 'o', type: 'string' }).parseSync();
+  .option('out', { alias: 'o', type: 'string' })
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('glossary-resolver', () => {

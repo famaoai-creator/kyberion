@@ -1,7 +1,7 @@
 ---
 name: skill-bundle-packager
 description: >-
-  
+
 status: implemented
 category: Utilities
 last_updated: '2026-02-16'

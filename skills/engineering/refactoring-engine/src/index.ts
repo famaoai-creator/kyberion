@@ -15,17 +15,17 @@ const argv = createStandardYargs()
   .option('out', { alias: 'o', type: 'string', describe: 'Optional output file path' }).argv;
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
-    runSkill('refactoring-engine', () => {
-        requireArgs(argv, ['input']);
-        const inputPath = validateFilePath(argv.input as string, 'input');
-        const content = fs.readFileSync(inputPath, 'utf8');
-        
-        const result = analyzeCode(content, inputPath);
+  runSkill('refactoring-engine', () => {
+    requireArgs(argv, ['input']);
+    const inputPath = validateFilePath(argv.input as string, 'input');
+    const content = fs.readFileSync(inputPath, 'utf8');
 
-        if (argv.out) {
-            safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-        }
+    const result = analyzeCode(content, inputPath);
 
-        return result;
-    });
+    if (argv.out) {
+      safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+    }
+
+    return result;
+  });
 }

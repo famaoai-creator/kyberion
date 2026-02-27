@@ -22,7 +22,8 @@ const argv = createStandardYargs()
     type: 'string',
     description: 'Output file path',
   })
-  .help().parseSync();
+  .help()
+  .parseSync();
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('self-healing-orchestrator', () => {

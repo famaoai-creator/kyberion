@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { classifyDORA, calculateBusinessImpact, processImpactAnalysis, AnalysisInput } from './lib.js';
+import {
+  classifyDORA,
+  calculateBusinessImpact,
+  processImpactAnalysis,
+  AnalysisInput,
+} from './lib.js';
 
 describe('business-impact-analyzer lib', () => {
   const mockInput: AnalysisInput = {
@@ -29,7 +34,11 @@ describe('business-impact-analyzer lib', () => {
   });
 
   it('should calculate business impact correctly', () => {
-    const impact = calculateBusinessImpact(mockInput.dora!, mockInput.quality!, mockInput.business!);
+    const impact = calculateBusinessImpact(
+      mockInput.dora!,
+      mockInput.quality!,
+      mockInput.business!
+    );
     expect(impact.monthlyDowntimeCost).toBeGreaterThan(0);
     expect(impact.techDebtMonthlyCost).toBe(200 * 80);
     expect(impact.coverageRisk).toBe('high');
@@ -58,17 +67,21 @@ describe('business-impact-analyzer lib', () => {
   it('should handle zero revenue gracefully', () => {
     const zeroRevInput: AnalysisInput = {
       ...mockInput,
-      business: { ...mockInput.business!, hourly_revenue: 0 }
+      business: { ...mockInput.business!, hourly_revenue: 0 },
     };
     const result = processImpactAnalysis(zeroRevInput);
-    expect(result.businessImpact.totalMonthlyImpact).toBe(result.businessImpact.techDebtMonthlyCost);
-    expect(result.recommendations.some(r => r.action.includes('Define hourly revenue'))).toBe(true);
+    expect(result.businessImpact.totalMonthlyImpact).toBe(
+      result.businessImpact.techDebtMonthlyCost
+    );
+    expect(result.recommendations.some((r) => r.action.includes('Define hourly revenue'))).toBe(
+      true
+    );
   });
 
   it('should handle extreme MTTR values', () => {
     const extremeInput: AnalysisInput = {
       ...mockInput,
-      dora: { ...mockInput.dora!, mttr_hours: 10000 }
+      dora: { ...mockInput.dora!, mttr_hours: 10000 },
     };
     const result = processImpactAnalysis(extremeInput);
     expect(result.doraClassification.metrics.mttr).toBe('low');

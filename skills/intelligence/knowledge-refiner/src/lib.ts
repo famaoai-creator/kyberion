@@ -48,7 +48,9 @@ export function scanKnowledge(dir: string): KnowledgeFile[] {
           modified: stat.mtime.toISOString(),
           content,
         });
-      } catch (_e) { /* ignore */ }
+      } catch (_e) {
+        /* ignore */
+      }
     }
   }
   return files;

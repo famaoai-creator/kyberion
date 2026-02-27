@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * scripts/skill-sanitizer.cjs v2.0
- * 
+ *
  * Advanced "Self-Healing Guard" for Gemini Skills.
  * - Context-aware patching (Regex with lookbehind to avoid process.argv)
  * - Parallel build capability (future optimization)
@@ -30,7 +30,10 @@ function getSkillDirs(dir) {
     try {
       const stat = fs.statSync(filePath);
       if (stat && stat.isDirectory()) {
-        if (fs.existsSync(path.join(filePath, 'package.json')) && fs.existsSync(path.join(filePath, 'src'))) {
+        if (
+          fs.existsSync(path.join(filePath, 'package.json')) &&
+          fs.existsSync(path.join(filePath, 'src'))
+        ) {
           results.push(filePath);
         } else {
           results = results.concat(getSkillDirs(filePath));

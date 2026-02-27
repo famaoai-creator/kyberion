@@ -15,7 +15,7 @@ module.exports = [
       '.gemini/',
       'vault/',
       'tests/',
-      'libs/core/*.ts', 
+      'libs/core/*.ts',
       '**/*.d.ts',
     ],
   },
@@ -36,7 +36,7 @@ module.exports = [
     },
   },
   // TS Config
-  ...tseslint.configs.recommended.map(config => ({
+  ...tseslint.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
   })),

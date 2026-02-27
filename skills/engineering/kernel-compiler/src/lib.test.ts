@@ -15,7 +15,9 @@ describe('kernel-compiler', () => {
 
   it('analyzes project structure', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ main: 'index.js', dependencies: { foo: '1.0' } }));
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ main: 'index.js', dependencies: { foo: '1.0' } })
+    );
     vi.mocked(fsUtils.getAllFiles).mockReturnValue(['index.js', 'lib.ts', 'main.go']);
 
     const analysis = analyzeProject('.');
@@ -39,7 +41,7 @@ describe('kernel-compiler', () => {
       if (cmd === 'npm') return '9.0.0';
       return '';
     });
-    
+
     const toolchain = checkToolchain('node');
     expect(toolchain.node).toBe('v18.0.0');
     expect(toolchain.npm).toBe('9.0.0');

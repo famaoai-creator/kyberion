@@ -36,20 +36,25 @@ export interface CompilerResult {
 }
 
 export function analyzeProject(dir: string): ProjectAnalysis {
-  const analysis: ProjectAnalysis = { entryPoints: [], dependencies: 0, scripts: [], languages: {} };
+  const analysis: ProjectAnalysis = {
+    entryPoints: [],
+    dependencies: 0,
+    scripts: [],
+    languages: {},
+  };
   const pkgPath = path.join(dir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        if (pkg.main) analysis.entryPoints.push(pkg.main);
-        if (pkg.bin) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (pkg.main) analysis.entryPoints.push(pkg.main);
+      if (pkg.bin) {
         const bins = typeof pkg.bin === 'string' ? { default: pkg.bin } : pkg.bin;
-        analysis.entryPoints.push(...Object.values(bins) as string[]);
-        }
-        analysis.dependencies = Object.keys(pkg.dependencies || {}).length;
-        analysis.scripts = Object.keys(pkg.scripts || {});
+        analysis.entryPoints.push(...(Object.values(bins) as string[]));
+      }
+      analysis.dependencies = Object.keys(pkg.dependencies || {}).length;
+      analysis.scripts = Object.keys(pkg.scripts || {});
     } catch (_e) {
-        // ignore
+      // ignore
     }
   }
 
@@ -122,7 +127,7 @@ export function checkToolchain(target: string): ToolchainCheck {
       }
     }
   } catch (_e) {
-      // ignore
+    // ignore
   }
   return checks;
 }
@@ -131,7 +136,7 @@ export function runCompiler(dir: string, target: string, dryRun: boolean): Compi
   const analysis = analyzeProject(dir);
   const buildPlan = generateBuildPlan(analysis, target);
   const toolchain = checkToolchain(target);
-  
+
   return {
     directory: dir,
     target: target,

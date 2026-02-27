@@ -14,8 +14,8 @@ export interface MemoryRegistry {
 
 export function saveFact(fact: string, category: string = 'general'): MemoryEntry {
   const memoryPath = pathResolver.shared('memory/facts.json');
-  const registry: MemoryRegistry = fs.existsSync(memoryPath) 
-    ? JSON.parse(fs.readFileSync(memoryPath, 'utf8')) 
+  const registry: MemoryRegistry = fs.existsSync(memoryPath)
+    ? JSON.parse(fs.readFileSync(memoryPath, 'utf8'))
     : { facts: [] };
 
   const entry: MemoryEntry = {
@@ -39,8 +39,9 @@ export function searchMemory(query: string): MemoryEntry[] {
   if (!fs.existsSync(memoryPath)) return [];
 
   const registry: MemoryRegistry = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
-  return registry.facts.filter(f => 
-    f.fact.toLowerCase().includes(query.toLowerCase()) || 
-    (f.category && f.category.toLowerCase().includes(query.toLowerCase()))
+  return registry.facts.filter(
+    (f) =>
+      f.fact.toLowerCase().includes(query.toLowerCase()) ||
+      (f.category && f.category.toLowerCase().includes(query.toLowerCase()))
   );
 }

@@ -29,7 +29,7 @@ export const MODEL_CATALOG: AIModel[] = [
     strengths: ['reasoning', 'long-context', 'multimodal'],
     latencyMs: 1000,
     capabilities: ['text', 'code', 'analysis', 'reasoning', 'multimodal'],
-  }
+  },
 ];
 
 export interface TaskComplexity {
@@ -47,7 +47,7 @@ export function analyzeTaskComplexity(content: string): TaskComplexity {
 
   let hardness: TaskComplexity['hardness'] = 'low';
   const requiredCapabilities = ['text'];
-  
+
   if (isCode) {
     hardness = 'medium';
     requiredCapabilities.push('code');
@@ -65,7 +65,10 @@ export function analyzeTaskComplexity(content: string): TaskComplexity {
   };
 }
 
-export function selectModel(complexity: TaskComplexity, budget: 'economy' | 'balanced' | 'premium'): AIModel {
+export function selectModel(
+  complexity: TaskComplexity,
+  budget: 'economy' | 'balanced' | 'premium'
+): AIModel {
   const budgetFilter = {
     economy: ['economy'],
     balanced: ['economy', 'balanced'],
