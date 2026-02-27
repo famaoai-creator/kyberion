@@ -1432,10 +1432,26 @@
     "category": "standards/contract"
   },
   {
+    "id": "standards/engineering/api-compatibility-standards.md",
+    "title": "API Compatibility & Evolution Standards",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
+    "tier": "public",
+    "category": "standards/engineering"
+  },
+  {
     "id": "standards/engineering/code-analysis-protocol.md",
     "title": "Source Code Analysis Protocol (SCAP)",
     "author": "Unknown",
     "last_updated": "2026-02-14",
+    "tier": "public",
+    "category": "standards/engineering"
+  },
+  {
+    "id": "standards/engineering/logging-design-standards.md",
+    "title": "Logging Design & Observability Standards",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
     "tier": "public",
     "category": "standards/engineering"
   },
