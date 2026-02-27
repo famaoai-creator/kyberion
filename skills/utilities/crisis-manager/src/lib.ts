@@ -22,3 +22,38 @@ export function analyzeLogLines(lines: string[]): any {
       .slice(0, 3),
   };
 }
+
+/**
+ * Generates a professional RCA (Root Cause Analysis) report using AI.
+ */
+export async function generateRCAReport(logContent: string): Promise<string> {
+  const { safeExec } = require('@agent/core/secure-io');
+  
+  const prompt = `
+あなたは（The Resilient Commander）として、以下の障害ログからプロフェッショナルな「障害報告書 (Post-Mortem)」を作成します。
+
+【ミッション】: 根本原因の特定（5-Whys）と再発防止策の策定。
+【報告書構成】:
+1. Executive Summary
+2. Timeline
+3. Impact Analysis
+4. Root Cause Analysis (5-Whys)
+5. Action Items (Preventative Measures)
+
+【対象ログ】:
+\`\`\`
+${logContent.substring(0, 5000)}
+\`\`\`
+
+Markdown形式で出力してください。
+  `.trim();
+
+  try {
+    const escapedPrompt = prompt.replace(/"/g, '\\"');
+    console.error('[Crisis] Consulting AI for RCA analysis...');
+    const report = safeExec('gemini', ['--prompt', escapedPrompt], { timeoutMs: 60000 });
+    return report;
+  } catch (err: any) {
+    throw new Error(`RCA Generation Failed: ${err.message}`);
+  }
+}
