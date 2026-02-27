@@ -9,6 +9,16 @@ transition: slide-left
 title: Chronos Mirror - Gemini Reality Interface
 ---
 
+# Welcome to the Bridge
+
+### Connecting Human Intuition with AI Logic
+
+<div class="pt-12">
+  <WelcomeGuide />
+</div>
+
+---
+
 # Chronos Mirror
 
 ### Gemini Reality-Mirroring Interface v1.0

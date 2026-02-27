@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 213,
-  "u": "2026-02-16T16:58:23.917Z",
+  "t": 214,
+  "u": "2026-02-27T17:31:18.120Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -111,7 +111,7 @@
       "id": "design/brand/visual_identity.md",
       "title": "Brand & Visual Identity Engineering",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "design/brand"
     },
@@ -135,7 +135,7 @@
       "id": "economics/finops/cloud_optimization.md",
       "title": "Cloud FinOps & Unit Economics Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "economics/finops"
     },
@@ -151,7 +151,7 @@
       "id": "ethics/ai_bias_mitigation.md",
       "title": "Data Ethics & AI Bias Mitigation Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "ethics"
     },
@@ -207,7 +207,7 @@
       "id": "external-wisdom/everything-claude/agents/e2e-runner.md",
       "title": "E2E Test Runner",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -335,7 +335,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/coding-style.md",
       "title": "Go Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -343,7 +343,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/hooks.md",
       "title": "Go Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -351,7 +351,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/patterns.md",
       "title": "Go Patterns",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -359,7 +359,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/security.md",
       "title": "Go Security",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -367,7 +367,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/testing.md",
       "title": "Go Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -375,7 +375,7 @@
       "id": "external-wisdom/everything-claude/rules/python/coding-style.md",
       "title": "Python Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -383,7 +383,7 @@
       "id": "external-wisdom/everything-claude/rules/python/hooks.md",
       "title": "Python Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -391,7 +391,7 @@
       "id": "external-wisdom/everything-claude/rules/python/patterns.md",
       "title": "Python Patterns",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -399,7 +399,7 @@
       "id": "external-wisdom/everything-claude/rules/python/security.md",
       "title": "Python Security",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -407,7 +407,7 @@
       "id": "external-wisdom/everything-claude/rules/python/testing.md",
       "title": "Python Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -423,7 +423,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/hooks.md",
       "title": "TypeScript/JavaScript Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -447,7 +447,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/testing.md",
       "title": "TypeScript/JavaScript Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-07",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -463,7 +463,7 @@
       "id": "fisc-compliance/blea_fisc_reference.md",
       "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "fisc-compliance"
     },
@@ -479,7 +479,7 @@
       "id": "future/quantum_sustainability.md",
       "title": "Future-Proofing: Quantum-Safe & Sustainability",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "future"
     },
@@ -487,7 +487,7 @@
       "id": "governance/dual-key-policy.md",
       "title": "Dual-Key Policy: ロール管理と決定権限の標準規約",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "governance"
     },
@@ -495,7 +495,7 @@
       "id": "legal/ip/patent_strategy.md",
       "title": "Legal & Intellectual Property Strategy",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "legal/ip"
     },
@@ -503,7 +503,7 @@
       "id": "nonfunctional/nonfunctional_requirements.md",
       "title": "Non-Functional Requirements Definition",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "nonfunctional"
     },
@@ -519,7 +519,7 @@
       "id": "onboarding/learning_paths.md",
       "title": "ロール別教育ロードマップ (Learning Paths by Role)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "onboarding"
     },
@@ -527,7 +527,7 @@
       "id": "operations/availability_best_practices.md",
       "title": "Availability & Disaster Recovery Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -543,7 +543,7 @@
       "id": "operations/modern_sre_best_practices.md",
       "title": "Modern SRE Best Practices (Advanced Operations)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -575,7 +575,7 @@
       "id": "operations/monitoring_best_practices.md",
       "title": "Monitoring & Observability Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -583,7 +583,7 @@
       "id": "operations/pagerduty_best_practices.md",
       "title": "PagerDuty Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -591,7 +591,7 @@
       "id": "operations/runbook_best_practices.md",
       "title": "Runbook & Playbook Best Practices (AI-Native Operations)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -607,7 +607,7 @@
       "id": "operations/slo_dashboard_best_practices.md",
       "title": "SLO & Dashboard Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-09",
       "tier": "public",
       "category": "operations"
     },
@@ -615,7 +615,7 @@
       "id": "orchestration/active_inquiry_protocol.md",
       "title": "Active Inquiry Protocol: The Power of Questioning",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -631,7 +631,7 @@
       "id": "orchestration/autonomous-agent-protocol.md",
       "title": "Sovereign Autonomous Agent Protocol (SAAP)",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -639,7 +639,7 @@
       "id": "orchestration/autonomous-debug-loop.md",
       "title": "自律型デバッグ・ループ (Autonomous Debug Loop)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -647,7 +647,7 @@
       "id": "orchestration/consensus-protocol.md",
       "title": "ACE (Autonomous Consensus Engine) Operating Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -655,7 +655,7 @@
       "id": "orchestration/context-extraction-rules.md",
       "title": "コンテキスト抽出・要約ルール (Context Extraction Rules)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -679,7 +679,7 @@
       "id": "orchestration/directives-protocol.md",
       "title": "Cross-Role Directive Protocol (CRDP)",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -703,7 +703,7 @@
       "id": "orchestration/hybrid-development-flow.md",
       "title": "ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -719,7 +719,7 @@
       "id": "orchestration/mission-execution-protocol.md",
       "title": "ミッション実行規程 (Mission Execution Protocol v1.0)",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -767,7 +767,7 @@
       "id": "orchestration/onboarding-directives/03_arch_to_steward.md",
       "title": "MISSION: Skill Usage & Performance Audit",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -775,7 +775,7 @@
       "id": "orchestration/onboarding-directives/04_steward_self_map.md",
       "title": "MISSION: External System Connection Mapping",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -951,7 +951,7 @@
       "id": "orchestration/self-refinement-protocol.md",
       "title": "Self-Refinement Protocol: The Path to Perpetual Growth",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -959,15 +959,15 @@
       "id": "orchestration/sentinel-operations.md",
       "title": "Autonomous Sentinel Operations",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
     {
-      "id": "orchestration/asset-token-economy-protocol.md",
+      "id": "orchestration/token-economy-protocol.md",
       "title": "トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -975,7 +975,7 @@
       "id": "orchestration/voice-interface-protocol.md",
       "title": "Voice Interface Protocol (VIP)",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "orchestration"
     },
@@ -983,7 +983,7 @@
       "id": "organization/change_management.md",
       "title": "Cultural Alignment & Change Management Protocol",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "organization"
     },
@@ -991,15 +991,23 @@
       "id": "personalities/matrix.md",
       "title": "ペルソナ・マトリクス (Persona Matrix)",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "personal",
       "category": "personalities"
+    },
+    {
+      "id": "pmo/hall-of-fame/mission-marathon-proof.md",
+      "title": "Hall of Fame: Ecosystem Viability Marathon",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
+      "tier": "public",
+      "category": "pmo/hall-of-fame"
     },
     {
       "id": "pmo/standard/ipa_nfr_bridge.md",
       "title": "PMO Bridge to IPA Non-Functional Grade",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1007,7 +1015,7 @@
       "id": "pmo/standard/pmbok_v7.md",
       "title": "PMBOK v7 Project Management Principles",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1015,7 +1023,7 @@
       "id": "pmo/standard/stakeholder_management.md",
       "title": "Stakeholder Management Framework",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1047,7 +1055,7 @@
       "id": "public/standards/blea_fisc_reference.md",
       "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "public/standards"
     },
@@ -1119,7 +1127,7 @@
       "id": "roles/ceo/memories/strategic_vision.md",
       "title": "STRATEGIC_VISION Memories (ROLES)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-11",
       "tier": "public",
       "category": "roles/ceo/memories"
     },
@@ -1175,7 +1183,7 @@
       "id": "roles/executive_assistant/mission.md",
       "title": "Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "roles/executive_assistant"
     },
@@ -1351,7 +1359,7 @@
       "id": "security/advanced/diff_based_scanning.md",
       "title": "Diff-Based Security Scanning Strategy",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "security/advanced"
     },
@@ -1367,7 +1375,7 @@
       "id": "skills/ux-visualizer/methodology.md",
       "title": "Methodology: High-Fidelity SPA Reverse Engineering",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "skills/ux-visualizer"
     },
@@ -1383,7 +1391,7 @@
       "id": "standards/adr/adr_standard.md",
       "title": "Architecture Decision Record (ADR) Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/adr"
     },
@@ -1399,7 +1407,7 @@
       "id": "standards/bcp/dr_playbook.md",
       "title": "Disaster Recovery & BCP Playbook",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/bcp"
     },
@@ -1407,7 +1415,7 @@
       "id": "standards/contract/negotiation_guardrails.md",
       "title": "Contract & SLA Negotiation Guardrails",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/contract"
     },
@@ -1431,7 +1439,7 @@
       "id": "standards/fisc/security-controls.md",
       "title": "FISC-Aligned Security Standard (Cloud Infrastructure)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/fisc"
     },
@@ -1455,7 +1463,7 @@
       "id": "standards/security/owasp_llm_top10.md",
       "title": "OWASP Top 10 for LLM Applications",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/security"
     },
@@ -1463,7 +1471,7 @@
       "id": "standards/testing/best_practices.md",
       "title": "Test Automation Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1471,7 +1479,7 @@
       "id": "standards/testing/mobile_automation.md",
       "title": "Mobile Test Automation Standard (Deep-Dive Edition)",
       "author": "Unknown",
-      "last_updated": "2026-02-16",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1479,7 +1487,7 @@
       "id": "standards/testing/web_automation.md",
       "title": "Web Test Automation Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1487,7 +1495,7 @@
       "id": "standards/ux/cognitive_load_principles.md",
       "title": "Cognitive Load Principles for UX Design",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "standards/ux"
     },
@@ -1535,7 +1543,7 @@
       "id": "tech-stack/cloud/rosetta_stone.md",
       "title": "The Rosetta Stone of Cloud (Multi-Cloud Mapping)",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/cloud"
     },
@@ -1551,7 +1559,7 @@
       "id": "tech-stack/java/terasoluna/architecture.md",
       "title": "TERASOLUNA Layered Architecture Standard",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/java/terasoluna"
     },
@@ -1559,7 +1567,7 @@
       "id": "tech-stack/java/terasoluna/implementation_standards.md",
       "title": "TERASOLUNA Implementation Standards",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/java/terasoluna"
     },
@@ -1583,7 +1591,7 @@
       "id": "tech-stack/voltmx/architecture.md",
       "title": "VoltMX Architecture Overview",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -1591,7 +1599,7 @@
       "id": "tech-stack/voltmx/best_practices.md",
       "title": "VoltMX Development Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -1599,7 +1607,7 @@
       "id": "tech-stack/voltmx/migration/mapping_rules.md",
       "title": "VoltMX to React Technical Mapping Rules",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/voltmx/migration"
     },
@@ -1607,7 +1615,7 @@
       "id": "tech-stack/voltmx/migration/strategy.md",
       "title": "VoltMX to React Migration Strategy",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/voltmx/migration"
     },
@@ -1615,7 +1623,7 @@
       "id": "tech-stack/voltmx/troubleshooting.md",
       "title": "VoltMX Troubleshooting Guide",
       "author": "Unknown",
-      "last_updated": "2026-02-14",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -1623,7 +1631,7 @@
       "id": "templates/reporting/audience_strategy.md",
       "title": "Audience Strategy for Executive Reporting",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -1631,7 +1639,7 @@
       "id": "templates/reporting/master_slide_structure.md",
       "title": "Master Slide Structure (Marp Standard)",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -1639,7 +1647,7 @@
       "id": "templates/reporting/project_management_plan_13.md",
       "title": "Project Management Plan (PMP) - 13 Standard Items",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -1647,7 +1655,7 @@
       "id": "templates/reporting/project_plan_master.md",
       "title": "Project Plan Master Template (Consulting Standard)",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -1679,7 +1687,7 @@
       "id": "templates/themes/visual_harmony_guide.md",
       "title": "ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition",
       "author": "Unknown",
-      "last_updated": "2026-02-15",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "templates/themes"
     },

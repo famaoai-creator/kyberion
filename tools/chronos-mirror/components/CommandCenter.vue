@@ -42,27 +42,30 @@ onUnmounted(() => {
 <template>
   <div class="grid grid-cols-3 gap-4 mb-8">
     <!-- Metric Cards -->
-    <div class="p-4 bg-gray-900 border-t-2 border-blue-500 rounded-lg shadow-xl">
+    <div class="p-4 bg-gray-900 border-t-2 border-blue-500 rounded-lg shadow-xl text-center">
       <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">
         Ecosystem Efficiency
       </p>
       <p class="text-3xl font-black text-white">
         {{ metrics.efficiency }}<span class="text-xs text-gray-600">/100</span>
       </p>
+      <p class="text-[8px] text-gray-600 mt-2 italic">現在の開発・実行スループット</p>
     </div>
-    <div class="p-4 bg-gray-900 border-t-2 border-green-500 rounded-lg shadow-xl">
+    <div class="p-4 bg-gray-900 border-t-2 border-green-500 rounded-lg shadow-xl text-center">
       <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">
         Reliability Index
       </p>
       <p class="text-3xl font-black text-white">
         {{ metrics.reliability }}<span class="text-xs text-gray-600">%</span>
       </p>
+      <p class="text-[8px] text-gray-600 mt-2 italic">ミッション達成率および型安全性</p>
     </div>
-    <div class="p-4 bg-gray-900 border-t-2 border-red-500 rounded-lg shadow-xl">
+    <div class="p-4 bg-gray-900 border-t-2 border-red-500 rounded-lg shadow-xl text-center">
       <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">
         Technical Debt Risk
       </p>
       <p class="text-3xl font-black text-white">{{ metrics.debt }}</p>
+      <p class="text-[8px] text-gray-600 mt-2 italic">未解決の課題・リファクタリングコスト</p>
     </div>
   </div>
 
