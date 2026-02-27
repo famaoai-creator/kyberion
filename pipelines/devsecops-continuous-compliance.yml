@@ -1,0 +1,24 @@
+name: DevSecOps Continuous Compliance Pipeline
+description: Advanced security and governance audit integrated into the delivery lifecycle
+steps:
+  - skill: supply-chain-sentinel
+    args: '--input "{{dir}}" --sbom --scan'
+    output: sbom
+  - skill: ai-ethics-auditor
+    args: '--input "{{dir}}"'
+    output: ethics
+  - skill: post-quantum-shield
+    args: '--dir "{{dir}}"'
+    output: quantum
+  - skill: sustainability-consultant
+    args: '--dir "{{dir}}"'
+    output: carbon
+  - skill: compliance-officer
+    args: '--dir "{{dir}}"'
+    output: compliance
+  - skill: crisis-manager
+    args: '--log "{{log}}" --rca'
+    output: postmortem
+  - skill: html-reporter
+    args: '--input "$prev.output" --out "reports/compliance-report.html"'
+    output: final_report

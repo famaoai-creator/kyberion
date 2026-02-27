@@ -1376,6 +1376,14 @@
     "category": "security"
   },
   {
+    "id": "security/security-by-design.md",
+    "title": "Security By Design Standard",
+    "author": "Unknown",
+    "last_updated": "2026-02-27",
+    "tier": "public",
+    "category": "security"
+  },
+  {
     "id": "security/supply-chain-governance.md",
     "title": "Software Supply Chain Governance & SBOM Standards",
     "author": "Unknown",

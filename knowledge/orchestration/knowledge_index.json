@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 219,
-  "u": "2026-02-27T20:28:10.077Z",
+  "t": 220,
+  "u": "2026-02-27T20:30:50.270Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -1376,6 +1376,14 @@
       "title": "Security Best Practices",
       "author": "Unknown",
       "last_updated": "2026-02-14",
+      "tier": "public",
+      "category": "security"
+    },
+    {
+      "id": "security/security-by-design.md",
+      "title": "Security By Design Standard",
+      "author": "Unknown",
+      "last_updated": "2026-02-27",
       "tier": "public",
       "category": "security"
     },

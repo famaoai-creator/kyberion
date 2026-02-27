@@ -16,6 +16,7 @@ node mission-control/scripts/orchestrate.cjs --pipeline pipelines/<name>.yml
 | `compliance-audit`         | License + regulatory compliance check                       |
 | `cost-optimization-audit`  | Cloud cost analysis and waste detection                     |
 | `data-flow-audit`          | Data flow and schema validation                             |
+| `devsecops-continuous-compliance` | Advanced security and governance audit integrated into the lifecycle |
 | `doc-analysis`             | Document analysis and extraction                            |
 | `documentation-excellence` | Full documentation quality suite                            |
 | `documentation-sync`       | Detect and fix documentation drift                          |
