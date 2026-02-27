@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const pathResolver = require('@agent/core/path-resolver');
 const { safeJsonParse } = require('@agent/core/validators');
 
-const PORT = 3030;
+const PORT = 3031;
 const _rootDir = pathResolver.rootDir();
 const queueDir = pathResolver.shared('queue');
 const inboxDir = path.join(queueDir, 'inbox');
@@ -138,7 +138,7 @@ const server = http.createServer((req, res) => {
       totalSkills: 0,
       activeMissions: 0,
       archivedMissions: 0,
-      healthScore: 95, // Default for YOLO
+      healthScore: 0,
       lastUpdated: new Date().toISOString()
     };
 
@@ -159,16 +159,33 @@ const server = http.createServer((req, res) => {
     }
 
     const evidenceDir = path.join(_rootDir, 'evidence/missions');
+    let totalScore = 0;
+    let evalCount = 0;
+
     if (fs.existsSync(evidenceDir)) {
       const months = fs.readdirSync(evidenceDir);
       months.forEach(m => {
         const mPath = path.join(evidenceDir, m);
         if (fs.lstatSync(mPath).isDirectory()) {
-          stats.archivedMissions += fs.readdirSync(mPath).length;
+          const missionDirs = fs.readdirSync(mPath);
+          stats.archivedMissions += missionDirs.length;
+
+          // Scan for ai-evaluation.json to calculate health score
+          missionDirs.forEach(mission => {
+            const evalPath = path.join(mPath, mission, 'ai-evaluation.json');
+            if (fs.existsSync(evalPath)) {
+              try {
+                const evalData = JSON.parse(fs.readFileSync(evalPath, 'utf8'));
+                totalScore += evalData.score;
+                evalCount++;
+              } catch (_) {}
+            }
+          });
         }
       });
     }
 
+    stats.healthScore = evalCount > 0 ? Math.round(totalScore / evalCount) : 95;
     sendJson(200, stats);
   }
   else {

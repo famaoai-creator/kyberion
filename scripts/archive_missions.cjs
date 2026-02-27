@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { distill } = require('./distill_wisdom.cjs');
+const { judge } = require('./ai_judge.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
 const activeMissionsDir = path.join(rootDir, 'active/missions');
@@ -24,7 +25,12 @@ for (const mission of missions) {
 
   if (fs.existsSync(reportPath)) {
     try {
-      // YOLO: Distill wisdom BEFORE moving the directory
+      // YOLO: Evaluate and Distill wisdom BEFORE moving the directory
+      const evaluation = judge(missionDir);
+      if (evaluation) {
+        console.log(`[JUDGE] Mission ${mission} graded: ${evaluation.grade} (${evaluation.score}/100) by ${evaluation.judge}`);
+      }
+
       const wisdomPath = distill(missionDir);
       if (wisdomPath) {
         console.log(`[WISDOM] Distilled knowledge to ${path.basename(wisdomPath)}`);

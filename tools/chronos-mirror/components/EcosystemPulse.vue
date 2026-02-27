@@ -62,7 +62,7 @@ const stats = ref({
 
 async function fetchStats() {
   try {
-    const res = await fetch('http://localhost:3030/ecosystem-stats');
+    const res = await fetch('http://localhost:3031/ecosystem-stats');
     if (res.ok) {
       stats.value = await res.json();
     }

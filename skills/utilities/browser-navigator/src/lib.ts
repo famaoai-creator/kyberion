@@ -94,6 +94,11 @@ export async function runYamlScenario(scenarioPath: string): Promise<any> {
         case 'wait':
           await asyncioSleep(step.timeout || 5000);
           break;
+
+        case 'visual_observe':
+          const obs = await visualObserve(page, step.save_path);
+          report.push(`  - Visual Observation: ${obs.summary}`);
+          break;
       }
     }
 
@@ -103,6 +108,24 @@ export async function runYamlScenario(scenarioPath: string): Promise<any> {
   } finally {
     await browser.close();
   }
+}
+
+async function visualObserve(page: Page, savePath?: string) {
+  const finalPath = savePath || `observation-${Date.now()}.png`;
+  await page.screenshot({ path: finalPath });
+
+  // Extract a simplified accessibility tree for the AI to "see" structure
+  const axTree = await (page as any).accessibility.snapshot();
+  
+  // Heuristic summary
+  const buttonCount = JSON.stringify(axTree).match(/"role":"button"/g)?.length || 0;
+  const linkCount = JSON.stringify(axTree).match(/"role":"link"/g)?.length || 0;
+
+  return {
+    screenshot: finalPath,
+    summary: `Captured ${buttonCount} buttons and ${linkCount} links. State saved to ${finalPath}`,
+    axTree
+  };
 }
 
 async function asyncioSleep(ms: number) {
