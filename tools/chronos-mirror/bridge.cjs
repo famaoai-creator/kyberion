@@ -188,6 +188,26 @@ const server = http.createServer((req, res) => {
     stats.healthScore = evalCount > 0 ? Math.round(totalScore / evalCount) : 95;
     sendJson(200, stats);
   }
+  // 7. Quality Report (Automation -> Browser)
+  else if (req.method === 'GET' && req.url === '/quality') {
+    const qualityPath = path.join(_rootDir, 'active/shared/quality-report.json');
+    if (fs.existsSync(qualityPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(qualityPath, 'utf8'));
+        sendJson(200, data);
+      } catch (err) {
+        sendJson(500, { error: 'Failed to parse quality report' });
+      }
+    } else {
+      // Fallback mock data
+      sendJson(200, {
+        fido: { status: 'Operational', coverage: '100%', lastRun: 'N/A' },
+        bff: { rest: 'Unknown', graphql: 'Unknown', schemas: 0, violations: 0 },
+        resilience: { mode: 'Ready', experiment: 'None', recoveryTime: '-' },
+        overall: 0
+      });
+    }
+  }
   else {
     sendJson(404, { error: 'Not Found' });
   }

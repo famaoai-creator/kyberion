@@ -107,6 +107,18 @@ title: Chronos Mirror - Gemini Reality Interface
 
 ## layout: center
 
+# 🛡️ Quality Automation Dashboard
+
+`iOS / Android / Web / BFF / Infrastructure`
+
+<div class="mt-8">
+  <QualityDashboard />
+</div>
+
+---
+
+## layout: center
+
 # 🌐 Ecosystem Mapping
 
 `Hierarchical Namespace Architecture`

@@ -25,10 +25,13 @@ export function generateMaestroYaml(options: TestGenOptions): string {
 1. 'appId: ${appId}' で開始せよ。
 2. '---' の後にアクションを記述せよ。
 3. Accessibility ID を優先したセレクタを使用せよ。
-4. 各ステップの間に必要に応じて 'assertVisible' を入れ、安定性を確保せよ。
-5. 出力は YAML コードのみとせよ。
-`.trim();
-
+    4. 各ステップの間に必要に応じて 'assertVisible' を入れ、安定性を確保せよ。
+    5. 生体認証（FaceID/Fingerprint/FIDO/Passkey）のステップを検知した場合、以下の手順を含めること：
+       - 'Sign in with Passkey' などのボタンをタップするアクション
+       - Maestro の '- authenticate' コマンドを実行
+       - 認証完了後の画面遷移を 'assertVisible' で確認
+    6. 出力は YAML コードのみとせよ。
+    `.trim();
   try {
     // Escape prompt for shell
     const escapedPrompt = systemPrompt.replace(/"/g, '"');

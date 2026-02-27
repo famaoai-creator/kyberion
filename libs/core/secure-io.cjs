@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync, spawnSync } = require('child_process');
 const { pipeline } = require('stream/promises');
 const pathResolver = require('./path-resolver.cjs');
 const { validateWritePermission, validateReadPermission } = require('./tier-guard.cjs');

@@ -1,5 +1,5 @@
 import { runAsyncSkill } from '@agent/core';
-import { requireArgs, safeJsonParse } from '@agent/core/validators';
+import { requireArgs, safeJsonParse, readJsonFile } from '@agent/core/validators';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { fetchApi } from './lib.js';
 
@@ -11,14 +11,19 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
       method: args.method,
       headers: args.headers ? safeJsonParse(args.headers as string, 'headers') : undefined,
       body: args.body ? safeJsonParse(args.body as string, 'request body') : undefined,
+      schema: args.schema ? readJsonFile(args.schema as string, 'schema') : undefined,
     };
 
-    const data = await fetchApi(args.url as string, options);
+    const result = await fetchApi(args.url as string, options);
 
     if (args.out) {
-      safeWriteFile(args.out as string, JSON.stringify(data, null, 2));
+      safeWriteFile(args.out as string, JSON.stringify(result.data, null, 2));
     }
 
-    return { data };
+    return { 
+      data: result.data, 
+      status: result.status, 
+      validation: result.validation 
+    };
   });
 }

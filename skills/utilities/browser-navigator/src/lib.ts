@@ -68,6 +68,18 @@ export async function runYamlScenario(scenarioPath: string): Promise<any> {
           await page.waitForLoadState('networkidle');
           break;
 
+        case 'fido_setup':
+          // FIDO2/Passkey Virtual Authenticator setup
+          await (context as any).addVirtualAuthenticator({
+            protocol: 'ctap2',
+            transport: 'usb',
+            hasResidentKey: true,
+            hasUserVerification: true,
+            isUserVerified: true,
+          });
+          report.push(`  - FIDO2 Virtual Authenticator: Setup Success`);
+          break;
+
         case 'login':
           const creds = await loadCredentials(step.credentials!);
           await page.fill(
