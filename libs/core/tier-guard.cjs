@@ -116,9 +116,82 @@ function validateInjection(knowledgePath, outputTier) {
   return result;
 }
 
-// Re-implement or import validateSovereignBoundary
+// Module-level token cache with TTL
+let _sovereignTokenCache = null;
+let _sovereignTokenCacheExpiry = 0;
+const SOVEREIGN_CACHE_TTL_MS = 60000; // 60 seconds
+
+function _collectTokensFromDir(dir) {
+  const tokens = [];
+  if (!fs.existsSync(dir)) return tokens;
+
+  const files = fs.readdirSync(dir, { recursive: true });
+  files.forEach((f) => {
+    const p = path.join(dir, f);
+    try {
+      if (fs.statSync(p).isFile()) {
+        const text = fs.readFileSync(p, 'utf8');
+        // Extract potential secrets (long base64-like strings)
+        const matches = text.match(/[A-Za-z0-9\-_]{64,}/g);
+        if (matches) {
+          const filtered = matches.filter((m) => !m.includes('/') && !m.includes('\\'));
+          tokens.push(...filtered);
+        }
+      }
+    } catch (_e) {
+      // Ignore read errors
+    }
+  });
+  return tokens;
+}
+
+function _getForbiddenTokens() {
+  const now = Date.now();
+  if (_sovereignTokenCache && now < _sovereignTokenCacheExpiry) {
+    return _sovereignTokenCache;
+  }
+
+  const staticTokens = [
+    ..._collectTokensFromDir(PERSONAL_DIR),
+    ..._collectTokensFromDir(CONFIDENTIAL_DIR),
+  ];
+
+  let dynamicSecrets = [];
+  try {
+    const secretGuard = require('./secret-guard.cjs');
+    if (secretGuard && secretGuard.getActiveSecrets) {
+      dynamicSecrets = secretGuard.getActiveSecrets();
+    }
+  } catch (_e) {
+    /* ignore circular dependency */
+  }
+
+  const tokens = [...staticTokens, ...dynamicSecrets];
+  _sovereignTokenCache = [...new Set(tokens)];
+  _sovereignTokenCacheExpiry = now + SOVEREIGN_CACHE_TTL_MS;
+  return _sovereignTokenCache;
+}
+
+/**
+ * Scan content for potential leaks of sovereign secrets.
+ * @param {string} content - The content to be validated.
+ * @returns {Object} { safe: boolean, detected: string[] }
+ */
 function validateSovereignBoundary(content) {
-  return { safe: true, detected: [] }; // Temporary placeholder to fix TypeError
+  const findings = [];
+  if (typeof content !== 'string') return { safe: true, detected: findings };
+
+  const forbiddenTokens = _getForbiddenTokens();
+  forbiddenTokens.forEach((token) => {
+    if (content.includes(token)) {
+      findings.push(token.substring(0, 4) + '...');
+    }
+  });
+
+  return {
+    safe: findings.length === 0,
+    detected: findings,
+  };
 }
 
 module.exports = {

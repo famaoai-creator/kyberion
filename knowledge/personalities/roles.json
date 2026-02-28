@@ -1,0 +1,341 @@
+{
+  "domains": {
+    "1": {
+      "name": "Leadership & Strategy",
+      "roles": {
+        "1": "CEO",
+        "2": "Business Owner",
+        "3": "Product Manager"
+      }
+    },
+    "2": {
+      "name": "Engineering & Operations",
+      "roles": {
+        "1": "Software Engineer",
+        "2": "Software Developer",
+        "3": "Ecosystem Architect",
+        "4": "Reliability Engineer",
+        "5": "Incident Commander",
+        "6": "Performance Engineer",
+        "7": "Integration Steward"
+      }
+    },
+    "3": {
+      "name": "Business & Growth",
+      "roles": {
+        "1": "Strategic Sales",
+        "2": "Marketing & Growth",
+        "3": "Customer Success"
+      }
+    },
+    "4": {
+      "name": "Governance & Quality",
+      "roles": {
+        "1": "PMO Governance",
+        "2": "Quality Assurance",
+        "3": "Legal & IP Strategist",
+        "4": "Cyber Security Lead"
+      }
+    },
+    "5": {
+      "name": "Support & Stewardship",
+      "roles": {
+        "1": "Executive Assistant",
+        "2": "Knowledge Steward",
+        "3": "Line Manager"
+      }
+    }
+  },
+  "roles": {
+    "CEO": {
+      "skills": [
+        "release-note-crafter",
+        "project-health-check",
+        "license-auditor",
+        "cloud-cost-estimator",
+        "pr-architect",
+        "onboarding-wizard",
+        "asset-token-economist",
+        "dependency-lifeline",
+        "skill-evolution-engine",
+        "sustainability-consultant"
+      ],
+      "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
+      "description": "Strategy, Finance, Org, and Ecosystem Stewardship"
+    },
+    "Business Owner": {
+      "skills": [
+        "business-impact-analyzer",
+        "strategic-roadmap-planner",
+        "financial-modeling-maestro",
+        "scenario-multiverse-orchestrator",
+        "executive-reporting-maestro",
+        "stakeholder-communicator",
+        "budget-variance-tracker",
+        "competitive-intel-strategist"
+      ],
+      "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
+      "description": "P&L Responsibility, Strategic Alignment, and Market Success"
+    },
+    "Product Manager": {
+      "skills": [
+        "requirements-wizard",
+        "strategic-roadmap-planner",
+        "ux-auditor",
+        "telemetry-insight-engine",
+        "business-impact-analyzer",
+        "doc-sync-sentinel",
+        "scenario-multiverse-orchestrator",
+        "stakeholder-communicator"
+      ],
+      "playbook": "knowledge/orchestration/mission-playbooks/product-audit.md",
+      "description": "Product Vision, Roadmap, and Requirement Definition"
+    },
+    "Software Engineer": {
+      "skills": [
+        "codebase-mapper",
+        "local-reviewer",
+        "security-scanner",
+        "quality-scorer",
+        "log-analyst",
+        "bug-predictor",
+        "refactoring-engine",
+        "test-genie"
+      ],
+      "description": "DevOps & Tooling"
+    },
+    "Software Developer": {
+      "skills": [
+        "boilerplate-genie",
+        "refactoring-engine",
+        "test-suite-architect",
+        "api-fetcher",
+        "data-transformer",
+        "template-renderer",
+        "codebase-mapper",
+        "local-reviewer",
+        "issue-to-solution-bridge",
+        "kernel-compiler",
+        "technology-porter"
+      ],
+      "description": "Product Implementation"
+    },
+    "Ecosystem Architect": {
+      "skills": [
+        "autonomous-skill-designer",
+        "skill-evolution-engine",
+        "skill-quality-auditor",
+        "knowledge-auditor",
+        "codebase-mapper",
+        "boilerplate-genie",
+        "dependency-grapher",
+        "document-generator"
+      ],
+      "description": "Monorepo Maintenance"
+    },
+    "Reliability Engineer": {
+      "skills": [
+        "crisis-manager",
+        "self-healing-orchestrator",
+        "log-analyst",
+        "chaos-monkey-orchestrator",
+        "sustainability-consultant",
+        "cloud-cost-estimator",
+        "monitoring-config-auditor",
+        "disaster-recovery-planner",
+        "log-to-requirement-bridge"
+      ],
+      "description": "SRE & Cost"
+    },
+    "Incident Commander": {
+      "skills": [
+        "crisis-manager",
+        "stakeholder-communicator",
+        "executive-reporting-maestro",
+        "slack-communicator-pro",
+        "log-analyst",
+        "document-generator",
+        "knowledge-fetcher"
+      ],
+      "description": "Crisis Coordination, Remediation Strategy, and Incident Reporting"
+    },
+    "Performance Engineer": {
+      "skills": [
+        "performance-monitor-analyst",
+        "cloud-waste-hunter",
+        "cloud-cost-estimator",
+        "cognitive-load-auditor",
+        "refactoring-engine",
+        "log-analyst",
+        "benchmark",
+        "unit-economics-optimizer"
+      ],
+      "description": "Performance Evaluation, Resource Optimization, and Scalability"
+    },
+    "Strategic Sales": {
+      "skills": [
+        "competitive-intel-strategist",
+        "business-growth-planner",
+        "stakeholder-communicator",
+        "ppt-artisan",
+        "document-generator",
+        "investor-readiness-audit",
+        "ip-profitability-architect"
+      ],
+      "description": "Business Development"
+    },
+    "Marketing & Growth": {
+      "skills": [
+        "competitive-intel-strategist",
+        "business-growth-planner",
+        "stakeholder-communicator",
+        "ppt-artisan",
+        "document-generator",
+        "scenario-multiverse-orchestrator"
+      ],
+      "description": "Market Fit & Branding"
+    },
+    "Customer Success": {
+      "skills": [
+        "automated-support-architect",
+        "telemetry-insight-engine",
+        "slack-communicator-pro",
+        "doc-sync-sentinel",
+        "ux-auditor",
+        "api-doc-generator"
+      ],
+      "description": "Support & Adoption"
+    },
+    "PMO Governance": {
+      "skills": [
+        "pmo-governance-lead",
+        "project-health-check",
+        "knowledge-auditor",
+        "skill-quality-auditor",
+        "budget-variance-tracker",
+        "executive-reporting-maestro",
+        "onboarding-wizard",
+        "dependency-lifeline"
+      ],
+      "description": "Quality Gates & Risk"
+    },
+    "Quality Assurance": {
+      "skills": [
+        "test-genie",
+        "test-suite-architect",
+        "test-viewpoint-analyst",
+        "ux-auditor",
+        "quality-scorer",
+        "completeness-scorer",
+        "requirements-wizard",
+        "doc-sync-sentinel",
+        "api-evolution-manager"
+      ],
+      "description": "QA/QC & Evidence"
+    },
+    "Legal & IP Strategist": {
+      "skills": [
+        "ip-strategist",
+        "ip-profitability-architect",
+        "license-auditor",
+        "compliance-officer",
+        "ai-ethics-auditor",
+        "sensitivity-detector",
+        "data-lineage-guardian"
+      ],
+      "description": "Compliance & IP"
+    },
+    "Cyber Security Lead": {
+      "skills": [
+        "security-scanner",
+        "red-team-adversary",
+        "post-quantum-shield",
+        "supply-chain-sentinel",
+        "ai-ethics-auditor",
+        "compliance-officer",
+        "crisis-manager",
+        "data-lineage-guardian"
+      ],
+      "description": "Defense & Vulnerability"
+    },
+    "Executive Assistant": {
+      "skills": [
+        "google-workspace-integrator",
+        "slack-communicator-pro",
+        "doc-sync-sentinel",
+        "release-note-crafter",
+        "asset-token-economist",
+        "knowledge-fetcher",
+        "word-artisan",
+        "ppt-artisan",
+        "document-generator"
+      ],
+      "description": "Support & Coordination"
+    },
+    "Knowledge Steward": {
+      "skills": [
+        "knowledge-harvester",
+        "knowledge-fetcher",
+        "knowledge-refiner",
+        "knowledge-auditor",
+        "data-collector",
+        "doc-to-text",
+        "api-fetcher",
+        "box-connector",
+        "google-workspace-integrator",
+        "auto-context-mapper",
+        "glossary-resolver"
+      ],
+      "description": "Data Collection"
+    },
+    "Line Manager": {
+      "skills": [
+        "onboarding-wizard",
+        "slack-communicator-pro",
+        "biometric-context-adapter",
+        "pr-architect",
+        "project-health-check",
+        "skill-bundle-packager",
+        "stakeholder-communicator",
+        "budget-variance-tracker"
+      ],
+      "description": "Approvals & Team Health"
+    },
+    "Experience Designer": {
+      "skills": [
+        "ux-auditor",
+        "layout-architect",
+        "synthetic-user-persona",
+        "diagram-renderer",
+        "ppt-artisan",
+        "html-reporter",
+        "document-generator",
+        "requirements-wizard"
+      ],
+      "description": "UX, UI, & Design Systems"
+    },
+    "Finance Controller": {
+      "skills": [
+        "financial-modeling-maestro",
+        "budget-variance-tracker",
+        "unit-economics-optimizer",
+        "cloud-cost-estimator",
+        "cloud-waste-hunter",
+        "business-impact-analyzer",
+        "excel-artisan",
+        "executive-reporting-maestro"
+      ],
+      "description": "P&L & Unit Economics"
+    },
+    "Talent & Culture": {
+      "skills": [
+        "talent-requirement-generator",
+        "onboarding-wizard",
+        "biometric-context-adapter",
+        "skill-bundle-packager",
+        "ai-ethics-auditor"
+      ],
+      "description": "Hiring & Culture"
+    }
+  }
+}
