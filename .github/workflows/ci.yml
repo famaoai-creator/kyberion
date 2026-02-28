@@ -17,22 +17,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Lint check
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Format check
-        run: npm run format:check || true
+        run: pnpm run format:check || true
 
       - name: TypeScript type check
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Validate skill metadata
         run: node scripts/validate_skills.cjs
@@ -46,9 +50,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build development stage
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -69,25 +70,29 @@ jobs:
         test-suite: [smoke, unit, integration, plugins, ts-skills]
         include:
           - test-suite: smoke
-            command: npm test
+            command: pnpm test
           - test-suite: unit
-            command: npm run test:coverage
+            command: pnpm run test:coverage
           - test-suite: integration
-            command: npm run test:integration
+            command: pnpm run test:integration
           - test-suite: plugins
-            command: npm run test:plugins
+            command: pnpm run test:plugins
           - test-suite: ts-skills
-            command: npm run test:ts
+            command: pnpm run test:ts
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run ${{ matrix.test-suite }} tests
         run: ${{ matrix.command }}
@@ -105,16 +110,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Security audit (blocking on critical)
-        run: npm audit --audit-level=critical
+        run: pnpm audit --audit-level=critical
 
       - name: Skill quality audit
         run: node scripts/audit_skills.cjs --format json
@@ -126,16 +135,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run benchmarks
-        run: npm run benchmark
+        run: pnpm run benchmark
 
       - uses: actions/upload-artifact@v4
         with:

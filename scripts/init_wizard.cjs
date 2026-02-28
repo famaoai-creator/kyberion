@@ -417,8 +417,8 @@ async function main() {
 
   // 4. Base Setup
   try {
-    logger.info('Installing core dependencies (npm install)...');
-    execSync('npm install', { stdio: 'inherit', cwd: rootDir });
+    logger.info('Installing core dependencies (pnpm install)...');
+    execSync('pnpm install', { stdio: 'inherit', cwd: rootDir });
   } catch (_e) {
     logger.error('Dependency installation failed.');
   }

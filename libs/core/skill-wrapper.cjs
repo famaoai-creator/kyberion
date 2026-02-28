@@ -268,7 +268,7 @@ function _checkHelp(skillName) {
 function _addSuggestion(errorObj, skillName) {
   const msg = errorObj.message || '';
   if (msg.includes('Cannot find module')) {
-    errorObj.suggestion = 'Run: npm install (from project root)';
+    errorObj.suggestion = 'Run: pnpm install (from project root)';
   } else if (msg.includes('Missing required argument') || msg.includes('required')) {
     errorObj.suggestion = `Run: node ${skillName}/scripts/<script>.cjs --help`;
   } else if (

@@ -16,7 +16,7 @@ This is not a generic tool collection. It is a system where **you define your pe
 
 For a visual, real-time overview of the agent's logic and the ecosystem's health, use **Chronos Mirror**:
 
-1.  **Start the Bridge**: `npm run mirror`
+1.  **Start the Bridge**: `pnpm run mirror`
 2.  **Open the Interface**: Go to `http://localhost:3030` in your browser.
 3.  **Synchronize**: See the AI's internal state, mission logs, and real-time pulse.
 
@@ -126,9 +126,9 @@ The system is designed for extensibility at every layer.
 **Plugin Manager** — Install external skills or register local directories:
 
 ```bash
-npm run plugin -- install <package>    # Install from npm
-npm run plugin -- register ./my-skill  # Register a local skill
-npm run plugin -- list                 # List installed plugins
+pnpm run plugin -- install <package>    # Install from npm
+pnpm run plugin -- register ./my-skill  # Register a local skill
+pnpm run plugin -- list                 # List installed plugins
 ```
 
 **External Knowledge** — Import third-party knowledge into `knowledge/external-wisdom/`. The system ships with [Everything Claude Code](https://github.com/affaan-m/everything-claude-code) (MIT) as a reference implementation, providing 14 agent guides and language-specific coding rules.
@@ -159,7 +159,7 @@ npm run plugin -- list                 # List installed plugins
 
 1. Clone this repository.
 2. Run the interactive wizard: `node scripts/init_wizard.cjs` (installs dependencies and configures your role).
-3. Validate: `npm run doctor`
+3. Validate: `pnpm run doctor`
 
 ## Project Status
 
@@ -280,16 +280,16 @@ Run any skill from a single entry point:
 
 ```bash
 # List all skills with status
-npm run cli -- list
+pnpm run cli -- list
 
 # List only implemented skills
-npm run cli -- list --status implemented
+pnpm run cli -- list --status implemented
 
 # Run a skill
-npm run cli -- run doc-type-classifier -- --input myfile.md
+pnpm run cli -- run doc-type-classifier -- --input myfile.md
 
 # Show skill info
-npm run cli -- info data-transformer
+pnpm run cli -- info data-transformer
 ```
 
 ### Performance Health Check
@@ -306,10 +306,10 @@ Scaffold a new skill from template:
 
 ```bash
 # Create from CJS template (default)
-npm run create-skill -- my-new-skill --description "Does something cool"
+pnpm run create-skill -- my-new-skill --description "Does something cool"
 
 # Create from TypeScript template
-npm run create-skill -- my-ts-skill --template ts --description "TypeScript skill"
+pnpm run create-skill -- my-ts-skill --template ts --description "TypeScript skill"
 ```
 
 ### Performance Benchmarks
@@ -317,7 +317,7 @@ npm run create-skill -- my-ts-skill --template ts --description "TypeScript skil
 Measure syntax-check load times for all implemented skills:
 
 ```bash
-npm run benchmark
+pnpm run benchmark
 # Results saved to evidence/benchmarks/
 ```
 
@@ -327,16 +327,16 @@ Install external skills or register local skill directories:
 
 ```bash
 # Install npm plugin
-npm run plugin -- install some-plugin-package
+pnpm run plugin -- install some-plugin-package
 
 # Register local skill
-npm run plugin -- register ./path/to/skill
+pnpm run plugin -- register ./path/to/skill
 
 # List installed plugins
-npm run plugin -- list
+pnpm run plugin -- list
 
 # Remove plugin
-npm run plugin -- uninstall plugin-name
+pnpm run plugin -- uninstall plugin-name
 ```
 
 ### Quality Audit
@@ -377,31 +377,31 @@ pipeline:
 
 ```bash
 # Install dependencies (npm workspaces)
-npm install
+pnpm install
 
 # Type check (TypeScript)
-npm run typecheck
+pnpm run typecheck
 
 # Validate all skill metadata and schemas
-npm run validate
+pnpm run validate
 
 # Run smoke tests (syntax check all skills)
-npm test
+pnpm test
 
 # Run unit tests
-npm run test:unit
+pnpm run test:unit
 
 # Regenerate skill index
-npm run generate-index
+pnpm run generate-index
 
 # Build TypeScript
-npm run build
+pnpm run build
 
 # Run quality audit
 node scripts/audit_skills.cjs
 
 # Run benchmarks
-npm run benchmark
+pnpm run benchmark
 ```
 
 ### Creating a New Skill
@@ -410,7 +410,7 @@ Use the creation wizard or copy from templates:
 
 ```bash
 # Recommended: use the wizard
-npm run create-skill -- my-skill --description "My new skill"
+pnpm run create-skill -- my-skill --description "My new skill"
 
 # Templates available:
 # - templates/skill-template-cjs/  (CommonJS, recommended)

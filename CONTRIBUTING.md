@@ -5,9 +5,9 @@
 ```bash
 git clone <repo-url>
 cd gemini-skills
-npm install
-npm run doctor      # Verify ecosystem health
-npm run test:unit   # Run unit tests
+pnpm install
+pnpm run doctor      # Verify ecosystem health
+pnpm run test:unit   # Run unit tests
 ```
 
 ## Creating a New Skill
@@ -15,7 +15,7 @@ npm run test:unit   # Run unit tests
 Use the skill creation wizard:
 
 ```bash
-npm run create-skill -- my-skill --description "What it does"
+pnpm run create-skill -- my-skill --description "What it does"
 ```
 
 This creates the directory structure, SKILL.md, package.json, and starter script.
@@ -142,10 +142,10 @@ test('my-skill does X', () => {
 ### Running Tests
 
 ```bash
-npm run test:unit           # Unit tests
-npm test                    # Smoke tests
-npm run test:integration    # E2E pipeline tests
-npm run test:coverage       # Coverage report
+pnpm run test:unit           # Unit tests
+pnpm test                    # Smoke tests
+pnpm run test:integration    # E2E pipeline tests
+pnpm run test:coverage       # Coverage report
 ```
 
 ## Code Quality
@@ -161,7 +161,7 @@ npx prettier --write .     # Auto-format
 ### Quality Audit
 
 ```bash
-npm run audit               # Skill quality scores
+pnpm run audit               # Skill quality scores
 ```
 
 ## Commit Convention

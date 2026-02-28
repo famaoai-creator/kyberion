@@ -21,7 +21,7 @@
     "test:coverage": "c8 node tests/unit.test.cjs",
     "test:plugins": "node tests/plugins.test.cjs",
     "test:ts": "vitest run",
-    "test:all": "npm run test:unit && npm run test:core && npm run test:secure-io && npm run test:metrics && npm run test:integration && npm run test:plugins && npm run test:ts && npm test",
+    "test:all": "pnpm run test:unit && pnpm run test:core && pnpm run test:secure-io && pnpm run test:metrics && pnpm run test:integration && pnpm run test:plugins && pnpm run test:ts && pnpm test",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier --write .",
@@ -40,14 +40,14 @@
     "catalog": "node scripts/generate_docs.cjs",
     "health": "node scripts/check_skills_health.cjs",
     "sanitize": "node scripts/skill-sanitizer.cjs",
-    "build:all": "npm run sanitize && npm run typecheck",
+    "build:all": "pnpm run sanitize && pnpm run typecheck",
     "clean": "rm -rf dist coverage .tsbuildinfo",
-    "dev": "npm run typecheck && npm run lint && npm run test:unit",
-    "ci": "npm run validate && npm run test:all && npm run typecheck",
+    "dev": "pnpm run typecheck && pnpm run lint && pnpm run test:unit",
+    "ci": "pnpm run validate && pnpm run test:all && pnpm run typecheck",
     "archive": "node scripts/archive_missions.cjs",
     "generate:types": "node scripts/generate_types.cjs",
     "prepare": "husky",
-    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && npm run dev"
+    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && pnpm run dev"
   },
   "lint-staged": {
     "knowledge/**/*.md": [
