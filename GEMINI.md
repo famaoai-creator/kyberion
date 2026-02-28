@@ -283,6 +283,22 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
 3.  **Public Tier (L1/L2)**: **エコシステム共有**。モノレポ本体の一部として、オープンな基準やプロトコルを保持する。
 4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.cjs` によってデータの越境（情報の漏洩）が機械的にブロックされる。
 
+### X. Multi-Role Collaboration (The ACE Federation)
+
+高度な品質担保と自己修正のため、ACE Engine は物理的に分離された「人格ディレクトリ（Persona Directory）」を用いて連携する。
+
+1. **Isolation (物理的分離)**: 
+   - 各ロール（Engineer, Auditor 等）は `active/missions/{MissionID}/role_{Name}/` 配下に専用の作業領域を持つ。
+   - 人格固有の中間データ、思考プロセス、一時的な `scratch/` スクリプトはこのディレクトリ内に完全に閉じ込め、人格間での干渉を防止する。
+2. **Shared Strategy (共有戦略)**: 
+   - 全ての人格は親ディレクトリの `TASK_BOARD.md` を唯一の「共有された真実（Shared Truth）」として参照し、ミッション全体の進捗とマイルストーンを同期する。
+3. **Cross-Role Validation (相互検証)**: 
+   - 一つの人格（例: Engineer）が `active/projects/` に作成した成果物は、別の人格（例: Auditor）による検証を経て、`consensus.json` での合意形成が行われなければならない。
+4. **The Sudo Finality (最終承認)**: 
+   - 関連する全ロールが `consensus.json` で承認（Approve）を出した場合のみ、主権者（Sovereign）への最終承認（Sudo Gate）が提示され、コミットや書き戻しが可能になる。
+
+---
+
 ### U. Mission-to-Intel Lifecycle (The Autonomic Cycle)
 
 ミッションの開始から完了、知恵としての永続化までのライフサイクルを以下のプロセスで完遂する。

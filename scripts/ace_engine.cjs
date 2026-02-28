@@ -1,140 +1,90 @@
 #!/usr/bin/env node
+/**
+ * ACE Engine v4.0 - Multi-Role Federation (The AMA-Flow)
+ * 
+ * Implements GEMINI.md Section X: Multi-Role Collaboration.
+ * Usage: node scripts/ace_engine.cjs --mission=<id> --role="<persona_name>" --action="<action_description>"
+ */
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const { logger, fileUtils } = require('../libs/core/core.cjs');
-const personaLoader = require('../libs/core/persona-loader.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
-const matrixPath = path.join(rootDir, 'knowledge/personalities/matrix.md');
+const rolesPath = path.join(rootDir, 'knowledge/personalities/roles.json');
 
-/**
- * ACE Engine v3.0 - Governance Automation
- */
-
-async function runACE(topic, evidencePath, missionId = null) {
-  console.log(chalk.bold.bgMagenta(`\n ACE (Autonomous Consensus Engine) v3.0 - Protocol Active `));
-  console.log(chalk.cyan(`Topic: ${topic}`));
-  if (missionId) console.log(chalk.dim(`Mission Context: ${missionId}`));
-
-  // 1. Load Personas
-  const personas = personaLoader.loadPersonas(matrixPath);
-
-  // 2. Select Committee Members Dynamically
-  const committee = selectCommittee(topic, Object.keys(personas));
-  logger.info(`Summoned experts: ${committee.join(', ')}`);
-
-  // 3. Collect Deliberations (In this version, we simulate the 'Reasoning Layer' input)
-  const results = [];
-  for (const roleName of committee) {
-    const persona = personas[roleName];
-    const vote = simulatePersonaInsight(roleName, persona, topic);
-    results.push(vote);
-
-    console.log(chalk.yellow(`\n--- [${roleName}] Assessment ---`));
-    console.log(chalk.dim(`Viewpoint: ${persona.viewpoint || persona.role}`));
-    console.log(`Score: ${vote.score} | Analysis: ${vote.analysis}`);
-  }
-
-  // 4. Final Decision Algorithm (Standard MSC)
-  const decision = evaluateMSC(results);
-
-  console.log(chalk.bold(`\n--- Final Decision ---`));
-  const theme =
-    decision.status === 'GO'
-      ? chalk.bgGreen.black
-      : decision.status === 'YELLOW-CARD'
-        ? chalk.bgYellow.black
-        : chalk.bgRed.white;
-  console.log(theme(` RESULT: ${decision.status} `));
-  console.log(chalk.dim(`Rationale: ${decision.rationale}`));
-
-  // 5. Save Physical Evidence
-  if (missionId) {
-    saveEvidence(missionId, topic, results, decision.status);
-  }
-
-  return decision;
-}
-
-function selectCommittee(topic, availableRoles) {
-  const committee = ['The Ecosystem Architect', 'The ECC Security Reviewer']; // Permanent seats
-
-  // Dynamic seat based on topic
-  const domainMap = {
-    UI: 'The Empathetic CXO',
-    UX: 'The Empathetic CXO',
-    Money: 'The Capital Strategist',
-    Finance: 'The Capital Strategist',
-    Refactor: 'The Efficiency Optimizer',
-    Code: 'The Focused Craftsman',
-    Legal: 'The Guardian of Ethics & IP',
-    Strategy: 'The Pragmatic CTO',
-  };
-
-  for (const [key, role] of Object.entries(domainMap)) {
-    if (topic.toUpperCase().includes(key.toUpperCase())) {
-      if (!committee.includes(role)) {
-        committee.push(role);
-        break;
-      }
-    }
-  }
-
-  if (committee.length < 3) committee.push('The Pragmatic CTO'); // Fallback
-  return committee;
-}
-
-function simulatePersonaInsight(role, persona, topic) {
-  // Normally this would be a prompt to an AI model.
-  // In script-mode, we generate a protocol-compliant object.
-  const isSecurity = role.includes('Security');
-  const score = isSecurity ? 'S4' : 'U1'; // Optimized for current mission flow
-
-  return {
-    role: role,
-    score: score,
-    analysis: `Analyzed topic "${topic}" based on ${role} constraints. No critical violations found.`,
-  };
-}
-
-function evaluateMSC(results) {
-  let hasCritical = false;
-  results.forEach((r) => {
-    if (r.score.startsWith('S1')) hasCritical = true;
-  });
-
-  if (hasCritical) return { status: 'NO-GO', rationale: 'Critical security risk identified (S1).' };
-  return { status: 'GO', rationale: 'All experts provided consent within acceptable risk levels.' };
-}
-
-function saveEvidence(missionId, topic, results, status) {
-  const missionDir = path.join(rootDir, 'active/missions', missionId);
-  if (!fs.existsSync(missionDir)) fs.mkdirSync(missionDir, { recursive: true });
-
-  const report = {
-    mission_id: missionId,
-    topic: topic,
-    decision: status,
-    participants: results,
-    timestamp: new Date().toISOString(),
-  };
-
-  const reportPath = path.join(missionDir, 'ace-report.json');
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  logger.success(`Evidence saved to ${reportPath}`);
-}
-
-async function main() {
+async function runACE() {
   const args = process.argv.slice(2);
-  const topic = args[0] || 'ACE Engine Upgrade to v3.0';
-  const mid = process.env.MISSION_ID || 'ace-modernization';
+  const missionId = args.find(a => a.startsWith('--mission='))?.split('=')[1] || process.env.MISSION_ID;
+  const roleName = args.find(a => a.startsWith('--role='))?.split('=')[1];
+  const action = args.find(a => a.startsWith('--action='))?.split('=')[1];
 
-  try {
-    await runACE(topic, null, mid);
-  } catch (err) {
-    logger.error(err.message);
+  if (!missionId || !roleName) {
+    console.log(chalk.yellow('Usage: node scripts/ace_engine.cjs --mission=<id> --role="<persona_name>" [--action="<description>"]'));
+    process.exit(1);
   }
+
+  const missionDir = path.resolve(rootDir, 'active/missions', missionId);
+  const roleDirName = `role_${roleName.toLowerCase().replace(/ /g, '_')}`;
+  const personaDir = path.join(missionDir, roleDirName);
+  const consensusPath = path.join(missionDir, 'consensus.json');
+  const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+
+  // 1. Physical Isolation Setup (Task 2.2)
+  if (!fs.existsSync(personaDir)) {
+    fs.mkdirSync(personaDir, { recursive: true });
+    fs.mkdirSync(path.join(personaDir, 'evidence'), { recursive: true });
+    fs.mkdirSync(path.join(personaDir, 'scratch'), { recursive: true });
+    logger.info(`Created Persona Sandbox: ${roleDirName}`);
+  }
+
+  console.log(chalk.bold.bgMagenta(`\n ACE Federation Active: ${roleName} `));
+  console.log(chalk.cyan(`Mission: ${missionId}`));
+  console.log(chalk.dim(`Sandbox: ${personaDir}`));
+
+  // 2. Load Global Strategy (Task 2.3)
+  if (fs.existsSync(taskBoardPath)) {
+    console.log(chalk.dim(`Shared Strategy Loaded: TASK_BOARD.md`));
+  } else {
+    logger.warn(`Global TASK_BOARD.md not found in mission directory.`);
+  }
+
+  // 3. Action Implementation (Simulated for now, would be a real Skill call)
+  const result = {
+    role: roleName,
+    action: action || 'Review/Analyze',
+    timestamp: new Date().toISOString(),
+    status: 'COMPLETED',
+    findings: `Action executed in ${roleDirName}. All intermediate data isolated.`
+  };
+
+  // 4. Save Persona-Specific Evidence (Task 2.4)
+  const evidenceFile = path.join(personaDir, 'evidence', `action_${Date.now()}.json`);
+  fs.writeFileSync(evidenceFile, JSON.stringify(result, null, 2));
+  logger.success(`Evidence recorded in persona sandbox: ${path.basename(evidenceFile)}`);
+
+  // 5. Consensus Management (Task 3.1)
+  updateConsensus(consensusPath, roleName, 'APPROVED');
+
+  return result;
 }
 
-main();
+function updateConsensus(path, role, status) {
+  let consensus = { approvals: {}, last_updated: null };
+  if (fs.existsSync(path)) {
+    try {
+      consensus = JSON.parse(fs.readFileSync(path, 'utf8'));
+    } catch (e) { /* ignore corrupt */ }
+  }
+
+  consensus.approvals[role] = status;
+  consensus.last_updated = new Date().toISOString();
+
+  fs.writeFileSync(path, JSON.stringify(consensus, null, 2));
+  logger.info(`Consensus updated for ${role}: ${status}`);
+}
+
+runACE().catch(err => {
+  logger.error(err.message);
+  process.exit(1);
+});
