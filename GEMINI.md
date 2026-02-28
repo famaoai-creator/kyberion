@@ -137,6 +137,9 @@ When performing complex or high-stakes missions, I supplement my core mandates w
 | **Ephemeral Scratch**   | `scratch/`         | 特定ミッションのための一時的な検証スクリプト（`.cjs`等）。                     |
 | **System Scripts**      | `scripts/`         | エコシステム全体の管理スクリプト。                                             |
 
+**外部データ持ち込み規約 (The Data Ingestion Protocol)**: 
+サンドボックス境界を維持しつつ外部データを安全に持ち込むための4つの許可された経路（Manual Vaulting, Connector Skills, Agentic Web Fetching, Controlled Symlinking）については、[`knowledge/orchestration/data-ingestion-protocol.md`](./knowledge/orchestration/data-ingestion-protocol.md) に厳格に定義されている。AIエージェントは自律的に外部ファイルシステムにアクセスしてはならず、必ずこのプロトコルに従うこと。
+
 ---
 
 ### J. Information Classification (The Distillation Principle)
