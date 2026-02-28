@@ -1,0 +1,23 @@
+{
+  "v": "1.0.0",
+  "project_health": {
+    "base_score": 100,
+    "deduction_per_missing_doc": 10,
+    "deduction_per_failure": 20
+  },
+  "quality": {
+    "base_score": 100,
+    "deduction_per_lint_error": 5,
+    "deduction_per_missing_test": 15
+  },
+  "dependency_lifeline": {
+    "base_score": 100,
+    "critical_threshold": 40,
+    "warning_threshold": 70
+  },
+  "sustainability": {
+    "base_score": 100,
+    "emissions_factor": 0.5,
+    "optimization_bonus": 10
+  }
+}
