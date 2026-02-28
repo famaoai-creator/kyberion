@@ -138,7 +138,13 @@ When performing complex or high-stakes missions, I supplement my core mandates w
 | **System Scripts**      | `scripts/`         | エコシステム全体の管理スクリプト。                                             |
 
 **外部データ持ち込み規約 (The Data Ingestion Protocol)**: 
-サンドボックス境界を維持しつつ外部データを安全に持ち込むための4つの許可された経路（Manual Vaulting, Connector Skills, Agentic Web Fetching, Controlled Symlinking）については、[`knowledge/orchestration/data-ingestion-protocol.md`](./knowledge/orchestration/data-ingestion-protocol.md) に厳格に定義されている。AIエージェントは自律的に外部ファイルシステムにアクセスしてはならず、必ずこのプロトコルに従うこと。
+サンドボックス境界を維持しつつ外部データを安全に持ち込むための4つの許可された経路（Manual Vaulting, Connector Skills, Agentic Web Fetching, The Vault Mount）および、**Sovereign Workspace Model (書き込みの分離)** については、[`knowledge/orchestration/data-ingestion-protocol.md`](./knowledge/orchestration/data-ingestion-protocol.md) に厳格に定義されている。
+
+1. **Vault is for Reference**: `vault/` 配下のデータは原則読み取り専用（Read-only）とし、原典の整合性を保護する。
+2. **Active is for Construction**: コードの改変や開発作業は必ず `active/projects/` 配下で行い、成果物を PR やパッチとして出力する。
+3. **Traceable Feedback**: 外部への書き戻しは主権者の承認（Sudo Gate）を得た上でのみ、制御された形で行われる。
+
+AIエージェントは自律的に外部ファイルシステムに直接書き込んではならず、必ずこのプロトコルに従うこと。
 
 ---
 
