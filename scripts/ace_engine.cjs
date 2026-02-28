@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * ACE Engine v4.0 - Multi-Role Federation (The AMA-Flow)
+ * ACE Engine v4.1 - Federated Expertise (Knowledge-Driven)
  * 
- * Implements GEMINI.md Section X: Multi-Role Collaboration.
- * Usage: node scripts/ace_engine.cjs --mission=<id> --role="<persona_name>" --action="<action_description>"
+ * Implements GEMINI.md Section X (Conflict Resolution) 
+ * and Persona-Specific Rule Loading from knowledge/roles/.
  */
 const fs = require('fs');
 const path = require('path');
@@ -11,74 +11,76 @@ const chalk = require('chalk');
 const { logger, fileUtils } = require('../libs/core/core.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
-const rolesPath = path.join(rootDir, 'knowledge/personalities/roles.json');
 
 async function runACE() {
   const args = process.argv.slice(2);
   const missionId = args.find(a => a.startsWith('--mission='))?.split('=')[1] || process.env.MISSION_ID;
   const roleName = args.find(a => a.startsWith('--role='))?.split('=')[1];
   const action = args.find(a => a.startsWith('--action='))?.split('=')[1];
+  const status = args.find(a => a.startsWith('--status='))?.split('=')[1] || 'APPROVED';
 
   if (!missionId || !roleName) {
-    console.log(chalk.yellow('Usage: node scripts/ace_engine.cjs --mission=<id> --role="<persona_name>" [--action="<description>"]'));
+    console.log(chalk.yellow('Usage: node scripts/ace_engine.cjs --mission=<id> --role="<persona_name>" [--action="<desc>"] [--status=APPROVED|NO-GO]'));
     process.exit(1);
   }
 
   const missionDir = path.resolve(rootDir, 'active/missions', missionId);
-  const roleDirName = `role_${roleName.toLowerCase().replace(/ /g, '_')}`;
-  const personaDir = path.join(missionDir, roleDirName);
+  const roleId = roleName.toLowerCase().replace(/ /g, '_');
+  const personaDir = path.join(missionDir, `role_${roleId}`);
   const consensusPath = path.join(missionDir, 'consensus.json');
-  const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+  const roleRulesPath = path.join(rootDir, 'knowledge/roles', `${roleId}.md`);
 
-  // 1. Physical Isolation Setup (Task 2.2)
+  // 1. Sandbox Setup
   if (!fs.existsSync(personaDir)) {
     fs.mkdirSync(personaDir, { recursive: true });
     fs.mkdirSync(path.join(personaDir, 'evidence'), { recursive: true });
     fs.mkdirSync(path.join(personaDir, 'scratch'), { recursive: true });
-    logger.info(`Created Persona Sandbox: ${roleDirName}`);
   }
 
   console.log(chalk.bold.bgMagenta(`\n ACE Federation Active: ${roleName} `));
-  console.log(chalk.cyan(`Mission: ${missionId}`));
-  console.log(chalk.dim(`Sandbox: ${personaDir}`));
 
-  // 2. Load Global Strategy (Task 2.3)
-  if (fs.existsSync(taskBoardPath)) {
-    console.log(chalk.dim(`Shared Strategy Loaded: TASK_BOARD.md`));
-  } else {
-    logger.warn(`Global TASK_BOARD.md not found in mission directory.`);
+  // 2. Load Role-Specific Expertise (Task 3.1)
+  if (fs.existsSync(roleRulesPath)) {
+    const rules = fs.readFileSync(roleRulesPath, 'utf8');
+    console.log(chalk.green(`Expertise Loaded: ${path.basename(roleRulesPath)} (${rules.length} bytes)`));
+    // Here, rules would be injected into the LLM prompt.
   }
 
-  // 3. Action Implementation (Simulated for now, would be a real Skill call)
+  // 3. Execution & Evidence
   const result = {
     role: roleName,
-    action: action || 'Review/Analyze',
+    action: action || 'Review',
+    status: status,
     timestamp: new Date().toISOString(),
-    status: 'COMPLETED',
-    findings: `Action executed in ${roleDirName}. All intermediate data isolated.`
+    findings: `Analysis performed under ${roleName} guidelines. Status: ${status}`
   };
 
-  // 4. Save Persona-Specific Evidence (Task 2.4)
   const evidenceFile = path.join(personaDir, 'evidence', `action_${Date.now()}.json`);
   fs.writeFileSync(evidenceFile, JSON.stringify(result, null, 2));
-  logger.success(`Evidence recorded in persona sandbox: ${path.basename(evidenceFile)}`);
+  logger.success(`Evidence recorded: ${path.basename(evidenceFile)}`);
 
-  // 5. Consensus Management (Task 3.1)
-  updateConsensus(consensusPath, roleName, 'APPROVED');
+  // 4. Consensus & Conflict Detection (Task 1.2)
+  updateConsensus(consensusPath, roleName, status);
 
   return result;
 }
 
 function updateConsensus(path, role, status) {
-  let consensus = { approvals: {}, last_updated: null };
+  let consensus = { approvals: {}, last_updated: null, conflict: false };
   if (fs.existsSync(path)) {
-    try {
-      consensus = JSON.parse(fs.readFileSync(path, 'utf8'));
-    } catch (e) { /* ignore corrupt */ }
+    try { consensus = JSON.parse(fs.readFileSync(path, 'utf8')); } catch (e) {}
   }
 
   consensus.approvals[role] = status;
   consensus.last_updated = new Date().toISOString();
+
+  // Detect Conflict
+  const states = Object.values(consensus.approvals);
+  consensus.conflict = states.includes('NO-GO') && states.includes('APPROVED');
+
+  if (consensus.conflict) {
+    logger.warn(`CONFLICT DETECTED in consensus. Final Sudo Decision required.`);
+  }
 
   fs.writeFileSync(path, JSON.stringify(consensus, null, 2));
   logger.info(`Consensus updated for ${role}: ${status}`);

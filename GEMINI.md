@@ -294,8 +294,11 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
    - 全ての人格は親ディレクトリの `TASK_BOARD.md` を唯一の「共有された真実（Shared Truth）」として参照し、ミッション全体の進捗とマイルストーンを同期する。
 3. **Cross-Role Validation (相互検証)**: 
    - 一つの人格（例: Engineer）が `active/projects/` に作成した成果物は、別の人格（例: Auditor）による検証を経て、`consensus.json` での合意形成が行われなければならない。
-4. **The Sudo Finality (最終承認)**: 
-   - 関連する全ロールが `consensus.json` で承認（Approve）を出した場合のみ、主権者（Sovereign）への最終承認（Sudo Gate）が提示され、コミットや書き戻しが可能になる。
+4. **Conflict Resolution (対立解消)**: 
+   - ロール間で意見が対立し、`consensus.json` で `APPROVED` と `NO-GO` が混在する場合、主権者（Sovereign）が「最終裁定者（Final Sudo Arbiter）」となる。
+   - セキュリティ、品質、法的リスクに関する `Auditor` の指摘は、`Engineer` が修正を行うか、主権者がリスクを明示的に受容（Risk Acceptance）しない限り、コミットを物理的に禁止する。
+5. **The Sudo Finality (最終承認)**: 
+   - 関連する全ロールが `consensus.json` で承認（Approve）を出したか、または主権者による最終裁定が下された場合のみ、主権者への最終承認（Sudo Gate）が提示される。
 
 ---
 
