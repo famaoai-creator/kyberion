@@ -1,7 +1,10 @@
 ---
 name: __SKILL_NAME__
-description: __DESCRIPTION__
+description: >-
+  Extracts and processes data for __SKILL_NAME__ purposes.
 status: planned
+category: Utilities
+freedom_level: med
 arguments:
   - name: input
     short: i
@@ -10,9 +13,11 @@ arguments:
     description: Input file path
 ---
 
-# **SKILL_TITLE**
+# __SKILL_NAME__
 
-**DESCRIPTION**
+## Overview
+
+Briefly describes the activity this skill performs in the third person. Focus on what it *does* (e.g., "Analyzes source code complexity").
 
 ## Usage
 
@@ -20,8 +25,12 @@ arguments:
 npx ts-node __SKILL_NAME__/scripts/main.ts [options]
 ```
 
+## Progressive Disclosure
+
+- **[Detailed Reference](./REFERENCE.md)**: Full API documentation and advanced configuration.
+- **[Examples](./EXAMPLES.md)**: Common use cases and input/output samples.
+
 ## Knowledge Protocol
 
-- This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`.
-- It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+- This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets.
 - Adheres to the [Sovereign Shield] write governance policy.

@@ -394,28 +394,59 @@ async function main() {
 
   logger.info(`Initializing environment for role: ${roleName}...`);
 
-  // 3. Save role config
+  // 3. Ensure Directory Structure & .gitkeep
   const personalDir = path.resolve(rootDir, 'knowledge/personal');
-  if (!fs.existsSync(personalDir)) fs.mkdirSync(personalDir, { recursive: true });
+  const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
+  
+  // 3.1. Personal is always local
+  if (!fs.existsSync(personalDir)) {
+    fs.mkdirSync(personalDir, { recursive: true });
+    logger.info(`Created local personal directory: knowledge/personal`);
+  }
+  fs.writeFileSync(path.join(personalDir, '.gitkeep'), '');
 
+  // 3.2. Confidential can be a remote sync target
+  const syncConfidential = await askQuestion('\nStep 3: Do you want to sync Confidential knowledge with a remote repository? (y/N): ');
+  if (syncConfidential.toLowerCase() === 'y') {
+    const repoUrl = await askQuestion('Enter the Git repository URL for Confidential knowledge: ');
+    if (repoUrl) {
+      try {
+        logger.info(`Linking knowledge/confidential to ${repoUrl}...`);
+        // Use sovereign-sync if available, else direct git
+        execSync(`node scripts/cli.cjs run sovereign-sync -- init confidential "${repoUrl}"`, {
+          stdio: 'inherit',
+          cwd: rootDir,
+        });
+        logger.success('Confidential knowledge synced and linked.');
+      } catch (e) {
+        logger.error(`Failed to sync confidential repo: ${e.message}`);
+        logger.info('Falling back to local confidential directory.');
+        if (!fs.existsSync(confidentialDir)) fs.mkdirSync(confidentialDir, { recursive: true });
+      }
+    }
+  } else {
+    if (!fs.existsSync(confidentialDir)) {
+      fs.mkdirSync(confidentialDir, { recursive: true });
+      logger.info('Created local confidential directory: knowledge/confidential');
+    }
+  }
+  fs.writeFileSync(path.join(confidentialDir, '.gitkeep'), '');
+
+  // 4. Save role config (Updated Schema)
   const roleConfigPath = path.join(personalDir, 'role-config.json');
-  fs.writeFileSync(
-    roleConfigPath,
-    JSON.stringify(
-      {
-        role: roleName,
-        domain: selectedDomain.name,
-        description: roleConfig.description,
-        recommended_skills: roleConfig.skills,
-        created_at: new Date().toISOString(),
-      },
-      null,
-      2
-    )
-  );
-  logger.success(`Role saved to knowledge/personal/role-config.json`);
+  const config = {
+    active_role: roleName,
+    persona: `The ${roleName}`,
+    mission: roleConfig.description,
+    tier_access: 'personal',
+    recommended_skills: roleConfig.skills,
+    last_initialized: new Date().toISOString(),
+  };
 
-  // 4. Base Setup
+  fs.writeFileSync(roleConfigPath, JSON.stringify(config, null, 2));
+  logger.success(`Role saved to knowledge/personal/role-config.json (Ready for Gemini CLI)`);
+
+  // 5. Base Setup
   try {
     logger.info('Installing core dependencies (pnpm install)...');
     execSync('pnpm install', { stdio: 'inherit', cwd: rootDir });

@@ -12,18 +12,24 @@ npm install
 echo "📂 Indexing 130+ skills..."
 node scripts/generate_skill_index.cjs
 
-# 3. Check Confidential Link
+# 3. Ensure Sovereign Directories
+echo "🛡️ Ensuring Sovereign Directories..."
+mkdir -p knowledge/personal
+mkdir -p knowledge/confidential
+touch knowledge/personal/.gitkeep
+touch knowledge/confidential/.gitkeep
+
+# 4. Check Confidential Link
 if [ ! -L "knowledge/confidential" ]; then
-  echo "⚠️  Confidential Link missing. Creating dummy placeholder..."
-  mkdir -p ../gemini-confidential-knowledge/skills
-  mkdir -p ../gemini-confidential-knowledge/clients
-  ln -s "$(realpath ../gemini-confidential-knowledge)" knowledge/confidential
-  echo "✅ Linked to ../gemini-confidential-knowledge"
+  echo "⚠️  Confidential Link missing. Creating local storage..."
+  mkdir -p knowledge/confidential/skills
+  mkdir -p knowledge/confidential/clients
+  echo "✅ Local Confidential storage initialized."
 else
   echo "✅ Confidential Link found."
 fi
 
-# 4. Final Verification
+# 5. Final Verification
 echo "🔍 Running self-audit..."
 node scripts/test_all_skills.cjs || echo "⚠️ Some skills may require specific local tools (Xcode, etc.)"
 

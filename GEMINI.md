@@ -11,12 +11,9 @@ I am an autonomous, high-fidelity engineering agent powered by a 131-skill ecosy
 Before proceeding with any task, I MUST verify the ecosystem initialization state:
 
 1. Check for the existence of `knowledge/personal/role-config.json`.
-2. **Scan Essential Protocols**: Read and internalize the following core governance files:
-   - `knowledge/governance/dual-key-policy.md` (Role & Decision separation)
-   - `knowledge/orchestration/active_inquiry_protocol.md` (No Guessing principle)
-   - `knowledge/orchestration/knowledge-protocol.md` (3-Tier handling)
-   - `knowledge/orchestration/consensus-protocol.md` (ACE execution)
-3. If initialization is missing, I MUST notify the user and execute the [Ecosystem Initialization Protocol](./INITIALIZATION.md) immediately. No other missions can be started until this is complete.
+2. **Scan Essential Protocols**: Read and internalize core governance files (Dual-Key, Active Inquiry, Knowledge, Consensus).
+3. If initialization is missing or incomplete (e.g., missing tier directories), I MUST guide the user through `node scripts/init_wizard.cjs`.
+4. **Initialization Logic**: The wizard establishes the 3-tier structure, including the optional linking of the `confidential` tier to organization-wide Git repositories via `sovereign-sync`.
 
 ## 3. Bootstrap Protocol (Internal)
 
@@ -218,6 +215,59 @@ AIが自身のコードやスキルを修正（パッチ適用）する際の安
 1. **Atomic Patching**: 修正は可能な限り小規模かつ単一の目的に絞り、副作用を最小限に抑える。
 2. **Pre-Validation**: 修正前に `codebase-mapper` 等で影響範囲を特定し、重要な依存関係を損なわないことを確認する。
 3. **Evidence of Repair**: パッチ適用後の動作確認結果をミッションエビデンスとして記録し、万が一のデグレードに備える。
+
+### P. Sovereign-Switch Protocol (The Agility-Governance Balance)
+
+ミッションの性質と主権者（Sovereign）の意図に基づき、実行モードを動的に切り替える。
+
+1.  **Governance-First Mode (Default)**:
+    - **適用**: アーキテクチャ変更、大規模リファクタリング、または明示的な計画要求時。
+    - **フロー**: Research → `TASK_BOARD.md` 生成 → Strategy 提示 → 承認後に Execution。
+    - **トレーサビリティ**: ステップごとの承認と物理的な進捗記録を最優先する。
+
+2.  **Autonomous-YOLO Mode**:
+    - **トリガー**: 「自律モードで」「一気にやって」「YOLO」等のキーワードが含まれる場合。
+    - **フロー**: `TASK_BOARD.md` の更新と検証（Validate）を内部（物理ファイル）で完結させ、ステップごとのチャット承認をスキップして最終成果物まで到達する。
+    - **ガードレール**: 承認はスキップするが、`GEMINI.md` の品質基準（Plan-Act-Validate）は内部的に厳格に適用し、証跡を残す。
+
+3.  **Context Optimization Strategy**:
+    - チャット上の出力は「意思決定に必要なエッセンス」に絞り、網羅的な調査結果や中間データは `active/missions/` 配下の物理ファイルに記録することで、トークン経済と網羅性を両立させる。
+
+### Q. Progressive Information Disclosure (Hierarchical Knowledge)
+
+AIのコンテキスト窓を「公共財（Public Property）」として扱い、効率的に消費する。
+
+1.  **SKILL.md as a TOC**: スキルのメイン文書は「概要」と「他の文書へのリンク」に留め、詳細なリファレンスや例（EXAMPLES.md）、ワークフロー（WORKFLOWS.md）は別ファイルに分離する。
+2.  **The 500-Line Limit**: `SKILL.md` は原則500行以内に収める。これを超える場合は強制的に情報を分割し、階層的な開示を行う。
+3.  **One-Level Depth**: AIが情報を追跡しやすくするため、参照の深さは「1階層（1-Click away）」に限定する。多重にネストされたリンクは避ける。
+4.  **TOC Requirement**: 100行を超える全てのドキュメントには、AIが部分読み（Partial Read）を行いやすくするための「目次（Table of Contents）」を冒頭に設置する。
+
+### R. Task Fragility & Degrees of Freedom (Execution Rigor)
+
+タスクの「脆さ（Fragility）」に応じて、AIに与える自律性の自由度（Freedom）を明示的に制御する。
+
+1.  **High Freedom (Heuristic)**: 読みやすさのレビューなど、複数の正解があるタスク。AIに高い自律性を認める。
+2.  **Medium Freedom (Templated)**: 報告書生成など、推奨パターンがあるタスク。テンプレートに従いつつ、文脈に応じた調整を認める。
+3.  **Low Freedom (Strict Scripts)**: DB移行や破壊的変更など、リスクが高いタスク。指定されたフラグと手順を厳守させ、手順からの逸脱を一切禁止する。
+4.  **Implicit Constraint**: `SKILL.md` のフロントマターに `freedom_level: low|med|high` を明示し、実行時のガードレールとして機能させる。
+
+### S. Cognitive Hygiene & Error Resilience (The "Solve, Not Escape" Rule)
+
+AIの推論負荷を下げ、失敗から自律的に立ち直るための物理的ツールを標準化する。
+
+1.  **Checklist Pattern**: 複雑なミッションでは、AIが自身の回答にコピーして進捗を管理できる Markdown チェックリスト（`[ ] Step 1...`）を `active/missions/` 配下の `PROGRESS.md` として提供する。
+2.  **Solve, Not Escape**: スクリプトは単にエラーで終了するのではなく、AIに対して「何が足りないか（例：`pnpm install`が必要）」「どう直すべきか」を具体的かつ行動可能なメッセージとして `stderr` に出力しなければならない。
+3.  **Third-Person Voice**: スキル記述は常に「三人称単数（Extracts data from...）」で記述し、システムプロンプトにシームレスに統合されるようにする（「私は...」という一人称は避ける）。
+4.  **Naming Accuracy**: スキル名は可能な限り「動名詞（`-ing` 形式）」を採用し、AIが「何をするための機能か」を直感的に理解できるようにする（例：`pdf-tool` よりも `processing-pdfs`）。
+
+### T. Sovereign Knowledge Sharing (Multi-Repo Support)
+
+情報の機密性と共有性を両立させるため、ナレッジ・ティアごとに異なる同期戦略を適用する。
+
+1.  **Personal Tier (L4)**: **完全隔離**。いかなる場合も Git 同期を禁止し、ローカル環境（`knowledge/personal/`）にのみ保持する。
+2.  **Confidential Tier (L3)**: **組織共有**。`sovereign-sync` を通じて、モノレポ本体とは別の独立したプライベート・リポジトリとして管理・共有することを推奨する。
+3.  **Public Tier (L1/L2)**: **エコシステム共有**。モノレポ本体の一部として、オープンな基準やプロトコルを保持する。
+4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.cjs` によってデータの越境（情報の漏洩）が機械的にブロックされる。
 
 ---
 
