@@ -340,8 +340,19 @@ class Cache {
     // 1. Memory Check: If heap is over 80% used, clear some entries
     if (process.env.NODE_ENV !== 'test') {
       const mem = process.memoryUsage();
-      if (mem.heapUsed / mem.heapTotal > 0.8) {
-        this.purge(0.3); // Gradually remove 30% instead of total clear
+      const usageRatio = mem.heapUsed / mem.heapTotal;
+      if (usageRatio > 0.8) {
+        const severity = usageRatio > 0.9 ? 'CRITICAL' : 'WARNING';
+        const purgeRatio = usageRatio > 0.9 ? 0.8 : 0.4;
+        
+        // Log to stderr to avoid breaking structured output
+        console.error(chalk.yellow(`\n[MEMORY_SENTINEL] ${severity}: Heap usage at ${Math.round(usageRatio * 100)}%. Purging cache...`));
+        this.purge(purgeRatio); 
+        
+        // Global GC hint if available
+        if (global.gc) {
+          global.gc();
+        }
       }
     }
 

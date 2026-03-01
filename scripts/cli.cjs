@@ -244,7 +244,12 @@ async function runCommand() {
   }
   // Clean arguments: remove the '--' separator if present so child processes can parse flags correctly
   const cleanArgs = skillArgs.filter((arg) => arg !== '--');
-  const cmd = `node "${script}" ${cleanArgs.map((a) => `"${a}"`).join(' ')}`;
+  
+  // Memory Sentinel: Inject --max-old-space-size to prevent OOM in memory-intensive skills
+  const NODE_OPTIONS = process.env.NODE_OPTIONS || '';
+  const memoryLimit = NODE_OPTIONS.includes('--max-old-space-size') ? '' : '--max-old-space-size=4096';
+  
+  const cmd = `node ${memoryLimit} "${script}" ${cleanArgs.map((a) => `"${a}"`).join(' ')}`;
   try {
     const env = { ...process.env, GEMINI_FORMAT: 'human' };
     const output = execSync(cmd, { encoding: 'utf8', cwd: rootDir, stdio: 'pipe', env });
@@ -488,6 +493,13 @@ ${chalk.bold('EXAMPLES:')}
 `);
 }
 async function init() {
+  // --- Memory Sentinel: Proactive usage check ---
+  const mem = process.memoryUsage();
+  const heapUsage = mem.heapUsed / mem.heapTotal;
+  if (heapUsage > 0.85) {
+    console.error(chalk.bgYellow.black.bold(`\n [MEMORY WARNING] `) + chalk.yellow(` High heap usage detected: ${Math.round(heapUsage * 100)}%. Consider increasing --max-old-space-size.`));
+  }
+
   const roleConfig = fileUtils.getFullRoleConfig() || {
     active_role: 'Unknown',
     persona: 'The Generic AI',
