@@ -54,7 +54,7 @@ async function nexusLoop() {
             logger.info(`🚀 Terminal (${session.type}) is IDLE. Injecting physical intervention...`);
             
             // Normalize payload newlines
-            const cleanPayload = stimulus.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const cleanPayload = stimulus.payload.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             
             // Standard Intervention Protocol
             const cmd = `\n--- [SENSORY INTERRUPTION] ---\nSource: ${stimulus.source_channel}\nTS:     ${stimulus.timestamp}\nPayload: ${cleanPayload}\n------------------------------\n`;
