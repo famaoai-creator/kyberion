@@ -128,6 +128,19 @@ Options:
   logger.info(`Creating skill "${name}" in category "${category}" from ${template} template...`);
   ensureNamespaceStructure(category);
   copyTemplate(templateDir, targetDir, replacements);
+
+  // Link local node_modules for @agent/core resolution
+  const localNmLink = path.join(targetDir, 'node_modules');
+  if (!fs.existsSync(localNmLink)) {
+    try {
+      const relativePath = template === 'ts' ? '../../../node_modules' : '../../../node_modules';
+      fs.symlinkSync(relativePath, localNmLink, 'dir');
+      logger.info(`Linked node_modules for skill "${name}"`);
+    } catch (e) {
+      logger.warn(`Failed to link node_modules: ${e.message}`);
+    }
+  }
+
   regenerateIndex();
   
   logger.success(`Skill "${name}" created at ${targetDir}`);
