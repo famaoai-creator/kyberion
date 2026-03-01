@@ -1,17 +1,19 @@
 /**
- * Presence Controller v1.1 (Priority Aware)
+ * Presence Controller v1.2 (Sovereign Refactor)
  * Orchestrates sensory stimuli across communication channels.
  * Manages the transition from Perception to Action.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('../../libs/core/core.cjs');
+const { safeReadFile, safeWriteFile, safeExec } = require('../../libs/core/secure-io.cjs');
+const pathResolver = require('../../libs/core/path-resolver.cjs');
 
 /**
  * Perception Engine: Gathers pending stimuli, sorted by channel priority.
  */
 function perceive() {
-  const { logger, safeReadFile, pathResolver } = require('../../scripts/system-prelude.cjs');
   const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');
   const REGISTRY_PATH = pathResolver.rootResolve('presence/bridge/channel-registry.json');
 
@@ -43,7 +45,6 @@ function perceive() {
  * Context Integration: Formats stimuli for the Agent's consciousness.
  */
 function getSensoryContext() {
-  const { safeReadFile, pathResolver } = require('../../scripts/system-prelude.cjs');
   const REGISTRY_PATH = pathResolver.rootResolve('presence/bridge/channel-registry.json');
   
   const pending = perceive();
@@ -70,7 +71,6 @@ ${formatted.join('\n')}
  * Marks stimuli as 'PROCESSED' and handles automated replies.
  */
 async function resolveStimulus(timestamp, responseText = '') {
-  const { logger, safeReadFile, safeWriteFile, pathResolver, safeExec } = require('../../scripts/system-prelude.cjs');
   const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');
 
   if (!fs.existsSync(STIMULI_PATH)) return;
@@ -104,7 +104,9 @@ async function resolveStimulus(timestamp, responseText = '') {
           input: responseText
         };
 
-        const tempInput = path.join(pathResolver.active('shared'), `slack_reply_${Date.now()}.json`);
+        const activeDir = String(pathResolver.active());
+        const tempInput = path.join(activeDir, `slack_reply_${Date.now()}.json`);
+        
         safeWriteFile(tempInput, JSON.stringify(replyPayload));
         
         try {
@@ -118,6 +120,7 @@ async function resolveStimulus(timestamp, responseText = '') {
     }
   } catch (err) {
     logger.error(`Resolution Failure: ${err.message}`);
+    if (err.stack) logger.error(err.stack);
   }
 }
 
@@ -126,13 +129,13 @@ if (require.main === module) {
   const action = args[0];
 
   if (action === 'resolve') {
-    const timestamp = args[1];
-    const response = args[2] || '';
-    if (!timestamp) {
+    const ts = args[1];
+    const resp = args[2] || '';
+    if (!ts) {
       console.log('Usage: node presence-controller.cjs resolve <timestamp> ["response text"]');
       process.exit(1);
     }
-    resolveStimulus(timestamp, response).then(() => {
+    resolveStimulus(ts, resp).then(() => {
       process.exit(0);
     });
   } else if (action === 'perceive') {

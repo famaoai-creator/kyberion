@@ -21,7 +21,7 @@ const terminalBridge = {
         repeat with w in windows
           repeat with t in tabs of w
             repeat with s in sessions of t
-              if contents of s contains "> Type your message" then
+              if (contents of s contains "> Type your message") or (contents of s contains "Gemini CLI") then
                 if is processing of s is false then
                   return (id of w as string) & ":" & (id of s as string)
                 end if
@@ -53,11 +53,19 @@ const terminalBridge = {
   injectAndExecute: (winId, sessionId, text, terminalType = 'iTerm2') => {
     const script = `
       tell application "iTerm2"
-        tell (first window whose id is ${winId})
-          tell (first session whose id is "${sessionId}")
-            write text "${text.replace(/"/g, '"')}"
-          end tell
-        end tell
+        repeat with w in windows
+          if id of w is ${winId} then
+            repeat with t in tabs of w
+              repeat with s in sessions of t
+                if id of s is "${sessionId}" then
+                  tell s
+                    write text "${text.replace(/"/g, '\\"')}"
+                  end tell
+                end if
+              end repeat
+            end repeat
+          end if
+        end repeat
       end tell
       tell application "System Events" to key code 36
     `;

@@ -11,16 +11,20 @@ const path = require('path');
 
 // --- 0. Presence Intelligence: Sensing the environment ---
 let sensoryContext = '';
-try {
-  const presence = require('./presence-controller.cjs');
-  sensoryContext = presence.getSensoryContext() || '';
-  if (sensoryContext) {
-    // Note: We don't log to console here to avoid cluttering human output, 
-    // but the Agent will 'feel' it in the context.
+function getSensoryContext() {
+  if (sensoryContext) return sensoryContext;
+  try {
+    // Lazy require to avoid circular dependencies during bootstrap
+    const presence = require('../presence/bridge/presence-controller.cjs');
+    sensoryContext = presence.getSensoryContext() || '';
+    return sensoryContext;
+  } catch (_) {
+    return '';
   }
-} catch (_) {
-  // Silent fail for presence during bootstrap
 }
+
+// Initial sensing (swallowed to avoid clutter, but populated for modules)
+getSensoryContext();
 
 // --- 1. Audit Hook: Auto-logging all system script executions ---
 const mid = process.env.MISSION_ID || 'SYSTEM';
@@ -59,6 +63,11 @@ fs.writeFileSync = (filePath, data, options) => {
     return originalWrite(filePath, data, realOptions);
   }
 
+  // Handle file descriptors (numbers) - they are already opened, so we trust them
+  if (typeof filePath === 'number') {
+    return originalWrite(filePath, data, options);
+  }
+
   if (pathResolver.isProtected(filePath)) {
     const err = new Error(`DEEP SANDBOX VIOLATION: Direct 'fs.writeFileSync' denied for protected path: ${filePath}. Use 'secure-io' instead.`);
     logger.error(err.message);
@@ -72,6 +81,11 @@ fs.appendFileSync = (filePath, data, options) => {
   if (options && options.__sudo === SUDO_KEY) {
     const { __sudo, ...realOptions } = options;
     return originalAppend(filePath, data, realOptions);
+  }
+
+  // Handle file descriptors (numbers)
+  if (typeof filePath === 'number') {
+    return originalAppend(filePath, data, options);
   }
 
   if (pathResolver.isProtected(filePath)) {
