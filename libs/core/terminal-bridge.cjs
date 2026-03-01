@@ -41,7 +41,7 @@ const STRATEGIES = {
                 repeat with s in sessions of t
                   if id of s is "${sessionId}" then
                     tell s
-                      write text "${text.replace(/"/g, '\\"')}"
+                      write text "${text.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
                     end tell
                   end if
                 end repeat
@@ -57,8 +57,6 @@ const STRATEGIES = {
   },
   VSCode: {
     findIdle: () => {
-      // For VS Code, we check if it's the frontmost application as a proxy for 'active terminal'
-      // Advanced: We could check window titles if needed.
       const script = `
         tell application "System Events"
           if (count (processes whose name is "Code")) > 0 then
@@ -73,11 +71,10 @@ const STRATEGIES = {
       } catch (_) { return null; }
     },
     inject: (winId, sessionId, text) => {
-      // VS Code intervention uses UI scripting (keystrokes)
       const script = `
         tell application "Code" to activate
         tell application "System Events"
-          keystroke "${text.replace(/"/g, '\\"')}"
+          keystroke "${text.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
           key code 36
         end tell
       `;
@@ -92,7 +89,6 @@ const terminalBridge = {
    * Find an active, idle session across supported terminal types.
    */
   findIdleSession: () => {
-    // Priority order: iTerm2 > VSCode
     const iterm = STRATEGIES.iTerm2.findIdle();
     if (iterm) return iterm;
 

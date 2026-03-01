@@ -54,7 +54,7 @@ async function nexusLoop() {
             logger.info(`🚀 Terminal (${session.type}) is IDLE. Injecting physical intervention...`);
             
             // Standard Intervention Protocol
-            const cmd = `[INTERRUPTION] TS:${stimulus.timestamp} Source:${stimulus.source_channel} Payload:${stimulus.payload}`;
+            const cmd = `\n--- [SENSORY INTERRUPTION] ---\nSource: ${stimulus.source_channel}\nTS:     ${stimulus.timestamp}\nPayload: ${stimulus.payload}\n------------------------------\n`;
             
             const success = terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
             if (success) {
