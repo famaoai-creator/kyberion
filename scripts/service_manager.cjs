@@ -112,14 +112,15 @@ function stopAll() {
  * Watchdog Mode: Periodically checks and restarts crashed services.
  */
 async function runWatchdog() {
-  logger.info(chalk.bold.cyan('🛡️ Service Watchdog Active. Monitoring for crashes...'));
+  logger.info(chalk.bold.cyan('🛡️ Service Watchdog Active. Monitoring for crashes & log bloat...'));
+  const presence = require('../presence/bridge/presence-controller.cjs');
   
   while (true) {
     const pids = loadPids();
     let changed = false;
 
     for (const [id, service] of Object.entries(SERVICES)) {
-      // Don't monitor yourself to avoid loop-recursion (it's managed by the OS/Process List)
+      // Don't monitor yourself
       if (id === 'service-watchdog') continue;
 
       const pid = pids[id];
@@ -131,6 +132,12 @@ async function runWatchdog() {
     }
 
     if (changed) savePids(pids);
+
+    // Periodically prune old stimuli to prevent log bloat
+    try {
+      await presence.pruneStimuli();
+    } catch (_) {}
+
     await new Promise(resolve => setTimeout(resolve, WATCHDOG_INTERVAL_MS));
   }
 }

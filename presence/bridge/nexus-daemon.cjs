@@ -56,8 +56,8 @@ async function nexusLoop() {
             // Normalize payload newlines
             const cleanPayload = stimulus.payload.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             
-            // Standard Intervention Protocol
-            const cmd = `\n--- [SENSORY INTERRUPTION] ---\nSource: ${stimulus.source_channel}\nTS:     ${stimulus.timestamp}\nPayload: ${cleanPayload}\n------------------------------\n`;
+            // Standard Intervention Protocol (Wrapped in non-executable tags for safety)
+            const cmd = `\n[SENSORY_INPUT_BEGIN]\nSource: ${stimulus.source_channel}\nTS:     ${stimulus.timestamp}\nPayload: <<<\n${cleanPayload}\n>>>\n[SENSORY_INPUT_END]\n`;
             
             const success = terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
             if (success) {

@@ -124,6 +124,50 @@ async function resolveStimulus(timestamp, responseText = '') {
   }
 }
 
+/**
+ * Prunes the stimuli log: Moves processed items older than 24h to archive and removes them.
+ */
+async function pruneStimuli() {
+  const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');
+  if (!fs.existsSync(STIMULI_PATH)) return;
+
+  try {
+    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+    const lines = content.trim().split('\n');
+    const remaining = [];
+    const archived = [];
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const s = JSON.parse(line);
+      const ts = new Date(s.timestamp);
+      
+      if (s.status === 'PROCESSED' && ts < oneDayAgo) {
+        archived.push(line);
+      } else {
+        remaining.push(line);
+      }
+    }
+
+    if (archived.length > 0) {
+      const archiveDir = pathResolver.active('archive/presence');
+      const archiveFile = path.join(archiveDir, `stimuli_archive_${now.toISOString().split('T')[0]}.jsonl`);
+      
+      // Use standard fs for archive to ensure it happens
+      if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
+      fs.appendFileSync(archiveFile, archived.join('\n') + '\n');
+      
+      safeWriteFile(STIMULI_PATH, remaining.join('\n') + '\n');
+      logger.info(`🧹 Pruned ${archived.length} old stimuli to archive.`);
+    }
+  } catch (err) {
+    logger.error(`Pruning Failure: ${err.message}`);
+  }
+}
+
 if (require.main === module) {
   const args = process.argv.slice(2);
   const action = args[0];
@@ -141,13 +185,16 @@ if (require.main === module) {
   } else if (action === 'perceive') {
     const pending = perceive();
     console.log(JSON.stringify(pending, null, 2));
+  } else if (action === 'prune') {
+    pruneStimuli().then(() => process.exit(0));
   } else {
-    console.log('Available actions: perceive, resolve');
+    console.log('Available actions: perceive, resolve, prune');
   }
 }
 
 module.exports = {
   perceive,
   getSensoryContext,
-  resolveStimulus
+  resolveStimulus,
+  pruneStimuli
 };
