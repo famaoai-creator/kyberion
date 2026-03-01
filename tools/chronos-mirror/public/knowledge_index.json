@@ -688,6 +688,14 @@
     "category": "orchestration"
   },
   {
+    "id": "orchestration/data-ingestion-protocol.md",
+    "title": "The Data Ingestion Protocol (外部データ持ち込み規約)",
+    "author": "Unknown",
+    "last_updated": "2026-02-28",
+    "tier": "public",
+    "category": "orchestration"
+  },
+  {
     "id": "orchestration/directives-protocol.md",
     "title": "Cross-Role Directive Protocol (CRDP)",
     "author": "Unknown",
