@@ -21,6 +21,7 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@agent/core": "workspace:*",
     "@types/node": "^20.11.16",
     "@types/pdf-parse": "^1.1.4",
     "@types/adm-zip": "^0.5.5",
