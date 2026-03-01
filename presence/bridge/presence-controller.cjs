@@ -23,7 +23,7 @@ function perceive() {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
     const stimuli = content.trim().split('\n')
       .map(line => JSON.parse(line))
-      .filter(s => s.status === 'PENDING');
+      .filter(s => s.status === 'PENDING' || s.status === 'INJECTED');
 
     const registry = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }));
     const priorityMap = new Map(registry.channels.map(c => [c.id, c.priority]));

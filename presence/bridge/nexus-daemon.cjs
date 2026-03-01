@@ -6,7 +6,7 @@
   * Flow: Watch stimuli.jsonl -> Detect PENDING -> Find Idle iTerm2 Session -> Inject Intervention Command.
   */
 
- const { logger, safeReadFile, pathResolver, requireRole } = require('../../scripts/system-prelude.cjs');
+ const { logger, safeReadFile, safeWriteFile, pathResolver, requireRole } = require('../../scripts/system-prelude.cjs');
  const terminalBridge = require('../../libs/core/terminal-bridge.cjs');
  const fs = require('fs');
 
@@ -15,7 +15,24 @@ requireRole('Ecosystem Architect');
 const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');
 const CHECK_INTERVAL_MS = 5000; // Watch every 5 seconds
 
-const processedInLoop = new Set(); // Prevent duplicate injections in the same daemon session
+async function markAsInjected(timestamp) {
+  try {
+    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
+    const lines = content.trim().split('\n').map(line => {
+      const s = JSON.parse(line);
+      if (s.timestamp === timestamp) {
+        s.status = 'INJECTED';
+        s.injected_at = new Date().toISOString();
+      }
+      return JSON.stringify(s);
+    });
+    safeWriteFile(STIMULI_PATH, lines.join('\n') + '\n');
+    return true;
+  } catch (err) {
+    logger.error(`Failed to mark as injected: ${err.message}`);
+    return false;
+  }
+}
 
 async function nexusLoop() {
   logger.info('🛡️ Nexus Daemon active. Watching for sensory stimuli...');
@@ -26,7 +43,7 @@ async function nexusLoop() {
         const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
         const pending = content.trim().split('\n')
           .map(line => JSON.parse(line))
-          .filter(s => s.status === 'PENDING' && !processedInLoop.has(s.timestamp));
+          .filter(s => s.status === 'PENDING');
 
         if (pending.length > 0) {
           const stimulus = pending[0]; // Process oldest first
@@ -41,8 +58,8 @@ async function nexusLoop() {
             
             const success = terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
             if (success) {
-              processedInLoop.add(stimulus.timestamp);
-              logger.success(`✅ Intervention command sent to ${session.type} Win:${session.winId || 'N/A'} Session:${session.sessionId || 'N/A'}`);
+              await markAsInjected(stimulus.timestamp);
+              logger.success(`✅ Intervention command sent and marked as INJECTED. (${session.type})`);
             }
           } else {
             logger.info('⏳ Terminal is busy or not found. Waiting for next heartbeat...');
