@@ -1,7 +1,7 @@
 {
   "v": "1.2.1",
-  "t": 139,
-  "u": "2026-03-01T17:46:26.786Z",
+  "t": 141,
+  "u": "2026-03-01T20:18:32.006Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -1796,9 +1796,29 @@
       "d": "Generates and edits images using Google Gemini Image API (Imagen).",
       "s": "impl",
       "r": "low",
-      "m": "",
+      "m": "scripts/main.cjs",
       "t": [],
       "u": "2026-03-01T17:45:58.708Z"
+    },
+    {
+      "n": "rakuten-ichiba-connector",
+      "path": "skills/lifestyle/rakuten-ichiba-connector",
+      "d": "Searches for products on Rakuten Ichiba.",
+      "s": "impl",
+      "r": "low",
+      "m": "",
+      "t": [],
+      "u": "2026-03-01T20:17:37.950Z"
+    },
+    {
+      "n": "rakuten-travel-connector",
+      "path": "skills/lifestyle/rakuten-travel-connector",
+      "d": "Searches for hotels and plans on Rakuten Travel.",
+      "s": "impl",
+      "r": "low",
+      "m": "",
+      "t": [],
+      "u": "2026-03-01T20:18:10.294Z"
     }
   ]
 }

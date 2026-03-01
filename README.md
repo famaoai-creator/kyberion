@@ -2,7 +2,7 @@
 
 Your personal AI agent team — assembled around who you are and what you do.
 
-**139 skills** (all implemented) + **26 conceptual frameworks** documented in `knowledge/frameworks/`.
+**141 skills** (all implemented) + **26 conceptual frameworks** documented in `knowledge/frameworks/`.
 
 ## Philosophy: "Everyone Can Automate Their Own Work"
 
