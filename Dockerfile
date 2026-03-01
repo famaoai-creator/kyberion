@@ -1,5 +1,5 @@
 # Stage 1: Base Runtime Environment
-FROM node:22-slim AS base
+FROM node:23-slim AS base
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -7,7 +7,7 @@ ENV NODE_ENV=production
 ENV COREPACK_ENABLE_STRICT=0
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
-# Install system dependencies (e.g. for python skills or native modules)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -20,19 +20,24 @@ FROM base AS builder
 # Copy workspace configuration and lockfile
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
-# Copy all package.json files to allow pnpm to resolve the workspace tree
-# (Note: We copy everything here because manually listing 136+ skills is fragile)
-# We rely on .dockerignore to keep this lean
+# Copy everything (Respecting .dockerignore)
 COPY . .
 
-# Install all dependencies (including dev)
-RUN pnpm install --frozen-lockfile
+# Synchronize lockfile for Linux environment and install all dependencies
+RUN pnpm install --no-frozen-lockfile
+
+# BUILD ALL SKILLS: Essential for 'doctor' to validate entrypoints
+RUN pnpm run build
 
 # Stage 3: Development & Quality Gate
 FROM builder AS development
 ENV NODE_ENV=development
 # Establish internal link to @agent/core
 RUN node scripts/bootstrap.cjs
+
+# Setup dummy role config for Governance Audit during doctor
+RUN mkdir -p knowledge/personal && echo '{"active_role":"Ecosystem Architect","persona":"Mock"}' > knowledge/personal/role-config.json
+
 # Validate ecosystem integrity
 RUN pnpm run doctor
 
