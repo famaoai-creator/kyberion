@@ -1,7 +1,7 @@
 {
   "v": "1.2.1",
-  "t": 144,
-  "u": "2026-03-01T20:51:57.448Z",
+  "t": 145,
+  "u": "2026-03-01T21:00:04.749Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -1806,9 +1806,9 @@
       "d": "Searches for products on Rakuten Ichiba.",
       "s": "impl",
       "r": "low",
-      "m": "",
+      "m": "scripts/main.cjs",
       "t": [],
-      "u": "2026-03-01T20:17:37.950Z"
+      "u": "2026-03-01T21:00:04.471Z"
     },
     {
       "n": "rakuten-travel-connector",
@@ -1816,9 +1816,9 @@
       "d": "Searches for hotels and plans on Rakuten Travel.",
       "s": "impl",
       "r": "low",
-      "m": "",
+      "m": "scripts/main.cjs",
       "t": [],
-      "u": "2026-03-01T20:18:10.294Z"
+      "u": "2026-03-01T21:00:04.473Z"
     },
     {
       "n": "switchbot-controller",
@@ -1826,9 +1826,9 @@
       "d": "Controls smart home devices via SwitchBot API.",
       "s": "impl",
       "r": "low",
-      "m": "",
+      "m": "scripts/main.cjs",
       "t": [],
-      "u": "2026-03-01T20:32:44.894Z"
+      "u": "2026-03-01T21:00:04.475Z"
     },
     {
       "n": "land-price-analyzer",
@@ -1838,7 +1838,7 @@
       "r": "low",
       "m": "scripts/main.cjs",
       "t": [],
-      "u": "2026-03-01T20:47:20.471Z"
+      "u": "2026-03-01T21:00:04.477Z"
     },
     {
       "n": "jpx-market-analyzer",
@@ -1848,7 +1848,17 @@
       "r": "low",
       "m": "scripts/main.cjs",
       "t": [],
-      "u": "2026-03-01T20:51:47.596Z"
+      "u": "2026-03-01T21:00:04.479Z"
+    },
+    {
+      "n": "trust-fund-monitor",
+      "path": "skills/finance/trust-fund-monitor",
+      "d": "Monitors investment trust NAV and info via MUFG Asset Management WebAPI.",
+      "s": "impl",
+      "r": "low",
+      "m": "scripts/main.cjs",
+      "t": [],
+      "u": "2026-03-01T21:00:04.481Z"
     }
   ]
 }

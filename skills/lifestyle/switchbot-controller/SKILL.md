@@ -2,6 +2,7 @@
 name: switchbot-controller
 description: Controls smart home devices via SwitchBot API.
 status: implemented
+main: scripts/main.cjs
 category: lifestyle
 r: low
 ---

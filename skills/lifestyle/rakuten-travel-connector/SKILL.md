@@ -2,6 +2,7 @@
 name: rakuten-travel-connector
 description: Searches for hotels and plans on Rakuten Travel.
 status: implemented
+main: scripts/main.cjs
 category: lifestyle
 r: low
 ---

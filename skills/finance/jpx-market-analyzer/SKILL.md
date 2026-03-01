@@ -2,6 +2,7 @@
 name: jpx-market-analyzer
 description: Analyzes Japanese stock market data and financials via JPX J-Quants API.
 status: implemented
+main: scripts/main.cjs
 category: finance
 r: high
 ---

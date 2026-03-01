@@ -2,6 +2,7 @@
 name: rakuten-ichiba-connector
 description: Searches for products on Rakuten Ichiba.
 status: implemented
+main: scripts/main.cjs
 category: lifestyle
 r: low
 ---
