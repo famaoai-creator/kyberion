@@ -1,7 +1,7 @@
 {
   "v": "1.2.1",
-  "t": 138,
-  "u": "2026-03-01T12:29:22.526Z",
+  "t": 139,
+  "u": "2026-03-01T17:46:26.786Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -475,7 +475,7 @@
         "mcp",
         "rag"
       ],
-      "u": "2026-03-01T11:09:23.455Z"
+      "u": "2026-03-01T15:51:45.210Z"
     },
     {
       "n": "mcp-terraform-connector",
@@ -489,7 +489,7 @@
         "iac",
         "mcp"
       ],
-      "u": "2026-03-01T11:09:28.947Z"
+      "u": "2026-03-01T15:51:45.210Z"
     },
     {
       "n": "slack-communicator-pro",
@@ -1789,6 +1789,16 @@
         "gemini-skill"
       ],
       "u": "2026-02-27T16:34:45.678Z"
+    },
+    {
+      "n": "visual-imagination",
+      "path": "skills/imagination/visual-imagination",
+      "d": "Generates and edits images using Google Gemini Image API (Imagen).",
+      "s": "impl",
+      "r": "low",
+      "m": "",
+      "t": [],
+      "u": "2026-03-01T17:45:58.708Z"
     }
   ]
 }
