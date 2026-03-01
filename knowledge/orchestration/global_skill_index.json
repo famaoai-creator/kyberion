@@ -1,7 +1,7 @@
 {
   "v": "1.2.1",
-  "t": 141,
-  "u": "2026-03-01T20:18:32.006Z",
+  "t": 142,
+  "u": "2026-03-01T20:33:08.141Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -1819,6 +1819,16 @@
       "m": "",
       "t": [],
       "u": "2026-03-01T20:18:10.294Z"
+    },
+    {
+      "n": "switchbot-controller",
+      "path": "skills/lifestyle/switchbot-controller",
+      "d": "Controls smart home devices via SwitchBot API.",
+      "s": "impl",
+      "r": "low",
+      "m": "",
+      "t": [],
+      "u": "2026-03-01T20:32:44.894Z"
     }
   ]
 }

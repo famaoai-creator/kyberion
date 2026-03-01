@@ -1,6 +1,6 @@
 # Gemini Skills Ecosystem Guide
 
-Total Skills: 141 (Implemented: 136)
+Total Skills: 142 (Implemented: 136)
 Last updated: 2026/03/01
 
 This guide is a domain-driven catalog of the ecosystem. Skills are organized into Namespaces for better governance and accountability.
