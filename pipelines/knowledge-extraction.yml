@@ -8,7 +8,7 @@ steps:
     args: '--dir "{{dir}}"'
     output: harvest
   - skill: glossary-resolver
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: glossary
   - skill: doc-sync-sentinel
     args: '--dir "{{dir}}"'

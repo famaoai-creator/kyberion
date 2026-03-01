@@ -8,7 +8,7 @@ steps:
     args: '--dir "{{dir}}"'
     output: onboarding
   - skill: requirements-wizard
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: requirements
   - skill: operational-runbook-generator
     args: '-t deploy -n "{{name}}"'

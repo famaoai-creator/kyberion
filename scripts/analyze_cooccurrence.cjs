@@ -22,8 +22,8 @@ function analyze() {
   pipelines.forEach((file) => {
     try {
       const def = yaml.load(fs.readFileSync(path.join(pipelineDir, file), 'utf8'));
-      if (def.pipeline && Array.isArray(def.pipeline)) {
-        const skillsInPipeline = def.pipeline.map((step) => step.skill);
+      if (def.steps && Array.isArray(def.steps)) {
+        const skillsInPipeline = def.steps.map((step) => step.skill);
 
         skillsInPipeline.forEach((skill) => {
           if (!graph[skill]) graph[skill] = new Set();

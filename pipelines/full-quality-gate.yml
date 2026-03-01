@@ -5,10 +5,10 @@ steps:
     args: '--dir "{{dir}}"'
     output: health
   - skill: code-lang-detector
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: language
   - skill: quality-scorer
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: quality
   - skill: security-scanner
     cwd: '{{dir}}'
@@ -20,8 +20,8 @@ steps:
     args: '--dir "{{dir}}"'
     output: licenses
   - skill: refactoring-engine
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: refactoring
   - skill: html-reporter
-    args: '-i "$prev.output" -o "{{output}}" -t "Quality Gate Report"'
+    args: '--input "$prev.output" -o "{{output}}" -t "Quality Gate Report"'
     output: report

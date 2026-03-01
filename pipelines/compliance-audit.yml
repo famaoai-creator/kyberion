@@ -5,11 +5,11 @@ steps:
     args: '--dir "{{dir}}"'
     output: licenses
   - skill: sensitivity-detector
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: sensitivity
   - skill: schema-validator
-    args: '-i "{{input}}" -s "{{schema}}"'
+    args: '--input "{{input}}" -s "{{schema}}"'
     output: validation
   - skill: nonfunctional-architect
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: nfrGrade

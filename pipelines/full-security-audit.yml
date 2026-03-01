@@ -14,7 +14,7 @@ steps:
     args: '--dir "{{dir}}"'
     output: licenses
   - skill: dependency-grapher
-    args: '-i "{{dir}}/package.json"'
+    args: '--input "{{dir}}/package.json"'
     output: dependencies
   - skill: html-reporter
     args: '--title "Security Audit Report" --input "$prev.output"'

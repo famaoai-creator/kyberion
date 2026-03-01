@@ -1,13 +1,8 @@
 name: Auto-Project-Audit
 steps:
   - skill: security-scanner
-    params: { dir: '.' }
+    args: '--input "."'
   - skill: project-health-check
-    params: { dir: '.' }
+    args: '--input "."'
   - skill: html-reporter
-    params:
-      {
-        input: 'README.md',
-        title: 'Project Health: $prev.output.score',
-        out: 'work/audit-report.html',
-      }
+    args: '--input "README.md" -t "Project Health: $prev.output.score" -o "{{out_dir}}/audit-report.html"'

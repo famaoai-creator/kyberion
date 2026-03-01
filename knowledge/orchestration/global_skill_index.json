@@ -929,7 +929,7 @@
       "d": "Generate Word documents (.docx) from Markdown.",
       "s": "impl",
       "r": "low",
-      "m": "scripts/convert.cjs",
+      "m": "dist/index.js",
       "t": [
         "automation",
         "documentation",

@@ -8,11 +8,11 @@ steps:
     args: '--dir "{{dir}}" --top 10 --since "3 months ago"'
     output: bugs
   - skill: refactoring-engine
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: refactoring
   - skill: quality-scorer
-    args: '-i "{{input}}"'
+    args: '--input "{{input}}"'
     output: quality
   - skill: html-reporter
-    args: '-i "$prev.output" -o "{{output}}" -t "Code Review Report"'
+    args: '--input "$prev.output" -o "{{output}}" -t "Code Review Report"'
     output: report

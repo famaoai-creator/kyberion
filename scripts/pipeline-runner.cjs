@@ -64,7 +64,12 @@ function interpolate(template, vars) {
 // Build the variables object from argv (everything except yargs internals)
 // ---------------------------------------------------------------------------
 function buildVars(parsedArgv) {
-  const vars = {};
+  const vars = {
+    out_dir: 'active/shared',
+    scratch_dir: 'scratch',
+    mission_dir: 'active/missions/default',
+    src_dir: 'src',
+  };
   for (const [key, val] of Object.entries(parsedArgv)) {
     // Skip yargs internal keys
     if (key === '_' || key === '$0' || key === 'pipeline' || key === 'p') continue;

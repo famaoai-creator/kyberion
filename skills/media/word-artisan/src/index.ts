@@ -8,6 +8,8 @@ import { validateFilePath } from '@agent/core/validators';
 import { generateWordContent, WordMasterSpecs } from './lib.js';
 
 
+import pathResolver from '@agent/core/path-resolver';
+
 const argv = yargs(hideBin(process.argv))
   .option('input', {
     alias: 'i',
@@ -29,8 +31,8 @@ runAsyncSkill('word-artisan', async () => {
 
   // 1. Load Master Specs
   const specsPath = path.resolve(
-    __dirname,
-    '../../../knowledge/standards/design/word-master-specs.json'
+    pathResolver.rootDir(),
+    'knowledge/standards/design/word-master-specs.json'
   );
   if (!fs.existsSync(specsPath)) {
     throw new Error(`Word master specs missing at: ${specsPath}`);

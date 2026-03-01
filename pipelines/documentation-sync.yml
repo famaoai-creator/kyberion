@@ -11,5 +11,5 @@ steps:
     args: '--dir "{{dir}}"'
     output: apiDocs
   - skill: completeness-scorer
-    args: '-i "{{dir}}/README.md"'
+    args: '--input "{{dir}}/README.md"'
     output: readmeScore

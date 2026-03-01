@@ -11,8 +11,8 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const outputPath = path.resolve(argv.out as string);
 
     const patternsPath = path.resolve(
-      __dirname,
-      '../../../knowledge/skills/api-doc-generator/patterns.json'
+      process.cwd(),
+      'knowledge/skills/api-doc-generator/patterns.json'
     );
     const patterns = JSON.parse((await safeReadFileAsync(patternsPath)) as string);
 
