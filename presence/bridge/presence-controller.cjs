@@ -101,7 +101,7 @@ async function resolveStimulus(timestamp, responseText = '') {
           action: 'message',
           channel: stimulusToReply.metadata.channel_id,
           thread_ts: stimulusToReply.metadata.thread_ts,
-          input: responseText
+          input: responseText.replace(/\\n/g, '\n')
         };
 
         const activeDir = String(pathResolver.active());
