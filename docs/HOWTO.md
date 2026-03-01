@@ -607,3 +607,20 @@ If you have configured the `slack-connector`, you can send messages to the agent
 
 -   **Dashboard**: View the real-time health in **Chronos Mirror** (`http://localhost:3030`).
 -   **Intervention**: Critical failures are injected as high-priority stimuli for immediate attention.
+
+### 👁️ Visual Capture (Screenshot)
+
+The Agent can capture the physical state of your workspace to assist with UI/UX debugging or document analysis.
+
+1.  **Manual Trigger**: `node scripts/cli.cjs system visual-capture`
+2.  **Output**: Images are saved to `active/shared/captures/`.
+3.  **Requirements (macOS)**: Ensure your terminal (iTerm2, Code) has **Screen Recording** permissions in System Settings.
+
+### 🛡️ Managing Background Services (Watchdog)
+
+Background sensors and daemons are managed via a central service manager.
+
+1.  **Start all services**: `node scripts/cli.cjs system services start`
+2.  **Check status**: `node scripts/cli.cjs system services status`
+3.  **Watchdog**: Once started, a `service-watchdog` process automatically monitors and restarts crashed services every 30 seconds.
+

@@ -15,6 +15,7 @@ All external interactions are categorized by **Channels**, each defined in `pres
 | Channel | Priority | Mode | Nature |
 | :--- | :--- | :--- | :--- |
 | **Terminal** | 10 | REALTIME | Primary direct interaction (Low latency). |
+| **Visual** | 9 | REALTIME | Screen capture and visual state (Prototype). |
 | **Voice** | 8 | REALTIME | High-priority auditory commands (Urgent). |
 | **Slack** | 5 | BATCH | Asynchronous collaboration (Delayed response). |
 | **Pulse** | 3 | BATCH | Background system events (Passive). |
@@ -27,37 +28,62 @@ Stimuli from sensors are written to `presence/bridge/stimuli.jsonl`.
 2.  **Priority Resolution**: The Agent MUST address stimuli in order of priority (Voice > Slack).
 3.  **Completion**: Once a stimulus is addressed, it is marked as `PROCESSED` via the `presence-controller.cjs`.
 
-### 3.1. Physical Intervention Protocol (macOS/iTerm2)
+### 3.1. Physical Intervention Protocol (Multi-Terminal)
 
-For a more "alive" experience, the **Nexus Daemon** (`presence/bridge/nexus-daemon.cjs`) can physically inject stimuli into an idle terminal session using AppleScript.
+The **Nexus Daemon** (`presence/bridge/nexus-daemon.cjs`) can physically inject stimuli into an idle terminal session using the **Terminal Bridge**.
 
-- **Trigger**: New `PENDING` stimulus detected + Terminal state is IDLE (`is processing is false`).
+- **Supported Terminals**: iTerm2 (Primary), VS Code Integrated Terminal (Fallback).
+- **Trigger**: New `PENDING` stimulus detected + Terminal state is IDLE.
 - **Injected Format**: 
-  `[INTERRUPTION] TS:<timestamp> Source:<channel_id> Payload:<message_content>`
-- **Agent Reaction**: The Agent recognizes this prefix, performs the requested task, and automatically resolves the stimulus.
+  ```text
+  [SENSORY_INPUT_BEGIN]
+  Source: <channel_id>
+  TS:     <timestamp>
+  Payload: <<<
+  <message_content>
+  >>>
+  [SENSORY_INPUT_END]
+  ```
+- **Stability**: Automatically marks stimuli as `INJECTED` in physical storage to prevent duplicates on restart.
 
-## 4. The Projection Protocol (How I Appear)
+## 4. 👁️ Visual Perception (SIGHT)
 
-Internal state changes are mirrored to the **Displays** (e.g., `chronos-mirror`) via the `presence/bridge/` communication bus. This allows stakeholders to observe the Agent's reasoning without direct access to the terminal.
+Provides the Agent with the ability to capture and interpret the physical state of the workspace.
 
-## 5. Governance of the Senses
+### 4.1. Modular Driver Architecture
+Visual sensing uses a **Driver Strategy Pattern** for cross-platform support:
+- **Orchestrator (`presence/sensors/visual-sensor.cjs`)**: Detects OS and delegates to drivers.
+- **Drivers**:
+    - `macos-driver.cjs`: Uses native `screencapture`.
+    - *Linux/Windows drivers planned.*
 
-- **Deep Sandbox**: All sensors and displays are subject to the same Deep Sandbox laws as core scripts. They cannot bypass `secure-io` to write to the Knowledge Tier.
-- **Audit Trails**: Every stimulus received and addressed is logged in the `governance-ledger.jsonl` for full traceability.
+### 4.2. CLI Usage
+Manual capture trigger:
+```bash
+node scripts/cli.cjs system visual-capture [screen|window]
+```
+
+## 5. 🛡️ Service Management & Watchdog
+
+Background presence services are managed by `scripts/service_manager.cjs`.
+
+- **Watchdog Mode**: A dedicated background process that monitors other services every 30 seconds.
+- **Auto-Healing**: Automatically restarts crashed sensors or daemons.
+- **Maintenance**: Periodically prunes `stimuli.jsonl` by archiving processed items older than 24 hours.
 
 ## 6. Developer Guide: Creating a New Sensor
 
-To add a new sensory input (e.g., a Telegram bot or a hardware button):
+To add a new sensory input:
 
-1.  **Register Channel**: Add a new entry to `presence/bridge/channel-registry.json`.
-2.  **Write Stimulus**: Your sensor script should append a JSON line to `presence/bridge/stimuli.jsonl`:
+1.  **Register Channel**: Update `presence/bridge/channel-registry.json`.
+2.  **Write Stimulus**: Append a JSON line to `presence/bridge/stimuli.jsonl`:
     ```json
     { 
       "timestamp": "ISO-8601-TS", 
       "source_channel": "your-id", 
       "delivery_mode": "REALTIME|BATCH", 
-      "payload": "Message content", 
+      "payload": "Message", 
       "status": "PENDING" 
     }
     ```
-3.  **Deploy**: Run your sensor as a background process. The Agent will automatically detect it during the next interaction.
+3.  **Integrate**: Ensure your sensor is listed in `service_manager.cjs` for lifecycle management.
