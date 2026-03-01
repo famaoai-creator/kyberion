@@ -15,6 +15,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "paths": {
+      "@agent/core": ["libs/core/skill-wrapper.cjs"],
       "@agent/core/*": ["libs/core/*"]
     }
   },

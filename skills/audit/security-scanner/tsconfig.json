@@ -9,8 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "paths": {}
+    "strict": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "scripts", "src/**/*.test.ts"]

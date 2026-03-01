@@ -4,7 +4,7 @@
  * Generates and edits images via Gemini Image API using unified core libraries.
  */
 
-const { runSkill } = require('../../../scripts/lib/skill-wrapper.cjs');
+const { runSkill } = require('@agent/core');
 const { logger } = require('@agent/core/core');
 const { safeWriteFile } = require('@agent/core/secure-io');
 const pathResolver = require('@agent/core/path-resolver');
