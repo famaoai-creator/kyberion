@@ -1,11 +1,11 @@
 /**
  * Google Workspace Integrator - CLI Entry Point
- * Implements 'fetch-agenda' and 'auth' actions.
+ * Implements 'fetch-agenda', 'list-emails', and 'send-email' actions.
  */
 
 // @ts-ignore
 const { runSkillAsync } = require('@agent/core');
-const { getGoogleAuth, fetchAgenda, formatAgenda } = require('./lib');
+const { getGoogleAuth, fetchAgenda, formatAgenda, listEmails, sendEmail } = require('./lib');
 const { logger, safeWriteFile } = require('@agent/core/secure-io');
 const pathResolver = require('@agent/core/path-resolver');
 const path = require('node:path');
@@ -25,7 +25,11 @@ async function main() {
     if (auth.status === 'needs_auth') {
       const authUrl = auth.client.generateAuthUrl({
         access_type: 'offline',
-        scope: ['https://www.googleapis.com/auth/calendar.readonly'],
+        scope: [
+          'https://www.googleapis.com/auth/calendar.readonly',
+          'https://www.googleapis.com/auth/gmail.modify',
+          'https://www.googleapis.com/auth/gmail.send'
+        ],
       });
       return {
         status: 'needs_attention',
@@ -40,15 +44,26 @@ async function main() {
         logger.info('📅 Fetching CEO Agenda...');
         const events = await fetchAgenda(auth.client, argv.limit || 5);
         const output = formatAgenda(events);
-        
-        const artifactPath = path.join(pathResolver.active('shared'), `ceo_agenda_${Date.now()}.md`);
-        safeWriteFile(artifactPath, output);
+        const calArtifact = path.join(pathResolver.active('shared'), `ceo_agenda_${Date.now()}.md`);
+        safeWriteFile(calArtifact, output);
+        return { agenda: output, artifact: calArtifact };
 
-        return {
-          agenda: output,
-          artifact: artifactPath,
-          event_count: events.length
-        };
+      case 'list-emails':
+        logger.info('📧 Fetching latest emails...');
+        const emails = await listEmails(auth.client, argv.q || '', argv.limit || 10);
+        const emailList = emails.map((e: any) => `- [${e.date}] FROM: ${e.from} | SUBJ: ${e.subject} (ID: ${e.id})`).join('\n');
+        const emailArtifact = path.join(pathResolver.active('shared'), `ceo_emails_${Date.now()}.md`);
+        safeWriteFile(emailArtifact, emailList);
+        return { emails: emails, artifact: emailArtifact };
+
+      case 'send-email':
+        const { to, subject, body } = argv;
+        if (!to || !subject || !body) {
+          throw new Error('Missing arguments for send-email: --to, --subject, --body');
+        }
+        logger.info(`📤 Sending email to ${to}...`);
+        const result = await sendEmail(auth.client, to, subject, body);
+        return { status: 'success', messageId: result.id };
 
       default:
         throw new Error(`Unsupported action: ${action}`);

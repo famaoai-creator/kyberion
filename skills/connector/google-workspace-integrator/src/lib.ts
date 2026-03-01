@@ -1,6 +1,6 @@
 /**
  * Google Workspace Integrator - Core Library
- * Provides helpers for Auth and Calendar operations.
+ * Provides helpers for Auth, Calendar, and Gmail operations.
  * Strictly uses @agent/core/secure-io for data persistence.
  */
 
@@ -13,6 +13,13 @@ import * as fs from 'node:fs';
 // --- Auth Paths ---
 const CREDENTIALS_PATH = pathResolver.rootResolve('knowledge/personal/connections/google/google-credentials.json');
 const TOKEN_PATH = pathResolver.rootResolve('knowledge/personal/connections/google/google-token.json');
+
+// --- Scopes ---
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/gmail.modify', // Read, compose, and send
+  'https://www.googleapis.com/auth/gmail.send'
+];
 
 export interface GoogleAuthClient {
   client: any;
@@ -41,9 +48,8 @@ export async function getGoogleAuth(): Promise<GoogleAuthClient> {
   return { client: oAuth2Client, status: 'authenticated' };
 }
 
-/**
- * Lists upcoming calendar events for the CEO.
- */
+// --- Calendar Logic ---
+
 export async function fetchAgenda(auth: any, maxResults: number = 10) {
   const calendar = google.calendar({ version: 'v3', auth });
   const res = await calendar.events.list({
@@ -56,16 +62,72 @@ export async function fetchAgenda(auth: any, maxResults: number = 10) {
   return res.data.items || [];
 }
 
-/**
- * Formats agenda items for Slack/Terminal consumption.
- */
 export function formatAgenda(events: any[]): string {
   if (events.length === 0) return 'CEO, your schedule is clear for now.';
-  
   const formatted = events.map((event: any) => {
     const start = event.start.dateTime || event.start.date;
     return `- [${new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${event.summary}`;
   });
-
   return `### 🗓️ CEO Agenda\n\n${formatted.join('\n')}`;
+}
+
+// --- Gmail Logic ---
+
+/**
+ * Lists latest emails.
+ */
+export async function listEmails(auth: any, q: string = '', maxResults: number = 10) {
+  const gmail = google.gmail({ version: 'v1', auth });
+  const res = await gmail.users.messages.list({
+    userId: 'me',
+    q,
+    maxResults,
+  });
+  const messages = res.data.messages || [];
+  
+  // Fetch details for each message
+  const details = await Promise.all(messages.map(async (m: any) => {
+    const msg = await gmail.users.messages.get({ userId: 'me', id: m.id, format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] });
+    const headers = msg.data.payload.headers;
+    return {
+      id: m.id,
+      threadId: m.threadId,
+      subject: headers.find((h: any) => h.name === 'Subject')?.value || '(No Subject)',
+      from: headers.find((h: any) => h.name === 'From')?.value || 'Unknown',
+      date: headers.find((h: any) => h.name === 'Date')?.value || ''
+    };
+  }));
+  
+  return details;
+}
+
+/**
+ * Sends a simple text email.
+ */
+export async function sendEmail(auth: any, to: string, subject: string, body: string) {
+  const gmail = google.gmail({ version: 'v1', auth });
+  const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+  const messageParts = [
+    `From: me`,
+    `To: ${to}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `MIME-Version: 1.0`,
+    `Subject: ${utf8Subject}`,
+    '',
+    body,
+  ];
+  const message = messageParts.join('\n');
+  const encodedMessage = Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: {
+      raw: encodedMessage,
+    },
+  });
+  return res.data;
 }

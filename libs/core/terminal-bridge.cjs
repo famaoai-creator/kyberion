@@ -1,7 +1,7 @@
 /**
- * Terminal Bridge v2.3 (Stable Reliable Edition)
+ * Terminal Bridge v2.4 (Ultra Stable Edition)
  * Encapsulates AppleScript-based terminal automation.
- * Supports iTerm2 and VS Code with stable injection.
+ * Supports iTerm2 and VS Code with robust targeting.
  */
 
 const { execSync } = require('child_process');
@@ -15,7 +15,7 @@ const STRATEGIES = {
             repeat with t in tabs of w
               repeat with s in sessions of t
                 if (contents of s contains "> Type your message") or (contents of s contains "Gemini CLI") then
-                  return (id of w as string) & ":" & (id of s as string)
+                  return (id of w as string) & ":" & (unique ID of s as string)
                 end if
               end repeat
             end repeat
@@ -31,28 +31,27 @@ const STRATEGIES = {
       } catch (_) { return null; }
     },
     inject: (winId, sessionId, text) => {
-      // For iTerm2, we convert JS newlines to AppleScript linefeed concatenation
       const escapedText = text.replace(/"/g, '\\"').split('\n').map(line => `"${line}"`).join(' & linefeed & ');
       const script = `
         tell application "iTerm2"
           repeat with w in windows
-            if id of w is ${winId} then
-              repeat with t in tabs of w
-                repeat with s in sessions of t
-                  if id of s is "${sessionId}" then
-                    tell s
-                      write text ${escapedText}
-                    end tell
-                  end if
-                end repeat
+            repeat with t in tabs of w
+              repeat with s in sessions of t
+                if (unique ID of s as string) is "${sessionId}" then
+                  tell s
+                    write text ${escapedText}
+                  end tell
+                  return "SUCCESS"
+                end if
               end repeat
-            end if
+            end repeat
           end repeat
+          return "SESSION_NOT_FOUND"
         end tell
         tell application "System Events" to key code 36
       `;
-      execSync(`osascript -e '${script.replace(/'/g, "'''")}'`);
-      return true;
+      const result = execSync(`osascript -e '${script.replace(/'/g, "'''")}'`, { encoding: 'utf8' }).trim();
+      return result === 'SUCCESS';
     }
   },
   VSCode: {
