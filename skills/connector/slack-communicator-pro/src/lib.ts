@@ -42,11 +42,10 @@ export async function sendSlackMessage(
     const message = formatSlackMessage(action, input, channel);
     return await client.chat.postMessage({
       ...message,
-      text: input || 'Gemini System Notification', // Required top-level text
+      text: input || 'Gemini System Notification',
       thread_ts: threadTs
     });
   } else if (creds.webhook_url) {
-    // Fallback to legacy webhook
     const axios = require('axios');
     const message = formatSlackMessage(action, input, channel);
     return await axios.post(creds.webhook_url, message);
@@ -67,6 +66,29 @@ export function formatSlackMessage(
     message.blocks = [
       { type: 'header', text: { type: 'plain_text', text: '🚨 GEMINI SYSTEM ALERT' } },
       { type: 'section', text: { type: 'mrkdwn', text: `*Status:* High Priority\n*Message:* ${text}` } },
+    ];
+  } else if (action === 'actionable') {
+    message.blocks = [
+      { type: 'section', text: { type: 'mrkdwn', text: text } },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: 'Approve & Execute' },
+            style: 'primary',
+            action_id: 'approve_action',
+            value: 'approved'
+          },
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: 'Reject' },
+            style: 'danger',
+            action_id: 'reject_action',
+            value: 'rejected'
+          }
+        ]
+      }
     ];
   } else {
     message.blocks = [{ type: 'section', text: { type: 'mrkdwn', text: text } }];

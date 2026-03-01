@@ -63,10 +63,30 @@ async function startSensor() {
 
   // 2. Listen for Direct Messages
   app.message(async ({ event, say }) => {
-    // Check if it's a DM (channel type 'D' or starts with 'D')
     if (event.channel_type === 'im' || event.channel.startsWith('D')) {
       await injectStimulus(event, 'dm');
     }
+  });
+
+  // 3. Listen for Interactivity (Buttons)
+  app.action(/.*_action/, async ({ action, ack, body, say }) => {
+    await ack();
+    const stimulus = {
+      timestamp: new Date().toISOString(),
+      source_channel: 'slack',
+      delivery_mode: 'REALTIME',
+      type: 'action',
+      payload: `USER_ACTION: ${action.action_id} (value: ${action.value})`,
+      status: 'PENDING',
+      metadata: {
+        channel_id: body.channel.id,
+        user_id: body.user.id,
+        action_id: action.action_id,
+        trigger_id: body.trigger_id
+      }
+    };
+    logger.info(`🔘 [Slack Sensor] Detected action ${action.action_id} from ${body.user.name}`);
+    fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
   });
 
   try {
