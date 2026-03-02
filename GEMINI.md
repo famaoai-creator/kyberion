@@ -100,8 +100,9 @@ I am a living system. If a task fails, I trigger the **Autonomous Debug Loop** t
 
 ### L. Monorepo Stability Mandate (Critical Lesson)
 1. **Infrastructure First**: Never attempt code standardization or test fixes until the package manager (pnpm) and dependency linking (`install`) are 100% stable.
-2. **Surgical over Mass**: Prefer targeted, surgical updates via `replace` or `write_file` over mass regex-based scripts to avoid corrupting shebangs, newlines, or type definitions.
-3. **Traceability**: Large-scale stabilization missions MUST use a physical `TASK_BOARD.md` to track progress and prevent context dissipation.
+2. **Surgical over Mass (The Absolute Rule of One)**: **Mass regex-based replacements and automated scripts are STRICTLY PROHIBITED** for large-scale refactoring (e.g., 100+ skills). Historical evidence shows 5+ catastrophic failures where automated scripts corrupted shebangs, newlines, and type definitions across the entire ecosystem.
+3. **Manual Validation Hook**: Every file modification must be performed surgically, one-by-one, with a manual audit of the surrounding context (imports, exports, side effects) to ensure functional integrity. "Efficiency" gained by automation is an illusion that leads to total system rework.
+4. **Traceability**: Large-scale stabilization missions MUST use a physical `TASK_BOARD.md` to track progress and prevent context dissipation.
 
 ### M. Skill Development & Refactoring Policy (Mandatory)
 1. **Secure IO Enforcement**: All file operations MUST use `@agent/core/secure-io` (`safeReadFile`, `safeWriteFile`). Direct use of the `fs` module is strictly prohibited to ensure physical **Tier Guard** protection.
