@@ -1,4 +1,4 @@
-const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
+import { safeWriteFile, safeReadFile, safeMkdir } from '@agent/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -27,8 +27,9 @@ export function saveFact(fact: string, category: string = 'general'): MemoryEntr
 
   registry.facts.push(entry);
 
-  if (!fs.existsSync(path.dirname(memoryPath))) {
-    fs.mkdirSync(path.dirname(memoryPath), { recursive: true });
+  const dir = path.dirname(memoryPath);
+  if (!fs.existsSync(dir)) {
+    safeMkdir(dir, { recursive: true });
   }
   safeWriteFile(memoryPath, JSON.stringify(registry, null, 2));
 

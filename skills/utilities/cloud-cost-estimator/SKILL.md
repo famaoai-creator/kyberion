@@ -2,7 +2,7 @@
 name: cloud-cost-estimator
 description: >-
 
-status: implemented
+status: unstable
 category: Utilities
 last_updated: '2026-02-16'
 tags:

@@ -1,7 +1,7 @@
 ---
 name: context-injector
 description: Inject knowledge into JSON data context.
-status: implemented
+status: unstable
 arguments:
   - name: data
     short: d

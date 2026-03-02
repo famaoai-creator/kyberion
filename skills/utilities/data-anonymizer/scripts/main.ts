@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { runSkill } from '@agent/core';
-import { requireArgs } from '@agent/core/validators';
+import { runSkill, safeReadFile, safeWriteFile } from '@agent/core';
 
 /**
  * Recursively masks sensitive fields in a JSON object.
@@ -23,12 +22,6 @@ function anonymize(obj: any): any {
     ];
 
     for (const [key, value] of Object.entries(obj)) {
-      const isSensitive = SENSITIVE_KEYS.some((sk) =>
-        key
-          .toLowerCase()
-          .includes(SENSITIVE_KEYS.find((s) => sk.toLowerCase().includes(s.toLowerCase())) || '')
-      );
-      // Refined check:
       const matchesSensitive = SENSITIVE_KEYS.some((sk) =>
         key.toLowerCase().includes(sk.toLowerCase())
       );
@@ -52,17 +45,11 @@ runSkill('data-anonymizer', () => {
   };
 
   if (!args.input) {
-    console.error('Error: Input file path is required');
-    process.exit(1);
+    throw new Error('Input file path is required');
   }
 
   const inputPath = path.resolve(args.input);
-
-  if (!fs.existsSync(inputPath)) {
-    throw new Error(`Input file not found: ${inputPath}`);
-  }
-
-  const rawData = fs.readFileSync(inputPath, 'utf8');
+  const rawData = safeReadFile(inputPath, 'utf8') as string;
   const jsonData = JSON.parse(rawData);
 
   process.stderr.write(`[Anonymizer] Processing ${inputPath}...\n`);
@@ -70,7 +57,7 @@ runSkill('data-anonymizer', () => {
 
   if (args.out) {
     const outputPath = path.resolve(args.out);
-    fs.writeFileSync(outputPath, JSON.stringify(anonymizedData, null, 2));
+    safeWriteFile(outputPath, JSON.stringify(anonymizedData, null, 2));
     return {
       status: 'success',
       output: outputPath,

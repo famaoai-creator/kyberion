@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createShadowTasks } from './lib';
 import * as fs from 'node:fs';
+import { safeWriteFile, safeMkdir } from '@agent/core';
 
 vi.mock('node:fs');
+vi.mock('@agent/core', () => ({
+  safeWriteFile: vi.fn(),
+  safeMkdir: vi.fn(),
+}));
 
 describe('shadow-dispatcher lib', () => {
   beforeEach(() => {
@@ -14,6 +19,6 @@ describe('shadow-dispatcher lib', () => {
     const { idA, idB } = createShadowTasks('test intent', 'A', 'B', '/inbox');
     expect(idA).toContain('SHADOW-A');
     expect(idB).toContain('SHADOW-B');
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(2);
+    expect(safeWriteFile).toHaveBeenCalledTimes(2);
   });
 });

@@ -2,7 +2,7 @@
 name: performance-monitor-analyst
 description: >-
 
-status: implemented
+status: unstable
 arguments:
   - name: input
     short: i

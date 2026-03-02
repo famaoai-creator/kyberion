@@ -1,19 +1,7 @@
-/**
- * TypeScript version of the release-note-crafter skill.
- *
- * Parses git commit log lines, classifies them by conventional commit type,
- * and generates a structured Markdown release note.
- *
- * The CLI entry point remains in main.cjs; this module exports
- * typed helper functions for the core logic.
- *
- * Usage:
- *   import { classifyCommit, stripPrefix, generateReleaseNotes } from './main.js';
- *   const result = generateReleaseNotes(commits, '2024-01-01');
- */
-
+import * as path from 'node:fs';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
+import * as pathMod from 'node:path';
+import { safeWriteFile, safeMkdir } from '@agent/core';
 import type { SkillOutput } from '@agent/core/types.js';
 
 // ---------------------------------------------------------------------------
@@ -205,9 +193,11 @@ export function generateReleaseNotes(
  * @param outPath  - Output file path
  */
 export function writeReleaseNotes(markdown: string, outPath: string): void {
-  const resolved = path.resolve(outPath);
-  fs.mkdirSync(path.dirname(resolved), { recursive: true });
-  fs.writeFileSync(resolved, markdown, 'utf8');
+  const resolved = pathMod.resolve(outPath);
+  if (!fs.existsSync(pathMod.dirname(resolved))) {
+    safeMkdir(pathMod.dirname(resolved), { recursive: true });
+  }
+  safeWriteFile(resolved, markdown);
 }
 
 // ---------------------------------------------------------------------------

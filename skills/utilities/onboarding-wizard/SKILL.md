@@ -2,7 +2,7 @@
 name: onboarding-wizard
 description: >-
 
-status: implemented
+status: unstable
 arguments:
   - name: dir
     short: d

@@ -5,11 +5,10 @@
  * Uses 'intent' for semantics and 'engine' for physical rendering.
  */
 
-const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { runSkill } = require('@agent/core');
-const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
+const { safeWriteFile, safeReadFile, safeUnlinkSync } = require('@agent/core/secure-io');
 const { requireArgs } = require('@agent/core/validators');
 
 function loadKnowledge() {
@@ -43,7 +42,9 @@ function delegateHtml(adf, out) {
   const sPath = path.join(path.dirname(out), 'render.yaml');
   safeWriteFile(sPath, scenario);
   try { execSync(`node scripts/cli.cjs run browser-navigator --scenario "${sPath}"`, { stdio: 'inherit', cwd: process.cwd() }); }
-  finally { if (fs.existsSync(sPath)) fs.unlinkSync(sPath); }
+  finally { 
+    try { safeUnlinkSync(sPath); } catch (_) {}
+  }
 }
 
 function renderSalt(mmd, out) {
@@ -51,7 +52,14 @@ function renderSalt(mmd, out) {
   safeWriteFile(p, mmd);
   try {
     execSync(`plantuml -tsvg "${p}"`, { stdio: 'inherit' });
-    if (fs.existsSync(p.replace('.puml', '.svg'))) fs.renameSync(p.replace('.puml', '.svg'), out);
+    const svgPath = p.replace('.puml', '.svg');
+    try {
+      const svg = safeReadFile(svgPath);
+      if (svg) {
+        safeWriteFile(out, svg);
+        safeUnlinkSync(svgPath);
+      }
+    } catch (_) {}
   } catch (e) { throw new Error(`Salt failed: ${e.message}`); }
 }
 

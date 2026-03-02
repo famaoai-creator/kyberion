@@ -79,6 +79,9 @@ skills.forEach((skillObj) => {
       }
 
       // 3. Main Script Check & Auto-Detection
+      const srcDir = path.join(skillPath, 'src');
+      const isTsSkill = fs.existsSync(srcDir);
+
       if (!mainScript || !fs.existsSync(mainScript)) {
         details.push(`Broken main: ${pkg.main || 'none'}`);
         if (argv.fix) {
@@ -86,27 +89,29 @@ skills.forEach((skillObj) => {
           const distDir = path.join(skillPath, 'dist');
           const candidates = [];
 
-          if (fs.existsSync(scriptsDir)) {
-            candidates.push(
-              ...fs
-                .readdirSync(scriptsDir)
+          if (isTsSkill) {
+            // Priority 1: dist/ (built from src/)
+            if (fs.existsSync(distDir)) {
+              const distFiles = fs.readdirSync(distDir, { recursive: true })
+                .filter((f) => f.endsWith('.js') || f.endsWith('.cjs'))
+                .map((f) => `dist/${f}`);
+              
+              const bestDist = distFiles.find(f => f.includes('index.js') || f.includes('main.js')) || distFiles[0];
+              if (bestDist) candidates.push(bestDist);
+            }
+          } else {
+            // Priority 1: scripts/ (legacy or pure JS skill)
+            if (fs.existsSync(scriptsDir)) {
+              const scriptFiles = fs.readdirSync(scriptsDir)
                 .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'))
-                .map((f) => `scripts/${f}`)
-            );
-          }
-          if (fs.existsSync(distDir)) {
-            candidates.push(
-              ...fs
-                .readdirSync(distDir)
-                .filter((f) => f.endsWith('.js'))
-                .map((f) => `dist/${f}`)
-            );
+                .map((f) => `scripts/${f}`);
+              
+              const bestScript = scriptFiles.find(f => f.includes('index.js') || f.includes('main.js')) || scriptFiles[0];
+              if (bestScript) candidates.push(bestScript);
+            }
           }
 
-          const bestMatch =
-            candidates.find(
-              (f) => f.includes('main.') || f.includes('score.') || f.includes('audit.')
-            ) || candidates[0];
+          const bestMatch = candidates[0];
           if (bestMatch) {
             pkg.main = bestMatch;
             mainScript = path.join(skillPath, pkg.main);

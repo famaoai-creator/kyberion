@@ -6,7 +6,8 @@
 // @ts-ignore
 const { runSkillAsync } = require('@agent/core');
 const { getGoogleAuth, fetchAgenda, formatAgenda, listEmails, sendEmail, exchangeCodeForToken } = require('./lib');
-const { logger, safeWriteFile } = require('@agent/core/secure-io');
+const { logger } = require('@agent/core/core');
+const { safeWriteFile } = require('@agent/core/secure-io');
 const pathResolver = require('@agent/core/path-resolver');
 const path = require('node:path');
 const yargs = require('yargs/yargs');

@@ -1,7 +1,7 @@
 ---
 name: api-doc-generator
 description: Generate API documentation from OpenAPI specs or code.
-status: implemented
+status: unstable
 category: Utilities
 last_updated: '2026-02-16'
 tags:

@@ -1,35 +1,16 @@
 ---
 name: google-workspace-integrator
-description: >-
-
-status: implemented
+description: Connects to Google Workspace (Calendar, Gmail) for executive secretary automation.
+status: unstable
+main: dist/index.js
 arguments:
   - name: action
     short: a
     type: string
     required: false
-    description:
-  - name: input
-    short: i
-    type: string
-    required: false
-    description:
-  - name: to
-    short: t
-    type: string
-    required: false
-    description:
-  - name: dry-run
-    type: boolean
-    required: false
-    description:
-  - name: out
-    short: o
-    type: string
-    required: false
-    description:
+    description: fetch-agenda, list-emails, send-email, auth
 category: Connector
-last_updated: '2026-02-16'
+last_updated: '2026-03-02'
 tags:
   - automation
   - cloud
@@ -41,22 +22,8 @@ tags:
 
 This skill connects the monorepo to your primary productivity tools.
 
-## Capabilities
-
-### 1. Document & Sheet Automation
-
-- **Sheets**: Automatically updates financial KPIs from `budget-variance-tracker`.
-- **Docs**: Converts Markdown deliverables into shared Google Docs for collaborative review.
-
-### 2. Strategic Email Drafting
-
-- Drafts polished emails for clients or partners based on `stakeholder-communicator` strategy.
-
-## Usage
-
-- "Export the latest P&L forecast to our Google Sheet 'Financial_Overview'."
-- "Draft an email to the client summarizing the project completion and share the link to the delivery doc."
-
-## Knowledge Protocol
-
-- Adheres to `knowledge/tech-stack/google/workspace_best_practices.md`.
+## Actions
+- `fetch-agenda`: Lists upcoming calendar events.
+- `list-emails`: Lists recent Gmail messages.
+- `send-email`: Sends a new email.
+- `auth`: Manages OAuth 2.0 authentication.

@@ -13,6 +13,7 @@
  */
 
 import * as fs from 'node:fs';
+import { safeWriteFile } from '@agent/core';
 import type { SkillOutput } from '@agent/core/types.js';
 
 // ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ export function resolveGlossaryFile(
   const resolved = resolveGlossary(content, glossary);
 
   if (outPath) {
-    fs.writeFileSync(outPath, resolved.content);
+    safeWriteFile(outPath, resolved.content);
     return { output: outPath, resolvedTerms: resolved.resolvedTerms };
   }
 

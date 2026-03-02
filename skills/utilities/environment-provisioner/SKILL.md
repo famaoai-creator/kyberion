@@ -2,7 +2,7 @@
 name: environment-provisioner
 description: >-
 
-status: implemented
+status: unstable
 arguments:
   - name: input
     short: i

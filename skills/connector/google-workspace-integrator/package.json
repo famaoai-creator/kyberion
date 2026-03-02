@@ -1,7 +1,7 @@
 {
   "name": "google-workspace-integrator",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "scripts/integrate.cjs",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

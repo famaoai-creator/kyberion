@@ -1,7 +1,7 @@
 {
   "v": "1.2.1",
   "t": 145,
-  "u": "2026-03-01T21:20:45.073Z",
+  "u": "2026-03-02T03:09:53.544Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -438,17 +438,17 @@
     {
       "n": "google-workspace-integrator",
       "path": "skills/connector/google-workspace-integrator",
-      "d": ">-",
+      "d": "Connects to Google Workspace (Calendar, Gmail) for executive secretary automation.",
       "s": "impl",
       "r": "low",
-      "m": "dist/index.js",
+      "m": "scripts/integrate.cjs",
       "t": [
         "automation",
         "cloud",
         "documentation",
         "gemini-skill"
       ],
-      "u": "2026-02-27T17:30:15.358Z"
+      "u": "2026-03-02T03:09:23.229Z"
     },
     {
       "n": "jira-agile-assistant",
@@ -1808,7 +1808,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.471Z"
+      "u": "2026-03-01T21:21:22.517Z"
     },
     {
       "n": "rakuten-travel-connector",
@@ -1818,7 +1818,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.473Z"
+      "u": "2026-03-01T21:21:22.519Z"
     },
     {
       "n": "switchbot-controller",
@@ -1828,7 +1828,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.475Z"
+      "u": "2026-03-01T21:21:22.521Z"
     },
     {
       "n": "land-price-analyzer",
@@ -1838,7 +1838,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.477Z"
+      "u": "2026-03-01T21:21:22.523Z"
     },
     {
       "n": "jpx-market-analyzer",
@@ -1848,7 +1848,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.479Z"
+      "u": "2026-03-01T21:21:22.524Z"
     },
     {
       "n": "trust-fund-monitor",
@@ -1858,7 +1858,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-01T21:00:04.481Z"
+      "u": "2026-03-01T21:21:22.526Z"
     }
   ]
 }

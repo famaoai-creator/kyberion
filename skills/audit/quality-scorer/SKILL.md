@@ -2,7 +2,7 @@
 name: quality-scorer
 description: >-
   Evaluates technical and textual quality based on IPA benchmarks and readability standards.
-status: implemented
+status: unstable
 arguments:
   - name: input
     short: i

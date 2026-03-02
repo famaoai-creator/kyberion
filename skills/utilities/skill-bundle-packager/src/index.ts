@@ -1,7 +1,6 @@
-import '@agent/core/secure-io'; // Enforce security boundaries
+import { runSkill, safeWriteFile, safeMkdir } from '@agent/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { runSkill } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findPlaybook } from './lib.js';
 
@@ -16,7 +15,9 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const bundleDir = path.join(pathResolver.shared('bundles'), missionName);
     const manifestFile = path.join(bundleDir, 'bundle.json');
 
-    if (!fs.existsSync(bundleDir)) fs.mkdirSync(bundleDir, { recursive: true });
+    if (!fs.existsSync(bundleDir)) {
+      safeMkdir(bundleDir, { recursive: true });
+    }
 
     const playbook = findPlaybook(missionName, rootDir);
     const bundle = {
@@ -26,7 +27,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
       playbook: playbook ? playbook.path : null,
     };
 
-    fs.writeFileSync(manifestFile, JSON.stringify(bundle, null, 2));
+    safeWriteFile(manifestFile, JSON.stringify(bundle, null, 2));
 
     return { mission: missionName, manifest: manifestFile };
   });

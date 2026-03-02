@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeWriteFile } from '@agent/core';
 import type { SkillOutput } from '@agent/core/types.js';
 
 // ---------------------------------------------------------------------------
@@ -152,7 +153,7 @@ export function transformData(
   const output = serializeData(data, options.to, serialiser);
 
   if (options.outPath) {
-    fs.writeFileSync(options.outPath, output);
+    safeWriteFile(options.outPath, output);
     return { output: options.outPath, format: options.to, size: output.length };
   }
 
