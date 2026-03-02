@@ -1,11 +1,11 @@
 /**
  * Google Workspace Integrator - CLI Entry Point
- * Implements 'fetch-agenda', 'list-emails', and 'send-email' actions.
+ * Implements 'fetch-agenda', 'list-emails', 'send-email', and 'auth' actions.
  */
 
 // @ts-ignore
 const { runSkillAsync } = require('@agent/core');
-const { getGoogleAuth, fetchAgenda, formatAgenda, listEmails, sendEmail } = require('./lib');
+const { getGoogleAuth, fetchAgenda, formatAgenda, listEmails, sendEmail, exchangeCodeForToken } = require('./lib');
 const { logger, safeWriteFile } = require('@agent/core/secure-io');
 const pathResolver = require('@agent/core/path-resolver');
 const path = require('node:path');
@@ -22,20 +22,36 @@ async function main() {
       throw new Error('Google API Credentials missing. Please place google-credentials.json in knowledge/personal/connections/google/.');
     }
 
+    // --- Action: auth ---
+    if (action === 'auth') {
+      if (argv.code) {
+        logger.info('🔑 Exchanging authorization code for tokens...');
+        const tokens = await exchangeCodeForToken(auth.client, argv.code as string);
+        logger.success('✅ Tokens saved to knowledge/personal/connections/google/google-token.json');
+        return { status: 'success', message: 'Authentication complete.', tokens: 'MASKED' };
+      } else {
+        const authUrl = auth.client.generateAuthUrl({
+          access_type: 'offline',
+          scope: [
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/gmail.modify',
+            'https://www.googleapis.com/auth/gmail.send'
+          ],
+        });
+        return {
+          status: 'needs_attention',
+          message: 'Authentication required.',
+          auth_url: authUrl,
+          instructions: '1. Visit the URL. 2. Authorize. 3. Run: node scripts/cli.cjs run google-workspace-integrator auth --code <YOUR_CODE>'
+        };
+      }
+    }
+
+    // Auto-guide if not authenticated
     if (auth.status === 'needs_auth') {
-      const authUrl = auth.client.generateAuthUrl({
-        access_type: 'offline',
-        scope: [
-          'https://www.googleapis.com/auth/calendar.readonly',
-          'https://www.googleapis.com/auth/gmail.modify',
-          'https://www.googleapis.com/auth/gmail.send'
-        ],
-      });
       return {
         status: 'needs_attention',
-        message: 'Authentication required.',
-        auth_url: authUrl,
-        instructions: '1. Visit the URL. 2. Authorize. 3. Save the resulting token.json to knowledge/personal/connections/google/google-token.json'
+        message: 'Authentication required. Please run: node scripts/cli.cjs run google-workspace-integrator auth',
       };
     }
 

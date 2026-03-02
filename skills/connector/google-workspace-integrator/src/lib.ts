@@ -1,12 +1,12 @@
 /**
  * Google Workspace Integrator - Core Library
  * Provides helpers for Auth, Calendar, and Gmail operations.
- * Strictly uses @agent/core/secure-io for data persistence.
+ * Strictly uses @agent/core for I/O and path resolution.
  */
 
 // @ts-ignore
 const { google } = require('googleapis');
-const { safeReadFile } = require('@agent/core/secure-io');
+const { safeReadFile, safeWriteFile } = require('@agent/core/secure-io');
 const pathResolver = require('@agent/core/path-resolver');
 import * as fs from 'node:fs';
 
@@ -17,7 +17,7 @@ const TOKEN_PATH = pathResolver.rootResolve('knowledge/personal/connections/goog
 // --- Scopes ---
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/gmail.modify', // Read, compose, and send
+  'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.send'
 ];
 
@@ -48,6 +48,15 @@ export async function getGoogleAuth(): Promise<GoogleAuthClient> {
   return { client: oAuth2Client, status: 'authenticated' };
 }
 
+/**
+ * Exchanges an auth code for a token and saves it.
+ */
+export async function exchangeCodeForToken(client: any, code: string): Promise<any> {
+  const { tokens } = await client.getToken(code);
+  safeWriteFile(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+  return tokens;
+}
+
 // --- Calendar Logic ---
 
 export async function fetchAgenda(auth: any, maxResults: number = 10) {
@@ -73,9 +82,6 @@ export function formatAgenda(events: any[]): string {
 
 // --- Gmail Logic ---
 
-/**
- * Lists latest emails.
- */
 export async function listEmails(auth: any, q: string = '', maxResults: number = 10) {
   const gmail = google.gmail({ version: 'v1', auth });
   const res = await gmail.users.messages.list({
@@ -85,7 +91,6 @@ export async function listEmails(auth: any, q: string = '', maxResults: number =
   });
   const messages = res.data.messages || [];
   
-  // Fetch details for each message
   const details = await Promise.all(messages.map(async (m: any) => {
     const msg = await gmail.users.messages.get({ userId: 'me', id: m.id, format: 'metadata', metadataHeaders: ['Subject', 'From', 'Date'] });
     const headers = msg.data.payload.headers;
@@ -101,9 +106,6 @@ export async function listEmails(auth: any, q: string = '', maxResults: number =
   return details;
 }
 
-/**
- * Sends a simple text email.
- */
 export async function sendEmail(auth: any, to: string, subject: string, body: string) {
   const gmail = google.gmail({ version: 'v1', auth });
   const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
