@@ -1,19 +1,19 @@
 const { test, assert, harness } = require('../../harness.cjs');
+const { safeWriteFile, safeReadFile, safeUnlinkSync } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const ledger = require('@agent/core/ledger');
 
 const TEST_LEDGER_PATH = path.resolve(__dirname, '../../../active/audit/governance-ledger.jsonl');
 
-// Backup original ledger if exists
-let backupPath = null;
+// Backup original ledger if exists using safe IO
+let backupContent = null;
 if (fs.existsSync(TEST_LEDGER_PATH)) {
-  backupPath = TEST_LEDGER_PATH + '.bak';
-  fs.copyFileSync(TEST_LEDGER_PATH, backupPath);
+  backupContent = safeReadFile(TEST_LEDGER_PATH);
 }
 
 // Clear ledger for testing
-fs.writeFileSync(TEST_LEDGER_PATH, '');
+safeWriteFile(TEST_LEDGER_PATH, '');
 
 console.log('--- ledger ---');
 
@@ -22,7 +22,7 @@ test('ledger records event and returns hash', () => {
   assert(typeof hash === 'string', 'Hash should be string');
   assert(hash.length === 64, 'Hash should be 64 chars (sha256)');
 
-  const content = fs.readFileSync(TEST_LEDGER_PATH, 'utf8');
+  const content = safeReadFile(TEST_LEDGER_PATH, 'utf8');
   assert(content.includes('TEST_EVENT'), 'File should contain event type');
   assert(content.includes('foo'), 'File should contain payload');
 });
@@ -37,21 +37,20 @@ test('ledger maintains integrity chain', () => {
 
 test('ledger detects tampering', () => {
   // Tamper with the file
-  const content = fs.readFileSync(TEST_LEDGER_PATH, 'utf8');
+  const content = safeReadFile(TEST_LEDGER_PATH, 'utf8');
   const tampered = content.replace('foo', 'evil');
-  fs.writeFileSync(TEST_LEDGER_PATH, tampered);
+  safeWriteFile(TEST_LEDGER_PATH, tampered);
 
   const isValid = ledger.verifyIntegrity();
   assert(isValid === false, 'Integrity check should fail for tampered data');
 });
 
 // Restore backup
-if (backupPath) {
-  fs.copyFileSync(backupPath, TEST_LEDGER_PATH);
-  fs.unlinkSync(backupPath);
+if (backupContent) {
+  safeWriteFile(TEST_LEDGER_PATH, backupContent);
 } else {
   // If no original ledger existed, remove the test one
-  if (fs.existsSync(TEST_LEDGER_PATH)) fs.unlinkSync(TEST_LEDGER_PATH);
+  if (fs.existsSync(TEST_LEDGER_PATH)) safeUnlinkSync(TEST_LEDGER_PATH);
 }
 
 if (require.main === module) {

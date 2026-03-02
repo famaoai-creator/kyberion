@@ -1,4 +1,5 @@
 const { describe, it, assert } = require('@agent/core/test-utils');
+const { safeWriteFile, safeUnlinkSync } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -19,7 +20,7 @@ describe('data-anonymizer Skill', () => {
     meta: 'safe data',
   };
 
-  fs.writeFileSync(testInput, JSON.stringify(data, null, 2));
+  safeWriteFile(testInput, JSON.stringify(data, null, 2));
 
   it('should mask sensitive fields in JSON', async () => {
     // Build the TS skill first (since it's a new skill)
@@ -42,7 +43,7 @@ describe('data-anonymizer Skill', () => {
 
   // Cleanup
   setTimeout(() => {
-    if (fs.existsSync(testInput)) fs.unlinkSync(testInput);
-    if (fs.existsSync(testOutput)) fs.unlinkSync(testOutput);
+    if (fs.existsSync(testInput)) safeUnlinkSync(testInput);
+    if (fs.existsSync(testOutput)) safeUnlinkSync(testOutput);
   }, 2000);
 });
