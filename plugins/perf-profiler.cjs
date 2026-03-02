@@ -7,6 +7,7 @@
  *
  * Data is stored in work/perf-profile.json
  */
+const { safeWriteFile, safeReadFile, safeMkdir } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 
@@ -16,10 +17,10 @@ const REGRESSION_THRESHOLD = 2.0; // Warn if current > 2x average
 
 let profiles = {};
 
-// Load existing profiles
+// Load existing profiles using safeReadFile
 try {
   if (fs.existsSync(PROFILE_FILE)) {
-    profiles = JSON.parse(fs.readFileSync(PROFILE_FILE, 'utf8'));
+    profiles = JSON.parse(safeReadFile(PROFILE_FILE, 'utf8'));
   }
 } catch (_e) {
   profiles = {};
@@ -53,10 +54,13 @@ module.exports = {
     }
     profile.avg = profile.times.reduce((a, b) => a + b, 0) / profile.times.length;
 
-    // Persist
+    // Persist using safeWriteFile
     try {
-      fs.mkdirSync(path.dirname(PROFILE_FILE), { recursive: true });
-      fs.writeFileSync(PROFILE_FILE, JSON.stringify(profiles, null, 2));
+      const dir = path.dirname(PROFILE_FILE);
+      if (!fs.existsSync(dir)) {
+        safeMkdir(dir, { recursive: true });
+      }
+      safeWriteFile(PROFILE_FILE, JSON.stringify(profiles, null, 2));
     } catch (_e) {
       // Silent — profiler should never break execution
     }

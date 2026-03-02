@@ -8,6 +8,7 @@
  */
 
 const { execSync } = require('child_process');
+const { safeWriteFile, safeReadFile, safeMkdir, safeUnlinkSync } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 
@@ -22,7 +23,9 @@ skillIndex.s.forEach(s => {
 });
 
 // Setup
-if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+if (!fs.existsSync(tmpDir)) {
+  safeMkdir(tmpDir, { recursive: true });
+}
 
 let passed = 0;
 let failed = 0;
@@ -65,8 +68,10 @@ function runAndParse(skillNameOrPath, args) {
 function writeTemp(name, content) {
   const p = path.join(tmpDir, name);
   const dir = path.dirname(p);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(p, content);
+  if (!fs.existsSync(dir)) {
+    safeMkdir(dir, { recursive: true });
+  }
+  safeWriteFile(p, content);
   return p;
 }
 
@@ -435,7 +440,7 @@ console.log('\n--- Chain 5: Dependency -> Visualization ---');
 test('graph dependencies then render with template', () => {
   // Step 1: Create a fake package.json in a subdirectory
   const pkgDir = path.join(tmpDir, 'chain5_pkg');
-  if (!fs.existsSync(pkgDir)) fs.mkdirSync(pkgDir, { recursive: true });
+  if (!fs.existsSync(pkgDir)) safeMkdir(pkgDir, { recursive: true });
   const pkgData = {
     name: 'my-web-app',
     version: '1.0.0',
@@ -448,7 +453,7 @@ test('graph dependencies then render with template', () => {
       jest: '^29.0.0',
     },
   };
-  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(pkgData, null, 2));
+  safeWriteFile(path.join(pkgDir, 'package.json'), JSON.stringify(pkgData, null, 2));
 
   // Step 2: Run dependency-grapher to produce a mermaid graph
   const graphEnv = runAndParse('dependency-grapher', `-d "${pkgDir}"`);
@@ -513,8 +518,8 @@ test('graph dependencies then render with template', () => {
 test('dependency graph node count feeds into template accurately', () => {
   // Minimal package with known dependency count
   const pkgDir2 = path.join(tmpDir, 'chain5_pkg2');
-  if (!fs.existsSync(pkgDir2)) fs.mkdirSync(pkgDir2, { recursive: true });
-  fs.writeFileSync(
+  if (!fs.existsSync(pkgDir2)) safeMkdir(pkgDir2, { recursive: true });
+  safeWriteFile(
     path.join(pkgDir2, 'package.json'),
     JSON.stringify({
       name: 'tiny-lib',
@@ -664,7 +669,7 @@ test('schema validation chain: validate then re-validate after fixing', () => {
     action: 'execute',
     description: 'now has required fields',
   };
-  fs.writeFileSync(dataFile, JSON.stringify(fixedData));
+  safeWriteFile(dataFile, JSON.stringify(fixedData));
 
   // Step 3: Re-validate -> should pass now
   const secondValidation = runAndParse(
@@ -743,10 +748,10 @@ console.log('\n--- Chain 7: Full Security Audit Pipeline (4 skills) ---');
 test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', () => {
   // Step 1: Create a temp directory with a few source files for mapping
   const auditDir = path.join(tmpDir, 'chain7_audit');
-  if (!fs.existsSync(auditDir)) fs.mkdirSync(auditDir, { recursive: true });
+  if (!fs.existsSync(auditDir)) safeMkdir(auditDir, { recursive: true });
 
   const srcFile1 = path.join(auditDir, 'app.js');
-  fs.writeFileSync(
+  safeWriteFile(
     srcFile1,
     [
       'const express = require("express");',
@@ -763,10 +768,10 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
   );
 
   const srcFile2 = path.join(auditDir, 'config.json');
-  fs.writeFileSync(srcFile2, JSON.stringify({ port: 3000, debug: true }, null, 2));
+  safeWriteFile(srcFile2, JSON.stringify({ port: 3000, debug: true }, null, 2));
 
   const srcFile3 = path.join(auditDir, 'utils.js');
-  fs.writeFileSync(
+  safeWriteFile(
     srcFile3,
     [
       'function validate(input) {',
@@ -813,7 +818,7 @@ test('codebase-mapper -> security-scanner -> bug-predictor -> html-reporter', ()
     stdio: 'pipe',
   });
   // Modify a file and commit again to create churn
-  fs.writeFileSync(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// updated\n');
+  safeWriteFile(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// updated\n');
   execSync('git add -A', { cwd: auditDir, stdio: 'pipe' });
   execSync('git -c user.email="test@test.com" -c user.name="Test" commit -m "update app"', {
     cwd: auditDir,
@@ -1350,8 +1355,8 @@ console.log('\n--- Chain 12: Knowledge Pipeline ---');
 test('harvest knowledge, optimize SKILL.md, render template', () => {
   // Step 1: Create a temp directory with package.json + README.md
   const knowledgeDir = path.join(tmpDir, 'chain12_project');
-  if (!fs.existsSync(knowledgeDir)) fs.mkdirSync(knowledgeDir, { recursive: true });
-  fs.writeFileSync(
+  if (!fs.existsSync(knowledgeDir)) safeMkdir(knowledgeDir, { recursive: true });
+  safeWriteFile(
     path.join(knowledgeDir, 'package.json'),
     JSON.stringify(
       {
@@ -1366,7 +1371,7 @@ test('harvest knowledge, optimize SKILL.md, render template', () => {
       2
     )
   );
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(knowledgeDir, 'README.md'),
     [
       '# Sample Project',
@@ -1834,8 +1839,8 @@ console.log('\n--- Chain 17: Knowledge Harvester -> Prompt Optimizer ---');
 test('harvest knowledge from project then optimize SKILL.md prompt', () => {
   // Step 1: Create a temp project directory with package.json and README.md
   const harvestDir = path.join(tmpDir, 'chain17_project');
-  if (!fs.existsSync(harvestDir)) fs.mkdirSync(harvestDir, { recursive: true });
-  fs.writeFileSync(
+  if (!fs.existsSync(harvestDir)) safeMkdir(harvestDir, { recursive: true });
+  safeWriteFile(
     path.join(harvestDir, 'package.json'),
     JSON.stringify(
       {
@@ -1850,7 +1855,7 @@ test('harvest knowledge from project then optimize SKILL.md prompt', () => {
       2
     )
   );
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(harvestDir, 'README.md'),
     [
       '# Chain17 Sample Project',
@@ -2289,10 +2294,10 @@ console.log('\n--- Chain 21: Bug Predictor -> Release Note Crafter ---');
 test('bug-predictor identifies hotspots then release-note-crafter generates notes', () => {
   // Step 1: Create a small git repository with some code and commit history
   const bugDir = path.join(tmpDir, 'chain21_repo');
-  if (!fs.existsSync(bugDir)) fs.mkdirSync(bugDir, { recursive: true });
+  if (!fs.existsSync(bugDir)) safeMkdir(bugDir, { recursive: true });
 
   const srcFile1 = path.join(bugDir, 'server.js');
-  fs.writeFileSync(
+  safeWriteFile(
     srcFile1,
     [
       'const http = require("http");',
@@ -2305,7 +2310,7 @@ test('bug-predictor identifies hotspots then release-note-crafter generates note
   );
 
   const srcFile2 = path.join(bugDir, 'utils.js');
-  fs.writeFileSync(
+  safeWriteFile(
     srcFile2,
     [
       'function validate(input) {',
@@ -2325,14 +2330,14 @@ test('bug-predictor identifies hotspots then release-note-crafter generates note
   );
 
   // Add more changes to create churn
-  fs.writeFileSync(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// fix: handle errors\n');
+  safeWriteFile(srcFile1, fs.readFileSync(srcFile1, 'utf8') + '\n// fix: handle errors\n');
   execSync('git add -A', { cwd: bugDir, stdio: 'pipe' });
   execSync(
     'git -c user.email="test@test.com" -c user.name="Test" commit -m "fix: add error handling to server"',
     { cwd: bugDir, stdio: 'pipe' }
   );
 
-  fs.writeFileSync(
+  safeWriteFile(
     srcFile2,
     fs.readFileSync(srcFile2, 'utf8') + '\n// refactor: improved validation\n'
   );
@@ -2682,10 +2687,10 @@ console.log('\n--- Chain 24: PR Architect -> Release Note Crafter ---');
 test('pr-architect generates PR data then release-note-crafter generates notes from same repo', () => {
   // Step 1: Create a small git repository with conventional commits
   const prDir = path.join(tmpDir, 'chain24_repo');
-  if (!fs.existsSync(prDir)) fs.mkdirSync(prDir, { recursive: true });
+  if (!fs.existsSync(prDir)) safeMkdir(prDir, { recursive: true });
 
   const appFile = path.join(prDir, 'app.js');
-  fs.writeFileSync(
+  safeWriteFile(
     appFile,
     [
       'const express = require("express");',
@@ -2696,7 +2701,7 @@ test('pr-architect generates PR data then release-note-crafter generates notes f
   );
 
   const configFile = path.join(prDir, 'config.json');
-  fs.writeFileSync(configFile, JSON.stringify({ port: 3000, env: 'development' }, null, 2));
+  safeWriteFile(configFile, JSON.stringify({ port: 3000, env: 'development' }, null, 2));
 
   execSync('git init', { cwd: prDir, stdio: 'pipe' });
   execSync('git add -A', { cwd: prDir, stdio: 'pipe' });
@@ -2706,7 +2711,7 @@ test('pr-architect generates PR data then release-note-crafter generates notes f
   );
 
   // Add a second commit to create diff history
-  fs.writeFileSync(
+  safeWriteFile(
     appFile,
     fs.readFileSync(appFile, 'utf8') +
       '\n// fix: handle 404\napp.use((req, res) => res.status(404).send("not found"));\n'
@@ -2717,7 +2722,7 @@ test('pr-architect generates PR data then release-note-crafter generates notes f
     { cwd: prDir, stdio: 'pipe' }
   );
 
-  fs.writeFileSync(
+  safeWriteFile(
     configFile,
     JSON.stringify({ port: 3000, env: 'production', debug: false }, null, 2)
   );
@@ -2826,9 +2831,9 @@ console.log('\n--- Chain 25: Onboarding Wizard -> Project Health Check ---');
 test('onboarding-wizard generates docs then project-health-check audits the same project', () => {
   // Step 1: Create a project directory with typical structure
   const projDir = path.join(tmpDir, 'chain25_project');
-  if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
+  if (!fs.existsSync(projDir)) safeMkdir(projDir, { recursive: true });
 
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(projDir, 'package.json'),
     JSON.stringify(
       {
@@ -2842,19 +2847,19 @@ test('onboarding-wizard generates docs then project-health-check audits the same
     )
   );
 
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(projDir, 'README.md'),
     '# Chain 25 Test Project\nA project for testing skill chains.'
   );
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(projDir, 'server.js'),
     'const http = require("http");\nhttp.createServer((req, res) => res.end("ok")).listen(3000);'
   );
 
   // Add CI config for health check
   const workflowDir = path.join(projDir, '.github', 'workflows');
-  fs.mkdirSync(workflowDir, { recursive: true });
-  fs.writeFileSync(
+  safeMkdir(workflowDir, { recursive: true });
+  safeWriteFile(
     path.join(workflowDir, 'ci.yml'),
     'name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n'
   );
@@ -2976,10 +2981,10 @@ console.log('\n--- Chain 26: Cloud Waste Hunter -> Cloud Cost Estimator ---');
 test('cloud-waste-hunter detects waste then cloud-cost-estimator prices the infrastructure', () => {
   // Step 1: Create a temp directory with a Terraform file using oversized instances
   const cloudDir = path.join(tmpDir, 'chain26_infra');
-  if (!fs.existsSync(cloudDir)) fs.mkdirSync(cloudDir, { recursive: true });
+  if (!fs.existsSync(cloudDir)) safeMkdir(cloudDir, { recursive: true });
 
   const tfFile = path.join(cloudDir, 'main.tf');
-  fs.writeFileSync(
+  safeWriteFile(
     tfFile,
     [
       'resource "aws_instance" "web" {',
@@ -3248,8 +3253,8 @@ console.log('\n--- Chain 28: Dependency Lifeline -> Project Health Check ---');
 test('dependency-lifeline and project-health-check both analyze same project dir', () => {
   // Create a test project with package.json
   const projDir = path.join(tmpDir, 'chain28_project');
-  if (!fs.existsSync(projDir)) fs.mkdirSync(projDir, { recursive: true });
-  fs.writeFileSync(
+  if (!fs.existsSync(projDir)) safeMkdir(projDir, { recursive: true });
+  safeWriteFile(
     path.join(projDir, 'package.json'),
     JSON.stringify(
       {
@@ -3264,7 +3269,7 @@ test('dependency-lifeline and project-health-check both analyze same project dir
       2
     )
   );
-  fs.writeFileSync(path.join(projDir, 'index.js'), 'console.log("hello");\n');
+  safeWriteFile(path.join(projDir, 'index.js'), 'console.log("hello");\n');
 
   // Step 1: Run dependency-lifeline
   const lifelineEnv = runAndParse('dependency-lifeline', `--dir "${projDir}"`);
@@ -3308,10 +3313,10 @@ test('test-suite-architect analyzes project then codebase-mapper maps same dir',
   const projDir = path.join(tmpDir, 'chain29_project');
   const srcDir = path.join(projDir, 'src');
   const testDir = path.join(projDir, 'tests');
-  if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir, { recursive: true });
-  if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+  if (!fs.existsSync(srcDir)) safeMkdir(srcDir, { recursive: true });
+  if (!fs.existsSync(testDir)) safeMkdir(testDir, { recursive: true });
 
-  fs.writeFileSync(
+  safeWriteFile(
     path.join(projDir, 'package.json'),
     JSON.stringify(
       {
@@ -3324,9 +3329,9 @@ test('test-suite-architect analyzes project then codebase-mapper maps same dir',
       2
     )
   );
-  fs.writeFileSync(path.join(srcDir, 'app.js'), 'module.exports = { greet: () => "hello" };\n');
-  fs.writeFileSync(path.join(srcDir, 'utils.js'), 'module.exports = { add: (a, b) => a + b };\n');
-  fs.writeFileSync(path.join(testDir, 'app.test.js'), 'test("greet", () => {});\n');
+  safeWriteFile(path.join(srcDir, 'app.js'), 'module.exports = { greet: () => "hello" };\n');
+  safeWriteFile(path.join(srcDir, 'utils.js'), 'module.exports = { add: (a, b) => a + b };\n');
+  safeWriteFile(path.join(testDir, 'app.test.js'), 'test("greet", () => {});\n');
 
   // Step 1: Analyze test architecture
   const archEnv = runAndParse('test-suite-architect', `--dir "${projDir}"`);
@@ -3376,18 +3381,18 @@ console.log('\n--- Chain 30: Knowledge Auditor -> Sensitivity Detector ---');
 test('knowledge-auditor scans dir then sensitivity-detector checks a file from it', () => {
   // Create a directory with some files containing different tier content
   const knDir = path.join(tmpDir, 'chain30_knowledge');
-  if (!fs.existsSync(knDir)) fs.mkdirSync(knDir, { recursive: true });
+  if (!fs.existsSync(knDir)) safeMkdir(knDir, { recursive: true });
 
   // Public file with no sensitive content
   const publicFile = path.join(knDir, 'readme.md');
-  fs.writeFileSync(
+  safeWriteFile(
     publicFile,
     '# Public Documentation\n\nThis is a public readme for the project.\n'
   );
 
   // File with some sensitive-looking content
   const sensitiveFile = path.join(knDir, 'config.txt');
-  fs.writeFileSync(
+  safeWriteFile(
     sensitiveFile,
     [
       'Database Configuration',

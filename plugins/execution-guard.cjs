@@ -10,6 +10,7 @@
  *   GUARD_BLOCKED_EXTS=".exe,.bat,.sh"
  *   GUARD_WARN_DURATION_MS=5000
  */
+const { safeAppendFileSync, safeMkdir } = require('@agent/core/secure-io');
 const fs = require('fs');
 const path = require('path');
 
@@ -37,7 +38,7 @@ module.exports = {
   afterSkill(skillName, output) {
     const duration = output.metadata ? output.metadata.duration_ms : 0;
 
-    // Write audit entry
+    // Write audit entry using safe IO
     try {
       const entry = {
         skill: skillName,
@@ -46,8 +47,11 @@ module.exports = {
         ts: new Date().toISOString(),
         pid: process.pid,
       };
-      fs.mkdirSync(path.dirname(auditLog), { recursive: true });
-      fs.appendFileSync(auditLog, JSON.stringify(entry) + '\n');
+      const dir = path.dirname(auditLog);
+      if (!fs.existsSync(dir)) {
+        safeMkdir(dir, { recursive: true });
+      }
+      safeAppendFileSync(auditLog, JSON.stringify(entry) + '\n');
     } catch (_e) {
       // Silent fail — audit should never break the skill
     }
