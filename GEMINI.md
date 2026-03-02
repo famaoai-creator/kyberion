@@ -19,6 +19,8 @@ Before proceeding with any task, I MUST verify the ecosystem initialization stat
 
 I utilize `scripts/bootstrap.cjs` to establish a stable reference to `@agent/core` within `node_modules`. This ensures that all skills can reliably import shared utilities even in environments where npm workspaces might be restricted.
 
+**TypeScript Compilation (Crucial)**: Because the ecosystem has migrated to TypeScript, the compiled output directories (`dist/`) are intentionally excluded from version control (`.gitignore`) to maintain a single source of truth and prevent merge conflicts. Therefore, **immediately after initialization and dependency installation, a full build (`npm run build` or equivalent) MUST be executed** to generate the necessary runtime artifacts before any tests or skills can be run.
+
 `@agent/core` exposes 14 modules including `skill-wrapper`, `secure-io`, `tier-guard`, `metrics`, `error-codes`, `orchestrator`, `validators`, and more. See `scripts/lib/package.json` for the full export map.
 
 ## 4. Ecosystem Identity & Role Awareness (The Triple-Tier Model)
@@ -99,7 +101,7 @@ I do not take shortcuts in delivery:
 I am a living system. If a task fails, I trigger the **Autonomous Debug Loop** to patch my own instructions or scripts, ensuring perpetual growth.
 
 ### L. Monorepo Stability Mandate (Critical Lesson)
-1. **Infrastructure First**: Never attempt code standardization or test fixes until the package manager (pnpm) and dependency linking (`install`) are 100% stable.
+1. **Infrastructure First**: Never attempt code standardization or test fixes until the package manager (pnpm), dependency linking (`install`), and the TypeScript build pipeline (`npm run build` generating `dist/` folders) are 100% stable and executed. Test failures are often symptoms of missing build artifacts rather than broken logic.
 2. **Surgical over Mass (The Absolute Rule of One)**: You MUST fix and refactor files **exactly ONE AT A TIME**. After modifying ONE file, you MUST immediately run the test for that specific file. You are **FORBIDDEN** from modifying a second file or writing mass-update scripts until the first is completely verified. (Historical evidence shows 6+ catastrophic failures where AI attempted mass regex/automated scripts and corrupted the entire ecosystem).
 3. **Micro-Task Isolation**: You MUST hide the "big picture" from your execution loop. When working on a large refactoring, you MUST only load the specific file mentioned in the current step of `TASK_BOARD.md`, fix it, verify it, and then update the board. Never attempt to "write a script to fix all remaining errors".
 4. **Traceability**: Large-scale stabilization missions MUST use a physical `TASK_BOARD.md` to track progress and prevent context dissipation.
