@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { metrics } from '../libs/core/metrics.cjs';
+import { metrics } from '@agent/core/metrics';
 import { safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();

@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { execSync } from 'node:child_process';
-import * as pathResolver from '../libs/core/path-resolver.cjs';
-import { safeJsonParse } from '../libs/core/validators.cjs';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeJsonParse } from '@agent/core/validators';
 import { safeWriteFile, safeReadFile, safeAppendFile } from '@agent/core';
 
 const rootDir = process.cwd();

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { compileFromFile } from 'json-schema-to-typescript';
-import { logger } from '../libs/core/core.cjs';
+import { logger } from '@agent/core/core';
 import { safeWriteFile } from '@agent/core';
 
 const rootDir = process.cwd();

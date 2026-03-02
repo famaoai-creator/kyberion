@@ -55,6 +55,7 @@
     "./secret-guard": "./secret-guard.cjs",
     "./test-utils": "./test-utils.cjs",
     "./pulse-guard": "./pulse-guard.cjs",
+    "./finance": "./finance.cjs",
     "./shared-business-types": {
       "types": "./shared-business-types.ts",
       "default": "./shared-business-types.ts"

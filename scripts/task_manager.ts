@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { logger, safeReadFile, safeWriteFile } from '@agent/core';
-import * as pathResolver from '../libs/core/path-resolver.cjs';
+import * as pathResolver from '@agent/core/path-resolver';
 
 const tasksDefPath = path.resolve(process.cwd(), 'scripts/config/routine-tasks.json');
 const statusPath = path.resolve(process.cwd(), 'active/maintenance/daily-log.json');

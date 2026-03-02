@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { logger, safeReadFile, safeWriteFile, safeAppendFile } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
-import * as pathResolver from '../libs/core/path-resolver.cjs';
+import * as pathResolver from '@agent/core/path-resolver';
 
 /**
  * Presence Controller v2.0 (Type-Safe TS Edition)

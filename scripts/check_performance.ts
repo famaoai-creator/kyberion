@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { metrics } from '../libs/core/metrics.cjs';
-import { logger } from '../libs/core/core.cjs';
-import * as pathResolver from '../libs/core/path-resolver.cjs';
+import { metrics } from '@agent/core/metrics';
+import { logger } from '@agent/core/core';
+import * as pathResolver from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core';
 
 interface SLOTarget {

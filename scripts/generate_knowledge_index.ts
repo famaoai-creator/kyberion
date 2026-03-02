@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
-import { detectTier } from '../libs/core/tier-guard.cjs';
+import { detectTier } from '@agent/core/tier-guard';
 import { safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();

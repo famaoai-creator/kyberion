@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { walk } from '../libs/core/fs-utils.cjs';
+import { walk } from '@agent/core/fs-utils';
 import { safeWriteFile } from '@agent/core';
 
 const rootDir = process.cwd();
