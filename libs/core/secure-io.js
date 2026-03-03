@@ -201,3 +201,4 @@ function writeArtifact(filePath, data, format) {
 // Alias for compatibility
 exports.safeAppendFile = safeAppendFileSync;
 exports.safeUnlink = safeUnlinkSync;
+//# sourceMappingURL=secure-io.js.map

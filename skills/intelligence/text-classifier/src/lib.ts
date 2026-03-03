@@ -1,6 +1,4 @@
-import * as classifier from '@agent/core/classifier';
-import { KnowledgeProvider } from '@agent/core/knowledge-provider';
-import { safeReadFile } from '@agent/core/secure-io';
+import { classifier, KnowledgeProvider, safeReadFile } from '@agent/core';
 
 export interface ClassifierRules {
   resultKey: string;
@@ -13,7 +11,7 @@ export function classifyText(filePath: string, ruleSet: 'doc-type' | 'domain' | 
     categories: {}
   });
 
-  return classifier.classifyFile(filePath, rules.categories, {
+  return (classifier as any).classifyFile(filePath, rules.categories, {
     resultKey: rules.resultKey,
   });
 }

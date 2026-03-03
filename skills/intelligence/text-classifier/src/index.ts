@@ -1,5 +1,4 @@
-import { runSkill } from '@agent/core/skill-wrapper';
-import { requireArgs } from '@agent/core/validators';
+import { runSkill, requireArgs } from '@agent/core';
 import { classifyText } from './lib';
 import yargs from 'yargs';
 

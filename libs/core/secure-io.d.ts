@@ -1,122 +1,66 @@
-import { Readable, Writable } from 'stream';
-
-export const DEFAULT_MAX_FILE_SIZE_MB: number;
-export const DEFAULT_TIMEOUT_MS: number;
-
-export interface SafeReadOptions {
-  maxSizeMB?: number;
-  encoding?: BufferEncoding;
-  label?: string;
-  cache?: boolean;
-  timeoutMs?: number;
-}
-
-export interface SafeWriteOptions {
-  mkdir?: boolean;
-  encoding?: BufferEncoding;
-}
-
-export interface SafeExecOptions {
-  timeoutMs?: number;
-  cwd?: string;
-  encoding?: BufferEncoding;
-  maxOutputMB?: number;
-}
-
-export interface SafeSpawnResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  signal: string | null;
-}
-
+import * as fs from 'node:fs';
 /**
- * Metadata for a data artifact stored on disk.
+ * Secure I/O utilities for Gemini Skills (TypeScript Edition)
+ * Provides file size validation, safe command execution, and resource guards.
  */
-export interface ArtifactPointer {
-  path: string;
-  hash: string;
-  format: string;
-  size_bytes: number;
-  timestamp: string;
+export declare const DEFAULT_MAX_FILE_SIZE_MB = 100;
+export declare const DEFAULT_TIMEOUT_MS = 30000;
+export interface SafeReadOptions {
+    maxSizeMB?: number;
+    encoding?: BufferEncoding;
+    label?: string;
+    cache?: boolean;
+    timeoutMs?: number;
 }
-
+export interface SafeWriteOptions {
+    mkdir?: boolean;
+    encoding?: BufferEncoding;
+    mode?: number;
+    flag?: string;
+    __sudo?: string;
+}
 /**
  * Validate that a file does not exceed a size limit.
  */
-export function validateFileSize(filePath: string, maxSizeMB?: number): number;
-
+export declare function validateFileSize(filePath: string, maxSizeMB?: number): number;
 /**
  * Read a file with size validation and optional caching.
  */
-export function safeReadFile(filePath: string, options?: SafeReadOptions | BufferEncoding): string | Buffer;
-
-/**
- * Read a file asynchronously with size validation and caching.
- */
-export function safeReadFileAsync(
-  filePath: string,
-  options?: SafeReadOptions
-): Promise<string | Buffer>;
-
+export declare function safeReadFile(filePath: string, options?: SafeReadOptions): string | Buffer;
 /**
  * Write a file safely using atomic operations (write to temp -> rename).
  */
-export function safeWriteFile(
-  filePath: string,
-  data: string | Buffer,
-  options?: SafeWriteOptions
-): void;
-
+export declare function safeWriteFile(filePath: string, data: string | Buffer, options?: SafeWriteOptions): void;
 /**
- * Append to a file safely with role-based write control.
+ * Append to a file safely.
  */
-export function safeAppendFileSync(
-  filePath: string,
-  data: string | Buffer,
-  encoding?: BufferEncoding
-): void;
-
+export declare function safeAppendFileSync(filePath: string, data: string | Buffer, options?: any): void;
 /**
- * Unlink a file safely with role-based write control.
+ * Unlink a file safely.
  */
-export function safeUnlinkSync(filePath: string): void;
-
+export declare function safeUnlinkSync(filePath: string): void;
 /**
- * Safely pipe streams with error handling and cleanup.
+ * Create a directory safely.
  */
-export function safeStreamPipeline(source: Readable, destination: Writable): Promise<void>;
-
+export declare function safeMkdir(dirPath: string, options?: fs.MakeDirectoryOptions): void;
 /**
- * Execute a command safely using execFileSync (no shell interpolation).
+ * Execute a command safely.
  */
-export function safeExec(command: string, args?: string[], options?: SafeExecOptions): string;
-
-/**
- * Execute a command safely using spawnSync with output streaming.
- */
-export function safeSpawn(
-  command: string,
-  args?: string[],
-  options?: SafeExecOptions
-): SafeSpawnResult;
-
+export declare function safeExec(command: string, args?: string[], options?: any): string;
 /**
  * Sanitize a string for safe use in file paths.
  */
-export function sanitizePath(input: string): string;
-
+export declare function sanitizePath(input: string): string;
 /**
- * Validate a URL for safe fetching.
+ * Writes an artifact and returns a HAP.
  */
-export function validateUrl(url: string): string;
-
-/**
- * Writes an artifact to disk and returns a Hashed Artifact Pointer (HAP).
- */
-export function writeArtifact(filePath: string, data: string | Buffer, format: string): ArtifactPointer;
-
-/**
- * Reads an artifact and validates its SHA-256 hash.
- */
-export function readArtifact(pointer: ArtifactPointer): string | Buffer;
+export declare function writeArtifact(filePath: string, data: string | Buffer, format: string): {
+    path: string;
+    hash: string;
+    format: string;
+    size_bytes: number;
+    timestamp: string;
+};
+export declare const safeAppendFile: typeof safeAppendFileSync;
+export declare const safeUnlink: typeof safeUnlinkSync;
+//# sourceMappingURL=secure-io.d.ts.map

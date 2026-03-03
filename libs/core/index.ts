@@ -19,6 +19,10 @@ export { logger, ui, fileUtils, errorHandler } from './core.js';
 export * from './validators.js';
 export * from './validate.js';
 
+// Classification & Knowledge
+export * as classifier from './classifier.js';
+export * from './knowledge-provider.js';
+
 // Governance & Security
 export * as tierGuard from './tier-guard.js';
 export * from './tier-guard.js';
@@ -30,3 +34,6 @@ export * as orchestrator from './orchestrator.js';
 // Specialized Utils
 export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
+
+// Shared Business Types
+export * from './shared-business-types.js';
