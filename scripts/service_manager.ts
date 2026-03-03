@@ -17,15 +17,15 @@ const WATCHDOG_INTERVAL_MS = 30000;
 
 const SERVICES: Record<string, any> = {
   'slack-sensor': {
-    path: 'presence/sensors/slack-sensor.cjs',
+    path: 'dist/presence/sensors/slack-sensor.js',
     description: 'Listens for Slack mentions and DMs'
   },
   'nexus-daemon': {
-    path: 'presence/bridge/nexus-daemon.cjs',
+    path: 'dist/presence/bridge/nexus-daemon.js',
     description: 'Coordinates physical terminal intervention'
   },
   'gemini-pulse': {
-    path: 'presence/sensors/gemini-pulse/daemon.cjs',
+    path: 'dist/presence/sensors/gemini-pulse/daemon.js',
     description: 'Monitors ecosystem health'
   },
   'service-watchdog': {
