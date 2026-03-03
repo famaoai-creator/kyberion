@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
-const rootPkgRaw = safeReadFile(path.join(rootDir, 'package.json'), 'utf8') as string;
+const rootPkgRaw = safeReadFile(path.join(rootDir, 'package.json'), { encoding: 'utf8' }) as string;
 const rootPkg = JSON.parse(rootPkgRaw);
 
 // Common packages we want to hoist to root

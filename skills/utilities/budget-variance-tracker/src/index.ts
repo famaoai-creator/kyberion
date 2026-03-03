@@ -12,7 +12,7 @@ const argv = createStandardYargs()
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('budget-variance-tracker', () => {
-    const data = JSON.parse(safeReadFile(path.resolve(argv.input as string), 'utf8') as string);
+    const data = JSON.parse(safeReadFile(path.resolve(argv.input as string), { encoding: 'utf8' }) as string);
     const analyses: CategoryAnalysis[] = data.categories.map((c: any) =>
       analyzeVariance(c, argv.threshold as number)
     );

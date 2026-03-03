@@ -24,7 +24,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     let projectName = path.basename(projectDir);
     if (fs.existsSync(pkgPath)) {
       try {
-        projectName = JSON.parse(safeReadFile(pkgPath, 'utf8') as string).name || projectName;
+        projectName = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string).name || projectName;
       } catch {}
     }
 

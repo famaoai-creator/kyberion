@@ -18,7 +18,7 @@ interface PortalRequest {
 async function processInbox(): Promise<void> {
   if (!fs.existsSync(inboxPath)) return;
 
-  const raw = safeReadFile(inboxPath, 'utf8') as string;
+  const raw = safeReadFile(inboxPath, { encoding: 'utf8' }) as string;
   const request: PortalRequest = JSON.parse(raw);
   if (request.status !== 'pending') return;
 

@@ -14,8 +14,8 @@ runSkill('doc-type-classifier', () => {
   );
 
   if (!fs.existsSync(inputPath)) throw new Error(`Input not found: \${inputPath}`);
-  const rules = JSON.parse(safeReadFile(rulesPath, 'utf8') as string);
-  const content = safeReadFile(inputPath, 'utf8') as string;
+  const rules = JSON.parse(safeReadFile(rulesPath, { encoding: 'utf8' }) as string);
+  const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
 
   const result = classifyDocType(content, rules.categories as Category[]);
 

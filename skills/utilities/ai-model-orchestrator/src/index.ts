@@ -20,7 +20,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const inputPath = path.resolve(argv.input as string);
     if (!fs.existsSync(inputPath)) throw new Error('Input not found');
 
-    const content = safeReadFile(inputPath, 'utf8') as string;
+    const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
     const complexity = analyzeTaskComplexity(content);
     const model = selectModel(complexity, argv.budget as any);
 

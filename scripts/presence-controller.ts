@@ -35,13 +35,13 @@ export function perceive(): Stimulus[] {
   if (!fs.existsSync(STIMULI_PATH)) return [];
 
   try {
-    const content = safeReadFile(STIMULI_PATH, 'utf8') as string;
+    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
     const stimuli: Stimulus[] = content.trim().split('\n')
       .filter(l => l.length > 0)
       .map(line => JSON.parse(line))
       .filter(s => s.status === 'PENDING' || s.status === 'INJECTED');
 
-    const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, 'utf8') as string);
+    const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
     const priorityMap = new Map(registry.channels.map(c => [c.id, c.priority]));
 
     return stimuli.sort((a, b) => {
@@ -61,7 +61,7 @@ export function getSensoryContext(): string | null {
   const pending = perceive();
   if (pending.length === 0) return null;
 
-  const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, 'utf8') as string);
+  const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
   
   const formatted = pending.map(s => {
     const channel = registry.channels.find(c => c.id === s.source_channel) || { name: 'Unknown', priority: 0 };
@@ -77,7 +77,7 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
   if (!fs.existsSync(STIMULI_PATH)) return;
 
   try {
-    const content = safeReadFile(STIMULI_PATH, 'utf8') as string;
+    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
     let stimulusToReply: Stimulus | null = null;
 
     const lines = content.trim().split('\n').filter(l => l.length > 0).map(line => {
@@ -124,7 +124,7 @@ export async function pruneStimuli(): Promise<void> {
   if (!fs.existsSync(STIMULI_PATH)) return;
 
   try {
-    const content = safeReadFile(STIMULI_PATH, 'utf8') as string;
+    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 

@@ -27,8 +27,8 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     while (!resultA || !resultB) {
       const resAPath = path.join(outboxDir, 'RES-' + idA + '.json');
       const resBPath = path.join(outboxDir, 'RES-' + idB + '.json');
-      if (fs.existsSync(resAPath)) resultA = JSON.parse(safeReadFile(resAPath, 'utf8') as string);
-      if (fs.existsSync(resBPath)) resultB = JSON.parse(safeReadFile(resBPath, 'utf8') as string);
+      if (fs.existsSync(resAPath)) resultA = JSON.parse(safeReadFile(resAPath, { encoding: 'utf8' }) as string);
+      if (fs.existsSync(resBPath)) resultB = JSON.parse(safeReadFile(resBPath, { encoding: 'utf8' }) as string);
       if (!resultA || !resultB) await new Promise((r) => setTimeout(r, 1000));
     }
 

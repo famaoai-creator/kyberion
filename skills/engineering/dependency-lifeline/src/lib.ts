@@ -21,7 +21,7 @@ function loadThresholds() {
   if (!fs.existsSync(pathRules)) {
     return { dependency_lifeline: { base_score: 100 } };
   }
-  return JSON.parse(safeReadFile(pathRules, 'utf8') as string);
+  return JSON.parse(safeReadFile(pathRules, { encoding: 'utf8' }) as string);
 }
 
 export function parseSemver(version: string) {
@@ -46,7 +46,7 @@ export function compareVersions(current: string, target: string): { status: stri
 export function analyzeDependencies(projectDir: string, outputFile?: string): LifelineReport {
   const pkgJsonPath = path.join(projectDir, 'package.json');
   if (!fs.existsSync(pkgJsonPath)) throw new Error('package.json missing');
-  const pkgJson = JSON.parse(safeReadFile(pkgJsonPath, 'utf8') as string);
+  const pkgJson = JSON.parse(safeReadFile(pkgJsonPath, { encoding: 'utf8' }) as string);
   const thresholds = loadThresholds().dependency_lifeline;
 
   let healthScore = thresholds.base_score;

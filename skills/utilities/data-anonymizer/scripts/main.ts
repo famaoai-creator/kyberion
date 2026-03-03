@@ -49,7 +49,7 @@ runSkill('data-anonymizer', () => {
   }
 
   const inputPath = path.resolve(args.input);
-  const rawData = safeReadFile(inputPath, 'utf8') as string;
+  const rawData = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const jsonData = JSON.parse(rawData);
 
   process.stderr.write(`[Anonymizer] Processing ${inputPath}...\n`);

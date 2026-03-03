@@ -52,7 +52,7 @@ function loadStandards() {
       recommendation_thresholds: { low_test_ratio: 0.2 }
     };
   }
-  return JSON.parse(safeReadFile(pathStd, 'utf8') as string);
+  return JSON.parse(safeReadFile(pathStd, { encoding: 'utf8' }) as string);
 }
 
 export function isTestFile(filePath: string): boolean {

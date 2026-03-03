@@ -13,7 +13,7 @@ const argv = createStandardYargs().option('input', {
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('visionary-ethos-keeper', () => {
     const inputPath = path.resolve(argv.input as string);
-    const content = safeReadFile(inputPath, 'utf8') as string;
+    const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
 
     const values = [
       { name: 'User First', keywords: ['user', 'ux'] },
