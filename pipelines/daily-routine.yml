@@ -1,0 +1,12 @@
+name: daily-routine
+description: Automated daily system health check and maintenance.
+steps:
+  - id: health_check
+    skill: run_shell_command
+    args: --command "node dist/scripts/service_manager.js status"
+  - id: knowledge_audit
+    skill: knowledge-auditor
+    args: --input knowledge/public --format summary
+  - id: prepare_report
+    skill: run_shell_command
+    args: --command "echo 'Daily routine completed at $(date)' > work/daily_status.txt"
