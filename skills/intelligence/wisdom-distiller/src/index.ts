@@ -42,7 +42,7 @@ runSkillAsync('wisdom-distiller', async () => {
   const pipeline = {
     name: argv.name,
     description: `Distilled from mission ${argv.mission}`,
-    steps: steps.length > 0 ? steps : [{ skill: 'placeholder', args: '--sample' }]
+    steps: steps.length > 0 ? steps : [{ id: 'manual_step', skill: 'codebase-mapper', args: '--dir .' }]
   };
 
   const outDir = argv['out-dir'] as string;
