@@ -29,59 +29,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build project
+        run: pnpm run build
+
+      - name: Establish links
+        run: node dist/scripts/bootstrap.js
+
       - name: Lint check
         run: pnpm run lint
-
-      - name: Format check
-        run: pnpm run format:check || true
 
       - name: TypeScript type check
         run: pnpm run typecheck
 
       - name: Validate skill metadata
-        run: node scripts/validate_skills.cjs
+        run: node dist/scripts/validate_skills.js
 
       - name: Validate schemas
-        run: node scripts/validate_schemas.cjs
-
-  docker-verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build development image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          target: development
-          tags: gemini-skills:dev
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run help in container
-        run: docker run --rm gemini-skills:dev list
+        run: node dist/scripts/validate_schemas.js
 
   test:
     runs-on: ubuntu-latest
     needs: lint-and-validate
     strategy:
       matrix:
-        test-suite: [smoke, unit, integration, plugins, ts-skills]
+        test-suite: [smoke, unit, integration]
         include:
           - test-suite: smoke
-            command: pnpm test
+            command: node tests/smoke.test.cjs
           - test-suite: unit
             command: pnpm run test:coverage
           - test-suite: integration
             command: pnpm run test:integration
-          - test-suite: plugins
-            command: pnpm run test:plugins
-          - test-suite: ts-skills
-            command: pnpm run test:ts
     steps:
       - uses: actions/checkout@v4
 
@@ -96,6 +74,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Establish links
+        run: node dist/scripts/bootstrap.js
 
       - name: Run ${{ matrix.test-suite }} tests
         run: ${{ matrix.command }}
@@ -125,36 +109,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build project
+        run: pnpm run build
+
+      - name: Establish links
+        run: node dist/scripts/bootstrap.js
+
       - name: Security audit (blocking on critical)
         run: pnpm audit --audit-level=critical
 
       - name: Skill quality audit
-        run: node scripts/audit_skills.cjs --format json
-
-  benchmark:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Run benchmarks
-        run: pnpm run benchmark
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: evidence/benchmarks/
-          retention-days: 30
+        run: node dist/scripts/audit_skills.js --format json

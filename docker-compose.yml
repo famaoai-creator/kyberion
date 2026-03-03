@@ -6,15 +6,18 @@ services:
       context: .
       target: development
     volumes:
-      # Mount source code for live reload, excluding node_modules
+      # Mount source code for live development
       - .:/app
-      # Use a named volume for container-specific node_modules
+      # Use a named volume for container-specific node_modules to avoid host conflicts
       - node_modules_data:/app/node_modules
     environment:
       - NODE_ENV=development
-      # Pass through host credentials if needed, or use vault/secrets
-    entrypoint: ['node', 'dist/scripts/cli.js']
-    command: ['list', 'implemented']
+    # Ensure links are correct inside the container on startup
+    entrypoint: >
+      bash -c "node dist/scripts/bootstrap.js && 
+      find skills -name 'core' -type l -path '*/node_modules/@agent/core' -exec rm {} \; && 
+      find skills -name '@agent' -type d -path '*/node_modules/@agent' -exec ln -s ../../../../../dist/libs/core {}/core \; &&
+      node dist/scripts/cli.js list implemented"
 
 volumes:
   node_modules_data:
