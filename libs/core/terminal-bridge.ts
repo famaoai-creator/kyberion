@@ -23,6 +23,17 @@ const STRATEGIES: Record<string, any> = {
               end repeat
             end repeat
           end repeat
+          
+          -- Fallback: If no Gemini session, take the front-most session
+          if bestSession is "NOT_FOUND" then
+            try
+              set w to front window
+              set t to current tab of w
+              set s to current session of t
+              set bestSession to (id of w as string) & ":" & (unique ID of s as string)
+            end try
+          end if
+          
           return bestSession
         end tell
       `;
