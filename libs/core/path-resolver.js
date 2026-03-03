@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pathResolver = void 0;
+exports.rootDir = rootDir;
 exports.knowledge = knowledge;
 exports.active = active;
 exports.scripts = scripts;
@@ -61,12 +62,13 @@ function findProjectRoot(startDir) {
     }
     return process.cwd();
 }
-const rootDir = findProjectRoot(process.cwd());
-const ACTIVE_ROOT = path.join(rootDir, 'active');
-const KNOWLEDGE_ROOT = path.join(rootDir, 'knowledge');
-const SCRIPTS_ROOT = path.join(rootDir, 'scripts');
-const VAULT_ROOT = path.join(rootDir, 'vault');
+const PROJECT_ROOT_DIR = findProjectRoot(process.cwd());
+const ACTIVE_ROOT = path.join(PROJECT_ROOT_DIR, 'active');
+const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
+const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
+const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const INDEX_PATH = path.join(KNOWLEDGE_ROOT, 'orchestration/global_skill_index.json');
+function rootDir() { return PROJECT_ROOT_DIR; }
 function knowledge(subPath = '') { return path.join(KNOWLEDGE_ROOT, subPath); }
 function active(subPath = '') { return path.join(ACTIVE_ROOT, subPath); }
 function scripts(subPath = '') { return path.join(SCRIPTS_ROOT, subPath); }
@@ -84,11 +86,11 @@ function isProtected(filePath) {
 }
 function skillDir(skillName) {
     if (!fs.existsSync(INDEX_PATH))
-        return path.join(rootDir, 'skills/utilities', skillName);
+        return path.join(PROJECT_ROOT_DIR, 'skills/utilities', skillName);
     const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
     const skillList = index.s || index.skills || [];
     const skill = skillList.find((s) => (s.n || s.name) === skillName);
-    return skill && skill.path ? path.join(rootDir, skill.path) : path.join(rootDir, skillName);
+    return skill && skill.path ? path.join(PROJECT_ROOT_DIR, skill.path) : path.join(PROJECT_ROOT_DIR, skillName);
 }
 function missionDir(missionId) {
     const dir = path.join(ACTIVE_ROOT, 'missions', missionId);
@@ -98,7 +100,7 @@ function missionDir(missionId) {
 }
 function resolve(logicalPath) {
     if (!logicalPath)
-        return rootDir;
+        return PROJECT_ROOT_DIR;
     if (logicalPath.startsWith('skill://')) {
         const parts = logicalPath.slice(8).split('/');
         return path.join(skillDir(parts[0]), parts.slice(1).join('/'));
@@ -106,14 +108,14 @@ function resolve(logicalPath) {
     if (logicalPath.startsWith('active/shared/')) {
         return shared(logicalPath.replace('active/shared/', ''));
     }
-    return path.isAbsolute(logicalPath) ? logicalPath : path.resolve(rootDir, logicalPath);
+    return path.isAbsolute(logicalPath) ? logicalPath : path.resolve(PROJECT_ROOT_DIR, logicalPath);
 }
 function rootResolve(relativePath) {
-    return path.isAbsolute(relativePath) ? relativePath : path.join(rootDir, relativePath);
+    return path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath);
 }
 // Named export for older scripts that import * as pathResolver
 exports.pathResolver = {
-    rootDir: () => rootDir,
+    rootDir: () => PROJECT_ROOT_DIR,
     activeRoot: () => ACTIVE_ROOT,
     knowledgeRoot: () => KNOWLEDGE_ROOT,
     scriptsRoot: () => SCRIPTS_ROOT,
@@ -129,3 +131,4 @@ exports.pathResolver = {
     resolve,
     rootResolve,
 };
+//# sourceMappingURL=path-resolver.js.map

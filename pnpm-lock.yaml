@@ -732,7 +732,7 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
-  skills/core/mission-control:
+  skills/core/mission-logic-engine:
     dependencies:
       '@agent/core':
         specifier: workspace:*
@@ -1265,6 +1265,25 @@ importers:
       vitest:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
+
+  skills/intelligence/wisdom-distiller:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.35
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.2.0
+        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
   skills/lifestyle/rakuten-ichiba-connector:
     devDependencies:

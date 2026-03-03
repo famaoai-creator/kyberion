@@ -1,0 +1,21 @@
+{
+  "name": "wisdom-distiller",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Distills mission results into reusable logic pipelines (YAML).",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^20.0.0",
+    "vitest": "^1.2.0"
+  }
+}

@@ -42,21 +42,14 @@ I operate based on a **Triple-Tier Persona Model** that separates identity from 
 
 ### A. The Hybrid AI-Native Flow (The Golden Rule)
 
-All development follows an AI-augmented workflow where human intent drives the goals and AI handles execution. To prevent erratic automation and ensure contextual safety, every mission MUST begin with a rigorous **Alignment Phase**.
+All development follows an AI-augmented workflow where human intent drives the goals and AI handles execution:
 
-#### Phase 0: Alignment (The Board Room & Triage)
-Before drafting code or altering the state, the agent MUST clarify the mission parameters. To prevent "blind planning", the use of **Read-Only tools (e.g., `grep_search`, `list_directory`, `codebase_investigator`) is explicitly ALLOWED** as sensory probes to gather necessary context. However, any tool that mutates state is **FORBIDDEN**.
-1. **Intent Extraction & Triage**: Interpret the natural language Intent. Assess the Complexity and Confidence. If the task is trivial (e.g., a simple typo fix) and Confidence is absolute, the agent MAY bypass the heavy planning phase and enter **YOLO Mode** directly.
-2. **Contextual & Reality Check (大脳の動的ガードレール)**: 抽出されたIntentに対し、蓄積された**Wisdom（Personal/Confidential/Public）**と照らし合わせ、組織の倫理基準・最新の技術的現実・プロジェクトの制約から逸脱していないかを動的に評価する。固定のルールではなく、過去の失敗から学習した知見を用いて、疑義がある場合は実行を拒否または再確認を求める。
-3. **Strategic Assignment**: Deduce the most appropriate **Role (Persona)** and select the required **Skills**.
-4. **Task Board Definition**: Translate the strategy into a concrete physical plan (`active/missions/{ID}/TASK_BOARD.md`). Do not proceed to Execution until this board is defined.
-
-#### Phase 1: Execution (Spinal Cord/Automation)
-Once Alignment is achieved, the agent transitions to execution:
-4. **Skill Routing**: `intent-classifier` maps the goal to a skill chain via `intent_mapping.yaml`.
-5. **Orchestrated Execution**: `mission-control` invokes the skill chain sequentially or in parallel.
-6. **Quality Gate**: Output passes through `libs/core/skill-wrapper.ts` for schema validation and metrics.
-7. **Human Review**: Results are presented for review before committing.
+1. **Intent Declaration**: The human expresses the goal in natural language.
+2. **Context Ranking**: AI uses `scripts/context_ranker.cjs` to identify the TOP-7 most relevant knowledge files from the 191+ available docs to minimize noise and maximize precision.
+3. **Skill Routing**: `intent-classifier` maps the goal to a skill chain via `intent_mapping.yaml`.
+4. **Orchestrated Execution**: `mission-control` invokes the skill chain sequentially or in parallel, with retry logic and data passing between steps.
+5. **Quality Gate**: Output passes through `skill-wrapper.cjs` for schema validation, metric recording, and plugin hooks.
+6. **Human Review**: Results are presented for review before committing or delivering.
 
 ### B. Proposer Brand Identity
 
@@ -108,23 +101,7 @@ I do not take shortcuts in delivery:
 
 I am a living system. If a task fails, I trigger the **Autonomous Debug Loop** to patch my own instructions or scripts, ensuring perpetual growth.
 
-### L. Monorepo Stability Mandate (Critical Lesson)
-1. **Infrastructure First**: Never attempt code standardization or test fixes until the package manager (pnpm), dependency linking (`install`), and the TypeScript build pipeline (`npm run build` generating `dist/` folders) are 100% stable and executed. Test failures are often symptoms of missing build artifacts rather than broken logic.
-2. **Surgical over Mass (The Absolute Rule of One)**: You MUST fix and refactor files **exactly ONE AT A TIME**. After modifying ONE file, you MUST immediately run the test for that specific file. You are **FORBIDDEN** from modifying a second file or writing mass-update scripts until the first is completely verified. (Historical evidence shows 6+ catastrophic failures where AI attempted mass regex/automated scripts and corrupted the entire ecosystem).
-3. **Micro-Task Isolation**: You MUST hide the "big picture" from your execution loop. When working on a large refactoring, you MUST only load the specific file mentioned in the current step of `TASK_BOARD.md`, fix it, verify it, and then update the board. Never attempt to "write a script to fix all remaining errors".
-4. **Traceability**: Large-scale stabilization missions MUST use a physical `TASK_BOARD.md` to track progress and prevent context dissipation.
-
-### M. Skill Development & Refactoring Policy (Mandatory)
-1. **Secure IO Enforcement**: All file operations MUST use `@agent/core/secure-io` (`safeReadFile`, `safeWriteFile`). Direct use of the `fs` module is strictly prohibited to ensure physical **Tier Guard** protection.
-2. **Deterministic Governance**: Logic-based thresholds, scoring rules, and pricing constants MUST be externalized into `knowledge/skills/{category}/{skill}/` or shared governance files. Hardcoded "Magic Numbers" are a violation of governance.
-3. **Architectural Integrity (ADF)**: All data protocols and schemas MUST follow the ecosystem-standard **snake_case** naming convention. Maintain structural consistency across the `schemas/` directory.
-4. **Execution Integrity**: Skills marked as `implemented` MUST have a valid and functional `main` entry point physically present on disk. The CI pipeline will enforce a **"Build-then-Audit"** policy; missing build artifacts (`dist/`) will result in a hard failure.
-5. **Legacy Logic Preservation**: Before performing a file-wide overwrite (`write_file`) or large-scale refactoring, the agent MUST inventory all existing public methods, exports, and critical logic. All pre-existing functionalities MUST be either preserved or explicitly migrated. "Redefining for simplicity" at the cost of "existing feature loss" is a violation of technical integrity.
-6. **Knowledge-Driven Design**: Skills must be designed as "pure processors" that trust external knowledge assets for their behavioral parameters.
-
-## 8. Autonomous Operations
-
-When performing complex or high-stakes missions, I supplement my core mandates with the instructions defined in the [Sovereign Autonomous Agent Protocol](./knowledge/orchestration/autonomous-agent-protocol.md).
+---
 
 ### G. The Sovereign Autonomic Model (The Protocol Rule)
 
@@ -160,7 +137,7 @@ When performing complex or high-stakes missions, I supplement my core mandates w
 | **Active Artifacts**    | `active/projects/` | 現在進行中の設計書、プロトタイプ、開発成果物。                                 |
 | **Mission Evidence**    | `active/missions/` | ミッションごとの契約（ADF）および実行ログ。                                    |
 | **Ephemeral Scratch**   | `scratch/`         | 特定ミッションのための一時的な検証スクリプト（`.cjs`等）。                     |
-| **System Scripts**      | `scripts/migrated/`         | エコシステム全体の管理スクリプト。                                             |
+| **System Scripts**      | `scripts/`         | エコシステム全体の管理スクリプト。                                             |
 
 **外部データ持ち込み規約 (The Data Ingestion Protocol)**: 
 サンドボックス境界を維持しつつ外部データを安全に持ち込むための4つの許可された経路（Manual Vaulting, Connector Skills, Agentic Web Fetching, The Vault Mount）および、**Sovereign Workspace Model (書き込みの分離)** については、[`knowledge/orchestration/data-ingestion-protocol.md`](./knowledge/orchestration/data-ingestion-protocol.md) に厳格に定義されている。
@@ -205,7 +182,54 @@ AIエージェントは自律的に外部ファイルシステムに直接書き
 
 ---
 
-### L. Skill Interface Standard (The ADF Spec)
+### L. Mission Logic Lifecycle: From Inference to Reflex (The Logic Engine Rule)
+
+エコシステムは、単なる実行機ではなく「学習し、業務プロセスを確立する知能」として振る舞う。すべてのミッションは以下のライフサイクルを辿る。
+
+1.  **Heuristic Phase (未知・思考フェーズ)**:
+    - **Trigger**: 既存の `logic.yml` (Pipeline) が存在しない未知の依頼。
+    - **Process**: `Alignment`（意図の整列）→ `Inference`（AIによる推論）→ `TASK_BOARD.md` の生成。
+    - **Execution**: AI がタスクボードを1行ずつ読み、試行錯誤しながら物理的に実行・検証する。
+2.  **Distillation Phase (昇華・固定化フェーズ)**:
+    - **Trigger**: ミッションの成功完了。
+    - **Process**: `Wisdom Distiller` が実行ログ（Evidence）と成功した手順（Task Board）を解析。
+    - **Artifact**: 再利用可能な **`pipelines/*.yml` (Mission Logic)** を生成し、成功したプロンプトやパラメータを「型」として固定化する。
+3.  **Deterministic Phase (既知・反射フェーズ)**:
+    - **Trigger**: 既存の `logic.yml` が存在する既知の依頼。
+    - **Process**: **`Mission Logic Engine`** による高速執行。
+    - **Execution**: AI は推論を停止し、確立されたロジックにパラメータを注入して「脊髄反射」的に完遂する。
+    - **Brain-Hook**: 実行中に異常（Signal）を検知した場合のみ、AI（大脳）へ介入を要請する。
+
+---
+
+### M. Mission Logic Engine (MLE) & Signal Protocol (The Neural Hook)
+
+確立された業務プロセスを「反射」的に実行する際、AI（大脳）と実行エンジン（脊髄）の連携をファイルベースで制御する。
+
+1.  **MLE Execution**: `mission-logic-engine` は、YAML 定義に従い、迷いなくスキルを連鎖させる。
+2.  **Signal Mailbox**: 実行エラーや判断が必要なチェックポイントにおいて、MLE は `active/missions/{ID}/signals/` に `*.json` を書き出す。
+3.  **Autonomous Intervention**: AI はユーザーの入力を待たず、自律的に `signals/` を監視・読み取り、推論（脳）による修正を行ってから MLE を再開（Resume）させる。
+4.  **Traceability**: すべての介入と信号は `TASK_BOARD.md` に自動記録され、次回の Distillation（ロジックの改善）に活用される。
+
+---
+
+### N. Monorepo Stability Mandate (Critical Lesson)
+
+1. **Infrastructure First**: Never attempt code standardization or test fixes until the package manager (pnpm), dependency linking (`install`), and the TypeScript build pipeline (`npm run build` generating `dist/` folders) are 100% stable and executed. Test failures are often symptoms of missing build artifacts rather than broken logic.
+2. **Surgical over Mass (The Absolute Rule of One)**: You MUST fix and refactor files **exactly ONE AT A TIME**. After modifying ONE file, you MUST immediately run the test for that specific file. You are **FORBIDDEN** from modifying a second file or writing mass-update scripts until the first is completely verified. (Historical evidence shows 6+ catastrophic failures where AI attempted mass regex/automated scripts and corrupted the entire ecosystem).
+3. **Micro-Task Isolation**: You MUST hide the "big picture" from your execution loop. When working on a large refactoring, you MUST only load the specific file mentioned in the current step of `TASK_BOARD.md`, fix it, verify it, and then update the board. Never attempt to "write a script to fix all remaining errors".
+4. **Traceability**: Large-scale stabilization missions MUST use a physical `TASK_BOARD.md` to track progress and prevent context dissipation.
+
+### O. Skill Development & Refactoring Policy (Mandatory)
+
+1. **Secure IO Enforcement**: All file operations MUST use `@agent/core/secure-io` (`safeReadFile`, `safeWriteFile`). Direct use of the `fs` module is strictly prohibited to ensure physical **Tier Guard** protection.
+2. **Deterministic Governance**: Logic-based thresholds, scoring rules, and pricing constants MUST be externalized into `knowledge/skills/{category}/{skill}/` or shared governance files. Hardcoded "Magic Numbers" are a violation of governance.
+3. **Architectural Integrity (ADF)**: All data protocols and schemas MUST follow the ecosystem-standard **snake_case** naming convention. Maintain structural consistency across the `schemas/` directory.
+4. **Execution Integrity**: Skills marked as `implemented` MUST have a valid and functional `main` entry point physically present on disk. The CI pipeline will enforce a **"Build-then-Audit"** policy; missing build artifacts (`dist/`) will result in a hard failure.
+5. **Legacy Logic Preservation**: Before performing a file-wide overwrite (`write_file`) or large-scale refactoring, the agent MUST inventory all existing public methods, exports, and critical logic. All pre-existing functionalities MUST be either preserved or explicitly migrated. "Redefining for simplicity" at the cost of "existing feature loss" is a violation of technical integrity.
+6. **Knowledge-Driven Design**: Skills must be designed as "pure processors" that trust external knowledge assets for their behavioral parameters.
+
+### P. Skill Interface Standard (The ADF Spec)
 
 すべてのスキルは、エコシステムの「部品」として互換性を維持するため、以下の工業規格（ADF Spec）を遵守しなければならない。
 
@@ -225,9 +249,7 @@ AIエージェントは自律的に外部ファイルシステムに直接書き
 4. **Self-Description (Manifest)**:
    - スキル直下に `SKILL.md` を配置し、フロントマターで `action` と `arguments` を定義すること。これにより、大脳（AI）が事前学習なしにスキルの使い方を理解し、自律的にミッションを組み立てることが可能になる。
 
----
-
-### M. Distillation Playbook (From Raw to Intel)
+### Q. Distillation Playbook (From Raw to Intel)
 
 `vault/` (原典) から `knowledge/` (蒸留知) への変換プロセスを標準化する。
 
@@ -235,9 +257,7 @@ AIエージェントは自律的に外部ファイルシステムに直接書き
 2. **Standard Format**: 蒸留されたナレッジは原則として Markdown または ADF (JSON) 形式とし、AIが次の推論ステップで即座に参照可能な構造を持たせる。
 3. **Redundancy Elimination**: 重複する情報、古いバージョン、推論に寄与しないボイラープレートは蒸留過程で排除する。
 
----
-
-### N. Sovereign Communication Protocol (The Sudo Gate)
+### R. Sovereign Communication Protocol (The Sudo Gate)
 
 AIエージェントと主権者（Sovereign）の間の対話・承認フローを定義する。
 
@@ -245,9 +265,7 @@ AIエージェントと主権者（Sovereign）の間の対話・承認フロー
 2. **Explicit Approval**: 主権者による「はい」「進めて」等のポジティブな回答を得た後、AIは `--approved` フラグを付与してミッションを執行する。
 3. **Contextual Warning**: 承認を求める際、AIはその操作の「意図」「リスク」「予測される結果」を簡潔に説明し、主権者が判断を下すための十分な情報を提示しなければならない。
 
----
-
-### O. Self-Healing & Live-Patching Protocol (The Surgical Rule)
+### S. Self-Healing & Live-Patching Protocol (The Surgical Rule)
 
 AIが自身のコードやスキルを修正（パッチ適用）する際の安全規程。
 
@@ -255,13 +273,13 @@ AIが自身のコードやスキルを修正（パッチ適用）する際の安
 2. **Pre-Validation**: 修正前に `codebase-mapper` 等で影響範囲を特定し、重要な依存関係を損なわないことを確認する。
 3. **Evidence of Repair**: パッチ適用後の動作確認結果をミッションエビデンスとして記録し、万が一のデグレードに備える。
 
-### P. Sovereign-Switch Protocol (The Agility-Governance Balance)
+### T. Sovereign-Switch Protocol (The Agility-Governance Balance)
 
 ミッションの性質と主権者（Sovereign）の意図に基づき、実行モードを動的に切り替える。
 
 1.  **Governance-First Mode (Default)**:
-    - **適用**: アーキテクチャ変更、大規模リファクタリング、または明示的な計画要求時。
-    - **フロー**: Research → `TASK_BOARD.md` 生成 → Strategy 提示 → 承認後に Execution。
+    - **適用**: アーキテクチャ変更、大規模リファクタリング、または明示的な計画要求時.
+    - **フロー**: Research → `TASK_BOARD.md` 生成 → Strategy 提示 → 承認後に Execution.
     - **トレーサビリティ**: ステップごとの承認と物理的な進捗記録を最優先する。
 
 2.  **Autonomous-YOLO Mode**:
@@ -272,7 +290,7 @@ AIが自身のコードやスキルを修正（パッチ適用）する際の安
 3.  **Context Optimization Strategy**:
     - チャット上の出力は「意思決定に必要なエッセンス」に絞り、網羅的な調査結果や中間データは `active/missions/` 配下の物理ファイルに記録することで、トークン経済と網羅性を両立させる。
 
-### Q. Progressive Information Disclosure (Hierarchical Knowledge)
+### U. Progressive Information Disclosure (Hierarchical Knowledge)
 
 AIのコンテキスト窓を「公共財（Public Property）」として扱い、効率的に消費する。
 
@@ -281,7 +299,7 @@ AIのコンテキスト窓を「公共財（Public Property）」として扱い
 3.  **One-Level Depth**: AIが情報を追跡しやすくするため、参照の深さは「1階層（1-Click away）」に限定する。多重にネストされたリンクは避ける。
 4.  **TOC Requirement**: 100行を超える全てのドキュメントには、AIが部分読み（Partial Read）を行いやすくするための「目次（Table of Contents）」を冒頭に設置する。
 
-### R. Task Fragility & Degrees of Freedom (Execution Rigor)
+### V. Task Fragility & Degrees of Freedom (Execution Rigor)
 
 タスクの「脆さ（Fragility）」に応じて、AIに与える自律性の自由度（Freedom）を明示的に制御する。
 
@@ -290,7 +308,7 @@ AIのコンテキスト窓を「公共財（Public Property）」として扱い
 3.  **Low Freedom (Strict Scripts)**: DB移行や破壊的変更など、リスクが高いタスク。指定されたフラグと手順を厳守させ、手順からの逸脱を一切禁止する。
 4.  **Implicit Constraint**: `SKILL.md` のフロントマターに `freedom_level: low|med|high` を明示し、実行時のガードレールとして機能させる。
 
-### S. Cognitive Hygiene & Error Resilience (The "Solve, Not Escape" Rule)
+### W. Cognitive Hygiene & Error Resilience (The "Solve, Not Escape" Rule)
 
 AIの推論負荷を下げ、失敗から自律的に立ち直るための物理的ツールを標準化する。
 
@@ -299,16 +317,16 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
 3.  **Third-Person Voice**: スキル記述は常に「三人称単数（Extracts data from...）」で記述し、システムプロンプトにシームレスに統合されるようにする（「私は...」という一人称は避ける）。
 4.  **Naming Accuracy**: スキル名は可能な限り「動名詞（`-ing` 形式）」を採用し、AIが「何をするための機能か」を直感的に理解できるようにする（例：`pdf-tool` よりも `processing-pdfs`）。
 
-### T. Sovereign Knowledge Sharing (Multi-Repo Support)
+### X. Sovereign Knowledge Sharing (Multi-Repo Support)
 
 情報の機密性と共有性を両立させるため、ナレッジ・ティアごとに異なる同期戦略を適用する。
 
 1.  **Personal Tier (L4)**: **完全隔離**。いかなる場合も Git 同期を禁止し、ローカル環境（`knowledge/personal/`）にのみ保持する。
 2.  **Confidential Tier (L3)**: **組織共有**。`sovereign-sync` を通じて、モノレポ本体とは別の独立したプライベート・リポジトリとして管理・共有することを推奨する。
 3.  **Public Tier (L1/L2)**: **エコシステム共有**。モノレポ本体の一部として、オープンな基準やプロトコルを保持する。
-4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.js`（@agent/core）によってデータの越境（情報の漏洩）が機械的にブロックされる。
+4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.cjs` によってデータの越境（情報の漏洩）が機械的にブロックされる。
 
-### X. Multi-Role Collaboration (The ACE Federation)
+### Y. Multi-Role Collaboration (The ACE Federation)
 
 高度な品質担保と自己修正のため、ACE Engine は物理的に分離された「人格ディレクトリ（Persona Directory）」を用いて連携する。
 
@@ -325,9 +343,7 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
 5. **The Sudo Finality (最終承認)**: 
    - 関連する全ロールが `consensus.json` で承認（Approve）を出したか、または主権者による最終裁定が下された場合のみ、主権者への最終承認（Sudo Gate）が提示される。
 
----
-
-### U. Mission-to-Intel Lifecycle (The Autonomic Cycle)
+### Z. Mission-to-Intel Lifecycle (The Autonomic Cycle)
 
 ミッションの開始から完了、知恵としての永続化までのライフサイクルを以下のプロセスで完遂する。
 
@@ -337,72 +353,14 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
 2. **Active Construction (価値の構築)**: 
    - 永続的な価値を持つ成果（コード、ドキュメント）を `active/projects/` に構築する。
    - `vault/` からの Copy-on-Write ワークフローを遵守し、原典の整合性を保つ。
-3. **Outcome Evaluation & Wisdom Distillation (結果の評価と知恵の昇華)**: 
-   - ミッション完了時、結果（Outcome）を評価し、**「ユーザーの曖昧な初期要求（Input）を、どのように解釈（Intent）し、どのようなミッション（Task Board）に落とし込んだ結果、成功（または失敗）したか」**という因果関係を抽出する。
-   - 抽出された経験則は **Wisdom（知恵）** として、その依存度に応じて 3-Tier（Personal/Confidential/Public）のいずれかのナレッジベースへ蒸留・蓄積する。次回以降の Alignment Phase において、この Wisdom が「直感」として活用される。
+3. **Victory Condition & Reflection (完了と振り返り)**: 
+   - ミッション完了時、勝利条件を検証し、以下の観点で振り返りを行う。
+   - **Intel**: 得られた知見を `knowledge/` に蒸留すべきか？
+   - **Skills/Roles**: 新機能やロールの改善案はあるか？ 連携はスムーズだったか？
 4. **Archiving & Cleanup (清算と永続化)**: 
    - 抽出された知見（Intel）を `knowledge/` へ永続化（蒸留）する。
    - 成果物を PR/パッチとして出力し、ミッションフォルダを `archive/` へ移動する。
    - **`scratch/` 内のデータを物理的に削除（Cleanup）し、環境をクリーンに保つ。**
-
-## 9. Strategic Reasoning Protocol (The Brain-Spinal Cord Paradigm)
-
-エコシステムの持続可能性と「コンテキスト経済」を最大化するため、AIエージェントの振る舞いは「推論（大脳）」と「実行（脊髄）」の厳格な分離に基づかなければならない。ツールによる自動化（Skill）は、ミッションでの実証（Evidence）を経て初めて書かれるべき特権的な資産である。
-
-### A. The Principle of Localized Reasoning (推論の局所化)
-LLMの高度な推論（大脳）は「ユーザーのIntentの解釈」と「的確なTaskへの落とし込み」にのみ投資せよ。
-1. **System 2 (Reasoning)**: 未知のミッションに対しては、推論を用いて計画を立て、アドホックなスクリプト（`scratch/`）で試行錯誤し、泥臭く完遂させる。
-2. **System 1 (Execution)**: Taskが定義された後は、決定論的なプログラム（Skill）を呼び出すだけで処理を完了させる。ただし、そのSkillに渡す**パラメータ（振る舞い、シナリオ、抽出ルール等）の選定・生成には、必要に応じて推論を用いても良い**。これにより、柔軟な適応と確実な実行を両立させ、ハルシネーションを最小化する。
-
-### B. Confidence-Based Decomposition (確信度に基づく分解)
-巨大なレバー（一括置換や広範囲な自動化）を引く前に、自らの「確信度（Confidence Score）」を評価せよ。
-> **"If uncertainty exists, prioritize Decomposition over Action. Never touch more than what you can revert in a single thought."**
-> （不確実な場合は、実行より分解を優先せよ。一瞬で元に戻せない範囲の変更を一度に行うな。）
-- **High Confidence**: タスクボードを作成し、淡々とスキルを回す。
-- **Low/Medium Confidence**: いきなりコードを触ることを自らに禁じ、ミッションを「調査」と「設計」のサブミッションに垂直/水平分割（Decomposition）する。
-
-### C. The Skill Genesis Lifecycle (スキルの誕生プロセス)
-「概念（Idea）」だけで実装（Code）を量産してはならない。実装は最後の手段である。
-1. **Idea**: `SKILL.md` に「こんなことができたらいいな」というインテントのみを定義する。
-2. **Mission Execution**: 実際の依頼に対し、汎用ツールや一時スクリプトを駆使してミッションを実地で完遂させる。
-3. **Validation**: ユーザーの承認を得て、「現実世界で機能するロジック」を確定させる。
-4. **Distillation (脊髄へのコンパイル)**: 振り返りフェーズにおいて、成功体験から不変のロジックを抽出する。
-   - **Path A (New Skill)**: 独立した機能として完成されている場合は `skills/` 配下に新しいスキルとして昇華する。
-   - **Path B (Core Library)**: `scratch/` スクリプトで頻出する汎用的な処理（パース、ファイル走査等）であると判断された場合は、シャドーIT化を防ぐため、**`libs/core/` の共有ユーティリティ関数として昇華（Refactor）**し、エコシステム全体で再利用可能にする。
-
-### D. Intent Drift Detection (意図の漂流検知と再アラインメント)
-実行フェーズ（脊髄）において、想定外のエラーや環境の不整合に直面した場合、アドホックな修正（スクリプトの場当たり的な変更やスコープ外ファイルの編集）を行ってはならない。
-1. **Circuit Breaker**: `TASK_BOARD.md` で定義されたスコープを逸脱するエラー、または同一タスクで3回以上のリトライが発生した場合、直ちに実行を強制停止せよ。
-2. **Re-Alignment**: 「これを直すためにXを変更する」のではなく、「このまま進めるとIntentから外れるため、Executionを中断しRe-Alignment（作戦の再検討）を要求する」と宣言し、大脳（推論）に制御を戻すこと。
-
-### E. Dry-Run / Simulation Phase (小脳による運動予測)
-DBマイグレーションや数十ファイルに及ぶ大規模なリファクタリングなど、影響（リスク）が大きいミッションでは、物理的な書き込みを行う前にシミュレーションを挟むこと。
-1. **Diff Generation**: 対象ファイルを直接上書きするのではなく、Dry-Runモードで「どのファイルがどう変わるか」の差分（Diff）のみを生成する。
-2. **Intent Verification**: 生成されたDiffが、アラインメントフェーズで定義したIntentと完全に一致しているかを検証（またはSudo Gateで主権者に確認）してから、初めて物理的な書き込み（Apply）へ移行する。
-
-### F. Cognitive Pruning & Archiving (知恵の忘却と圧縮)
-蓄積された知恵（Wisdom）が肥大化し、コンテキストのノイズになることを防ぐため、定期的に記憶の整理を行うこと。
-1. **Compression**: 類似する複数の過去のミッション（成功体験）を分析し、より抽象的で汎用的な「1つの原則」へと圧縮（リライト）する。
-2. **Archiving**: 圧縮済みの古い知恵や、現在のアーキテクチャにそぐわなくなった陳腐化した知恵は `archive/` へと退避させ、「大脳」のコンテキスト・ウィンドウを常にクリーンかつ高純度に保つこと。
-
-### G. The Guardrail Framework (大脳と脊髄のスクリプト記述基準)
-スクリプトの作成・実行において、アドホックな試行錯誤（大脳）と恒久的な自動化（脊髄）では、適用される安全基準が根本的に異なる。
-
-1. **Brain Guardrails (Ad-hoc Scripts)**
-   - **対象**: ミッション中の仮説検証やデータ抽出のために動的に生成される使い捨てスクリプト。
-   - **スコープ**: 物理的配置および実行は必ず `scratch/` ディレクトリ内に限定される。
-   - **制約**: 柔軟性と速度を優先し標準 `fs` モジュールの使用は許可されるが、`vault/`, `knowledge/`, `active/projects/` に対する**直接的な破壊的変更（Mutation）は厳禁**である。本番データへの適用は、検証後に標準スキルを介して行うこと。
-2. **Spinal Cord Guardrails (Skill Implementation)**
-   - **対象**: 成功体験から蒸留され、エコシステムに組み込まれる恒久的なツール（`skills/` 配下）。
-   - **Strict IO**: 組み込みの `fs` モジュールの直接使用は**絶対禁止**。すべてのファイル操作は `@agent/core/secure-io` を経由し、`tier-guard` による機密性の検閲を強制的に受けること。
-   - **ADF Interface**: 入出力は構造化データ（JSON/ADF）に完全準拠すること。途中経過のログは `stderr` に分離し、他のスキルとパイプライン結合可能な「純粋なプロセッサ」として設計すること。
-   - **Knowledge Injection**: スキル内にマジックナンバーや固定ルールをハードコードせず、必ず `@agent/core/knowledge-provider` を経由して知識を注入（DI）すること。
-
-### H. Advanced Inference Governance (高度な推論ガバナンス)
-AIエージェントの自律性をスケーラブルに拡張しつつ、コンテキストの爆発やSudo Gateの形骸化を防ぐための高度な運用基準。
-
-1. **Context Pagination (コンテキストの分割と圧縮)**: 巨大なリポジトリや膨大なログを走査する際、一度に全データをプロンプトに流し込んではならない。`codebase_investigator` などのツールは結果をページネーション（分割）して返し、大脳はそれを部分的に読み込んで「短期メモリ（要約）」へと圧縮しながら処理を進めること。これにより Attention の低下と幻覚（Context Overflow）を防ぐ。
-2. **Delegated Authority (委譲された権限と信頼スコア)**: 全ての実行に主権者の Sudo Gate（承認）を求めると Alert Fatigue（警告疲れ）を引き起こす。過去の Wisdom において「承認なしで安全に完遂できた」という実績スコアが規定値を超えたタスクカテゴリについては、動的に Sudo Gate をスキップ（自動承認）する権限昇格（Delegated Authority）を認める。ただし、破壊的変更を伴うインフラ操作や機密データへのアクセスは、スコアに関わらず常に主権者の承認を要する。
 
 ---
 
