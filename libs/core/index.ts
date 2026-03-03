@@ -34,6 +34,7 @@ export * as orchestrator from './orchestrator.js';
 // Specialized Utils
 export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
+export { terminalBridge } from './terminal-bridge.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';
