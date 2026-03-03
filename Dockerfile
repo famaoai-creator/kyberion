@@ -26,16 +26,19 @@ COPY . .
 # Synchronize lockfile for Linux environment and install all dependencies
 RUN pnpm install --no-frozen-lockfile
 
-# BUILD ALL SKILLS: Essential for 'doctor' to validate entrypoints
+# BUILD ALL SKILLS & LIBS
 RUN pnpm run build
 
 # Stage 3: Development & Quality Gate
 FROM builder AS development
 ENV NODE_ENV=development
-# Establish internal link to @agent/core
-RUN node scripts/bootstrap.cjs
 
-# Setup dummy role config for Governance Audit during doctor
+# Establish internal links pointing to dist
+RUN node dist/scripts/bootstrap.js && \
+    find skills -name "core" -type l -path "*/node_modules/@agent/core" -exec rm {} \; && \
+    find skills -name "@agent" -type d -path "*/node_modules/@agent" -exec ln -s ../../../../../dist/libs/core {}/core \;
+
+# Setup dummy role config for Governance Audit
 RUN mkdir -p knowledge/personal && echo '{"active_role":"Ecosystem Architect","persona":"Mock"}' > knowledge/personal/role-config.json
 
 # Validate ecosystem integrity
@@ -46,18 +49,21 @@ FROM base AS production
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy built artifacts and necessary files
-COPY --from=builder /app ./
+# Copy built artifacts
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/libs ./libs
+COPY --from=builder /app/skills ./skills
+COPY --from=builder /app/knowledge ./knowledge
 
-# Prune dev dependencies to keep the image small
+# Prune dev dependencies
 RUN pnpm prune --prod
 
-# Establish internal links for runtime
-RUN node scripts/bootstrap.cjs
-
-# Cleanup artifacts not needed for execution
-RUN rm -rf tests scripts/templates scratch \
-    skills/**/tests skills/**/.tsbuildinfo
+# Establish internal links for runtime (pointing to dist)
+RUN node dist/scripts/bootstrap.js && \
+    find skills -name "core" -type l -path "*/node_modules/@agent/core" -exec rm {} \; && \
+    find skills -name "@agent" -type d -path "*/node_modules/@agent" -exec ln -s ../../../../../dist/libs/core {}/core \;
 
 # Optimized Entrypoint using the unified CLI
 ENTRYPOINT ["node", "dist/scripts/cli.js"]
