@@ -6,11 +6,8 @@
   * Flow: Watch stimuli.jsonl -> Detect PENDING -> Find Idle iTerm2 Session -> Inject Intervention Command.
   */
 
- const { logger, safeReadFile, safeWriteFile, pathResolver, requireRole } = require('../../scripts/system-prelude.cjs');
- const terminalBridge = require('../../libs/core/terminal-bridge.cjs');
- const fs = require('fs');
-
-requireRole('Ecosystem Architect');
+const { logger, safeReadFile, safeWriteFile, pathResolver, terminalBridge } = require('@agent/core');
+const fs = require('fs');
 
 const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');
 const CHECK_INTERVAL_MS = 5000; // Watch every 5 seconds
