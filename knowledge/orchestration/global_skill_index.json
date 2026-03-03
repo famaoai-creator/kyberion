@@ -519,14 +519,22 @@
     {
       "n": "mission-logic-engine",
       "path": "skills/core/mission-logic-engine",
-      "d": ">-",
+      "d": "Reflexive execution engine for mission logic.",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [
-        "gemini-skill"
-      ],
-      "u": "2026-03-02T14:43:55.997Z"
+      "t": ["gemini-skill"],
+      "u": "2026-03-03T17:00:00.000Z"
+    },
+    {
+      "n": "wisdom-distiller",
+      "path": "skills/intelligence/wisdom-distiller",
+      "d": "Distills mission results into reusable logic pipelines.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": ["gemini-skill", "intelligence"],
+      "u": "2026-03-03T17:00:00.000Z"
     },
     {
       "n": "prompt-optimizer",
