@@ -19,19 +19,15 @@ export interface ExcelMasterSpecs {
 }
 
 /**
- * Extracts table data from a DocumentArtifact (HTML format).
+ * Extracts table rows from HTML content.
  */
-export function extractRowsFromArtifact(artifact: DocumentArtifact): string[][] {
-  if (artifact.format !== 'html') {
-    throw new Error('DocumentArtifact must be in HTML format to extract table rows.');
-  }
-
-  const dom = new JSDOM(artifact.body);
+export function extractRowsFromHtml(html: string): string[][] {
+  const dom = new JSDOM(html);
   const document = dom.window.document;
   const table = document.querySelector('table');
 
   if (!table) {
-    throw new Error(`No <table> tag found in the artifact: ${artifact.title}`);
+    throw new Error('No <table> tag found in the provided HTML.');
   }
 
   const rows: string[][] = [];

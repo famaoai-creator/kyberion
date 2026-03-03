@@ -1,57 +1,60 @@
 ---
 name: ppt-artisan
-description: Create and convert PowerPoint presentations from Markdown using Marp.
+description: A specialized artisan for distilling PPTX designs into portable ADF (JSON) and re-generating presentations, as well as legacy Markdown-to-PPTX conversion.
 status: implemented
 category: Media
-last_updated: '2026-03-01'
+last_updated: '2026-03-03'
+version: '2.0.0'
 tags:
+  - powerpoint
+  - distillation
+  - adf
   - gemini-skill
 ---
 
-# PowerPoint Artisan (ppt-artisan)
+# PowerPoint Artisan (v2.0)
 
-This skill creates high-impact, boardroom-ready presentations. It goes beyond simple Markdown conversion by integrating with custom brand themes and high-resolution visual assets.
+This skill creates high-impact, boardroom-ready presentations. It has evolved from a simple Markdown-to-Marp converter into a **design-centric orchestrator** that can distill native PPTX designs into portable data and reconstruct them from scratch.
 
-## Capabilities
+## Core Capabilities (v2.0: AI-Native Generation)
 
-### 1. Visual-First Presentation Generation
+### 1. Design Distillation (The Distiller)
+Extracts the "soul" (visual design, heritage chain, physical colors) of an existing PowerPoint file into a portable, structured JSON format.
+- **Heritage Sync**: Resolves background images and themes across Slide -> Layout -> Master layers.
+- **Physical Color Resolution**: Translates abstract `schemeClr` (e.g., `bg1`, `accent3`) into physical ARGB values.
+- **Asset Extraction**: Automatically saves referenced media (images/logos) to an `assets` directory.
 
-- **Theme Awareness**: Automatically checks `knowledge/templates/themes/` for client-specific CSS before falling back to default themes.
-- **High-Impact Layouts**: Leverages the `theme_design_guide.md` to structure information using cards, multi-column grids, and "Lead" slides.
-- **Asset Integration**: Mandates the use of absolute paths for images and prefers SVG diagrams (from `diagram-renderer`) for scalability.
+### 2. Tailored Re-generation (The Tailor)
+"Wears" an extracted Design Protocol onto new presentations without needing the original binary template.
+- **Z-Order Preservation**: Ensures backgrounds, master shapes, and text are rendered in the correct optical order.
+- **Scale Sync**: Matches the EMU canvas dimensions of the original file perfectly.
 
-### 2. Multi-Format Conversion
+## Legacy Capabilities (v1.0: Marp Conversion)
+- Converts Markdown files to PPTX using Marp ecosystems.
+- Applies custom CSS themes (`--theme`).
 
-- **PPTX**: Default format for editable presentations.
-- **PDF/HTML**: Formats for quick preview and digital distribution.
+## Usage Examples
 
-## Fidelity Modes (Audience-Driven Density)
+### Distill: Extract Design from a Source PPTX
+```bash
+ppt-artisan --distill vault/downloads/original.pptx --out knowledge/templates/design/my-ppt-pattern.json --assets knowledge/templates/design/assets
+```
 
-Adjust the information density based on the target audience:
+### Generate: Create PPTX from a Pattern
+```bash
+ppt-artisan --template knowledge/templates/design/my-ppt-pattern.json --out active/projects/final-report.pptx
+```
 
-1.  **Executive Mode (High Summary)**:
-    - **Goal**: Rapid decision-making and high-level vision.
-    - **Design**: "1-Slide-1-Message." Focus on ROI, major milestones, and business risks. Max 10-15 slides.
-2.  **Standard Mode (Balanced)**:
-    - **Goal**: Operational alignment and project management.
-    - **Design**: Structured overview with key technical metrics. Good for kick-offs and monthly reviews.
-3.  **Deep Dive Mode (Technical Exhaustiveness)**:
-    - **Goal**: Implementation, auditing, and knowledge transfer.
-    - **Design**: "Anti-Summarization." Mandatory tables, code evidence, and granular sub-topic separation. No slide limit (e.g., 40+ slides).
+## Options
 
-## High-Fidelity Authoring Workflow
+| Option | Alias | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `--distill` | `-d` | string | Path to source PPTX file to extract Design Protocol (ADF). |
+| `--template` | `-t` | string | Path to Design Protocol JSON (ADF) to apply as a template. |
+| `--input` | `-i` | string | Path to input data (Markdown for Marp, or JSON data). |
+| `--out` | `-o` | string | Output file path (.pptx for generation, .json for distillation). |
+| `--assets` | | string | Directory path to save/load media assets (Default: next to `--out`). |
 
-1.  **Audience Identification**: Confirm the density mode before drafting.
-2.  **Storyboard Strategy**: Define slide count targets per chapter based on the selected mode.
-3.  **Synthesis**: Combine sections with professional templates.
+## Fidelity Modes & Knowledge Protocol
+(Legacy Markdown/Marp generation rules regarding Executive/Standard/Deep-Dive modes still apply when using the `--input <markdown>` flow.)
 
-## Best Practices
-
-- **Comprehensive Indexing (MANDATORY for SDLC/AIDLC)**: The second slide MUST be a comprehensive Table of Contents. For engineering projects, it must list all 26 potential blueprint areas (or relevant sub-sets) to show the full governance context, marking current vs. future phases.
-- **Topic-Per-Slide (Deep Dive)**: Instead of brief bullets, provide detailed technical specs. A professional system design should naturally exceed 40 slides.
-- **Visual Evidence**: Use two-column layouts to place conceptual diagrams next to technical tables.
-- **High Fidelity**: Always use `--allow-local-files` to ensure assets render.
-
-## Knowledge Protocol
-
-- This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
