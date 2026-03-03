@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-03T17:20:41.362Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-03T19:42:16.181Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -8,6 +8,7 @@
 - [エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)](./ai-engineering/strategy.md) (public | Unknown)
 
 ## 📁 architecture
+- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./architecture/analysis-multi-tenant-governance-20260304.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Unknown)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Unknown)
 - [Microservices Design Patterns](./architecture/microservices-patterns.md) (public | Unknown)

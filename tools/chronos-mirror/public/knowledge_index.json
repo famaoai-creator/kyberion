@@ -24,6 +24,14 @@
     "category": "ai-engineering"
   },
   {
+    "id": "architecture/analysis-multi-tenant-governance-20260304.md",
+    "title": "検討報告：マルチテナント・ナレッジガバナンスの最適化案",
+    "author": "Unknown",
+    "last_updated": "2026-03-03",
+    "tier": "public",
+    "category": "architecture"
+  },
+  {
     "id": "architecture/distributed-systems.md",
     "title": "分散システム ＆ アーキテクチャパターン",
     "author": "Unknown",
