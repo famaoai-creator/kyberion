@@ -1,5 +1,5 @@
-import { runSkillAsync, logger, safeReadFile, safeWriteFile } from '@agent/core';
-import * as pathResolver from '../@agent/core/path-resolver';
+import { runSkillAsync, safeReadFile, safeWriteFile } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
 import path from 'node:path';
 import fs from 'node:fs';
 import * as yaml from 'js-yaml';
@@ -13,14 +13,14 @@ runSkillAsync('wisdom-distiller', async () => {
     .option('out-dir', { alias: 'o', type: 'string', default: 'pipelines' })
     .parseSync();
 
-  const missionDir = pathResolver.missionDir(argv.mission);
+  const missionDir = pathResolver.missionDir(argv.mission as string);
   const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
 
   if (!fs.existsSync(taskBoardPath)) {
     throw new Error(`Task Board not found: ${taskBoardPath}`);
   }
 
-  logger.info(`[Distiller] Analyzing mission: ${argv.mission}`);
+  console.log(`[Distiller] Analyzing mission: ${argv.mission}`);
   const content = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
   
   // Very basic extraction of skill sequences from Markdown
@@ -33,8 +33,8 @@ runSkillAsync('wisdom-distiller', async () => {
     if (match) {
       steps.push({
         id: match[1],
-        skill: 'FIXME: manual extraction required',
-        args: '--fix-me'
+        skill: 'codebase-mapper', // Placeholder for simulation
+        args: '--dir .'
       });
     }
   });
@@ -45,11 +45,12 @@ runSkillAsync('wisdom-distiller', async () => {
     steps: steps.length > 0 ? steps : [{ skill: 'placeholder', args: '--sample' }]
   };
 
-  const outPath = path.resolve(argv.out_dir as string, `${argv.name}.yml`);
-  if (!fs.existsSync(argv.out_dir)) fs.mkdirSync(argv.out_dir, { recursive: true });
+  const outDir = argv['out-dir'] as string;
+  const outPath = path.resolve(outDir, `${argv.name}.yml`);
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   
   safeWriteFile(outPath, yaml.dump(pipeline));
-  logger.success(`[Distiller] New logic distilled to: ${outPath}`);
+  console.log(`[Distiller] New logic distilled to: ${outPath}`);
 
   return { pipeline_path: outPath, steps_extracted: steps.length };
 });

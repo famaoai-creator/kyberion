@@ -1,6 +1,0 @@
-name: Living-Documentation-Pipeline
-steps:
-  - skill: api-doc-generator
-    args: '--dir "{{src_dir}}" --out "{{scratch_dir}}/extracted-api.adf.json"'
-  - skill: word-artisan
-    args: '--input "README.md" --out "{{out_dir}}/Technical_Specification_v3.docx"'
