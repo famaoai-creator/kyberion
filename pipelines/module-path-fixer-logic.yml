@@ -1,0 +1,9 @@
+name: module-path-fixer-logic
+description: Distilled from mission MSN-FIX-MODULE-PATHS. Automates TypeScript import path fixes.
+steps:
+  - id: fix_imports
+    skill: run_shell_command
+    args: --command "grep -l \"import.*from '../libs/core\" -r scripts/ | xargs sed -i '' \"s|from '../libs/core|from '@agent/core|g\""
+  - id: build_and_verify
+    skill: run_shell_command
+    args: --command "npm run build"

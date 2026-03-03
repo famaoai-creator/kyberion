@@ -1,0 +1,12 @@
+name: Core Base Stabilizer
+description: Reflexively stabilizes library imports and symlinks.
+steps:
+  - id: fix_symlinks
+    skill: run_shell_command
+    args: --command "rm -f node_modules/@agent/core && ln -s ../../dist/libs/core node_modules/@agent/core"
+  - id: build_all
+    skill: run_shell_command
+    args: --command "npm run build"
+  - id: verify_index
+    skill: run_shell_command
+    args: --command "node dist/scripts/generate_skill_index.js"
