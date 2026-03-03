@@ -517,8 +517,8 @@
       "u": "2026-03-02T14:43:55.996Z"
     },
     {
-      "n": "mission-control",
-      "path": "skills/core/mission-control",
+      "n": "mission-logic-engine",
+      "path": "skills/core/mission-logic-engine",
       "d": ">-",
       "s": "impl",
       "r": "low",

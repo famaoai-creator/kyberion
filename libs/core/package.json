@@ -64,6 +64,10 @@
       "types": "./pptx-utils.d.ts",
       "default": "./pptx-utils.cjs"
     },
+    "./mission-logic-engine": {
+      "types": "./mission-logic-engine.d.ts",
+      "default": "./mission-logic-engine.cjs"
+    },
     "./shared-business-types": {
       "types": "./shared-business-types.ts",
       "default": "./shared-business-types.ts"
