@@ -11,7 +11,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('lang-detector', () => {
     const inputPath = validateFilePath(argv.input as string, 'input');
-    const content = safeReadFile(inputPath, 'utf8') as string;
+    const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
     return detectLanguage(content);
   });
 }

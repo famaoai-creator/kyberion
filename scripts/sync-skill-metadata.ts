@@ -32,7 +32,7 @@ function syncSkill(category: string, name: string): void {
   console.log(`[Sync] Processing ${category}/${name}...`);
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  let skillMd = safeReadFile(skillMdPath, 'utf8') as string;
+  let skillMd = safeReadFile(skillMdPath, { encoding: 'utf8' }) as string;
 
   // 1. Sync Description
   const descPattern = /description: >-?\n([\s\S]*?)status:/;

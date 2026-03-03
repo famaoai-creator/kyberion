@@ -36,7 +36,7 @@ function resolvePlaceholders(text: string): string {
 }
 
 export async function runYamlScenario(scenarioPath: string): Promise<any> {
-  const content = safeReadFile(scenarioPath, 'utf8') as string;
+  const content = safeReadFile(scenarioPath, { encoding: 'utf8' }) as string;
   const scenario = yaml.load(content) as Scenario;
   const browser: Browser = await chromium.launch({ headless: true, args: ['--ignore-certificate-errors', '--no-sandbox'] });
   const context: BrowserContext = await browser.newContext({ ignoreHTTPSErrors: true });

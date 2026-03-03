@@ -56,7 +56,7 @@ function analyze(): void {
     const skillMdPath = path.join(skillFullDir, 'SKILL.md');
     
     if (fs.existsSync(skillMdPath)) {
-      const content = safeReadFile(skillMdPath, 'utf8') as string;
+      const content = safeReadFile(skillMdPath, { encoding: 'utf8' }) as string;
       const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
       
       if (fmMatch) {

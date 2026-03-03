@@ -26,7 +26,7 @@ interface PluginRegistry {
 
 function loadRegistry(): PluginRegistry {
   if (fs.existsSync(pluginRegistryPath)) {
-    return JSON.parse(safeReadFile(pluginRegistryPath, 'utf8') as string);
+    return JSON.parse(safeReadFile(pluginRegistryPath, { encoding: 'utf8' }) as string);
   }
   return { plugins: [], last_updated: null };
 }

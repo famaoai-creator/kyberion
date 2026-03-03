@@ -12,7 +12,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const readmePath = path.join(targetDir, 'README.md');
     let faqs: any[] = [];
     if (fs.existsSync(readmePath)) {
-      faqs = extractFAQsFromMarkdown(safeReadFile(readmePath, 'utf8') as string);
+      faqs = extractFAQsFromMarkdown(safeReadFile(readmePath, { encoding: 'utf8' }) as string);
     }
     return { directory: targetDir, faqs };
   });

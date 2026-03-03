@@ -3,70 +3,96 @@
   "version": "1.0.0",
   "private": true,
   "description": "Core utilities and wrappers for Gemini Skills.",
-  "main": "skill-wrapper.cjs",
-  "types": "skill-wrapper.d.cts",
+  "main": "index.js",
+  "types": "index.d.ts",
   "exports": {
     ".": {
-      "types": "./skill-wrapper.d.cts",
-      "default": "./skill-wrapper.cjs"
+      "types": "./index.d.ts",
+      "default": "./index.js"
     },
     "./validators": {
-      "types": "./validators.d.cts",
-      "default": "./validators.cjs"
+      "types": "./validators.d.ts",
+      "default": "./validators.js"
     },
     "./fs-utils": {
       "types": "./fs-utils.d.ts",
-      "default": "./fs-utils.cjs"
+      "default": "./fs-utils.js"
     },
     "./cli-utils": {
       "types": "./cli-utils.d.ts",
-      "default": "./cli-utils.cjs"
+      "default": "./cli-utils.js"
     },
     "./secure-io": {
       "types": "./secure-io.d.ts",
-      "default": "./secure-io.cjs"
+      "default": "./secure-io.js"
     },
     "./classifier": {
       "types": "./classifier.d.ts",
-      "default": "./classifier.cjs"
+      "default": "./classifier.js"
     },
     "./path-resolver": {
       "types": "./path-resolver.d.ts",
-      "default": "./path-resolver.cjs"
+      "default": "./path-resolver.js"
     },
     "./tier-guard": {
       "types": "./tier-guard.d.ts",
-      "default": "./tier-guard.cjs"
+      "default": "./tier-guard.js"
     },
     "./network": {
       "types": "./network.d.ts",
-      "default": "./network.cjs"
+      "default": "./network.js"
     },
     "./core": {
       "types": "./core.d.ts",
-      "default": "./core.cjs"
+      "default": "./core.js"
     },
-    "./logger": "./logger.cjs",
-    "./metrics": "./metrics.cjs",
-    "./error-codes": "./error-codes.cjs",
-    "./validate": "./validate.cjs",
-    "./orchestrator": "./orchestrator.cjs",
-    "./ledger": "./ledger.cjs",
-    "./secret-guard": "./secret-guard.cjs",
-    "./test-utils": "./test-utils.cjs",
-    "./pulse-guard": "./pulse-guard.cjs",
-    "./finance": "./finance.cjs",
+    "./logger": {
+      "types": "./logger.d.ts",
+      "default": "./logger.js"
+    },
+    "./metrics": {
+      "types": "./metrics.d.ts",
+      "default": "./metrics.js"
+    },
+    "./error-codes": {
+      "types": "./error-codes.d.ts",
+      "default": "./error-codes.js"
+    },
+    "./validate": {
+      "types": "./validate.d.ts",
+      "default": "./validate.js"
+    },
+    "./orchestrator": {
+      "types": "./orchestrator.d.ts",
+      "default": "./orchestrator.js"
+    },
+    "./ledger": {
+      "types": "./ledger.d.ts",
+      "default": "./ledger.js"
+    },
+    "./secret-guard": {
+      "types": "./secret-guard.d.ts",
+      "default": "./secret-guard.js"
+    },
+    "./test-utils": {
+      "types": "./test-utils.d.ts",
+      "default": "./test-utils.js"
+    },
+    "./pulse-guard": {
+      "types": "./pulse-guard.d.ts",
+      "default": "./pulse-guard.js"
+    },
+    "./finance": {
+      "types": "./finance.d.ts",
+      "default": "./finance.js"
+    },
     "./excel-utils": {
       "types": "./excel-utils.d.ts",
-      "default": "./excel-utils.cjs"
+      "default": "./excel-utils.js"
     },
     "./pptx-utils": {
       "types": "./pptx-utils.d.ts",
-      "default": "./pptx-utils.cjs"
-    },
-    "./mission-logic-engine": {
-      "types": "./mission-logic-engine.d.ts",
-      "default": "./mission-logic-engine.cjs"
+      "default": "./pptx-utils.js"
     },
     "./shared-business-types": {
       "types": "./shared-business-types.ts",

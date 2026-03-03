@@ -20,7 +20,7 @@ const argv = createStandardYargs()
 runSkill('asset-token-economist', () => {
   let text = '';
   if (argv.input) {
-    text = safeReadFile(path.resolve(argv.input as string), 'utf8') as string;
+    text = safeReadFile(path.resolve(argv.input as string), { encoding: 'utf8' }) as string;
   } else if (argv.text) {
     text = argv.text as string;
   }

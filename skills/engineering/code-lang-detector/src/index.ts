@@ -13,7 +13,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     // If input string looks like a file path and exists, read it
     // Otherwise treat the input string as the content itself
     if (input && input.length < 255 && fs.existsSync(input)) {
-      content = safeReadFile(input, 'utf8') as string;
+      content = safeReadFile(input, { encoding: 'utf8' }) as string;
     } else {
       content = input;
     }

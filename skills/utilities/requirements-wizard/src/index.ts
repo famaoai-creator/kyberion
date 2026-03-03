@@ -12,7 +12,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
 
     if (!fs.existsSync(inputPath)) throw new Error(`Input not found: \${inputPath}`);
 
-    const rawContent = safeReadFile(inputPath, 'utf8') as string;
+    const rawContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
     let adf: any;
     try {
       adf = JSON.parse(rawContent);
@@ -23,7 +23,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     let checklist: string[] = [];
 
     if (standardPath && fs.existsSync(standardPath)) {
-      const standardContent = safeReadFile(standardPath, 'utf8') as string;
+      const standardContent = safeReadFile(standardPath, { encoding: 'utf8' }) as string;
       const matches = standardContent.matchAll(/^###?\s+(.+)$/gm);
       for (const match of matches) {
         checklist.push(match[1].trim());

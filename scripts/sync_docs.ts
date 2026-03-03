@@ -24,7 +24,7 @@ function sync(): void {
     process.exit(1);
   }
 
-  const indexRaw = safeReadFile(indexPath, 'utf8') as string;
+  const indexRaw = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
   const index: SkillIndex = JSON.parse(indexRaw);
   const total = index.t;
   const skills = index.s;
@@ -36,7 +36,7 @@ function sync(): void {
 
   // 1. Update README.md
   if (fs.existsSync(readmePath)) {
-    let readme = safeReadFile(readmePath, 'utf8') as string;
+    let readme = safeReadFile(readmePath, { encoding: 'utf8' }) as string;
     readme = readme.replace(
       /\*\*(\d+) skills\*\* \(all implemented\)/,
       `**${implemented} skills** (all implemented)`
@@ -47,7 +47,7 @@ function sync(): void {
 
   // 2. Update SKILLS_GUIDE.md
   if (fs.existsSync(guidePath)) {
-    let guide = safeReadFile(guidePath, 'utf8') as string;
+    let guide = safeReadFile(guidePath, { encoding: 'utf8' }) as string;
     guide = guide.replace(/Total Skills: (\d+)/, `Total Skills: ${implemented}`);
     guide = guide.replace(
       /Last updated: \d{4}\/\d{1,2}\/\d{1,2}/,

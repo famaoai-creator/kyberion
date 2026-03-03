@@ -13,7 +13,7 @@ const argv = createStandardYargs().option('input', {
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('log-to-requirement-bridge', () => {
     const inputPath = path.resolve(argv.input as string);
-    const content = safeReadFile(inputPath, 'utf8') as string;
+    const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
     const nl = String.fromCharCode(10);
     const lines = content.split(nl).filter((l: string) => l.trim().length > 0);
 

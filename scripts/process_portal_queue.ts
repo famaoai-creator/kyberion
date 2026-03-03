@@ -91,7 +91,7 @@ async function processQueue(): Promise<void> {
     const handoffPath = path.join(missionDir, 'handoff.md');
 
     let handoffContext = fs.existsSync(handoffPath)
-      ? safeReadFile(handoffPath, 'utf8') as string
+      ? safeReadFile(handoffPath, { encoding: 'utf8' }) as string
       : 'None (New mission)';
 
     console.log(chalk.bold.magenta(`\n🧠 [${msgId}] Awakening: ${currentRole}`));

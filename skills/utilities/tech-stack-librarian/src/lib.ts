@@ -7,7 +7,7 @@ export function detectStack(dir: string, bestPractices: any): any[] {
   const pkgPath = path.join(dir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
-      const pkg = JSON.parse(safeReadFile(pkgPath, 'utf8'));
+      const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }));
       const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
       for (const dep of Object.keys(allDeps)) {
         if (bestPractices[dep.toLowerCase()])

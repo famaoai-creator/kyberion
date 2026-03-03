@@ -11,7 +11,7 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkill('telemetry-insight-engine', () => {
     const inputPath = path.resolve(argv.input as string);
-    const data = JSON.parse(safeReadFile(inputPath, 'utf8') as string);
+    const data = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }) as string);
     const events = Array.isArray(data.events) ? data.events : Array.isArray(data) ? data : [];
 
     const stats = analyzeTelemetry(events);

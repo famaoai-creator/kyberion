@@ -16,7 +16,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     for (const f of allFiles) {
       if (['.js', '.ts', '.yml', '.json'].includes(path.extname(f))) {
         try {
-          combinedContent += safeReadFile(f, 'utf8') as string;
+          combinedContent += safeReadFile(f, { encoding: 'utf8' }) as string;
         } catch {}
       }
     }

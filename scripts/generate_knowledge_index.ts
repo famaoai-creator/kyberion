@@ -67,7 +67,7 @@ function walk(dir: string, fileList: KnowledgeItem[] = []): KnowledgeItem[] {
       walk(filePath, fileList);
     } else if (file.endsWith('.md') && file !== '_index.md' && file !== 'README.md') {
       const relPath = path.relative(knowledgeDir, filePath);
-      const content = safeReadFile(filePath, 'utf8') as string;
+      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const metadata = extractMetadata(content, filePath);
 
       fileList.push({

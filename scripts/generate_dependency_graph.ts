@@ -21,7 +21,7 @@ interface SkillIndex {
 
 function generate(): void {
   if (!fs.existsSync(indexPath)) return;
-  const indexRaw = safeReadFile(indexPath, 'utf8') as string;
+  const indexRaw = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
   const index: SkillIndex = JSON.parse(indexRaw);
   const skills = index.s || index.skills;
 

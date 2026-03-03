@@ -25,7 +25,7 @@ function generateAuditReport() {
     return;
   }
 
-  const raw = safeReadFile(LEDGER_PATH, 'utf8') as string;
+  const raw = safeReadFile(LEDGER_PATH, { encoding: 'utf8' }) as string;
   const entries: LedgerEntry[] = raw
     .trim()
     .split('\n')
