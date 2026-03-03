@@ -1,49 +1,59 @@
 ---
 name: excel-artisan
-description: Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying cell values, and applying basic formatting.
+description: A specialized artisan for distilling Excel designs into portable ADF (JSON) and re-generating Excel files using these "design patterns" with dynamic data.
 status: implemented
 category: Media
-last_updated: '2026-02-28'
+last_updated: '2026-03-03'
+version: '2.0.0'
 tags:
+  - excel
+  - distillation
+  - adf
   - automation
-  - gemini-skill
 ---
 
-# Excel Artisan
+# Excel Artisan (v2.0)
 
 ## Overview
 
-Excel Artisan is a specialized skill for **creating and modifying Excel files**. While `doc-to-text` reads files, this skill focuses on **writing** them. It enables automated reporting, data conversion, and spreadsheet manipulation directly from the CLI.
+Excel Artisan is no longer a simple spreadsheet writer. It is a **design-centric orchestrator** that bridges the gap between structured data (Markdown, HTML, JSON) and professional Excel aesthetics. By distilling binary Excel files into **Design Protocols (ADF)**, it enables 100% visual fidelity without depending on legacy binary templates.
 
-## Capabilities
+## Core Capabilities
 
-### 1. Visual Excel Generation
+### 1. Design Distillation (The Distiller)
+Extracts the "soul" (visual design) of an existing Excel file into a portable, structured JSON format.
+- **Theme Resolution**: Resolves abstract theme colors (e.g., Accent 6) into absolute ARGB values (e.g., #FF70AD47).
+- **Structural Mapping**: Captures column widths, row heights, cell merges, and auto-filter ranges.
+- **Portable ADF**: Generates a standalone JSON "Pattern" that can recreate the design anywhere.
 
-- **Theme Awareness**: Automatically applies layout patterns defined in `knowledge/templates/themes/excel_design_guide.md`.
-- **Metadata Injection**: Automatically populates project headers (System Name, Phase, etc.).
-- **Grid Optimization**: Formats tables with consistent borders, alternating row colors, and professional fonts.
+### 2. Tailored Re-generation (The Tailor)
+"Wears" a extracted Design Protocol onto new structured data.
+- **Dynamic Hydration**: Maps data (from HTML tables or JSON) onto the template's header and data row styles.
+- **Visual Fidelity**: Recreates the exact colors, borders, and fonts of the original design.
+- **AI-Native Workflow**: Eliminates binary template dependencies, treating all design as structured text.
 
-### 2. Data Conversion
+## Usage Examples
 
-2.  **HTML to Excel**: Scrapes an HTML table and saves it as an Excel file (preserving layout like merged cells).
-3.  **Edit Spreadsheet**: Loads an existing `.xlsx`, updates specific cells, and saves the result.
-
-## Usage
-
-### 1. Convert Data to Excel
-
+### Distill: Extract Design from a Source Excel
 ```bash
-# Convert a JSON file to Excel
-node dist/index.js input.json output.xlsx
-
-# Convert an HTML file (containing <table>) to Excel
-node dist/index.js input.html output.xlsx
+excel-artisan --distill vault/downloads/original.xlsx --out knowledge/templates/design/my-pattern.json
 ```
 
-### 2. Dependencies
+### Generate: Create Excel from HTML using a Pattern
+```bash
+excel-artisan --input data.html --template knowledge/templates/design/my-pattern.json --out active/projects/final-report.xlsx
+```
 
-Requires `xlsx` (SheetJS) and `jsdom` (for HTML parsing).
+## Options
 
-## Knowledge Protocol
+| Option | Alias | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `--distill` | `-d` | string | Path to source Excel file to extract Design Protocol (ADF). |
+| `--template` | `-t` | string | Path to Design Protocol JSON (ADF) to apply as a template. |
+| `--input` | `-i` | string | Path to input data (HTML table or JSON array). |
+| `--out` | `-o` | string | Output file path (.xlsx for generation, .json for distillation). |
+| `--sheet` | | string | Target sheet name for distillation or generation (Default: '本番システム一覧'). |
 
-- This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+## Design Philosophy
+"Distill the beauty, structure the data, and re-generate the perfection."
+By separating **Design (ADF)** from **Data (Markdown/JSON)**, Excel Artisan ensures that professional-grade reports can be generated purely through automated, AI-driven pipelines.

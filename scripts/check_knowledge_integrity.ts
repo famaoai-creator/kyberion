@@ -5,9 +5,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, safeReadFile } from '@agent/core';
+import { createLogger } from '@agent/core/logger';
+import { safeReadFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
+const logger = createLogger('integrity');
 const knowledgeDir = pathResolver.knowledge();
 
 function* walk(dir: string): Generator<string> {
@@ -46,11 +48,11 @@ async function main() {
     issues.forEach(i => console.log(`  [${i.type}] ${i.file}: ${i.detail}`));
     process.exit(1);
   } else {
-    logger.success('Knowledge integrity verified.');
+    logger.info('Knowledge integrity verified.');
   }
 }
 
 main().catch(err => {
-  logger.error(err.message);
+  logger.error(err instanceof Error ? err.message : String(err));
   process.exit(1);
 });

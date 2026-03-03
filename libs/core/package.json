@@ -56,6 +56,14 @@
     "./test-utils": "./test-utils.cjs",
     "./pulse-guard": "./pulse-guard.cjs",
     "./finance": "./finance.cjs",
+    "./excel-utils": {
+      "types": "./excel-utils.d.ts",
+      "default": "./excel-utils.cjs"
+    },
+    "./pptx-utils": {
+      "types": "./pptx-utils.d.ts",
+      "default": "./pptx-utils.cjs"
+    },
     "./shared-business-types": {
       "types": "./shared-business-types.ts",
       "default": "./shared-business-types.ts"
@@ -67,6 +75,9 @@
     "axios": "^1.13.4",
     "js-yaml": "^4.1.1",
     "marked": "^12.0.0",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "adm-zip": "^0.5.12",
+    "pptxgenjs": "^4.0.1",
+    "exceljs": "^4.4.0"
   }
 }
