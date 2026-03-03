@@ -8,7 +8,7 @@
 const { App } = require('@slack/bolt');
 const fs = require('fs');
 const path = require('path');
-const { logger, safeReadFile, safeWriteFile, pathResolver } = require('../../scripts/system-prelude.cjs');
+const { logger, safeReadFile, pathResolver } = require('@agent/core');
 
 const CREDENTIALS_PATH = pathResolver.rootResolve('knowledge/personal/connections/slack/slack-credentials.json');
 const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/stimuli.jsonl');

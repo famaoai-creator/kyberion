@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 296,
-  "u": "2026-03-03T17:20:41.362Z",
+  "t": 297,
+  "u": "2026-03-03T19:15:10.731Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -26,6 +26,14 @@
       "last_updated": "2026-03-03",
       "tier": "public",
       "category": "ai-engineering"
+    },
+    {
+      "id": "architecture/analysis-multi-tenant-governance-20260304.md",
+      "title": "検討報告：マルチテナント・ナレッジガバナンスの最適化案",
+      "author": "Unknown",
+      "last_updated": "2026-03-03",
+      "tier": "public",
+      "category": "architecture"
     },
     {
       "id": "architecture/distributed-systems.md",

@@ -12,6 +12,10 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vitest": "^1.2.0"
-  }
+    "vitest": "^1.2.0",
+    "@agent/core": "workspace:*"
+  },
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "private": true
 }
