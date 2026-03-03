@@ -5,8 +5,8 @@ import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
 /**
- * Mission Control Core Library.
- * Orchestrates multiple skills to achieve high-level goals.
+ * Mission Logic Engine Core Library.
+ * Reflexive execution engine for established mission logic.
  */
 
 export interface MissionContract {
@@ -48,8 +48,8 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
 
   // 3. Execution
   const missionId = process.env.MISSION_ID || `MSN-${Date.now()}`;
-  const missionDir = pathResolver.missionDir(missionId);
-  const evidenceDir = path.join(missionDir, 'evidence');
+  const currentMissionDir = pathResolver.missionDir(missionId);
+  const evidenceDir = path.join(currentMissionDir, 'evidence');
   if (!fs.existsSync(evidenceDir)) fs.mkdirSync(evidenceDir, { recursive: true });
 
   const cmd = `node "${skillScript}" ${contract.args || ''}`;
@@ -58,7 +58,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
     const stdout = execSync(cmd, {
       encoding: 'utf8',
       cwd: process.cwd(),
-      env: { ...process.env, MISSION_ID: missionId, MISSION_DIR: missionDir }
+      env: { ...process.env, MISSION_ID: missionId, MISSION_DIR: currentMissionDir }
     });
 
     let data;
@@ -77,7 +77,7 @@ export async function orchestrate(contractPath: string, approved: boolean = fals
       data
     };
 
-    safeWriteFile(path.join(missionDir, 'ace-report.json'), JSON.stringify(report, null, 2));
+    safeWriteFile(path.join(currentMissionDir, 'ace-report.json'), JSON.stringify(report, null, 2));
     return report;
   } catch (err: any) {
     const errorMsg = `${err.message}\nSTDERR: ${err.stderr || ''}\nSTDOUT: ${err.stdout || ''}`;

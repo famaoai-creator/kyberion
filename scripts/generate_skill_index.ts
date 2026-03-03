@@ -112,9 +112,9 @@ async function main() {
     };
 
     safeWriteFile(indexFile, JSON.stringify(output, null, 2));
-    logger.success(`Global Skill Index updated: ${updated} modified, ${skills.length} total.`);
+    console.log(`Global Skill Index updated: ${updated} modified, ${skills.length} total.`);
   } catch (err: any) {
-    logger.error(`Index Generation Failed: ${err.message}`);
+    console.error(`Index Generation Failed: ${err.message}`);
   }
 }
 
