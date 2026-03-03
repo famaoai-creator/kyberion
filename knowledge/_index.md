@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-02T18:44:48.271Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-03T17:20:41.362Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -9,7 +9,9 @@
 
 ## 📁 architecture
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Unknown)
+- [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Unknown)
 - [Microservices Design Patterns](./architecture/microservices-patterns.md) (public | Unknown)
+- [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Unknown)
 
 ## 📁 ceo
@@ -28,6 +30,16 @@
 
 ## 📁 ceo/planning
 - [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./ceo/planning/frameworks.md) (public | Unknown)
+
+## 📁 common/operations
+- [勤怠承認 標準運用手順書 (Attendance Approval SOP)](./common/operations/attendance-approval-sop.md) (public | Unknown)
+- [稟議承認 標準運用手順書 (Ringi Approval SOP)](./common/operations/ringi-approval-sop.md) (public | Unknown)
+
+## 📁 common/pmo
+- [リリース整合性監査 標準運用手順書 (Release Audit SOP)](./common/pmo/release-audit-sop.md) (public | Unknown)
+
+## 📁 common/wisdom
+- [Wisdom: Agentic Evolution & Architecture Patterns](./common/wisdom/agentic-evolution-patterns.md) (public | Unknown)
 
 ## 📁 connections
 - [ユニバーサル接続設定ガイド (UCM Setup)](./connections/setup_guide.md) (public | Unknown)
@@ -110,8 +122,13 @@
 - [Future-Proofing: Quantum-Safe & Sustainability](./future/quantum_sustainability.md) (public | Unknown)
 
 ## 📁 governance
+- [Active Inquiry Protocol: The Power of Questioning](./governance/active-inquiry-protocol.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./governance/config-protocol.md) (public | Unknown)
+- [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Unknown)
 - [Dual-Key Policy: ロール管理と決定権限の標準規約](./governance/dual-key-policy.md) (public | Unknown)
+- [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Unknown)
+- [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./governance/onboarding-protocol.md) (public | Unknown)
+- [SOP: TypeScript Core Base Stabilization](./governance/ts-base-stabilization-sop.md) (public | Unknown)
 
 ## 📁 legal/ip
 - [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md) (public | Unknown)
@@ -220,12 +237,47 @@
 ## 📁 pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Unknown)
 
+## 📁 public/ai-engineering
+- [AIエンジニアリング・ベストプラクティス](./public/ai-engineering/best_practices.md) (public | Unknown)
+- [AIシステム・レビューチェックリスト](./public/ai-engineering/review_checklist.md) (public | Unknown)
+- [エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)](./public/ai-engineering/strategy.md) (public | Unknown)
+
+## 📁 public/design/brand
+- [Brand & Visual Identity Engineering](./public/design/brand/visual_identity.md) (public | Unknown)
+
+## 📁 public/devops
+- [CI/CD Pipeline Design Patterns](./public/devops/ci-cd-patterns.md) (public | Unknown)
+- [クラウドネイティブ ＆ インフラ設計](./public/devops/cloud-native.md) (public | Unknown)
+- [DevSecOps Pipeline Standards: Automating Trust](./public/devops/devsecops-pipeline-standards.md) (public | Unknown)
+
+## 📁 public/sdlc
+- [AIDLC Standards: AI Development Life Cycle](./public/sdlc/aidlc-standards.md) (public | Unknown)
+- [アプリケーション方式設計標準 (Nablarch/AWS参考)](./public/sdlc/design_standard_nablarch.md) (public | Unknown)
+- [Modern SDLC Standards: Agile, Shift-Left & Quality-First](./public/sdlc/modern-sdlc-standards.md) (public | Unknown)
+- [ウォーターフォール開発標準：工程と成果物 (SDLC Standard)](./public/sdlc/waterfall_standard.md) (public | Unknown)
+
+## 📁 public/security
+- [AISMS Framework: AI Security Management System](./public/security/aisms-framework.md) (public | Unknown)
+- [Data Privacy & Governance: APPI & GDPR Compliance](./public/security/privacy-governance.md) (public | Unknown)
+- [Security Best Practices](./public/security/security-best-practices.md) (public | Unknown)
+- [Security By Design Standard](./public/security/security-by-design.md) (public | Unknown)
+- [Software Supply Chain Governance & SBOM Standards](./public/security/supply-chain-governance.md) (public | Unknown)
+
+## 📁 public/security/advanced
+- [Diff-Based Security Scanning Strategy](./public/security/advanced/diff_based_scanning.md) (public | Unknown)
+
 ## 📁 public/standards
 - [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md) (public | Unknown)
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Unknown)
 
 ## 📁 public/templates
 - [ss_ppt_theme](./public/templates/ss_ppt_theme.md) (public | Unknown)
+
+## 📁 public/testing
+- [テスト項目表・実施結果標準仕様 (Test Item Specification)](./public/testing/test_item_specification.md) (public | Unknown)
+
+## 📁 public/testing/viewpoint-catalogs
+- [テスト観点カタログ (TIS株式会社 公開版 v1.6)](./public/testing/viewpoint-catalogs/tis_catalog_v1_6.md) (public | Unknown)
 
 ## 📁 quality-management
 - [定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)](./quality-management/metrics_standards.md) (public | Unknown)
@@ -373,6 +425,9 @@
 ## 📁 standards/ipa
 - [IPA-Aligned Requirements Engineering Standard](./standards/ipa/requirements-checklist.md) (public | Unknown)
 
+## 📁 standards/media
+- [Standard: Office Open XML (OOXML) for PowerPoint (.pptx)](./standards/media/pptx-ooxml-standards.md) (public | Unknown)
+
 ## 📁 standards/qa
 - [Accessibility (A11y) Excellence Standards](./standards/qa/accessibility-standards.md) (public | Unknown)
 - [Screen Transition & State Machine Testing Standards](./standards/qa/screen-transition-standards.md) (public | Unknown)
@@ -401,7 +456,7 @@
 - [Box CLI 活用ガイド](./tech-stack/box_cli.md) (public | Unknown)
 - [MCP (Model Context Protocol) Integration Guide](./tech-stack/mcp-integration-guide.md) (public | Unknown)
 - [Triple-Tier Persona Model: Identity, Mask, and Mission](./tech-stack/persona-model.md) (public | Unknown)
-- [The Gemini Runtime Interop Standard: CJS, ESM, and TypeScript](./tech-stack/runtime-interop.md) (public | Unknown)
+- [The Gemini Runtime Interop Standard: TypeScript Authority with CJS Continuity](./tech-stack/runtime-interop.md) (public | Unknown)
 
 ## 📁 tech-stack/atlassian
 - [Jira 運用ベストプラクティス](./tech-stack/atlassian/jira_best_practices.md) (public | Unknown)

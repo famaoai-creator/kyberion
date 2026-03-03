@@ -5,14 +5,14 @@
   },
   "GOVERNANCE_VIOLATION": {
     "description": "Run the governance mass refactor tool",
-    "command": "node scripts/mass_refactor_governance.cjs"
+    "command": "node dist/scripts/mass_refactor_governance.js"
   },
   "NON_COMPLIANT": {
     "description": "Run the self-healing health check",
-    "command": "node scripts/check_skills_health.cjs --fix"
+    "command": "node dist/scripts/check_skills_health.js --fix"
   },
   "SLO_BREACH": {
     "description": "Analyze performance bottlenecks",
-    "command": "node scripts/check_performance.cjs"
+    "command": "node dist/scripts/check_performance.js"
   }
 }

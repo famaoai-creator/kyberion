@@ -12,7 +12,7 @@ export declare class MetricsCollector {
     private _aggregates;
     constructor(options?: MetricsOptions);
     record(skillName: string, durationMs: number, status: 'success' | 'error', extra?: any): void;
-    summarize(): never[];
+    summarize(): any[];
     getSkillMetrics(skillName: string): any;
     loadHistory(): any[];
     reportFromHistory(): {
@@ -21,7 +21,7 @@ export declare class MetricsCollector {
         dateRange: {
             from: any;
             to: any;
-        } | null;
+        };
         skills: {
             skill: string;
             executions: any;
@@ -38,7 +38,7 @@ export declare class MetricsCollector {
             savedCost: number;
         }[];
     };
-    detectRegressions(thresholdMultiplier?: number): never[];
+    detectRegressions(thresholdMultiplier?: number): any[];
     reset(): void;
     private _appendToFile;
 }

@@ -94,7 +94,8 @@ function findScript(skillDir: string): string | null {
   
   if (fs.existsSync(scriptsDir)) {
     const files = fs.readdirSync(scriptsDir);
-    const main = files.find(f => f === 'index.js' || f === 'main.js' || f === 'index.cjs');
+    // Prioritize .js (compiled) over .cjs (legacy)
+    const main = files.find(f => f === 'index.js' || f === 'main.js') || files.find(f => f === 'index.cjs');
     if (main) return path.join(scriptsDir, main);
   }
   
