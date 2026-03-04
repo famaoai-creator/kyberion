@@ -1,9 +1,9 @@
 /**
- * Reflex Terminal (RT) - Core Logic v1.0
- * Provides a persistent virtual terminal session with bi-directional neural bridging.
+ * Reflex Terminal (RT) - Core Logic v1.1 (Native Bridge Edition)
+ * Provides a persistent virtual terminal session using native child_process.
  */
 
-import * as pty from 'node-pty';
+import { spawn, ChildProcess } from 'node:child_process';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -19,43 +19,39 @@ export interface ReflexTerminalOptions {
 }
 
 export class ReflexTerminal {
-  private ptyProcess: pty.IPty;
-  private outputBuffer: string = '';
+  private proc: ChildProcess;
   private feedbackPath: string;
 
   constructor(options: ReflexTerminalOptions = {}) {
-    const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : 'zsh');
+    const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/zsh');
     this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
 
-    this.ptyProcess = pty.spawn(shell, [], {
-      name: 'xterm-color',
-      cols: options.cols || 80,
-      rows: options.rows || 24,
-      cwd: options.cwd || process.cwd(),
-      env: process.env as any
+    this.proc = spawn(shell, ['-i'], { // Use interactive mode to get prompt and environment
+      cwd: path.resolve(options.cwd || process.cwd()),
+      env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' },
+      stdio: ['pipe', 'pipe', 'pipe']
     });
 
     this.setupListeners(options.onOutput);
-    logger.info(`[RT] Reflex Terminal started with shell: \${shell}`);
+    logger.info(`[RT] Reflex Terminal (Native) started with shell: ${shell}`);
   }
 
   private setupListeners(onOutput?: (data: string) => void) {
-    this.ptyProcess.onData((data) => {
-      this.outputBuffer += data;
-      if (onOutput) onOutput(data);
-      this.processOutput(data);
+    this.proc.stdout?.on('data', (data) => {
+      const str = data.toString();
+      if (onOutput) onOutput(str);
+      process.stdout.write(str);
     });
 
-    this.ptyProcess.onExit(({ exitCode, signal }) => {
-      logger.warn(`[RT] Shell exited with code ${exitCode}, signal ${signal}`);
+    this.proc.stderr?.on('data', (data) => {
+      const str = data.toString();
+      if (onOutput) onOutput(str);
+      process.stderr.write(str);
     });
-  }
 
-  private processOutput(data: string) {
-    // Process terminal output in real-time.
-    // In v1.0, we just log it. In v2.0, we'll use an AI-based filter 
-    // to decide what's important enough to send to Slack.
-    process.stdout.write(data);
+    this.proc.on('exit', (code) => {
+      logger.warn(`[RT] Shell exited with code ${code}`);
+    });
   }
 
   /**
@@ -63,12 +59,11 @@ export class ReflexTerminal {
    */
   public execute(command: string) {
     logger.info(`[RT] Injecting command: ${command}`);
-    this.ptyProcess.write(`${command}`);
+    this.proc.stdin?.write(`${command}\n`);
   }
 
   /**
    * Manually trigger a feedback update to the shared response file.
-   * This is what allows the AI to "speak" back to Slack.
    */
   public persistResponse(text: string, skillName = 'reflex-terminal') {
     try {
@@ -90,11 +85,7 @@ export class ReflexTerminal {
     }
   }
 
-  public resize(cols: number, rows: number) {
-    this.ptyProcess.resize(cols, rows);
-  }
-
   public kill() {
-    this.ptyProcess.kill();
+    this.proc.kill();
   }
 }

@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../dist/scripts",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "paths": {
+      "@agent/core": ["../dist/libs/core/index.d.ts"],
+      "@agent/core/*": ["../dist/libs/core/*"]
+    }
+  },
+  "include": ["rt-orchestrator.ts"]
+}
