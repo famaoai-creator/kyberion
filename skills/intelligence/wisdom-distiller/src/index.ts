@@ -69,21 +69,30 @@ runSkillAsync('wisdom-distiller', async () => {
   const pipeline = {
     name: argv.name,
     description: `Distilled from mission ${argv.mission}`,
-    steps: steps
+    steps: steps.map(s => ({
+      id: String(s.id),
+      skill: String(s.skill),
+      args: String(s.args)
+    }))
   };
 
   const outDir = argv['out-dir'] as string;
   const outPath = path.resolve(outDir, `${argv.name}.yml`);
   
-  // Return to safeWriteFile as requested
-  const yamlContent = yaml.dump(pipeline, { 
-    indent: 2,
-    lineWidth: -1,
-    noRefs: true
-  });
+  // High-fidelity MANUAL YAML Generation (Bypass unstable js-yaml)
+  let yamlContent = `name: ${argv.name}\ndescription: Distilled from mission ${argv.mission}\nsteps:\n`;
+  for (const s of steps) {
+    yamlContent += `  - id: ${s.id}\n    skill: ${s.skill}\n    args: ${s.args}\n`;
+  }
   
   safeWriteFile(outPath, yamlContent);
+  
+  // High-fidelity JSON Backup (to verify data integrity)
+  const jsonPath = outPath.replace(/\.yml$/, '.json');
+  safeWriteFile(jsonPath, JSON.stringify(pipeline, null, 2));
+  
   console.log(`[Distiller] SUCCESS: High-fidelity logic crystallized to: ${outPath}`);
+  console.log(`[Distiller] JSON backup created at: ${jsonPath}`);
 
   return { pipeline_path: outPath, steps_distilled: steps.length, mode: 'data-driven' };
 });

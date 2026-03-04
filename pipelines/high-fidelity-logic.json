@@ -1,0 +1,11 @@
+{
+  "name": "high-fidelity-logic",
+  "description": "Distilled from mission MSN-SIM-LOG-001",
+  "steps": [
+    {
+      "id": "json_check",
+      "skill": "codebase-mapper",
+      "args": "--dir ."
+    }
+  ]
+}
