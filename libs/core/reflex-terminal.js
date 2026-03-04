@@ -1,7 +1,7 @@
 "use strict";
 /**
- * Reflex Terminal (RT) - Core Logic v1.1 (Native Bridge Edition)
- * Provides a persistent virtual terminal session using native child_process.
+ * Reflex Terminal (RT) - Core Logic v2.0 (node-pty Edition)
+ * Provides a persistent virtual terminal session using node-pty for true PTY support.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -38,48 +38,62 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReflexTerminal = void 0;
-const node_child_process_1 = require("node:child_process");
+const pty = __importStar(require("node-pty"));
 const os = __importStar(require("node:os"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const core_js_1 = require("./core.js");
 class ReflexTerminal {
-    proc;
+    ptyProcess;
     feedbackPath;
     constructor(options = {}) {
-        const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/zsh');
+        const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash'));
         this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
-        this.proc = (0, node_child_process_1.spawn)(shell, ['-i'], {
+        this.ptyProcess = pty.spawn(shell, [], {
+            name: 'xterm-256color',
+            cols: options.cols || 80,
+            rows: options.rows || 24,
             cwd: path.resolve(options.cwd || process.cwd()),
-            env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' },
-            stdio: ['pipe', 'pipe', 'pipe']
+            env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' }
         });
         this.setupListeners(options.onOutput);
-        core_js_1.logger.info(`[RT] Reflex Terminal (Native) started with shell: ${shell}`);
+        core_js_1.logger.info(`[RT] Reflex Terminal (node-pty) started with shell: ${shell}`);
     }
     setupListeners(onOutput) {
-        this.proc.stdout?.on('data', (data) => {
-            const str = data.toString();
+        this.ptyProcess.onData((data) => {
             if (onOutput)
-                onOutput(str);
-            process.stdout.write(str);
+                onOutput(data);
+            // Optional: fallback to stdout if needed, but usually redundant for PTY
+            // process.stdout.write(data); 
         });
-        this.proc.stderr?.on('data', (data) => {
-            const str = data.toString();
-            if (onOutput)
-                onOutput(str);
-            process.stderr.write(str);
-        });
-        this.proc.on('exit', (code) => {
-            core_js_1.logger.warn(`[RT] Shell exited with code ${code}`);
+        this.ptyProcess.onExit(({ exitCode, signal }) => {
+            core_js_1.logger.warn(`[RT] PTY process exited with code ${exitCode}, signal ${signal}`);
         });
     }
     /**
-     * Inject a command into the terminal.
+     * Inject a command or raw input into the terminal.
      */
     execute(command) {
         core_js_1.logger.info(`[RT] Injecting command: ${command}`);
-        this.proc.stdin?.write(`${command}\n`);
+        this.ptyProcess.write(`${command}\r`);
+    }
+    /**
+     * Write raw data to the terminal.
+     */
+    write(data) {
+        this.ptyProcess.write(data);
+    }
+    /**
+     * Resize the terminal dimensions.
+     */
+    resize(cols, rows) {
+        this.ptyProcess.resize(cols, rows);
+    }
+    /**
+     * Register an output listener.
+     */
+    onData(callback) {
+        return this.ptyProcess.onData(callback);
     }
     /**
      * Manually trigger a feedback update to the shared response file.
@@ -109,7 +123,7 @@ class ReflexTerminal {
         }
     }
     kill() {
-        this.proc.kill();
+        this.ptyProcess.kill();
     }
 }
 exports.ReflexTerminal = ReflexTerminal;

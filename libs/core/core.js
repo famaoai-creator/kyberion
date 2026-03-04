@@ -32,6 +32,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fileUtils = exports.errorHandler = exports._fileCache = exports.Cache = exports.sre = exports.ui = exports.logger = void 0;
 const fs = __importStar(require("node:fs"));
@@ -39,7 +42,7 @@ const path = __importStar(require("node:path"));
 const node_crypto_1 = require("node:crypto");
 const v8 = __importStar(require("node:v8"));
 const readline = __importStar(require("node:readline"));
-const chalk = require('chalk').default || require('chalk');
+const chalk_1 = __importDefault(require("chalk"));
 /**
  * Shared Utility Core for Gemini Skills (TypeScript Edition)
  */
@@ -47,22 +50,22 @@ exports.logger = {
     _log: (level, msg) => {
         if (process.env.NODE_ENV === 'test' && level !== 'error')
             return;
-        const ts = chalk.dim(new Date().toISOString());
-        const mid = process.env.MISSION_ID ? chalk.magenta(' [' + process.env.MISSION_ID + ']') : '';
+        const ts = chalk_1.default.dim(new Date().toISOString());
+        const mid = process.env.MISSION_ID ? chalk_1.default.magenta(' [' + process.env.MISSION_ID + ']') : '';
         const prefix = level === 'error'
-            ? chalk.red(' [ERROR] ')
+            ? chalk_1.default.red(' [ERROR] ')
             : level === 'warn'
-                ? chalk.yellow(' [WARN]  ')
-                : chalk.blue(' [INFO]  ');
+                ? chalk_1.default.yellow(' [WARN]  ')
+                : chalk_1.default.blue(' [INFO]  ');
         console.error(ts + mid + prefix + msg);
     },
     info: (msg) => exports.logger._log('info', msg),
     warn: (msg) => exports.logger._log('warn', msg),
     error: (msg) => exports.logger._log('error', msg),
     success: (msg) => {
-        const ts = chalk.dim(new Date().toISOString());
-        const mid = process.env.MISSION_ID ? chalk.magenta(' [' + process.env.MISSION_ID + ']') : '';
-        console.log(ts + mid + chalk.green(' [SUCCESS] ') + msg);
+        const ts = chalk_1.default.dim(new Date().toISOString());
+        const mid = process.env.MISSION_ID ? chalk_1.default.magenta(' [' + process.env.MISSION_ID + ']') : '';
+        console.log(ts + mid + chalk_1.default.green(' [SUCCESS] ') + msg);
     },
 };
 exports.ui = {
@@ -72,12 +75,12 @@ exports.ui = {
         const chars = ['\u25dc', '\u25dd', '\u25de', '\u25df'];
         let i = 0;
         const interval = setInterval(() => {
-            process.stdout.write('\r' + chalk.cyan(chars[i++ % chars.length]) + ' ' + msg + '...');
+            process.stdout.write('\r' + chalk_1.default.cyan(chars[i++ % chars.length]) + ' ' + msg + '...');
         }, 100);
         return {
             stop: (success = true) => {
                 clearInterval(interval);
-                process.stdout.write('\r' + (success ? chalk.green('\u2714') : chalk.red('\u2718')) + ' ' + msg + '\n');
+                process.stdout.write('\r' + (success ? chalk_1.default.green('\u2714') : chalk_1.default.red('\u2718')) + ' ' + msg + '\n');
             },
         };
     },
@@ -97,7 +100,7 @@ exports.ui = {
         const filled = Math.round(width * progress);
         const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
         const percent = Math.round(progress * 100);
-        return '[' + chalk.cyan(bar) + '] ' + percent + '%';
+        return '[' + chalk_1.default.cyan(bar) + '] ' + percent + '%';
     },
     confirm: (question) => {
         if (process.argv.includes('-y') || process.argv.includes('--yes'))
@@ -107,7 +110,7 @@ exports.ui = {
             output: process.stdout,
         });
         return new Promise((resolve) => {
-            rl.question(chalk.yellow.bold('\uff1f') + ' ' + question + ' [y/N]: ', (answer) => {
+            rl.question(chalk_1.default.yellow.bold('\uff1f') + ' ' + question + ' [y/N]: ', (answer) => {
                 rl.close();
                 resolve(answer.toLowerCase() === 'y');
             });
@@ -119,7 +122,7 @@ exports.ui = {
             output: process.stdout,
         });
         return new Promise((resolve) => {
-            rl.question(chalk.cyan.bold('\u276f') + ' ' + question, (answer) => {
+            rl.question(chalk_1.default.cyan.bold('\u276f') + ' ' + question, (answer) => {
                 rl.close();
                 resolve(answer.trim());
             });
@@ -131,10 +134,10 @@ exports.ui = {
                 return data;
             const head = data.slice(0, Math.ceil(maxItems / 2));
             const tail = data.slice(-Math.floor(maxItems / 2));
-            return [...head, chalk.dim('... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
+            return [...head, chalk_1.default.dim('... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
         }
         if (typeof data === 'string' && data.length > 500) {
-            return (data.substring(0, 250) + chalk.dim('\n\n... (content truncated) ...\n\n') + data.slice(-250));
+            return (data.substring(0, 250) + chalk_1.default.dim('\n\n... (content truncated) ...\n\n') + data.slice(-250));
         }
         return data;
     },

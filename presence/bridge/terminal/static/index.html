@@ -8,63 +8,117 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
-        body, html { 
-            margin: 0; padding: 0; height: 100%; 
-            background: #0d0f14;
-            overflow: hidden; 
-        }
-        #terminal-container { 
-            width: 100vw; height: 100vh; 
-            margin: 0; padding: 0;
-            display: flex;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; background: #0d0f14; overflow: hidden; }
+        #terminal-container { width: 100vw; height: 100vh; margin: 0; padding: 0; display: flex; }
         #terminal { flex: 1; height: 100%; }
+        #status-bar {
+            position: absolute; top: 10px; right: 30px;
+            color: #00f2ff; font-family: 'Fira Code', monospace; font-size: 11px;
+            padding: 6px 14px; z-index: 100;
+            background: rgba(13, 15, 20, 0.85); backdrop-filter: blur(4px);
+            border: 1px solid #1a1d23; border-radius: 20px;
+            pointer-events: none; display: flex; align-items: center; gap: 10px;
+        }
+        .indicator { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+        .active { background: #00f2ff; box-shadow: 0 0 12px #00f2ff; }
+        .ai-active { background: #ff00ff; box-shadow: 0 0 12px #ff00ff; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+        .pulsing { animation: pulse 1.2s infinite ease-in-out; }
     </style>
 </head>
 <body>
-    <div id="terminal-container">
-        <div id="terminal"></div>
+    <div id="status-bar">
+        <div id="conn-indicator" class="indicator"></div>
+        <span id="status-text">CONNECTING...</span>
+        <div id="ai-indicator" class="indicator"></div>
+        <span id="ai-text" style="display:none; color: #ff00ff; font-weight: bold;">AI ACTIVE</span>
     </div>
+    <div id="terminal-container"><div id="terminal"></div></div>
     <script>
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const connIndicator = document.getElementById('conn-indicator');
+        const aiIndicator = document.getElementById('ai-indicator');
+        const aiText = document.getElementById('ai-text');
+
         const term = new Terminal({
             theme: { background: '#0d0f14', foreground: '#e0e0e0', cursor: '#00f2ff' },
-            cursorBlink: true,
-            fontSize: 14,
-            fontFamily: 'Menlo, Monaco, "Courier New", monospace'
+            cursorBlink: true, fontSize: 14, fontFamily: 'Menlo, Monaco, "Courier New", monospace'
         });
 
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
-        term.focus(); // Focus immediately to prevent IME issues
+        fitAddon.fit(); // Pre-calculate size
+        term.focus();
         
-        const socket = new WebSocket(`ws://${location.host}`);
+        let socket;
+        let currentSessionId = localStorage.getItem('sovereign_session_id');
 
-        function performFit() {
-            fitAddon.fit();
-            const { cols, rows } = term;
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'resize', cols, rows }));
+        function connect() {
+            socket = new WebSocket(`ws://${location.host}`);
+            socket.onopen = () => {
+                statusText.innerText = 'HANDSHAKE...';
+                connIndicator.classList.add('active');
+                // Send current size during INIT
+                socket.send(JSON.stringify({ 
+                    type: 'init', 
+                    sessionId: currentSessionId,
+                    cols: term.cols,
+                    rows: term.rows
+                }));
+            };
+            socket.onmessage = (event) => {
+                if (event.data.startsWith('{')) {
+                    try {
+                        const payload = JSON.parse(event.data);
+                        if (payload.type === 'session_ready') {
+                            currentSessionId = payload.sessionId;
+                            localStorage.setItem('sovereign_session_id', currentSessionId);
+                            statusText.innerText = `SESS: ${currentSessionId.substring(0, 8)}`;
+                            return;
+                        }
+                        if (payload.type === 'ai_activity') {
+                            triggerAIIndicator(payload.active);
+                            return;
+                        }
+                    } catch (e) {}
+                }
+                term.write(event.data);
+            };
+            socket.onclose = () => {
+                statusText.innerText = 'OFFLINE';
+                connIndicator.classList.remove('active');
+                triggerAIIndicator(false);
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function triggerAIIndicator(active) {
+            if (active) {
+                aiIndicator.classList.add('ai-active', 'pulsing');
+                aiText.style.display = 'inline';
+            } else {
+                aiIndicator.classList.remove('ai-active', 'pulsing');
+                aiText.style.display = 'none';
             }
         }
 
-        socket.onmessage = (event) => term.write(event.data);
-        term.onData((data) => socket.send(JSON.stringify({ type: 'input', data })));
-
-        window.addEventListener('resize', () => {
-            setTimeout(performFit, 50); // Small delay to let browser settle
+        term.onData((data) => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'input', data }));
+            }
         });
 
-        socket.onopen = () => {
-            term.write('\r\n\x1b[1;36m*** Sovereign PTY Session Active ***\x1b[0m\r\n');
-            performFit();
-            term.focus();
-        };
+        window.addEventListener('resize', () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                fitAddon.fit();
+                socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            }
+        });
 
-        // Ensure focus is kept on terminal even if user clicks elsewhere
         document.body.addEventListener('click', () => term.focus());
-
-        socket.onclose = () => term.write('\r\n\x1b[1;31m*** Session Terminated ***\x1b[0m\r\n');
+        connect();
     </script>
 </body>
 </html>
