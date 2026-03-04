@@ -121,5 +121,24 @@ export const terminalBridge = {
     const strategy = STRATEGIES[terminalType];
     if (!strategy) throw new Error(`Unsupported terminal strategy: ${terminalType}`);
     return strategy.inject(winId, sessionId, text);
+  },
+  readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
+    if (terminalType !== 'iTerm2') return '';
+    const script = `
+      tell application "iTerm2"
+        try
+          set w to window id ${winId}
+          set s to session id "${sessionId}" of w
+          return contents of s
+        on error
+          return "ERROR"
+        end try
+      end tell
+    `;
+    try {
+      return execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
+    } catch {
+      return '';
+    }
   }
 };
