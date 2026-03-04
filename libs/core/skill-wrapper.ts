@@ -1,14 +1,11 @@
 /**
  * TypeScript version of skill-wrapper.
  * Provides typed wrappers for skill execution with standardized output.
- *
- * Usage:
- *   import { runSkill } from '../../scripts/lib/skill-wrapper.js';
- *   runSkill<MyResult>('my-skill', () => ({ result: 'data' }));
  */
 
 import type { SkillOutput } from './types.js';
 import { metrics } from './metrics.js';
+const chalk: any = require('chalk').default || require('chalk');
 
 function buildOutput<T>(
   skillName: string,
@@ -28,7 +25,6 @@ function buildOutput<T>(
 
   if (status === 'success') {
     base.data = dataOrError as T;
-    // Record metrics
     const extra: any = {};
     if (base.data && (base.data as any).metadata?.usage) {
       extra.usage = (base.data as any).metadata.usage;
@@ -43,6 +39,32 @@ function buildOutput<T>(
     metrics.record(skillName, durationMs, 'error');
   }
   return base;
+}
+
+function printOutput<T>(output: SkillOutput<T>) {
+  const isHuman = process.env.GEMINI_FORMAT === 'human' || process.argv.includes('--format=human');
+
+  if (isHuman) {
+    if (output.status === 'success') {
+      console.log(chalk.green(`\n✅ ${output.skill} success`));
+      if (output.data) {
+        if (typeof output.data === 'string') {
+          console.log(output.data);
+        } else if ((output.data as any).message) {
+          console.log((output.data as any).message);
+        } else {
+          console.log(JSON.stringify(output.data, null, 2));
+        }
+      }
+    } else {
+      console.log(chalk.red(`\n❌ ${output.skill} error`));
+      console.log(chalk.yellow(`Code: ${output.error?.code}`));
+      console.log(output.error?.message);
+    }
+    console.log(chalk.dim(`Duration: ${output.metadata.duration_ms}ms | ${output.metadata.timestamp}\n`));
+  } else {
+    console.log(JSON.stringify(output, null, 2));
+  }
 }
 
 export function wrapSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
@@ -68,7 +90,7 @@ export async function wrapSkillAsync<T>(
 
 export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
   const output = wrapSkill(skillName, fn);
-  console.log(JSON.stringify(output, null, 2));
+  printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;
 }
@@ -78,10 +100,9 @@ export async function runSkillAsync<T>(
   fn: () => Promise<T>
 ): Promise<SkillOutput<T>> {
   const output = await wrapSkillAsync(skillName, fn);
-  console.log(JSON.stringify(output, null, 2));
+  printOutput(output);
   if (output.status === 'error') process.exit(1);
   return output;
 }
 
-// Aliases for backward compatibility
 export const runAsyncSkill = runSkillAsync;

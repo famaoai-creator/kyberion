@@ -162,6 +162,44 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
 }
 
 /**
+ * Validate a URL against SSRF and protocol restrictions.
+ */
+export function validateUrl(url: string): string {
+  if (!url) {
+    throw new Error('Missing or invalid URL');
+  }
+
+  try {
+    const parsed = new URL(url);
+    
+    // Protocol whitelist
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+    }
+
+    // SSRF protection: Block private IP ranges and localhost
+    const hostname = parsed.hostname.toLowerCase();
+    const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
+    
+    if (blockedHostnames.includes(hostname)) {
+      throw new Error(`Blocked URL: ${hostname}`);
+    }
+
+    // Basic private IP range detection (IPv4)
+    if (/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(hostname)) {
+      throw new Error(`Blocked URL: Private IP range (${hostname})`);
+    }
+
+    return url;
+  } catch (err: any) {
+    if (err.message.includes('Blocked URL') || err.message.includes('Unsupported protocol')) {
+      throw err;
+    }
+    throw new Error(`Invalid URL: ${url}`);
+  }
+}
+
+/**
  * Sanitize a string for safe use in file paths.
  */
 export function sanitizePath(input: string): string {

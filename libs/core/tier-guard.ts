@@ -2,11 +2,6 @@
  * TypeScript version of the Knowledge Tier Guard.
  *
  * Prevents confidential / personal data from leaking into lower-tier outputs.
- *
- * Tier hierarchy (higher number = more sensitive):
- *   personal (3) > confidential (2) > public (1)
- *
- * Data from a higher tier must never appear in a lower-tier output.
  */
 
 import * as path from 'node:path';
@@ -64,7 +59,6 @@ export function validateInjection(knowledgePath: string, outputTier: TierLevel):
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
   const tier = detectTier(filePath);
-  // Default allow for now, but can be restricted by role later
   return { allowed: true };
 }
 
@@ -77,6 +71,32 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     return { allowed: false, reason: 'Writing to personal tier is restricted.' };
   }
   return { allowed: true };
+}
+
+/**
+ * Validate that content does not cross the Sovereign boundary (no secret leaks).
+ * Note: activeSecrets must be passed from secret-guard to avoid circular dependency.
+ */
+export function validateSovereignBoundary(content: string, activeSecrets: string[] = []): { safe: boolean; detected: string[] } {
+  const detected: string[] = [];
+
+  // 1. Check for active secrets
+  for (const secret of activeSecrets) {
+    if (content.includes(secret)) {
+      detected.push(`SECRET_LEAK: ${secret.substring(0, 3)}...`);
+    }
+  }
+
+  // 2. Check for markers
+  const markerCheck = scanForConfidentialMarkers(content);
+  if (markerCheck.hasMarkers) {
+    detected.push(...markerCheck.markers.map(m => `MARKER_DETECTED: ${m}`));
+  }
+
+  return {
+    safe: detected.length === 0,
+    detected,
+  };
 }
 
 /**
