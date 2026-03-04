@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeReadFile, logger } from '@agent/core';
 
 /**
  * Lightweight security scanner core.
@@ -44,16 +44,27 @@ export function scanProject(dir: string): { findings: Finding[]; scannedFiles: n
   let scannedFiles = 0;
 
   function walk(currentDir: string) {
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch (err: any) {
+      logger.error(`[SecurityScanner] Failed to read directory ${currentDir}: ${err.message}`);
+      return;
+    }
+
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue;
         walk(fullPath);
       } else if (/\.(js|ts|json|yaml|yml|md|env)$/.test(entry.name)) {
-        scannedFiles++;
-        const content = fs.readFileSync(fullPath, 'utf8');
-        findings.push(...scanFile(fullPath, content));
+        try {
+          scannedFiles++;
+          const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+          findings.push(...scanFile(fullPath, content));
+        } catch (err: any) {
+          logger.warn(`[SecurityScanner] Skipping file ${fullPath}: ${err.message}`);
+        }
       }
     }
   }

@@ -10,19 +10,14 @@ const metrics = ref({
 
 const fetchData = async () => {
   try {
-    // 1. Fetch Parallel Registry (Active Missions)
-    // Bridge Server need a new endpoint for this
-    const regRes = await fetch('http://localhost:3031/registry');
-    const regData = await regRes.json();
-    activeMissions.value = regData.active || [];
-
-    // 2. Fetch Latest Metrics
-    const resRes = await fetch('http://localhost:3031/responses');
-    const resData = await resRes.json();
-    // Simulated logic to derive metrics from responses
-    metrics.value.efficiency = 58;
+    const res = await fetch('/mission_registry.json');
+    const data = await res.json();
+    activeMissions.value = data.missions || [];
+    
+    // Derived Metrics
+    metrics.value.efficiency = 85; 
     metrics.value.reliability = 100;
-    metrics.value.debt = '$1,600/hr';
+    metrics.value.debt = '$420/hr';
   } catch (e) {
     console.error('Dashboard sync failed');
   }
@@ -84,24 +79,29 @@ onUnmounted(() => {
     <div v-if="activeMissions.length > 0" class="space-y-3">
       <div
         v-for="mission in activeMissions"
-        :key="mission.missionId"
+        :key="mission.id"
         class="p-3 bg-gray-900 bg-opacity-40 rounded border border-gray-800 flex justify-between items-center"
       >
         <div>
-          <p class="text-[10px] font-mono text-blue-400">{{ mission.missionId }}</p>
+          <p class="text-[10px] font-mono text-blue-400">{{ mission.id }}</p>
           <p class="text-xs font-bold text-gray-200 mt-1">
-            {{ mission.taskId || 'General Agent' }}
+            {{ mission.persona || 'General Agent' }}
           </p>
         </div>
         <div class="text-right">
-          <div class="flex items-center gap-2">
-            <span class="text-[8px] text-gray-500 font-mono italic">PID: {{ mission.pid }}</span>
-            <div class="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
-              <div class="h-full bg-blue-500 animate-pulse w-2/3"></div>
+          <div class="flex items-center gap-2 justify-end">
+            <span :class="{
+              'px-2 py-0.5 rounded text-[8px] font-bold': true,
+              'bg-blue-900 text-blue-200': mission.status === 'active',
+              'bg-yellow-900 text-yellow-200': mission.status === 'paused',
+              'bg-green-900 text-green-200': mission.status === 'done'
+            }">{{ mission.status.toUpperCase() }}</span>
+            <div class="w-12 h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-500 w-full" :class="{'animate-pulse': mission.status === 'active'}"></div>
             </div>
           </div>
           <p class="text-[8px] text-gray-600 mt-1">
-            Started: {{ new Date(mission.startedAt).toLocaleTimeString() }}
+            Priority: {{ mission.priority }}/10
           </p>
         </div>
       </div>

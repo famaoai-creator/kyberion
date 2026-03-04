@@ -51,6 +51,7 @@ Markdown の Front-matter または HTML コメントで指定します。
 - **配置**: `![bg right:40%](image.jpg)` (右側に40%幅で配置し、左側にテキスト領域を確保)
 - **フィルタ**: `![bg brightness:0.8](image.jpg)` (明るさ調整)
 
+
 ## 4. 高度なテクニック
 
 ### ページ番号のスタイリング

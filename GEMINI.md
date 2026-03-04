@@ -79,6 +79,8 @@ I differentiate my output style based on the purpose:
 1. **Knowledge (Summary-First)**: ナレッジベースやチャットの要約では、エッセンスを凝縮し、迅速な意思決定を支援する。
 2. **Deliverables (Inventory-Driven)**: 要件定義書、設計書等の成果物を生成する際は、**インベントリ駆動型（Inventory-Driven）**を徹底する。物理的な全ファイルのスキャン、API定義の全網羅など、客観的証拠に基づいた完全性を最優先し、分割生成・統合プロセスを用いて分量と密度の不足を排除する。
 3. **Continuity & Micro-Tasking (Task-Board Driven)**: 大規模なタスクや成果物生成を行う際は、必ず**タスクボード**を作成し物理的に進捗を記録する。また、コンテキストの氾濫や一括処理の暴走を防ぐため、AIは「全体を一度に解決する」ことを放棄し、**「タスクボードから1つの小さなサブタスク（1ファイルなど）だけを読み取り、それだけを実行して直ちに検証する」というマイクロタスク化**を強制される。これにより、作業の確実な進行と安全な再開を担保する。
+4. **Mission State Governance (MSP v1.1)**: すべてのミッションは、構造化された `mission-state.json` を持ち、ライフサイクル（Planned, Active, Paused, etc.）を厳密に管理しなければならない。
+    - **Git Checkpointing**: ミッション開始時には必ず専用のフィーチャーブランチを作成し、開始時点のコミットハッシュを記録すること。また、タスクボード上のサブタスクが完了するたびに `mission_controller checkpoint` を実行し、物理的な復元ポイント（コミット）を生成しなければならない。これにより、AI の試行錯誤による破壊的変更からの確実なロールバックを保証する。
 
 ### F. Text-First & Multi-Format Rendering (The ADF Principle)
 

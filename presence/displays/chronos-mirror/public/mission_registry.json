@@ -1,0 +1,24 @@
+{
+  "last_updated": "2026-03-04T22:05:26.086Z",
+  "active_mission_id": "OVERNIGHT-EVOLUTION-20260305",
+  "missions": [
+    {
+      "id": "MSN-ECOSYSTEM-STABILIZATION-YOLO-20260305",
+      "status": "active",
+      "priority": 10,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-MISSION-STATE-GOVERNANCE-20260305",
+      "status": "active",
+      "priority": 10,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-OVERNIGHT-EVOLUTION-20260305",
+      "status": "active",
+      "priority": 10,
+      "persona": "Ecosystem Architect"
+    }
+  ]
+}

@@ -274,7 +274,7 @@ npm run build
 
 ## Architecture
 
-See [docs/CODEMAPS/INDEX.md](docs/CODEMAPS/INDEX.md) for detailed architecture.
+See `[docs/CODEMAPS/INDEX.md](docs/CODEMAPS/INDEX.md)` for detailed architecture.
 
 ### Key Directories
 
@@ -289,13 +289,13 @@ See [docs/CODEMAPS/INDEX.md](docs/CODEMAPS/INDEX.md) for detailed architecture.
 
 ## Documentation
 
-- [Setup Guide](docs/GUIDES/setup.md)
-- [API Reference](docs/GUIDES/api.md)
-- [Architecture](docs/CODEMAPS/INDEX.md)
+- `[Setup Guide](docs/GUIDES/setup.md)`
+- `[API Reference](docs/GUIDES/api.md)`
+- `[Architecture](docs/CODEMAPS/INDEX.md)`
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+See `[CONTRIBUTING.md](CONTRIBUTING.md)`
 ```
 
 ## Scripts to Power Documentation

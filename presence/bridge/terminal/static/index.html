@@ -3,83 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Sovereign Terminal</title>
+    <title>Gemini Sovereign Hub</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #0d0f14; overflow: hidden; }
-        #terminal-container { width: 100vw; height: 100vh; margin: 0; padding: 0; display: flex; }
-        #terminal { flex: 1; height: 100%; }
-        #status-bar {
-            position: absolute; top: 10px; right: 30px;
-            color: #00f2ff; font-family: 'Fira Code', monospace; font-size: 11px;
-            padding: 6px 14px; z-index: 100;
-            background: rgba(13, 15, 20, 0.85); backdrop-filter: blur(4px);
-            border: 1px solid #1a1d23; border-radius: 20px;
-            pointer-events: none; display: flex; align-items: center; gap: 10px;
+        body, html { margin: 0; padding: 0; height: 100%; background: #0d0f14; overflow: hidden; display: flex; }
+        #sidebar { 
+            width: 200px; background: #1a1d23; border-right: 1px solid #333; 
+            display: flex; flex-direction: column; padding: 10px; gap: 10px;
         }
-        .indicator { width: 10px; height: 10px; border-radius: 50%; background: #333; }
-        .active { background: #00f2ff; box-shadow: 0 0 12px #00f2ff; }
-        .ai-active { background: #ff00ff; box-shadow: 0 0 12px #ff00ff; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
-        .pulsing { animation: pulse 1.2s infinite ease-in-out; }
+        .session-item { 
+            padding: 8px; background: #2a2e37; border-radius: 4px; color: #aaa; cursor: pointer; font-size: 12px;
+            border: 1px solid transparent; transition: all 0.2s;
+        }
+        .session-item:hover { background: #3a3f4b; }
+        .session-item.active { border-color: #00f2ff; color: #00f2ff; background: #1a1d23; }
+        #new-session { 
+            padding: 8px; background: #00f2ff; color: #000; border: none; border-radius: 4px; 
+            cursor: pointer; font-weight: bold; font-size: 12px;
+        }
+        #terminal-container { flex: 1; height: 100vh; position: relative; }
+        #terminal { width: 100%; height: 100%; }
+        #status-bar {
+            position: absolute; top: 10px; right: 20px; color: #00f2ff; font-family: monospace; font-size: 11px;
+            padding: 4px 12px; z-index: 100; background: rgba(13, 15, 20, 0.85); backdrop-filter: blur(4px);
+            border: 1px solid #1a1d23; border-radius: 20px; display: flex; align-items: center; gap: 8px;
+        }
+        .indicator { width: 8px; height: 8px; border-radius: 50%; background: #333; }
+        .indicator.on { background: #00f2ff; box-shadow: 0 0 10px #00f2ff; }
+        .ai-active { color: #ff00ff; animation: pulse 1s infinite; font-weight: bold; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
-    <div id="status-bar">
-        <div id="conn-indicator" class="indicator"></div>
-        <span id="status-text">CONNECTING...</span>
-        <div id="ai-indicator" class="indicator"></div>
-        <span id="ai-text" style="display:none; color: #ff00ff; font-weight: bold;">AI ACTIVE</span>
+    <div id="sidebar">
+        <h2 style="color: #fff; font-size: 14px; margin: 0 0 10px 0;">Sessions</h2>
+        <div id="session-list" style="display: flex; flex-direction: column; gap: 5px; flex: 1; overflow-y: auto;"></div>
+        <button id="new-session">+ New Session</button>
     </div>
-    <div id="terminal-container"><div id="terminal"></div></div>
+    <div id="terminal-container">
+        <div id="status-bar">
+            <div id="conn-indicator" class="indicator"></div>
+            <span id="status-text">CONNECTING...</span>
+            <span id="ai-text" style="display:none;" class="ai-active">AI ACTIVE</span>
+        </div>
+        <div id="terminal"></div>
+    </div>
     <script>
-        const statusBar = document.getElementById('status-bar');
+        const sessionList = document.getElementById('session-list');
         const statusText = document.getElementById('status-text');
         const connIndicator = document.getElementById('conn-indicator');
-        const aiIndicator = document.getElementById('ai-indicator');
         const aiText = document.getElementById('ai-text');
 
         const term = new Terminal({
             theme: { background: '#0d0f14', foreground: '#e0e0e0', cursor: '#00f2ff' },
-            cursorBlink: true, fontSize: 14, fontFamily: 'Menlo, Monaco, "Courier New", monospace'
+            cursorBlink: true, fontSize: 13, fontFamily: 'Menlo, Monaco, "Courier New", monospace'
         });
 
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
-        fitAddon.fit(); // Pre-calculate size
-        term.focus();
         
         let socket;
         let currentSessionId = localStorage.getItem('sovereign_session_id');
 
+        async function fetchSessions() {
+            try {
+                const res = await fetch('/sessions');
+                const list = await res.json();
+                sessionList.innerHTML = '';
+                list.forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = `session-item ${s.id === currentSessionId ? 'active' : ''}`;
+                    div.innerText = s.name;
+                    div.onclick = () => switchSession(s.id);
+                    sessionList.appendChild(div);
+                });
+            } catch (e) {}
+        }
+
+        function switchSession(id) {
+            if (id === currentSessionId) return;
+            localStorage.setItem('sovereign_session_id', id);
+            location.reload();
+        }
+
         function connect() {
             socket = new WebSocket(`ws://${location.host}`);
             socket.onopen = () => {
-                statusText.innerText = 'HANDSHAKE...';
-                connIndicator.classList.add('active');
-                // Send current size during INIT
+                connIndicator.classList.add('on');
                 socket.send(JSON.stringify({ 
-                    type: 'init', 
-                    sessionId: currentSessionId,
-                    cols: term.cols,
-                    rows: term.rows
+                    type: 'init', sessionId: currentSessionId, cols: term.cols, rows: term.rows 
                 }));
             };
             socket.onmessage = (event) => {
                 if (event.data.startsWith('{')) {
                     try {
-                        const payload = JSON.parse(event.data);
-                        if (payload.type === 'session_ready') {
-                            currentSessionId = payload.sessionId;
+                        const p = JSON.parse(event.data);
+                        if (p.type === 'session_ready') {
+                            currentSessionId = p.sessionId;
                             localStorage.setItem('sovereign_session_id', currentSessionId);
-                            statusText.innerText = `SESS: ${currentSessionId.substring(0, 8)}`;
+                            statusText.innerText = p.name;
+                            fitAddon.fit();
+                            fetchSessions();
                             return;
                         }
-                        if (payload.type === 'ai_activity') {
-                            triggerAIIndicator(payload.active);
+                        if (p.type === 'ai_activity') {
+                            aiText.style.display = p.active ? 'inline' : 'none';
                             return;
                         }
                     } catch (e) {}
@@ -87,38 +118,36 @@
                 term.write(event.data);
             };
             socket.onclose = () => {
-                statusText.innerText = 'OFFLINE';
-                connIndicator.classList.remove('active');
-                triggerAIIndicator(false);
+                connIndicator.classList.remove('on');
                 setTimeout(connect, 3000);
             };
         }
 
-        function triggerAIIndicator(active) {
-            if (active) {
-                aiIndicator.classList.add('ai-active', 'pulsing');
-                aiText.style.display = 'inline';
-            } else {
-                aiIndicator.classList.remove('ai-active', 'pulsing');
-                aiText.style.display = 'none';
-            }
-        }
-
-        term.onData((data) => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'input', data }));
-            }
+        term.onData(data => {
+            if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'input', data }));
         });
 
         window.addEventListener('resize', () => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
+            if (socket?.readyState === WebSocket.OPEN) {
                 fitAddon.fit();
                 socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
             }
         });
 
+        document.getElementById('new-session').onclick = () => {
+            const name = prompt('Session Name:');
+            if (name) {
+                localStorage.removeItem('sovereign_session_id');
+                const id = `s-${Date.now()}`;
+                localStorage.setItem('sovereign_session_id', id);
+                // We'll let the init handle creation
+                location.reload();
+            }
+        };
+
         document.body.addEventListener('click', () => term.focus());
         connect();
+        fetchSessions();
     </script>
 </body>
 </html>
