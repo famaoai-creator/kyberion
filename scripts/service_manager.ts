@@ -8,48 +8,39 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { logger } from '@agent/core/core';
-import { safeReadFile, safeWriteFile } from '@agent/core';
-import * as pathResolver from '@agent/core/path-resolver';
-import { pruneStimuli } from './presence-controller.js';
 
-const PID_FILE = pathResolver.active('shared/services-pids.json');
+const rootDir = process.cwd();
+const PID_FILE = path.join(rootDir, 'active/shared/services-pids.json');
 const WATCHDOG_INTERVAL_MS = 30000;
 
 const SERVICES: Record<string, any> = {
   'slack-sensor': {
-    path: 'dist/presence/sensors/slack-sensor.js',
+    path: 'presence/sensors/slack-sensor.ts',
     description: 'Listens for Slack mentions and DMs'
   },
-  'reflex-terminal': {
-    path: 'dist/scripts/rt-orchestrator.js',
-    description: 'Persistent AI-native virtual terminal session'
+  'terminal-hub': {
+    path: 'presence/bridge/terminal/server.ts',
+    description: 'Persistent AI-native virtual terminal session (API Hub)'
   },
   'nexus-daemon': {
-    path: 'dist/presence/bridge/nexus-daemon.js',
+    path: 'presence/bridge/nexus-daemon.ts',
     description: 'Coordinates physical terminal intervention'
-  },
-  'gemini-pulse': {
-    path: 'dist/presence/sensors/gemini-pulse/daemon.js',
-    description: 'Monitors ecosystem health'
-  },
-  'service-watchdog': {
-    path: 'dist/scripts/service_manager.js',
-    args: ['watchdog'],
-    description: 'Auto-heals other services if they crash'
   }
 };
 
 function loadPids() {
   if (!fs.existsSync(PID_FILE)) return {};
   try {
-    return JSON.parse(safeReadFile(PID_FILE, { encoding: 'utf8' }) as string);
+    return JSON.parse(fs.readFileSync(PID_FILE, 'utf8'));
   } catch (_) {
     return {};
   }
 }
 
 function savePids(pids: any) {
-  safeWriteFile(PID_FILE, JSON.stringify(pids, null, 2));
+  const dir = path.dirname(PID_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(PID_FILE, JSON.stringify(pids, null, 2));
 }
 
 function isRunning(pid: number) {
@@ -65,27 +56,29 @@ async function startService(id: string, pids: any) {
   const service = SERVICES[id];
   if (!service) return;
 
-  const scriptPath = pathResolver.rootResolve(service.path);
-  const logFile = pathResolver.active(`shared/logs/${id}.log`);
+  const scriptPath = path.join(rootDir, service.path);
+  const logFile = path.join(rootDir, `active/shared/logs/${id}.log`);
   if (!fs.existsSync(path.dirname(logFile))) {
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
   }
 
   const out = fs.openSync(logFile, 'a');
-  const child = spawn('node', [scriptPath, ...(service.args || [])], {
+  // Use tsx for direct TS execution in development
+  const child = spawn('npx', ['tsx', scriptPath], {
     detached: true,
     stdio: ['ignore', out, out],
-    cwd: pathResolver.rootDir()
+    cwd: rootDir,
+    env: { ...process.env, PORT: '4321' }
   });
 
   child.unref();
   pids[id] = child.pid;
-  logger.success(`  - ${id} started (PID: ${child.pid}). Logs: ${path.basename(logFile)}`);
+  logger.success(`  - ${id} started (PID: ${child.pid}). Logs: active/shared/logs/${id}.log`);
 }
 
 async function startAll() {
   const pids = loadPids();
-  logger.info('🚀 Starting Presence Services...');
+  logger.info('🚀 Starting Presence Services (Modern TS Mode)...');
 
   for (const id of Object.keys(SERVICES)) {
     if (pids[id] && isRunning(pids[id])) {
@@ -117,34 +110,6 @@ function stopAll() {
   savePids(pids);
 }
 
-async function runWatchdog() {
-  logger.info(chalk.bold.cyan('🛡️ Service Watchdog Active. Monitoring for crashes & log bloat...'));
-  
-  while (true) {
-    const pids = loadPids();
-    let changed = false;
-
-    for (const [id, service] of Object.entries(SERVICES)) {
-      if (id === 'service-watchdog') continue;
-
-      const pid = pids[id];
-      if (!pid || !isRunning(pid)) {
-        logger.warn(`⚠️ Service crash detected: ${id}. Attempting auto-recovery...`);
-        await startService(id, pids);
-        changed = true;
-      }
-    }
-
-    if (changed) savePids(pids);
-
-    try {
-      await pruneStimuli();
-    } catch (_) {}
-
-    await new Promise(resolve => setTimeout(resolve, WATCHDOG_INTERVAL_MS));
-  }
-}
-
 function showStatus() {
   const pids = loadPids();
   console.log(chalk.bold('\n📡 Presence Services Status:'));
@@ -174,11 +139,8 @@ async function main() {
     case 'status':
       showStatus();
       break;
-    case 'watchdog':
-      await runWatchdog();
-      break;
     default:
-      console.log('Usage: node service_manager.js [start|stop|status|watchdog]');
+      console.log('Usage: npx tsx scripts/service_manager.ts [start|stop|status]');
   }
 }
 
