@@ -38,4 +38,17 @@
 ## 4. 運用とガバナンス
 - **ポート管理**: デフォルトは `4321`。占有回避のため動的なポート変更（4322, 4323...）をサポート。
 - **セッションライフサイクル**: ブラウザ接続時に PTY を生成し、切断（Close）時に確実に `rt.kill()` を実行してゾンビプロセスを防止する。
-- **監査**: すべての入力データは `ReflexTerminal` を通じて `active/shared/` へ永続化（Persist）され、エージェントの思考コンテキストとして再利用される。
+
+## 5. Sensory Bridge (Nexus Daemon)
+本ターミナルは、単なるユーザーインターフェースを超え、外部センサー（Slack, Voice 等）と AI をつなぐ **「Sensory Bridge」** として機能する。
+
+### 5.1 Nexus Daemon による統合
+- **実装**: `presence/bridge/nexus-daemon.ts`
+- **フロー**:
+    1.  **Stimulus Ingestion**: 外部センサーが `presence/bridge/stimuli.jsonl` に「刺激」を書き込む。
+    2.  **Terminal Injection**: Nexus Daemon がアイドル状態のターミナルセッションを特定し、刺激を `[SENSORY_INPUT]` コマンドとして PTY へ直接注入する。
+    3.  **Autonomous Execution**: 注入された刺激により AI の思考がトリガーされ、ターミナル上で自律的な処理（スキルの実行等）が開始される。
+    4.  **Feedback Mirroring**: 処理結果が `active/shared/last_response.json` に書き出されると、Nexus Daemon がそれを元のソース（Slack 等）へ送り返す。
+
+### 5.2 監査と不揮発性
+すべての入力データは `ReflexTerminal` を通じて `active/shared/` へ永続化（Persist）され、エージェントの思考コンテキストとして再利用される。これにより、ターミナルは「AI と外部世界の接点」としての透明性を確保している。
