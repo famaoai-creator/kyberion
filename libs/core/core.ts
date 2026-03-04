@@ -304,14 +304,37 @@ export class Cache {
     return true;
   }
 
-  clear() { this._map.clear(); }
-  get size() { return this._map.size; }
+  clear() {
+    this._map.clear();
+  }
+  get size() {
+    return this._map.size;
+  }
 }
 
 export const _fileCache = new Cache(200, 3600000);
 
-export const errorHandler = (err: any, context = '') => {
-  logger.error(context + ': ' + (err.message || err));
+/**
+ * Throw a structured error with logging.
+ * Safe to use in library code and tests — does NOT call process.exit().
+ */
+export const errorHandler = (err: any, context = ''): never => {
+  const message = context ? `${context}: ${err.message || err}` : String(err.message || err);
+  logger.error(message);
+  if (process.env.DEBUG) console.error(err.stack);
+  const wrapped = new Error(message);
+  (wrapped as any).cause = err;
+  (wrapped as any).originalStack = err.stack;
+  throw wrapped;
+};
+
+/**
+ * CLI-only variant: logs the error and exits with code 1.
+ * Use this only in top-level CLI scripts (scripts/, skill entrypoints),
+ * never in shared library code that may be imported by tests.
+ */
+export const cliErrorHandler = (err: any, context = ''): never => {
+  logger.error((context ? `${context}: ` : '') + (err.message || err));
   if (process.env.DEBUG) console.error(err.stack);
   process.exit(1);
 };
@@ -324,7 +347,10 @@ export const fileUtils = {
   getFullRoleConfig: () => {
     const mid = process.env.MISSION_ID;
     const priorityPaths = [];
-    if (mid) priorityPaths.push(path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json'));
+    if (mid)
+      priorityPaths.push(
+        path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json')
+      );
     priorityPaths.push(path.resolve(process.cwd(), 'active/shared/governance/session.json'));
     priorityPaths.push(path.resolve(process.cwd(), 'knowledge/personal/role-config.json'));
 
@@ -354,7 +380,9 @@ export const fileUtils = {
         _fileCache.set(resolved, { mtimeMs, data }, undefined, isIndex);
       }
       return data;
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
   },
   writeJson: (filePath: string, data: any) => {
     try {

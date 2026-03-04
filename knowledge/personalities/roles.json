@@ -71,13 +71,10 @@
         "release-note-crafter",
         "project-health-check",
         "license-auditor",
-        "cloud-cost-estimator",
         "pr-architect",
         "onboarding-wizard",
         "asset-token-economist",
-        "dependency-lifeline",
-        "skill-evolution-engine",
-        "sustainability-consultant"
+        "skill-evolution-engine"
       ],
       "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
       "description": "Strategy, Finance, Org, and Ecosystem Stewardship"
@@ -87,7 +84,6 @@
         "business-impact-analyzer",
         "strategic-roadmap-planner",
         "financial-modeling-maestro",
-        "scenario-multiverse-orchestrator",
         "executive-reporting-maestro",
         "stakeholder-communicator",
         "budget-variance-tracker",
@@ -104,7 +100,6 @@
         "telemetry-insight-engine",
         "business-impact-analyzer",
         "doc-sync-sentinel",
-        "scenario-multiverse-orchestrator",
         "stakeholder-communicator"
       ],
       "playbook": "knowledge/orchestration/mission-playbooks/product-audit.md",
@@ -158,8 +153,6 @@
         "self-healing-orchestrator",
         "log-analyst",
         "chaos-monkey-orchestrator",
-        "sustainability-consultant",
-        "cloud-cost-estimator",
         "monitoring-config-auditor",
         "disaster-recovery-planner",
         "log-to-requirement-bridge"
@@ -182,7 +175,6 @@
       "skills": [
         "performance-monitor-analyst",
         "cloud-waste-hunter",
-        "cloud-cost-estimator",
         "cognitive-load-auditor",
         "refactoring-engine",
         "log-analyst",
@@ -209,8 +201,7 @@
         "stakeholder-communicator",
         "ppt-artisan",
         "document-generator",
-        "investor-readiness-audit",
-        "ip-profitability-architect"
+        "investor-readiness-audit"
       ],
       "description": "Business Development"
     },
@@ -220,14 +211,12 @@
         "business-growth-planner",
         "stakeholder-communicator",
         "ppt-artisan",
-        "document-generator",
-        "scenario-multiverse-orchestrator"
+        "document-generator"
       ],
       "description": "Market Fit & Branding"
     },
     "Customer Success": {
       "skills": [
-        "automated-support-architect",
         "telemetry-insight-engine",
         "slack-communicator-pro",
         "doc-sync-sentinel",
@@ -244,8 +233,7 @@
         "skill-quality-auditor",
         "budget-variance-tracker",
         "executive-reporting-maestro",
-        "onboarding-wizard",
-        "dependency-lifeline"
+        "onboarding-wizard"
       ],
       "description": "Quality Gates & Risk"
     },
@@ -253,7 +241,6 @@
       "skills": [
         "test-genie",
         "test-suite-architect",
-        "test-viewpoint-analyst",
         "ux-auditor",
         "quality-scorer",
         "completeness-scorer",
@@ -265,8 +252,6 @@
     },
     "Legal & IP Strategist": {
       "skills": [
-        "ip-strategist",
-        "ip-profitability-architect",
         "license-auditor",
         "compliance-officer",
         "ai-ethics-auditor",
@@ -322,7 +307,6 @@
       "skills": [
         "onboarding-wizard",
         "slack-communicator-pro",
-        "biometric-context-adapter",
         "pr-architect",
         "project-health-check",
         "skill-bundle-packager",
@@ -349,7 +333,6 @@
         "financial-modeling-maestro",
         "budget-variance-tracker",
         "unit-economics-optimizer",
-        "cloud-cost-estimator",
         "cloud-waste-hunter",
         "business-impact-analyzer",
         "excel-artisan",
@@ -359,9 +342,7 @@
     },
     "Talent & Culture": {
       "skills": [
-        "talent-requirement-generator",
         "onboarding-wizard",
-        "biometric-context-adapter",
         "skill-bundle-packager",
         "ai-ethics-auditor"
       ],

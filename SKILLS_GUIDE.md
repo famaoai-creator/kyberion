@@ -1,6 +1,6 @@
 # Gemini Skills Ecosystem Guide
 
-Total Skills: 137 (Implemented: 137)
+Total Skills: 125 (Implemented: 125)
 Last updated: 2026/03/02
 
 > **Governance Note (The Skill Genesis Lifecycle):**
@@ -38,14 +38,10 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 | **executive-reporting-maestro** | >- | N/A | - | `npm run cli -- run executive-reporting-maestro` |
 | **financial-modeling-maestro** | >- | N/A | - | `npm run cli -- run financial-modeling-maestro` |
 | **investor-readiness-audit** | >- | N/A | - | `npm run cli -- run investor-readiness-audit` |
-| **ip-profitability-architect** | >- | N/A | - | `npm run cli -- run ip-profitability-architect` |
-| **ip-strategist** | >- | N/A | - | `npm run cli -- run ip-strategist` |
 | **pmo-governance-lead** | >- | N/A | - | `npm run cli -- run pmo-governance-lead` |
-| **scenario-multiverse-orchestrator** | >- | N/A | - | `npm run cli -- run scenario-multiverse-orchestrator` |
 | **stakeholder-communicator** | >- | N/A | - | `npm run cli -- run stakeholder-communicator` |
 | **strategic-roadmap-planner** | >- | N/A | - | `npm run cli -- run strategic-roadmap-planner` |
 | **sunset-architect** | >- | N/A | - | `npm run cli -- run sunset-architect` |
-| **talent-requirement-generator** | >- | N/A | - | `npm run cli -- run talent-requirement-generator` |
 | **tech-dd-analyst** | >- | N/A | - | `npm run cli -- run tech-dd-analyst` |
 | **unit-economics-optimizer** | >- | N/A | - | `npm run cli -- run unit-economics-optimizer` |
 
@@ -162,19 +158,16 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 
 | Skill | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
-| **agent-activity-monitor** | >- | N/A | - | `npm run cli -- run agent-activity-monitor` |
 | **ai-model-orchestrator** | >- | N/A | - | `npm run cli -- run ai-model-orchestrator` |
 | **api-doc-generator** | Generate API documentation from OpenAPI specs or code. | N/A | - | `npm run cli -- run api-doc-generator` |
 | **api-evolution-manager** | >- | N/A | - | `npm run cli -- run api-evolution-manager` |
 | **api-fetcher** | Fetch data from REST/GraphQL APIs securely. | N/A | - | `npm run cli -- run api-fetcher` |
 | **asset-token-economist** | >- | N/A | - | `npm run cli -- run asset-token-economist` |
-| **automated-support-architect** | >- | N/A | - | `npm run cli -- run automated-support-architect` |
 | **autonomous-skill-designer** | >- | N/A | - | `npm run cli -- run autonomous-skill-designer` |
 | **boilerplate-genie** | >- | N/A | - | `npm run cli -- run boilerplate-genie` |
 | **browser-navigator** | >- | N/A | - | `npm run cli -- run browser-navigator` |
 | **budget-variance-tracker** | >- | N/A | - | `npm run cli -- run budget-variance-tracker` |
 | **chaos-monkey-orchestrator** | >- | N/A | - | `npm run cli -- run chaos-monkey-orchestrator` |
-| **cloud-cost-estimator** | >- | N/A | - | `npm run cli -- run cloud-cost-estimator` |
 | **cloud-waste-hunter** | >- | N/A | - | `npm run cli -- run cloud-waste-hunter` |
 | **completeness-scorer** | Evaluate text completeness based on criteria. | N/A | - | `npm run cli -- run completeness-scorer` |
 | **context-injector** | Inject knowledge into JSON data context. | N/A | - | `npm run cli -- run context-injector` |
@@ -205,26 +198,19 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 | **sensitivity-detector** | Detect PII and sensitive information in text. | N/A | - | `npm run cli -- run sensitivity-detector` |
 | **shadow-dispatcher** | >- | N/A | - | `npm run cli -- run shadow-dispatcher` |
 | **skill-bundle-packager** | >- | 100 ✅ | 7ms | `npm run cli -- run skill-bundle-packager` |
-| **sustainability-consultant** | >- | N/A | - | `npm run cli -- run sustainability-consultant` |
-| **tech-stack-librarian** | >- | N/A | - | `npm run cli -- run tech-stack-librarian` |
 | **telemetry-insight-engine** | >- | N/A | - | `npm run cli -- run telemetry-insight-engine` |
 | **template-renderer** | Render text from templates (Mustache/EJS) and data. | N/A | - | `npm run cli -- run template-renderer` |
 | **terraform-arch-mapper** | >- | N/A | - | `npm run cli -- run terraform-arch-mapper` |
-| **test-viewpoint-analyst** | >- | N/A | - | `npm run cli -- run test-viewpoint-analyst` |
-| **visionary-ethos-keeper** | >- | N/A | - | `npm run cli -- run visionary-ethos-keeper` |
 
 ## 📂 UX
 > Human-centric UI/UX auditing and voice interface control.
 
 | Skill | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
-| **biometric-context-adapter** | >- | N/A | - | `npm run cli -- run biometric-context-adapter` |
 | **localization-maestro** | >- | N/A | - | `npm run cli -- run localization-maestro` |
 | **synthetic-user-persona** | >- | N/A | - | `npm run cli -- run synthetic-user-persona` |
 | **ux-auditor** | >- | N/A | - | `npm run cli -- run ux-auditor` |
 | **ux-visualizer** | >- | N/A | - | `npm run cli -- run ux-visualizer` |
-| **voice-command-listener** | >- | N/A | - | `npm run cli -- run voice-command-listener` |
-| **voice-interface-maestro** | >- | N/A | - | `npm run cli -- run voice-interface-maestro` |
 
 ---
 *Generated by Ecosystem Architect Tool | Based on Hierarchical Namespace Model v1.0*

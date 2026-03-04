@@ -34,7 +34,6 @@ intents:
     trigger_phrases:
       ['strategic plan', 'business roadmap', 'executive summary', 'scenario analysis']
     chain:
-      - 'scenario-multiverse-orchestrator'
       - 'financial-modeling-maestro'
       - 'business-impact-analyzer'
       - 'competitive-intel-strategist'
@@ -46,7 +45,6 @@ intents:
       - 'investor-readiness-audit'
       - 'financial-modeling-maestro'
       - 'unit-economics-optimizer'
-      - 'ip-strategist'
 
   # === Code & Engineering ===
   - name: 'Legacy Modernization'
@@ -55,7 +53,6 @@ intents:
       - 'codebase-mapper'
       - 'refactoring-engine'
       - 'technology-porter'
-      - 'dependency-lifeline'
 
   - name: 'Code Quality Audit'
     trigger_phrases: ['review code', 'code quality', 'check code health', 'code smell']
@@ -109,7 +106,6 @@ intents:
     trigger_phrases:
       ['reduce cloud cost', 'cloud waste', 'optimize infrastructure', 'save money on cloud']
     chain:
-      - 'cloud-cost-estimator'
       - 'cloud-waste-hunter'
       - 'performance-monitor-analyst'
 

@@ -1,6 +1,6 @@
 import { runSkillAsync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { runYamlScenario } from './lib.js';
+import { runScenario } from './lib.js';
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 
@@ -15,15 +15,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const argv = await argvBuilder.parseSync();
     const scenarioPath = argv.scenario as string;
 
-    if (scenarioPath.endsWith('.yaml') || scenarioPath.endsWith('.yml')) {
-      const result = await runYamlScenario(path.resolve(process.cwd(), scenarioPath));
-      return result;
-    } else {
-      const output = execSync('npx playwright test "' + scenarioPath + '" --reporter=json', {
-        cwd: process.cwd(),
-        encoding: 'utf8',
-      });
-      return { result: 'completed', output: JSON.parse(output) };
-    }
+    const result = await runScenario(path.resolve(process.cwd(), scenarioPath));
+    return result;
   });
 }

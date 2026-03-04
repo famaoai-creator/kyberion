@@ -547,7 +547,7 @@
     "id": "frameworks/conceptual-frameworks.md",
     "title": "Conceptual Frameworks Reference",
     "author": "Unknown",
-    "last_updated": "2026-03-03",
+    "last_updated": "2026-03-04",
     "tier": "public",
     "category": "frameworks"
   },
@@ -812,6 +812,14 @@
     "title": "スキル間データ受け渡し仕様 (Data Handover Specs)",
     "author": "Unknown",
     "last_updated": "2026-03-03",
+    "tier": "public",
+    "category": "orchestration"
+  },
+  {
+    "id": "orchestration/data-harvesting-best-practices.md",
+    "title": "Data Harvesting Best Practices: URL Resolution & Secure Download",
+    "author": "Unknown",
+    "last_updated": "2026-03-04",
     "tier": "public",
     "category": "orchestration"
   },
