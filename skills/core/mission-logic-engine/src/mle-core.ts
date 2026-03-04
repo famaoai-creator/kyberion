@@ -32,7 +32,14 @@ export async function executeMLE(options: MLEOptions): Promise<any> {
     throw new Error(`Pipeline not found: ${pipelinePath}`);
   }
 
-  const pipelineDef: any = yaml.load(fs.readFileSync(pipelinePath, 'utf8'));
+  const content = fs.readFileSync(pipelinePath, 'utf8');
+  let pipelineDef: any;
+  try {
+    pipelineDef = JSON.parse(content);
+  } catch {
+    pipelineDef = yaml.load(content);
+  }
+
   const steps = pipelineDef.steps || [];
   const results: any[] = [];
   let lastOutput: any = null;
@@ -68,7 +75,20 @@ export async function executeMLE(options: MLEOptions): Promise<any> {
         lastOutput = stdout.trim();
       }
 
-      results.push({ id: stepId, status: 'success', output: lastOutput });
+      const stepArtifact = {
+        id: stepId,
+        skill: skillName,
+        args,
+        status: 'success',
+        output: lastOutput,
+        timestamp: new Date().toISOString()
+      };
+
+      const evidenceDir = path.join(rootDir, 'active/missions', missionId, 'evidence');
+      if (!fs.existsSync(evidenceDir)) fs.mkdirSync(evidenceDir, { recursive: true });
+      safeWriteFile(path.join(evidenceDir, `task_${stepId}.json`), JSON.stringify(stepArtifact, null, 2));
+
+      results.push(stepArtifact);
     } catch (err: any) {
       logger.error(`[MLE] Step Failed: ${stepId}`);
       
