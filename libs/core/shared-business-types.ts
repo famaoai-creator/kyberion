@@ -29,6 +29,32 @@ export interface TechStackInfo {
 }
 
 /**
+ * Represents a physical or logical asset within the ecosystem.
+ */
+export interface Asset {
+  id: string;
+  name: string;
+  type: 'code' | 'doc' | 'credential' | 'other';
+  tenant: string; // One of the 8 companies
+  confidentiality: 'public' | 'internal' | 'confidential' | 'restricted';
+  hash: string;
+  path: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+/**
+ * Audit trail entry for the Sovereign Asset Ledger.
+ */
+export interface LedgerEntry {
+  action: 'ingest' | 'update' | 'archive' | 'purge';
+  asset_id: string;
+  timestamp: string;
+  actor: string; // e.g., "Ecosystem Architect"
+  details: string;
+}
+
+/**
  * Unified risk/issue entry for reporting and audit skills.
  */
 export interface Issue {
