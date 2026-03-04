@@ -1,13 +1,13 @@
 {
   "v": "2.0.0",
-  "t": 303,
-  "u": "2026-03-04T16:57:39.215Z",
+  "t": 304,
+  "u": "2026-03-04T22:23:58.190Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
       "title": "AIエンジニアリング・ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ai-engineering"
     },
@@ -15,7 +15,7 @@
       "id": "ai-engineering/review_checklist.md",
       "title": "AIシステム・レビューチェックリスト",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ai-engineering"
     },
@@ -23,7 +23,7 @@
       "id": "ai-engineering/strategy.md",
       "title": "エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ai-engineering"
     },
@@ -39,7 +39,7 @@
       "id": "architecture/analysis-multi-tenant-governance-20260304.md",
       "title": "検討報告：マルチテナント・ナレッジガバナンスの最適化案",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -47,7 +47,7 @@
       "id": "architecture/distributed-systems.md",
       "title": "分散システム ＆ アーキテクチャパターン",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -55,7 +55,7 @@
       "id": "architecture/excel-design-distillation-pattern.md",
       "title": "Wisdom: Excel Design Distillation & AI-Native Replication",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -63,7 +63,7 @@
       "id": "architecture/microservices-patterns.md",
       "title": "Microservices Design Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -79,7 +79,7 @@
       "id": "architecture/pptx-design-distillation-pattern.md",
       "title": "Wisdom: PowerPoint Design Distillation & Heritage Sync",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -93,7 +93,7 @@
     },
     {
       "id": "architecture/terminal-hosting.md",
-      "title": "Sovereign Terminal Hosting Protocol",
+      "title": "Terminal Hosting: The Institutional Gateway",
       "author": "Unknown",
       "last_updated": "2026-03-04",
       "tier": "public",
@@ -103,7 +103,7 @@
       "id": "ceo/ai-business-engineering.md",
       "title": "AI-Driven Business Engineering: The Gemini Strategy",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo"
     },
@@ -111,7 +111,7 @@
       "id": "ceo/executive_briefing_standards.md",
       "title": "Executive Briefing Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo"
     },
@@ -119,7 +119,7 @@
       "id": "ceo/finance/kpi_standards.md",
       "title": "財務KPI標準基準 (Financial KPI Standards)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo/finance"
     },
@@ -127,7 +127,7 @@
       "id": "ceo/investment/tech_dd_standard.md",
       "title": "技術デューデリジェンス (Tech DD) 標準基準",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo/investment"
     },
@@ -135,7 +135,7 @@
       "id": "ceo/legal-tax-essentials-jp.md",
       "title": "Corporate Legal & Tax Essentials (Japan context)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo"
     },
@@ -143,7 +143,7 @@
       "id": "ceo/mission/corporate_purpose.md",
       "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo/mission"
     },
@@ -151,7 +151,7 @@
       "id": "ceo/planning/frameworks.md",
       "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ceo/planning"
     },
@@ -159,7 +159,7 @@
       "id": "common/operations/attendance-approval-sop.md",
       "title": "勤怠承認 標準運用手順書 (Attendance Approval SOP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "common/operations"
     },
@@ -167,7 +167,7 @@
       "id": "common/operations/ringi-approval-sop.md",
       "title": "稟議承認 標準運用手順書 (Ringi Approval SOP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "common/operations"
     },
@@ -175,7 +175,7 @@
       "id": "common/pmo/release-audit-sop.md",
       "title": "リリース整合性監査 標準運用手順書 (Release Audit SOP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "common/pmo"
     },
@@ -183,7 +183,7 @@
       "id": "common/wisdom/agentic-evolution-patterns.md",
       "title": "Wisdom: Agentic Evolution & Architecture Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "common/wisdom"
     },
@@ -191,7 +191,7 @@
       "id": "connections/setup_guide.md",
       "title": "ユニバーサル接続設定ガイド (UCM Setup)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "connections"
     },
@@ -199,7 +199,7 @@
       "id": "design/brand/visual_identity.md",
       "title": "Brand & Visual Identity Engineering",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "design/brand"
     },
@@ -207,7 +207,7 @@
       "id": "devops/ci-cd-patterns.md",
       "title": "CI/CD Pipeline Design Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "devops"
     },
@@ -215,7 +215,7 @@
       "id": "devops/cloud-native.md",
       "title": "クラウドネイティブ ＆ インフラ設計",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "devops"
     },
@@ -223,7 +223,7 @@
       "id": "devops/devsecops-pipeline-standards.md",
       "title": "DevSecOps Pipeline Standards: Automating Trust",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "devops"
     },
@@ -231,7 +231,7 @@
       "id": "economics/finops/cloud_optimization.md",
       "title": "Cloud FinOps & Unit Economics Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "economics/finops"
     },
@@ -239,7 +239,7 @@
       "id": "economics/it_cost_benchmarks.md",
       "title": "IT Cost Benchmarks & Strategic ROI",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "economics"
     },
@@ -247,7 +247,7 @@
       "id": "ethics/ai_bias_mitigation.md",
       "title": "Data Ethics & AI Bias Mitigation Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "ethics"
     },
@@ -255,7 +255,7 @@
       "id": "evolution/biometric_privacy.md",
       "title": "Biometric & Mood Data Privacy Protocol",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "evolution"
     },
@@ -263,7 +263,7 @@
       "id": "evolution/wisdom_2026_03_01.md",
       "title": "🧠 Autonomous Wisdom Distillation - 2026-03-01",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "evolution"
     },
@@ -271,7 +271,7 @@
       "id": "external-wisdom/everything-claude/agents/architect.md",
       "title": "ADR-001: Use Redis for Semantic Search Vector Storage",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -279,7 +279,7 @@
       "id": "external-wisdom/everything-claude/agents/build-error-resolver.md",
       "title": "Build Error Resolver",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -287,7 +287,7 @@
       "id": "external-wisdom/everything-claude/agents/code-reviewer.md",
       "title": "code-reviewer",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -295,7 +295,7 @@
       "id": "external-wisdom/everything-claude/agents/database-reviewer.md",
       "title": "Database Reviewer",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -303,7 +303,7 @@
       "id": "external-wisdom/everything-claude/agents/doc-updater.md",
       "title": "Documentation & Codemap Specialist",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -311,7 +311,7 @@
       "id": "external-wisdom/everything-claude/agents/e2e-runner.md",
       "title": "E2E Test Runner",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -319,7 +319,7 @@
       "id": "external-wisdom/everything-claude/agents/go-build-resolver.md",
       "title": "Go Build Error Resolver",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -327,7 +327,7 @@
       "id": "external-wisdom/everything-claude/agents/go-reviewer.md",
       "title": "Static analysis",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -335,7 +335,7 @@
       "id": "external-wisdom/everything-claude/agents/planner.md",
       "title": "Implementation Plan: [Feature Name]",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -343,7 +343,7 @@
       "id": "external-wisdom/everything-claude/agents/python-reviewer.md",
       "title": "Type checking",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -351,7 +351,7 @@
       "id": "external-wisdom/everything-claude/agents/refactor-cleaner.md",
       "title": "Refactor & Dead Code Cleaner",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -359,7 +359,7 @@
       "id": "external-wisdom/everything-claude/agents/security-reviewer.md",
       "title": "Security Reviewer",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -367,7 +367,7 @@
       "id": "external-wisdom/everything-claude/agents/tdd-guide.md",
       "title": "Test should fail - we haven't implemented yet",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/agents"
     },
@@ -375,7 +375,7 @@
       "id": "external-wisdom/everything-claude/rules/common/agents.md",
       "title": "Agent Orchestration",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -383,7 +383,7 @@
       "id": "external-wisdom/everything-claude/rules/common/coding-style.md",
       "title": "Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -391,7 +391,7 @@
       "id": "external-wisdom/everything-claude/rules/common/git-workflow.md",
       "title": "Git Workflow",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -399,7 +399,7 @@
       "id": "external-wisdom/everything-claude/rules/common/hooks.md",
       "title": "Hooks System",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -407,7 +407,7 @@
       "id": "external-wisdom/everything-claude/rules/common/patterns.md",
       "title": "Common Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -415,7 +415,7 @@
       "id": "external-wisdom/everything-claude/rules/common/performance.md",
       "title": "Performance Optimization",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -423,7 +423,7 @@
       "id": "external-wisdom/everything-claude/rules/common/security.md",
       "title": "Security Guidelines",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -431,7 +431,7 @@
       "id": "external-wisdom/everything-claude/rules/common/testing.md",
       "title": "Testing Requirements",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/common"
     },
@@ -439,7 +439,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/coding-style.md",
       "title": "Go Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -447,7 +447,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/hooks.md",
       "title": "Go Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -455,7 +455,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/patterns.md",
       "title": "Go Patterns",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -463,7 +463,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/security.md",
       "title": "Go Security",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -471,7 +471,7 @@
       "id": "external-wisdom/everything-claude/rules/golang/testing.md",
       "title": "Go Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/golang"
     },
@@ -479,7 +479,7 @@
       "id": "external-wisdom/everything-claude/rules/python/coding-style.md",
       "title": "Python Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -487,7 +487,7 @@
       "id": "external-wisdom/everything-claude/rules/python/hooks.md",
       "title": "Python Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -495,7 +495,7 @@
       "id": "external-wisdom/everything-claude/rules/python/patterns.md",
       "title": "Python Patterns",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -503,7 +503,7 @@
       "id": "external-wisdom/everything-claude/rules/python/security.md",
       "title": "Python Security",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -511,7 +511,7 @@
       "id": "external-wisdom/everything-claude/rules/python/testing.md",
       "title": "Python Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/python"
     },
@@ -519,7 +519,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/coding-style.md",
       "title": "TypeScript/JavaScript Coding Style",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -527,7 +527,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/hooks.md",
       "title": "TypeScript/JavaScript Hooks",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -535,7 +535,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/patterns.md",
       "title": "TypeScript/JavaScript Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -543,7 +543,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/security.md",
       "title": "TypeScript/JavaScript Security",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -551,7 +551,7 @@
       "id": "external-wisdom/everything-claude/rules/typescript/testing.md",
       "title": "TypeScript/JavaScript Testing",
       "author": "Unknown",
-      "last_updated": "2026-02-07",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "external-wisdom/everything-claude/rules/typescript"
     },
@@ -559,7 +559,7 @@
       "id": "fisc-compliance/aws_fisc_standard.md",
       "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "fisc-compliance"
     },
@@ -567,7 +567,7 @@
       "id": "fisc-compliance/blea_fisc_reference.md",
       "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "fisc-compliance"
     },
@@ -583,7 +583,7 @@
       "id": "future/quantum_sustainability.md",
       "title": "Future-Proofing: Quantum-Safe & Sustainability",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "future"
     },
@@ -591,7 +591,7 @@
       "id": "governance/active-inquiry-protocol.md",
       "title": "Active Inquiry Protocol: The Power of Questioning",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -599,7 +599,7 @@
       "id": "governance/config-protocol.md",
       "title": "Config Protocol: The Sovereign Rule of System State",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -607,7 +607,7 @@
       "id": "governance/consensus-protocol.md",
       "title": "ACE (Autonomous Consensus Engine) Operating Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -615,7 +615,15 @@
       "id": "governance/dual-key-policy.md",
       "title": "Dual-Key Policy: ロール管理と決定権限の標準規約",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "category": "governance"
+    },
+    {
+      "id": "governance/git-strategy.md",
+      "title": "GIT Strategy: Sovereign Hierarchical Synchronization",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -623,7 +631,7 @@
       "id": "governance/knowledge-protocol.md",
       "title": "ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -631,7 +639,7 @@
       "id": "governance/onboarding-protocol.md",
       "title": "主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -647,7 +655,7 @@
       "id": "governance/ts-base-stabilization-sop.md",
       "title": "SOP: TypeScript Core Base Stabilization",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
@@ -655,7 +663,7 @@
       "id": "legal/ip/patent_strategy.md",
       "title": "Legal & Intellectual Property Strategy",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "legal/ip"
     },
@@ -663,7 +671,7 @@
       "id": "nonfunctional/nonfunctional_requirements.md",
       "title": "Non-Functional Requirements Definition",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "nonfunctional"
     },
@@ -671,7 +679,7 @@
       "id": "nonfunctional/test-viewpoints/ipa_grade_2018.md",
       "title": "非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "nonfunctional/test-viewpoints"
     },
@@ -679,7 +687,7 @@
       "id": "onboarding/learning_paths.md",
       "title": "ロール別教育ロードマップ (Learning Paths by Role)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "onboarding"
     },
@@ -687,7 +695,7 @@
       "id": "operations/availability_best_practices.md",
       "title": "Availability & Disaster Recovery Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -695,7 +703,7 @@
       "id": "operations/incident-management-excellence.md",
       "title": "Incident Management & RCA Excellence Handbook",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -703,7 +711,7 @@
       "id": "operations/incident_knowledge_loop.md",
       "title": "Incident Knowledge Loop: Learning from Failures",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -711,7 +719,7 @@
       "id": "operations/modern_sre_best_practices.md",
       "title": "Modern SRE Best Practices (Advanced Operations)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -719,7 +727,7 @@
       "id": "operations/monitoring/best_practices.md",
       "title": "監視設定ベストプラクティス・チェックリスト",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations/monitoring"
     },
@@ -727,7 +735,7 @@
       "id": "operations/monitoring/datadog_best_practices.md",
       "title": "Datadog 導入・運用ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations/monitoring"
     },
@@ -735,7 +743,7 @@
       "id": "operations/monitoring/newrelic_best_practices.md",
       "title": "New Relic 導入・運用ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations/monitoring"
     },
@@ -743,7 +751,7 @@
       "id": "operations/monitoring_best_practices.md",
       "title": "Monitoring & Observability Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -751,7 +759,7 @@
       "id": "operations/pagerduty_best_practices.md",
       "title": "PagerDuty Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -759,7 +767,7 @@
       "id": "operations/runbook_best_practices.md",
       "title": "Runbook & Playbook Best Practices (AI-Native Operations)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -767,7 +775,7 @@
       "id": "operations/runbooks/standard.md",
       "title": "運用ランブック（手順書）標準構成",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations/runbooks"
     },
@@ -775,7 +783,7 @@
       "id": "operations/slo_dashboard_best_practices.md",
       "title": "SLO & Dashboard Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "operations"
     },
@@ -783,7 +791,7 @@
       "id": "orchestration/active_inquiry_protocol.md",
       "title": "Active Inquiry Protocol: The Power of Questioning",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -791,7 +799,7 @@
       "id": "orchestration/advanced-development-flow.md",
       "title": "高度な自律開発標準ワークフロー (Advanced Development Flow)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -799,7 +807,7 @@
       "id": "orchestration/autonomous-agent-protocol.md",
       "title": "Sovereign Autonomous Agent Protocol (SAAP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -807,7 +815,7 @@
       "id": "orchestration/autonomous-debug-loop.md",
       "title": "自律型デバッグ・ループ (Autonomous Debug Loop)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -823,7 +831,7 @@
       "id": "orchestration/consensus-protocol.md",
       "title": "ACE (Autonomous Consensus Engine) Operating Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -831,7 +839,7 @@
       "id": "orchestration/context-extraction-rules.md",
       "title": "コンテキスト抽出・要約ルール (Context Extraction Rules)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -839,7 +847,7 @@
       "id": "orchestration/corporate-env-guide.md",
       "title": "企業内ネットワーク環境セットアップガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -847,7 +855,7 @@
       "id": "orchestration/data-handover-specs.md",
       "title": "スキル間データ受け渡し仕様 (Data Handover Specs)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -871,7 +879,7 @@
       "id": "orchestration/directives-protocol.md",
       "title": "Cross-Role Directive Protocol (CRDP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -879,7 +887,7 @@
       "id": "orchestration/fusion-protocols/learning_loop.md",
       "title": "Continuous Learning Loop Protocol",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/fusion-protocols"
     },
@@ -887,7 +895,7 @@
       "id": "orchestration/git-flow-standards.md",
       "title": "自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -895,7 +903,7 @@
       "id": "orchestration/hybrid-development-flow.md",
       "title": "ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -903,7 +911,7 @@
       "id": "orchestration/knowledge-protocol.md",
       "title": "ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -911,7 +919,7 @@
       "id": "orchestration/mission-execution-protocol.md",
       "title": "ミッション実行規程 (Mission Execution Protocol v1.0)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -919,7 +927,7 @@
       "id": "orchestration/mission-playbooks/ceo-strategy.md",
       "title": "ミッション・プレイブック：CEO戦略的意思決定",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/mission-playbooks"
     },
@@ -927,7 +935,7 @@
       "id": "orchestration/mission-playbooks/product-audit.md",
       "title": "ミッション・プレイブック：プロダクト健全性 ＆ リリース監査",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/mission-playbooks"
     },
@@ -935,7 +943,7 @@
       "id": "orchestration/mission-playbooks/saas-roi.md",
       "title": "ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/mission-playbooks"
     },
@@ -951,7 +959,7 @@
       "id": "orchestration/onboarding-directives/01_eng_to_steward.md",
       "title": "MISSION: Infrastructure & Environment Mapping",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -959,7 +967,7 @@
       "id": "orchestration/onboarding-directives/02_ceo_to_steward.md",
       "title": "MISSION: Strategic Vision Harvesting",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -967,7 +975,7 @@
       "id": "orchestration/onboarding-directives/03_arch_to_steward.md",
       "title": "MISSION: Skill Usage & Performance Audit",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -975,7 +983,7 @@
       "id": "orchestration/onboarding-directives/04_steward_self_map.md",
       "title": "MISSION: External System Connection Mapping",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -983,7 +991,7 @@
       "id": "orchestration/onboarding-directives/05_sol_to_steward.md",
       "title": "MISSION: Competitive Edge & ROI Benchmarking",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -991,7 +999,7 @@
       "id": "orchestration/onboarding-directives/06_sre_to_steward.md",
       "title": "MISSION: Incident Response & SRE Wisdom",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -999,7 +1007,7 @@
       "id": "orchestration/onboarding-directives/07_legal_to_steward.md",
       "title": "MISSION: Legal Guardrails & IP Portfolio",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1007,7 +1015,7 @@
       "id": "orchestration/onboarding-directives/08_qa_to_steward.md",
       "title": "MISSION: Testing Standards & Bug Analytics",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1015,7 +1023,7 @@
       "id": "orchestration/onboarding-directives/09_pmo_to_steward.md",
       "title": "MISSION: Project Governance & Standards Alignment",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1023,7 +1031,7 @@
       "id": "orchestration/onboarding-directives/10_manager_to_steward.md",
       "title": "MISSION: Organizational Map & Approval History",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1031,7 +1039,7 @@
       "id": "orchestration/onboarding-directives/11_marketing_to_steward.md",
       "title": "MISSION: Brand Assets & Trend Harvesting",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1039,7 +1047,7 @@
       "id": "orchestration/onboarding-directives/12_cs_to_steward.md",
       "title": "MISSION: Voice of Customer (VoC) Data Collection",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1047,7 +1055,7 @@
       "id": "orchestration/onboarding-directives/13_hr_to_steward.md",
       "title": "MISSION: Culture Archetypes & Talent Specs",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1055,7 +1063,7 @@
       "id": "orchestration/onboarding-directives/14_pdm_to_steward.md",
       "title": "MISSION: Product Roadmap & Feature Backlog",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1063,7 +1071,7 @@
       "id": "orchestration/onboarding-directives/15_designer_to_steward.md",
       "title": "MISSION: UI/UX Asset & Persona Templates",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1071,7 +1079,7 @@
       "id": "orchestration/onboarding-directives/16_finance_to_steward.md",
       "title": "MISSION: Financial P&L & Cost Analysis",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1079,7 +1087,7 @@
       "id": "orchestration/onboarding-directives/17_sec_to_steward.md",
       "title": "MISSION: Threat Intelligence & Vulnerability Feed",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1087,7 +1095,7 @@
       "id": "orchestration/onboarding-directives/18_sales_to_steward.md",
       "title": "MISSION: Sales Pipelines & Deal Insights",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1095,7 +1103,7 @@
       "id": "orchestration/onboarding-directives/19_dev_to_steward.md",
       "title": "MISSION: Technical Blueprint Discovery",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1103,7 +1111,7 @@
       "id": "orchestration/onboarding-directives/20_owner_to_steward.md",
       "title": "MISSION: Market Dynamics & P&L Sensitivity",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1111,7 +1119,7 @@
       "id": "orchestration/onboarding-directives/21_assistant_to_steward.md",
       "title": "MISSION: Executive Support & Templates",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1119,7 +1127,7 @@
       "id": "orchestration/onboarding-protocol.md",
       "title": "主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1127,7 +1135,7 @@
       "id": "orchestration/optimization-standards.md",
       "title": "自律型シナジー標準基準 (Autonomous Synergy Standards)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1143,7 +1151,7 @@
       "id": "orchestration/proposal-pipeline.md",
       "title": "Professional Proposal Pipeline (Orchestration Pattern)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1151,7 +1159,7 @@
       "id": "orchestration/quality-management-flow.md",
       "title": "エンタープライズ品質管理フロー (Quality Management Flow)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1159,7 +1167,7 @@
       "id": "orchestration/self-refinement-protocol.md",
       "title": "Self-Refinement Protocol: The Path to Perpetual Growth",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1175,7 +1183,7 @@
       "id": "orchestration/token-economy-protocol.md",
       "title": "トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1191,7 +1199,7 @@
       "id": "organization/change_management.md",
       "title": "Cultural Alignment & Change Management Protocol",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "organization"
     },
@@ -1199,7 +1207,7 @@
       "id": "personalities/matrix.md",
       "title": "ペルソナ・マトリクス (Persona Matrix)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "personal",
       "category": "personalities"
     },
@@ -1207,7 +1215,7 @@
       "id": "pmo/hall-of-fame/mission-marathon-proof.md",
       "title": "Hall of Fame: Ecosystem Viability Marathon",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/hall-of-fame"
     },
@@ -1215,7 +1223,7 @@
       "id": "pmo/standard/ipa_nfr_bridge.md",
       "title": "PMO Bridge to IPA Non-Functional Grade",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1223,7 +1231,7 @@
       "id": "pmo/standard/pmbok_v7.md",
       "title": "PMBOK v7 Project Management Principles",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1231,7 +1239,7 @@
       "id": "pmo/standard/stakeholder_management.md",
       "title": "Stakeholder Management Framework",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/standard"
     },
@@ -1239,7 +1247,7 @@
       "id": "pmo/standards/governance.md",
       "title": "PMO ガバナンス標準基準 (Governance Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/standards"
     },
@@ -1247,7 +1255,7 @@
       "id": "pmo/templates/external_status_report.md",
       "title": "対外報告用ステータスレポート・テンプレート",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "pmo/templates"
     },
@@ -1255,7 +1263,7 @@
       "id": "public/ai-engineering/best_practices.md",
       "title": "AIエンジニアリング・ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/ai-engineering"
     },
@@ -1263,7 +1271,7 @@
       "id": "public/ai-engineering/review_checklist.md",
       "title": "AIシステム・レビューチェックリスト",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/ai-engineering"
     },
@@ -1271,7 +1279,7 @@
       "id": "public/ai-engineering/strategy.md",
       "title": "エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/ai-engineering"
     },
@@ -1279,7 +1287,7 @@
       "id": "public/design/brand/visual_identity.md",
       "title": "Brand & Visual Identity Engineering",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/design/brand"
     },
@@ -1287,7 +1295,7 @@
       "id": "public/devops/ci-cd-patterns.md",
       "title": "CI/CD Pipeline Design Patterns",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/devops"
     },
@@ -1295,7 +1303,7 @@
       "id": "public/devops/cloud-native.md",
       "title": "クラウドネイティブ ＆ インフラ設計",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/devops"
     },
@@ -1303,7 +1311,7 @@
       "id": "public/devops/devsecops-pipeline-standards.md",
       "title": "DevSecOps Pipeline Standards: Automating Trust",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/devops"
     },
@@ -1311,7 +1319,7 @@
       "id": "public/sdlc/aidlc-standards.md",
       "title": "AIDLC Standards: AI Development Life Cycle",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/sdlc"
     },
@@ -1319,7 +1327,7 @@
       "id": "public/sdlc/design_standard_nablarch.md",
       "title": "アプリケーション方式設計標準 (Nablarch/AWS参考)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/sdlc"
     },
@@ -1327,7 +1335,7 @@
       "id": "public/sdlc/modern-sdlc-standards.md",
       "title": "Modern SDLC Standards: Agile, Shift-Left & Quality-First",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/sdlc"
     },
@@ -1335,7 +1343,7 @@
       "id": "public/sdlc/waterfall_standard.md",
       "title": "ウォーターフォール開発標準：工程と成果物 (SDLC Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/sdlc"
     },
@@ -1343,7 +1351,7 @@
       "id": "public/security/advanced/diff_based_scanning.md",
       "title": "Diff-Based Security Scanning Strategy",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security/advanced"
     },
@@ -1351,7 +1359,7 @@
       "id": "public/security/aisms-framework.md",
       "title": "AISMS Framework: AI Security Management System",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security"
     },
@@ -1359,7 +1367,7 @@
       "id": "public/security/privacy-governance.md",
       "title": "Data Privacy & Governance: APPI & GDPR Compliance",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security"
     },
@@ -1367,7 +1375,7 @@
       "id": "public/security/security-best-practices.md",
       "title": "Security Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security"
     },
@@ -1375,7 +1383,7 @@
       "id": "public/security/security-by-design.md",
       "title": "Security By Design Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security"
     },
@@ -1383,7 +1391,7 @@
       "id": "public/security/supply-chain-governance.md",
       "title": "Software Supply Chain Governance & SBOM Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/security"
     },
@@ -1391,7 +1399,7 @@
       "id": "public/standards/aws_fisc_standard.md",
       "title": "AWS FISC (金融機関向け安全対策基準) 準拠ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/standards"
     },
@@ -1399,7 +1407,7 @@
       "id": "public/standards/blea_fisc_reference.md",
       "title": "AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/standards"
     },
@@ -1407,7 +1415,7 @@
       "id": "public/templates/ss_ppt_theme.md",
       "title": "ss_ppt_theme",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/templates"
     },
@@ -1415,7 +1423,7 @@
       "id": "public/testing/test_item_specification.md",
       "title": "テスト項目表・実施結果標準仕様 (Test Item Specification)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/testing"
     },
@@ -1423,7 +1431,7 @@
       "id": "public/testing/viewpoint-catalogs/tis_catalog_v1_6.md",
       "title": "テスト観点カタログ (TIS株式会社 公開版 v1.6)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "public/testing/viewpoint-catalogs"
     },
@@ -1431,7 +1439,7 @@
       "id": "quality-management/metrics_standards.md",
       "title": "定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "quality-management"
     },
@@ -1439,7 +1447,7 @@
       "id": "quality-management/test_viewpoints_catalog.md",
       "title": "Test Viewpoint Catalog: Non-Functional Excellence",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "quality-management"
     },
@@ -1447,7 +1455,7 @@
       "id": "requirements-guide/ipa_best_practices.md",
       "title": "要件定義ガイド (IPA準拠)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "requirements-guide"
     },
@@ -1455,7 +1463,7 @@
       "id": "requirements-guide/review_checklist.md",
       "title": "要件定義ドキュメント・レビューチェックリスト",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "requirements-guide"
     },
@@ -1463,7 +1471,7 @@
       "id": "roles/business_owner/mission.md",
       "title": "Business Owner (事業責任者) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/business_owner"
     },
@@ -1471,7 +1479,7 @@
       "id": "roles/ceo/finance/kpi_standards.md",
       "title": "財務KPI標準基準 (Financial KPI Standards)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ceo/finance"
     },
@@ -1479,7 +1487,7 @@
       "id": "roles/ceo/investment/tech_dd_standard.md",
       "title": "技術デューデリジェンス (Tech DD) 標準基準",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ceo/investment"
     },
@@ -1487,7 +1495,7 @@
       "id": "roles/ceo/memories/strategic_vision.md",
       "title": "STRATEGIC_VISION Memories (ROLES)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ceo/memories"
     },
@@ -1495,7 +1503,7 @@
       "id": "roles/ceo/mission/corporate_purpose.md",
       "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ceo/mission"
     },
@@ -1503,7 +1511,7 @@
       "id": "roles/ceo/planning/frameworks.md",
       "title": "事業計画 ＆ 戦略フレームワーク (Planning Frameworks)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ceo/planning"
     },
@@ -1511,7 +1519,7 @@
       "id": "roles/customer_success/mission.md",
       "title": "Customer Success (カスタマーサクセス) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/customer_success"
     },
@@ -1519,7 +1527,7 @@
       "id": "roles/cyber_security/mission.md",
       "title": "Cyber Security Lead (セキュリティ責任者) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/cyber_security"
     },
@@ -1527,7 +1535,7 @@
       "id": "roles/designer/mission.md",
       "title": "Experience Designer (デザイナー) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/designer"
     },
@@ -1543,7 +1551,7 @@
       "id": "roles/executive_assistant/mission.md",
       "title": "Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/executive_assistant"
     },
@@ -1551,7 +1559,7 @@
       "id": "roles/finance_controller/mission.md",
       "title": "Finance Controller (財務・経理責任者) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/finance_controller"
     },
@@ -1559,7 +1567,7 @@
       "id": "roles/incident_commander/mission.md",
       "title": "Incident Commander (インシデント・コマンダー) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/incident_commander"
     },
@@ -1567,7 +1575,7 @@
       "id": "roles/integration_steward/mission.md",
       "title": "Role: Integration Steward",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/integration_steward"
     },
@@ -1575,7 +1583,7 @@
       "id": "roles/knowledge_steward/mission.md",
       "title": "Knowledge Steward (ナレッジ・スチュワード) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/knowledge_steward"
     },
@@ -1583,7 +1591,7 @@
       "id": "roles/legal_strategist/mission.md",
       "title": "Legal & IP Strategist (法務・知財戦略) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/legal_strategist"
     },
@@ -1591,7 +1599,7 @@
       "id": "roles/line_manager/mission.md",
       "title": "Line Manager (ラインマネージャー) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/line_manager"
     },
@@ -1599,7 +1607,7 @@
       "id": "roles/marketing_growth/mission.md",
       "title": "Marketing & Growth (マーケティング & 成長戦略) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/marketing_growth"
     },
@@ -1607,7 +1615,7 @@
       "id": "roles/performance_engineer/guidelines.md",
       "title": "Performance Engineer 行動指針 (Operational Guidelines)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/performance_engineer"
     },
@@ -1623,7 +1631,7 @@
       "id": "roles/pmo_governance/mission.md",
       "title": "PMO Governance (PMO/ガバナンス) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/pmo_governance"
     },
@@ -1631,7 +1639,7 @@
       "id": "roles/pmo_governance/quality_gates.md",
       "title": "品質ゲート (Quality Gates) 運用基準",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/pmo_governance"
     },
@@ -1639,7 +1647,7 @@
       "id": "roles/product_manager/mission.md",
       "title": "Product Manager (プロダクトマネージャー) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/product_manager"
     },
@@ -1647,7 +1655,7 @@
       "id": "roles/qa_lead/mission.md",
       "title": "Quality Assurance (QA/QC) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/qa_lead"
     },
@@ -1655,7 +1663,7 @@
       "id": "roles/qa_lead/qa_checkpoints.md",
       "title": "QA/QC 重点チェックポイント：非同期通信と物理制約",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/qa_lead"
     },
@@ -1663,7 +1671,7 @@
       "id": "roles/reliability_engineer/mission.md",
       "title": "Reliability Engineer (SRE/運用責任者) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/reliability_engineer"
     },
@@ -1671,7 +1679,7 @@
       "id": "roles/software_developer/mission.md",
       "title": "Software Developer (ソフトウェア開発者) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/software_developer"
     },
@@ -1679,7 +1687,7 @@
       "id": "roles/solution_architect/mission.md",
       "title": "Solution Architect (ソリューション・アーキテクト) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/solution_architect"
     },
@@ -1687,7 +1695,7 @@
       "id": "roles/strategic_sales/mission.md",
       "title": "Strategic Sales (営業・事業開発) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/strategic_sales"
     },
@@ -1695,7 +1703,7 @@
       "id": "roles/talent_culture/mission.md",
       "title": "Talent & Culture (採用 & 組織文化) ミッション声明",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/talent_culture"
     },
@@ -1703,7 +1711,7 @@
       "id": "sdlc/aidlc-standards.md",
       "title": "AIDLC Standards: AI Development Life Cycle",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "sdlc"
     },
@@ -1711,7 +1719,7 @@
       "id": "sdlc/design_standard_nablarch.md",
       "title": "アプリケーション方式設計標準 (Nablarch/AWS参考)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "sdlc"
     },
@@ -1719,7 +1727,7 @@
       "id": "sdlc/modern-sdlc-standards.md",
       "title": "Modern SDLC Standards: Agile, Shift-Left & Quality-First",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "sdlc"
     },
@@ -1727,7 +1735,7 @@
       "id": "sdlc/waterfall_standard.md",
       "title": "ウォーターフォール開発標準：工程と成果物 (SDLC Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "sdlc"
     },
@@ -1735,7 +1743,7 @@
       "id": "security/advanced/diff_based_scanning.md",
       "title": "Diff-Based Security Scanning Strategy",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security/advanced"
     },
@@ -1743,7 +1751,7 @@
       "id": "security/aisms-framework.md",
       "title": "AISMS Framework: AI Security Management System",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security"
     },
@@ -1751,7 +1759,7 @@
       "id": "security/privacy-governance.md",
       "title": "Data Privacy & Governance: APPI & GDPR Compliance",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security"
     },
@@ -1759,7 +1767,7 @@
       "id": "security/security-best-practices.md",
       "title": "Security Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security"
     },
@@ -1767,7 +1775,7 @@
       "id": "security/security-by-design.md",
       "title": "Security By Design Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security"
     },
@@ -1775,7 +1783,7 @@
       "id": "security/supply-chain-governance.md",
       "title": "Software Supply Chain Governance & SBOM Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "security"
     },
@@ -1783,7 +1791,7 @@
       "id": "skills/ux-visualizer/methodology.md",
       "title": "Methodology: High-Fidelity SPA Reverse Engineering",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "skills/ux-visualizer"
     },
@@ -1791,7 +1799,7 @@
       "id": "software-design/patterns.md",
       "title": "ソフトウェアデザインパターン & 設計原則",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "software-design"
     },
@@ -1799,7 +1807,7 @@
       "id": "standards/adr/adr_standard.md",
       "title": "Architecture Decision Record (ADR) Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/adr"
     },
@@ -1807,7 +1815,7 @@
       "id": "standards/ai-native/gemini-coding-standard.md",
       "title": "Gemini AI-Native Coding Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/ai-native"
     },
@@ -1815,7 +1823,7 @@
       "id": "standards/bcp/dr_playbook.md",
       "title": "Disaster Recovery & BCP Playbook",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/bcp"
     },
@@ -1823,7 +1831,7 @@
       "id": "standards/contract/negotiation_guardrails.md",
       "title": "Contract & SLA Negotiation Guardrails",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/contract"
     },
@@ -1831,7 +1839,7 @@
       "id": "standards/data/data-governance.md",
       "title": "Data Engineering & Governance Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/data"
     },
@@ -1839,7 +1847,7 @@
       "id": "standards/design/platform-design-guidelines.md",
       "title": "Platform Design Guidelines: iOS, Android, and Web",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/design"
     },
@@ -1847,7 +1855,7 @@
       "id": "standards/design/visual-testing-standards.md",
       "title": "Visual & Design Testing Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/design"
     },
@@ -1855,7 +1863,7 @@
       "id": "standards/engineering/api-compatibility-standards.md",
       "title": "API Compatibility & Evolution Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/engineering"
     },
@@ -1863,7 +1871,7 @@
       "id": "standards/engineering/code-analysis-protocol.md",
       "title": "Source Code Analysis Protocol (SCAP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/engineering"
     },
@@ -1871,7 +1879,7 @@
       "id": "standards/engineering/logging-design-standards.md",
       "title": "Logging Design & Observability Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/engineering"
     },
@@ -1879,7 +1887,7 @@
       "id": "standards/engineering/platform-engineering.md",
       "title": "Platform Engineering & DevEx Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/engineering"
     },
@@ -1887,7 +1895,7 @@
       "id": "standards/engineering/reverse-design-protocol.md",
       "title": "Reverse Design Protocol (RDP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/engineering"
     },
@@ -1895,7 +1903,7 @@
       "id": "standards/fisc/security-controls.md",
       "title": "FISC-Aligned Security Standard (Cloud Infrastructure)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/fisc"
     },
@@ -1903,7 +1911,7 @@
       "id": "standards/ipa/requirements-checklist.md",
       "title": "IPA-Aligned Requirements Engineering Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/ipa"
     },
@@ -1911,7 +1919,7 @@
       "id": "standards/media/pptx-ooxml-standards.md",
       "title": "Standard: Office Open XML (OOXML) for PowerPoint (.pptx)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/media"
     },
@@ -1919,7 +1927,7 @@
       "id": "standards/qa/accessibility-standards.md",
       "title": "Accessibility (A11y) Excellence Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/qa"
     },
@@ -1927,7 +1935,7 @@
       "id": "standards/qa/screen-transition-standards.md",
       "title": "Screen Transition & State Machine Testing Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/qa"
     },
@@ -1935,7 +1943,7 @@
       "id": "standards/sdlc/methodologies.md",
       "title": "Software Development Life Cycle (SDLC) Methodologies",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/sdlc"
     },
@@ -1943,7 +1951,7 @@
       "id": "standards/security/owasp_llm_top10.md",
       "title": "OWASP Top 10 for LLM Applications",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/security"
     },
@@ -1951,7 +1959,7 @@
       "id": "standards/testing/best_practices.md",
       "title": "Test Automation Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1959,7 +1967,7 @@
       "id": "standards/testing/maestro-spec.md",
       "title": "Maestro Syntax Standard (v1.35.0)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1967,7 +1975,7 @@
       "id": "standards/testing/mobile_automation.md",
       "title": "Mobile Test Automation Standard (Deep-Dive Edition)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1975,7 +1983,7 @@
       "id": "standards/testing/web_automation.md",
       "title": "Web Test Automation Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/testing"
     },
@@ -1983,7 +1991,7 @@
       "id": "standards/ux/cognitive_load_principles.md",
       "title": "Cognitive Load Principles for UX Design",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "standards/ux"
     },
@@ -1991,7 +1999,7 @@
       "id": "strategy/winning-proposal-standards.md",
       "title": "Winning Proposal Standards (Strategic Communication)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "strategy"
     },
@@ -1999,7 +2007,7 @@
       "id": "tech-stack/atlassian/jira_best_practices.md",
       "title": "Jira 運用ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/atlassian"
     },
@@ -2007,7 +2015,7 @@
       "id": "tech-stack/aws_unified_operations_support.md",
       "title": "AWS Unified Operations Team (Premium Support Extension)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },
@@ -2015,7 +2023,7 @@
       "id": "tech-stack/box_api.md",
       "title": "Box API 連携ガイド (Node.js SDK)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },
@@ -2023,7 +2031,7 @@
       "id": "tech-stack/box_cli.md",
       "title": "Box CLI 活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },
@@ -2031,7 +2039,7 @@
       "id": "tech-stack/cloud/rosetta_stone.md",
       "title": "The Rosetta Stone of Cloud (Multi-Cloud Mapping)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/cloud"
     },
@@ -2039,7 +2047,7 @@
       "id": "tech-stack/google/workspace_best_practices.md",
       "title": "Google Workspace 連携ベストプラクティス",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/google"
     },
@@ -2047,7 +2055,7 @@
       "id": "tech-stack/java/terasoluna/architecture.md",
       "title": "TERASOLUNA Layered Architecture Standard",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/java/terasoluna"
     },
@@ -2055,7 +2063,7 @@
       "id": "tech-stack/java/terasoluna/implementation_standards.md",
       "title": "TERASOLUNA Implementation Standards",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/java/terasoluna"
     },
@@ -2063,7 +2071,7 @@
       "id": "tech-stack/macos/voice_control_guide.md",
       "title": "macOS 音声コントロール ＆ 音声入力活用ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/macos"
     },
@@ -2095,7 +2103,7 @@
       "id": "tech-stack/voltmx/architecture.md",
       "title": "VoltMX Architecture Overview",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -2103,7 +2111,7 @@
       "id": "tech-stack/voltmx/best_practices.md",
       "title": "VoltMX Development Best Practices",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -2111,7 +2119,7 @@
       "id": "tech-stack/voltmx/migration/mapping_rules.md",
       "title": "VoltMX to React Technical Mapping Rules",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/voltmx/migration"
     },
@@ -2119,7 +2127,7 @@
       "id": "tech-stack/voltmx/migration/strategy.md",
       "title": "VoltMX to React Migration Strategy",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/voltmx/migration"
     },
@@ -2127,7 +2135,7 @@
       "id": "tech-stack/voltmx/troubleshooting.md",
       "title": "VoltMX Troubleshooting Guide",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack/voltmx"
     },
@@ -2135,7 +2143,7 @@
       "id": "templates/blueprints/api-reference.md",
       "title": "Blueprint: API Reference",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2143,7 +2151,7 @@
       "id": "templates/blueprints/architecture-decision-record.md",
       "title": "Blueprint: Architecture Decision Record (ADR)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2151,7 +2159,7 @@
       "id": "templates/blueprints/architecture-design.md",
       "title": "Blueprint: Architecture Design (AIDLC Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2159,7 +2167,7 @@
       "id": "templates/blueprints/business-impact-analysis.md",
       "title": "Blueprint: Business Impact Analysis",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2167,7 +2175,7 @@
       "id": "templates/blueprints/capacity-planning-report.md",
       "title": "Blueprint: Capacity & Scalability Report",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2175,7 +2183,7 @@
       "id": "templates/blueprints/change-control-ledger.md",
       "title": "Blueprint: Change Control Ledger",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2183,7 +2191,7 @@
       "id": "templates/blueprints/data-flow-lifecycle-map.md",
       "title": "Blueprint: Data Flow & Lifecycle Map",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2191,7 +2199,7 @@
       "id": "templates/blueprints/detailed-design.md",
       "title": "Blueprint: Detailed Design",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2199,7 +2207,7 @@
       "id": "templates/blueprints/environment-setup-guide.md",
       "title": "Blueprint: Environment Setup & Provisioning Guide",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2207,7 +2215,7 @@
       "id": "templates/blueprints/incident-report.md",
       "title": "Blueprint: Incident Report (障害報告書)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2215,7 +2223,7 @@
       "id": "templates/blueprints/information-asset-registry.md",
       "title": "Blueprint: Information Asset Registry (情報資産管理台帳)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2223,7 +2231,7 @@
       "id": "templates/blueprints/issue-log.md",
       "title": "Blueprint: Issue Log (課題管理表)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2231,7 +2239,7 @@
       "id": "templates/blueprints/mission-closure-report.md",
       "title": "Blueprint: Mission Closure & Knowledge Distillation (AIDLC Final)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2239,7 +2247,7 @@
       "id": "templates/blueprints/onboarding-guide.md",
       "title": "Blueprint: Onboarding Guide",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2247,7 +2255,7 @@
       "id": "templates/blueprints/operation-runbook.md",
       "title": "Blueprint: Operational Runbook",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2255,7 +2263,7 @@
       "id": "templates/blueprints/post-mortem.md",
       "title": "Blueprint: Post-Mortem (事後検証報告書)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2263,7 +2271,7 @@
       "id": "templates/blueprints/project-charter.md",
       "title": "Blueprint: Project Charter (Gemini Standard v1.1)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2271,7 +2279,7 @@
       "id": "templates/blueprints/project-management-plan.md",
       "title": "Blueprint: Project Management Plan (AIDLC Integrated v1.1)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2279,7 +2287,7 @@
       "id": "templates/blueprints/raid-log.md",
       "title": "Blueprint: RAID Log (Risks, Assumptions, Issues, Dependencies)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2287,7 +2295,7 @@
       "id": "templates/blueprints/requirements-definition.md",
       "title": "Blueprint: Requirements Definition (AIDLC Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2295,7 +2303,7 @@
       "id": "templates/blueprints/security-audit-report.md",
       "title": "Blueprint: Security Audit Report",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2303,7 +2311,7 @@
       "id": "templates/blueprints/slo-sli-definition.md",
       "title": "Blueprint: SLO/SLI Definition",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2311,7 +2319,7 @@
       "id": "templates/blueprints/stakeholder-communication-register.md",
       "title": "Blueprint: Stakeholder Communication Register",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2319,7 +2327,7 @@
       "id": "templates/blueprints/sustainability-report.md",
       "title": "Blueprint: Sustainability & Efficiency Report",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2327,7 +2335,7 @@
       "id": "templates/blueprints/test-validation-report.md",
       "title": "Blueprint: Test & Validation Report (AIDLC Evidence)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2335,7 +2343,7 @@
       "id": "templates/blueprints/user-manual-faq.md",
       "title": "Blueprint: User Manual & FAQ",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/blueprints"
     },
@@ -2343,7 +2351,7 @@
       "id": "templates/reporting/audience_strategy.md",
       "title": "Audience Strategy for Executive Reporting",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -2351,7 +2359,7 @@
       "id": "templates/reporting/master_slide_structure.md",
       "title": "Master Slide Structure (Marp Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -2359,7 +2367,7 @@
       "id": "templates/reporting/project_management_plan_13.md",
       "title": "Project Management Plan (PMP) - 13 Standard Items",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -2367,7 +2375,7 @@
       "id": "templates/reporting/project_plan_master.md",
       "title": "Project Plan Master Template (Consulting Standard)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/reporting"
     },
@@ -2375,7 +2383,7 @@
       "id": "templates/themes/excel_design_guide.md",
       "title": "プロフェッショナル・エクセル設計書テーマガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/themes"
     },
@@ -2383,7 +2391,7 @@
       "id": "templates/themes/marp_theme_guide.md",
       "title": "Marp テーマ作成 ＆ スタイリング完全ガイド",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/themes"
     },
@@ -2391,7 +2399,7 @@
       "id": "templates/themes/theme_design_guide.md",
       "title": "プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/themes"
     },
@@ -2399,7 +2407,7 @@
       "id": "templates/themes/visual_harmony_guide.md",
       "title": "ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "templates/themes"
     },
@@ -2407,7 +2415,7 @@
       "id": "testing/test_item_specification.md",
       "title": "テスト項目表・実施結果標準仕様 (Test Item Specification)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "testing"
     },
@@ -2415,7 +2423,7 @@
       "id": "testing/viewpoint-catalogs/tis_catalog_v1_6.md",
       "title": "テスト観点カタログ (TIS株式会社 公開版 v1.6)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "testing/viewpoint-catalogs"
     },
@@ -2423,7 +2431,7 @@
       "id": "voice/persona_definitions.md",
       "title": "音声ペルソナ定義 (Voice Persona Definitions)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "voice"
     }

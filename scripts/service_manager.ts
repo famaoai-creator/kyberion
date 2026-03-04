@@ -6,11 +6,13 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import crypto from 'node:crypto';
 import chalk from 'chalk';
 import { logger } from '@agent/core/core';
 
 const rootDir = process.cwd();
 const PID_FILE = path.join(rootDir, 'active/shared/services-pids.json');
+const STIMULI_PATH = path.join(rootDir, 'presence/bridge/runtime/stimuli.jsonl');
 const WATCHDOG_INTERVAL_MS = 30000;
 
 const SERVICES: Record<string, any> = {
@@ -25,6 +27,14 @@ const SERVICES: Record<string, any> = {
   'nexus-daemon': {
     path: 'presence/bridge/nexus-daemon.ts',
     description: 'Coordinates physical terminal intervention'
+  },
+  'log-watcher': {
+    path: 'presence/sensors/log-watcher.ts',
+    description: 'Monitors logs for system errors'
+  },
+  'system-whisperer': {
+    path: 'scripts/system_whisperer.ts',
+    description: 'Injects periodic system status to the agent'
   }
 };
 
@@ -52,6 +62,31 @@ function isRunning(pid: number) {
   }
 }
 
+function emitRecoveryStimulus(serviceId: string) {
+  const date = new Date();
+  const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+  const shortId = crypto.randomBytes(3).toString('hex');
+
+  const stimulus = {
+    id: `req-${dateStr}-recovery-${shortId}`,
+    ts: date.toISOString(),
+    ttl: 600,
+    origin: { channel: 'system', source_id: 'service-watchdog' },
+    signal: {
+      intent: 'alert',
+      priority: 8,
+      payload: `[SELF_HEALING] Service '${serviceId}' crash detected and recovered.`
+    },
+    control: {
+      status: 'pending',
+      feedback: 'auto',
+      evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-watchdog' }]
+    }
+  };
+
+  fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+}
+
 async function startService(id: string, pids: any) {
   const service = SERVICES[id];
   if (!service) return;
@@ -63,7 +98,6 @@ async function startService(id: string, pids: any) {
   }
 
   const out = fs.openSync(logFile, 'a');
-  // Use tsx for direct TS execution in development
   const child = spawn('npx', ['tsx', scriptPath], {
     detached: true,
     stdio: ['ignore', out, out],
@@ -78,8 +112,7 @@ async function startService(id: string, pids: any) {
 
 async function startAll() {
   const pids = loadPids();
-  logger.info('🚀 Starting Presence Services (Modern TS Mode)...');
-
+  logger.info('🚀 Starting Presence Services...');
   for (const id of Object.keys(SERVICES)) {
     if (pids[id] && isRunning(pids[id])) {
       logger.info(`  - ${id} is already running (PID: ${pids[id]})`);
@@ -87,14 +120,12 @@ async function startAll() {
     }
     await startService(id, pids);
   }
-
   savePids(pids);
 }
 
 function stopAll() {
   const pids = loadPids();
   logger.info('🛑 Stopping Presence Services...');
-
   for (const [id, pid] of Object.entries(pids)) {
     if (isRunning(pid as number)) {
       try {
@@ -106,15 +137,32 @@ function stopAll() {
     }
     delete pids[id];
   }
-
   savePids(pids);
+}
+
+async function runWatchdog() {
+  logger.info(chalk.bold.cyan('🛡️ Service Watchdog Active. Monitoring for crashes...'));
+  while (true) {
+    const pids = loadPids();
+    let changed = false;
+    for (const [id, service] of Object.entries(SERVICES)) {
+      const pid = pids[id];
+      if (!pid || !isRunning(pid)) {
+        logger.warn(`⚠️ Service crash detected: ${id}. Attempting auto-recovery...`);
+        await startService(id, pids);
+        emitRecoveryStimulus(id);
+        changed = true;
+      }
+    }
+    if (changed) savePids(pids);
+    await new Promise(resolve => setTimeout(resolve, WATCHDOG_INTERVAL_MS));
+  }
 }
 
 function showStatus() {
   const pids = loadPids();
   console.log(chalk.bold('\n📡 Presence Services Status:'));
   console.log('━'.repeat(40));
-
   for (const [id, service] of Object.entries(SERVICES)) {
     const pid = pids[id];
     const active = pid && isRunning(pid);
@@ -128,19 +176,13 @@ function showStatus() {
 
 async function main() {
   const action = process.argv[2] || 'status';
-
   switch (action) {
-    case 'start':
-      await startAll();
-      break;
-    case 'stop':
-      stopAll();
-      break;
-    case 'status':
-      showStatus();
-      break;
+    case 'start': await startAll(); break;
+    case 'stop': stopAll(); break;
+    case 'status': showStatus(); break;
+    case 'watchdog': await runWatchdog(); break;
     default:
-      console.log('Usage: npx tsx scripts/service_manager.ts [start|stop|status]');
+      console.log('Usage: npx tsx scripts/service_manager.ts [start|stop|status|watchdog]');
   }
 }
 
