@@ -108,7 +108,12 @@ export const ui = {
     return data;
   },
   stripAnsi: (input: string): string => {
-    return input.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    return input
+      .replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '') // CSI
+      .replace(/\x1B\].*?(\x07|\x1B\\)/g, '') // OSC
+      .replace(/\x1B[()#;?]./g, '') // ESC + single char
+      .replace(/\x1B[PX^_].*?\x1B\\/g, '') // DCS, SOS, PM, APC
+      .replace(/\r/g, ''); // Carriage returns
   },
 };
 
