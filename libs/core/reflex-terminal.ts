@@ -7,7 +7,7 @@ import { spawn, ChildProcess } from 'node:child_process';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger } from './core.js';
+import { logger, ui } from './core.js';
 
 export interface ReflexTerminalOptions {
   shell?: string;
@@ -67,10 +67,13 @@ export class ReflexTerminal {
    */
   public persistResponse(text: string, skillName = 'reflex-terminal') {
     try {
+      const cleanText = ui.stripAnsi(text).trim();
+      if (!cleanText) return;
+
       const envelope = {
         skill: skillName,
         status: 'success',
-        data: { message: text },
+        data: { message: cleanText },
         metadata: {
           timestamp: new Date().toISOString(),
           duration_ms: 0
