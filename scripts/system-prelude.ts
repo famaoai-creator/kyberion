@@ -1,10 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
-import { logger, fileUtils } from '@agent/core/core';
-import * as pathResolver from '@agent/core/path-resolver';
-import * as ledger from '@agent/core/ledger';
-import * as secureIo from '@agent/core/secure-io';
+import { logger, fileUtils, pathResolver, ledger, secureIo } from '../libs/core/index.js';
 
 /**
  * System Prelude v3.0 (Type-Safe Sandbox Edition)

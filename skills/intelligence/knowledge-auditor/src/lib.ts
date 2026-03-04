@@ -1,8 +1,12 @@
-import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
-import * as fs from 'node:fs';
+import { 
+  safeWriteFile, 
+  safeReadFile, 
+  validateSovereignBoundary, 
+  validateWritePermission, 
+  getActiveSecrets,
+  getAllFiles 
+} from '@agent/core';
 import * as path from 'node:path';
-import { validateSovereignBoundary, validateWritePermission } from '@agent/core/tier-guard';
-import { getAllFiles } from '@agent/core/fs-utils';
 
 export interface AuditConfig {
   audit_name: string;
@@ -40,7 +44,7 @@ export function performAudit(targetDir: string, config: AuditConfig): AuditResul
 
     try {
       const content = safeReadFile(file, { encoding: 'utf8' }) as string;
-      const leakGuard = validateSovereignBoundary(content);
+      const leakGuard = validateSovereignBoundary(content, getActiveSecrets());
 
       if (!leakGuard.safe) {
         violations.push({
