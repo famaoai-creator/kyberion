@@ -84,6 +84,7 @@ export * as orchestrator from './orchestrator.js';
 export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
 export { terminalBridge } from './terminal-bridge.js';
+export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';
