@@ -15,13 +15,15 @@ const INBOX_PATH = pathResolver.resolve('active/shared/rt_inbox.jsonl');
 async function main() {
   logger.info('🚀 Initializing Gemini Reflex Terminal (RT)...');
 
+  const shellPath = '/bin/zsh'; // Explicit absolute path for stability on macOS
+  
   // Neural Bridge Hook: 
   // Decides when to mirror terminal output back to Slack automatically.
   let outputAccumulator = '';
   let lastActivity = Date.now();
 
   const rt = new ReflexTerminal({
-    shell: process.env.SHELL || 'zsh',
+    shell: shellPath,
     cwd: process.cwd(),
     feedbackPath: pathResolver.resolve('active/shared/last_response.json'),
     onOutput: (data) => {
