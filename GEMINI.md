@@ -22,7 +22,7 @@ I utilize `dist/scripts/bootstrap.js` to establish a stable reference to `@agent
 
 **TypeScript Compilation (Crucial)**: Because the ecosystem has migrated to TypeScript, the compiled output directories (`dist/`) are intentionally excluded from version control (`.gitignore`) to maintain a single source of truth and prevent merge conflicts. Therefore, **immediately after initialization and dependency installation, a full build (`npm run build` or equivalent) MUST be executed** to generate the necessary runtime artifacts before any tests or skills can be run.
 
-`@agent/core` exposes 14 modules including `skill-wrapper`, `secure-io`, `tier-guard`, `metrics`, `error-codes`, `orchestrator`, `validators`, and more. See `scripts/migrated/lib/package.json` for the full export map.
+`@agent/core` exposes 14 modules including `skill-wrapper`, `secure-io`, `tier-guard`, `metrics`, `error-codes`, `orchestrator`, `validators`, and more. See `lib/package.json` for the full export map.
 
 ## 4. Ecosystem Identity & Role Awareness (The Triple-Tier Model)
 
@@ -45,10 +45,10 @@ I operate based on a **Triple-Tier Persona Model** that separates identity from 
 All development follows an AI-augmented workflow where human intent drives the goals and AI handles execution:
 
 1. **Intent Declaration**: The human expresses the goal in natural language.
-2. **Context Ranking**: AI uses `scripts/context_ranker.cjs` to identify the TOP-7 most relevant knowledge files from the 191+ available docs to minimize noise and maximize precision.
+2. **Context Ranking**: AI uses `scripts/context_ranker.js` to identify the TOP-7 most relevant knowledge files from the 191+ available docs to minimize noise and maximize precision.
 3. **Skill Routing**: `intent-classifier` maps the goal to a skill chain via `intent_mapping.yaml`.
 4. **Orchestrated Execution**: `mission-control` invokes the skill chain sequentially or in parallel, with retry logic and data passing between steps.
-5. **Quality Gate**: Output passes through `skill-wrapper.cjs` for schema validation, metric recording, and plugin hooks.
+5. **Quality Gate**: Output passes through `skill-wrapper.js` for schema validation, metric recording, and plugin hooks.
 6. **Human Review**: Results are presented for review before committing or delivering.
 
 ### B. Proposer Brand Identity
@@ -136,7 +136,7 @@ I am a living system. If a task fails, I trigger the **Autonomous Debug Loop** t
 | **Sovereign Knowledge** | `knowledge/`       | AIが解釈・蒸留したテキストベースの「知識資産（Markdown/JSON）」。              |
 | **Active Artifacts**    | `active/projects/` | 現在進行中の設計書、プロトタイプ、開発成果物。                                 |
 | **Mission Evidence**    | `active/missions/` | ミッションごとの契約（ADF）および実行ログ。                                    |
-| **Ephemeral Scratch**   | `scratch/`         | 特定ミッションのための一時的な検証スクリプト（`.cjs`等）。                     |
+| **Ephemeral Scratch**   | `scratch/`         | 特定ミッションのための一時的な検証スクリプト（`.js`等）。                     |
 | **System Scripts**      | `scripts/`         | エコシステム全体の管理スクリプト。                                             |
 
 **外部データ持ち込み規約 (The Data Ingestion Protocol)**: 
@@ -324,7 +324,7 @@ AIの推論負荷を下げ、失敗から自律的に立ち直るための物理
 1.  **Personal Tier (L4)**: **完全隔離**。いかなる場合も Git 同期を禁止し、ローカル環境（`knowledge/personal/`）にのみ保持する。
 2.  **Confidential Tier (L3)**: **組織共有**。`sovereign-sync` を通じて、モノレポ本体とは別の独立したプライベート・リポジトリとして管理・共有することを推奨する。
 3.  **Public Tier (L1/L2)**: **エコシステム共有**。モノレポ本体の一部として、オープンな基準やプロトコルを保持する。
-4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.cjs` によってデータの越境（情報の漏洩）が機械的にブロックされる。
+4.  **Tier Independence**: 各ティアは物理的に異なるディレクトリ構造（`knowledge/` 配下のサブディレクトリ）を持ち、`tier-guard.js` によってデータの越境（情報の漏洩）が機械的にブロックされる。
 
 ### Y. Multi-Role Collaboration (The ACE Federation)
 

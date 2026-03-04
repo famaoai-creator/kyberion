@@ -3,7 +3,7 @@
 Pre-built YAML pipelines that chain multiple skills into automated workflows. Execute via `mission-control`:
 
 ```bash
-node mission-control/scripts/orchestrate.cjs --pipeline pipelines/<name>.yml
+node mission-control/scripts/orchestrate.js --pipeline pipelines/<name>.yml
 ```
 
 ## Available Pipelines

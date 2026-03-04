@@ -4,7 +4,7 @@
 
 ## 🎯 Victory Conditions
 - [x] アイデンティティの固定 (`knowledge/personal/my-identity.json`)
-- [x] `@agent/core` リンクの確立 (`scripts/migrated/bootstrap.cjs`)
+- [x] `@agent/core` リンクの確立 (`scripts/migrated/bootstrap.js`)
 - [x] 構成プロトコルの検証
 - [x] エコシステム安定性の証明（テストラン）
 
@@ -14,7 +14,7 @@
 - [x] セッションの確立
 
 ### Phase 2: Orchestration (Complete)
-- [x] `@agent/core` の物理リンク確立 (`bootstrap.cjs`)
+- [x] `@agent/core` の物理リンク確立 (`bootstrap.js`)
 - [x] `role-config.json` の生成
 - [x] 共通ライブラリの整合性チェック
 

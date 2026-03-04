@@ -58,7 +58,7 @@ These scenarios can be formalized as pipelines (`pipelines/*.yml`) or mission pl
 
 ```bash
 # Example: Package the pre-commit security scenario
-node skill-bundle-packager/scripts/bundle.cjs security-check local-reviewer security-scanner project-health-check log-analyst
+node skill-bundle-packager/scripts/bundle.js security-check local-reviewer security-scanner project-health-check log-analyst
 ```
 
 See also: [`intent_mapping.yaml`](./knowledge/orchestration/meta-skills/intent_mapping.yaml) for intent-driven routing that can trigger these chains automatically from natural language.

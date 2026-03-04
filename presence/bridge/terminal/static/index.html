@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Sovereign Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            background: #0d0f14;
+            overflow: hidden; 
+        }
+        #terminal-container { 
+            width: 100vw; height: 100vh; 
+            margin: 0; padding: 0;
+            display: flex;
+        }
+        #terminal { flex: 1; height: 100%; }
+    </style>
+</head>
+<body>
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
+    <script>
+        const term = new Terminal({
+            theme: { background: '#0d0f14', foreground: '#e0e0e0', cursor: '#00f2ff' },
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace'
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        term.focus(); // Focus immediately to prevent IME issues
+        
+        const socket = new WebSocket(`ws://${location.host}`);
+
+        function performFit() {
+            fitAddon.fit();
+            const { cols, rows } = term;
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'resize', cols, rows }));
+            }
+        }
+
+        socket.onmessage = (event) => term.write(event.data);
+        term.onData((data) => socket.send(JSON.stringify({ type: 'input', data })));
+
+        window.addEventListener('resize', () => {
+            setTimeout(performFit, 50); // Small delay to let browser settle
+        });
+
+        socket.onopen = () => {
+            term.write('\r\n\x1b[1;36m*** Sovereign PTY Session Active ***\x1b[0m\r\n');
+            performFit();
+            term.focus();
+        };
+
+        // Ensure focus is kept on terminal even if user clicks elsewhere
+        document.body.addEventListener('click', () => term.focus());
+
+        socket.onclose = () => term.write('\r\n\x1b[1;31m*** Session Terminated ***\x1b[0m\r\n');
+    </script>
+</body>
+</html>

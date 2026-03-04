@@ -58,15 +58,19 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@slack/bolt": "^4.6.0",
     "@slack/web-api": "^7.14.1",
+    "@types/express": "^5.0.6",
+    "@types/ws": "^8.18.1",
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "chokidar": "^5.0.0",
     "exceljs": "^4.4.0",
+    "express": "^5.2.1",
     "googleapis": "^144.0.0",
     "js-yaml": "^4.1.1",
     "node-pty": "^1.1.0",
     "pptxgenjs": "^4.0.1",
     "sqlite3": "^5.1.7",
+    "ws": "^8.19.0",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
@@ -96,7 +100,14 @@
       "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz",
       "nth-check": "^2.0.1"
     },
-    "ignoredBuiltDependencies": []
+    "ignoredBuiltDependencies": [],
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "node-pty",
+      "puppeteer",
+      "sqlite3",
+      "tesseract.js"
+    ]
   },
   "overrides": {
     "form-data": "^4.0.0"

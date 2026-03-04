@@ -1,5 +1,6 @@
 ---
 name: diagram-renderer
+description: Official implementation of the Gemini Diagram ADF Protocol v1 for high-fidelity visualization.
 status: implemented
 category: Media
 last_updated: '2026-03-01'

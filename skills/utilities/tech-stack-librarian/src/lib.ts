@@ -1,4 +1,4 @@
-const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -7,7 +7,7 @@ export function detectStack(dir: string, bestPractices: any): any[] {
   const pkgPath = path.join(dir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
-      const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }));
+      const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
       const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
       for (const dep of Object.keys(allDeps)) {
         if (bestPractices[dep.toLowerCase()])

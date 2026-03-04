@@ -60,7 +60,7 @@ function resolveParams(params: any, prevOutput: any) {
 }
 
 function buildArgs(params: any) {
-  const args = [];
+  const args: string[] = [];
   for (const [key, val] of Object.entries(params || {})) {
     if (val === true) args.push(`--${key}`);
     else if (val !== false && val !== null && val !== undefined)

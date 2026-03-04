@@ -8,21 +8,21 @@ Create `.gemini-plugins.json` in your working directory:
 
 ```json
 {
-  "plugins": ["./plugins/execution-guard.cjs", "./plugins/perf-profiler.cjs"]
+  "plugins": ["./plugins/execution-guard.js", "./plugins/perf-profiler.js"]
 }
 ```
 
-Plugins are loaded automatically by `skill-wrapper.cjs` during `runSkill()`.
+Plugins are loaded automatically by `skill-wrapper.js` during `runSkill()`.
 
 ## Available Plugins
 
 | Plugin                  | Hooks              | Purpose                                                    |
 | ----------------------- | ------------------ | ---------------------------------------------------------- |
-| `metrics-collector.cjs` | `afterSkill`       | In-memory execution metrics collection                     |
-| `output-logger.cjs`     | `afterSkill`       | JSONL logging to `work/plugin-output.log`                  |
-| `execution-guard.cjs`   | `before` + `after` | File type blocking, audit logging, slow execution warnings |
-| `tier-enforcer.cjs`     | `afterSkill`       | Scans outputs for leaked confidential markers              |
-| `perf-profiler.cjs`     | `afterSkill`       | Performance regression detection (rolling window)          |
+| `metrics-collector.js` | `afterSkill`       | In-memory execution metrics collection                     |
+| `output-logger.js`     | `afterSkill`       | JSONL logging to `work/plugin-output.log`                  |
+| `execution-guard.js`   | `before` + `after` | File type blocking, audit logging, slow execution warnings |
+| `tier-enforcer.js`     | `afterSkill`       | Scans outputs for leaked confidential markers              |
+| `perf-profiler.js`     | `afterSkill`       | Performance regression detection (rolling window)          |
 
 ## Configuration
 

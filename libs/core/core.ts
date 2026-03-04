@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 /**
  * Shared Utility Core for Gemini Skills (TypeScript Edition)
@@ -253,7 +253,7 @@ export class Cache {
     if (this._map.has(key)) this._map.delete(key);
     if (this._map.size >= this._maxSize) {
       const lruKey = this._map.keys().next().value;
-      this._map.delete(lruKey);
+      if (lruKey !== undefined) this._map.delete(lruKey);
     }
     this._map.set(key, { value, timestamp, ttl, persistent: persist });
 
@@ -323,7 +323,7 @@ export const fileUtils = {
   },
   getFullRoleConfig: () => {
     const mid = process.env.MISSION_ID;
-    const priorityPaths = [];
+    const priorityPaths: string[] = [];
     if (mid) priorityPaths.push(path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json'));
     priorityPaths.push(path.resolve(process.cwd(), 'active/shared/governance/session.json'));
     priorityPaths.push(path.resolve(process.cwd(), 'knowledge/personal/role-config.json'));

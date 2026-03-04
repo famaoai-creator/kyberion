@@ -18,7 +18,7 @@
 
 ## 3. 音声コマンドの拡張
 
-- 「お疲れ様」→ `task_manager.cjs` の退勤処理を起動。
+- 「お疲れ様」→ `task_manager.js` の退勤処理を起動。
 - 「今の状況は？」→ `PERFORMANCE_DASHBOARD` の要約を読み上げ。
 - 「資料を作って」→ `Executive Reporting Maestro` を召喚。
 

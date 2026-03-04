@@ -1,3 +1,11 @@
+---
+name: wisdom-distiller
+description: Distills mission results into reusable logic pipelines (YAML).
+status: implemented
+category: Intelligence
+last_updated: '2026-03-04'
+---
+
 # Wisdom Distiller
 
 Distills mission results into reusable logic pipelines (YAML). It converts successful sequences from `TASK_BOARD.md` into standard `pipelines/*.yml`.

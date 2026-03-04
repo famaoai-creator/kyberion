@@ -10,7 +10,7 @@ Gemini has transitioned to a **TypeScript-First Architecture** to ensure maximum
 | :--- | :--- | :--- | :--- |
 | **Authority Layer** | TypeScript (`.ts`) | "Source of Truth" | All logic, including core orchestration and skills, is authored in TS. |
 | **Runtime Layer** | Node.js (`.js`) | "Execution Engine" | Compiled output in `dist/` is used for runtime execution. |
-| **Continuity Layer**| CommonJS (`.cjs`) | "Legacy Bridge" | Lightweight bridges in `libs/core/` ensuring backward compatibility for older tools. |
+| **Continuity Layer**| CommonJS (`.js`) | "Legacy Bridge" | Lightweight bridges in `libs/core/` ensuring backward compatibility for older tools. |
 
 ## 2. The "TypeScript Authority" (Why TS?)
 
@@ -28,13 +28,13 @@ Both TS skills and legacy CJS scripts consume core utilities through the `@agent
 - **TS Consumer**: `import { logger } from '@agent/core/core';`
     - Resolves to: `dist/libs/core/core.js` (at runtime).
 - **CJS Consumer**: `const { logger } = require('@agent/core/core');`
-    - Resolves to: `libs/core/core.cjs` (Bridge), which then loads the `dist` version.
+    - Resolves to: `libs/core/core.js` (Bridge), which then loads the `dist` version.
 
 ### B. File Extension Policy
 
 - **`.ts`**: Mandatory for all source code in `scripts/`, `libs/core/`, and `skills/`.
 - **`.js`**: Found in `dist/`, these are the compiled artifacts.
-- **`.cjs`**: Used exclusively for **Bridges** in `libs/core/` to maintain backward compatibility.
+- **`.js`**: Used exclusively for **Bridges** in `libs/core/` to maintain backward compatibility.
 
 ## 4. Summary: The New Golden Rule
 

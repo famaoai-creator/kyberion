@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export default defineConfig({
   test: {
-    include: ['skills/**/src/**/*.test.ts', 'skills/**/src/**/*.test.js', 'libs/core/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: ['**/src/**/*.test.ts', '**/src/**/*.test.js', 'libs/core/**/*.test.ts', 'tests/**/*.test.ts'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
@@ -13,7 +13,7 @@ export default defineConfig({
       '**/knowledge/**',
     ],
     alias: [
-      { find: /^@agent\/core\/(.*)$/, replacement: path.resolve(__dirname, './libs/core/$1.ts') },
+      { find: /^@agent\/core\/(.*)$/, replacement: path.resolve(__dirname, './libs/core/$1') },
       { find: '@agent/core', replacement: path.resolve(__dirname, './libs/core/index.ts') },
     ],
   },

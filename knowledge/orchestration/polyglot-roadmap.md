@@ -4,7 +4,7 @@ To support Python, Go, and Rust skills natively without Node.js dependencies, we
 
 ## Phase 1: Current State (Node.js Monolith)
 
-- **Core**: `scripts/lib/core.cjs`
+- **Core**: `scripts/lib/core.js`
 - **Constraint**: All skills must be wrapped in or invoke Node.js.
 
 ## Phase 2: The Sidecar Bridge (Transition)
@@ -12,7 +12,7 @@ To support Python, Go, and Rust skills natively without Node.js dependencies, we
 - **Architecture**: Create a compiled binary (Go/Rust) `gemini-core` that exposes:
   - `gemini-core log --level info "msg"`
   - `gemini-core file read <path>`
-- **Integration**: Update `core.cjs` to simply wrap calls to this binary.
+- **Integration**: Update `core.js` to simply wrap calls to this binary.
 
 ## Phase 3: True Polyglot (Final State)
 
