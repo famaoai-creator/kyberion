@@ -1,11 +1,67 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.terminalBridge = void 0;
 const node_child_process_1 = require("node:child_process");
+const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
 /**
- * Terminal Bridge v2.8 (Resilient Discovery Edition)
+ * Terminal Bridge v2.9 (Reflex Terminal Integration)
  */
 const STRATEGIES = {
+    ReflexTerminal: {
+        findIdle: () => {
+            // Logic to check if the RT session is active (via presence of PID or lock file)
+            const rootDir = process.cwd();
+            const pidFile = path.join(rootDir, 'active/shared/services-pids.json');
+            if (fs.existsSync(pidFile)) {
+                try {
+                    const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
+                    if (pids['reflex-terminal'])
+                        return { winId: 'rt-main', sessionId: 'default', type: 'ReflexTerminal' };
+                }
+                catch (_) { }
+            }
+            return null;
+        },
+        inject: (winId, sessionId, text) => {
+            const inboxPath = path.join(process.cwd(), 'active/shared/rt_inbox.jsonl');
+            fs.appendFileSync(inboxPath, JSON.stringify({ text, timestamp: new Date().toISOString() }) + '\n');
+            return true;
+        }
+    },
     iTerm2: {
         findIdle: () => {
             const script = `
@@ -25,7 +81,6 @@ const STRATEGIES = {
             end repeat
           end repeat
           
-          -- Fallback: If no Gemini session, take the front-most session
           if bestSession is "NOT_FOUND" then
             try
               set w to front window
@@ -120,6 +175,10 @@ const STRATEGIES = {
 };
 exports.terminalBridge = {
     findIdleSession: () => {
+        // RT has the highest priority for autonomous operations
+        const rt = STRATEGIES.ReflexTerminal.findIdle();
+        if (rt)
+            return rt;
         const iterm = STRATEGIES.iTerm2.findIdle();
         if (iterm)
             return iterm;
@@ -133,6 +192,27 @@ exports.terminalBridge = {
         if (!strategy)
             throw new Error(`Unsupported terminal strategy: ${terminalType}`);
         return strategy.inject(winId, sessionId, text);
+    },
+    readLatestOutput: (winId, sessionId, terminalType = 'iTerm2') => {
+        if (terminalType !== 'iTerm2')
+            return '';
+        const script = `
+      tell application "iTerm2"
+        try
+          set w to window id ${winId}
+          set s to session id "${sessionId}" of w
+          return contents of s
+        on error
+          return "ERROR"
+        end try
+      end tell
+    `;
+        try {
+            return (0, node_child_process_1.execSync)(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
+        }
+        catch {
+            return '';
+        }
     }
 };
 //# sourceMappingURL=terminal-bridge.js.map

@@ -15,7 +15,7 @@ The initialization follows the five stages defined in the [Onboarding Protocol](
 - **Session Activation**: Initialize `active/shared/governance/session.json`.
 
 ### Phase 2: Provision & Stabilize (Stage 3)
-- **Environment Setup**: Run `scripts/migrated/bootstrap.cjs` and verify core links.
+- **Environment Setup**: Run `npm run bootstrap` and verify core links.
 - **Role Configuration**: Generate `knowledge/personal/role-config.json` reflecting the Sovereign's chosen persona.
 - **Task Board Initiation**: Create a `TASK_BOARD.md` in `active/missions/{MissionID}/` to track all setup tasks transparently.
 

@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 const rootDir = process.cwd();
 const tmpDist = path.join(rootDir, 'dist_tmp/skills');

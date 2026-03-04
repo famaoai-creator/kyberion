@@ -8,20 +8,20 @@
 
 - **Execution Time (ms)**: 各スキルの平均実行時間。
 - **Memory Footprint (MB)**: 実行時の最大ヒープ使用量 (`heapUsed`) および RSS。
-- **Syntax Check Overhead**: `scripts/benchmark.cjs` で計測される、スクリプトのパース/読み込みにかかる時間。
+- **Syntax Check Overhead**: `scripts/benchmark.js` で計測される、スクリプトのパース/読み込みにかかる時間。
 - **Token Efficiency**: LLM呼び出し時の入力トークン量に対する出力の価値（ROI）。
 
 ## 2. 性能監視・計測ツール
 
-- **Skill Metrics**: `scripts/lib/metrics.cjs` により自動収集。`work/metrics/skill-metrics.jsonl` に記録。
+- **Skill Metrics**: `scripts/lib/metrics.js` により自動収集。`work/metrics/skill-metrics.jsonl` に記録。
 - **System Benchmark**: `npm run benchmark` で全スキルのロード性能を一括評価。
 - **Resource Profiler**: `performance-monitor-analyst` スキルを使用して、詳細なボトルネック分析を実施。
 
 ## 3. 最適化の定石 (Optimization Patterns)
 
-- **Lazy Loading**: `scripts/lib/skill-wrapper.cjs` で行われているような、ライブラリ（Ajv等）の遅延読み込み。
-- **Cache Strategy**: `scripts/lib/core.cjs` の `Cache` クラスを用いたファイル/データのキャッシュ。
-- **Parallel Execution**: `scripts/lib/orchestrator.cjs` の `runParallel()` を利用したIO待ちの解消。
+- **Lazy Loading**: `scripts/lib/skill-wrapper.js` で行われているような、ライブラリ（Ajv等）の遅延読み込み。
+- **Cache Strategy**: `scripts/lib/core.js` の `Cache` クラスを用いたファイル/データのキャッシュ。
+- **Parallel Execution**: `scripts/lib/orchestrator.js` の `runParallel()` を利用したIO待ちの解消。
 
 ## 4. 評価基準 (Baseline & Thresholds)
 

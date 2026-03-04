@@ -138,6 +138,14 @@ exports.ui = {
         }
         return data;
     },
+    stripAnsi: (input) => {
+        return input
+            .replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '') // CSI
+            .replace(/\x1B\].*?(\x07|\x1B\\)/g, '') // OSC
+            .replace(/\x1B[()#;?]./g, '') // ESC + single char
+            .replace(/\x1B[PX^_].*?\x1B\\/g, '') // DCS, SOS, PM, APC
+            .replace(/\r/g, ''); // Carriage returns
+    },
 };
 exports.sre = {
     analyzeRootCause: (errorMessage) => {
@@ -269,7 +277,8 @@ class Cache {
             this._map.delete(key);
         if (this._map.size >= this._maxSize) {
             const lruKey = this._map.keys().next().value;
-            this._map.delete(lruKey);
+            if (lruKey !== undefined)
+                this._map.delete(lruKey);
         }
         this._map.set(key, { value, timestamp, ttl, persistent: persist });
         if (persist) {

@@ -1,0 +1,24 @@
+import { safeAppendFileSync, safeMkdir } from '@agent/core/secure-io';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+/**
+ * Plugin: Output Logger
+ */
+
+const logFile = path.join(process.cwd(), 'work', 'plugin-output.log');
+
+export const afterSkill = (skillName: string, output: any) => {
+  try {
+    const line =
+      JSON.stringify({ skill: skillName, status: output.status, ts: new Date().toISOString() }) +
+      '\n';
+    const dir = path.dirname(logFile);
+    if (!fs.existsSync(dir)) {
+      safeMkdir(dir, { recursive: true });
+    }
+    safeAppendFileSync(logFile, line);
+  } catch (_e) {
+    // Silent fail
+  }
+};

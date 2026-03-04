@@ -25,17 +25,44 @@ export interface TechStackInfo {
     database?: string[];
 }
 /**
+ * Represents a physical or logical asset within the ecosystem.
+ */
+export interface Asset {
+    id: string;
+    name: string;
+    type: 'code' | 'doc' | 'credential' | 'other';
+    tenant: string;
+    confidentiality: 'public' | 'internal' | 'confidential' | 'restricted';
+    hash: string;
+    path: string;
+    metadata?: Record<string, any>;
+    created_at: string;
+}
+/**
+ * Audit trail entry for the Sovereign Asset Ledger.
+ */
+export interface LedgerEntry {
+    action: 'ingest' | 'update' | 'archive' | 'purge';
+    asset_id: string;
+    timestamp: string;
+    actor: string;
+    details: string;
+}
+/**
  * Unified risk/issue entry for reporting and audit skills.
  */
 export interface Issue {
     id: string;
-    category: string;
-    severity: Severity;
-    title: string;
-    description: string;
+    category?: string;
+    severity?: Severity;
+    title?: string;
+    description?: string;
+    risk?: string;
     impact?: string;
     mitigation?: string;
     location?: string;
+    phase?: string;
+    missing?: string[];
 }
 /**
  * Represents a logical unit of work (Mission).
@@ -114,6 +141,12 @@ export interface Report {
     artifacts: ArtifactPointer[];
     metadata?: Record<string, any>;
 }
+/**
+ * Legacy support aliases to prevent broken builds during migration.
+ */
+export type RiskEntry = Issue;
+export type FinancialMetricsV1 = FinancialMetrics;
+export type DocumentArtifactV1 = DocumentArtifact;
 /**
  * Base Input for many skills.
  */

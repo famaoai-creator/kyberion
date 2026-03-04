@@ -19,25 +19,31 @@ export function runInWorker(scriptPath: string, data: any): Promise<any> {
     });
   } else {
     // This part runs in the worker
-    const { scriptPath, data } = workerData;
-    try {
-      const task = require(scriptPath);
-      const result = typeof task === 'function' ? task(data) : task;
-      parentPort?.postMessage(result);
-    } catch (err) {
-      throw err;
-    }
+    (async () => {
+      const { scriptPath, data } = workerData;
+      try {
+        const module = await import(scriptPath);
+        const task = module.default || module;
+        const result = typeof task === 'function' ? task(data) : task;
+        parentPort?.postMessage(result);
+      } catch (err) {
+        throw err;
+      }
+    })();
     return Promise.resolve(); // Keep TS happy
   }
 }
 
 if (!isMainThread) {
-  const { scriptPath, data } = workerData;
-  try {
-    const task = require(scriptPath);
-    const result = typeof task === 'function' ? task(data) : task;
-    parentPort?.postMessage(result);
-  } catch (err) {
-    throw err;
-  }
+  (async () => {
+    const { scriptPath, data } = workerData;
+    try {
+      const module = await import(scriptPath);
+      const task = module.default || module;
+      const result = typeof task === 'function' ? task(data) : task;
+      parentPort?.postMessage(result);
+    } catch (err) {
+      throw err;
+    }
+  })();
 }

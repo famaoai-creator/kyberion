@@ -18,13 +18,14 @@ export declare const ui: {
     confirm: (question: string) => Promise<boolean>;
     ask: (question: string) => Promise<string>;
     summarize: (data: any, maxItems?: number) => any;
+    stripAnsi: (input: string) => string;
 };
 export declare const sre: {
     analyzeRootCause: (errorMessage: string) => {
         cause: any;
         impact: any;
         recommendation: any;
-    };
+    } | null;
 };
 export declare class Cache {
     private _maxSize;

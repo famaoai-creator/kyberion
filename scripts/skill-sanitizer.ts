@@ -1,4 +1,4 @@
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';

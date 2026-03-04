@@ -41,6 +41,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.terminalBridge = exports.pptxUtils = exports.excelUtils = exports.orchestrator = exports.isSecretPath = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.validateInjection = exports.canFlowTo = exports.detectTier = exports.tierGuard = exports.classifier = exports.verifyIntegrity = exports.record = exports.ledger = exports.getAllFiles = exports.Cache = exports.errorHandler = exports.fileUtils = exports.ui = exports.logger = exports.pathUtils = exports.rootResolve = exports.resolve = exports.missionDir = exports.skillDir = exports.isProtected = exports.shared = exports.vault = exports.scripts = exports.active = exports.knowledge = exports.rootDir = exports.pathResolver = exports.writeArtifact = exports.sanitizePath = exports.validateUrl = exports.validateFileSize = exports.safeExec = exports.safeMkdir = exports.safeUnlink = exports.safeAppendFile = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
+exports.ReflexTerminal = void 0;
 // Core Wrapper & Metrics
 __exportStar(require("./skill-wrapper.js"), exports);
 __exportStar(require("./metrics.js"), exports);
@@ -115,6 +116,8 @@ exports.excelUtils = __importStar(require("./excel-utils.js"));
 exports.pptxUtils = __importStar(require("./pptx-utils.js"));
 var terminal_bridge_js_1 = require("./terminal-bridge.js");
 Object.defineProperty(exports, "terminalBridge", { enumerable: true, get: function () { return terminal_bridge_js_1.terminalBridge; } });
+var reflex_terminal_js_1 = require("./reflex-terminal.js");
+Object.defineProperty(exports, "ReflexTerminal", { enumerable: true, get: function () { return reflex_terminal_js_1.ReflexTerminal; } });
 // Shared Business Types
 __exportStar(require("./shared-business-types.js"), exports);
 //# sourceMappingURL=index.js.map

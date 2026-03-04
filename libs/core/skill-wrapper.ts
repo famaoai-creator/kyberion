@@ -9,7 +9,7 @@
 
 import type { SkillOutput } from './types.js';
 import { metrics } from './metrics.js';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 function buildOutput<T>(
   skillName: string,

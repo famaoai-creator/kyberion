@@ -1,4 +1,4 @@
-const { safeWriteFile, safeReadFile } = require('@agent/core/secure-io');
+import { safeWriteFile, safeReadFile } from '@agent/core/secure-io';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 

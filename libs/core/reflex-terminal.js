@@ -1,7 +1,7 @@
 "use strict";
 /**
- * Reflex Terminal (RT) - Core Logic v1.0
- * Provides a persistent virtual terminal session with bi-directional neural bridging.
+ * Reflex Terminal (RT) - Core Logic v1.1 (Native Bridge Edition)
+ * Provides a persistent virtual terminal session using native child_process.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -38,62 +38,61 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReflexTerminal = void 0;
-const pty = __importStar(require("node-pty"));
+const node_child_process_1 = require("node:child_process");
 const os = __importStar(require("node:os"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const core_js_1 = require("./core.js");
 class ReflexTerminal {
-    ptyProcess;
-    outputBuffer = '';
+    proc;
     feedbackPath;
     constructor(options = {}) {
-        const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : 'zsh');
+        const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : '/bin/zsh');
         this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
-        this.ptyProcess = pty.spawn(shell, [], {
-            name: 'xterm-color',
-            cols: options.cols || 80,
-            rows: options.rows || 24,
-            cwd: options.cwd || process.cwd(),
-            env: process.env
+        this.proc = (0, node_child_process_1.spawn)(shell, ['-i'], {
+            cwd: path.resolve(options.cwd || process.cwd()),
+            env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' },
+            stdio: ['pipe', 'pipe', 'pipe']
         });
         this.setupListeners(options.onOutput);
-        core_js_1.logger.info(`[RT] Reflex Terminal started with shell: \${shell}`);
+        core_js_1.logger.info(`[RT] Reflex Terminal (Native) started with shell: ${shell}`);
     }
     setupListeners(onOutput) {
-        this.ptyProcess.onData((data) => {
-            this.outputBuffer += data;
+        this.proc.stdout?.on('data', (data) => {
+            const str = data.toString();
             if (onOutput)
-                onOutput(data);
-            this.processOutput(data);
+                onOutput(str);
+            process.stdout.write(str);
         });
-        this.ptyProcess.onExit(({ exitCode, signal }) => {
-            core_js_1.logger.warn(`[RT] Shell exited with code ${exitCode}, signal ${signal}`);
+        this.proc.stderr?.on('data', (data) => {
+            const str = data.toString();
+            if (onOutput)
+                onOutput(str);
+            process.stderr.write(str);
         });
-    }
-    processOutput(data) {
-        // Process terminal output in real-time.
-        // In v1.0, we just log it. In v2.0, we'll use an AI-based filter 
-        // to decide what's important enough to send to Slack.
-        process.stdout.write(data);
+        this.proc.on('exit', (code) => {
+            core_js_1.logger.warn(`[RT] Shell exited with code ${code}`);
+        });
     }
     /**
      * Inject a command into the terminal.
      */
     execute(command) {
         core_js_1.logger.info(`[RT] Injecting command: ${command}`);
-        this.ptyProcess.write(`${command}`);
+        this.proc.stdin?.write(`${command}\n`);
     }
     /**
      * Manually trigger a feedback update to the shared response file.
-     * This is what allows the AI to "speak" back to Slack.
      */
     persistResponse(text, skillName = 'reflex-terminal') {
         try {
+            const cleanText = core_js_1.ui.stripAnsi(text).trim();
+            if (!cleanText)
+                return;
             const envelope = {
                 skill: skillName,
                 status: 'success',
-                data: { message: text },
+                data: { message: cleanText },
                 metadata: {
                     timestamp: new Date().toISOString(),
                     duration_ms: 0
@@ -109,11 +108,8 @@ class ReflexTerminal {
             core_js_1.logger.error(`[RT] Failed to persist response: ${err.message}`);
         }
     }
-    resize(cols, rows) {
-        this.ptyProcess.resize(cols, rows);
-    }
     kill() {
-        this.ptyProcess.kill();
+        this.proc.kill();
     }
 }
 exports.ReflexTerminal = ReflexTerminal;

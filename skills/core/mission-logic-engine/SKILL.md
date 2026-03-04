@@ -1,3 +1,11 @@
+---
+name: mission-logic-engine
+description: Reflexive execution engine for established mission logic (pipelines).
+status: implemented
+category: Core
+last_updated: '2026-03-04'
+---
+
 # Mission Logic Engine (MLE)
 
 Reflexive execution engine for established mission logic (pipelines). It executes predefined sequences of skills and provides a Signal Mailbox for autonomous intervention.
