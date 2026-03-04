@@ -2,7 +2,7 @@
 
 Your personal AI agent team — assembled around who you are and what you do.
 
-**137 skills** (all implemented) + **26 conceptual frameworks** documented in `knowledge/frameworks/`.
+**129 skills** (all implemented) + **26 conceptual frameworks** documented in `knowledge/frameworks/`.
 
 ## Philosophy: "Everyone Can Automate Their Own Work"
 
@@ -89,7 +89,7 @@ Each person can securely maintain their own knowledge base. Higher tiers always 
 
 **Precedence:** Personal > Confidential (Client) > Confidential (General) > Public
 
-**Enforcement:** `tier-guard.cjs` prevents higher-tier data from leaking into lower-tier outputs:
+**Enforcement:** `tier-guard.js` prevents higher-tier data from leaking into lower-tier outputs:
 
 - `validateInjection()` — Validates data flow direction before injection
 - `scanForConfidentialMarkers()` — Detects accidental inclusion of secrets (API_KEY, PASSWORD, TOKEN, etc.)
@@ -122,7 +122,7 @@ Express your goals in natural language. The system maps trigger phrases to skill
 
 The system is designed for extensibility at every layer.
 
-**Plugin System** — Every skill execution passes through `skill-wrapper.cjs`, which supports `beforeSkill` / `afterSkill` hooks loaded from `.gemini-plugins.json`. Intercept, validate, or augment any skill execution without modifying core code.
+**Plugin System** — Every skill execution passes through `skill-wrapper.js`, which supports `beforeSkill` / `afterSkill` hooks loaded from `.gemini-plugins.json`. Intercept, validate, or augment any skill execution without modifying core code.
 
 **Plugin Manager** — Install external skills or register local directories:
 
@@ -299,7 +299,7 @@ pnpm run cli -- info data-transformer
 Diagnose ecosystem performance and detect regressions:
 
 ```bash
-node scripts/check_performance.cjs
+node scripts/check_performance.js
 ```
 
 ### Skill Creation Wizard
@@ -347,10 +347,10 @@ Check all implemented skills against a quality checklist:
 
 ```bash
 # Table output
-node scripts/audit_skills.cjs
+node scripts/audit_skills.js
 
 # JSON output (for CI)
-node scripts/audit_skills.cjs --format json
+node scripts/audit_skills.js --format json
 ```
 
 ### Skill Pipelines
@@ -359,7 +359,7 @@ Chain skills together with data passing:
 
 ```bash
 # Run a YAML pipeline
-node scripts/run_pipeline.cjs pipelines/my-pipeline.yml
+node scripts/run_pipeline.js pipelines/my-pipeline.yml
 ```
 
 Pipeline YAML format:
@@ -400,7 +400,7 @@ pnpm run generate-index
 pnpm run build
 
 # Run quality audit
-node scripts/audit_skills.cjs
+node scripts/audit_skills.js
 
 # Run benchmarks
 pnpm run benchmark

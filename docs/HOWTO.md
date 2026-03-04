@@ -62,7 +62,7 @@ npm run cli -- run quality-scorer -- -i ./src/app.js
 You can also run skill scripts directly:
 
 ```bash
-node data-transformer/scripts/transform.cjs --input data.csv --format json
+node data-transformer/scripts/transform.js --input data.csv --format json
 ```
 
 All skills produce a standardized JSON envelope:
@@ -119,13 +119,13 @@ Pipelines chain multiple skills together, passing data between steps.
 
 ```bash
 # Security audit pipeline
-node mission-control/scripts/orchestrate.cjs --pipeline pipelines/security-audit.yml --dir .
+node mission-control/scripts/orchestrate.js --pipeline pipelines/security-audit.yml --dir .
 
 # Code quality pipeline
-node mission-control/scripts/orchestrate.cjs --pipeline pipelines/code-quality.yml --input ./src/app.js
+node mission-control/scripts/orchestrate.js --pipeline pipelines/code-quality.yml --input ./src/app.js
 
 # Release pipeline (health check → security → licenses → bugs → release notes)
-node mission-control/scripts/orchestrate.cjs --pipeline pipelines/release-pipeline.yml --dir .
+node mission-control/scripts/orchestrate.js --pipeline pipelines/release-pipeline.yml --dir .
 ```
 
 **Available pre-built pipelines** (in `pipelines/`):
@@ -158,7 +158,7 @@ node mission-control/scripts/orchestrate.cjs --pipeline pipelines/release-pipeli
 **Pipeline mode** — run a YAML pipeline:
 
 ```bash
-node mission-control/scripts/orchestrate.cjs \
+node mission-control/scripts/orchestrate.js \
   --pipeline pipelines/security-audit.yml \
   --dir /path/to/project
 ```
@@ -166,7 +166,7 @@ node mission-control/scripts/orchestrate.cjs \
 **Ad-hoc mode** — run skills by name (sequential):
 
 ```bash
-node mission-control/scripts/orchestrate.cjs \
+node mission-control/scripts/orchestrate.js \
   --skills "codebase-mapper,security-scanner,bug-predictor" \
   --dir /path/to/project
 ```
@@ -174,7 +174,7 @@ node mission-control/scripts/orchestrate.cjs \
 **Parallel mode** — run skills simultaneously:
 
 ```bash
-node mission-control/scripts/orchestrate.cjs \
+node mission-control/scripts/orchestrate.js \
   --skills "quality-scorer,completeness-scorer,format-detector" \
   --input ./src/app.js \
   --parallel
@@ -200,18 +200,18 @@ Bundle specific skills into a mission-ready package.
 **Create a bundle:**
 
 ```bash
-# Syntax: bundle.cjs <mission-name> <skill-1> <skill-2> ...
+# Syntax: bundle.js <mission-name> <skill-1> <skill-2> ...
 
 # CEO strategy bundle
-node skill-bundle-packager/scripts/bundle.cjs ceo-strategy \
+node skill-bundle-packager/scripts/bundle.js ceo-strategy \
   codebase-mapper quality-scorer security-scanner release-note-crafter
 
 # Engineer daily toolkit
-node skill-bundle-packager/scripts/bundle.cjs engineer-daily \
+node skill-bundle-packager/scripts/bundle.js engineer-daily \
   local-reviewer security-scanner project-health-check log-analyst
 
 # PM audit bundle
-node skill-bundle-packager/scripts/bundle.cjs pm-audit \
+node skill-bundle-packager/scripts/bundle.js pm-audit \
   project-health-check quality-scorer completeness-scorer license-auditor
 ```
 
@@ -279,7 +279,7 @@ knowledge/confidential/
 
 ### Personal Tier (`knowledge/personal/`)
 
-Your private space. Created by `init_wizard.cjs`. **Never committed to Git.**
+Your private space. Created by `init_wizard.js`. **Never committed to Git.**
 
 ```bash
 # Store API keys
@@ -303,10 +303,10 @@ When the same setting exists in multiple tiers:
 Personal (wins)  >  Confidential (Client)  >  Confidential (General)  >  Public
 ```
 
-The `tier-guard.cjs` library enforces this and prevents higher-tier data from leaking into lower-tier outputs:
+The `tier-guard.js` library enforces this and prevents higher-tier data from leaking into lower-tier outputs:
 
 ```javascript
-const { validateInjection, scanForConfidentialMarkers } = require('./scripts/lib/tier-guard.cjs');
+const { validateInjection, scanForConfidentialMarkers } = require('./scripts/lib/tier-guard.js');
 
 // Validate before injecting knowledge into a skill
 validateInjection(sourcePath, targetTier);
@@ -398,7 +398,7 @@ import { MetricsCollector } from '@agent/core/metrics'; // Metrics
 **Verify quality:**
 
 ```bash
-node scripts/migrated/audit_skills.cjs
+node audit_skills.js
 ```
 
 ---
@@ -435,7 +435,7 @@ Plugins use a hook system via `.gemini-plugins.json`. Every skill execution can 
 
 ```json
 {
-  "plugins": ["./my-plugins/audit-logger.cjs"]
+  "plugins": ["./my-plugins/audit-logger.js"]
 }
 ```
 
@@ -486,7 +486,7 @@ steps:
 **Run your pipeline:**
 
 ```bash
-node mission-control/scripts/orchestrate.cjs \
+node mission-control/scripts/orchestrate.js \
   --pipeline pipelines/my-custom-pipeline.yml \
   --dir /path/to/project \
   --input ./src/main.js
@@ -495,7 +495,7 @@ node mission-control/scripts/orchestrate.cjs \
 **Programmatic usage (in your own scripts):**
 
 ```javascript
-const { runPipeline, runParallel, loadPipeline } = require('./scripts/lib/orchestrator.cjs');
+const { runPipeline, runParallel, loadPipeline } = require('./scripts/lib/orchestrator.js');
 
 // Sequential pipeline
 const result = runPipeline([
@@ -534,10 +534,10 @@ Run the quality audit to check all implemented skills:
 
 ```bash
 # Table format
-node scripts/migrated/audit_skills.cjs
+node audit_skills.js
 
 # JSON format (for CI integration)
-node scripts/migrated/audit_skills.cjs --format json
+node audit_skills.js --format json
 ```
 
 **The audit checks 5 criteria per skill:**
@@ -548,7 +548,7 @@ node scripts/migrated/audit_skills.cjs --format json
 | `wrapper`  | Uses `runSkill()` or `runSkillAsync()` from skill-wrapper |
 | `yargs`    | Uses `yargs` for argument parsing                         |
 | `SKILL.md` | Has valid metadata (name, description, status)            |
-| `tests`    | Has unit tests in `tests/unit.test.cjs`                   |
+| `tests`    | Has unit tests in `tests/unit.test.js`                   |
 
 Each skill gets a score from 0/5 to 5/5.
 
@@ -590,13 +590,13 @@ npm run benchmark
 | Run a skill    | `npm run cli -- run <skill> -- [args]`                                   |
 | List skills    | `npm run cli -- list [implemented\|planned]`                             |
 | Skill info     | `npm run cli -- info <skill>`                                            |
-| Run pipeline   | `node mission-control/scripts/orchestrate.cjs -p pipelines/<name>.yml`   |
-| Ad-hoc chain   | `node mission-control/scripts/orchestrate.cjs -s "skill-a,skill-b" -d .` |
-| Parallel run   | `node mission-control/scripts/orchestrate.cjs -s "a,b,c" --parallel`     |
-| Create bundle  | `node skill-bundle-packager/scripts/bundle.cjs <mission> <skills...>`    |
+| Run pipeline   | `node mission-control/scripts/orchestrate.js -p pipelines/<name>.yml`   |
+| Ad-hoc chain   | `node mission-control/scripts/orchestrate.js -s "skill-a,skill-b" -d .` |
+| Parallel run   | `node mission-control/scripts/orchestrate.js -s "a,b,c" --parallel`     |
+| Create bundle  | `node skill-bundle-packager/scripts/bundle.js <mission> <skills...>`    |
 | New skill      | `npm run create-skill -- <name> --description "..."`                     |
 | Install plugin | `npm run plugin -- install <package>`                                    |
-| Quality audit  | `node scripts/migrated/audit_skills.cjs`                                          |
+| Quality audit  | `node audit_skills.js`                                          |
 | Run tests      | `npm run test:unit`                                                      |
 | Benchmark      | `npm run benchmark`                                                      |
 
@@ -627,7 +627,7 @@ If you have configured the `slack-connector`, you can send messages to the agent
 
 ### 🎙️ Interacting via Voice
 
-1.  **Launch the Hub**: `node presence/sensors/voice-hub/scripts/launch.cjs` (requires Python).
+1.  **Launch the Hub**: `node presence/sensors/voice-hub/scripts/launch.js` (requires Python).
 2.  **Command**: Speak naturally. Commands like "Check system health" are detected and injected as **REALTIME** stimuli.
 3.  **Priority**: Voice commands always override Slack or background Pulse events.
 

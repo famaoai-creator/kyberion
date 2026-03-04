@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": true,
+    "strict": true, "baseUrl": ".", "paths": { "@agent/core": ["../../../libs/core/index.js"], "@agent/core/*": ["../../../libs/core/*.js"] },
     "paths": {
       "@agent/core/*": [
         "../../../libs/core/*"

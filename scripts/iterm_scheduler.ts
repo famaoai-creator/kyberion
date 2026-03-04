@@ -4,7 +4,7 @@
  */
 
 import { execSync } from 'node:child_process';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 async function scheduleTask() {
   const prompt = process.argv[2];

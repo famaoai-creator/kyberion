@@ -7,13 +7,13 @@
 
 ### [x] Phase 2: Runtime & Core Verification
 - [x] Verify @agent/core path alias resolution
-- [x] Run scripts/migrated/bootstrap.cjs check
+- [x] Run scripts/migrated/bootstrap.js check
 - [x] Run scripts/system-prelude.ts test execution (Note: Deep sandboxing hooked but partially restricted by Node.js runtime)
 
 ### [/] Phase 3: Skill & Protocol Health
 - [ ] Run scripts/check_skills_health.ts
 - [ ] Verify tier-guard & secure-io enforcement (Basic)
-- [ ] Run core unit tests (tests/unit.test.cjs)
+- [ ] Run core unit tests (tests/unit.test.js)
 
 ### [ ] Phase 4: Onboarding Prep
 - [ ] Verify presence of onboarding directives

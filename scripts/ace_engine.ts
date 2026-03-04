@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 import { logger } from '@agent/core/core';
 import { safeReadFile, safeWriteFile } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 import { safeWriteFile } from '@agent/core';
 
 interface GovernanceResult {

@@ -40,6 +40,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TIERS = void 0;
 exports.detectTier = detectTier;
+exports.detectTenant = detectTenant;
 exports.canFlowTo = canFlowTo;
 exports.validateInjection = validateInjection;
 exports.validateReadPermission = validateReadPermission;
@@ -71,6 +72,19 @@ function detectTier(filePath) {
     return 'public';
 }
 /**
+ * Extract tenant name from physical path (e.g., vault/{Tenant}/...)
+ */
+function detectTenant(filePath) {
+    const resolved = path.resolve(filePath);
+    const vaultRoot = path.resolve(process.cwd(), 'vault');
+    if (resolved.startsWith(vaultRoot)) {
+        const relative = path.relative(vaultRoot, resolved);
+        const parts = relative.split(path.sep);
+        return parts.length > 0 ? parts[0] : null;
+    }
+    return null;
+}
+/**
  * Check whether data from `sourceTier` is allowed to flow into `targetTier` output.
  */
 function canFlowTo(sourceTier, targetTier) {
@@ -89,19 +103,34 @@ function validateInjection(knowledgePath, outputTier) {
     return result;
 }
 /**
- * Validates read permission based on role and tier.
+ * Validates read permission based on role, tier and tenant.
  */
 function validateReadPermission(filePath) {
-    const tier = detectTier(filePath);
+    const tenant = detectTenant(filePath);
+    const activeTenant = process.env.ACTIVE_TENANT;
+    if (tenant && activeTenant && tenant !== activeTenant) {
+        return {
+            allowed: false,
+            reason: `[TENANT_VIOLATION] Access to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.`
+        };
+    }
     return { allowed: true };
 }
 /**
- * Validates write permission based on role and tier.
+ * Validates write permission based on role, tier and tenant.
  */
 function validateWritePermission(filePath) {
     const tier = detectTier(filePath);
+    const tenant = detectTenant(filePath);
+    const activeTenant = process.env.ACTIVE_TENANT;
     if (tier === 'personal') {
         return { allowed: false, reason: 'Writing to personal tier is restricted.' };
+    }
+    if (tenant && activeTenant && tenant !== activeTenant) {
+        return {
+            allowed: false,
+            reason: `[TENANT_VIOLATION] Writing to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.`
+        };
     }
     return { allowed: true };
 }

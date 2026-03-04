@@ -102,11 +102,6 @@ export declare class SkillError extends Error {
     context: any;
     cause: any;
     constructor(errorDef: any, detail?: string, options?: any);
-    toJSON(): {
-        context: any;
-        code: string;
-        message: string;
-        retryable: boolean;
-    };
+    toJSON(): any;
 }
 //# sourceMappingURL=error-codes.d.ts.map

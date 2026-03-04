@@ -26,5 +26,6 @@ export * as orchestrator from './orchestrator.js';
 export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
 export { terminalBridge } from './terminal-bridge.js';
+export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './shared-business-types.js';
 //# sourceMappingURL=index.d.ts.map

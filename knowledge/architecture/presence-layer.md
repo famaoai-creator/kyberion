@@ -24,13 +24,13 @@ All external interactions are categorized by **Channels**, each defined in `pres
 
 Stimuli from sensors are written to `presence/bridge/stimuli.jsonl`. 
 
-1.  **Dynamic Context Injection**: During script execution, the `system-prelude.cjs` automatically reads pending stimuli and injects them into the Agent's consciousness as a "System Whisper."
+1.  **Dynamic Context Injection**: During script execution, the `system-prelude.js` automatically reads pending stimuli and injects them into the Agent's consciousness as a "System Whisper."
 2.  **Priority Resolution**: The Agent MUST address stimuli in order of priority (Voice > Slack).
-3.  **Completion**: Once a stimulus is addressed, it is marked as `PROCESSED` via the `presence-controller.cjs`.
+3.  **Completion**: Once a stimulus is addressed, it is marked as `PROCESSED` via the `presence-controller.js`.
 
 ### 3.1. Physical Intervention Protocol (Multi-Terminal)
 
-The **Nexus Daemon** (`presence/bridge/nexus-daemon.cjs`) can physically inject stimuli into an idle terminal session using the **Terminal Bridge**.
+The **Nexus Daemon** (`presence/bridge/nexus-daemon.js`) can physically inject stimuli into an idle terminal session using the **Terminal Bridge**.
 
 - **Supported Terminals**: iTerm2 (Primary), VS Code Integrated Terminal (Fallback).
 - **Trigger**: New `PENDING` stimulus detected + Terminal state is IDLE.
@@ -52,9 +52,9 @@ Provides the Agent with the ability to capture and interpret the physical state 
 
 ### 4.1. Modular Driver Architecture
 Visual sensing uses a **Driver Strategy Pattern** for cross-platform support:
-- **Orchestrator (`presence/sensors/visual-sensor.cjs`)**: Detects OS and delegates to drivers.
+- **Orchestrator (`presence/sensors/visual-sensor.js`)**: Detects OS and delegates to drivers.
 - **Drivers**:
-    - `macos-driver.cjs`: Uses native `screencapture`.
+    - `macos-driver.js`: Uses native `screencapture`.
     - *Linux/Windows drivers planned.*
 
 ### 4.2. CLI Usage
@@ -65,7 +65,7 @@ npm run cli -- system visual-capture [screen|window]
 
 ## 5. 🛡️ Service Management & Watchdog
 
-Background presence services are managed by `scripts/service_manager.cjs`.
+Background presence services are managed by `scripts/service_manager.js`.
 
 - **Watchdog Mode**: A dedicated background process that monitors other services every 30 seconds.
 - **Auto-Healing**: Automatically restarts crashed sensors or daemons.
@@ -86,4 +86,4 @@ To add a new sensory input:
       "status": "PENDING" 
     }
     ```
-3.  **Integrate**: Ensure your sensor is listed in `service_manager.cjs` for lifecycle management.
+3.  **Integrate**: Ensure your sensor is listed in `service_manager.js` for lifecycle management.
