@@ -8,20 +8,22 @@ resource "aws_instance" "web" { ami = "x" }
 resource "aws_db_instance" "db" { engine = "y" }
 resource "google_compute_instance" "app" { name = "z" }
     `;
-    const resources = parseHCL(hcl);
-    expect(resources).toHaveLength(3);
-    expect(resources[0]).toEqual({ type: 'aws_instance', name: 'web', provider: 'aws' });
-    expect(resources[2].provider).toBe('google');
+    const graph = parseHCL(hcl);
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.nodes[0]).toEqual({ id: 'web', type: 'aws_instance' });
   });
 
   it('should generate summary of resources', () => {
-    const resources = [
-      { type: 'aws_instance', name: 'a', provider: 'aws' },
-      { type: 'aws_instance', name: 'b', provider: 'aws' },
-      { type: 'aws_s3_bucket', name: 'c', provider: 'aws' }
-    ];
-    const summary = generateSummary(resources);
-    expect(summary).toContain('aws_instance: 2');
-    expect(summary).toContain('aws_s3_bucket: 1');
+    const graph = {
+      nodes: [
+        { id: 'a', type: 'aws_instance' },
+        { id: 'b', type: 'aws_instance' },
+        { id: 'c', type: 'aws_s3_bucket' }
+      ],
+      edges: []
+    };
+    const summary = generateSummary(graph);
+    expect(summary).toContain('3 nodes');
+    expect(summary).toContain('0 edges');
   });
 });

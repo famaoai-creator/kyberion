@@ -8,33 +8,30 @@ export interface ResourceInfo {
   provider: string;
 }
 
-export function parseHCL(content: string): ResourceInfo[] {
-  const resources: ResourceInfo[] = [];
+export interface TerraformGraph {
+  nodes: { id: string; type: string }[];
+  edges: { from: string; to: string }[];
+}
+
+export function parseHCL(content: string): TerraformGraph {
+  const nodes: { id: string; type: string }[] = [];
+  const edges: { from: string; to: string }[] = [];
   const lines = content.split('\n');
 
   lines.forEach((line) => {
     const match = line.match(/resource\s+['"]([^'"]+)['"]\s+['"]([^'"]+)['"]/);
     if (match) {
-      resources.push({
-        type: match[1],
-        name: match[2],
-        provider: match[1].split('_')[0]
-      });
+      nodes.push({ id: match[2], type: match[1] });
     }
   });
 
-  return resources;
+  return { nodes, edges };
 }
 
-export function generateSummary(resources: ResourceInfo[]): string {
-  const counts: Record<string, number> = {};
-  resources.forEach(r => {
-    counts[r.type] = (counts[r.type] || 0) + 1;
-  });
+export function parseTerraformContent(content: string) {
+  return parseHCL(content);
+}
 
-  let summary = 'Architecture Summary:\n';
-  for (const [type, count] of Object.entries(counts)) {
-    summary += `- ${type}: ${count}\n`;
-  }
-  return summary.trim();
+export function generateSummary(graph: TerraformGraph): string {
+  return `Architecture Summary: \${graph.nodes.length} nodes, \${graph.edges.length} edges.`;
 }

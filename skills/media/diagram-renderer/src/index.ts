@@ -32,18 +32,7 @@ runSkill('diagram-renderer', () => {
   }
   const adf = JSON.parse(fs.readFileSync(inputPath, 'utf8')) as ADF;
 
-  // Icon map path relative to this skill's source/dist
-  // Knowledge is at knowledge/skills/diagram-renderer/icon-map.json
-  const iconMapPath = path.resolve(
-    __dirname,
-    '../../../knowledge/skills/diagram-renderer/icon-map.json'
-  );
-  if (!fs.existsSync(iconMapPath)) {
-    throw new Error(`Icon map knowledge missing: ${iconMapPath}`);
-  }
-  const iconMap = JSON.parse(fs.readFileSync(iconMapPath, 'utf8')) as IconMap;
-
-  const mmdContent = adfToMermaid(adf, iconMap);
+  const mmdContent = adfToMermaid(adf);
   safeWriteFile(mmdPath, mmdContent);
 
   try {

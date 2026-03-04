@@ -48,7 +48,7 @@ export async function collectData(
     }
   }
 
-  const history = manifest[url] || { history: [] };
+  const history = manifest[url] || { latest: {} as ManifestEntry, history: [] };
   const lastEntry = history.history.length > 0 ? history.history[history.history.length - 1] : null;
 
   let data: any, contentType: string, statusCode: number;

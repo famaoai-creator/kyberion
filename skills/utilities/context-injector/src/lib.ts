@@ -1,4 +1,4 @@
-import { validateInjection, scanForConfidentialMarkers } from '@agent/core/tier-guard';
+import { validateInjection, scanForConfidentialMarkers, TierLevel } from '@agent/core/tier-guard';
 
 export interface InjectResult {
   injected: boolean;
@@ -12,7 +12,7 @@ export function injectContext(
   knowledgePath: string,
   outputTier: string
 ): InjectResult {
-  const tierCheck = validateInjection(knowledgePath, outputTier);
+  const tierCheck = validateInjection(knowledgePath, outputTier as TierLevel);
   if (!tierCheck.allowed) {
     throw new Error(`Tier violation: \${tierCheck.reason}`);
   }

@@ -20,7 +20,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
 
     let requiredKeywords: string[] = [];
     if (argv.criteria) {
-      const criteria = readJsonFile(argv.criteria as string, 'criteria');
+      const criteria = readJsonFile(argv.criteria as string, 'criteria') as any;
       if (Array.isArray(criteria.required)) {
         requiredKeywords = criteria.required;
       }

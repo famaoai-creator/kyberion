@@ -1,6 +1,6 @@
 import { spawn, execSync, ChildProcess } from 'child_process';
 import * as fs from 'node:fs';
-import { safeUnlinkSync, safeMkdir } from '@agent/core';
+import { safeUnlink, safeMkdir } from '@agent/core';
 import { StrategicAction } from '@agent/core/shared-business-types';
 
 export interface VoiceListenerOptions {
@@ -41,7 +41,7 @@ export function startRecording(options: VoiceListenerOptions): ChildProcess {
     if (!rec.killed) rec.kill('SIGKILL');
     if (fs.existsSync(options.audioFile)) {
       try {
-        safeUnlinkSync(options.audioFile);
+        safeUnlink(options.audioFile);
       } catch (_e) {
         /* ignore */
       }

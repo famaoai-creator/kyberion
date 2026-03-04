@@ -1,16 +1,9 @@
-// @ts-ignore
-import { runSkillAsync } from '@agent/core';
-const { logger, safeReadFile, safeWriteFile } = require('@agent/core/secure-io');
-const pathResolver = require('@agent/core/path-resolver');
+import { runSkillAsync, logger, safeReadFile, safeWriteFile, pathResolver } from '@agent/core';
 import axios from 'axios';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-
-interface SkillArgs {
-  action?: string;
-  code?: string;
-  _: string[];
-}
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 async function getAuthToken(creds: any, endpoints: any) {
   const cacheDir = pathResolver.active('shared/cache/jpx');
@@ -19,7 +12,7 @@ async function getAuthToken(creds: any, endpoints: any) {
 
   let cache: any = { idToken: null, refreshToken: null, expires: 0 };
   if (fs.existsSync(tokenCacheFile)) {
-    cache = JSON.parse(safeReadFile(tokenCacheFile, { encoding: 'utf8' }));
+    cache = JSON.parse(safeReadFile(tokenCacheFile, { encoding: 'utf8' }) as string);
   }
 
   if (cache.idToken && cache.expires > Date.now()) {
@@ -52,18 +45,22 @@ async function getAuthToken(creds: any, endpoints: any) {
   }
 }
 
-runSkillAsync('jpx-market-analyzer', async (args: SkillArgs) => {
-  const safeArgs = args || { _: [] };
-  const action = safeArgs.action || (safeArgs._ && safeArgs._[0]) || 'get-prices';
-  const code = safeArgs.code;
+runSkillAsync('jpx-market-analyzer', async () => {
+  const argv = yargs(hideBin(process.argv))
+    .option('action', { alias: 'a', type: 'string' })
+    .option('code', { alias: 'c', type: 'string' })
+    .parseSync();
+
+  const action = argv.action || (argv._ && argv._[0]) || 'get-prices';
+  const code = argv.code as string;
 
   const credPath = pathResolver.rootResolve('knowledge/personal/connections/jpx/jpx-credentials.json');
   const endpointPath = pathResolver.rootResolve('knowledge/common/api-endpoints.json');
 
   if (!fs.existsSync(credPath)) throw new Error('JPX credentials missing.');
   
-  const creds = JSON.parse(safeReadFile(credPath, { encoding: 'utf8' }));
-  const endpoints = JSON.parse(safeReadFile(endpointPath, { encoding: 'utf8' }));
+  const creds = JSON.parse(safeReadFile(credPath, { encoding: 'utf8' }) as string);
+  const endpoints = JSON.parse(safeReadFile(endpointPath, { encoding: 'utf8' }) as string);
 
   const idToken = await getAuthToken(creds, endpoints);
   const headers = { Authorization: 'Bearer ' + idToken };

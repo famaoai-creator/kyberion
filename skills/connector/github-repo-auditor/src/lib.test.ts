@@ -4,8 +4,8 @@ import { classifyRepos } from './lib';
 describe('github-repo-auditor lib', () => {
   it('should classify repos by name', () => {
     const repos = [
-      { name: 'cp-portal', description: 'd', pushedAt: '2025-01-01', isArchived: false },
-      { name: 'common-utils', description: 'd', pushedAt: '2025-01-01', isArchived: false },
+      { name: 'cp-portal', description: 'd', pushedAt: '2025-01-01', isArchived: false, hasIssues: true, hasWiki: true, defaultBranch: 'main' },
+      { name: 'common-utils', description: 'd', pushedAt: '2025-01-01', isArchived: false, hasIssues: true, hasWiki: true, defaultBranch: 'main' },
     ];
     const mapping = classifyRepos(repos);
     expect(mapping['Customer Portal (CP)']).toHaveLength(1);

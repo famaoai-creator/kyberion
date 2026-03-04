@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeReadFileAsync } from '@agent/core/secure-io';
+import { safeReadFile } from '@agent/core/secure-io';
 
 export interface ApiEndpoint {
   defined_in: string;
@@ -21,7 +21,7 @@ export async function extractExpressRoutes(
 
   const tasks = files.map(async (file) => {
     const filePath = path.join(targetDir, file);
-    const content = (await safeReadFileAsync(filePath)) as string;
+    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
     const matches = content.matchAll(expressPattern);
 
     for (const match of matches) {

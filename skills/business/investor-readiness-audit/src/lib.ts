@@ -245,6 +245,8 @@ export function assessRisks(
       const severity: RiskAssessment['severity'] =
         cat.category === 'Legal' || cat.category === 'Financial' ? 'high' : 'medium';
       risks.push({
+        id: `missing-${cat.category.toLowerCase()}`,
+        title: `Missing ${cat.category} Evidence`,
         category: cat.category,
         severity,
         missing: missing.map((m) => m.item),
@@ -256,6 +258,8 @@ export function assessRisks(
 
   if (audit.completionPercent < 50) {
     risks.push({
+      id: 'overall-readiness',
+      title: 'Critically Low Readiness',
       category: 'Overall',
       severity: 'critical',
       missing: [],
