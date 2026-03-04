@@ -15,6 +15,7 @@ export interface ReflexTerminalOptions {
   cols?: number;
   rows?: number;
   feedbackPath?: string;
+  onOutput?: (data: string) => void;
 }
 
 export class ReflexTerminal {
@@ -34,15 +35,14 @@ export class ReflexTerminal {
       env: process.env as any
     });
 
-    this.setupListeners();
-    logger.info(`[RT] Reflex Terminal started with shell: ${shell}`);
+    this.setupListeners(options.onOutput);
+    logger.info(`[RT] Reflex Terminal started with shell: \${shell}`);
   }
 
-  private setupListeners() {
+  private setupListeners(onOutput?: (data: string) => void) {
     this.ptyProcess.onData((data) => {
       this.outputBuffer += data;
-      // Heuristic: If we detect a large chunk of text ending in a prompt, 
-      // or specific markers, we might want to mirror it.
+      if (onOutput) onOutput(data);
       this.processOutput(data);
     });
 
