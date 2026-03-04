@@ -98,6 +98,20 @@ try {
   safeWriteFile(jsonPath, JSON.stringify(ssotData, null, 2));
   console.log(chalk.green(`  ✔ Generated SSoT JSON index (${index.length} assets recorded)`));
 
+  // Mirror Sensory Feed
+  const stimuliPath = path.join(rootDir, 'presence/bridge/runtime/stimuli.jsonl');
+  const mirrorStimuliPath = path.join(rootDir, 'presence/displays/chronos-mirror/public/stimuli_feed.json');
+  if (fs.existsSync(stimuliPath)) {
+    try {
+      const raw = fs.readFileSync(stimuliPath, 'utf8').trim().split('\n');
+      const recent = raw.slice(-15).map(line => JSON.parse(line));
+      safeWriteFile(mirrorStimuliPath, JSON.stringify(recent, null, 2));
+      console.log(chalk.green(`  ✔ Mirrored recent stimuli to Dashboard`));
+    } catch (e: any) {
+      console.warn(chalk.yellow(`  ⚠️ Failed to mirror stimuli: ${e.message}`));
+    }
+  }
+
   const mirrorPath = path.join(rootDir, 'tools/chronos-mirror/public/knowledge_index.json');
   const mirrorDir = path.dirname(mirrorPath);
   if (fs.existsSync(mirrorDir)) {

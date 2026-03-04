@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T17:12:30.748Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T22:24:07.316Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -16,7 +16,7 @@
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./architecture/passkey-push-protocol.md) (public | Unknown)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Unknown)
-- [Sovereign Terminal Hosting Protocol](./architecture/terminal-hosting.md) (public | Unknown)
+- [Terminal Hosting: The Institutional Gateway](./architecture/terminal-hosting.md) (public | Unknown)
 
 ## 📁 ceo
 - [AI-Driven Business Engineering: The Gemini Strategy](./ceo/ai-business-engineering.md) (public | Unknown)
@@ -130,6 +130,7 @@
 - [Config Protocol: The Sovereign Rule of System State](./governance/config-protocol.md) (public | Unknown)
 - [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Unknown)
 - [Dual-Key Policy: ロール管理と決定権限の標準規約](./governance/dual-key-policy.md) (public | Unknown)
+- [GIT Strategy: Sovereign Hierarchical Synchronization](./governance/git-strategy.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Unknown)
 - [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./governance/onboarding-protocol.md) (public | Unknown)
 - [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Unknown)
