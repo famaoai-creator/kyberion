@@ -41,8 +41,18 @@ function buildOutput<T>(
   return base;
 }
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 function printOutput<T>(output: SkillOutput<T>) {
   const isHuman = process.env.GEMINI_FORMAT === 'human' || process.argv.includes('--format=human');
+
+  // Persistence for Feedback Loop: Save the latest response to a physical file
+  try {
+    const sharedDir = path.join(process.cwd(), 'active/shared');
+    if (!fs.existsSync(sharedDir)) fs.mkdirSync(sharedDir, { recursive: true });
+    fs.writeFileSync(path.join(sharedDir, 'last_response.json'), JSON.stringify(output, null, 2), 'utf8');
+  } catch (_) { /* Ignore silent failures in persistence */ }
 
   if (isHuman) {
     if (output.status === 'success') {

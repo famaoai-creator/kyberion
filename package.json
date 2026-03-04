@@ -64,6 +64,7 @@
     "exceljs": "^4.4.0",
     "googleapis": "^144.0.0",
     "js-yaml": "^4.1.1",
+    "node-pty": "^1.1.0",
     "pptxgenjs": "^4.0.1",
     "sqlite3": "^5.1.7",
     "yargs": "^18.0.0"
@@ -94,7 +95,8 @@
       "esbuild": "^0.25.0",
       "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz",
       "nth-check": "^2.0.1"
-    }
+    },
+    "ignoredBuiltDependencies": []
   },
   "overrides": {
     "form-data": "^4.0.0"

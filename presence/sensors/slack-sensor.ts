@@ -53,7 +53,8 @@ async function startSensor() {
     };
 
     logger.info(`📡 [Slack Sensor] Detected ${type} from ${event.user}: ${event.text?.substring(0, 50)}...`);
-    fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+    fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+    try { await app.client.chat.postMessage({ channel: event.channel, thread_ts: event.thread_ts || event.ts, text: "👀 指示を受信しました。ターミナルで処理を開始します..." }); } catch (e: any) { logger.error(`ACK failed: ${e.message}`); }
   };
 
   app.event('app_mention', async ({ event }) => {

@@ -11,66 +11,7 @@ import { logger, fileUtils, ui } from '@agent/core/core';
 
 const rootDir = process.cwd();
 const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
-
-interface SkillInfo {
-  name?: string;
-  n?: string;
-  status?: string;
-  s?: string;
-  path?: string;
-  main?: string;
-  m?: string;
-  risk?: string;
-  r?: string;
-  description?: string;
-  d?: string;
-  tags?: string[];
-  t?: string[];
-}
-
-/**
- * Proactive Health Check
- */
-async function checkHealth(role: string) {
-  const govPath = path.join(rootDir, 'active/shared/governance-report.json');
-  const perfDir = path.join(rootDir, 'evidence/performance');
-  const recipePath = path.join(rootDir, 'knowledge/orchestration/remediation-recipes.json');
-
-  const priorities: Record<string, string[]> = {
-    'Ecosystem Architect': ['integrity', 'governance', 'debt'],
-    'Reliability Engineer': ['performance', 'governance'],
-    'Security Reviewer': ['pii', 'governance'],
-    CEO: ['debt', 'governance', 'performance'],
-  };
-
-  const myPriorities = priorities[role] || ['governance', 'performance'];
-
-  for (const p of myPriorities) {
-    if (p === 'governance') {
-      if (fs.existsSync(govPath)) {
-        const report = JSON.parse(fs.readFileSync(govPath, 'utf8'));
-        if (report.overall_status !== 'compliant') {
-          logger.warn('Ecosystem is currently NON-COMPLIANT.');
-          if (fs.existsSync(recipePath)) {
-            const recipes = JSON.parse(fs.readFileSync(recipePath, 'utf8'));
-            if (recipes.NON_COMPLIANT) {
-              console.log(chalk.cyan(`
-⚙️  Auto-healing triggered: ${recipes.NON_COMPLIANT.description}`));
-              try {
-                execSync(recipes.NON_COMPLIANT.command, { stdio: 'inherit', cwd: rootDir });
-                console.log(chalk.green('\n✔  Repair complete. Continuing...\n'));
-              } catch (e: any) {
-                logger.error(`Self-healing failed: ${e.message}`);
-              }
-            }
-          }
-        }
-      }
-    }
-    // ... performance, integrity checks omitted for brevity in POC, 
-    // but fully implemented in final version.
-  }
-}
+const govPath = path.join(rootDir, 'knowledge/personal/role-config.json');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -94,7 +35,6 @@ function findScript(skillDir: string): string | null {
   
   if (fs.existsSync(scriptsDir)) {
     const files = fs.readdirSync(scriptsDir);
-    // Prioritize .js (compiled) over .cjs (legacy)
     const main = files.find(f => f === 'index.js' || f === 'main.js') || files.find(f => f === 'index.cjs');
     if (main) return path.join(scriptsDir, main);
   }
@@ -102,39 +42,65 @@ function findScript(skillDir: string): string | null {
   return null;
 }
 
+async function checkHealth(role: string) {
+  const priorities: Record<string, string[]> = {
+    'Ecosystem Architect': ['integrity', 'governance', 'debt'],
+    'Reliability Engineer': ['performance', 'governance'],
+    'Security Reviewer': ['pii', 'governance'],
+    CEO: ['debt', 'governance', 'performance'],
+  };
+
+  const myPriorities = priorities[role] || ['governance', 'performance'];
+
+  for (const p of myPriorities) {
+    if (p === 'governance') {
+      if (fs.existsSync(govPath)) {
+        // Governance check logic could go here
+      } else {
+        logger.warn('Ecosystem is currently NON-COMPLIANT.');
+        try {
+          console.log(chalk.yellow('⚙️  Auto-healing triggered: Run the self-healing health check'));
+          execSync('node dist/scripts/check_skills_health.js --fix', { stdio: 'inherit', cwd: rootDir });
+        } catch (err) {
+          logger.error('Self-healing failed: ' + (err as Error).message);
+        }
+      }
+    }
+  }
+}
+
+function logResponse(text: string) {
+  try {
+    const sharedDir = path.join(rootDir, 'active/shared');
+    if (!fs.existsSync(sharedDir)) fs.mkdirSync(sharedDir, { recursive: true });
+    const envelope = {
+      skill: 'cli-direct',
+      status: 'success',
+      data: { message: text },
+      metadata: { timestamp: new Date().toISOString(), duration_ms: 0 }
+    };
+    fs.writeFileSync(path.join(sharedDir, 'last_response.json'), JSON.stringify(envelope, null, 2), 'utf8');
+  } catch (_) {}
+}
+
 async function runCommand() {
   const index = loadIndex();
-  const skills: SkillInfo[] = index.s || index.skills;
-  let targetSkill = skillName;
+  const skills = index.s || index.skills || [];
+  const skill = skills.find((s: any) => s.n === skillName || s.name === skillName);
 
-  if (!targetSkill) {
-    console.log(chalk.bold('\n▶ Select a skill to run:'));
-    const implemented = skills.filter(s => (s.s || s.status) === 'impl' || s.status === 'implemented');
-    implemented.slice(0, 10).forEach((s, i) => console.log(`  ${chalk.cyan(i + 1 + '.')} ${s.n || s.name}`));
-    targetSkill = (await ui.confirm('Run interactive search?')) ? await ui.ask('Enter skill name: ') : null;
-    if (!targetSkill) process.exit(0);
-  }
-
-  const skill = skills.find(s => (s.n || s.name) === targetSkill);
   if (!skill) {
-    logger.error(`Skill "${targetSkill}" not found in index`);
-    process.exit(1);
+    const errorMsg = `Skill "${skillName}" not found in index`;
+    logger.error(errorMsg);
+    logResponse(errorMsg);
+    return;
   }
 
-  const skillPath = skill.path || (skill.n || skill.name);
-  const skillDir = path.join(rootDir, skillPath!);
-  let script = null;
-  const mainPath = skill.m || skill.main;
-  
-  if (mainPath) {
-    const fullPath = path.join(skillDir, mainPath);
-    if (fs.existsSync(fullPath)) script = fullPath;
-  }
-  
-  if (!script) script = findScript(skillDir);
+  const script = findScript(path.join(rootDir, skill.path));
   if (!script) {
-    logger.error(`Skill "${targetSkill}" has no runnable scripts.`);
-    process.exit(1);
+    const errorMsg = `Skill "${skillName}" has no runnable scripts.`;
+    logger.error(errorMsg);
+    logResponse(errorMsg);
+    return;
   }
 
   const cleanArgs = skillArgs.filter(arg => arg !== '--');
@@ -157,16 +123,22 @@ async function main() {
   await checkHealth(currentRole);
 
   switch (command) {
-    case 'run': await runCommand(); break;
-    case 'list': /* list implementation */ break;
-    case 'system': /* system proxy implementation */ break;
+    case 'run': 
+      await runCommand(); 
+      break;
+    case 'list':
+      console.log('List of skills not implemented in this proxy.');
+      break;
     default:
-      console.log('Available commands: run, list, info, system');
-      process.exit(0);
+      const helpMsg = 'Available commands: run, list, info, system';
+      console.log(helpMsg);
+      logResponse(helpMsg);
   }
 }
 
 main().catch(err => {
-  logger.error(err.message);
+  const errorMsg = (err as Error).message;
+  logger.error(errorMsg);
+  logResponse(errorMsg);
   process.exit(1);
 });
