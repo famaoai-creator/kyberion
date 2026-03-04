@@ -1,10 +1,31 @@
 import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 /**
- * Terminal Bridge v2.8 (Resilient Discovery Edition)
+ * Terminal Bridge v2.9 (Reflex Terminal Integration)
  */
 
 const STRATEGIES: Record<string, any> = {
+  ReflexTerminal: {
+    findIdle: () => {
+      // Logic to check if the RT session is active (via presence of PID or lock file)
+      const rootDir = process.cwd();
+      const pidFile = path.join(rootDir, 'active/shared/services-pids.json');
+      if (fs.existsSync(pidFile)) {
+        try {
+          const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
+          if (pids['reflex-terminal']) return { winId: 'rt-main', sessionId: 'default', type: 'ReflexTerminal' };
+        } catch (_) {}
+      }
+      return null;
+    },
+    inject: (winId: string, sessionId: string, text: string) => {
+      const inboxPath = path.join(process.cwd(), 'active/shared/rt_inbox.jsonl');
+      fs.appendFileSync(inboxPath, JSON.stringify({ text, timestamp: new Date().toISOString() }) + '\n');
+      return true;
+    }
+  },
   iTerm2: {
     findIdle: () => {
       const script = `
@@ -24,7 +45,6 @@ const STRATEGIES: Record<string, any> = {
             end repeat
           end repeat
           
-          -- Fallback: If no Gemini session, take the front-most session
           if bestSession is "NOT_FOUND" then
             try
               set w to front window
@@ -111,10 +131,16 @@ const STRATEGIES: Record<string, any> = {
 
 export const terminalBridge = {
   findIdleSession: () => {
+    // RT has the highest priority for autonomous operations
+    const rt = STRATEGIES.ReflexTerminal.findIdle();
+    if (rt) return rt;
+
     const iterm = STRATEGIES.iTerm2.findIdle();
     if (iterm) return iterm;
+
     const vscode = STRATEGIES.VSCode.findIdle();
     if (vscode) return vscode;
+
     return null;
   },
   injectAndExecute: (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {

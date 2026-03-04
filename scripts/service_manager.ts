@@ -20,6 +20,10 @@ const SERVICES: Record<string, any> = {
     path: 'dist/presence/sensors/slack-sensor.js',
     description: 'Listens for Slack mentions and DMs'
   },
+  'reflex-terminal': {
+    path: 'dist/scripts/rt-orchestrator.js',
+    description: 'Persistent AI-native virtual terminal session'
+  },
   'nexus-daemon': {
     path: 'dist/presence/bridge/nexus-daemon.js',
     description: 'Coordinates physical terminal intervention'
