@@ -236,6 +236,8 @@ export function identifyRisks(phaseResults: PhaseResult[]): GovernanceRisk[] {
   for (const phase of phaseResults) {
     if (phase.status === 'not_ready') {
       risks.push({
+        id: `insufficient-evidence-${phase.phase.toLowerCase().replace(/ /g, '-')}`,
+        title: `Insufficient Evidence: ${phase.phase}`,
         category: 'Governance',
         severity: 'high',
         phase: phase.phase,
@@ -246,6 +248,8 @@ export function identifyRisks(phaseResults: PhaseResult[]): GovernanceRisk[] {
     const missing = phase.evidence.filter((e) => e.status === 'missing');
     for (const m of missing) {
       risks.push({
+        id: `missing-evidence-${m.label.toLowerCase().replace(/ /g, '-')}`,
+        title: `Missing Evidence: ${m.label}`,
         category: 'Evidence',
         severity: phase.completion < 50 ? 'high' : 'medium',
         phase: phase.phase,

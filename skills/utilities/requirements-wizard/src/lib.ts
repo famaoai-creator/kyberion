@@ -28,3 +28,7 @@ export function exportToMarkdown(reqs: Requirement[]): string {
   });
   return md.trim();
 }
+
+export function auditRequirements(reqs: Requirement[]) {
+  return validateRequirements(reqs);
+}

@@ -1,11 +1,15 @@
 import { runAsyncSkill } from '@agent/core';
 import { requireArgs, safeJsonParse, readJsonFile } from '@agent/core/validators';
 import { safeWriteFile } from '@agent/core/secure-io';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import { fetchApi } from './lib.js';
 
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runAsyncSkill('api-fetcher', async () => {
-    const args = requireArgs(['url']);
+    const argv = yargs(hideBin(process.argv)).parseSync() as any;
+    requireArgs(argv, ['url']);
+    const args = argv;
 
     const options = {
       method: args.method,

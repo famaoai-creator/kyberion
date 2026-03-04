@@ -19,7 +19,7 @@ export interface Registry {
 
 export async function importSource(repoUrl: string, name?: string): Promise<SourceEntry> {
   const repoName = name || path.basename(repoUrl, '.git');
-  const quarantineDir = path.join(pathResolver.activeRoot(), 'quarantine', repoName);
+  const quarantineDir = path.join(pathResolver.active('quarantine'), repoName);
   const registryPath = pathResolver.shared('registry/source_registry.json');
 
   if (fs.existsSync(quarantineDir)) {

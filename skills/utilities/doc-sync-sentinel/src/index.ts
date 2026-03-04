@@ -12,7 +12,8 @@ const argv = createStandardYargs()
 if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   runSkillAsync('doc-sync-sentinel', async () => {
     const rootDir = path.resolve(argv.dir as string);
-    const changes = getRecentChanges(rootDir, argv.since as string);
+    const days = parseInt((argv.since as string).split(' ')[0], 10) || 7;
+    const changes = getRecentChanges(rootDir, days);
     const docs = getAllFiles(rootDir).filter((f) => f.endsWith('.md'));
 
     return {

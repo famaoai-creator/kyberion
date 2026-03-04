@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { execSync } from 'node:child_process';
+
 /**
  * Local Reviewer Core Library.
  */
@@ -10,6 +12,14 @@ export interface ReviewFinding {
   line: number;
   type: 'style' | 'security' | 'logic';
   message: string;
+}
+
+export function getStagedDiff(): string {
+  try {
+    return execSync('git diff --staged', { encoding: 'utf8' });
+  } catch (_) {
+    return '';
+  }
 }
 
 export function reviewFile(filePath: string, content: string): ReviewFinding[] {

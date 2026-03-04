@@ -56,3 +56,13 @@ export function generateRecommendations(tokens: number, type: ContentType): stri
   }
   return recs;
 }
+
+export function pruneContext(content: string, maxTokens: number, type: ContentType): string {
+  const currentTokens = estimateTokens(content, type);
+  if (currentTokens <= maxTokens) return content;
+
+  // Simple truncation for now - more advanced logic could use sentence boundaries
+  const ratio = type === 'code' ? 3 : 4;
+  const targetChars = maxTokens * ratio;
+  return content.substring(0, targetChars) + '\n... [TRUNCATED DUE TO TOKEN LIMIT] ...';
+}

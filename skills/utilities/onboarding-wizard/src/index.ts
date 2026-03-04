@@ -28,8 +28,8 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
       } catch {}
     }
 
-    const prerequisites = detectPrerequisites(projectDir);
-    const setupSteps = generateSetupSteps(projectDir);
+    const prerequisites = detectPrerequisites();
+    const setupSteps = generateSetupSteps();
 
     return {
       projectName,

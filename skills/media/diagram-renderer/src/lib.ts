@@ -52,7 +52,15 @@ export function applyDesignerStyle(mmd: string, adf: ADF, knowledge: any): strin
     cssStyles: `${styleRule ? Object.values(styleRule).join(' ') : ''} ${overrides.custom_style || ''}`
   };
   
-  return `%%{init: ${JSON.stringify(init)} }%%\n${mmd}`;
+  return `%%{init: \${JSON.stringify(init)} }%%\n\${mmd}`;
+}
+
+/**
+ * Converts ADF elements into Mermaid syntax (helper for external callers).
+ */
+export function adfToMermaid(adf: ADF): string {
+  const knowledge = loadDesignerKnowledge();
+  return applyDesignerStyle(adf.elements.diagram || '', adf, knowledge);
 }
 
 /**

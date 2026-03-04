@@ -33,13 +33,16 @@ export interface TechStackInfo {
  */
 export interface Issue {
   id: string;
-  category: string;
-  severity: Severity;
-  title: string;
-  description: string;
+  category?: string;
+  severity?: Severity;
+  title?: string;
+  description?: string;
+  risk?: string; 
   impact?: string;
   mitigation?: string;
-  location?: string; // File path or module name
+  location?: string; 
+  phase?: string; // Used by PMO
+  missing?: string[]; // Used by Audit
 }
 
 /**
@@ -125,6 +128,13 @@ export interface Report {
   artifacts: ArtifactPointer[];
   metadata?: Record<string, any>;
 }
+
+/**
+ * Legacy support aliases to prevent broken builds during migration.
+ */
+export type RiskEntry = Issue;
+export type FinancialMetricsV1 = FinancialMetrics;
+export type DocumentArtifactV1 = DocumentArtifact;
 
 /**
  * Base Input for many skills.

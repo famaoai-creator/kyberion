@@ -19,9 +19,9 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
   runSkill('operational-runbook-generator', () => {
     const service = argv.service as string;
     const type = (argv.type as string) || 'deploy';
-    const template = TEMPLATES[type] || TEMPLATES.deploy;
+    const template = TEMPLATES[type] || Object.values(TEMPLATES)[0];
 
-    const markdown = generateRunbookMarkdown(service, type, template);
+    const markdown = generateRunbookMarkdown(template);
 
     if (argv.out) {
       safeWriteFile(argv.out as string, markdown);

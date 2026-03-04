@@ -50,7 +50,7 @@ describe('business-growth-planner lib', () => {
   });
 
   it('should handle empty input gracefully', () => {
-    const emptyInput: BusinessInput = {};
+    const emptyInput: BusinessInput = { name: '' };
     const result = processBusinessPlan(emptyInput);
 
     expect(result.company).toBe('Unknown Entity');

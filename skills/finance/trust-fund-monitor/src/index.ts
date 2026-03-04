@@ -1,27 +1,24 @@
-// @ts-ignore
-import { runSkillAsync } from '@agent/core';
-const { logger, safeReadFile, safeWriteFile } = require('@agent/core/secure-io');
-const pathResolver = require('@agent/core/path-resolver');
+import { runSkillAsync, logger, safeReadFile, pathResolver } from '@agent/core';
 import axios from 'axios';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
-interface SkillArgs {
-  action?: string;
-  code?: string;
-  _: string[];
-}
+runSkillAsync('trust-fund-monitor', async () => {
+  const argv = yargs(hideBin(process.argv))
+    .option('action', { alias: 'a', type: 'string' })
+    .option('code', { alias: 'c', type: 'string' })
+    .parseSync();
 
-runSkillAsync('trust-fund-monitor', async (args: SkillArgs) => {
-  const safeArgs = args || { _: [] };
-  const action = safeArgs.action || (safeArgs._ && safeArgs._[0]) || 'get-nav';
-  let fundCode = safeArgs.code;
+  const action = argv.action || (argv._ && argv._[0]) || 'get-nav';
+  let fundCode = argv.code as string;
 
   const endpointPath = pathResolver.rootResolve('knowledge/common/api-endpoints.json');
   const aliasPath = pathResolver.rootResolve('knowledge/finance/fund-aliases.json');
 
-  const endpoints = JSON.parse(safeReadFile(endpointPath, { encoding: 'utf8' }));
-  const fundData = JSON.parse(safeReadFile(aliasPath, { encoding: 'utf8' }));
+  const endpoints = JSON.parse(safeReadFile(endpointPath, { encoding: 'utf8' }) as string);
+  const fundData = JSON.parse(safeReadFile(aliasPath, { encoding: 'utf8' }) as string);
 
   if (fundCode && fundData.aliases[fundCode.toLowerCase()]) {
     fundCode = fundData.aliases[fundCode.toLowerCase()];

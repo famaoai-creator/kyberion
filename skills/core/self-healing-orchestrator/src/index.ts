@@ -37,8 +37,7 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     }
 
     if (argv['auto-heal']) {
-      const sourcePath = path.resolve(argv['auto-heal'] as string);
-      return await autoHealTestFailure(resolved, sourcePath);
+      return autoHealTestFailure(resolved);
     }
 
     const errors = parseInput(resolved);

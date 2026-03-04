@@ -16,8 +16,8 @@ export interface WasteFinding {
 export function checkOversizedInstances(content: string, filePath: string): WasteFinding[] {
   const findings: WasteFinding[] = [];
   const oversizedPatterns = [
-    { regex: /instance_type\s*=\s*['"].*\.[4-9]xlarge['"]/i, label: 'oversized-instance', impact: 'high' as const },
-    { regex: /instance_type\s*=\s*['"].*\.24xlarge['"]/i, label: 'oversized-instance', impact: 'high' as const },
+    { regex: /instance_type\s*=\s*['"].*\.[4-9]xlarge['"]/i, label: 'oversized-instance' as const, impact: 'high' as const },
+    { regex: /instance_type\s*=\s*['"].*\.24xlarge['"]/i, label: 'oversized-instance' as const, impact: 'high' as const },
   ];
 
   oversizedPatterns.forEach(p => {

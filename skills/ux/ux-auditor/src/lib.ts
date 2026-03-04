@@ -24,3 +24,7 @@ export function auditAccessibility(html: string): UXFinding[] {
 
   return findings;
 }
+
+export function auditHtmlContent(html: string) {
+  return auditAccessibility(html);
+}

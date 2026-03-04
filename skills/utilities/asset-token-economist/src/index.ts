@@ -28,23 +28,19 @@ runSkill('asset-token-economist', () => {
   // 1. Handle Pruning if flag is set
   if (argv.prune) {
     if (!text) throw new Error('Pruning requires input via --input or --text.');
-    try {
-      const messages = JSON.parse(text);
-      const { pruned, summary } = pruneContext(messages);
-      const tokensBefore = estimateTokens(text, 'prose');
-      const tokensAfter = estimateTokens(JSON.stringify(pruned), 'prose');
-      
-      const result = { 
-        pruned, 
-        summary, 
-        tokensSaved: Math.max(0, tokensBefore - tokensAfter)
-      };
+    const contentType = detectContentType(text);
+    const prunedText = pruneContext(text, 2000, contentType);
+    const tokensBefore = estimateTokens(text, contentType);
+    const tokensAfter = estimateTokens(prunedText, contentType);
+    
+    const result = { 
+      pruned_text: prunedText, 
+      tokens_saved: Math.max(0, tokensBefore - tokensAfter),
+      content_type: contentType
+    };
 
-      if (argv.out) safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
-      return result;
-    } catch (e) {
-      throw new Error(`Failed to prune context: ${(e as Error).message}. Ensure input is a JSON array of messages.`);
-    }
+    if (argv.out) safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+    return result;
   }
 
   // 2. Default Token Accounting

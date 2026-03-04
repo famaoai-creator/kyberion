@@ -8,7 +8,7 @@ import { validateFilePath } from '@agent/core/validators';
 import { generateWordContent, WordMasterSpecs } from './lib.js';
 
 
-import pathResolver from '@agent/core/path-resolver';
+import { pathResolver } from '@agent/core';
 
 const argv = yargs(hideBin(process.argv))
   .option('input', {

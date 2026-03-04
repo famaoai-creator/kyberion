@@ -27,3 +27,7 @@ export function validateDesign(design: string, reqs: NFRequirement[]): string[] 
   });
   return violations;
 }
+
+export function cleanRequirementText(text: string): string {
+  return text.trim().replace(/[*_#]/g, '').replace(/\s+/g, ' ');
+}

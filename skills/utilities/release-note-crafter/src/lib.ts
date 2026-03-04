@@ -27,3 +27,18 @@ export function craftReleaseNote(data: ReleaseNoteData): string {
 
   return note.trim();
 }
+
+export function getGitCommits(count: number): string[] {
+  // Mock for now - in real use would call git via execSync
+  return ['feat: add new sensor', 'fix: correct pii mask', 'chore: update deps'];
+}
+
+export function classifyCommit(msg: string): 'feat' | 'fix' | 'chore' {
+  if (msg.startsWith('feat')) return 'feat';
+  if (msg.startsWith('fix')) return 'fix';
+  return 'chore';
+}
+
+export function stripPrefix(msg: string): string {
+  return msg.replace(/^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\(.*?\))?: /, '');
+}

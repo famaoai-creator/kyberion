@@ -47,3 +47,7 @@ export function calculateTotalProjectedCost(services: CloudService[]) {
     yearly: totalMonthly * 12
   };
 }
+
+export function estimateCosts(services: CloudService[]) {
+  return calculateTotalProjectedCost(services);
+}

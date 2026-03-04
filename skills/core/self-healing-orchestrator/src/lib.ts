@@ -86,3 +86,8 @@ export function matchRunbook(errors: string[]): HealingAction[] {
   const weight = { high: 3, medium: 2, low: 1 };
   return actions.sort((a, b) => weight[b.severity] - weight[a.severity]);
 }
+
+export function autoHealTestFailure(filePath: string): HealingAction[] {
+  const errors = parseInput(filePath);
+  return matchRunbook(errors);
+}
