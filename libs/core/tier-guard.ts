@@ -35,6 +35,21 @@ export function detectTier(filePath: string): TierLevel {
 }
 
 /**
+ * Extract tenant name from physical path (e.g., vault/{Tenant}/...)
+ */
+export function detectTenant(filePath: string): string | null {
+  const resolved = path.resolve(filePath);
+  const vaultRoot = path.resolve(process.cwd(), 'vault');
+  
+  if (resolved.startsWith(vaultRoot)) {
+    const relative = path.relative(vaultRoot, resolved);
+    const parts = relative.split(path.sep);
+    return parts.length > 0 ? parts[0] : null;
+  }
+  return null;
+}
+
+/**
  * Check whether data from `sourceTier` is allowed to flow into `targetTier` output.
  */
 export function canFlowTo(sourceTier: TierLevel, targetTier: TierLevel): boolean {
@@ -57,21 +72,41 @@ export function validateInjection(knowledgePath: string, outputTier: TierLevel):
 }
 
 /**
- * Validates read permission based on role and tier.
+ * Validates read permission based on role, tier and tenant.
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
-  const tier = detectTier(filePath);
+  const tenant = detectTenant(filePath);
+  const activeTenant = process.env.ACTIVE_TENANT;
+
+  if (tenant && activeTenant && tenant !== activeTenant) {
+    return { 
+      allowed: false, 
+      reason: `[TENANT_VIOLATION] Access to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.` 
+    };
+  }
+
   return { allowed: true };
 }
 
 /**
- * Validates write permission based on role and tier.
+ * Validates write permission based on role, tier and tenant.
  */
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const tier = detectTier(filePath);
+  const tenant = detectTenant(filePath);
+  const activeTenant = process.env.ACTIVE_TENANT;
+
   if (tier === 'personal') {
     return { allowed: false, reason: 'Writing to personal tier is restricted.' };
   }
+
+  if (tenant && activeTenant && tenant !== activeTenant) {
+    return { 
+      allowed: false, 
+      reason: `[TENANT_VIOLATION] Writing to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.` 
+    };
+  }
+
   return { allowed: true };
 }
 
