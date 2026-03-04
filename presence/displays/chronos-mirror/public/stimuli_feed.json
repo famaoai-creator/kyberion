@@ -1,0 +1,117 @@
+[
+  {
+    "timestamp": "2026-03-04T17:29:47Z",
+    "source_channel": "demonstration-sensor",
+    "payload": "ls -la",
+    "status": "INJECTED",
+    "injected_at": "2026-03-04T17:30:46.886Z"
+  },
+  {
+    "timestamp": "2026-03-04T17:30:51Z",
+    "source_channel": "demonstration-sensor",
+    "payload": "ls -la",
+    "status": "INJECTED",
+    "injected_at": "2026-03-04T17:48:58.192Z"
+  },
+  {
+    "timestamp": "2026-03-04T19:39:08.406Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "元気？",
+    "status": "INJECTED",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772653147.651719",
+      "event_ts": "1772653147.651719"
+    },
+    "injected_at": "2026-03-04T19:49:15.021Z"
+  },
+  {
+    "timestamp": "2026-03-04T19:50:01.518Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "反応ないね？",
+    "status": "INJECTED",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772653147.651719",
+      "event_ts": "1772653800.302909"
+    },
+    "injected_at": "2026-03-04T19:50:05.230Z"
+  },
+  {
+    "timestamp": "2026-03-04T19:51:52.643Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "どですか？",
+    "status": "INJECTED",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772653147.651719",
+      "event_ts": "1772653911.656669"
+    },
+    "injected_at": "2026-03-04T19:51:55.506Z"
+  },
+  {
+    "timestamp": "2026-03-04T21:15:02.920Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "元気かい？",
+    "status": "PENDING",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772658901.798569",
+      "event_ts": "1772658901.798569"
+    }
+  },
+  {
+    "timestamp": "2026-03-04T21:36:54.698Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "おーい",
+    "status": "PENDING",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772652652.350349",
+      "event_ts": "1772652652.350349"
+    }
+  },
+  {
+    "timestamp": "2026-03-04T21:37:58.484Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "mention",
+    "payload": "<@U0AJNS2DT0Q> これで行けるか",
+    "status": "PENDING",
+    "metadata": {
+      "channel_id": "C0AJ7EHH8BB",
+      "user_id": "U0AHUGY997U",
+      "thread_ts": "1772652713.307639",
+      "event_ts": "1772652713.307639"
+    }
+  },
+  {
+    "timestamp": "2026-03-04T21:43:41.156Z",
+    "source_channel": "slack",
+    "delivery_mode": "BATCH",
+    "type": "dm",
+    "payload": "元気？",
+    "status": "PENDING",
+    "metadata": {
+      "channel_id": "D0AHY6L7KRA",
+      "user_id": "U0AJNSAP3DW",
+      "thread_ts": "1772653042.691729",
+      "event_ts": "1772653042.691729"
+    }
+  }
+]
