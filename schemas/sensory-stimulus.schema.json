@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gemini Unified Sensory Protocol (GUSP) v1.0",
+  "type": "object",
+  "required": ["id", "ts", "origin", "signal", "control"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique request identifier" },
+    "ts": { "type": "string", "format": "date-time", "description": "Event occurrence timestamp" },
+    "ttl": { "type": "integer", "default": 3600, "description": "Time-to-live in seconds" },
+    "origin": {
+      "type": "object",
+      "required": ["channel"],
+      "properties": {
+        "channel": { "type": "string", "enum": ["slack", "terminal", "voice", "system", "internal"] },
+        "source_id": { "type": "string" },
+        "context": { "type": "string" }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "required": ["intent", "payload"],
+      "properties": {
+        "intent": { "type": "string", "enum": ["command", "whisper", "alert", "broadcast"] },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
+        "payload": { "type": "string" }
+      }
+    },
+    "control": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "injected", "processed", "expired", "failed"] },
+        "feedback": { "type": "string", "enum": ["auto", "silent", "manual"], "default": "auto" },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": { "type": "string" },
+              "ts": { "type": "string", "format": "date-time" },
+              "agent": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,58 +1,74 @@
 /**
  * scripts/check_knowledge_integrity.ts
- * Detects broken internal links in documentation.
+ * Scans knowledge base for broken links and metadata inconsistencies.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createLogger } from '@agent/core/logger';
-import { safeReadFile } from '@agent/core/secure-io';
-import * as pathResolver from '@agent/core/path-resolver';
+import { logger } from '@agent/core';
 
-const logger = createLogger('integrity');
-const knowledgeDir = pathResolver.knowledge();
+const ROOT_DIR = process.cwd();
+const KNOWLEDGE_DIR = path.join(ROOT_DIR, 'knowledge');
 
-function* walk(dir: string): Generator<string> {
-  const files = fs.readdirSync(dir, { withFileTypes: true });
+function walk(dir: string, fileList: string[] = []): string[] {
+  const files = fs.readdirSync(dir);
   for (const file of files) {
-    if (file.isDirectory()) yield* walk(path.join(dir, file.name));
-    else yield path.join(dir, file.name);
+    const filePath = path.join(dir, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      if (!['node_modules', '.git', 'dist'].includes(file)) walk(filePath, fileList);
+    } else if (file.endsWith('.md')) {
+      fileList.push(filePath);
+    }
   }
+  return fileList;
 }
 
-async function main() {
-  const issues: any[] = [];
-  const files: string[] = [];
+async function checkIntegrity() {
+  logger.info('🛡️  Scanning Knowledge Integrity...');
+  const files = walk(KNOWLEDGE_DIR);
+  let brokenLinks = 0;
+  let totalLinks = 0;
 
-  for (const file of walk(knowledgeDir)) {
-    if (file.endsWith('.md')) files.push(file);
-  }
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf8');
+    const relFile = path.relative(KNOWLEDGE_DIR, file);
+    
+    // Match [label](./path/to/file.md) but NOT `[label](./path/to/file.md)`
+    const linkRegex = /(?<!`)\[([^\]]+)\]\(([^)]+)\)(?!`)/g;
+    let match;
 
-  files.forEach((file) => {
-    try {
-      const content = safeReadFile(file, { encoding: 'utf8' }) as string;
-      const relFile = path.relative(process.cwd(), file);
-      const linkRegex = /\[.*?\]\(((\.\/|\.\.\/).*?\.md)\)/g;
-      let match;
-      while ((match = linkRegex.exec(content)) !== null) {
-        const linkPath = path.resolve(path.dirname(file), match[1]);
-        if (!fs.existsSync(linkPath)) {
-          issues.push({ file: relFile, type: 'BROKEN_LINK', detail: match[1] });
+    while ((match = linkRegex.exec(content)) !== null) {
+      const label = match[1];
+      const link = match[2];
+
+      if (link.startsWith('http') || link.startsWith('#')) continue;
+      
+      totalLinks++;
+      const linkPath = path.resolve(path.dirname(file), link);
+      
+      if (!fs.existsSync(linkPath)) {
+        logger.error(`❌ Broken link in ${relFile}: [${label}](${link})`);
+        brokenLinks++;
+      } else {
+        // Optional: Title mismatch check
+        const targetContent = fs.readFileSync(linkPath, 'utf8');
+        const titleMatch = targetContent.match(/^# (.*)/m);
+        if (titleMatch) {
+          const targetTitle = titleMatch[1].trim();
+          if (label !== targetTitle && !label.includes(targetTitle) && !targetTitle.includes(label)) {
+            // logger.warn(`⚠️ Title mismatch in ${relFile}: Label "${label}" vs Target "${targetTitle}"`);
+          }
         }
       }
-    } catch (_) {}
-  });
+    }
+  }
 
-  if (issues.length > 0) {
-    logger.warn(`Knowledge Integrity Issues Found: ${issues.length}`);
-    issues.forEach(i => console.log(`  [${i.type}] ${i.file}: ${i.detail}`));
-    process.exit(1);
+  if (brokenLinks === 0) {
+    logger.success(`✨ Knowledge Shield: All ${totalLinks} internal links are valid.`);
   } else {
-    logger.info('Knowledge integrity verified.');
+    logger.error(`🚨 Found ${brokenLinks} broken links out of ${totalLinks} total.`);
+    process.exit(1);
   }
 }
 
-main().catch(err => {
-  logger.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+checkIntegrity().catch(e => logger.error(e.message));

@@ -1,6 +1,7 @@
 /**
  * scripts/generate_skill_index.ts
- * Scans all directories for SKILL.md and creates a compact JSON index.
+ * Advanced Skill Discovery & Indexer.
+ * Automatically initializes new skill directories with standard metadata.
  */
 
 import * as fs from 'node:fs';
@@ -12,23 +13,39 @@ import * as pathResolver from '@agent/core/path-resolver';
 const indexFile = pathResolver.knowledge('orchestration/global_skill_index.json');
 
 interface SkillEntry {
-  n: string;
-  path: string;
-  d: string;
-  s: string;
-  r: string;
-  m: string;
-  t: string[];
-  u: string;
+  n: string; path: string; d: string; s: string; r: string; m: string; t: string[]; u: string;
+}
+
+function initializeSkill(skillPath: string, name: string, category: string) {
+  const skillMdPath = path.join(skillPath, 'SKILL.md');
+  const pkgPath = path.join(skillPath, 'package.json');
+
+  if (!fs.existsSync(skillMdPath)) {
+    const mdContent = `---\nname: ${name}\ndescription: New autonomous skill discovery.\nstatus: planned\ncategory: ${category}\nlast_updated: '${new Date().toISOString().split('T')[0]}'\n---\n\n# ${name}\n\nDescription pending initialization.\n`;
+    fs.writeFileSync(skillMdPath, mdContent);
+    logger.info(`✨ Auto-Discovery: Initialized SKILL.md for ${name}`);
+  }
+
+  if (!fs.existsSync(pkgPath)) {
+    const pkgContent = {
+      name: `@agent/skill-${name}`,
+      version: '1.0.0',
+      private: true,
+      description: `Gemini Skill: ${name}`,
+      main: 'dist/index.js',
+      types: 'dist/index.d.ts',
+      dependencies: { "@agent/core": "workspace:*" }
+    };
+    fs.writeFileSync(pkgPath, JSON.stringify(pkgContent, null, 2));
+    logger.info(`✨ Auto-Discovery: Initialized package.json for ${name}`);
+  }
 }
 
 async function main() {
   try {
     let existingIndex: any = { s: [] };
     if (fs.existsSync(indexFile)) {
-      try {
-        existingIndex = JSON.parse(safeReadFile(indexFile, { encoding: 'utf8' }) as string);
-      } catch (_) {}
+      try { existingIndex = JSON.parse(safeReadFile(indexFile, { encoding: 'utf8' }) as string); } catch (_) {}
     }
 
     const skillsMap = new Map<string, SkillEntry>(existingIndex.s.map((s: any) => [s.path, s]));
@@ -38,7 +55,6 @@ async function main() {
     if (!fs.existsSync(skillsRootDir)) return;
 
     const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
-    
     let updated = 0;
 
     for (const cat of categories) {
@@ -46,75 +62,50 @@ async function main() {
       const skillDirs = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
 
       for (const dir of skillDirs) {
-        const skillPhysicalPath = path.join('skills', cat, dir);
-        const skillFullDir = path.join(process.cwd(), skillPhysicalPath);
-        const skillMdPath = path.join(skillFullDir, 'SKILL.md');
+        const relPath = path.join('skills', cat, dir);
+        const fullDir = path.join(process.cwd(), relPath);
+        
+        // AUTO-DISCOVERY & INITIALIZATION
+        initializeSkill(fullDir, dir, cat);
 
+        const skillMdPath = path.join(fullDir, 'SKILL.md');
         if (fs.existsSync(skillMdPath)) {
-          foundPaths.add(skillPhysicalPath);
+          foundPaths.add(relPath);
           const stat = fs.statSync(skillMdPath);
-          const existing = skillsMap.get(skillPhysicalPath);
-          const lastMtime = existing?.u ? new Date(existing.u).getTime() : 0;
-
-          if (stat.mtimeMs > lastMtime) {
+          const existing = skillsMap.get(relPath);
+          if (stat.mtimeMs > (existing?.u ? new Date(existing.u).getTime() : 0)) {
             updated++;
             const content = safeReadFile(skillMdPath, { encoding: 'utf8' }) as string;
-            
-            let desc = (content.match(/^description:\s*(.*)$/m)?.[1] || '').trim();
-            if (desc.length > 100) desc = desc.substring(0, 97) + '...';
-
+            const desc = (content.match(/^description:\s*(.*)$/m)?.[1] || '').trim().substring(0, 97);
             const status = content.match(/^status:\s*(\w+)$/m)?.[1] || 'plan';
             const risk = content.match(/^risk_level:\s*(\w+)$/m)?.[1] || 'low';
-
+            
             let mainScript = '';
-            const pkgPath = path.join(skillFullDir, 'package.json');
+            const pkgPath = path.join(fullDir, 'package.json');
             if (fs.existsSync(pkgPath)) {
-              try {
-                mainScript = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).main || '';
-              } catch (_) {}
+              try { mainScript = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).main || ''; } catch (_) {}
             }
 
             let tags: string[] = [];
             const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-            if (fmMatch) {
-              try {
-                const fm: any = yaml.load(fmMatch[1]);
-                tags = fm.tags || [];
-              } catch (_) {}
-            }
+            if (fmMatch) { try { const fm: any = yaml.load(fmMatch[1]); tags = fm.tags || []; } catch (_) {} }
 
-            skillsMap.set(skillPhysicalPath, {
-              n: dir,
-              path: skillPhysicalPath,
-              d: desc,
-              s: status === 'implemented' ? 'impl' : status.substring(0, 4),
-              r: risk,
-              m: mainScript,
-              t: tags,
-              u: new Date(stat.mtimeMs).toISOString()
+            skillsMap.set(relPath, {
+              n: dir, path: relPath, d: desc, s: status === 'implemented' ? 'impl' : status.substring(0, 4),
+              r: risk, m: mainScript, t: tags, u: new Date(stat.mtimeMs).toISOString()
             });
           }
         }
       }
     }
 
-    // Delete stale entries
-    for (const pathKey of skillsMap.keys()) {
-      if (!foundPaths.has(pathKey)) skillsMap.delete(pathKey);
-    }
+    for (const pathKey of skillsMap.keys()) { if (!foundPaths.has(pathKey)) skillsMap.delete(pathKey); }
 
     const skills = Array.from(skillsMap.values());
-    const output = {
-      v: '1.3.0',
-      t: skills.length,
-      u: new Date().toISOString(),
-      s: skills,
-    };
-
-    safeWriteFile(indexFile, JSON.stringify(output, null, 2));
-    console.log(`Global Skill Index updated: ${updated} modified, ${skills.length} total.`);
+    safeWriteFile(indexFile, JSON.stringify({ v: '1.4.0', t: skills.length, u: new Date().toISOString(), s: skills }, null, 2));
+    logger.success(`✅ Global Skill Index: ${skills.length} skills (Updated: ${updated})`);
   } catch (err: any) {
-    console.error(`Index Generation Failed: ${err.message}`);
+    logger.error(`Index Generation Failed: ${err.message}`);
   }
 }
 

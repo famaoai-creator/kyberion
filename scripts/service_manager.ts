@@ -25,6 +25,10 @@ const SERVICES: Record<string, any> = {
   'nexus-daemon': {
     path: 'presence/bridge/nexus-daemon.ts',
     description: 'Coordinates physical terminal intervention'
+  },
+  'log-watcher': {
+    path: 'presence/sensors/log-watcher.ts',
+    description: 'Monitors logs for system errors'
   }
 };
 

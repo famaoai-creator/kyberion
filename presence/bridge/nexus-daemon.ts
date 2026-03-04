@@ -1,7 +1,7 @@
 /**
- * Nexus Daemon v2.3 (File-Based Feedback Edition)
- * Background stimuli watcher that triggers physical terminal intervention 
- * and mirrors the response back to the source channel via persistent files.
+ * Nexus Daemon v3.0 (GUSP v1.0 Edition)
+ * Central nerve system that coordinates stimuli ingestion, terminal injection, 
+ * and feedback mirroring using the Unified Sensory Protocol.
  */
 
 import { logger, safeReadFile, safeWriteFile, pathResolver, terminalBridge } from '@agent/core';
@@ -9,22 +9,30 @@ import { WebClient } from '@slack/web-api';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
+const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const CREDENTIALS_PATH = pathResolver.rootResolve('knowledge/personal/connections/slack/slack-credentials.json');
-const LAST_RESPONSE_PATH = pathResolver.resolve('active/shared/last_response.json');
-const CHECK_INTERVAL_MS = 5000;
+const LAST_RESPONSE_PATH = pathResolver.resolve('presence/bridge/runtime/last_response.json');
+const CHECK_INTERVAL_MS = 3000;
 
-interface Stimulus {
-  timestamp: string;
-  source_channel: string;
-  payload: string;
-  status: 'PENDING' | 'INJECTED' | 'PROCESSED';
-  metadata: {
-    channel_id?: string;
-    thread_ts?: string;
-    [key: string]: any;
+interface GUSPStimulus {
+  id: string;
+  ts: string;
+  ttl: number;
+  origin: {
+    channel: string;
+    source_id?: string;
+    context?: string;
   };
-  [key: string]: any;
+  signal: {
+    intent: string;
+    priority: number;
+    payload: string;
+  };
+  control: {
+    status: 'pending' | 'injected' | 'processed' | 'expired' | 'failed';
+    feedback: 'auto' | 'silent' | 'manual';
+    evidence: Array<{ step: string; ts: string; agent: string }>;
+  };
 }
 
 let slackClient: WebClient | null = null;
@@ -32,48 +40,52 @@ let slackClient: WebClient | null = null;
 function getSlackClient() {
   if (slackClient) return slackClient;
   if (fs.existsSync(CREDENTIALS_PATH)) {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
-    if (creds.bot_token) {
-      slackClient = new WebClient(creds.bot_token);
-      return slackClient;
-    }
+    try {
+      const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+      if (creds.bot_token) {
+        slackClient = new WebClient(creds.bot_token);
+        return slackClient;
+      }
+    } catch (e) {}
   }
   return null;
 }
 
-async function markAsInjected(timestamp: string): Promise<boolean> {
+async function updateStimulusStatus(id: string, status: GUSPStimulus['control']['status'], step?: string) {
   try {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
     const lines = content.trim().split('\n').map(line => {
       if (!line) return '';
-      const s = JSON.parse(line) as Stimulus;
-      if (s.timestamp === timestamp) {
-        s.status = 'INJECTED';
-        s.injected_at = new Date().toISOString();
+      const s = JSON.parse(line) as GUSPStimulus;
+      if (s.id === id) {
+        s.control.status = status;
+        if (step) {
+          s.control.evidence.push({ step, ts: new Date().toISOString(), agent: 'nexus-daemon' });
+        }
       }
       return JSON.stringify(s);
     }).filter(l => l !== '');
     safeWriteFile(STIMULI_PATH, lines.join('\n') + '\n');
     return true;
   } catch (err: any) {
-    logger.error(`Failed to mark as injected: ${err.message}`);
+    logger.error(`[Nexus] Update failed for ${id}: ${err.message}`);
     return false;
   }
 }
 
-async function waitForFileResponseAndReply(stimulus: Stimulus) {
-  logger.info(`⏳ [Feedback] Watching for file-based response for ${stimulus.source_channel}...`);
+async function handleFeedback(stimulus: GUSPStimulus) {
+  if (stimulus.control.feedback === 'silent') return;
+
+  logger.info(`⏳ [Feedback] Watching response for stimulus ${stimulus.id}...`);
   
-  // Watch for changes in last_response.json
   const startTime = Date.now();
-  const timeoutMs = 60000; // Wait up to 1 minute for AI to finish
+  const timeoutMs = 120000; // 2 minutes
   const initialMtime = fs.existsSync(LAST_RESPONSE_PATH) ? fs.statSync(LAST_RESPONSE_PATH).mtimeMs : 0;
 
   while (Date.now() - startTime < timeoutMs) {
     if (fs.existsSync(LAST_RESPONSE_PATH)) {
       const currentMtime = fs.statSync(LAST_RESPONSE_PATH).mtimeMs;
       if (currentMtime > initialMtime) {
-        // New response detected!
         try {
           const response = JSON.parse(fs.readFileSync(LAST_RESPONSE_PATH, 'utf8'));
           let text = '';
@@ -83,64 +95,69 @@ async function waitForFileResponseAndReply(stimulus: Stimulus) {
             text = `Error: ${response.error?.message}`;
           }
 
-          if (stimulus.source_channel === 'slack' && stimulus.metadata.channel_id) {
+          if (stimulus.origin.channel === 'slack' && stimulus.origin.context) {
             const client = getSlackClient();
             if (client) {
-              const ts = stimulus.metadata.thread_ts || stimulus.metadata.event_ts;
+              const [channelId, threadTs] = stimulus.origin.context.split(':');
               await client.chat.postMessage({
-                channel: stimulus.metadata.channel_id,
-                thread_ts: ts,
-                text: `🤖 *Gemini 応答:*\n\n${text.substring(0, 3000)}`
+                channel: channelId,
+                thread_ts: threadTs,
+                text: `🤖 *Gemini 応答 (${stimulus.id}):*\n\n${text.substring(0, 3000)}`
               });
-              logger.success(`📬 [Feedback] Response mirrored via file to Slack.`);
+              logger.success(`📬 [Feedback] Mirrored to Slack for ${stimulus.id}`);
+              await updateStimulusStatus(stimulus.id, 'processed', 'feedback_mirrored');
               return;
             }
           }
         } catch (err: any) {
-          logger.error(`❌ [Feedback] Error processing response file: ${err.message}`);
+          logger.error(`❌ [Feedback] Processing error: ${err.message}`);
         }
       }
     }
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
-  logger.warn(`⚠️ [Feedback] Timeout waiting for AI response file.`);
+  logger.warn(`⚠️ [Feedback] Timeout for ${stimulus.id}`);
+  await updateStimulusStatus(stimulus.id, 'failed', 'feedback_timeout');
 }
 
 async function nexusLoop() {
-  logger.info('🛡️ Nexus Daemon (v2.3) active. File-based feedback loop enabled.');
+  logger.info('🛡️ Nexus Daemon (v3.0) active. GUSP v1.0 Link established.');
 
   while (true) {
     if (fs.existsSync(STIMULI_PATH)) {
       try {
         const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
-        const pending = content.trim().split('\n')
+        const allStimuli = content.trim().split('\n')
           .filter(l => l.length > 0)
-          .map(line => JSON.parse(line) as Stimulus)
-          .filter(s => s.status === 'PENDING');
+          .map(line => JSON.parse(line) as GUSPStimulus);
 
-        if (pending.length > 0) {
-          const stimulus = pending[0];
-          logger.info(`📡 Stimulus detected: [${stimulus.source_channel}] ${stimulus.payload.substring(0, 30)}...`);
+        const pending = allStimuli.filter(s => s.control.status === 'pending');
 
+        for (const stimulus of pending) {
+          // 1. TTL Check
+          const age = (Date.now() - new Date(stimulus.ts).getTime()) / 1000;
+          if (stimulus.ttl > 0 && age > stimulus.ttl) {
+            logger.warn(`🚫 Stimulus ${stimulus.id} expired (Age: ${Math.round(age)}s)`);
+            await updateStimulusStatus(stimulus.id, 'expired', 'ttl_expiration');
+            continue;
+          }
+
+          // 2. Find Terminal Hub
           const session = terminalBridge.findIdleSession();
           if (session) {
-            logger.info(`🚀 Terminal (${session.type}) is IDLE. Injecting...`);
+            logger.info(`🚀 Injecting GUSP ${stimulus.id} -> ${session.type}`);
             
-            const cleanPayload = stimulus.payload.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
-            const cmd = `${cleanPayload}\n`; // Ensure newline for command execution
-            
-            const success = await terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
+            const success = await terminalBridge.injectAndExecute(session.winId, session.sessionId, stimulus.signal.payload, session.type);
             if (success) {
-              await markAsInjected(stimulus.timestamp);
-              logger.success(`✅ Injected. Watching for result file.`);
-              
-              // Start background watcher for the response file
-              waitForFileResponseAndReply(stimulus).catch(e => logger.error(`Feedback Error: ${e.message}`));
+              await updateStimulusStatus(stimulus.id, 'injected', 'injection_success');
+              handleFeedback(stimulus).catch(e => logger.error(`Feedback Loop Error: ${e.message}`));
+            } else {
+              await updateStimulusStatus(stimulus.id, 'failed', 'injection_failed');
             }
           }
         }
       } catch (err: any) {
-        logger.error(`Loop Error: ${err.message}`);
+        logger.error(`[Nexus] Loop Error: ${err.message}`);
       }
     }
     await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL_MS));
