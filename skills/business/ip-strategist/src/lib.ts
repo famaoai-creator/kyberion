@@ -77,7 +77,14 @@ export function processIPStrategy(dir: string): IPStrategyResult {
   const risks: RiskEntry[] = [];
 
   if (!license.protected) {
-    risks.push({ category: 'Legal', severity: 'critical', risk: 'IP unprotected', impact: 'Loss of rights' });
+    risks.push({ 
+      id: 'missing-license',
+      title: 'IP at Risk: Missing License',
+      category: 'Legal', 
+      severity: 'critical', 
+      risk: 'IP unprotected', 
+      impact: 'Loss of rights' 
+    });
     recommendations.push({ action: 'Create LICENSE', priority: 'critical', area: 'Legal' });
   }
   return {

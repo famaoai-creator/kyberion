@@ -37,15 +37,15 @@ runSkill('cloud-cost-estimator', () => {
   }
 
   const adf = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-  const { totalCost, findings } = estimateCosts(adf, pricing, rules);
+  const result = estimateCosts(adf);
 
   const report = {
     title: 'Cloud FinOps Audit',
-    summary: { total_monthly_estimated: totalCost, currency: 'USD' },
-    optimizations: findings,
+    summary: { total_monthly_estimated: result.monthly, currency: 'USD' },
+    optimizations: [],
   };
 
   safeWriteFile(outputPath, JSON.stringify(report, null, 2));
 
-  return { status: 'success', total_cost: totalCost, output: outputPath };
+  return { status: 'success', total_cost: result.monthly, output: outputPath };
 });

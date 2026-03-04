@@ -154,20 +154,15 @@ export function runTests(
           command,
           duration,
           success: !error,
-          exitCode: error ? ((error as NodeJS.ErrnoException).code as unknown as number) : 0,
+          exitCode: error ? (error as any).code : 0,
           stdout,
           stderr: stderr || undefined,
         };
 
         if (error) {
           // We resolve with result even on error, because test failures are expected outcomes.
-          // Rejection is for execution failures (spawn failed etc), but here exec calls callback with error on non-zero exit code too.
-          // The original logic rejected, let's keep it consistent but attach data.
-          const err = Object.assign(
-            new Error(`Test failed with exit code ${(error as NodeJS.ErrnoException).code}`),
-            { data: result }
-          );
-          resolve(result); // Actually, typically we want to return the result object even if tests failed.
+          const code = (error as any).code;
+          resolve(result); 
         } else {
           resolve(result);
         }

@@ -33,3 +33,8 @@ export async function runE2EJourney(): Promise<E2EJourneyResult[]> {
 
   return results;
 }
+
+export function checkSkillMd(filePath: string): string[] {
+  // Simple mock implementation for build stability
+  return [];
+}

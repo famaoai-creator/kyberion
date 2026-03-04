@@ -44,6 +44,25 @@ export function extractRowsFromHtml(html: string): string[][] {
 }
 
 /**
+ * Extracts table rows from a DocumentArtifact (HTML or Markdown).
+ */
+export function extractRowsFromArtifact(artifact: DocumentArtifact): string[][] {
+  if (artifact.format === 'html' || artifact.body.includes('<table')) {
+    return extractRowsFromHtml(artifact.body);
+  }
+  // Basic Markdown table parser
+  const lines = artifact.body.trim().split('\n');
+  return lines
+    .filter((line) => line.includes('|') && !line.includes('---'))
+    .map((line) =>
+      line
+        .split('|')
+        .filter((cell) => cell.trim() !== '')
+        .map((cell) => cell.trim())
+    );
+}
+
+/**
  * Creates a new Excel workbook from HTML table content.
  */
 export async function createWorkbookFromHTML(html: string): Promise<ExcelJS.Workbook> {

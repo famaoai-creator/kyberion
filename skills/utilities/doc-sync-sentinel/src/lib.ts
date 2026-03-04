@@ -25,3 +25,13 @@ export function checkSync(srcFile: string, targetFile: string): SyncStatus {
     lastUpdated: targetStat.mtime.toISOString()
   };
 }
+
+export function getRecentChanges(dir: string, days: number): string[] {
+  const files = fs.readdirSync(dir).filter(f => fs.statSync(path.join(dir, f)).isFile());
+  const threshold = Date.now() - (days * 24 * 60 * 60 * 1000);
+  
+  return files.filter(f => {
+    const stat = fs.statSync(path.join(dir, f));
+    return stat.mtimeMs > threshold;
+  });
+}

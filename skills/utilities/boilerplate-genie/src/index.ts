@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { runSkill } from '@agent/core';
+import { runSkill, safeWriteFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { requireArgs } from '@agent/core/validators';
 import {
@@ -27,23 +27,32 @@ if (require.main === module || (typeof process !== 'undefined' && process.env.VI
     const projectType = argv.type as ProjectType;
     const outDir = path.resolve((argv.out as string) || projectName);
 
-    fs.mkdirSync(outDir, { recursive: true });
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-    let files: string[];
+    let fileRecord: Record<string, string>;
     switch (projectType) {
       case 'node':
-        files = generateNodeProject(projectName, outDir);
+        fileRecord = generateNodeProject(projectName);
         break;
       case 'python':
-        files = generatePythonProject(projectName, outDir);
+        fileRecord = generatePythonProject(projectName);
         break;
       case 'generic':
-        files = generateGenericProject(projectName, outDir);
+        fileRecord = generateGenericProject(projectName);
         break;
       default:
         throw new Error(`Unsupported type: ${projectType}`);
     }
 
-    return { name: projectName, type: projectType, files, directory: outDir };
+    const filesGenerated: string[] = [];
+    for (const [filename, content] of Object.entries(fileRecord)) {
+      const fullPath = path.join(outDir, filename);
+      const parentDir = path.dirname(fullPath);
+      if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+      safeWriteFile(fullPath, content);
+      filesGenerated.push(filename);
+    }
+
+    return { name: projectName, type: projectType, files: filesGenerated, directory: outDir };
   });
 }

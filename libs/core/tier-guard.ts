@@ -7,6 +7,8 @@
 import * as path from 'node:path';
 import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
 
+export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
+
 /** Numeric weight for each tier (higher = more sensitive). */
 export const TIERS: TierWeightMap = {
   personal: 3,

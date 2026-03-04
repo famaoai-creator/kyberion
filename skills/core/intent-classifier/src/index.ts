@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { runSkill } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { loadRules, classifyIntent } from './lib.js';
-import pathResolver from '@agent/core/path-resolver';
+import { pathResolver } from '@agent/core';
 
 const argv = createStandardYargs()
   .option('input', {

@@ -2,21 +2,41 @@
  * Boilerplate Genie Core Library.
  */
 
+export enum ProjectType {
+  NODE = 'node',
+  PYTHON = 'python',
+  GENERIC = 'generic'
+}
+
 export interface ProjectDef {
   name: string;
-  type: 'express' | 'react' | 'cli';
+  type: ProjectType;
+}
+
+export function generateNodeProject(name: string): Record<string, string> {
+  return {
+    'package.json': JSON.stringify({ name, version: '1.0.0', main: 'index.js' }, null, 2),
+    'index.js': 'console.log("Hello Node.js");'
+  };
+}
+
+export function generatePythonProject(name: string): Record<string, string> {
+  return {
+    'requirements.txt': 'requests==2.31.0',
+    'main.py': 'print("Hello Python")'
+  };
+}
+
+export function generateGenericProject(name: string): Record<string, string> {
+  return {
+    'README.md': `# ${name}\nGenerated generic project.`
+  };
 }
 
 export function generateBoilerplate(def: ProjectDef): Record<string, string> {
-  const files: Record<string, string> = {};
-  
-  if (def.type === 'express') {
-    files['package.json'] = JSON.stringify({ name: def.name, dependencies: { express: '^4.18.0' } }, null, 2);
-    files['index.js'] = 'const express = require("express");\nconst app = express();\napp.listen(3000);';
-  } else if (def.type === 'cli') {
-    files['package.json'] = JSON.stringify({ name: def.name, bin: './index.js' }, null, 2);
-    files['index.js'] = '#!/usr/bin/env node\nconsole.log("Hello CLI");';
+  switch (def.type) {
+    case ProjectType.NODE: return generateNodeProject(def.name);
+    case ProjectType.PYTHON: return generatePythonProject(def.name);
+    default: return generateGenericProject(def.name);
   }
-
-  return files;
 }
