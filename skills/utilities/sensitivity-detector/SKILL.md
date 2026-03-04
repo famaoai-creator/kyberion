@@ -1,27 +1,16 @@
 ---
 name: sensitivity-detector
-description: Detect PII and sensitive information in text.
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
+arguments: 
+- name: input
+short: i
+type: string
+required: true
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - codebase-mapper
-  - doc-type-classifier
-  - domain-classifier
-  - html-reporter
-  - intent-classifier
-  - license-auditor
-  - nonfunctional-architect
-  - schema-validator
-  - security-scanner
 ---
 
 # Sensitivity Detector

@@ -1,41 +1,15 @@
 ---
 name: box-connector
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: 
-  - name: folder
-    short: f
-    type: string
-    required: false
-    description: 
-  - name: query
-    short: q
-    type: string
-    required: false
-    description: 
-  - name: config
-    short: c
-    type: string
-    required: false
-    description: 
-  - name: dry-run
-    type: boolean
-    required: false
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Box Connector

@@ -4,13 +4,8 @@ description: Retrieves git diff of staged files for pre-commit AI code review.
 status: implemented
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - code-lang-detector
-  - completeness-scorer
-  - quality-scorer
-  - refactoring-engine
 ---
 
 # Local Reviewer Skill

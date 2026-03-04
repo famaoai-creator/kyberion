@@ -4,16 +4,12 @@ description: Analyzes project history and failures to self-propose improvements 
 status: implemented
 category: Core
 last_updated: '2026-02-28'
-arguments:
-  - name: target
-    short: t
-    type: string
-  - name: reason
-    short: r
-    type: string
-    required: true
-tags:
-  - gemini-skill
+arguments: 
+- name: reason
+short: r
+type: string
+required: true
+tags: gemini-skill
 ---
 
 # self-evolution

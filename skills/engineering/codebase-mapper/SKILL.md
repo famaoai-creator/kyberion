@@ -1,41 +1,16 @@
 ---
 name: codebase-mapper
-description: Maps the directory structure of the project to help the AI understand the codebase layout.
+description: Max tree depth
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: Root directory to map
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output path for JSON map
-  - name: depth
-    short: d
-    type: number
-    required: false
-    description: Max tree depth
+arguments: 
+- name: depth
+short: d
+type: number
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - api-doc-generator
-  - bug-predictor
-  - completeness-scorer
-  - dependency-grapher
-  - doc-sync-sentinel
-  - glossary-resolver
-  - html-reporter
-  - knowledge-harvester
-  - license-auditor
-  - quality-scorer
-  - refactoring-engine
-  - security-scanner
-  - sensitivity-detector
 ---
 
 # Codebase Mapper Skill

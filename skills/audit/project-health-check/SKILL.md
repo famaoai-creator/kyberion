@@ -4,22 +4,8 @@ description: Audits the project for modern and Waterfall standards (SDLC, CI/CD,
 status: implemented
 category: Audit
 last_updated: '2026-02-28'
-tags:
-  - compliance
-  - gemini-skill
-  - qa
+tags: compliance,gemini-skill,qa
 related_skills:
-  - bug-predictor
-  - code-lang-detector
-  - html-reporter
-  - license-auditor
-  - onboarding-wizard
-  - operational-runbook-generator
-  - quality-scorer
-  - refactoring-engine
-  - release-note-crafter
-  - requirements-wizard
-  - security-scanner
 ---
 
 # Project Health Check

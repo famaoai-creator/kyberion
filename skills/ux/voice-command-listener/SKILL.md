@@ -4,8 +4,7 @@ description: Captures microphone input and transcribes it into text commands.
 status: implemented
 category: Ux
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Voice Command Listener

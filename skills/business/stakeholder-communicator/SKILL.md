@@ -1,32 +1,15 @@
 ---
 name: stakeholder-communicator
-description: Translates technical decisions and architectural changes into clear, business-oriented language for non-technical stakeholders (Execs, Marketing, Sales).
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to technical document or JSON report
-  - name: audience
-    short: a
-    type: string
-    required: false
-    description: Target audience
-  - name: format
-    short: f
-    type: string
-    required: false
-    description: Output format
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Stakeholder Communicator

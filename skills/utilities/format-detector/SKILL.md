@@ -1,20 +1,16 @@
 ---
 name: format-detector
-description: Detect text format (JSON, YAML, CSV, etc.) and confidence.
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
+arguments: 
+- name: input
+short: i
+type: string
+required: true
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - completeness-scorer
-  - quality-scorer
 ---
 
 # Format Detector

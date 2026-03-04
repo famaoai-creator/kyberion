@@ -1,30 +1,15 @@
 ---
 name: jira-agile-assistant
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: 
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: 
-  - name: issue-key
-    type: string
-    required: false
-    description: 
-  - name: dry-run
-    type: boolean
-    required: false
-    description: 
+arguments: 
+- name: dry-run
+short: i
+type: boolean
+required: false
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Jira Agile Assistant

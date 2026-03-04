@@ -1,22 +1,15 @@
 ---
 name: ip-strategist
-description: Identifies and protects intellectual property within the codebase. Drafts initial patent applications and IP reports for innovative algorithms or designs.
+description: Output file path
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: Project directory to analyze
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # IP Strategist

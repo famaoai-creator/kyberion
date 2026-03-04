@@ -1,22 +1,15 @@
 ---
 name: synthetic-user-persona
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: count
-    short: n
-    type: number
-    required: false
-    description: 
-  - name: product
-    short: p
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: product
+short: p
+type: string
+required: false
 category: Ux
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Synthetic User Persona

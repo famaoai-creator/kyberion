@@ -1,28 +1,15 @@
 ---
 name: diff-visualizer
-description: Generate a visual difference report between two texts.
+description: 
 status: implemented
-arguments:
-  - name: old
-    short: a
-    type: string
-    required: true
-    description: 
-  - name: new
-    short: b
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Diff Visualizer

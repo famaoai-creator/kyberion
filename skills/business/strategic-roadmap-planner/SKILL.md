@@ -1,27 +1,15 @@
 ---
 name: strategic-roadmap-planner
-description: Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic roadmap. Aligns engineering effort with business ROI.
+description: Output file path
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: Project directory to analyze
-  - name: months
-    short: m
-    type: number
-    required: false
-    description: Planning horizon in months
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Strategic Roadmap Planner

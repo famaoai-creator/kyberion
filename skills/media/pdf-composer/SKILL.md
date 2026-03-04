@@ -4,10 +4,7 @@ description: Generate PDF documents from Markdown with headers/footers.
 status: implemented
 category: Media
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - documentation
-  - gemini-skill
+tags: automation,documentation,gemini-skill
 ---
 
 # Pdf Composer

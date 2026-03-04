@@ -1,31 +1,17 @@
 ---
 name: backlog-connector
-description: ''
+description: Project Key (e.g., NBS_INCIDENT)
 status: implemented
-arguments:
-  - name: project
-    short: p
-    type: string
-    required: true
-    description: Project Key (e.g., NBS_INCIDENT)
-  - name: action
-    short: a
-    type: string
-    default: fetch-issues
-    choices:
-      - fetch-issues
-      - get-project-info
-      - list-users
-  - name: count
-    type: number
-    default: 100
-  - name: out
-    short: o
-    type: string
+arguments: 
+- name: out
+short: o
+type: string
+required: true
+default: 100
+choices: 
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Backlog Connector

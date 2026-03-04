@@ -1,28 +1,15 @@
 ---
 name: executive-reporting-maestro
-description: Synthesizes technical data into professional external reports for PMOs and stakeholders. Focuses on ROI, milestones, and high-level project health.
+description: Output file path (JSON or .md)
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to a directory of JSON result files or a single JSON file
-  - name: title
-    short: t
-    type: string
-    required: false
-    description: Report title
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path (JSON or .md)
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Executive Reporting Maestro

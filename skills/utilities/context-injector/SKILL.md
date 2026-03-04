@@ -1,32 +1,15 @@
 ---
 name: context-injector
-description: Inject knowledge into JSON data context.
+description: 
 status: unstable
-arguments:
-  - name: data
-    short: d
-    type: string
-    required: true
-    description: 
-  - name: knowledge
-    short: k
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
-  - name: output-tier
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: output-tier
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-03-02'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # context-injector

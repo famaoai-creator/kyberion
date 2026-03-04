@@ -1,22 +1,15 @@
 ---
 name: business-impact-analyzer
-description: Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financial impact. Helps justify technical investments to stakeholders.
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to JSON file with engineering metrics
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Business Impact Analyzer

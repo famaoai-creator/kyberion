@@ -1,27 +1,15 @@
 ---
 name: audio-transcriber
-description: Transcribe audio/video files to text using OpenAI Whisper.
+description: Output file path
 status: implemented
-arguments:
-  - name: file
-    short: f
-    type: string
-    required: true
-    description: Path to audio/video file
-  - name: key
-    short: k
-    type: string
-    required: false
-    description: OpenAI API Key
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Media
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Audio Transcriber

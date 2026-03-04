@@ -1,17 +1,15 @@
 ---
 name: pr-architect
-description: Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain "Why", "How", and the "Impact" of the work.
+description: Git repository directory
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: Git repository directory
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # PR Architect

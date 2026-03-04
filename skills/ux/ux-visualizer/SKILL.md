@@ -1,31 +1,15 @@
 ---
 name: ux-visualizer
-description: ''
+description: Render to image
 status: implemented
 category: Ux
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Input directory or file
-  - name: type
-    short: t
-    type: string
-  - name: fidelity
-    short: f
-    type: string
-  - name: output
-    short: o
-    type: string
-    description: Output Mermaid file
-  - name: render
-    short: r
-    type: boolean
-    description: Render to image
+tags: gemini-skill
+arguments: 
+- name: render
+short: r
+type: boolean
+required: true
 ---
 
 # ux-visualizer

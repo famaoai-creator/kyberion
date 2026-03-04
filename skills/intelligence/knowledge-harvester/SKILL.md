@@ -1,21 +1,16 @@
 ---
 name: knowledge-harvester
-description: ''
+description: Git repository URL
 status: implemented
-arguments:
-  - name: repo
-    short: r
-    type: string
-    required: true
-    description: Git repository URL
+arguments: 
+- name: repo
+short: r
+type: string
+required: true
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - codebase-mapper
-  - doc-sync-sentinel
-  - glossary-resolver
 ---
 
 # Knowledge Harvester

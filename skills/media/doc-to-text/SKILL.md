@@ -4,9 +4,7 @@ description: Extract text content from various file formats. Supports PDF, Excel
 status: implemented
 category: Media
 last_updated: '2026-02-28'
-tags:
-  - documentation
-  - gemini-skill
+tags: documentation,gemini-skill
 ---
 
 # Document to Text Converter

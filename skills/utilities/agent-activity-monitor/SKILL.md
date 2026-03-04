@@ -4,9 +4,7 @@ description: ''
 status: implemented
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - observability
+tags: gemini-skill,observability
 ---
 
 # Agent Activity Monitor

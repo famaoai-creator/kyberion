@@ -1,22 +1,15 @@
 ---
 name: business-growth-planner
-description: Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to JSON with business goals and context
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Business Growth Planner

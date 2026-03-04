@@ -4,8 +4,7 @@ description: ''
 status: implemented
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # GitHub Skills Manager

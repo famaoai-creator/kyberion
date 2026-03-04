@@ -4,11 +4,7 @@ description: Generates and edits images using Google Gemini Image API (Imagen).
 status: implemented
 category: imagination
 r: high
-tags:
-  - automation
-  - cloud
-  - gemini-skill
-  - integration
+tags: automation,cloud,gemini-skill,integration
 last_updated: '2026-03-02'
 ---
 

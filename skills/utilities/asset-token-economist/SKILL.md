@@ -1,22 +1,15 @@
 ---
 name: asset-token-economist
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: prune
-    short: p
-    type: boolean
-    required: false
-    description: 
-  - name: text
-    short: t
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: text
+short: t
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Token Economist

@@ -1,24 +1,15 @@
 ---
 name: self-healing-orchestrator
-description: Automatically repairs known production issues by applying patches, rollbacks, or config changes. The autonomous counterpart to crisis-manager.
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to error log or JSON error report
-  - name: dry-run
-    type: boolean
-    description: Only propose fixes without applying them
-  - name: out
-    short: o
-    type: string
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: true
 category: Core
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Self-Healing Orchestrator

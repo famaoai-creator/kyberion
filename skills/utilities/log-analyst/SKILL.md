@@ -1,26 +1,15 @@
 ---
 name: log-analyst
-description: Reads the tail of a log file to help analyze recent errors or behavior.
+description: Validate JSON log structure
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to log file
-  - name: lines
-    short: n
-    type: number
-    required: false
-    description: Number of lines to tail
-  - name: validate
-    type: boolean
-    required: false
-    description: Validate JSON log structure
+arguments: 
+- name: validate
+short: n
+type: boolean
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Log Analyst Skill

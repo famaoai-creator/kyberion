@@ -1,33 +1,15 @@
 ---
 name: data-collector
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: url
-    short: u
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: true
-    description: 
-  - name: name
-    short: n
-    type: string
-    required: false
-    description: 
-  - name: force
-    short: f
-    type: boolean
-    required: false
-    description: 
+arguments: 
+- name: force
+short: f
+type: boolean
+required: false
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: data-engineering,gemini-skill
 ---
 
 # Data Collector

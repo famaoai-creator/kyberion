@@ -1,28 +1,15 @@
 ---
 name: talent-requirement-generator
-description: Identifies the ideal human skills needed for the project's next phase. Analyzes technical debt, roadmap, and current team gaps to generate job descriptions and coding challenges.
+description: Output file path
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: Project directory
-  - name: role
-    short: r
-    type: string
-    required: false
-    description: Role type
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Talent Requirement Generator

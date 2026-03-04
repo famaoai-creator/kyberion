@@ -4,9 +4,7 @@ description: Converts visual designs into implementation code (CSS, HTML). Gener
 status: implemented
 category: Media
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
+tags: automation,gemini-skill
 ---
 
 # Layout Architect

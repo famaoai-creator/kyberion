@@ -1,31 +1,15 @@
 ---
 name: technology-porter
-description: Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves logic equivalence while optimizing for the target language's idioms.
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Source file to analyze for porting
-  - name: from
-    type: string
-    required: false
-    description: Source language (auto-detected if omitted)
-  - name: to
-    short: t
-    type: string
-    required: true
-    description: Target language
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Technology Porter

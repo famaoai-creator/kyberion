@@ -1,23 +1,15 @@
 ---
 name: ip-profitability-architect
-description: Designs business and licensing models for internal intellectual property. Transforms IP from a protection cost into a revenue-generating asset.
+description: Output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to JSON with IP portfolio data
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Business
 last_updated: '2026-02-28'
-tags:
-  - finops
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # IP Profitability Architect

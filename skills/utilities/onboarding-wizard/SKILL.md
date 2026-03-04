@@ -1,21 +1,16 @@
 ---
 name: onboarding-wizard
-description: ''
+description: Project directory
 status: unstable
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: Project directory
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Utilities
 last_updated: '2026-03-02'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - operational-runbook-generator
-  - project-health-check
-  - requirements-wizard
 ---
 
 # Onboarding Wizard

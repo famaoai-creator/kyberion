@@ -1,22 +1,15 @@
 ---
 name: prompt-optimizer
-description: Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to refine system prompts and prompt templates.
+description: Optional output file path
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Path to SKILL.md file to analyze
-  - name: out
-    short: o
-    type: string
-    description: Optional output file path
+arguments: 
+- name: out
+short: o
+type: string
+required: true
 category: Core
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - performance
+tags: gemini-skill,performance
 ---
 
 # Prompt Optimizer

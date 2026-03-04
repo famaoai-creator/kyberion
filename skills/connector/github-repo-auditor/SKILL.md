@@ -4,9 +4,7 @@ description: Audits and classifies GitHub repositories into business solutions.
 status: implemented
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - compliance
-  - gemini-skill
+tags: compliance,gemini-skill
 ---
 
 # GitHub Repo Auditor
