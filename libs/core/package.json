@@ -108,6 +108,8 @@
     "jsdom": "^24.0.0",
     "adm-zip": "^0.5.12",
     "pptxgenjs": "^4.0.1",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "papaparse": "^5.4.1",
+    "@types/papaparse": "^5.3.15"
   }
 }

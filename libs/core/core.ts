@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 /**
  * Shared Utility Core for Gemini Skills (TypeScript Edition)
@@ -253,7 +253,7 @@ export class Cache {
     if (this._map.has(key)) this._map.delete(key);
     if (this._map.size >= this._maxSize) {
       const lruKey = this._map.keys().next().value;
-      this._map.delete(lruKey);
+      if (lruKey !== undefined) this._map.delete(lruKey);
     }
     this._map.set(key, { value, timestamp, ttl, persistent: persist });
 
@@ -304,37 +304,14 @@ export class Cache {
     return true;
   }
 
-  clear() {
-    this._map.clear();
-  }
-  get size() {
-    return this._map.size;
-  }
+  clear() { this._map.clear(); }
+  get size() { return this._map.size; }
 }
 
 export const _fileCache = new Cache(200, 3600000);
 
-/**
- * Throw a structured error with logging.
- * Safe to use in library code and tests — does NOT call process.exit().
- */
-export const errorHandler = (err: any, context = ''): never => {
-  const message = context ? `${context}: ${err.message || err}` : String(err.message || err);
-  logger.error(message);
-  if (process.env.DEBUG) console.error(err.stack);
-  const wrapped = new Error(message);
-  (wrapped as any).cause = err;
-  (wrapped as any).originalStack = err.stack;
-  throw wrapped;
-};
-
-/**
- * CLI-only variant: logs the error and exits with code 1.
- * Use this only in top-level CLI scripts (scripts/, skill entrypoints),
- * never in shared library code that may be imported by tests.
- */
-export const cliErrorHandler = (err: any, context = ''): never => {
-  logger.error((context ? `${context}: ` : '') + (err.message || err));
+export const errorHandler = (err: any, context = '') => {
+  logger.error(context + ': ' + (err.message || err));
   if (process.env.DEBUG) console.error(err.stack);
   process.exit(1);
 };
@@ -346,11 +323,8 @@ export const fileUtils = {
   },
   getFullRoleConfig: () => {
     const mid = process.env.MISSION_ID;
-    const priorityPaths = [];
-    if (mid)
-      priorityPaths.push(
-        path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json')
-      );
+    const priorityPaths: string[] = [];
+    if (mid) priorityPaths.push(path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json'));
     priorityPaths.push(path.resolve(process.cwd(), 'active/shared/governance/session.json'));
     priorityPaths.push(path.resolve(process.cwd(), 'knowledge/personal/role-config.json'));
 
@@ -380,9 +354,7 @@ export const fileUtils = {
         _fileCache.set(resolved, { mtimeMs, data }, undefined, isIndex);
       }
       return data;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   },
   writeJson: (filePath: string, data: any) => {
     try {

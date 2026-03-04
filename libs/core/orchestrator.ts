@@ -1,4 +1,4 @@
-import { spawnSync, spawn } from 'node:child_process';
+import { execSync, exec, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
@@ -18,9 +18,7 @@ export function resolveSkillScript(skillName: string): string {
 
   let skill;
   if (skillName.includes('/')) {
-    skill = skills.find(
-      (s: any) => (s.path || '').includes(skillName) || (s.n || s.name) === skillName
-    );
+    skill = skills.find((s: any) => (s.path || '').includes(skillName) || (s.n || s.name) === skillName);
   } else {
     skill = skills.find((s: any) => (s.n || s.name) === skillName);
   }
@@ -61,78 +59,68 @@ function resolveParams(params: any, prevOutput: any) {
   return resolved;
 }
 
-function buildArgsList(params: Record<string, unknown>): string[] {
+function buildArgs(params: any) {
   const args: string[] = [];
   for (const [key, val] of Object.entries(params || {})) {
-    if (val === true) {
-      args.push(`--${key}`);
-    } else if (val !== false && val !== null && val !== undefined) {
-      args.push(`--${key}`, String(val));
-    }
+    if (val === true) args.push(`--${key}`);
+    else if (val !== false && val !== null && val !== undefined)
+      args.push(`--${key}`, `"${String(val)}"`);
   }
-  return args;
+  return args.join(' ');
 }
 
-/** Synchronous sleep without spawning a shell process. */
-function sleepSync(ms: number): void {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    /* busy-wait — acceptable for short retry delays */
-  }
-}
-
-export function runStep(script: string, params: Record<string, unknown>, step: any = {}) {
+export function runStep(script: string, args: string, step: any = {}) {
   const maxAttempts = (step.retries || 0) + 1;
   const initialDelay = step.retryDelay || 1000;
   const timeout = step.timeout || 60000;
   const skillDir = path.dirname(path.dirname(script));
-  const args = buildArgsList(params);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const result = spawnSync('node', [script, ...args], {
-      encoding: 'utf8',
-      cwd: skillDir,
-      timeout,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    try {
+      const output = execSync(`node "${script}" ${args}`, {
+        encoding: 'utf8',
+        cwd: skillDir,
+        timeout,
+        stdio: 'pipe',
+      });
 
-    if (result.status === 0 && !result.error) {
       let parsed;
       try {
-        parsed = JSON.parse(result.stdout);
+        parsed = JSON.parse(output);
       } catch {
-        parsed = { raw: result.stdout.trim() };
+        parsed = { raw: output.trim() };
       }
+
       return { status: 'success', data: parsed, attempts: attempt, recovered: attempt > 1 };
+    } catch (err: any) {
+      let parsedError;
+      try {
+        parsedError = JSON.parse(err.stdout || err.message);
+      } catch {
+        parsedError = null;
+      }
+
+      const isRetryable = parsedError?.error?.retryable || false;
+      const shouldRetry = attempt < maxAttempts && (isRetryable || !parsedError);
+
+      if (shouldRetry) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        logger.warn(
+          `[Orchestrator] Step failed (retryable: ${isRetryable}). Retrying attempt ${attempt + 1}/${maxAttempts} after ${delay}ms...`
+        );
+
+        const delaySec = Math.ceil(delay / 1000);
+        spawnSync('sleep', [String(delaySec)], { stdio: 'ignore' });
+        continue;
+      }
+
+      return {
+        status: 'error',
+        error: parsedError?.error?.message || err.message,
+        attempts: attempt,
+        recovered: false,
+      };
     }
-
-    // Parse structured error from stderr/stdout if available
-    let parsedError: any = null;
-    const errText = result.stdout || result.stderr || result.error?.message || '';
-    try {
-      parsedError = JSON.parse(errText);
-    } catch {
-      /* non-JSON output */
-    }
-
-    const isRetryable = parsedError?.error?.retryable || false;
-    const shouldRetry = attempt < maxAttempts && (isRetryable || !parsedError);
-
-    if (shouldRetry) {
-      const delay = initialDelay * Math.pow(2, attempt - 1);
-      logger.warn(
-        `[Orchestrator] Step failed (retryable: ${isRetryable}). Retrying attempt ${attempt + 1}/${maxAttempts} after ${delay}ms...`
-      );
-      sleepSync(Math.min(delay, 30000));
-      continue;
-    }
-
-    return {
-      status: 'error',
-      error: parsedError?.error?.message || result.error?.message || `exit ${result.status}`,
-      attempts: attempt,
-      recovered: false,
-    };
   }
   return { status: 'error', error: 'Exhausted retries', attempts: maxAttempts, recovered: false };
 }
@@ -145,13 +133,14 @@ export function runPipeline(steps: any[], initialData = {}) {
   for (const step of steps) {
     const script = resolveSkillScript(step.skill);
     const params = resolveParams(step.params, prevOutput);
+    const args = buildArgs(params);
 
-    const result = runStep(script, params, step);
+    const result = runStep(script, args, step);
     results.push({ skill: step.skill, ...result });
 
     if (result.status === 'success') {
-      prevOutput = (result as any).data?.data || (result as any).data;
-      metrics.record(step.skill, (result as any).data?.metadata?.duration_ms || 0, 'success', {
+      prevOutput = result.data?.data || result.data;
+      metrics.record(step.skill, result.data?.metadata?.duration_ms || 0, 'success', {
         recovered: result.recovered,
       });
     } else if (!step.continueOnError) {
@@ -173,48 +162,33 @@ export function runParallel(steps: any[]): Promise<any> {
 
   const promises = steps.map((step) => {
     const script = resolveSkillScript(step.skill);
-    const args = buildArgsList(step.params || {});
+    const args = buildArgs(step.params);
     const timeout = step.timeout || 60000;
     const skillDir = path.dirname(path.dirname(script));
 
     return new Promise((resolve) => {
-      const proc = spawn('node', [script, ...args], {
-        encoding: 'utf8',
-        cwd: skillDir,
-        timeout,
-      } as any);
-
-      let stdout = '';
-      let stderr = '';
-      proc.stdout?.on('data', (d: Buffer) => {
-        stdout += d.toString();
-      });
-      proc.stderr?.on('data', (d: Buffer) => {
-        stderr += d.toString();
-      });
-
-      proc.on('close', (code: number) => {
-        if (code !== 0) {
-          resolve({
-            skill: step.skill,
-            status: 'error',
-            error: stderr.trim() || `exit ${code}`,
-            attempts: 1,
-          });
-        } else {
-          let parsed;
-          try {
-            parsed = JSON.parse(stdout);
-          } catch {
-            parsed = { raw: stdout.trim() };
+      exec(
+        `node "${script}" ${args}`,
+        {
+          encoding: 'utf8',
+          cwd: skillDir,
+          timeout,
+          maxBuffer: 5 * 1024 * 1024,
+        },
+        (err, stdout) => {
+          if (err) {
+            resolve({ skill: step.skill, status: 'error', error: err.message, attempts: 1 });
+          } else {
+            let parsed;
+            try {
+              parsed = JSON.parse(stdout!);
+            } catch {
+              parsed = { raw: stdout!.trim() };
+            }
+            resolve({ skill: step.skill, status: 'success', data: parsed, attempts: 1 });
           }
-          resolve({ skill: step.skill, status: 'success', data: parsed, attempts: 1 });
         }
-      });
-
-      proc.on('error', (err: Error) => {
-        resolve({ skill: step.skill, status: 'error', error: err.message, attempts: 1 });
-      });
+      );
     });
   });
 

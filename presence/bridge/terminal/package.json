@@ -1,0 +1,10 @@
+{
+  "name": "sovereign-terminal-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "express": "^5.2.1",
+    "node-pty": "^1.1.0",
+    "ws": "^8.19.0"
+  }
+}

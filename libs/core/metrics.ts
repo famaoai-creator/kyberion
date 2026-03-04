@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 /**
  * Lightweight metrics collection for Gemini Skills.
@@ -107,7 +107,7 @@ export class MetricsCollector {
   }
 
   summarize() {
-    const summaries = [];
+    const summaries: any[] = [];
     const TIME_BASE = 5000;
     const MEM_BASE = 200;
 
@@ -256,7 +256,7 @@ export class MetricsCollector {
       bySkill[entry.skill].push(entry);
     }
 
-    const regressions = [];
+    const regressions: any[] = [];
     for (const [name, runs] of Object.entries(bySkill)) {
       if (runs.length < 5) continue;
       const lastRun = runs[runs.length - 1];

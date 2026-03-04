@@ -1,1 +1,1 @@
-{"version":3,"file":"terminal-bridge.d.ts","sourceRoot":"","sources":["terminal-bridge.ts"],"names":[],"mappings":"AA+GA,eAAO,MAAM,cAAc;;8BAQC,MAAM,aAAa,MAAM,QAAQ,MAAM;CAKlE,CAAC"}
+{"version":3,"file":"terminal-bridge.d.ts","sourceRoot":"","sources":["terminal-bridge.ts"],"names":[],"mappings":"AAmIA,eAAO,MAAM,cAAc;;8BAcC,MAAM,aAAa,MAAM,QAAQ,MAAM;8BAKvC,MAAM,aAAa,MAAM,4BAA4B,MAAM;CAmBtF,CAAC"}

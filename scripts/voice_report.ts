@@ -4,7 +4,7 @@
  */
 
 import { execSync, spawn } from 'node:child_process';
-const chalk: any = require('chalk').default || require('chalk');
+import chalk from 'chalk';
 
 async function voiceReport() {
   const args = process.argv.slice(2);

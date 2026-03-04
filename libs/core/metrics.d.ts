@@ -21,7 +21,7 @@ export declare class MetricsCollector {
         dateRange: {
             from: any;
             to: any;
-        };
+        } | null;
         skills: {
             skill: string;
             executions: any;

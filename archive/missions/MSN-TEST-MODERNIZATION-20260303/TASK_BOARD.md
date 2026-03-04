@@ -17,7 +17,7 @@
 
 ### [x] Phase 3: Validation & Cleanup
 - [x] Final global check with `pnpm run test:ts`
-- [x] Remove extracted blocks from `tests/unit.test.cjs`
+- [x] Remove extracted blocks from `tests/unit.test.js`
 
 ---
 *Created: 2026-03-03*

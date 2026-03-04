@@ -31,7 +31,7 @@ When a skill or script asks "Who am I?", the system resolves the identity in the
 Edit `knowledge/personal/my-identity.json` to set your name and interaction style. This information is available to all roles to personalize responses.
 
 ### Switching Global Masks
-Use the `init_wizard.cjs` or manually update `active/shared/governance/session.json`.
+Use the `init_wizard.js` or manually update `active/shared/governance/session.json`.
 
 ### Assigning Mission Masks
 When starting a mission, create a `role-state.json` within the mission directory to override the global session role.

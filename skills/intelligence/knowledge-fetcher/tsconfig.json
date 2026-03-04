@@ -10,10 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "baseUrl": ".",
     "paths": {
-      "@agent/core/*": [
-        "../../../libs/core/*"
-      ]
+      "@agent/core": ["../../../libs/core/index.js"],
+      "@agent/core/*": ["../../../libs/core/*.js"]
     }
   },
   "include": [
@@ -22,7 +22,6 @@
   "exclude": [
     "node_modules",
     "dist",
-    "scripts",
     "src/**/*.test.ts"
   ]
 }
