@@ -13,3 +13,6 @@ steps:
   - id: verify_status
     skill: run_shell_command
     args: --command "node dist/scripts/service_manager.js status"
+  - id: smoke_test
+    skill: run_shell_command
+    args: --command "npm run test:smoke"
