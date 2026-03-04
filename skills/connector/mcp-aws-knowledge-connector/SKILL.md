@@ -1,28 +1,15 @@
 ---
 name: mcp-aws-knowledge-connector
-description: Connects to AWS Knowledge Base (Bedrock RAG) using the Model Context Protocol (MCP).
+description: 
 status: implemented
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: 
-  - name: name
-    short: n
-    type: string
-    required: false
-    description: 
-  - name: arguments
-    short: g
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: arguments
+short: g
+type: string
+required: false
 category: Connector
 last_updated: '2026-03-02'
-tags:
-  - cloud
-  - gemini-skill
+tags: cloud,gemini-skill
 ---
 
 # AWS Knowledge MCP Connector

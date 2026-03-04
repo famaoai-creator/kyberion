@@ -1,67 +1,67 @@
 {
   "v": "1.3.0",
-  "t": 142,
-  "u": "2026-03-03T17:16:13.168Z",
+  "t": 139,
+  "u": "2026-03-04T06:15:47.553Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
       "path": "skills/audit/ai-ethics-auditor",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.898Z"
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.594Z"
     },
     {
       "n": "bug-predictor",
       "path": "skills/audit/bug-predictor",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.898Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.601Z"
     },
     {
       "n": "compliance-officer",
       "path": "skills/audit/compliance-officer",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.899Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.611Z"
     },
     {
       "n": "license-auditor",
       "path": "skills/audit/license-auditor",
-      "d": "''",
+      "d": "Output path for license report",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.899Z"
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.616Z"
     },
     {
       "n": "monitoring-config-auditor",
       "path": "skills/audit/monitoring-config-auditor",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.900Z"
+      "t": "compliance,gemini-skill,observability",
+      "u": "2026-03-04T06:15:28.622Z"
     },
     {
       "n": "post-quantum-shield",
       "path": "skills/audit/post-quantum-shield",
-      "d": "''",
+      "d": "Output path for report",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.900Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.626Z"
     },
     {
       "n": "project-health-check",
@@ -70,28 +70,28 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.900Z"
+      "t": "compliance,gemini-skill,qa",
+      "u": "2026-03-04T06:15:28.630Z"
     },
     {
       "n": "quality-scorer",
       "path": "skills/audit/quality-scorer",
-      "d": "Evaluates technical and textual quality based on IPA benchmarks and readability standards.",
+      "d": "Output JSON path",
       "s": "unst",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.901Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.634Z"
     },
     {
       "n": "red-team-adversary",
       "path": "skills/audit/red-team-adversary",
-      "d": "''",
+      "d": "Output path for report",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.901Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.638Z"
     },
     {
       "n": "security-scanner",
@@ -100,218 +100,208 @@
       "s": "impl",
       "r": "high",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.902Z"
+      "t": "gemini-skill,security",
+      "u": "2026-03-04T06:15:28.643Z"
     },
     {
       "n": "skill-quality-auditor",
       "path": "skills/audit/skill-quality-auditor",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.902Z"
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.648Z"
     },
     {
       "n": "supply-chain-sentinel",
       "path": "skills/audit/supply-chain-sentinel",
-      "d": "''",
+      "d": "Output path for report",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.903Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.653Z"
     },
     {
       "n": "business-growth-planner",
       "path": "skills/business/business-growth-planner",
-      "d": "Helps define long-term business goals, market entry strategies, and revenue streams. Translates C...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.903Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.656Z"
     },
     {
       "n": "business-impact-analyzer",
       "path": "skills/business/business-impact-analyzer",
-      "d": "Translates engineering metrics (DORA, error rates, technical debt) into business KPIs and financi...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.903Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.659Z"
     },
     {
       "n": "competitive-intel-strategist",
       "path": "skills/business/competitive-intel-strategist",
-      "d": "Analyzes competitor releases and market trends to propose technical differentiation strategies. E...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.904Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.664Z"
     },
     {
       "n": "executive-reporting-maestro",
       "path": "skills/business/executive-reporting-maestro",
-      "d": "Synthesizes technical data into professional external reports for PMOs and stakeholders. Focuses ...",
+      "d": "Output file path (JSON or .md)",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.905Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.667Z"
     },
     {
       "n": "financial-modeling-maestro",
       "path": "skills/business/financial-modeling-maestro",
-      "d": "Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms bus...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.905Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.671Z"
     },
     {
       "n": "investor-readiness-audit",
       "path": "skills/business/investor-readiness-audit",
-      "d": "Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, an...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.906Z"
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.675Z"
     },
     {
       "n": "ip-profitability-architect",
       "path": "skills/business/ip-profitability-architect",
-      "d": "Designs business and licensing models for internal intellectual property. Transforms IP from a pr...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.906Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.678Z"
     },
     {
       "n": "ip-strategist",
       "path": "skills/business/ip-strategist",
-      "d": "Identifies and protects intellectual property within the codebase. Drafts initial patent applicat...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.907Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.683Z"
     },
     {
       "n": "pmo-governance-lead",
       "path": "skills/business/pmo-governance-lead",
-      "d": "Fulfills the role of a PMO by overseeing project quality gates, risks, and cross-skill alignment....",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.907Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.687Z"
     },
     {
       "n": "scenario-multiverse-orchestrator",
       "path": "skills/business/scenario-multiverse-orchestrator",
-      "d": "Generates multiple business scenarios (Growth/Stability/Hybrid) from financial and strategic assu...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.907Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.691Z"
     },
     {
       "n": "stakeholder-communicator",
       "path": "skills/business/stakeholder-communicator",
-      "d": "Translates technical decisions and architectural changes into clear, business-oriented language f...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.908Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.695Z"
     },
     {
       "n": "strategic-roadmap-planner",
       "path": "skills/business/strategic-roadmap-planner",
-      "d": "Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic road...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.908Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.699Z"
     },
     {
       "n": "sunset-architect",
       "path": "skills/business/sunset-architect",
-      "d": "Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.909Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.703Z"
     },
     {
       "n": "talent-requirement-generator",
       "path": "skills/business/talent-requirement-generator",
-      "d": "Identifies the ideal human skills needed for the project's next phase. Analyzes technical debt, r...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.909Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.707Z"
     },
     {
       "n": "tech-dd-analyst",
       "path": "skills/business/tech-dd-analyst",
-      "d": "Performs Technical Due Diligence on startups. Analyzes code (if available) or evaluates public si...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.910Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.711Z"
     },
     {
       "n": "unit-economics-optimizer",
       "path": "skills/business/unit-economics-optimizer",
-      "d": "Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer reten...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.911Z"
+      "t": "gemini-skill,performance",
+      "u": "2026-03-04T06:15:28.716Z"
     },
     {
       "n": "backlog-connector",
       "path": "skills/connector/backlog-connector",
-      "d": "''",
+      "d": "Project Key (e.g., NBS_INCIDENT)",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.911Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.720Z"
     },
     {
       "n": "box-connector",
       "path": "skills/connector/box-connector",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.912Z"
-    },
-    {
-      "n": "connection-manager",
-      "path": "skills/connector/connection-manager",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.912Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.725Z"
     },
     {
       "n": "github-repo-auditor",
@@ -320,8 +310,8 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.913Z"
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.728Z"
     },
     {
       "n": "github-skills-manager",
@@ -330,103 +320,78 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.913Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.733Z"
     },
     {
       "n": "google-workspace-integrator",
       "path": "skills/connector/google-workspace-integrator",
-      "d": "Connects to Google Workspace (Calendar, Gmail) for executive secretary automation.",
+      "d": "fetch-agenda, list-emails, send-email, auth",
       "s": "unst",
       "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.914Z"
+      "m": "dist/skills/connector/google-workspace-integrator/src/index.js",
+      "t": "cloud,gemini-skill",
+      "u": "2026-03-04T06:15:28.739Z"
     },
     {
       "n": "jira-agile-assistant",
       "path": "skills/connector/jira-agile-assistant",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.915Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.743Z"
     },
     {
       "n": "mcp-aws-knowledge-connector",
       "path": "skills/connector/mcp-aws-knowledge-connector",
-      "d": "Connects to AWS Knowledge Base (Bedrock RAG) using the Model Context Protocol (MCP).",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.915Z"
+      "t": "cloud,gemini-skill",
+      "u": "2026-03-04T06:15:28.747Z"
     },
     {
       "n": "mcp-terraform-connector",
       "path": "skills/connector/mcp-terraform-connector",
-      "d": "Connects to the Terraform Registry via the Model Context Protocol (MCP).",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.916Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.752Z"
     },
     {
       "n": "slack-communicator-pro",
       "path": "skills/connector/slack-communicator-pro",
-      "d": "''",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.917Z"
-    },
-    {
-      "n": "intent-classifier",
-      "path": "skills/core/intent-classifier",
-      "d": "Classify intent of text (request, question, report).",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.917Z"
+      "t": "communication,gemini-skill",
+      "u": "2026-03-04T06:15:28.756Z"
     },
     {
       "n": "mission-logic-engine",
       "path": "skills/core/mission-logic-engine",
-      "d": "Reflexive execution engine for mission logic.",
-      "s": "impl",
+      "d": "",
+      "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [
-        "gemini-skill"
-      ],
-      "u": "2026-03-03T17:00:00.000Z"
-    },
-    {
-      "n": "wisdom-distiller",
-      "path": "skills/intelligence/wisdom-distiller",
-      "d": "Distills mission results into reusable logic pipelines.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [
-        "gemini-skill",
-        "intelligence"
-      ],
-      "u": "2026-03-03T17:00:00.000Z"
+      "t": [],
+      "u": "2026-03-03T16:37:56.523Z"
     },
     {
       "n": "prompt-optimizer",
       "path": "skills/core/prompt-optimizer",
-      "d": "Self-improves agent instructions and context handling. Analyzes failed or suboptimal responses to...",
+      "d": "Optional output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.919Z"
+      "t": "gemini-skill,performance",
+      "u": "2026-03-04T06:15:28.762Z"
     },
     {
       "n": "self-evolution",
@@ -435,58 +400,58 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.919Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.766Z"
     },
     {
       "n": "self-healing-orchestrator",
       "path": "skills/core/self-healing-orchestrator",
-      "d": "Automatically repairs known production issues by applying patches, rollbacks, or config changes. ...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.919Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.771Z"
     },
     {
       "n": "skill-evolution-engine",
       "path": "skills/core/skill-evolution-engine",
-      "d": "Enables skills to self-improve by analyzing execution logs and user feedback. Automatically refin...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.920Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.776Z"
     },
     {
       "n": "binary-archaeologist",
       "path": "skills/engineering/binary-archaeologist",
-      "d": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. ...",
+      "d": "Output path for forensic report",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.920Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.781Z"
     },
     {
       "n": "code-lang-detector",
       "path": "skills/engineering/code-lang-detector",
-      "d": "Detect programming language of source code.",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.920Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.785Z"
     },
     {
       "n": "codebase-mapper",
       "path": "skills/engineering/codebase-mapper",
-      "d": "Maps the directory structure of the project to help the AI understand the codebase layout.",
+      "d": "Max tree depth",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.920Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.789Z"
     },
     {
       "n": "dependency-grapher",
@@ -495,28 +460,28 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.921Z"
+      "t": "automation,gemini-skill",
+      "u": "2026-03-04T06:15:28.793Z"
     },
     {
       "n": "dependency-lifeline",
       "path": "skills/engineering/dependency-lifeline",
-      "d": "Proactively monitors and plans library updates. Assesses the risk of breaking changes and propose...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.921Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.797Z"
     },
     {
       "n": "kernel-compiler",
       "path": "skills/engineering/kernel-compiler",
-      "d": "Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensure...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.922Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.799Z"
     },
     {
       "n": "local-reviewer",
@@ -525,8 +490,8 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.922Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.804Z"
     },
     {
       "n": "mobile-test-generator",
@@ -535,28 +500,28 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.923Z"
+      "t": "automation,gemini-skill,qa",
+      "u": "2026-03-04T06:15:28.809Z"
     },
     {
       "n": "pr-architect",
       "path": "skills/engineering/pr-architect",
-      "d": "Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain \"Why\", ...",
+      "d": "Git repository directory",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.923Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.812Z"
     },
     {
       "n": "refactoring-engine",
       "path": "skills/engineering/refactoring-engine",
-      "d": "Executes large-scale architectural refactoring and technical debt reduction across the entire cod...",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.923Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.816Z"
     },
     {
       "n": "schema-inspector",
@@ -565,28 +530,28 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.924Z"
+      "t": "gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.820Z"
     },
     {
       "n": "sequence-mapper",
       "path": "skills/engineering/sequence-mapper",
-      "d": "Generate Mermaid sequence diagrams from source code function calls.",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.924Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.825Z"
     },
     {
       "n": "technology-porter",
       "path": "skills/engineering/technology-porter",
-      "d": "Executes large-scale migrations across language stacks (e.g., C++ to Rust, JS to Go). Preserves l...",
+      "d": "Output file path",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.925Z"
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.829Z"
     },
     {
       "n": "test-genie",
@@ -595,808 +560,18 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.925Z"
+      "t": "analytics,gemini-skill,qa",
+      "u": "2026-03-04T06:15:28.833Z"
     },
     {
       "n": "test-suite-architect",
       "path": "skills/engineering/test-suite-architect",
-      "d": "Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. ...",
+      "d": "status: implemented",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.925Z"
-    },
-    {
-      "n": "auto-context-mapper",
-      "path": "skills/intelligence/auto-context-mapper",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.928Z"
-    },
-    {
-      "n": "data-collector",
-      "path": "skills/intelligence/data-collector",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.928Z"
-    },
-    {
-      "n": "dataset-curator",
-      "path": "skills/intelligence/dataset-curator",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.929Z"
-    },
-    {
-      "n": "db-extractor",
-      "path": "skills/intelligence/db-extractor",
-      "d": "Extract schema and sample data from databases for analysis.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.930Z"
-    },
-    {
-      "n": "glossary-resolver",
-      "path": "skills/intelligence/glossary-resolver",
-      "d": "Resolve terms using glossary.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.930Z"
-    },
-    {
-      "n": "knowledge-auditor",
-      "path": "skills/intelligence/knowledge-auditor",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.931Z"
-    },
-    {
-      "n": "knowledge-fetcher",
-      "path": "skills/intelligence/knowledge-fetcher",
-      "d": "Fetch knowledge from both public and confidential directories.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.931Z"
-    },
-    {
-      "n": "knowledge-harvester",
-      "path": "skills/intelligence/knowledge-harvester",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.931Z"
-    },
-    {
-      "n": "knowledge-refiner",
-      "path": "skills/intelligence/knowledge-refiner",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.932Z"
-    },
-    {
-      "n": "source-importer",
-      "path": "skills/intelligence/source-importer",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.932Z"
-    },
-    {
-      "n": "sovereign-memory",
-      "path": "skills/intelligence/sovereign-memory",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.933Z"
-    },
-    {
-      "n": "sovereign-sync",
-      "path": "skills/intelligence/sovereign-sync",
-      "d": "Syncs specific knowledge tiers with external private repositories.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.933Z"
-    },
-    {
-      "n": "audio-transcriber",
-      "path": "skills/media/audio-transcriber",
-      "d": "Transcribe audio/video files to text using OpenAI Whisper.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.935Z"
-    },
-    {
-      "n": "diagram-renderer",
-      "path": "skills/media/diagram-renderer",
-      "d": "Universal Diagram Processor implementing the Gemini Diagram ADF Protocol v1. Converts structured ...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.936Z"
-    },
-    {
-      "n": "doc-to-text",
-      "path": "skills/media/doc-to-text",
-      "d": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, a...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.937Z"
-    },
-    {
-      "n": "excel-artisan",
-      "path": "skills/media/excel-artisan",
-      "d": "A specialized artisan for distilling Excel designs into portable ADF (JSON) and re-generating Exc...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T15:26:18.180Z"
-    },
-    {
-      "n": "html-reporter",
-      "path": "skills/media/html-reporter",
-      "d": "Generate standalone HTML reports from JSON/Markdown.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.938Z"
-    },
-    {
-      "n": "layout-architect",
-      "path": "skills/media/layout-architect",
-      "d": "Converts visual designs into implementation code (CSS, HTML). Generates themes based on master sp...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.938Z"
-    },
-    {
-      "n": "pdf-composer",
-      "path": "skills/media/pdf-composer",
-      "d": "Generate PDF documents from Markdown with headers/footers.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.939Z"
-    },
-    {
-      "n": "ppt-artisan",
-      "path": "skills/media/ppt-artisan",
-      "d": "A specialized artisan for distilling PPTX designs into portable ADF (JSON) and re-generating pres...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T15:26:18.180Z"
-    },
-    {
-      "n": "word-artisan",
-      "path": "skills/media/word-artisan",
-      "d": "Generate Word documents (.docx) from Markdown.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.940Z"
-    },
-    {
-      "n": "agent-activity-monitor",
-      "path": "skills/utilities/agent-activity-monitor",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.940Z"
-    },
-    {
-      "n": "ai-model-orchestrator",
-      "path": "skills/utilities/ai-model-orchestrator",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.941Z"
-    },
-    {
-      "n": "api-doc-generator",
-      "path": "skills/utilities/api-doc-generator",
-      "d": "Generate API documentation from OpenAPI specs or code.",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.941Z"
-    },
-    {
-      "n": "api-evolution-manager",
-      "path": "skills/utilities/api-evolution-manager",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.942Z"
-    },
-    {
-      "n": "api-fetcher",
-      "path": "skills/utilities/api-fetcher",
-      "d": "Fetch data from REST/GraphQL APIs securely.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.942Z"
-    },
-    {
-      "n": "asset-token-economist",
-      "path": "skills/utilities/asset-token-economist",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.943Z"
-    },
-    {
-      "n": "automated-support-architect",
-      "path": "skills/utilities/automated-support-architect",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.943Z"
-    },
-    {
-      "n": "boilerplate-genie",
-      "path": "skills/utilities/boilerplate-genie",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.944Z"
-    },
-    {
-      "n": "browser-navigator",
-      "path": "skills/utilities/browser-navigator",
-      "d": "Automates web interactions using Playwright. Supports both legacy Playwright specs and modern, de...",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.944Z"
-    },
-    {
-      "n": "budget-variance-tracker",
-      "path": "skills/utilities/budget-variance-tracker",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.945Z"
-    },
-    {
-      "n": "chaos-monkey-orchestrator",
-      "path": "skills/utilities/chaos-monkey-orchestrator",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.945Z"
-    },
-    {
-      "n": "cloud-cost-estimator",
-      "path": "skills/utilities/cloud-cost-estimator",
-      "d": "''",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.946Z"
-    },
-    {
-      "n": "cloud-waste-hunter",
-      "path": "skills/utilities/cloud-waste-hunter",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.946Z"
-    },
-    {
-      "n": "completeness-scorer",
-      "path": "skills/utilities/completeness-scorer",
-      "d": "Evaluate text completeness based on criteria.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.947Z"
-    },
-    {
-      "n": "context-injector",
-      "path": "skills/utilities/context-injector",
-      "d": "Inject knowledge into JSON data context.",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.948Z"
-    },
-    {
-      "n": "crisis-manager",
-      "path": "skills/utilities/crisis-manager",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.949Z"
-    },
-    {
-      "n": "data-anonymizer",
-      "path": "skills/utilities/data-anonymizer",
-      "d": "Masks sensitive fields in JSON data for safe sharing.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.949Z"
-    },
-    {
-      "n": "data-lineage-guardian",
-      "path": "skills/utilities/data-lineage-guardian",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.950Z"
-    },
-    {
-      "n": "diff-visualizer",
-      "path": "skills/utilities/diff-visualizer",
-      "d": "Generate a visual difference report between two texts.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.950Z"
-    },
-    {
-      "n": "disaster-recovery-planner",
-      "path": "skills/utilities/disaster-recovery-planner",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.950Z"
-    },
-    {
-      "n": "doc-sync-sentinel",
-      "path": "skills/utilities/doc-sync-sentinel",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.951Z"
-    },
-    {
-      "n": "document-generator",
-      "path": "skills/utilities/document-generator",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.951Z"
-    },
-    {
-      "n": "ecosystem-integration-test",
-      "path": "skills/utilities/ecosystem-integration-test",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.952Z"
-    },
-    {
-      "n": "encoding-detector",
-      "path": "skills/utilities/encoding-detector",
-      "d": "Detect file encoding and line endings.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.952Z"
-    },
-    {
-      "n": "environment-provisioner",
-      "path": "skills/utilities/environment-provisioner",
-      "d": "''",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.953Z"
-    },
-    {
-      "n": "format-detector",
-      "path": "skills/utilities/format-detector",
-      "d": "Detect text format (JSON, YAML, CSV, etc.) and confidence.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.953Z"
-    },
-    {
-      "n": "issue-to-solution-bridge",
-      "path": "skills/utilities/issue-to-solution-bridge",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.954Z"
-    },
-    {
-      "n": "lang-detector",
-      "path": "skills/utilities/lang-detector",
-      "d": "Detect natural language of text (ja, en, etc.).",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.955Z"
-    },
-    {
-      "n": "log-analyst",
-      "path": "skills/utilities/log-analyst",
-      "d": "Reads the tail of a log file to help analyze recent errors or behavior.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.955Z"
-    },
-    {
-      "n": "log-to-requirement-bridge",
-      "path": "skills/utilities/log-to-requirement-bridge",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.956Z"
-    },
-    {
-      "n": "nonfunctional-architect",
-      "path": "skills/utilities/nonfunctional-architect",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.956Z"
-    },
-    {
-      "n": "onboarding-wizard",
-      "path": "skills/utilities/onboarding-wizard",
-      "d": "''",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.957Z"
-    },
-    {
-      "n": "operational-runbook-generator",
-      "path": "skills/utilities/operational-runbook-generator",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.958Z"
-    },
-    {
-      "n": "performance-monitor-analyst",
-      "path": "skills/utilities/performance-monitor-analyst",
-      "d": "''",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.958Z"
-    },
-    {
-      "n": "release-note-crafter",
-      "path": "skills/utilities/release-note-crafter",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.959Z"
-    },
-    {
-      "n": "requirements-wizard",
-      "path": "skills/utilities/requirements-wizard",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.959Z"
-    },
-    {
-      "n": "schema-validator",
-      "path": "skills/utilities/schema-validator",
-      "d": "Validate JSON against schemas and identify best match.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.960Z"
-    },
-    {
-      "n": "sensitivity-detector",
-      "path": "skills/utilities/sensitivity-detector",
-      "d": "Detect PII and sensitive information in text.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.961Z"
-    },
-    {
-      "n": "skill-bundle-packager",
-      "path": "skills/utilities/skill-bundle-packager",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.961Z"
-    },
-    {
-      "n": "sustainability-consultant",
-      "path": "skills/utilities/sustainability-consultant",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.961Z"
-    },
-    {
-      "n": "tech-stack-librarian",
-      "path": "skills/utilities/tech-stack-librarian",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.962Z"
-    },
-    {
-      "n": "telemetry-insight-engine",
-      "path": "skills/utilities/telemetry-insight-engine",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.963Z"
-    },
-    {
-      "n": "template-renderer",
-      "path": "skills/utilities/template-renderer",
-      "d": "Render text from templates (Mustache/EJS) and data.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.963Z"
-    },
-    {
-      "n": "terraform-arch-mapper",
-      "path": "skills/utilities/terraform-arch-mapper",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.964Z"
-    },
-    {
-      "n": "test-viewpoint-analyst",
-      "path": "skills/utilities/test-viewpoint-analyst",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.964Z"
-    },
-    {
-      "n": "visionary-ethos-keeper",
-      "path": "skills/utilities/visionary-ethos-keeper",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.965Z"
-    },
-    {
-      "n": "biometric-context-adapter",
-      "path": "skills/ux/biometric-context-adapter",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.965Z"
-    },
-    {
-      "n": "localization-maestro",
-      "path": "skills/ux/localization-maestro",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.965Z"
-    },
-    {
-      "n": "synthetic-user-persona",
-      "path": "skills/ux/synthetic-user-persona",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.966Z"
-    },
-    {
-      "n": "ux-auditor",
-      "path": "skills/ux/ux-auditor",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.966Z"
-    },
-    {
-      "n": "ux-visualizer",
-      "path": "skills/ux/ux-visualizer",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.967Z"
-    },
-    {
-      "n": "voice-command-listener",
-      "path": "skills/ux/voice-command-listener",
-      "d": "Captures microphone input and transcribes it into text commands.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.967Z"
-    },
-    {
-      "n": "voice-interface-maestro",
-      "path": "skills/ux/voice-interface-maestro",
-      "d": "Converts text responses into spoken audio (TTS). Supports multiple voice personas.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.968Z"
-    },
-    {
-      "n": "visual-imagination",
-      "path": "skills/imagination/visual-imagination",
-      "d": "Generates and edits images using Google Gemini Image API (Imagen).",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.927Z"
-    },
-    {
-      "n": "rakuten-ichiba-connector",
-      "path": "skills/lifestyle/rakuten-ichiba-connector",
-      "d": "Searches for products on Rakuten Ichiba.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.934Z"
-    },
-    {
-      "n": "rakuten-travel-connector",
-      "path": "skills/lifestyle/rakuten-travel-connector",
-      "d": "Searches for hotels and plans on Rakuten Travel.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.935Z"
-    },
-    {
-      "n": "switchbot-controller",
-      "path": "skills/lifestyle/switchbot-controller",
-      "d": "Controls smart home devices via SwitchBot API.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.935Z"
-    },
-    {
-      "n": "land-price-analyzer",
-      "path": "skills/finance/land-price-analyzer",
-      "d": "Analyzes land prices and real estate transactions via MLIT RE-Infolib API.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.926Z"
+      "t": "gemini-skill,qa",
+      "u": "2026-03-04T06:15:28.837Z"
     },
     {
       "n": "jpx-market-analyzer",
@@ -1405,8 +580,18 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.926Z"
+      "t": "data-engineering,gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.841Z"
+    },
+    {
+      "n": "land-price-analyzer",
+      "path": "skills/finance/land-price-analyzer",
+      "d": "Analyzes land prices and real estate transactions via MLIT RE-Infolib API.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.845Z"
     },
     {
       "n": "trust-fund-monitor",
@@ -1415,8 +600,128 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T09:28:07.927Z"
+      "t": "gemini-skill,integration,observability",
+      "u": "2026-03-04T06:15:28.849Z"
+    },
+    {
+      "n": "visual-imagination",
+      "path": "skills/imagination/visual-imagination",
+      "d": "Generates and edits images using Google Gemini Image API (Imagen).",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,cloud,gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.851Z"
+    },
+    {
+      "n": "auto-context-mapper",
+      "path": "skills/intelligence/auto-context-mapper",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.856Z"
+    },
+    {
+      "n": "data-collector",
+      "path": "skills/intelligence/data-collector",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill",
+      "u": "2026-03-04T06:15:28.861Z"
+    },
+    {
+      "n": "dataset-curator",
+      "path": "skills/intelligence/dataset-curator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill",
+      "u": "2026-03-04T06:15:28.865Z"
+    },
+    {
+      "n": "db-extractor",
+      "path": "skills/intelligence/db-extractor",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.868Z"
+    },
+    {
+      "n": "knowledge-auditor",
+      "path": "skills/intelligence/knowledge-auditor",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:28.871Z"
+    },
+    {
+      "n": "knowledge-fetcher",
+      "path": "skills/intelligence/knowledge-fetcher",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.875Z"
+    },
+    {
+      "n": "knowledge-harvester",
+      "path": "skills/intelligence/knowledge-harvester",
+      "d": "Git repository URL",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.879Z"
+    },
+    {
+      "n": "knowledge-refiner",
+      "path": "skills/intelligence/knowledge-refiner",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.883Z"
+    },
+    {
+      "n": "source-importer",
+      "path": "skills/intelligence/source-importer",
+      "d": "Local name",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.886Z"
+    },
+    {
+      "n": "sovereign-memory",
+      "path": "skills/intelligence/sovereign-memory",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.890Z"
+    },
+    {
+      "n": "sovereign-sync",
+      "path": "skills/intelligence/sovereign-sync",
+      "d": "Syncs specific knowledge tiers with external private repositories.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.894Z"
     },
     {
       "n": "text-classifier",
@@ -1425,8 +730,668 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
+      "t": "documentation,gemini-skill",
+      "u": "2026-03-04T06:15:28.898Z"
+    },
+    {
+      "n": "wisdom-distiller",
+      "path": "skills/intelligence/wisdom-distiller",
+      "d": "",
+      "s": "plan",
+      "r": "low",
+      "m": "dist/index.js",
       "t": [],
-      "u": "2026-03-03T09:28:07.934Z"
+      "u": "2026-03-03T16:38:53.850Z"
+    },
+    {
+      "n": "rakuten-ichiba-connector",
+      "path": "skills/lifestyle/rakuten-ichiba-connector",
+      "d": "Searches for products on Rakuten Ichiba.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.900Z"
+    },
+    {
+      "n": "rakuten-travel-connector",
+      "path": "skills/lifestyle/rakuten-travel-connector",
+      "d": "Searches for hotels and plans on Rakuten Travel.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.904Z"
+    },
+    {
+      "n": "switchbot-controller",
+      "path": "skills/lifestyle/switchbot-controller",
+      "d": "Controls smart home devices via SwitchBot API.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.908Z"
+    },
+    {
+      "n": "audio-transcriber",
+      "path": "skills/media/audio-transcriber",
+      "d": "Output file path",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.912Z"
+    },
+    {
+      "n": "diagram-renderer",
+      "path": "skills/media/diagram-renderer",
+      "d": "",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.915Z"
+    },
+    {
+      "n": "doc-to-text",
+      "path": "skills/media/doc-to-text",
+      "d": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, a...",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "documentation,gemini-skill",
+      "u": "2026-03-04T06:15:28.918Z"
+    },
+    {
+      "n": "excel-artisan",
+      "path": "skills/media/excel-artisan",
+      "d": "A specialized artisan for distilling Excel designs into portable ADF (JSON) and re-generating Exc...",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill",
+      "u": "2026-03-04T06:15:28.923Z"
+    },
+    {
+      "n": "html-reporter",
+      "path": "skills/media/html-reporter",
+      "d": "Report title",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.927Z"
+    },
+    {
+      "n": "layout-architect",
+      "path": "skills/media/layout-architect",
+      "d": "Converts visual designs into implementation code (CSS, HTML). Generates themes based on master sp...",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,gemini-skill",
+      "u": "2026-03-04T06:15:28.930Z"
+    },
+    {
+      "n": "pdf-composer",
+      "path": "skills/media/pdf-composer",
+      "d": "Generate PDF documents from Markdown with headers/footers.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,documentation,gemini-skill",
+      "u": "2026-03-04T06:15:28.934Z"
+    },
+    {
+      "n": "ppt-artisan",
+      "path": "skills/media/ppt-artisan",
+      "d": "A specialized artisan for distilling PPTX designs into portable ADF (JSON) and re-generating pres...",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.937Z"
+    },
+    {
+      "n": "word-artisan",
+      "path": "skills/media/word-artisan",
+      "d": "Generate Word documents (.docx) from Markdown.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,documentation,gemini-skill",
+      "u": "2026-03-04T06:15:28.940Z"
+    },
+    {
+      "n": "agent-activity-monitor",
+      "path": "skills/utilities/agent-activity-monitor",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,observability",
+      "u": "2026-03-04T06:15:28.945Z"
+    },
+    {
+      "n": "ai-model-orchestrator",
+      "path": "skills/utilities/ai-model-orchestrator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.949Z"
+    },
+    {
+      "n": "api-doc-generator",
+      "path": "skills/utilities/api-doc-generator",
+      "d": "Generate API documentation from OpenAPI specs or code.",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,documentation,gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.951Z"
+    },
+    {
+      "n": "api-evolution-manager",
+      "path": "skills/utilities/api-evolution-manager",
+      "d": "Path to previous OpenAPI spec for compatibility check",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.954Z"
+    },
+    {
+      "n": "api-fetcher",
+      "path": "skills/utilities/api-fetcher",
+      "d": "Fetch data from REST/GraphQL APIs securely.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill,integration",
+      "u": "2026-03-04T06:15:28.958Z"
+    },
+    {
+      "n": "asset-token-economist",
+      "path": "skills/utilities/asset-token-economist",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.963Z"
+    },
+    {
+      "n": "automated-support-architect",
+      "path": "skills/utilities/automated-support-architect",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.967Z"
+    },
+    {
+      "n": "boilerplate-genie",
+      "path": "skills/utilities/boilerplate-genie",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.971Z"
+    },
+    {
+      "n": "browser-navigator",
+      "path": "skills/utilities/browser-navigator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.975Z"
+    },
+    {
+      "n": "budget-variance-tracker",
+      "path": "skills/utilities/budget-variance-tracker",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.979Z"
+    },
+    {
+      "n": "chaos-monkey-orchestrator",
+      "path": "skills/utilities/chaos-monkey-orchestrator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.983Z"
+    },
+    {
+      "n": "cloud-cost-estimator",
+      "path": "skills/utilities/cloud-cost-estimator",
+      "d": "''",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "finops,gemini-skill",
+      "u": "2026-03-04T06:15:28.987Z"
+    },
+    {
+      "n": "cloud-waste-hunter",
+      "path": "skills/utilities/cloud-waste-hunter",
+      "d": "Output path for waste report",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.991Z"
+    },
+    {
+      "n": "completeness-scorer",
+      "path": "skills/utilities/completeness-scorer",
+      "d": "JSON file with required keywords",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.995Z"
+    },
+    {
+      "n": "context-injector",
+      "path": "skills/utilities/context-injector",
+      "d": "status: unstable",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:28.999Z"
+    },
+    {
+      "n": "crisis-manager",
+      "path": "skills/utilities/crisis-manager",
+      "d": "Generate professional RCA report using AI",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,gemini-skill",
+      "u": "2026-03-04T06:15:29.004Z"
+    },
+    {
+      "n": "data-anonymizer",
+      "path": "skills/utilities/data-anonymizer",
+      "d": "Masks sensitive fields in JSON data for safe sharing.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill",
+      "u": "2026-03-04T06:15:29.007Z"
+    },
+    {
+      "n": "data-lineage-guardian",
+      "path": "skills/utilities/data-lineage-guardian",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "data-engineering,gemini-skill",
+      "u": "2026-03-04T06:15:29.011Z"
+    },
+    {
+      "n": "diff-visualizer",
+      "path": "skills/utilities/diff-visualizer",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.015Z"
+    },
+    {
+      "n": "disaster-recovery-planner",
+      "path": "skills/utilities/disaster-recovery-planner",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.019Z"
+    },
+    {
+      "n": "doc-sync-sentinel",
+      "path": "skills/utilities/doc-sync-sentinel",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "documentation,gemini-skill",
+      "u": "2026-03-04T06:15:29.024Z"
+    },
+    {
+      "n": "document-generator",
+      "path": "skills/utilities/document-generator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "documentation,gemini-skill",
+      "u": "2026-03-04T06:15:29.028Z"
+    },
+    {
+      "n": "ecosystem-integration-test",
+      "path": "skills/utilities/ecosystem-integration-test",
+      "d": "null",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,qa",
+      "u": "2026-03-04T06:15:29.032Z"
+    },
+    {
+      "n": "encoding-detector",
+      "path": "skills/utilities/encoding-detector",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.035Z"
+    },
+    {
+      "n": "environment-provisioner",
+      "path": "skills/utilities/environment-provisioner",
+      "d": "status: unstable",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.039Z"
+    },
+    {
+      "n": "format-detector",
+      "path": "skills/utilities/format-detector",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.043Z"
+    },
+    {
+      "n": "issue-to-solution-bridge",
+      "path": "skills/utilities/issue-to-solution-bridge",
+      "d": "Output path for implementation ticket",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.047Z"
+    },
+    {
+      "n": "lang-detector",
+      "path": "skills/utilities/lang-detector",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.052Z"
+    },
+    {
+      "n": "log-analyst",
+      "path": "skills/utilities/log-analyst",
+      "d": "Validate JSON log structure",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.056Z"
+    },
+    {
+      "n": "log-to-requirement-bridge",
+      "path": "skills/utilities/log-to-requirement-bridge",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.059Z"
+    },
+    {
+      "n": "nonfunctional-architect",
+      "path": "skills/utilities/nonfunctional-architect",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.064Z"
+    },
+    {
+      "n": "onboarding-wizard",
+      "path": "skills/utilities/onboarding-wizard",
+      "d": "Project directory",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.069Z"
+    },
+    {
+      "n": "operational-runbook-generator",
+      "path": "skills/utilities/operational-runbook-generator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.073Z"
+    },
+    {
+      "n": "performance-monitor-analyst",
+      "path": "skills/utilities/performance-monitor-analyst",
+      "d": "Output path for performance report",
+      "s": "unst",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,observability",
+      "u": "2026-03-04T06:15:29.077Z"
+    },
+    {
+      "n": "release-note-crafter",
+      "path": "skills/utilities/release-note-crafter",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.080Z"
+    },
+    {
+      "n": "requirements-wizard",
+      "path": "skills/utilities/requirements-wizard",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.085Z"
+    },
+    {
+      "n": "schema-validator",
+      "path": "skills/utilities/schema-validator",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.089Z"
+    },
+    {
+      "n": "sensitivity-detector",
+      "path": "skills/utilities/sensitivity-detector",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.092Z"
+    },
+    {
+      "n": "skill-bundle-packager",
+      "path": "skills/utilities/skill-bundle-packager",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.096Z"
+    },
+    {
+      "n": "sustainability-consultant",
+      "path": "skills/utilities/sustainability-consultant",
+      "d": "Output path for sustainability report",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.101Z"
+    },
+    {
+      "n": "tech-stack-librarian",
+      "path": "skills/utilities/tech-stack-librarian",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.106Z"
+    },
+    {
+      "n": "telemetry-insight-engine",
+      "path": "skills/utilities/telemetry-insight-engine",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.111Z"
+    },
+    {
+      "n": "template-renderer",
+      "path": "skills/utilities/template-renderer",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.115Z"
+    },
+    {
+      "n": "terraform-arch-mapper",
+      "path": "skills/utilities/terraform-arch-mapper",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.120Z"
+    },
+    {
+      "n": "test-viewpoint-analyst",
+      "path": "skills/utilities/test-viewpoint-analyst",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill,qa",
+      "u": "2026-03-04T06:15:29.124Z"
+    },
+    {
+      "n": "visionary-ethos-keeper",
+      "path": "skills/utilities/visionary-ethos-keeper",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.128Z"
+    },
+    {
+      "n": "biometric-context-adapter",
+      "path": "skills/ux/biometric-context-adapter",
+      "d": "''",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.133Z"
+    },
+    {
+      "n": "localization-maestro",
+      "path": "skills/ux/localization-maestro",
+      "d": "Output path for localization audit report",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:29.137Z"
+    },
+    {
+      "n": "synthetic-user-persona",
+      "path": "skills/ux/synthetic-user-persona",
+      "d": "status: implemented",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.140Z"
+    },
+    {
+      "n": "ux-auditor",
+      "path": "skills/ux/ux-auditor",
+      "d": "Output path for report",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "compliance,gemini-skill",
+      "u": "2026-03-04T06:15:29.144Z"
+    },
+    {
+      "n": "ux-visualizer",
+      "path": "skills/ux/ux-visualizer",
+      "d": "Render to image",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.148Z"
+    },
+    {
+      "n": "voice-command-listener",
+      "path": "skills/ux/voice-command-listener",
+      "d": "Captures microphone input and transcribes it into text commands.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.152Z"
+    },
+    {
+      "n": "voice-interface-maestro",
+      "path": "skills/ux/voice-interface-maestro",
+      "d": "Converts text responses into spoken audio (TTS). Supports multiple voice personas.",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill",
+      "u": "2026-03-04T06:15:29.156Z"
     }
   ]
 }

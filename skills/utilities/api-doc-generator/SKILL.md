@@ -4,16 +4,8 @@ description: Generate API documentation from OpenAPI specs or code.
 status: unstable
 category: Utilities
 last_updated: '2026-03-02'
-tags:
-  - automation
-  - documentation
-  - gemini-skill
-  - integration
+tags: automation,documentation,gemini-skill,integration
 related_skills:
-  - codebase-mapper
-  - completeness-scorer
-  - doc-sync-sentinel
-  - word-artisan
 ---
 
 # Api Doc Generator

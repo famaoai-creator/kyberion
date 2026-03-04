@@ -4,12 +4,8 @@ description: ''
 status: unstable
 category: Utilities
 last_updated: '2026-03-02'
-tags:
-  - finops
-  - gemini-skill
+tags: finops,gemini-skill
 related_skills:
-  - cloud-waste-hunter
-  - html-reporter
 ---
 
 # Cloud Cost Estimator

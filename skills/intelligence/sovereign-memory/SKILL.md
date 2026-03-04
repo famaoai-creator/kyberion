@@ -3,8 +3,7 @@ name: sovereign-memory
 description: ''
 status: implemented
 category: Intelligence
-tags:
-  - gemini-skill
+tags: gemini-skill
 last_updated: '2026-02-28'
 ---
 

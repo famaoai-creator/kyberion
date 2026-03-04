@@ -4,10 +4,7 @@ description: Fetch data from REST/GraphQL APIs securely.
 status: implemented
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
-  - integration
+tags: data-engineering,gemini-skill,integration
 ---
 
 # Api Fetcher

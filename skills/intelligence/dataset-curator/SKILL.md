@@ -1,28 +1,15 @@
 ---
 name: dataset-curator
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
-  - name: format
-    short: f
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: format
+short: f
+type: string
+required: false
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: data-engineering,gemini-skill
 ---
 
 # Dataset Curator

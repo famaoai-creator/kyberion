@@ -1,19 +1,15 @@
 ---
 name: test-suite-architect
-description: Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. Enables Test-Driven Development (TDD) at scale.
+description: 
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: true
-    description: 
+arguments: 
+- name: dir
+short: d
+type: string
+required: true
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
-  - qa
+tags: gemini-skill,qa
 ---
 
 # Test Suite Architect

@@ -1,41 +1,15 @@
 ---
 name: slack-communicator-pro
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: 
-  - name: channel
-    short: c
-    type: string
-    required: false
-    description: 
-  - name: thread_ts
-    type: string
-    required: false
-    description: Parent thread timestamp for replies
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: 
-  - name: dry-run
-    type: boolean
-    required: false
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Connector
 last_updated: '2026-02-28'
-tags:
-  - communication
-  - gemini-skill
+tags: communication,gemini-skill
 ---
 
 # Slack Communicator Pro

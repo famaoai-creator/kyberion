@@ -1,31 +1,16 @@
 ---
 name: operational-runbook-generator
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: service
-    short: s
-    type: string
-    required: true
-    description: 
-  - name: type
-    short: t
-    type: string
-    required: false
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - onboarding-wizard
-  - project-health-check
-  - requirements-wizard
 ---
 
 # Operational Runbook Generator

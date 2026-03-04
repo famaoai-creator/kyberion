@@ -1,18 +1,15 @@
 ---
 name: document-generator
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: format
-    short: f
-    type: string
-    required: true
-    description: 
+arguments: 
+- name: format
+short: f
+type: string
+required: true
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - documentation
-  - gemini-skill
+tags: documentation,gemini-skill
 ---
 
 # Document Generator (Gateway)

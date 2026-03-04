@@ -4,8 +4,7 @@ description: Converts text responses into spoken audio (TTS). Supports multiple 
 status: implemented
 category: Ux
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Voice Interface Maestro

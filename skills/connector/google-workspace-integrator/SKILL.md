@@ -1,19 +1,16 @@
 ---
 name: google-workspace-integrator
-description: Connects to Google Workspace (Calendar, Gmail) for executive secretary automation.
+description: fetch-agenda, list-emails, send-email, auth
 status: unstable
 main: dist/index.js
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: fetch-agenda, list-emails, send-email, auth
+arguments: 
+- name: action
+short: a
+type: string
+required: false
 category: Connector
 last_updated: '2026-03-02'
-tags:
-  - cloud
-  - gemini-skill
+tags: cloud,gemini-skill
 ---
 
 # Google Workspace Integrator

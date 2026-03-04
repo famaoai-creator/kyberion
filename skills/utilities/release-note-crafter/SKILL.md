@@ -1,32 +1,16 @@
 ---
 name: release-note-crafter
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: true
-    description: 
-  - name: since
-    short: s
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - bug-predictor
-  - license-auditor
-  - project-health-check
-  - security-scanner
 ---
 
 # Release Note Crafter

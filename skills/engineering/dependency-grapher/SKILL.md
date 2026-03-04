@@ -4,16 +4,8 @@ description: Generate dependency graphs (Mermaid/DOT) from project files.
 status: implemented
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
+tags: automation,gemini-skill
 related_skills:
-  - bug-predictor
-  - codebase-mapper
-  - dependency-lifeline
-  - html-reporter
-  - license-auditor
-  - security-scanner
 ---
 
 # Dependency Grapher

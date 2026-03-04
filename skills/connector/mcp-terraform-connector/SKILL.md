@@ -1,27 +1,15 @@
 ---
 name: mcp-terraform-connector
-description: Connects to the Terraform Registry via the Model Context Protocol (MCP).
+description: 
 status: implemented
-arguments:
-  - name: action
-    short: a
-    type: string
-    required: false
-    description: 
-  - name: name
-    short: n
-    type: string
-    required: false
-    description: 
-  - name: arguments
-    short: g
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: arguments
+short: g
+type: string
+required: false
 category: Connector
 last_updated: '2026-03-02'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Terraform MCP Connector

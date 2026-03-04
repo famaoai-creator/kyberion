@@ -4,9 +4,7 @@ description: ''
 status: implemented
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - compliance
-  - gemini-skill
+tags: compliance,gemini-skill
 ---
 
 # Knowledge Auditor

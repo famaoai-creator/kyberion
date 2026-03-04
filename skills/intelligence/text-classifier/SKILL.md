@@ -4,10 +4,7 @@ description: Universal text classifier supporting multiple rule sets (doc-type, 
 status: implemented
 category: Intelligence
 last_updated: '2026-03-03'
-tags:
-  - gemini-skill
-  - classifier
-  - text-analysis
+tags: documentation,gemini-skill
 ---
 
 # Text Classifier

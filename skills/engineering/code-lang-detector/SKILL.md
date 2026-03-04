@@ -1,27 +1,16 @@
 ---
 name: code-lang-detector
-description: Detect programming language of source code.
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: input
+short: i
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - bug-predictor
-  - completeness-scorer
-  - html-reporter
-  - license-auditor
-  - local-reviewer
-  - project-health-check
-  - quality-scorer
-  - refactoring-engine
-  - security-scanner
 ---
 
 # code-lang-detector

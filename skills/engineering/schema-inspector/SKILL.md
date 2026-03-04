@@ -4,9 +4,7 @@ description: Automatically locates and displays schema definition files (SQL, Pr
 status: implemented
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - integration
+tags: gemini-skill,integration
 ---
 
 # Schema Inspector Skill

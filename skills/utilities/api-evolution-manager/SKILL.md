@@ -1,23 +1,15 @@
 ---
 name: api-evolution-manager
-description: ''
+description: Path to previous OpenAPI spec for compatibility check
 status: implemented
-arguments:
-  - name: current
-    short: c
-    type: string
-    required: true
-    description: Path to current OpenAPI spec
-  - name: previous
-    short: p
-    type: string
-    required: false
-    description: Path to previous OpenAPI spec for compatibility check
+arguments: 
+- name: previous
+short: p
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - integration
+tags: gemini-skill,integration
 ---
 
 # API Evolution Manager

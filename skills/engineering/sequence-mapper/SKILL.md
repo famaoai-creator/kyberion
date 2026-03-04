@@ -1,23 +1,15 @@
 ---
 name: sequence-mapper
-description: Generate Mermaid sequence diagrams from source code function calls.
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - automation
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Sequence Mapper

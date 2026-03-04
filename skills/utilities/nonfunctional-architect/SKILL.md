@@ -4,12 +4,8 @@ description: ''
 status: implemented
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - license-auditor
-  - schema-validator
-  - sensitivity-detector
 ---
 
 # Non-Functional Architect

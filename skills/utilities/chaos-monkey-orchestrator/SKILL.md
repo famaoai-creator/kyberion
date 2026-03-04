@@ -1,31 +1,15 @@
 ---
 name: chaos-monkey-orchestrator
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: target
-    short: t
-    type: string
-    required: false
-    description: 
-  - name: mode
-    short: m
-    type: string
-    required: false
-    description: 
-  - name: intensity
-    type: number
-    required: false
-    description: 
-  - name: aws-fis-template
-    short: f
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: aws-fis-template
+short: f
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Chaos Monkey Orchestrator

@@ -1,43 +1,16 @@
 ---
 name: quality-scorer
-description: Evaluates technical and textual quality based on IPA benchmarks and readability standards.
+description: Output JSON path
 status: unstable
-arguments:
-  - name: content
-    short: c
-    type: string
-    required: false
-    description: Content to score
-  - name: file
-    short: f
-    type: string
-    required: false
-    description: File to score
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output JSON path
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Audit
 last_updated: '2026-03-02'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - bug-predictor
-  - code-lang-detector
-  - codebase-mapper
-  - completeness-scorer
-  - doc-sync-sentinel
-  - doc-type-classifier
-  - format-detector
-  - glossary-resolver
-  - html-reporter
-  - intent-classifier
-  - license-auditor
-  - local-reviewer
-  - project-health-check
-  - refactoring-engine
-  - security-scanner
 ---
 
 # Quality Scorer

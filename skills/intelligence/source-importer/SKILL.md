@@ -1,21 +1,15 @@
 ---
 name: source-importer
-description: ''
+description: Local name
 status: implemented
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-arguments:
-  - name: repo
-    short: r
-    type: string
-    required: true
-    description: Repository URL
-  - name: name
-    short: 'n'
-    type: string
-    description: Local name
+tags: gemini-skill
+arguments: 
+- name: name
+short: 'n'
+type: string
+required: true
 ---
 
 # source-importer

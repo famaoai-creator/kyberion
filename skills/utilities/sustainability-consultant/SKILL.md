@@ -1,29 +1,16 @@
 ---
 name: sustainability-consultant
-description: ''
+description: Output path for sustainability report
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: Directory to assess for sustainability
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output path for sustainability report
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - ai-ethics-auditor
-  - compliance-officer
-  - crisis-manager
-  - html-reporter
-  - post-quantum-shield
-  - supply-chain-sentinel
 ---
 
 # Sustainability Consultant (GreenOps)

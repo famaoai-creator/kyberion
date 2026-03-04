@@ -1,18 +1,15 @@
 ---
 name: ecosystem-integration-test
-description: ''
+description: null
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: null
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - qa
+tags: gemini-skill,qa
 ---
 
 # Ecosystem Integration Test

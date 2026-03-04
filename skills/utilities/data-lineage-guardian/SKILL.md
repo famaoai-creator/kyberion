@@ -1,18 +1,15 @@
 ---
 name: data-lineage-guardian
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: data-engineering,gemini-skill
 ---
 
 # Data Lineage Guardian

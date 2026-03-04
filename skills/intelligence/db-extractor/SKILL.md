@@ -1,29 +1,15 @@
 ---
 name: db-extractor
-description: Extract schema and sample data from databases for analysis.
+description: 
 status: implemented
-arguments:
-  - name: db
-    short: d
-    type: string
-    required: true
-    description: 
-  - name: query
-    short: q
-    type: string
-    required: false
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - analytics
-  - data-engineering
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Db Extractor

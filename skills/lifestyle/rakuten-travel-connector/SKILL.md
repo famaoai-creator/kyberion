@@ -5,8 +5,7 @@ status: implemented
 main: dist/index.js
 category: lifestyle
 r: low
-tags:
-  - gemini-skill
+tags: gemini-skill
 last_updated: '2026-03-02'
 ---
 

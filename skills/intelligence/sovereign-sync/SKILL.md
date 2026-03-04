@@ -4,8 +4,7 @@ description: Syncs specific knowledge tiers with external private repositories.
 status: implemented
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Sovereign Sync

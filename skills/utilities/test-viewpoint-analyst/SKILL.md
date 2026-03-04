@@ -4,9 +4,7 @@ description: ''
 status: implemented
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
-  - qa
+tags: gemini-skill,qa
 ---
 
 # Test Viewpoint Analyst (IPA-Standard)

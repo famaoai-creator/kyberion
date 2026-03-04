@@ -1,19 +1,15 @@
 ---
 name: monitoring-config-auditor
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Audit
 last_updated: '2026-02-28'
-tags:
-  - compliance
-  - gemini-skill
-  - observability
+tags: compliance,gemini-skill,observability
 ---
 
 # Monitoring Config Auditor

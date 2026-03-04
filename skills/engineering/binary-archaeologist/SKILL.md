@@ -1,22 +1,15 @@
 ---
 name: binary-archaeologist
-description: Reverse engineers legacy binaries and "black box" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.
+description: Output path for forensic report
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: Binary file or directory to scan
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output path for forensic report
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Binary Archaeologist

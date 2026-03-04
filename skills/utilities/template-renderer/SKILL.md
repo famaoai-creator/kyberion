@@ -1,28 +1,15 @@
 ---
 name: template-renderer
-description: Render text from templates (Mustache/EJS) and data.
+description: 
 status: implemented
-arguments:
-  - name: template
-    short: t
-    type: string
-    required: true
-    description: 
-  - name: data
-    short: d
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - data-engineering
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Template Renderer

@@ -4,22 +4,12 @@ description: Automatically generates Maestro YAML test flows based on provided s
 status: implemented
 category: Engineering
 last_updated: '2026-02-28'
-arguments:
-  - name: app-id
-    short: a
-    type: string
-    required: true
-  - name: scenario
-    short: s
-    type: string
-    required: true
-  - name: out
-    short: o
-    type: string
-tags:
-  - automation
-  - gemini-skill
-  - qa
+arguments: 
+- name: out
+short: o
+type: string
+required: true
+tags: automation,gemini-skill,qa
 ---
 
 # mobile-test-generator

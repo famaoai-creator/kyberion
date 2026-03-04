@@ -1,22 +1,15 @@
 ---
 name: knowledge-fetcher
-description: Fetch knowledge from both public and confidential directories.
+description: 
 status: implemented
-arguments:
-  - name: query
-    short: q
-    type: string
-    required: true
-    description: 
-  - name: type
-    short: t
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: type
+short: t
+type: string
+required: false
 category: Intelligence
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Knowledge Fetcher (Hybrid Bridge)

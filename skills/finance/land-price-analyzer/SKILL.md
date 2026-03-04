@@ -5,9 +5,7 @@ status: implemented
 main: dist/index.js
 category: finance
 r: high
-tags:
-  - gemini-skill
-  - integration
+tags: gemini-skill,integration
 last_updated: '2026-03-02'
 ---
 

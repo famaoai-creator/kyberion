@@ -1,17 +1,15 @@
 ---
 name: automated-support-architect
-description: ''
+description: 
 status: implemented
-arguments:
-  - name: dir
-    short: d
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: dir
+short: d
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # Automated Support Architect

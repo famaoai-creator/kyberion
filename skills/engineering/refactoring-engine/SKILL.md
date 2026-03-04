@@ -1,33 +1,16 @@
 ---
 name: refactoring-engine
-description: Executes large-scale architectural refactoring and technical debt reduction across the entire codebase. Ensures consistency with modern design patterns.
+description: 
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: 
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Engineering
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - bug-predictor
-  - code-lang-detector
-  - codebase-mapper
-  - completeness-scorer
-  - html-reporter
-  - license-auditor
-  - local-reviewer
-  - project-health-check
-  - quality-scorer
-  - security-scanner
 ---
 
 # Refactoring Engine

@@ -1,22 +1,15 @@
 ---
 name: localization-maestro
-description: ''
+description: Output path for localization audit report
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: false
-    description: Project directory to audit for localization
-  - name: out
-    short: o
-    type: string
-    required: false
-    description: Output path for localization audit report
+arguments: 
+- name: out
+short: o
+type: string
+required: false
 category: Ux
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: compliance,gemini-skill
 ---
 
 # Localization Maestro

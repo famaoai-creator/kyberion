@@ -1,34 +1,16 @@
 ---
 name: completeness-scorer
-description: Evaluate text completeness based on criteria.
+description: JSON file with required keywords
 status: implemented
-arguments:
-  - name: input
-    short: i
-    type: string
-    required: true
-    description: 
-  - name: criteria
-    short: c
-    type: string
-    required: false
-    description: JSON file with required keywords
+arguments: 
+- name: criteria
+short: c
+type: string
+required: false
 category: Utilities
 last_updated: '2026-02-28'
-tags:
-  - gemini-skill
+tags: gemini-skill
 related_skills:
-  - api-doc-generator
-  - code-lang-detector
-  - codebase-mapper
-  - doc-sync-sentinel
-  - doc-type-classifier
-  - format-detector
-  - glossary-resolver
-  - intent-classifier
-  - local-reviewer
-  - quality-scorer
-  - refactoring-engine
 ---
 
 # Completeness Scorer

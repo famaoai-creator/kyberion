@@ -5,11 +5,7 @@ status: implemented
 category: Media
 last_updated: '2026-03-03'
 version: '2.0.0'
-tags:
-  - powerpoint
-  - distillation
-  - adf
-  - gemini-skill
+tags: gemini-skill
 ---
 
 # PowerPoint Artisan (v2.0)
