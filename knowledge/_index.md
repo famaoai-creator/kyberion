@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T05:01:14.564Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T16:49:00.231Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -167,10 +167,12 @@
 - [高度な自律開発標準ワークフロー (Advanced Development Flow)](./orchestration/advanced-development-flow.md) (public | Unknown)
 - [Sovereign Autonomous Agent Protocol (SAAP)](./orchestration/autonomous-agent-protocol.md) (public | Unknown)
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./orchestration/autonomous-debug-loop.md) (public | Unknown)
+- [Browser Automation Best Practices (Omni-Browser v2)](./orchestration/browser-automation-best-practices.md) (public | Unknown)
 - [ACE (Autonomous Consensus Engine) Operating Standard](./orchestration/consensus-protocol.md) (public | Unknown)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./orchestration/context-extraction-rules.md) (public | Unknown)
 - [企業内ネットワーク環境セットアップガイド](./orchestration/corporate-env-guide.md) (public | Unknown)
 - [スキル間データ受け渡し仕様 (Data Handover Specs)](./orchestration/data-handover-specs.md) (public | Unknown)
+- [Data Harvesting Best Practices: URL Resolution & Secure Download](./orchestration/data-harvesting-best-practices.md) (public | Unknown)
 - [The Data Ingestion Protocol (外部データ持ち込み規約)](./orchestration/data-ingestion-protocol.md) (public | Unknown)
 - [Cross-Role Directive Protocol (CRDP)](./orchestration/directives-protocol.md) (public | Unknown)
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./orchestration/git-flow-standards.md) (public | Unknown)

@@ -1,103 +1,156 @@
 import { safeWriteFile, safeReadFile } from '@agent/core';
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import * as yaml from 'js-yaml';
+import { chromium, Browser, BrowserContext, Page, Locator } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+
+/**
+ * Omni-Browser v2 (Sovereign Eye)
+ * Alignment with 'browser-use' philosophy: index-based agentic interaction + human demonstration support.
+ */
 
 export interface ScenarioStep {
-  action: string; url?: string; selector?: string; text?: string; value?: string; timeout?: number; credentials?: string;
-  button?: string; confirm_buttons?: string[]; extract_keywords?: string[]; item_filter_keywords?: string[];
-  item_filter_re?: string; exclude_keywords?: string[]; report_item_template?: string; save_path?: string;
+  action: 'goto' | 'click' | 'fill' | 'press' | 'wait' | 'snapshot' | 'screenshot' | 'extract' | 'observe';
+  url?: string;
+  index?: number;      // Index from UI Snapshot (Agentic)
+  locator?: string;    // CSS/XPath/Playwright locator (Human Demo)
+  text?: string;       // Text to fill or key to press
+  ms?: number;         // Wait time
+  save_path?: string;
+  reasoning?: string;  // AI justification for the action
+  schema?: any;        // Structure for data extraction
 }
 
-export interface Scenario { name: string; steps: ScenarioStep[]; }
+export interface Scenario {
+  name: string;
+  description?: string;
+  steps: ScenarioStep[];
+}
 
-export function runBrowserScenario(specPath: string, rootDir: string): any {
-  const cmd = `npx playwright test "${specPath}"`;
-  const output = execSync(cmd, { cwd: rootDir, encoding: 'utf8' });
+const ElementRegistry = new Map<number, Locator>();
+
+/**
+ * Main entry point for running v2 JSON scenarios.
+ */
+export async function runScenario(scenarioPath: string): Promise<any> {
+  const content = fs.readFileSync(scenarioPath, 'utf8').trim();
+  let scenario: Scenario;
+  
   try {
-    return JSON.parse(output);
-  } catch (_e) {
-    return { raw: output };
+    scenario = JSON.parse(content);
+  } catch (err: any) {
+    // Basic YAML to JSON shim for legacy support
+    const yaml = require('js-yaml');
+    scenario = yaml.load(content);
   }
-}
 
-function resolvePlaceholders(text: string): string {
-  const now = new Date();
-  const replacements: { [key: string]: string } = {
-    '{YYYY}': now.getFullYear().toString(), '{MM}': (now.getMonth() + 1).toString().padStart(2, '0'),
-    '{DD}': now.getDate().toString().padStart(2, '0'), '{YY}': now.getFullYear().toString().slice(-2),
-    '{M}': (now.getMonth() + 1).toString(), '{D}': now.getDate().toString(),
-  };
-  let resolved = text;
-  for (const [key, val] of Object.entries(replacements)) { resolved = resolved.split(key).join(val); }
-  return resolved;
-}
+  const browser = await chromium.launch({ headless: false, args: ['--ignore-certificate-errors'] });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const report: string[] = [`# Sovereign Eye Execution: ${scenario.name}\n`];
 
-export async function runYamlScenario(scenarioPath: string): Promise<any> {
-  const content = safeReadFile(scenarioPath, { encoding: 'utf8' }) as string;
-  const scenario = yaml.load(content) as Scenario;
-  const browser: Browser = await chromium.launch({ headless: true, args: ['--ignore-certificate-errors', '--no-sandbox'] });
-  const context: BrowserContext = await browser.newContext({ ignoreHTTPSErrors: true });
-  const page: Page = await context.newPage();
-  const report: string[] = [`# Execution Report: ${scenario.name}\n`];
+  console.log(`🚀 Executing Scenario: ${scenario.name}`);
 
   try {
     for (const step of scenario.steps) {
+      if (step.reasoning) console.log(`💭 Reasoning: ${step.reasoning}`);
+      
+      let target: Locator | undefined;
+
+      // Resolve Target (Hybrid approach)
+      if (step.index !== undefined && ElementRegistry.has(step.index)) {
+        target = ElementRegistry.get(step.index);
+      } else if (step.locator) {
+        // Support Playwright locator strings like 'role=button[name="..."]'
+        target = page.locator(step.locator);
+      }
+
       switch (step.action) {
         case 'goto':
-          await page.goto(resolvePlaceholders(step.url!));
-          await page.waitForLoadState('networkidle');
+          await page.goto(step.url!, { waitUntil: 'load' });
+          report.push(`- Navigated to: ${step.url}`);
           break;
+
+        case 'click':
+          if (target) {
+            const firstTarget = target.first();
+            await firstTarget.scrollIntoViewIfNeeded();
+            await firstTarget.click({ force: true });
+            report.push(`- Clicked: ${step.index || step.locator}`);
+          }
+          break;
+
+        case 'fill':
+          if (target) {
+            const firstTarget = target.first();
+            await firstTarget.fill(step.text || '');
+            report.push(`- Filled ${step.index || step.locator} with text.`);
+          }
+          break;
+
+        case 'press':
+          if (target) {
+            await target.press(step.text || 'Enter');
+          } else {
+            await page.keyboard.press(step.text || 'Enter');
+          }
+          break;
+
         case 'wait':
-          await new Promise(r => setTimeout(r, step.timeout || 5000));
+          await page.waitForTimeout(step.ms || 3000);
           break;
+
+        case 'snapshot':
+          const snapshot = await buildAIAccessibleSnapshot(page);
+          const sPath = step.save_path || 'snapshot.json';
+          safeWriteFile(sPath, JSON.stringify(snapshot, null, 2));
+          report.push(`- UI Snapshot captured (${snapshot.elements.length} elements).`);
+          break;
+
         case 'screenshot':
           await page.screenshot({ path: step.save_path || 'output.png' });
+          report.push(`- Screenshot saved to ${step.save_path}`);
           break;
-        case 'screenshot_svg':
-          const viewport = page.viewportSize() || { width: 1280, height: 720 };
-          const buffer = await page.screenshot({ type: 'png', fullPage: false });
-          const base64 = buffer.toString('base64');
-          const svg = `<svg width="${viewport.width}" height="${viewport.height}" viewBox="0 0 ${viewport.width} ${viewport.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image xlink:href="data:image/png;base64,${base64}" width="${viewport.width}" height="${viewport.height}" /></svg>`;
-          safeWriteFile(step.save_path || 'output.svg', svg);
-          break;
-        case 'visual_observe':
-          const obs = await visualObserve(page, step.save_path);
-          report.push(`  - Visual Observation: ${obs.summary}`);
-          break;
-        case 'click_robust':
-          await robustClick(page, resolvePlaceholders(step.text || step.selector!));
-          break;
-        case 'loop_approve':
-          await loopApprove(page, context, step, report);
+
+        case 'extract':
+          // Future: Add LLM-guided extraction logic here
+          const data = await page.evaluate(() => document.body.innerText.substring(0, 5000));
+          safeWriteFile(step.save_path || 'extracted.txt', data);
+          report.push(`- Data extracted to ${step.save_path}`);
           break;
       }
+      await page.waitForTimeout(500); // Breathe
     }
     return { status: 'success', report: report.join('\n') };
-  } catch (err: any) { return { status: 'error', error: err.message }; } finally { await browser.close(); }
-}
-
-async function visualObserve(page: Page, savePath?: string) {
-  const finalPath = savePath || `observation-${Date.now()}.png`;
-  await page.screenshot({ path: finalPath });
-  const axTree = await (page as any).accessibility.snapshot();
-  const buttonCount = JSON.stringify(axTree).match(/"role":"button"/g)?.length || 0;
-  return { screenshot: finalPath, summary: `Captured ${buttonCount} buttons. State saved to ${finalPath}`, axTree };
-}
-
-async function robustClick(page: Page, target: string): Promise<boolean> {
-  for (const frame of [page, ...page.frames()]) {
-    try {
-      const el = frame.locator(`text=${target}, button:has-text("${target}"), a:has-text("${target}")`).first();
-      if (await el.isVisible()) { await el.scrollIntoViewIfNeeded(); await el.click({ force: true }); return true; }
-    } catch { continue; }
+  } catch (err: any) {
+    console.error(`❌ Execution Error: ${err.message}`);
+    return { status: 'error', error: err.message };
+  } finally {
+    await browser.close();
   }
-  return false;
 }
 
-async function loopApprove(page: Page, context: BrowserContext, step: ScenarioStep, report: string[]): Promise<number> {
-  let count = 0;
-  return count;
+async function buildAIAccessibleSnapshot(page: Page) {
+  ElementRegistry.clear();
+  let refCounter = 1;
+  const elements = [];
+
+  const locators = await page.locator('button, a, input, textarea, select, [role="button"], [role="link"]').all();
+  
+  for (const loc of locators) {
+    if (!(await loc.isVisible())) continue;
+
+    const tagName = await loc.evaluate(el => el.tagName.toLowerCase());
+    const text = (await loc.innerText() || await loc.getAttribute('aria-label') || '').trim();
+    if (text === '' && tagName !== 'input') continue;
+
+    const id = refCounter++;
+    ElementRegistry.set(id, loc);
+    elements.push({ index: id, type: tagName, text: text.substring(0, 100) });
+  }
+
+  return {
+    url: page.url(),
+    title: await page.title(),
+    elements
+  };
 }
