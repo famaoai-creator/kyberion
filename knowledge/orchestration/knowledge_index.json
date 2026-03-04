@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 299,
-  "u": "2026-03-04T13:14:39.545Z",
+  "t": 303,
+  "u": "2026-03-04T16:57:39.215Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -26,6 +26,14 @@
       "last_updated": "2026-03-03",
       "tier": "public",
       "category": "ai-engineering"
+    },
+    {
+      "id": "architecture/agent-wallet-protocol.md",
+      "title": "Agent Wallet & Passkey Approval Protocol (2026-03-04)",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "category": "architecture"
     },
     {
       "id": "architecture/analysis-multi-tenant-governance-20260304.md",
@@ -60,6 +68,14 @@
       "category": "architecture"
     },
     {
+      "id": "architecture/passkey-push-protocol.md",
+      "title": "Sovereign Approval Protocol: Push & Passkey (2026-03-04)",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "category": "architecture"
+    },
+    {
       "id": "architecture/pptx-design-distillation-pattern.md",
       "title": "Wisdom: PowerPoint Design Distillation & Heritage Sync",
       "author": "Unknown",
@@ -71,7 +87,15 @@
       "id": "architecture/presence-layer.md",
       "title": "Presence Layer: Sensors, Displays, and Intervention",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "category": "architecture"
+    },
+    {
+      "id": "architecture/terminal-hosting.md",
+      "title": "Sovereign Terminal Hosting Protocol",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "architecture"
     },
@@ -788,6 +812,14 @@
       "category": "orchestration"
     },
     {
+      "id": "orchestration/browser-automation-best-practices.md",
+      "title": "Browser Automation Best Practices (Omni-Browser v2)",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "category": "orchestration"
+    },
+    {
       "id": "orchestration/consensus-protocol.md",
       "title": "ACE (Autonomous Consensus Engine) Operating Standard",
       "author": "Unknown",
@@ -831,7 +863,7 @@
       "id": "orchestration/data-ingestion-protocol.md",
       "title": "The Data Ingestion Protocol (外部データ持ち込み規約)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -911,7 +943,7 @@
       "id": "orchestration/onboarding-directives/00_sovereign_onboarding.md",
       "title": "Directive: Sovereign Onboarding (シミュレーション開始指令)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration/onboarding-directives"
     },
@@ -1103,7 +1135,7 @@
       "id": "orchestration/polyglot-roadmap.md",
       "title": "Polyglot Core Transformation Roadmap (Sidecar Architecture)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1135,7 +1167,7 @@
       "id": "orchestration/sentinel-operations.md",
       "title": "Autonomous Sentinel Operations",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1151,7 +1183,7 @@
       "id": "orchestration/voice-interface-protocol.md",
       "title": "Voice Interface Protocol (VIP)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "orchestration"
     },
@@ -1503,7 +1535,7 @@
       "id": "roles/ecosystem_architect/guidelines.md",
       "title": "Ecosystem Architect 行動指針 (Operational Guidelines)",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/ecosystem_architect"
     },
@@ -1583,7 +1615,7 @@
       "id": "roles/performance_engineer/knowledge_base.md",
       "title": "Performance Evaluation Knowledge Base",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "roles/performance_engineer"
     },
@@ -2039,7 +2071,7 @@
       "id": "tech-stack/mcp-integration-guide.md",
       "title": "MCP (Model Context Protocol) Integration Guide",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },
@@ -2047,7 +2079,7 @@
       "id": "tech-stack/persona-model.md",
       "title": "Triple-Tier Persona Model: Identity, Mask, and Mission",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },
@@ -2055,7 +2087,7 @@
       "id": "tech-stack/runtime-interop.md",
       "title": "The Gemini Runtime Interop Standard: TypeScript Authority with CJS Continuity",
       "author": "Unknown",
-      "last_updated": "2026-03-03",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "tech-stack"
     },

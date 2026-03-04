@@ -1,0 +1,8 @@
+2026-03-04T17:08:51.676Z [INFO]  [Terminal] Serving static files from: /Users/famaoai/gemini/skills/github/presence/bridge/terminal/static
+2026-03-04T17:08:51.682Z [SUCCESS] [Terminal] Bridge server running at http://localhost:4323
+2026-03-04T17:09:08.371Z [INFO]  [Terminal] Client connected via WebSocket
+2026-03-04T17:09:08.373Z [ERROR] [Terminal] Failed to initialize ReflexTerminal: posix_spawnp failed.
+2026-03-04T17:09:09.074Z [INFO]  [Terminal] Client connected via WebSocket
+2026-03-04T17:09:09.075Z [ERROR] [Terminal] Failed to initialize ReflexTerminal: posix_spawnp failed.
+2026-03-04T17:09:09.512Z [INFO]  [Terminal] Client connected via WebSocket
+2026-03-04T17:09:09.512Z [ERROR] [Terminal] Failed to initialize ReflexTerminal: posix_spawnp failed.

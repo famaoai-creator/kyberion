@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T16:49:00.231Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T17:12:30.748Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -8,12 +8,15 @@
 - [エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)](./ai-engineering/strategy.md) (public | Unknown)
 
 ## 📁 architecture
+- [Agent Wallet & Passkey Approval Protocol (2026-03-04)](./architecture/agent-wallet-protocol.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./architecture/analysis-multi-tenant-governance-20260304.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Unknown)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Unknown)
 - [Microservices Design Patterns](./architecture/microservices-patterns.md) (public | Unknown)
+- [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./architecture/passkey-push-protocol.md) (public | Unknown)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Unknown)
+- [Sovereign Terminal Hosting Protocol](./architecture/terminal-hosting.md) (public | Unknown)
 
 ## 📁 ceo
 - [AI-Driven Business Engineering: The Gemini Strategy](./ceo/ai-business-engineering.md) (public | Unknown)
