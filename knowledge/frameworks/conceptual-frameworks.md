@@ -15,24 +15,6 @@ This document consolidates 26 conceptual frameworks that inform the Gemini Skill
 - **Mission Alignment Audit**: Evaluates new feature requests and architectural proposals against the project's defined mission statement. Identifies "Distraction Features" that do not contribute to long-term strategic goals.
 - **Strategic Reminders**: Periodically reminds the team of the "North Star" metrics and goals during `mission-control` or `strategic-roadmap-planner` executions.
 
-### visionary-ethos-keeper
-
-**Description:** Preserves the company's mission and "soul." Audits high-level decisions against the core purpose and values defined by the CEO.
-
-**Capabilities:**
-
-- **Purpose Alignment**: Audits major decisions (M&A, new product lines, major technical pivots) against the `corporate_purpose.md`. Acts as a "Devil's Advocate" to ensure profit-seeking doesn't compromise core values.
-- **Cultural Pulse**: Connects with `engineering-culture-analyst` to ensure that the actual culture reflects the CEO's vision.
-
-### scenario-multiverse-orchestrator
-
-**Description:** Simulates multiple business and technical scenarios simultaneously. Provides comparative reports on Growth, Stability, and Hybrid paths for executive decision-making.
-
-**Capabilities:**
-
-- **Parallel Path Simulation**: Simultaneously executes models for different strategic stances (e.g., Aggressive vs. Conservative). Correlates technical velocity, financial runway, and talent acquisition risks across all paths.
-- **Comparative Reporting**: Generates side-by-side comparison tables and impact forecasts.
-
 ---
 
 ## 2. AI Governance & Safety
@@ -144,15 +126,6 @@ This document consolidates 26 conceptual frameworks that inform the Gemini Skill
 - **External Research**: Scans GitHub Trends, arXiv papers, and tech blogs for innovations relevant to your tech stack.
 - **Integration Proposal**: Proposes specific refactoring or new library adoption with a clear "Pros/Cons" analysis.
 
-### universal-polymath-engine
-
-**Description:** Applies knowledge from biology, physics, economics, and other fields to engineering. Inspires cross-disciplinary innovation.
-
-**Capabilities:**
-
-- **Cross-Disciplinary Analogy**: Applies concepts like Natural Selection, Thermodynamics, or Game Theory to engineering problems.
-- **Biomimetic & Physical Modeling**: Proposes architectural patterns inspired by biological immune systems or physical structures.
-
 ### social-impact-forecaster
 
 **Description:** Simulates long-term societal and behavioral impacts of software. Identifies risks related to digital addiction, inequality, or isolation.
@@ -236,15 +209,6 @@ This document consolidates 26 conceptual frameworks that inform the Gemini Skill
 
 - **Rationale Extraction**: Analyzes PR threads and design documents to identify why specific paths were chosen.
 - **Decision Indexing**: Creates a searchable "Decision Log" linking code modules to original discussions.
-
-### eternal-self-preservation-guardian
-
-**Description:** Ensures the project's "soul" survives for centuries. Builds distributed archives and human-readable recovery guides for 100-year longevity.
-
-**Capabilities:**
-
-- **Ultra-Long-Term Archiving**: Generates "Soul Backups" designed to be interpreted by future AIs or humans with minimal context.
-- **Time-Capsule Documentation**: Writes "Letters to the Future" that explain the project's purpose beyond current technical jargon.
 
 ### empathy-engine
 

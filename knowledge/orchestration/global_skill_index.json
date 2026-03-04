@@ -184,26 +184,6 @@
       "u": "2026-03-04T06:15:28.675Z"
     },
     {
-      "n": "ip-profitability-architect",
-      "path": "skills/business/ip-profitability-architect",
-      "d": "Output file path",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:28.678Z"
-    },
-    {
-      "n": "ip-strategist",
-      "path": "skills/business/ip-strategist",
-      "d": "Output file path",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:28.683Z"
-    },
-    {
       "n": "pmo-governance-lead",
       "path": "skills/business/pmo-governance-lead",
       "d": "Output file path",
@@ -212,16 +192,6 @@
       "m": "dist/index.js",
       "t": "gemini-skill",
       "u": "2026-03-04T06:15:28.687Z"
-    },
-    {
-      "n": "scenario-multiverse-orchestrator",
-      "path": "skills/business/scenario-multiverse-orchestrator",
-      "d": "Output file path",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:28.691Z"
     },
     {
       "n": "stakeholder-communicator",
@@ -252,16 +222,6 @@
       "m": "dist/index.js",
       "t": "gemini-skill",
       "u": "2026-03-04T06:15:28.703Z"
-    },
-    {
-      "n": "talent-requirement-generator",
-      "path": "skills/business/talent-requirement-generator",
-      "d": "Output file path",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:28.707Z"
     },
     {
       "n": "tech-dd-analyst",
@@ -376,12 +336,12 @@
     {
       "n": "mission-logic-engine",
       "path": "skills/core/mission-logic-engine",
-      "d": "",
-      "s": "plan",
+      "d": "Reflexive execution engine for established mission logic (pipelines).",
+      "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T16:37:56.523Z"
+      "t": "core,automation",
+      "u": "2026-03-04T09:30:00.000Z"
     },
     {
       "n": "prompt-optimizer",
@@ -736,12 +696,12 @@
     {
       "n": "wisdom-distiller",
       "path": "skills/intelligence/wisdom-distiller",
-      "d": "",
-      "s": "plan",
+      "d": "Distills execution evidence into reusable mission logic (YAML).",
+      "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-03T16:38:53.850Z"
+      "t": "core,intelligence",
+      "u": "2026-03-04T09:30:00.000Z"
     },
     {
       "n": "rakuten-ichiba-connector",
@@ -864,16 +824,6 @@
       "u": "2026-03-04T06:15:28.940Z"
     },
     {
-      "n": "agent-activity-monitor",
-      "path": "skills/utilities/agent-activity-monitor",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill,observability",
-      "u": "2026-03-04T06:15:28.945Z"
-    },
-    {
       "n": "ai-model-orchestrator",
       "path": "skills/utilities/ai-model-orchestrator",
       "d": "status: implemented",
@@ -924,16 +874,6 @@
       "u": "2026-03-04T06:15:28.963Z"
     },
     {
-      "n": "automated-support-architect",
-      "path": "skills/utilities/automated-support-architect",
-      "d": "status: implemented",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:28.967Z"
-    },
-    {
       "n": "boilerplate-genie",
       "path": "skills/utilities/boilerplate-genie",
       "d": "status: implemented",
@@ -972,16 +912,6 @@
       "m": "dist/index.js",
       "t": "gemini-skill",
       "u": "2026-03-04T06:15:28.983Z"
-    },
-    {
-      "n": "cloud-cost-estimator",
-      "path": "skills/utilities/cloud-cost-estimator",
-      "d": "''",
-      "s": "unst",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "finops,gemini-skill",
-      "u": "2026-03-04T06:15:28.987Z"
     },
     {
       "n": "cloud-waste-hunter",
@@ -1254,26 +1184,6 @@
       "u": "2026-03-04T06:15:29.096Z"
     },
     {
-      "n": "sustainability-consultant",
-      "path": "skills/utilities/sustainability-consultant",
-      "d": "Output path for sustainability report",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.101Z"
-    },
-    {
-      "n": "tech-stack-librarian",
-      "path": "skills/utilities/tech-stack-librarian",
-      "d": "status: implemented",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.106Z"
-    },
-    {
       "n": "telemetry-insight-engine",
       "path": "skills/utilities/telemetry-insight-engine",
       "d": "status: implemented",
@@ -1302,36 +1212,6 @@
       "m": "dist/index.js",
       "t": "gemini-skill",
       "u": "2026-03-04T06:15:29.120Z"
-    },
-    {
-      "n": "test-viewpoint-analyst",
-      "path": "skills/utilities/test-viewpoint-analyst",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill,qa",
-      "u": "2026-03-04T06:15:29.124Z"
-    },
-    {
-      "n": "visionary-ethos-keeper",
-      "path": "skills/utilities/visionary-ethos-keeper",
-      "d": "status: implemented",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.128Z"
-    },
-    {
-      "n": "biometric-context-adapter",
-      "path": "skills/ux/biometric-context-adapter",
-      "d": "''",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.133Z"
     },
     {
       "n": "localization-maestro",
@@ -1372,26 +1252,6 @@
       "m": "dist/index.js",
       "t": "gemini-skill",
       "u": "2026-03-04T06:15:29.148Z"
-    },
-    {
-      "n": "voice-command-listener",
-      "path": "skills/ux/voice-command-listener",
-      "d": "Captures microphone input and transcribes it into text commands.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.152Z"
-    },
-    {
-      "n": "voice-interface-maestro",
-      "path": "skills/ux/voice-interface-maestro",
-      "d": "Converts text responses into spoken audio (TTS). Supports multiple voice personas.",
-      "s": "impl",
-      "r": "low",
-      "m": "dist/index.js",
-      "t": "gemini-skill",
-      "u": "2026-03-04T06:15:29.156Z"
     }
-  ]
-}
+    ]
+    }
