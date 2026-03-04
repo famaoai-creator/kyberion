@@ -127,9 +127,9 @@ async function nexusLoop() {
             logger.info(`🚀 Terminal (${session.type}) is IDLE. Injecting...`);
             
             const cleanPayload = stimulus.payload.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
-            const cmd = `\n[SENSORY_INPUT_BEGIN]\nSource: ${stimulus.source_channel}\nPayload: <<<\n${cleanPayload}\n>>>\n[SENSORY_INPUT_END]\n`;
+            const cmd = `${cleanPayload}\n`; // Ensure newline for command execution
             
-            const success = terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
+            const success = await terminalBridge.injectAndExecute(session.winId, session.sessionId, cmd, session.type);
             if (success) {
               await markAsInjected(stimulus.timestamp);
               logger.success(`✅ Injected. Watching for result file.`);

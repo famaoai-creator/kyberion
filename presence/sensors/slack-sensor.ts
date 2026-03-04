@@ -33,7 +33,7 @@ async function startSensor() {
     token: creds.bot_token,
     appToken: creds.app_token,
     socketMode: true,
-    logLevel: 'info' as any
+    logLevel: 'debug' as any
   });
 
   const injectStimulus = async (event: any, type: string) => {

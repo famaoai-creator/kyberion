@@ -20,10 +20,19 @@ const STRATEGIES: Record<string, any> = {
       }
       return null;
     },
-    inject: (winId: string, sessionId: string, text: string) => {
-      const inboxPath = path.join(process.cwd(), 'active/shared/rt_inbox.jsonl');
-      fs.appendFileSync(inboxPath, JSON.stringify({ text, timestamp: new Date().toISOString() }) + '\n');
-      return true;
+    inject: async (winId: string, sessionId: string, text: string) => {
+      const url = process.env.TERMINAL_HUB_URL || 'http://localhost:4321/inject';
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, sessionId })
+        });
+        return response.ok;
+      } catch (err: any) {
+        console.error(`[TerminalBridge] API Injection Failed (${url}): ${err.message}`);
+        return false;
+      }
     }
   },
   iTerm2: {
@@ -143,10 +152,10 @@ export const terminalBridge = {
 
     return null;
   },
-  injectAndExecute: (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {
+  injectAndExecute: async (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {
     const strategy = STRATEGIES[terminalType];
     if (!strategy) throw new Error(`Unsupported terminal strategy: ${terminalType}`);
-    return strategy.inject(winId, sessionId, text);
+    return await strategy.inject(winId, sessionId, text);
   },
   readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
     if (terminalType !== 'iTerm2') return '';

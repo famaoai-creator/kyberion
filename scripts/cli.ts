@@ -129,6 +129,14 @@ async function main() {
     case 'list':
       console.log('List of skills not implemented in this proxy.');
       break;
+    case 'system':
+      const serviceAction = args[1] || 'status';
+      try {
+        execSync(`npx tsx scripts/service_manager.ts ${serviceAction}`, { stdio: 'inherit', cwd: rootDir });
+      } catch (err: any) {
+        process.exit(err.status || 1);
+      }
+      break;
     default:
       const helpMsg = 'Available commands: run, list, info, system';
       console.log(helpMsg);
