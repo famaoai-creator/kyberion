@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-03T19:42:16.181Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T05:01:14.564Z*
 
 ## 📁 ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./ai-engineering/best_practices.md) (public | Unknown)
@@ -129,6 +129,7 @@
 - [Dual-Key Policy: ロール管理と決定権限の標準規約](./governance/dual-key-policy.md) (public | Unknown)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Unknown)
 - [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./governance/onboarding-protocol.md) (public | Unknown)
+- [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Unknown)
 - [SOP: TypeScript Core Base Stabilization](./governance/ts-base-stabilization-sop.md) (public | Unknown)
 
 ## 📁 legal/ip

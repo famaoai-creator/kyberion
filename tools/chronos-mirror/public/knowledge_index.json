@@ -608,6 +608,14 @@
     "category": "governance"
   },
   {
+    "id": "governance/test-modernization-sop.md",
+    "title": "SOP: Unit Test Modernization & Alias Integrity",
+    "author": "Unknown",
+    "last_updated": "2026-03-04",
+    "tier": "public",
+    "category": "governance"
+  },
+  {
     "id": "governance/ts-base-stabilization-sop.md",
     "title": "SOP: TypeScript Core Base Stabilization",
     "author": "Unknown",

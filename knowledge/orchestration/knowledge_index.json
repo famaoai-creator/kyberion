@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 297,
-  "u": "2026-03-03T19:42:16.181Z",
+  "t": 298,
+  "u": "2026-03-04T04:47:58.333Z",
   "items": [
     {
       "id": "ai-engineering/best_practices.md",
@@ -608,6 +608,14 @@
       "title": "主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)",
       "author": "Unknown",
       "last_updated": "2026-03-03",
+      "tier": "public",
+      "category": "governance"
+    },
+    {
+      "id": "governance/test-modernization-sop.md",
+      "title": "SOP: Unit Test Modernization & Alias Integrity",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
       "tier": "public",
       "category": "governance"
     },
