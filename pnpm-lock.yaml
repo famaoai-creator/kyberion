@@ -428,64 +428,7 @@ importers:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
-  skills/business/ip-profitability-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/ip-strategist:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
   skills/business/pmo-governance-lead:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/scenario-multiverse-orchestrator:
     dependencies:
       '@agent/core':
         specifier: workspace:*
@@ -543,25 +486,6 @@ importers:
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
   skills/business/sunset-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/talent-requirement-generator:
     dependencies:
       '@agent/core':
         specifier: workspace:*
@@ -1492,19 +1416,6 @@ importers:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
-  skills/utilities/agent-activity-monitor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
   skills/utilities/ai-model-orchestrator:
     dependencies:
       '@agent/core':
@@ -1570,19 +1481,6 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
-  skills/utilities/automated-support-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
   skills/utilities/boilerplate-genie:
     dependencies:
       '@agent/core':
@@ -1629,19 +1527,6 @@ importers:
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
   skills/utilities/chaos-monkey-orchestrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/cloud-cost-estimator:
     dependencies:
       '@agent/core':
         specifier: workspace:*
@@ -2026,32 +1911,6 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
-  skills/utilities/sustainability-consultant:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/tech-stack-librarian:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
   skills/utilities/telemetry-insight-engine:
     dependencies:
       '@agent/core':
@@ -2097,44 +1956,11 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
-  skills/utilities/test-viewpoint-analyst:
+  skills/utilities/wallet-manager:
     dependencies:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/visionary-ethos-keeper:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/biometric-context-adapter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
   skills/ux/localization-maestro:
     dependencies:
@@ -2187,44 +2013,6 @@ importers:
       vitest:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/voice-command-listener:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/ux/voice-interface-maestro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
 packages:
 
