@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 309,
-  "u": "2026-03-05T04:16:25.471Z",
+  "t": 310,
+  "u": "2026-03-05T04:47:56.122Z",
   "items": [
     {
       "id": "Ecosystem_Map.md",
@@ -986,6 +986,14 @@
       "last_updated": "2026-03-03",
       "tier": "public",
       "category": "orchestration/mission-playbooks"
+    },
+    {
+      "id": "orchestration/mission-portability-standard.md",
+      "title": "Mission Portability Standard (MEP v0.1)",
+      "author": "Unknown",
+      "last_updated": "2026-03-05",
+      "tier": "public",
+      "category": "orchestration"
     },
     {
       "id": "orchestration/onboarding-directives/00_sovereign_onboarding.md",
