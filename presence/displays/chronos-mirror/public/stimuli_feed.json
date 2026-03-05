@@ -1,117 +1,377 @@
 [
   {
-    "timestamp": "2026-03-04T17:29:47Z",
-    "source_channel": "demonstration-sensor",
-    "payload": "ls -la",
-    "status": "INJECTED",
-    "injected_at": "2026-03-04T17:30:46.886Z"
-  },
-  {
-    "timestamp": "2026-03-04T17:30:51Z",
-    "source_channel": "demonstration-sensor",
-    "payload": "ls -la",
-    "status": "INJECTED",
-    "injected_at": "2026-03-04T17:48:58.192Z"
-  },
-  {
-    "timestamp": "2026-03-04T19:39:08.406Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "元気？",
-    "status": "INJECTED",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772653147.651719",
-      "event_ts": "1772653147.651719"
+    "id": "req-20260305-alert-8952a6",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
     },
-    "injected_at": "2026-03-04T19:49:15.021Z"
-  },
-  {
-    "timestamp": "2026-03-04T19:50:01.518Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "反応ないね？",
-    "status": "INJECTED",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772653147.651719",
-      "event_ts": "1772653800.302909"
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-f186d5"
     },
-    "injected_at": "2026-03-04T19:50:05.230Z"
-  },
-  {
-    "timestamp": "2026-03-04T19:51:52.643Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "どですか？",
-    "status": "INJECTED",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772653147.651719",
-      "event_ts": "1772653911.656669"
-    },
-    "injected_at": "2026-03-04T19:51:55.506Z"
-  },
-  {
-    "timestamp": "2026-03-04T21:15:02.920Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "元気かい？",
-    "status": "PENDING",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772658901.798569",
-      "event_ts": "1772658901.798569"
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
     }
   },
   {
-    "timestamp": "2026-03-04T21:36:54.698Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "おーい",
-    "status": "PENDING",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772652652.350349",
-      "event_ts": "1772652652.350349"
+    "id": "req-20260305-alert-ad29bd",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-57347c"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
     }
   },
   {
-    "timestamp": "2026-03-04T21:37:58.484Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "mention",
-    "payload": "<@U0AJNS2DT0Q> これで行けるか",
-    "status": "PENDING",
-    "metadata": {
-      "channel_id": "C0AJ7EHH8BB",
-      "user_id": "U0AHUGY997U",
-      "thread_ts": "1772652713.307639",
-      "event_ts": "1772652713.307639"
+    "id": "req-20260305-alert-488c19",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-8febe2"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
     }
   },
   {
-    "timestamp": "2026-03-04T21:43:41.156Z",
-    "source_channel": "slack",
-    "delivery_mode": "BATCH",
-    "type": "dm",
-    "payload": "元気？",
-    "status": "PENDING",
-    "metadata": {
-      "channel_id": "D0AHY6L7KRA",
-      "user_id": "U0AJNSAP3DW",
-      "thread_ts": "1772653042.691729",
-      "event_ts": "1772653042.691729"
+    "id": "req-20260305-alert-be3b5f",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-4e114b"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-2be97e",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-5f40c2"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-d0683c",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-7463cb"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-c6a402",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-c1c10f"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-a549b8",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-babd6b"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-e805ae",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-f67761"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-f50efa",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-fd3da2"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-b58cc3",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-f21013"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-9384da",
+    "ts": "2026-03-05T04:16:19.811Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-ef1a61"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.811Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-696a77",
+    "ts": "2026-03-05T04:16:19.812Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-52dcdd"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.812Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-519c4c",
+    "ts": "2026-03-05T04:16:19.812Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-1b6cc4"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.812Z",
+          "agent": "log-watcher"
+        }
+      ]
+    }
+  },
+  {
+    "id": "req-20260305-alert-e465e3",
+    "ts": "2026-03-05T04:16:19.812Z",
+    "ttl": 1800,
+    "origin": {
+      "channel": "system",
+      "source_id": "log-watcher:log-watcher.log"
+    },
+    "signal": {
+      "intent": "alert",
+      "priority": 9,
+      "payload": "[AUTONOMIC_ALERT] System error detected in log-watcher.log: 2026-03-05T04:16:09.809Z [ERROR] 🚨 System Alert Emitted from log-watcher.log: req-20260305-alert-086910"
+    },
+    "control": {
+      "status": "pending",
+      "feedback": "auto",
+      "evidence": [
+        {
+          "step": "log_detection",
+          "ts": "2026-03-05T04:16:19.812Z",
+          "agent": "log-watcher"
+        }
+      ]
     }
   }
 ]
