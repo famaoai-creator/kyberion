@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-04T22:12:42.017Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-05T04:08:22.482Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Unknown)
@@ -158,6 +158,7 @@
 - [Availability & Disaster Recovery Best Practices](./operations/availability_best_practices.md) (public | Unknown)
 - [Incident Management & RCA Excellence Handbook](./operations/incident-management-excellence.md) (public | Unknown)
 - [Incident Knowledge Loop: Learning from Failures](./operations/incident_knowledge_loop.md) (public | Unknown)
+- [Mission History Ledger](./operations/mission_history.md) (public | Unknown)
 - [Modern SRE Best Practices (Advanced Operations)](./operations/modern_sre_best_practices.md) (public | Unknown)
 - [Monitoring & Observability Best Practices](./operations/monitoring_best_practices.md) (public | Unknown)
 - [PagerDuty Best Practices](./operations/pagerduty_best_practices.md) (public | Unknown)
