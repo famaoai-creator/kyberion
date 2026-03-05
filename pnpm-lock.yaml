@@ -428,6 +428,18 @@ importers:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
+  skills/business/ip-profitability-architect:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
+  skills/business/ip-strategist:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/business/pmo-governance-lead:
     dependencies:
       '@agent/core':
@@ -446,6 +458,12 @@ importers:
       vitest:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
+
+  skills/business/scenario-multiverse-orchestrator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
 
   skills/business/stakeholder-communicator:
     dependencies:
@@ -503,6 +521,12 @@ importers:
       vitest:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
+
+  skills/business/talent-requirement-generator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
 
   skills/business/tech-dd-analyst:
     dependencies:
@@ -1416,6 +1440,12 @@ importers:
         specifier: ^1.2.2
         version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
 
+  skills/utilities/agent-activity-monitor:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/utilities/ai-model-orchestrator:
     dependencies:
       '@agent/core':
@@ -1481,6 +1511,12 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
+  skills/utilities/automated-support-architect:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/utilities/boilerplate-genie:
     dependencies:
       '@agent/core':
@@ -1538,6 +1574,12 @@ importers:
       vitest:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
+
+  skills/utilities/cloud-cost-estimator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
 
   skills/utilities/cloud-waste-hunter:
     dependencies:
@@ -1911,6 +1953,18 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
+  skills/utilities/sustainability-consultant:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
+  skills/utilities/tech-stack-librarian:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/utilities/telemetry-insight-engine:
     dependencies:
       '@agent/core':
@@ -1956,7 +2010,25 @@ importers:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
+  skills/utilities/test-viewpoint-analyst:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
+  skills/utilities/visionary-ethos-keeper:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/utilities/wallet-manager:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
+  skills/ux/biometric-context-adapter:
     dependencies:
       '@agent/core':
         specifier: workspace:*
@@ -2013,6 +2085,18 @@ importers:
       vitest:
         specifier: ^1.2.0
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
+
+  skills/ux/voice-command-listener:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
+  skills/ux/voice-interface-maestro:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
 
 packages:
 
