@@ -28,7 +28,7 @@
       "required_role": "Ecosystem Architect"
     },
     {
-      "id": "integrity-check",
+      "id": "knowledge-integrity-audit",
       "name": "ナレッジ整合性チェック",
       "layer": "Role",
       "frequency": "daily",
@@ -47,7 +47,7 @@
       "required_role": "all"
     },
     {
-      "id": "integrity-check",
+      "id": "pulse-dispatch-test",
       "name": "Pulse稼働テスト",
       "layer": "Role",
       "frequency": "daily",
