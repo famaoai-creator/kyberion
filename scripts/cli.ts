@@ -132,7 +132,17 @@ async function main() {
     case 'system':
       const serviceAction = args[1] || 'status';
       try {
-        execSync(`npx tsx scripts/service_manager.ts ${serviceAction}`, { stdio: 'inherit', cwd: rootDir });
+        if (serviceAction === 'create-skill') {
+          const cat = args[2];
+          const nom = args[3];
+          if (!cat || !nom) {
+            console.log('Usage: system create-skill <category> <skill-name>');
+          } else {
+            execSync(`npx tsx scripts/create_skill.ts ${cat} ${nom}`, { stdio: 'inherit', cwd: rootDir });
+          }
+        } else {
+          execSync(`npx tsx scripts/service_manager.ts ${serviceAction}`, { stdio: 'inherit', cwd: rootDir });
+        }
       } catch (err: any) {
         process.exit(err.status || 1);
       }
