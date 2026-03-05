@@ -1,13 +1,5 @@
 [
   {
-    "id": "Ecosystem_Map.md",
-    "title": "Ecosystem Knowledge Map",
-    "author": "Unknown",
-    "last_updated": "2026-03-04",
-    "tier": "public",
-    "category": "."
-  },
-  {
     "id": "ai-engineering/best_practices.md",
     "title": "AIエンジニアリング・ベストプラクティス",
     "author": "Unknown",
@@ -48,14 +40,6 @@
     "category": "architecture"
   },
   {
-    "id": "architecture/analysis-sensory-alignment-20260305.md",
-    "title": "Analysis: Sensory Bridge Alignment (2026-03-05)",
-    "author": "Unknown",
-    "last_updated": "2026-03-04",
-    "tier": "public",
-    "category": "architecture"
-  },
-  {
     "id": "architecture/distributed-systems.md",
     "title": "分散システム ＆ アーキテクチャパターン",
     "author": "Unknown",
@@ -80,14 +64,6 @@
     "category": "architecture"
   },
   {
-    "id": "architecture/mission-conflict-avoidance.md",
-    "title": "Mission Conflict Avoidance Rules",
-    "author": "Unknown",
-    "last_updated": "2026-03-04",
-    "tier": "public",
-    "category": "architecture"
-  },
-  {
     "id": "architecture/passkey-push-protocol.md",
     "title": "Sovereign Approval Protocol: Push & Passkey (2026-03-04)",
     "author": "Unknown",
@@ -106,14 +82,6 @@
   {
     "id": "architecture/presence-layer.md",
     "title": "Presence Layer: Sensors, Displays, and Intervention",
-    "author": "Unknown",
-    "last_updated": "2026-03-04",
-    "tier": "public",
-    "category": "architecture"
-  },
-  {
-    "id": "architecture/sensory-bridge-protocol.md",
-    "title": "Sensory Bridge Protocol (GUSP v1.0)",
     "author": "Unknown",
     "last_updated": "2026-03-04",
     "tier": "public",
