@@ -39,27 +39,36 @@ const STRATEGIES: Record<string, any> = {
     findIdle: () => {
       const script = `
         tell application "iTerm2"
+          if not (exists windows) then return "NOT_FOUND"
+          
           set bestSession to "NOT_FOUND"
-          set maxOffset to -1
+          
+          -- First, try to find a session with "Gemini" in its name or content
           repeat with w in windows
             repeat with t in tabs of w
               repeat with s in sessions of t
-                set conts to contents of s
-                set off to offset of "Gemini" in conts
-                if off > maxOffset then
-                  set maxOffset to off
-                  set bestSession to (id of w as string) & ":" & (unique ID of s as string)
-                end if
+                try
+                  set conts to contents of s
+                  if conts contains "Gemini" then
+                    set bestSession to (id of w as string) & ":" & (unique ID of s as string)
+                    exit repeat
+                  end if
+                end try
               end repeat
+              if bestSession is not "NOT_FOUND" then exit repeat
             end repeat
+            if bestSession is not "NOT_FOUND" then exit repeat
           end repeat
           
+          -- Fallback to the current session of the front window
           if bestSession is "NOT_FOUND" then
             try
               set w to front window
               set t to current tab of w
               set s to current session of t
               set bestSession to (id of w as string) & ":" & (unique ID of s as string)
+            on error
+              return "NOT_FOUND"
             end try
           end if
           
@@ -67,37 +76,43 @@ const STRATEGIES: Record<string, any> = {
         end tell
       `;
       try {
-        const result = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
-        if (result === 'NOT_FOUND') return null;
+        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
+        if (result === 'NOT_FOUND' || !result.includes(':')) return null;
         const [winId, sessionId] = result.split(':');
         return { winId, sessionId, type: 'iTerm2' };
       } catch (_) { return null; }
     },
-    inject: (winId: string, sessionId: string, text: string) => {
+    inject: async (winId: string, sessionId: string, text: string) => {
       const escapedText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
       const script = `
         tell application "iTerm2"
-          repeat with w in windows
-            repeat with t in tabs of w
-              repeat with s in sessions of t
-                if (unique ID of s as string) is "${sessionId}" then
-                  tell s
-                    write text "${escapedText}"
-                  end tell
-                  tell application "System Events" to key code 36
-                  return "SUCCESS"
-                end if
+          try
+            repeat with w in windows
+              repeat with t in tabs of w
+                repeat with s in sessions of t
+                  if (unique ID of s as string) is "${sessionId}" then
+                    tell s
+                      write text "${escapedText}"
+                    end tell
+                    tell application "System Events" to key code 36
+                    return "SUCCESS"
+                  end if
+                end repeat
               end repeat
             end repeat
-          end repeat
+          on error errText
+            return "ERROR: " & errText
+          end try
           return "SESSION_NOT_FOUND"
         end tell
       `;
       try {
-        const result = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
-        return result === 'SUCCESS';
+        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
+        if (result === 'SUCCESS') return true;
+        console.error(`[TerminalBridge] iTerm2 Injection Status: ${result}`);
+        return false;
       } catch (err: any) {
-        console.error(`[TerminalBridge] iTerm2 Injection Error: ${err.message}`);
+        console.error(`[TerminalBridge] iTerm2 Injection Exception: ${err.message}`);
         return false;
       }
     }
@@ -113,11 +128,11 @@ const STRATEGIES: Record<string, any> = {
         end tell
       `;
       try {
-        const result = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
+        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
         return result === 'CODE_RUNNING' ? { type: 'VSCode' } : null;
       } catch (_) { return null; }
     },
-    inject: (winId: string, sessionId: string, text: string) => {
+    inject: async (winId: string, sessionId: string, text: string) => {
       const escapedText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const script = `
         tell application "Code" to activate
@@ -128,7 +143,7 @@ const STRATEGIES: Record<string, any> = {
         end tell
       `;
       try {
-        execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+        execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'");
         return true;
       } catch (err: any) {
         console.error(`[TerminalBridge] VSCode Injection Error: ${err.message}`);
@@ -161,17 +176,21 @@ export const terminalBridge = {
     if (terminalType !== 'iTerm2') return '';
     const script = `
       tell application "iTerm2"
-        try
-          set w to window id ${winId}
-          set s to session id "${sessionId}" of w
-          return contents of s
-        on error
-          return "ERROR"
-        end try
+        repeat with w in windows
+          repeat with t in tabs of w
+            repeat with s in sessions of t
+              if (unique ID of s as string) is "${sessionId}" then
+                return contents of s
+              end if
+            end repeat
+          end repeat
+        end repeat
+        return "SESSION_NOT_FOUND"
       end tell
     `;
     try {
-      return execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { encoding: 'utf8' }).trim();
+      const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
+      return result === 'SESSION_NOT_FOUND' ? '' : result;
     } catch {
       return '';
     }

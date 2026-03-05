@@ -28,7 +28,7 @@ async function scanLogs() {
       const lines = content.split('\n');
       
       for (const line of lines) {
-        if (line.toUpperCase().includes('ERROR') || line.toUpperCase().includes('FAILED')) {
+        if ((line.toUpperCase().includes('ERROR') || line.toUpperCase().includes('FAILED')) && !line.includes('System Alert Emitted')) {
           emitAlert(file, line.trim());
         }
       }
