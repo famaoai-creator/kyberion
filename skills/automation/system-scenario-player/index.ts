@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
  */
 
 interface ScenarioStep {
-  type: 'keyboard' | 'mouse' | 'wait' | 'shell';
+  type: 'keyboard' | 'mouse' | 'wait' | 'shell' | 'visual_wait' | 'screenshot';
   params?: any;
   ms?: number;
 }
@@ -33,6 +33,12 @@ async function executeStep(step: ScenarioStep, speed: number) {
     case 'wait':
       const waitMs = (step.ms || 1000) / speed;
       await new Promise(r => setTimeout(r, waitMs));
+      break;
+    case 'visual_wait':
+      await safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-assertion-engine', ...objectToArgs(step.params)]);
+      break;
+    case 'screenshot':
+      await safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-evidence-generator', ...objectToArgs(step.params)]);
       break;
     case 'shell':
       await safeExec(step.params.command, step.params.args || []);
