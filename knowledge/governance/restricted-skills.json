@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-06",
+  "restrictions": [
+    {
+      "name": "mock-malicious-skill",
+      "status": "restricted",
+      "reason": "Governance: Security risk detected in automated scan.",
+      "allow_override": false
+    }
+  ]
+}

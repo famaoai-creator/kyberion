@@ -1,5 +1,5 @@
 import * as os from 'node:os';
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { logger } from './core.js';
 
@@ -12,6 +12,16 @@ export interface PlatformCapabilities {
   hasScreenCapture: boolean;
   hasAudioPlayback: boolean;
   nativeTerminal: string;
+}
+
+function commandExists(cmd: string): boolean {
+  try {
+    const checkCmd = os.platform() === 'win32' ? `where ${cmd}` : `which ${cmd}`;
+    execSync(checkCmd, { stdio: 'ignore' });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 export interface OSDriver {
@@ -27,10 +37,15 @@ export interface OSDriver {
  */
 class MacOSDriver implements OSDriver {
   async captureScreen(outputPath: string): Promise<void> {
+    if (!commandExists('screencapture')) throw new Error('screencapture command not found');
     await execAsync(`screencapture -x -t jpg "${outputPath}"`);
   }
 
   async speak(text: string, options?: { voice?: string; rate?: number }): Promise<void> {
+    if (!commandExists('say')) {
+      logger.warn('[Platform] "say" command not found. Speech skipped.');
+      return;
+    }
     const sanitized = text.replace(/"/g, '').replace(/'/g, '');
     let cmd = `say "${sanitized}"`;
     if (options?.voice) cmd += ` -v ${options.voice}`;
@@ -39,6 +54,7 @@ class MacOSDriver implements OSDriver {
   }
 
   async playSound(path: string): Promise<void> {
+    if (!commandExists('afplay')) return;
     await execAsync(`afplay "${path}"`);
   }
 
@@ -48,9 +64,9 @@ class MacOSDriver implements OSDriver {
 
   getCapabilities(): PlatformCapabilities {
     return {
-      hasSpeech: true,
-      hasScreenCapture: true,
-      hasAudioPlayback: true,
+      hasSpeech: commandExists('say'),
+      hasScreenCapture: commandExists('screencapture'),
+      hasAudioPlayback: commandExists('afplay'),
       nativeTerminal: 'Terminal.app'
     };
   }
