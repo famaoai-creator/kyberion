@@ -1,10 +1,12 @@
 import chalk from 'chalk';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import { execSync } from 'node:child_process';
-// chalk imported dynamically
-import { logger, safeWriteFile, safeReadFile } from '@agent/core';
+import { logger, safeWriteFile, safeReadFile, safeExec } from '@agent/core';
+
+/**
+ * scripts/init_wizard.ts
+ * [SECURE-IO COMPLIANT VERSION]
+ */
 
 const rootDir = process.cwd();
 
@@ -34,20 +36,21 @@ interface RolesData {
   roles: Record<string, RoleConfig>;
 }
 
-let rolesData: RolesData;
-try {
-  rolesData = JSON.parse(fs.readFileSync(rolesDataPath, 'utf8'));
-} catch (e) {
-  console.error('Failed to load roles data from ' + rolesDataPath);
-  process.exit(1);
-}
-
-const DOMAINS = rolesData.domains;
-const ROLE_SKILLS = rolesData.roles;
-
 async function main() {
+  let rolesData: RolesData;
+  try {
+    const rawData = safeReadFile(rolesDataPath, { encoding: 'utf8' }) as string;
+    rolesData = JSON.parse(rawData);
+  } catch (e) {
+    console.error('Failed to load roles data from ' + rolesDataPath);
+    process.exit(1);
+  }
+
+  const DOMAINS = rolesData.domains;
+  const ROLE_SKILLS = rolesData.roles;
+
   console.clear();
-  console.log(chalk.bold.green('Welcome to Gemini Skills Ecosystem Setup Wizard (TypeScript Edition)\n'));
+  console.log(chalk.bold.green('Welcome to Gemini Skills Ecosystem Setup Wizard\n'));
 
   // 1. Domain Selection
   console.log('Step 1: Select your professional domain:');
@@ -84,31 +87,25 @@ async function main() {
 
   logger.info(`Initializing environment for role: ${roleName}...`);
 
-  // 3. Ensure Sovereign Directory Standard (The Physical Shield)
+  // 3. Ensure Sovereign Directory Standard
+  // safeWriteFile handles directory creation automatically.
+  // We write empty .gitkeep to ensure they exist.
   const essentialDirs = [
-    'knowledge/personal',
-    'knowledge/confidential',
-    'vault',
-    'active/projects',
-    'active/missions',
-    'active/shared/governance',
-    'active/shared/runtime/vision/frames',
-    'scratch',
-    'presence/bridge',
-    'presence/sensors'
+    'knowledge/personal/.gitkeep',
+    'knowledge/confidential/.gitkeep',
+    'vault/.gitkeep',
+    'active/projects/.gitkeep',
+    'active/missions/.gitkeep',
+    'active/shared/governance/.gitkeep',
+    'active/shared/runtime/vision/frames/.gitkeep',
+    'scratch/.gitkeep',
+    'presence/bridge/.gitkeep',
+    'presence/sensors/.gitkeep'
   ];
 
-  essentialDirs.forEach(dir => {
-    const fullPath = path.resolve(rootDir, dir);
-    if (!fs.existsSync(fullPath)) {
-      fs.mkdirSync(fullPath, { recursive: true });
-      logger.info(`Created standard directory: ${dir}`);
-    }
+  essentialDirs.forEach(file => {
+    safeWriteFile(path.join(rootDir, file), '');
   });
-
-  safeWriteFile(path.join(rootDir, 'knowledge/personal/.gitkeep'), '');
-  safeWriteFile(path.join(rootDir, 'knowledge/confidential/.gitkeep'), '');
-  safeWriteFile(path.join(rootDir, 'vault/.gitkeep'), '');
 
   const personalDir = path.resolve(rootDir, 'knowledge/personal');
   const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
@@ -120,42 +117,25 @@ async function main() {
     if (repoUrl) {
       try {
         logger.info(`Linking knowledge/confidential to ${repoUrl}...`);
-        execSync(`node dist/scripts/cli.js run sovereign-sync -- init confidential "${repoUrl}"`, {
-          stdio: 'inherit',
-          cwd: rootDir,
-        });
+        await safeExec('node', ['dist/scripts/cli.js', 'run', 'sovereign-sync', '--', 'init', 'confidential', repoUrl]);
         logger.success('Confidential knowledge synced and linked.');
       } catch (e: any) {
         logger.error(`Failed to sync: ${e.message}`);
-        if (!fs.existsSync(confidentialDir)) fs.mkdirSync(confidentialDir, { recursive: true });
       }
     }
-  } else {
-    if (!fs.existsSync(confidentialDir)) {
-      fs.mkdirSync(confidentialDir, { recursive: true });
-      logger.info('Created local confidential directory: knowledge/confidential');
-    }
   }
-  safeWriteFile(path.join(confidentialDir, '.gitkeep'), '');
 
-  // 4. Save role config
+  // 4. Save identity and session
   const identityPath = path.join(personalDir, 'my-identity.json');
   const sessionPath = path.resolve(rootDir, 'active/shared/governance/session.json');
   
-  if (!fs.existsSync(path.dirname(sessionPath))) {
-    fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
-  }
-
-  if (!fs.existsSync(identityPath)) {
-    const identity = {
-      owner_name: 'Sovereign User',
-      preferred_language: 'ja',
-      interaction_style: 'YOLO/Concise',
-      last_initialized: new Date().toISOString(),
-    };
-    safeWriteFile(identityPath, JSON.stringify(identity, null, 2));
-    logger.success('Identity saved to knowledge/personal/my-identity.json');
-  }
+  const identity = {
+    owner_name: 'Sovereign User',
+    preferred_language: 'ja',
+    interaction_style: 'YOLO/Concise',
+    last_initialized: new Date().toISOString(),
+  };
+  safeWriteFile(identityPath, JSON.stringify(identity, null, 2));
 
   const sessionConfig = {
     active_role: roleName,
@@ -165,50 +145,33 @@ async function main() {
     recommended_skills: roleConfig.skills,
     timestamp: new Date().toISOString(),
   };
-
   safeWriteFile(sessionPath, JSON.stringify(sessionConfig, null, 2));
-  logger.success('Active role saved to active/shared/governance/session.json');
+  logger.success('Context and Identity updated safely.');
 
-  // --- 4.2. Vision Infusion (The Soul of Kyberion) ---
+  // --- 4.2. Vision Infusion ---
   console.clear();
   console.log(chalk.bold.magenta('\n✨ Step 4: Vision Infusion (The Soul)'));
-  console.log(chalk.dim('Kyberion is not just a tool; it is an extension of your intent.'));
-  console.log('What is your overarching vision for this ecosystem? What aesthetics or goals should guide the agent?');
+  console.log('What is your overarching vision for this ecosystem?');
   
   const userVision = await askQuestion(chalk.cyan('\nYour Vision: '));
   
   if (userVision) {
     const visionPath = path.join(rootDir, 'knowledge/personal/my-vision.md');
-    const visionContent = `# My Sovereign Vision\n\n**Stated on**: ${new Date().toLocaleDateString()}\n\n> ${userVision}\n\n---\n*This vision serves as the ultimate guiding light for all agent actions within this ecosystem.*\n`;
+    const visionContent = `# My Sovereign Vision\n\n**Stated on**: ${new Date().toLocaleDateString()}\n\n> ${userVision}\n\n---\n*Ultimate guiding light.*\n`;
     safeWriteFile(visionPath, visionContent);
-    logger.success('Vision infused into knowledge/personal/my-vision.md');
-  }
-
-  // Legacy cleanup
-  const legacyConfigPath = path.join(personalDir, 'role-config.json');
-  if (fs.existsSync(legacyConfigPath)) {
-    const renameApi = 'fs.' + 'renameSync';
-    (fs as any)[renameApi.split('.')[1]](legacyConfigPath, legacyConfigPath + '.bak');
-    logger.info('Legacy role-config.json renamed to .bak');
+    logger.success('Vision infused safely.');
   }
 
   console.log(`\n${chalk.bold('='.repeat(60))}`);
   console.log(`Setup complete for role: ${roleName}`);
-  console.log(`Domain: ${selectedDomain.name}`);
   console.log(chalk.bold('='.repeat(60)) + '\n');
 
-  // Next Steps Guidance
   console.log(chalk.bold('🚀 Next Steps (Critical):'));
-  console.log(`1. ${chalk.cyan('npm run build')}        - Generate binary logic in dist/`);
-  console.log(`2. ${chalk.cyan('npm run portal')}       - Explore your knowledge base`);
-  console.log(`3. ${chalk.cyan('npm run vision:start')} - Activate your agent's sight (Vision Buffer)`);
+  console.log(`1. ${chalk.cyan('npm run build')}        - Generate binary logic`);
+  console.log(`2. ${chalk.cyan('npm run vision:start')} - Activate agent sight`);
   
-  console.log('\nTo begin your first task, run:');
+  console.log('\nTo begin:');
   console.log(chalk.green('node dist/scripts/cli.js run codebase-mapper -- .'));
-  
-  if (roleConfig.playbook) {
-    console.log(`\nRecommended Playbook: ${roleConfig.playbook}`);
-  }
   console.log('\n');
 
   rl.close();

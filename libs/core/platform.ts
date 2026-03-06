@@ -1,9 +1,10 @@
 import * as os from 'node:os';
-import { exec, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-import { logger } from './core.js';
+import { logger, safeExec } from './index.js';
 
-const execAsync = promisify(exec);
+/**
+ * Platform Abstraction Layer
+ * [SECURE-IO COMPLIANT VERSION]
+ */
 
 export type Platform = 'darwin' | 'win32' | 'linux' | 'unknown';
 
@@ -14,10 +15,13 @@ export interface PlatformCapabilities {
   nativeTerminal: string;
 }
 
-function commandExists(cmd: string): boolean {
+/**
+ * Checks if a command exists in the system path safely.
+ */
+async function commandExists(cmd: string): Promise<boolean> {
   try {
-    const checkCmd = os.platform() === 'win32' ? `where ${cmd}` : `which ${cmd}`;
-    execSync(checkCmd, { stdio: 'ignore' });
+    const checkCmd = os.platform() === 'win32' ? 'where' : 'which';
+    await safeExec(checkCmd, [cmd]);
     return true;
   } catch (_) {
     return false;
@@ -29,7 +33,7 @@ export interface OSDriver {
   speak(text: string, options?: { voice?: string; rate?: number }): Promise<void>;
   playSound(path: string): Promise<void>;
   open(target: string): Promise<void>;
-  getCapabilities(): PlatformCapabilities;
+  getCapabilities(): Promise<PlatformCapabilities>;
 }
 
 /**
@@ -37,64 +41,58 @@ export interface OSDriver {
  */
 class MacOSDriver implements OSDriver {
   async captureScreen(outputPath: string): Promise<void> {
-    if (!commandExists('screencapture')) throw new Error('screencapture command not found');
-    await execAsync(`screencapture -x -t jpg "${outputPath}"`);
+    if (!(await commandExists('screencapture'))) throw new Error('screencapture not found');
+    await safeExec('screencapture', ['-x', '-t', 'jpg', outputPath]);
   }
 
   async speak(text: string, options?: { voice?: string; rate?: number }): Promise<void> {
-    if (!commandExists('say')) {
-      logger.warn('[Platform] "say" command not found. Speech skipped.');
-      return;
-    }
-    const sanitized = text.replace(/"/g, '').replace(/'/g, '');
-    let cmd = `say "${sanitized}"`;
-    if (options?.voice) cmd += ` -v ${options.voice}`;
-    if (options?.rate) cmd += ` -r ${options.rate}`;
-    await execAsync(cmd);
+    if (!(await commandExists('say'))) return;
+    const args = [text];
+    if (options?.voice) { args.push('-v', options.voice); }
+    if (options?.rate) { args.push('-r', String(options.rate)); }
+    await safeExec('say', args);
   }
 
   async playSound(path: string): Promise<void> {
-    if (!commandExists('afplay')) return;
-    await execAsync(`afplay "${path}"`);
+    if (!(await commandExists('afplay'))) return;
+    await safeExec('afplay', [path]);
   }
 
   async open(target: string): Promise<void> {
-    await execAsync(`open "${target}"`);
+    await safeExec('open', [target]);
   }
 
-  getCapabilities(): PlatformCapabilities {
+  async getCapabilities(): Promise<PlatformCapabilities> {
     return {
-      hasSpeech: commandExists('say'),
-      hasScreenCapture: commandExists('screencapture'),
-      hasAudioPlayback: commandExists('afplay'),
+      hasSpeech: await commandExists('say'),
+      hasScreenCapture: await commandExists('screencapture'),
+      hasAudioPlayback: await commandExists('afplay'),
       nativeTerminal: 'Terminal.app'
     };
   }
 }
 
 /**
- * Windows Implementation (Stub)
+ * Windows Implementation
  */
 class WindowsDriver implements OSDriver {
-  async captureScreen(_outputPath: string): Promise<void> {
-    // Note: Windows requires external tools like SnippingTool or PowerShell scripts
+  async captureScreen(): Promise<void> {
     logger.warn('[Platform] Screen capture not yet implemented for Windows.');
   }
 
   async speak(text: string): Promise<void> {
-    const sanitized = text.replace(/"/g, '').replace(/'/g, '');
-    await execAsync(`powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${sanitized}')"`);
+    await safeExec('powershell', ['-Command', `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text.replace(/'/g, "''")}')`]);
   }
 
   async playSound(path: string): Promise<void> {
-    await execAsync(`powershell -Command "(New-Object Media.SoundPlayer '${path}').PlaySync()"`);
+    await safeExec('powershell', ['-Command', `(New-Object Media.SoundPlayer '${path}').PlaySync()`]);
   }
 
   async open(target: string): Promise<void> {
-    await execAsync(`start "${target}"`);
+    await safeExec('start', [target]);
   }
 
-  getCapabilities(): PlatformCapabilities {
+  async getCapabilities(): Promise<PlatformCapabilities> {
     return {
       hasSpeech: true,
       hasScreenCapture: false,
@@ -105,31 +103,30 @@ class WindowsDriver implements OSDriver {
 }
 
 /**
- * Linux Implementation (Stub)
+ * Linux Implementation
  */
 class LinuxDriver implements OSDriver {
   async captureScreen(outputPath: string): Promise<void> {
-    await execAsync(`import -window root "${outputPath}"`); // Requires ImageMagick
+    await safeExec('import', ['-window', 'root', outputPath]);
   }
 
   async speak(text: string): Promise<void> {
-    const sanitized = text.replace(/"/g, '').replace(/'/g, '');
-    await execAsync(`espeak "${sanitized}"`);
+    await safeExec('espeak', [text]);
   }
 
   async playSound(path: string): Promise<void> {
-    await execAsync(`aplay "${path}"`);
+    await safeExec('aplay', [path]);
   }
 
   async open(target: string): Promise<void> {
-    await execAsync(`xdg-open "${target}"`);
+    await safeExec('xdg-open', [target]);
   }
 
-  getCapabilities(): PlatformCapabilities {
+  async getCapabilities(): Promise<PlatformCapabilities> {
     return {
-      hasSpeech: true,
-      hasScreenCapture: true,
-      hasAudioPlayback: true,
+      hasSpeech: await commandExists('espeak'),
+      hasScreenCapture: await commandExists('import'),
+      hasAudioPlayback: await commandExists('aplay'),
       nativeTerminal: 'xterm'
     };
   }
@@ -140,7 +137,7 @@ class UnknownDriver implements OSDriver {
   async speak() {}
   async playSound() {}
   async open() {}
-  getCapabilities(): PlatformCapabilities {
+  async getCapabilities(): Promise<PlatformCapabilities> {
     return { hasSpeech: false, hasScreenCapture: false, hasAudioPlayback: false, nativeTerminal: 'sh' };
   }
 }
