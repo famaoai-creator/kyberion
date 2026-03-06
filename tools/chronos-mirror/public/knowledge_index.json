@@ -120,6 +120,14 @@
     "category": "architecture"
   },
   {
+    "id": "architecture/tenant-vision-model.md",
+    "title": "Tenant-Aware Vision-Mission Model",
+    "author": "Unknown",
+    "last_updated": "2026-03-05",
+    "tier": "public",
+    "category": "architecture"
+  },
+  {
     "id": "architecture/terminal-hosting.md",
     "title": "Terminal Hosting: The Institutional Gateway",
     "author": "Unknown",
@@ -166,14 +174,6 @@
     "last_updated": "2026-03-03",
     "tier": "public",
     "category": "ceo"
-  },
-  {
-    "id": "ceo/mission/corporate_purpose.md",
-    "title": "コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)",
-    "author": "Unknown",
-    "last_updated": "2026-03-03",
-    "tier": "public",
-    "category": "ceo/mission"
   },
   {
     "id": "ceo/planning/frameworks.md",

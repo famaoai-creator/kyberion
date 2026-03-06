@@ -1,53 +1,58 @@
 ---
 name: doc-to-text
-description: Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, and ZIP Archives. Use for summarizing or analyzing binary files.
+description: Document parsing and extraction engine based on the 3-layer model (Soul, Mask, Context). Supports PDF, Word, Excel, PowerPoint, and OCR.
 status: implemented
 category: Media
-last_updated: '2026-02-28'
-tags: documentation,gemini-skill
+last_updated: '2026-03-06'
+tags: ocr,parsing,archaeology
 ---
 
-# Document to Text Converter
+# Document to Text Reborn (Digital Archaeologist)
 
 ## Overview
 
-This skill acts as a universal converter to extract plain text and structured data from various binary and complex file formats. It enables Gemini to "read" files that are otherwise inaccessible.
+This skill utilizes a 3-layer extraction model to "excavate" meaning and aesthetics from various document formats. It separates pure content from design and metadata, enabling high-fidelity analysis and reuse.
 
-## Capabilities
+## 3-Layer Extraction Model
 
-### 1. Document Extraction
+1. **Content Layer (Soul)**: High-fidelity text extraction maintaining structural elements like headings and tables (Markdown output).
+2. **Aesthetic Layer (Mask)**: Extraction of design parameters, colors, fonts, and layout grid information.
+3. **Metadata Layer (Context)**: File properties, authorship, and contextual markers.
 
-- **PDF** (`.pdf`): Extracts plain text.
-- **Excel** (`.xlsx`): Converts sheets to CSV and performs OCR on embedded images.
-- **Word** (`.docx`): Extracts text and performs OCR on embedded images.
-- **PowerPoint** (`.pptx`): Extracts slide text and performs OCR on embedded images.
+## Supported Formats
 
-### 2. Image OCR
-
-- **Images** (`.png`, `.jpg`, `.jpeg`, `.webp`): Uses Tesseract.js to perform OCR (Optical Character Recognition) and extract text from images. Supports English and Japanese.
-
-### 3. Data & Archives
-
-- **Email** (`.eml`): Parses headers (From, To, Subject) and body text.
-- **ZIP Archive** (`.zip`): Lists files and extracts content of text-based files within the archive without extracting to disk.
+- **PDF**: Text and metadata. (Aesthetic: Coordinate-based analysis)
+- **Word (`.docx`)**: Structural Markdown conversion. (Aesthetic: Style extraction)
+- **Excel (`.xlsx`)**: Multi-sheet CSV extraction.
+- **PowerPoint (`.pptx`)**: Slide-based content extraction.
+- **Images**: OCR supporting English and Japanese.
 
 ## Usage
 
-To read a file, execute the `extract.cjs` script with the file path.
-
 ```bash
-node dist/index.js <path/to/file>
+node dist/index.js <file_path> [options]
 ```
 
-**Example:**
-User: "What does the error screenshot say?"
-Action: `node dist/index.js error.png`
+### Options
+
+- `--mode, -m`: Extraction mode. Choices: `content`, `aesthetic`, `metadata`, `all` (default).
+- `--out, -o`: Save the structural JSON result to a file.
+
+### Examples
+
+**Extract only text (soul) as Markdown:**
+```bash
+node dist/index.js report.pdf --mode content
+```
+
+**Extract design/layout DNA (mask):**
+```bash
+node dist/index.js brochure.docx --mode aesthetic
+```
 
 ## Dependencies
 
-This skill requires Node.js packages.
-Run `npm install` in the skill directory before using.
-
-## Knowledge Protocol
-
-- This skill adheres to the `knowledge/orchestration/knowledge-protocol.md`. It automatically integrates Public, Confidential (Company/Client), and Personal knowledge tiers, prioritizing the most specific secrets while ensuring no leaks to public outputs.
+- `pdf-parse`: Basic PDF text.
+- `mammoth`: Word-to-Markdown conversion.
+- `xlsx`: Excel data parsing.
+- `tesseract.js`: Image OCR.

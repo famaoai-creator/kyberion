@@ -1,30 +1,43 @@
-import path from 'path';
-import fs from 'fs';
-import { runAsyncSkill } from '@agent/core';
+import { runSkillAsync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { extractText } from './lib.js';
+import { extract, ExtractionMode } from './lib.js';
+import * as path from 'node:path';
 
-const parser = createStandardYargs()
+const argvBuilder = createStandardYargs()
   .positional('file', {
     type: 'string',
-    description: 'Path to the document file to extract text from'
+    description: 'Path to the document to extract',
+  })
+  .option('mode', {
+    alias: 'm',
+    type: 'string',
+    choices: ['content', 'aesthetic', 'metadata', 'all'],
+    default: 'all',
+    description: 'Extraction mode: soul (content), mask (aesthetic), or context (metadata)',
+  })
+  .option('out', {
+    alias: 'o',
+    type: 'string',
+    description: 'Output JSON file path',
   });
 
-runAsyncSkill('doc-to-text', async () => {
-  const argv = parser.parseSync();
-  const filePath = path.resolve((argv._[0] as string) || (argv.file as string));
-  
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error(`Valid file path required. Provided: ${filePath}`);
-  }
+if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
+  runSkillAsync('doc-to-text', async () => {
+    const argv = await argvBuilder.parseSync();
+    const filePath = argv.file as string || argv._[0] as string;
+    const mode = argv.mode as ExtractionMode;
 
-  const result = await extractText(filePath);
+    if (!filePath) {
+      throw new Error('Please provide a file path to extract.');
+    }
 
-  return {
-    status: 'success',
-    file: path.basename(filePath),
-    format: result.format,
-    content: result.content,
-    metadata: result.metadata
-  };
-});
+    const result = await extract(path.resolve(process.cwd(), filePath), mode);
+
+    if (argv.out) {
+      const { safeWriteFile } = await import('@agent/core');
+      safeWriteFile(argv.out as string, JSON.stringify(result, null, 2));
+    }
+
+    return result;
+  });
+}
