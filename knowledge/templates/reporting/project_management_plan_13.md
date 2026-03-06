@@ -1,3 +1,12 @@
+---
+title: Project Management Plan (PMP) - 13 Standard Items
+category: Templates
+tags: [templates, reporting, project, management, plan, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Project Management Plan (PMP) - 13 Standard Items
 
 PMラボラトリーの知見に基づく、プロジェクト計画書の「完全網羅」標準。

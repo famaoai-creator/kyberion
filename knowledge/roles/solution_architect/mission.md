@@ -1,3 +1,12 @@
+---
+title: Solution Architect (ソリューション・アーキテクト) ミッション声明
+category: Roles
+tags: [roles, solution_architect, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Solution Architect (ソリューション・アーキテクト) ミッション声明
 
 ## 1. 目的 (Mission)

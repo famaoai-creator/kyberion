@@ -1,3 +1,12 @@
+---
+title: Wisdom: PowerPoint Design Distillation & Heritage Sync
+category: Architecture
+tags: [architecture, pptx, design, distillation, pattern]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Wisdom: PowerPoint Design Distillation & Heritage Sync
 
 - **Mission Context**: `pptx-design-replication` (v1 - v18)

@@ -1,3 +1,12 @@
+---
+title: エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)
+category: Ai-engineering
+tags: [ai-engineering, strategy]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # エンタープライズ生成AI導入戦略 (Enterprise AI Strategy)
 
 生成AIを全社導入する際、経営層の承認を得て実効性を高めるための戦略的ノウハウ。

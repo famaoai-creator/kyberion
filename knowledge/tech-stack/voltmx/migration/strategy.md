@@ -1,3 +1,12 @@
+---
+title: VoltMX to React Migration Strategy
+category: Tech-stack
+tags: [tech-stack, voltmx, migration, strategy]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # VoltMX to React Migration Strategy
 
 VoltMX 資産を React ベースのモダンなスタックに書き換えるための段階的移行計画。

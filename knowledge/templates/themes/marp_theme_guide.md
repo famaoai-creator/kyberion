@@ -1,3 +1,12 @@
+---
+title: Marp テーマ作成 ＆ スタイリング完全ガイド
+category: Templates
+tags: [templates, themes, marp, theme, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Marp テーマ作成 ＆ スタイリング完全ガイド
 
 Marpit フレームワークを用いた高度なスライドデザインのためのリファレンス。

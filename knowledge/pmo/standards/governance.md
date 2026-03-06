@@ -1,3 +1,12 @@
+---
+title: PMO ガバナンス標準基準 (Governance Standard)
+category: Pmo
+tags: [pmo, standards, governance]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # PMO ガバナンス標準基準 (Governance Standard)
 
 プロジェクトの健全性を客観的に維持し、成功率を最大化するためのPMOの行動指針。

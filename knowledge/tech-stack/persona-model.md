@@ -1,3 +1,12 @@
+---
+title: Triple-Tier Persona Model: Identity, Mask, and Mission
+category: Tech-stack
+tags: [tech-stack, persona, model]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Triple-Tier Persona Model: Identity, Mask, and Mission
 
 The Gemini Skills Ecosystem employs a **Triple-Tier Persona Model** to manage user identity and agent roles. This architecture separates the user's permanent self ("Soul") from the transient roles required for specific tasks ("Masks").

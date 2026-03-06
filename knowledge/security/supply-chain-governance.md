@@ -1,3 +1,12 @@
+---
+title: Software Supply Chain Governance & SBOM Standards
+category: Security
+tags: [security, supply, chain, governance]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Software Supply Chain Governance & SBOM Standards
 
 このドキュメントは、ソフトウェアサプライチェーンの透明性と安全性を確保するための、現代的な管理手法とノウハウをまとめたものである。

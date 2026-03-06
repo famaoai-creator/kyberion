@@ -1,3 +1,12 @@
+---
+title: Cultural Alignment & Change Management Protocol
+category: Organization
+tags: [organization, change, management]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Cultural Alignment & Change Management Protocol
 
 システム更改を成功させるための、組織文化変革と人間心理へのアプローチ。

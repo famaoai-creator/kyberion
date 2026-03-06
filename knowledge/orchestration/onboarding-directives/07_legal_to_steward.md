@@ -1,3 +1,12 @@
+---
+title: MISSION: Legal Guardrails & IP Portfolio
+category: Orchestration
+tags: [orchestration, onboarding-directives, legal, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Legal Guardrails & IP Portfolio
 
 - **FROM**: Legal & IP Strategist

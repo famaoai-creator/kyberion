@@ -1,3 +1,12 @@
+---
+title: Quality Assurance (QA/QC) ミッション声明
+category: Roles
+tags: [roles, qa_lead, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Quality Assurance (QA/QC) ミッション声明
 
 ## 1. 目的 (Mission)

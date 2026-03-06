@@ -1,3 +1,12 @@
+---
+title: Blueprint: Security Audit Report
+category: Templates
+tags: [templates, blueprints, security, audit, report]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Security Audit Report
 <!-- Owner: Auditor / QA -->
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->

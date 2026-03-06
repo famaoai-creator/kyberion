@@ -1,3 +1,12 @@
+---
+title: ウォーターフォール開発標準：工程と成果物 (SDLC Standard)
+category: Sdlc
+tags: [sdlc, waterfall, standard]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ウォーターフォール開発標準：工程と成果物 (SDLC Standard)
 
 本ドキュメントは、IPAの標準的な指針に基づき、ウォーターフォール型プロジェクトにおける各工程の定義と、必須・推奨される成果物をまとめたものである。

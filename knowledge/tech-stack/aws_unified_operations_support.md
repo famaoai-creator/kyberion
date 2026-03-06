@@ -1,3 +1,12 @@
+---
+title: AWS Unified Operations Team (Premium Support Extension)
+category: Tech-stack
+tags: [tech-stack, aws, unified, operations, support]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AWS Unified Operations Team (Premium Support Extension)
 
 AWS Unified Operations Team は、AWS Enterprise Support を補完し、顧客の運用チームを強力に拡張する専用のサポート・エンジニアリング組織です。

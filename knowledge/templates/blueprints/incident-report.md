@@ -1,3 +1,12 @@
+---
+title: Blueprint: Incident Report (障害報告書)
+category: Templates
+tags: [templates, blueprints, incident, report, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Incident Report (障害報告書)
 <!-- Owner: Auditor / ACE Engine -->
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->

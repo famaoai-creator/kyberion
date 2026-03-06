@@ -1,3 +1,12 @@
+---
+title: macOS 音声コントロール ＆ 音声入力活用ガイド
+category: Tech-stack
+tags: [tech-stack, macos, voice, control, guide, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # macOS 音声コントロール ＆ 音声入力活用ガイド
 
 macOS 標準機能を活用し、キーボードを使わずに Gemini CLI を操作するためのセットアップ手順。

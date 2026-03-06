@@ -1,3 +1,12 @@
+---
+title: AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド
+category: Public
+tags: [public, standards, blea, fisc, reference]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド
 
 本ドキュメントは、AWSが提供する「Baseline Environment on AWS for Financial Services Institute (BLEA for FSI)」に基づき、FISC準拠のセキュアなマルチアカウント基盤を構築するための技術リファレンスです。

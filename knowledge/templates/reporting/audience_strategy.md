@@ -1,3 +1,12 @@
+---
+title: Audience Strategy for Executive Reporting
+category: Templates
+tags: [templates, reporting, audience, strategy, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Audience Strategy for Executive Reporting
 
 対象読者の「関心事」と「痛み」に最適化されたプレゼンテーション戦略。

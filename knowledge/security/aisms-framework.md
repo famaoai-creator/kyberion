@@ -1,3 +1,12 @@
+---
+title: AISMS Framework: AI Security Management System
+category: Security
+tags: [security, aisms, framework]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AISMS Framework: AI Security Management System
 
 このドキュメントは、AI システム特有のセキュリティリスクを管理し、組織全体の AI ガバナンスを確立するための「AI セキュリティ管理システム (AISMS)」のフレームワークを定義する。

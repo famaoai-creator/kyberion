@@ -1,3 +1,12 @@
+---
+title: Corporate Legal & Tax Essentials (Japan context)
+category: Ceo
+tags: [ceo, legal, tax, essentials]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Corporate Legal & Tax Essentials (Japan context)
 
 ## 1. Corporate Legal (法務)

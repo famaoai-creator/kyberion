@@ -1,3 +1,12 @@
+---
+title: Sovereign Approval Protocol: Push & Passkey (2026-03-04)
+category: Architecture
+tags: [architecture, passkey, push, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Sovereign Approval Protocol: Push & Passkey (2026-03-04)
 
 ## 1. Executive Summary

@@ -1,3 +1,12 @@
+---
+title: MISSION: Culture Archetypes & Talent Specs
+category: Orchestration
+tags: [orchestration, onboarding-directives, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Culture Archetypes & Talent Specs
 
 - **FROM**: Talent & Culture

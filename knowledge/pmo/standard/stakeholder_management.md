@@ -1,3 +1,12 @@
+---
+title: Stakeholder Management Framework
+category: Pmo
+tags: [pmo, standard, stakeholder, management, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Stakeholder Management Framework
 
 大規模更改プロジェクトにおける利害関係者の制御とエンゲージメントの基準。

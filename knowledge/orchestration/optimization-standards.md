@@ -1,3 +1,12 @@
+---
+title: 自律型シナジー標準基準 (Autonomous Synergy Standards)
+category: Orchestration
+tags: [orchestration, optimization, standards]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 自律型シナジー標準基準 (Autonomous Synergy Standards)
 
 エコシステム全体の実行効率と、アウトプットの多角的な深さを極限まで高めるための運用指針。

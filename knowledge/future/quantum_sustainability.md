@@ -1,3 +1,12 @@
+---
+title: Future-Proofing: Quantum-Safe & Sustainability
+category: Future
+tags: [future, quantum, sustainability]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Future-Proofing: Quantum-Safe & Sustainability
 
 10年先を見据えた、システムの「生存戦略」と「社会的責任」。

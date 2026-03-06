@@ -1,3 +1,12 @@
+---
+title: Microservices Design Patterns
+category: Architecture
+tags: [architecture, microservices, patterns, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Microservices Design Patterns
 
 Reference guide for microservices architecture, covering core design patterns, communication strategies, data management, service discovery, and observability.

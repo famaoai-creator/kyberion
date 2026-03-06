@@ -1,3 +1,12 @@
+---
+title: 品質ゲート (Quality Gates) 運用基準
+category: Roles
+tags: [roles, pmo_governance, quality, gates]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 品質ゲート (Quality Gates) 運用基準
 
 ## 1. 開発完了ゲート (Dev-Complete)

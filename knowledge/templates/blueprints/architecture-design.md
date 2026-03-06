@@ -1,3 +1,12 @@
+---
+title: Blueprint: Architecture Design (AIDLC Standard)
+category: Templates
+tags: [templates, blueprints, architecture, design]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Architecture Design (AIDLC Standard)
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->
 

@@ -1,3 +1,12 @@
+---
+title: PMO Bridge to IPA Non-Functional Grade
+category: Pmo
+tags: [pmo, standard, ipa, nfr, bridge, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # PMO Bridge to IPA Non-Functional Grade
 
 非機能要求を「技術者のこだわり」から「経営判断の指標」へ変換する基準。

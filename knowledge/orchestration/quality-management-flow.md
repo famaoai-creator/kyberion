@@ -1,3 +1,12 @@
+---
+title: エンタープライズ品質管理フロー (Quality Management Flow)
+category: Orchestration
+tags: [orchestration, quality, management, flow]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # エンタープライズ品質管理フロー (Quality Management Flow)
 
 成果物の品質を担保し、エンタープライズの監査に耐えうるエビデンスを残すための標準フロー。

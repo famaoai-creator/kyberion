@@ -1,3 +1,12 @@
+---
+title: AWS FISC (金融機関向け安全対策基準) 準拠ガイド
+category: Fisc-compliance
+tags: [fisc-compliance, aws, fisc, standard, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AWS FISC (金融機関向け安全対策基準) 準拠ガイド
 
 本ドキュメントは、AWS上でFISC安全対策基準（第13版対応）を遵守するための設計・運用のポイントをまとめたものです。

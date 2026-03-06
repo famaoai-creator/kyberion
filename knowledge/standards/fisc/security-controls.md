@@ -1,3 +1,12 @@
+---
+title: FISC-Aligned Security Standard (Cloud Infrastructure)
+category: Standards
+tags: [standards, fisc, security, controls]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # FISC-Aligned Security Standard (Cloud Infrastructure)
 
 ## 1. Overview

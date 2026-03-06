@@ -1,3 +1,12 @@
+---
+title: TypeScript/JavaScript Hooks
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, typescript, hooks]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # TypeScript/JavaScript Hooks
 
 > This file extends [common/hooks.md](../common/hooks.md) with TypeScript/JavaScript specific content.

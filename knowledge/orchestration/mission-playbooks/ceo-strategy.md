@@ -1,3 +1,12 @@
+---
+title: ミッション・プレイブック：CEO戦略的意思決定
+category: Orchestration
+tags: [orchestration, mission-playbooks, ceo, strategy]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ミッション・プレイブック：CEO戦略的意思決定
 
 本プレイブックは、CEOが重要な経営判断（投資、市場参入、組織変更等）を行う際の「勝利条件」を定義する。

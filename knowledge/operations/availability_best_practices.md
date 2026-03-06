@@ -1,3 +1,12 @@
+---
+title: Availability & Disaster Recovery Best Practices
+category: Operations
+tags: [operations, availability, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Availability & Disaster Recovery Best Practices
 
 システムの継続性を保証し、障害発生時にもサービスを維持・迅速に復旧させるためのガイドラインです。

@@ -1,3 +1,12 @@
+---
+title: TERASOLUNA Layered Architecture Standard
+category: Tech-stack
+tags: [tech-stack, java, terasoluna, architecture]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # TERASOLUNA Layered Architecture Standard
 
 NTTデータが推奨する、堅牢なエンタープライズJavaアプリケーションのためのレイヤ構造。

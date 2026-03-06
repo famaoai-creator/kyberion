@@ -1,3 +1,12 @@
+---
+title: Security By Design Standard
+category: Security
+tags: [security, design]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Security By Design Standard
 
 このドキュメントは、システム開発の初期段階からセキュリティを組み込み、後戻りコストを最小化しつつ堅牢性を最大化するための、設計原則とノウハウをまとめたものである。

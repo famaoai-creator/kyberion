@@ -1,3 +1,12 @@
+---
+title: Mobile Test Automation Standard (Deep-Dive Edition)
+category: Standards
+tags: [standards, testing, mobile, automation]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Mobile Test Automation Standard (Deep-Dive Edition)
 
 iOS/Android アプリケーションにおける、高品質・高効率な自動化の実装ガイドライン。

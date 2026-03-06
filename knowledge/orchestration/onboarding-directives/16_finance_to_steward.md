@@ -1,3 +1,12 @@
+---
+title: MISSION: Financial P&L & Cost Analysis
+category: Orchestration
+tags: [orchestration, onboarding-directives, finance, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Financial P&L & Cost Analysis
 
 - **FROM**: Finance Controller

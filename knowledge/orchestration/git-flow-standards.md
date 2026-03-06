@@ -1,3 +1,12 @@
+---
+title: 自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)
+category: Orchestration
+tags: [orchestration, git, flow, standards]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)
 
 本エコシステムがコードを変更する際の標準的な Git 手順。

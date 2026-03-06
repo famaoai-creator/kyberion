@@ -1,3 +1,12 @@
+---
+title: MISSION: Market Dynamics & P&L Sensitivity
+category: Orchestration
+tags: [orchestration, onboarding-directives, owner, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Market Dynamics & P&L Sensitivity
 
 - **FROM**: Business Owner

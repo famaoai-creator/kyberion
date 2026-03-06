@@ -1,3 +1,12 @@
+---
+title: Terminal Hosting: The Institutional Gateway
+category: Architecture
+tags: [architecture, terminal, hosting]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Terminal Hosting: The Institutional Gateway
 
 本ドキュメントは、主権者（人間）と AI エージェントが同一の PTY セッションをリアルタイムに共有し、高忠実度な操作環境を実現するための「Institutional Gateway」の設計と実装について定義する。

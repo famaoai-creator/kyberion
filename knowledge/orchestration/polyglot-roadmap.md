@@ -1,3 +1,12 @@
+---
+title: Polyglot Core Transformation Roadmap (Sidecar Architecture)
+category: Orchestration
+tags: [orchestration, polyglot, roadmap]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Polyglot Core Transformation Roadmap (Sidecar Architecture)
 
 To support Python, Go, and Rust skills natively without Node.js dependencies, we will transition the Shared Utility Core to a Sidecar model.

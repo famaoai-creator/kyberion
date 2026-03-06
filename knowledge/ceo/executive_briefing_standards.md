@@ -1,3 +1,12 @@
+---
+title: Executive Briefing Standards
+category: Ceo
+tags: [ceo, executive, briefing, standards]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Executive Briefing Standards
 
 ## 1. The "CEO Rule of 3"

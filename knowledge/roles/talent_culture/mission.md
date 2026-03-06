@@ -1,3 +1,12 @@
+---
+title: Talent & Culture (採用 & 組織文化) ミッション声明
+category: Roles
+tags: [roles, talent_culture, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Talent & Culture (採用 & 組織文化) ミッション声明
 
 ## 1. 目的 (Mission)

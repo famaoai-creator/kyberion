@@ -1,3 +1,12 @@
+---
+title: IPA-Aligned Requirements Engineering Standard
+category: Standards
+tags: [standards, ipa, requirements, checklist]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # IPA-Aligned Requirements Engineering Standard
 
 ## 1. Functional Requirements (機能要件)

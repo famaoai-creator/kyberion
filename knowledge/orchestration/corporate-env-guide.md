@@ -1,3 +1,12 @@
+---
+title: 企業内ネットワーク環境セットアップガイド
+category: Orchestration
+tags: [orchestration, corporate, env, guide]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 企業内ネットワーク環境セットアップガイド
 
 企業PCなど、プロキシや制限されたネットワーク下で本モノレポを使用するための手順。

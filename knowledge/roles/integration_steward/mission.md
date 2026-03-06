@@ -1,3 +1,12 @@
+---
+title: Role: Integration Steward
+category: Roles
+tags: [roles, integration_steward, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Role: Integration Steward
 
 ## Mission

@@ -1,3 +1,12 @@
+---
+title: AIDLC Standards: AI Development Life Cycle
+category: Sdlc
+tags: [sdlc, aidlc, standards, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AIDLC Standards: AI Development Life Cycle
 
 このドキュメントは、AI モデルおよび AI 搭載アプリケーションの開発・運用におけるライフサイクル (AIDLC) を定義し、伝統的な SDLC に AI 特有のプロセスを統合するための標準規約である。

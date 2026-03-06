@@ -1,3 +1,12 @@
+---
+title: Diff-Based Security Scanning Strategy
+category: Security
+tags: [security, advanced, diff, based, scanning, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Diff-Based Security Scanning Strategy
 
 全量スキャンの非効率性を排除し、変更差分（Diff）に基づいてリスクの高い箇所をピンポイントで診断するための戦略。

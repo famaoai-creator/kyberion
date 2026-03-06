@@ -1,3 +1,12 @@
+---
+title: MISSION: Technical Blueprint Discovery
+category: Orchestration
+tags: [orchestration, onboarding-directives, dev, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Technical Blueprint Discovery
 
 - **FROM**: Software Developer

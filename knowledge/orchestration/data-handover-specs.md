@@ -1,3 +1,12 @@
+---
+title: スキル間データ受け渡し仕様 (Data Handover Specs)
+category: Orchestration
+tags: [orchestration, data, handover, specs]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # スキル間データ受け渡し仕様 (Data Handover Specs)
 
 複数のスキルが連鎖する際の情報欠落を防ぐための共通インターフェース。

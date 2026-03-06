@@ -1,3 +1,12 @@
+---
+title: Runbook & Playbook Best Practices (AI-Native Operations)
+category: Operations
+tags: [operations, runbook, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Runbook & Playbook Best Practices (AI-Native Operations)
 
 生成AIによる自動実行（Autonomous Operations）を視野に入れた、次世代型の運用手順書の設計指針です。

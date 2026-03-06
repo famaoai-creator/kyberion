@@ -1,3 +1,12 @@
+---
+title: Blueprint: Post-Mortem (事後検証報告書)
+category: Templates
+tags: [templates, blueprints, post, mortem]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Post-Mortem (事後検証報告書)
 <!-- Owner: SRE / Auditor -->
 <!-- Visibility: [L1: EXECUTIVE, L2: MANAGEMENT] -->

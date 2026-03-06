@@ -1,3 +1,12 @@
+---
+title: ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定
+category: Orchestration
+tags: [orchestration, mission-playbooks, saas, roi]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定
 
 新規SaaS事業の立ち上げに際し、その収益性と投資価値を科学的に証明するための「勝利条件」。

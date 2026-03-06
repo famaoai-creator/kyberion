@@ -1,3 +1,12 @@
+---
+title: Legal & IP Strategist (法務・知財戦略) ミッション声明
+category: Roles
+tags: [roles, legal_strategist, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Legal & IP Strategist (法務・知財戦略) ミッション声明
 
 ## 1. 目的 (Mission)

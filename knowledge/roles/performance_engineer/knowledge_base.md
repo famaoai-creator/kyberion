@@ -1,3 +1,12 @@
+---
+title: Performance Evaluation Knowledge Base
+category: Roles
+tags: [roles, performance_engineer, knowledge, base]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Performance Evaluation Knowledge Base
 
 性能評価エンジニアがシステムの状態を正確に把握し、改善案を提示するための統合ガイド。

@@ -1,3 +1,12 @@
+---
+title: Platform Engineering & DevEx Standards
+category: Standards
+tags: [standards, engineering, platform]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Platform Engineering & DevEx Standards
 
 このドキュメントは、開発者の認知負荷を下げ、高品質なソフトウェアを「セルフサービス」で高速にリリースするための、プラットフォームエンジニアリングと開発者体験 (DevEx) の標準規約である。

@@ -1,3 +1,12 @@
+---
+title: ACE (Autonomous Consensus Engine) Operating Standard
+category: Orchestration
+tags: [orchestration, consensus, protocol, ace]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ACE (Autonomous Consensus Engine) Operating Standard
 
 ACE は、Gemini エージェントが複雑な意思決定を行うための標準プロトコルである。

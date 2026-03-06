@@ -1,3 +1,12 @@
+---
+title: Reverse Design Protocol (RDP)
+category: Standards
+tags: [standards, engineering, reverse, design, protocol]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Reverse Design Protocol (RDP)
 
 ## 1. Overview

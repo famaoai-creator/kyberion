@@ -1,3 +1,12 @@
+---
+title: 対外報告用ステータスレポート・テンプレート
+category: Pmo
+tags: [pmo, templates, external, status, report, security]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 対外報告用ステータスレポート・テンプレート
 
 外部のPMOや顧客へ提出する、プロジェクトの進捗と信頼性を証明するための構成。

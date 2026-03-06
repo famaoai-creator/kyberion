@@ -1,3 +1,12 @@
+---
+title: PMO Governance (PMO/ガバナンス) ミッション声明
+category: Roles
+tags: [roles, pmo_governance, mission]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # PMO Governance (PMO/ガバナンス) ミッション声明
 
 ## 1. 目的 (Mission)

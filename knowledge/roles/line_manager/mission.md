@@ -1,3 +1,12 @@
+---
+title: Line Manager (ラインマネージャー) ミッション声明
+category: Roles
+tags: [roles, line_manager, mission, security]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Line Manager (ラインマネージャー) ミッション声明
 
 ## 1. 目的 (Mission)

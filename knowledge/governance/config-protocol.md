@@ -1,3 +1,12 @@
+---
+title: Config Protocol: The Sovereign Rule of System State
+category: Governance
+tags: [governance, config, protocol]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Config Protocol: The Sovereign Rule of System State
 
 このドキュメントは、Gemini Skills エコシステムの構成（Configuration）に関する基本原則を定義します。全てのミッションおよびエージェントはこのプロトコルを遵守しなければなりません。

@@ -1,3 +1,12 @@
+---
+title: 定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)
+category: Quality-management
+tags: [quality-management, metrics, standards]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)
 
 IPA（情報処理推進機構）の統計データに基づいた、ウォーターフォール開発における品質評価の目安。

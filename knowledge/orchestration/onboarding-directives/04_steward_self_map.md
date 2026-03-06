@@ -1,3 +1,12 @@
+---
+title: MISSION: External System Connection Mapping
+category: Orchestration
+tags: [orchestration, onboarding-directives, steward, self, map]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: External System Connection Mapping
 
 - **FROM**: Knowledge Steward

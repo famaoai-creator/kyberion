@@ -1,3 +1,12 @@
+---
+title: Go Hooks
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, golang, hooks]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Go Hooks
 
 > This file extends [common/hooks.md](../common/hooks.md) with Go specific content.

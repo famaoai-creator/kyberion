@@ -1,3 +1,12 @@
+---
+title: ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition
+category: Templates
+tags: [templates, themes, visual, harmony, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition
 
 ## 1. 提案者ブランドの定義

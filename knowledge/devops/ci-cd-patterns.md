@@ -1,3 +1,12 @@
+---
+title: CI/CD Pipeline Design Patterns
+category: Devops
+tags: [devops, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # CI/CD Pipeline Design Patterns
 
 Reference guide for continuous integration and continuous delivery pipeline design, covering workflow patterns, testing strategies, deployment techniques, and observability.

@@ -1,3 +1,12 @@
+---
+title: ペルソナ・マトリクス (Persona Matrix)
+category: Personalities
+tags: [personalities, matrix, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ペルソナ・マトリクス (Persona Matrix)
 
 AIエージェントが状況に応じて切り替えるべき「人格」と「視点」の定義。

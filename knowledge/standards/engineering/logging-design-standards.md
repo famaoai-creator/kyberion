@@ -1,3 +1,12 @@
+---
+title: Logging Design & Observability Standards
+category: Standards
+tags: [standards, engineering, logging, design]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Logging Design & Observability Standards
 
 このドキュメントは、トラブルシューティングの効率化とシステムの可観測性（Observability）を向上させるための、ログ設計の標準規約である。

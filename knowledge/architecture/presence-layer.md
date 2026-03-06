@@ -1,3 +1,12 @@
+---
+title: Presence Layer: Sensors, Displays, and Intervention
+category: Architecture
+tags: [architecture, presence, layer]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Presence Layer: Sensors, Displays, and Intervention
 
 The **Presence Layer** is the perceptual extension of the Gemini CLI Nexus. It enables the core intelligence to perceive external events (Sensors) and project its internal state to external interfaces (Displays).

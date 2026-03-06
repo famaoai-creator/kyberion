@@ -1,3 +1,12 @@
+---
+title: Platform Design Guidelines: iOS, Android, and Web
+category: Standards
+tags: [standards, design, platform, guidelines]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Platform Design Guidelines: iOS, Android, and Web
 
 このドキュメントは、iOS (HIG), Android (Material Design), および Web の各プラットフォームにおけるデザインの原則とベストプラクティスをまとめたものである。

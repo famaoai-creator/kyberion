@@ -1,3 +1,12 @@
+---
+title: ミッション実行規程 (Mission Execution Protocol v1.0)
+category: Orchestration
+tags: [orchestration, mission, execution, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ミッション実行規程 (Mission Execution Protocol v1.0)
 
 ## 1. 動作レイヤーの分離定義

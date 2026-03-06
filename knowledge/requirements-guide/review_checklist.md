@@ -1,3 +1,12 @@
+---
+title: 要件定義ドキュメント・レビューチェックリスト
+category: Requirements-guide
+tags: [requirements-guide, review, checklist]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 要件定義ドキュメント・レビューチェックリスト
 
 ## 1. ビジネス要求

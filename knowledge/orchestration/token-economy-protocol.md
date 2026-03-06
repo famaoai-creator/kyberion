@@ -1,3 +1,12 @@
+---
+title: トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)
+category: Orchestration
+tags: [orchestration, token, economy, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)
 
 Geminiエージェントが「最小のコスト」で「最高の精度」を叩き出すための実行基準。

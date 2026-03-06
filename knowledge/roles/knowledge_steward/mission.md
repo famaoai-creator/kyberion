@@ -1,3 +1,12 @@
+---
+title: Knowledge Steward (ナレッジ・スチュワード) ミッション声明
+category: Roles
+tags: [roles, knowledge_steward, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Knowledge Steward (ナレッジ・スチュワード) ミッション声明
 
 ## 1. 目的 (Mission)

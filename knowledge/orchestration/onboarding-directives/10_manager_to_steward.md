@@ -1,3 +1,12 @@
+---
+title: MISSION: Organizational Map & Approval History
+category: Orchestration
+tags: [orchestration, onboarding-directives, manager, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Organizational Map & Approval History
 
 - **FROM**: Line Manager

@@ -1,3 +1,12 @@
+---
+title: Blueprint: Environment Setup & Provisioning Guide
+category: Templates
+tags: [templates, blueprints, environment, setup, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Environment Setup & Provisioning Guide
 <!-- Owner: Engineer / DevOps -->
 <!-- Visibility: [L3: SYSTEM/DATA] -->

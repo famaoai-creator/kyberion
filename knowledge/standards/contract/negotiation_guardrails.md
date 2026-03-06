@@ -1,3 +1,12 @@
+---
+title: Contract & SLA Negotiation Guardrails
+category: Standards
+tags: [standards, contract, negotiation, guardrails, ace]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Contract & SLA Negotiation Guardrails
 
 大規模システム更改において、PMOロールが「契約上の不利益」を回避するための指針。

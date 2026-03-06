@@ -1,3 +1,12 @@
+---
+title: Git Workflow
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, git, workflow]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Git Workflow
 
 ## Commit Message Format

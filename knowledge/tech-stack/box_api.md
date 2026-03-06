@@ -1,3 +1,12 @@
+---
+title: Box API 連携ガイド (Node.js SDK)
+category: Tech-stack
+tags: [tech-stack, box, api]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Box API 連携ガイド (Node.js SDK)
 
 本ドキュメントは、Box上のファイルをプログラムから安全に取得するための認証とAPI利用のベストプラクティスをまとめたものです。

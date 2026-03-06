@@ -1,3 +1,12 @@
+---
+title: Mission Conflict Avoidance Rules
+category: Architecture
+tags: [architecture, mission, conflict, avoidance]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Mission Conflict Avoidance Rules
 
 To ensure stability when multiple missions are running in parallel, the following rules apply:

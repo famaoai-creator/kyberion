@@ -1,3 +1,12 @@
+---
+title: Data Harvesting Best Practices: URL Resolution & Secure Download
+category: Orchestration
+tags: [orchestration, data, harvesting, best, practices]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Data Harvesting Best Practices: URL Resolution & Secure Download
 
 ## Overview

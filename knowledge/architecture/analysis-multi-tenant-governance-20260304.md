@@ -1,3 +1,12 @@
+---
+title: 検討報告：マルチテナント・ナレッジガバナンスの最適化案
+category: Architecture
+tags: [architecture, analysis, multi, tenant, governance, 20260304]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 検討報告：マルチテナント・ナレッジガバナンスの最適化案
 **日付:** 2026-03-04  
 **コンテキスト:** 8社兼務のCEOという特殊状況下での、コンテキスト・ノイズの排除、FISC/ISMS準拠、および安全な知恵の共有（Sharing）に関するアーキテクチャの検討。

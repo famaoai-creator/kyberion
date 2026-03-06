@@ -1,3 +1,12 @@
+---
+title: OWASP Top 10 for LLM Applications
+category: Standards
+tags: [standards, security, owasp, llm, top10, ace]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # OWASP Top 10 for LLM Applications
 
 生成AIエージェントを運用する上で防護すべき10の脆弱性と対策。

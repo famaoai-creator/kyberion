@@ -1,3 +1,12 @@
+---
+title: MISSION: Skill Usage & Performance Audit
+category: Orchestration
+tags: [orchestration, onboarding-directives, arch, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Skill Usage & Performance Audit
 
 - **FROM**: Ecosystem Architect

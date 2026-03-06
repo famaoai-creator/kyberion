@@ -1,3 +1,12 @@
+---
+title: 分散システム ＆ アーキテクチャパターン
+category: Architecture
+tags: [architecture, distributed, systems]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 分散システム ＆ アーキテクチャパターン
 
 ## 1. 分散トランザクション

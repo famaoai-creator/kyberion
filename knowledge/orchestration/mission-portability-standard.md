@@ -1,3 +1,12 @@
+---
+title: Mission Portability Standard (MEP v0.1)
+category: Orchestration
+tags: [orchestration, mission, portability, standard, security]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Mission Portability Standard (MEP v0.1)
 
 ## 1. Concept

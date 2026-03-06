@@ -1,3 +1,12 @@
+---
+title: Screen Transition & State Machine Testing Standards
+category: Standards
+tags: [standards, qa, screen, transition]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Screen Transition & State Machine Testing Standards
 
 このドキュメントは、単一画面の検証を超え、アプリケーションの「状態遷移」と「画面遷移パス」の網羅性を保証するための標準規約である。

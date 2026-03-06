@@ -1,3 +1,12 @@
+---
+title: Marketing & Growth (マーケティング & 成長戦略) ミッション声明
+category: Roles
+tags: [roles, marketing_growth, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Marketing & Growth (マーケティング & 成長戦略) ミッション声明
 
 ## 1. 目的 (Mission)

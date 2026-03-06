@@ -1,3 +1,12 @@
+---
+title: SLO & Dashboard Best Practices
+category: Operations
+tags: [operations, slo, dashboard, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # SLO & Dashboard Best Practices
 
 サービスの信頼性を定量化し、ビジネスと開発の意思決定を一致させるためのガイドラインです。

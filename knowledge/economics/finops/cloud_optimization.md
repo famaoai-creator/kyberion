@@ -1,3 +1,12 @@
+---
+title: Cloud FinOps & Unit Economics Standard
+category: Economics
+tags: [economics, finops, cloud, optimization, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Cloud FinOps & Unit Economics Standard
 
 技術的選択を「コスト効率」と「利益率」の観点から最適化するための基準。

@@ -1,3 +1,12 @@
+---
+title: AI-Driven Business Engineering: The Gemini Strategy
+category: Ceo
+tags: [ceo, business, engineering, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AI-Driven Business Engineering: The Gemini Strategy
 
 ## 1. Overview

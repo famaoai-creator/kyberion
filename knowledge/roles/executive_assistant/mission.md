@@ -1,3 +1,12 @@
+---
+title: Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明
+category: Roles
+tags: [roles, executive_assistant, mission, protocol]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明
 
 ## 1. 目的 (Mission)

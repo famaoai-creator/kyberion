@@ -1,3 +1,12 @@
+---
+title: Voice Interface Protocol (VIP)
+category: Orchestration
+tags: [orchestration, voice, interface, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Voice Interface Protocol (VIP)
 
 音声による対話を通じて、エコシステムの操作と意思決定を迅速化するためのプロトコル。

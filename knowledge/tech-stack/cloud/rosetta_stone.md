@@ -1,3 +1,12 @@
+---
+title: The Rosetta Stone of Cloud (Multi-Cloud Mapping)
+category: Tech-stack
+tags: [tech-stack, cloud, rosetta, stone]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # The Rosetta Stone of Cloud (Multi-Cloud Mapping)
 
 クラウドベンダー間のサービス対応表と、設計思想の相違点。

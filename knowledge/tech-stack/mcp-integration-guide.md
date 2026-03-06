@@ -1,3 +1,12 @@
+---
+title: MCP (Model Context Protocol) Integration Guide
+category: Tech-stack
+tags: [tech-stack, mcp, integration, guide, protocol]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MCP (Model Context Protocol) Integration Guide
 
 ## 1. Overview

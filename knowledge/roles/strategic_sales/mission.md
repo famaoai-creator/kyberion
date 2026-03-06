@@ -1,3 +1,12 @@
+---
+title: Strategic Sales (営業・事業開発) ミッション声明
+category: Roles
+tags: [roles, strategic_sales, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Strategic Sales (営業・事業開発) ミッション声明
 
 ## 1. 目的 (Mission)

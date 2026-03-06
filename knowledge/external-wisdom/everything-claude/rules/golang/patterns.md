@@ -1,3 +1,12 @@
+---
+title: Go Patterns
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, golang, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Go Patterns
 
 > This file extends [common/patterns.md](../common/patterns.md) with Go specific content.

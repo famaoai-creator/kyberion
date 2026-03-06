@@ -1,3 +1,12 @@
+---
+title: ユニバーサル接続設定ガイド (UCM Setup)
+category: Connections
+tags: [connections, setup, guide]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ユニバーサル接続設定ガイド (UCM Setup)
 
 本エコシステムが外部ツールと連携するための認証情報は、**Personal Tier (`knowledge/personal/connections/`)** で一元管理します。

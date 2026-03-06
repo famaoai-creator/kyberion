@@ -1,3 +1,12 @@
+---
+title: Performance Engineer 行動指針 (Operational Guidelines)
+category: Roles
+tags: [roles, performance_engineer, guidelines]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Performance Engineer 行動指針 (Operational Guidelines)
 
 性能評価エンジニアは、システムの「速度」と「効率」の守護者である。

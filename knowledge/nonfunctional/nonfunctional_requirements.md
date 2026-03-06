@@ -1,3 +1,12 @@
+---
+title: Non-Functional Requirements Definition
+category: Nonfunctional
+tags: [nonfunctional, requirements]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Non-Functional Requirements Definition
 
 **Date:** 2026/2/2

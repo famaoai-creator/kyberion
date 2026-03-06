@@ -1,3 +1,12 @@
+---
+title: Blueprint: Requirements Definition (AIDLC Standard)
+category: Templates
+tags: [templates, blueprints, requirements, definition]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Requirements Definition (AIDLC Standard)
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->
 

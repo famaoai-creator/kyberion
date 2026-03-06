@@ -1,3 +1,12 @@
+---
+title: Go Security
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, golang, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Go Security
 
 > This file extends [common/security.md](../common/security.md) with Go specific content.

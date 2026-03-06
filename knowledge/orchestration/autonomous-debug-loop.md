@@ -1,3 +1,12 @@
+---
+title: 自律型デバッグ・ループ (Autonomous Debug Loop)
+category: Orchestration
+tags: [orchestration, autonomous, debug, loop]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 自律型デバッグ・ループ (Autonomous Debug Loop)
 
 スキル実行中に予期せぬエラーが発生した際の、自動復旧と再試行の標準プロトコル。

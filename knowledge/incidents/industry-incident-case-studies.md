@@ -1,3 +1,12 @@
+---
+title: Industry Incident Case Studies & Prevention
+category: Incidents
+tags: [incidents, industry, incident, case, studies, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Industry Incident Case Studies & Prevention
 
 このドキュメントは、IT業界で発生した象徴的なインシデント事例を分析し、そこから得られた教訓と再発防止策を「自律型エコシステム」の論理に落とし込んだものである。

@@ -1,3 +1,12 @@
+---
+title: Master Slide Structure (Marp Standard)
+category: Templates
+tags: [templates, reporting, master, slide, structure, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Master Slide Structure (Marp Standard)
 
 リポーティング・マエストロが自動生成するスライドの標準レイアウト。

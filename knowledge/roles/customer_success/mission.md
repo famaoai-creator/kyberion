@@ -1,3 +1,12 @@
+---
+title: Customer Success (カスタマーサクセス) ミッション声明
+category: Roles
+tags: [roles, customer_success, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Customer Success (カスタマーサクセス) ミッション声明
 
 ## 1. 目的 (Mission)

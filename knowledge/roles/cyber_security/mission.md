@@ -1,3 +1,12 @@
+---
+title: Cyber Security Lead (セキュリティ責任者) ミッション声明
+category: Roles
+tags: [roles, cyber_security, mission, security]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Cyber Security Lead (セキュリティ責任者) ミッション声明
 
 ## 1. 目的 (Mission)

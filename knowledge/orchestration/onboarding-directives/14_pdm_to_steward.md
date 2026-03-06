@@ -1,3 +1,12 @@
+---
+title: MISSION: Product Roadmap & Feature Backlog
+category: Orchestration
+tags: [orchestration, onboarding-directives, pdm, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Product Roadmap & Feature Backlog
 
 - **FROM**: Product Manager

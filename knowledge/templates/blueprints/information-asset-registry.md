@@ -1,3 +1,12 @@
+---
+title: Blueprint: Information Asset Registry (情報資産管理台帳)
+category: Templates
+tags: [templates, blueprints, information, asset, registry]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Information Asset Registry (情報資産管理台帳)
 <!-- Owner: PMO / Ecosystem Architect -->
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->

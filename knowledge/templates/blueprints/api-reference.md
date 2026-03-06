@@ -1,3 +1,12 @@
+---
+title: Blueprint: API Reference
+category: Templates
+tags: [templates, blueprints, api, reference]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: API Reference
 <!-- Owner: Engineer / Architect -->
 <!-- Visibility: [L3: SYSTEM/DATA] -->

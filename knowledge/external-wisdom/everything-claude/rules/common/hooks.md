@@ -1,3 +1,12 @@
+---
+title: Hooks System
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, hooks]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Hooks System
 
 ## Hook Types

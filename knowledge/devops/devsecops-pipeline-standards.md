@@ -1,3 +1,12 @@
+---
+title: DevSecOps Pipeline Standards: Automating Trust
+category: Devops
+tags: [devops, devsecops, pipeline, standards]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # DevSecOps Pipeline Standards: Automating Trust
 
 このドキュメントは、DevOps にセキュリティを統合し、安全なリリースを自動化するためのパイプライン標準規約である。

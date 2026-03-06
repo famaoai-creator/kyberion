@@ -1,3 +1,12 @@
+---
+title: API Compatibility & Evolution Standards
+category: Standards
+tags: [standards, engineering, api, compatibility]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # API Compatibility & Evolution Standards
 
 このドキュメントは、APIの変更に伴うクライアントへの影響を最小限にし、長期的な互換性を維持するための標準規約である。

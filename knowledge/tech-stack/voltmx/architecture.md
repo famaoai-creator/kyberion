@@ -1,3 +1,12 @@
+---
+title: VoltMX Architecture Overview
+category: Tech-stack
+tags: [tech-stack, voltmx, architecture]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # VoltMX Architecture Overview
 
 VoltMX は、フロントエンド開発環境の **Iris** と、バックエンド・ミドルウェアの **Foundry** の2層構造で構成される低コード開発プラットフォームです。

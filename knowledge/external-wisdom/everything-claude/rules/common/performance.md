@@ -1,3 +1,12 @@
+---
+title: Performance Optimization
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, performance]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Performance Optimization
 
 ## Model Selection Strategy

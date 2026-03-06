@@ -1,3 +1,12 @@
+---
+title: ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)
+category: Orchestration
+tags: [orchestration, knowledge, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)
 
 本モノレポの全スキルが遵守すべき、ナレッジの階層構造と取り扱い基準。

@@ -1,3 +1,12 @@
+---
+title: Mission History Ledger
+category: Operations
+tags: [operations, mission, history]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Mission History Ledger
 
 自動生成された、エコシステムの過去の全ミッションの完了記録です。
