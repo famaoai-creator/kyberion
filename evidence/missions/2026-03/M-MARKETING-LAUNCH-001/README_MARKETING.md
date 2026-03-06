@@ -1,11 +1,11 @@
 # 🌌 Kyberion: The High-Fidelity Autonomous Engineering Ecosystem
 
-[![GitHub stars](https://img.shields.io/github/stars/famaoai-creator/gemini-skills?style=social)](https://github.com/famaoai-creator/gemini-skills)
+[![GitHub stars](https://img.shields.io/github/stars/famaoai-creator/kyberion?style=social)](https://github.com/famaoai-creator/kyberion)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **"Logic is a Hygiene Factor. Vision is the Compass."**
 
-**Kyberion** (formerly Kyberion) is an autonomous agent ecosystem designed for production-grade engineering labor. It moves beyond "AI Assistants" to provide a robust **Harness** for AI laborers to build, test, and maintain complex software systems with surgical precision.
+**Kyberion** (formerly Gemini Skills) is an autonomous agent ecosystem designed for production-grade engineering labor. It moves beyond "AI Assistants" to provide a robust **Harness** for AI laborers to build, test, and maintain complex software systems with surgical precision.
 
 ---
 

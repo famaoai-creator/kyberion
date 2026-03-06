@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://gemini-skills.local/schemas/skill-output.json",
+  "$id": "https://kyberion.local/schemas/skill-output.json",
   "title": "Skill Output",
   "description": "Standard output contract for Gemini Skills",
   "type": "object",

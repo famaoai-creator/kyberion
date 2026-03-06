@@ -4,7 +4,7 @@
 
 ```bash
 git clone <repo-url>
-cd gemini-skills
+cd kyberion
 pnpm install
 pnpm run doctor      # Verify ecosystem health
 pnpm run test:unit   # Run unit tests
@@ -23,7 +23,7 @@ This creates the directory structure, SKILL.md, package.json, and starter script
 ## Project Structure
 
 ```
-gemini-skills/
+kyberion/
   <skill-name>/
     SKILL.md              # Metadata and documentation
     package.json          # Dependencies
