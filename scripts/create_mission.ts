@@ -100,9 +100,15 @@ async function main() {
 
 ## Status: Planned
 
+### 🛠️ Execution Phase
 - [ ] Step 1: Research and Strategy
 - [ ] Step 2: Implementation
 - [ ] Step 3: Validation
+
+### 🧠 Distillation & Reflex Phase
+- [ ] Step 4: Knowledge Distillation - Extract key insights to \`knowledge/\`.
+- [ ] Step 5: Mission Logic - Update/Register \`pipelines/*.yml\` if repeatable.
+- [ ] Step 6: Final Cleanup - Archive mission and delete ephemeral scratch files.
 `;
   safeWriteFile(taskBoardPath, taskBoardContent);
 
