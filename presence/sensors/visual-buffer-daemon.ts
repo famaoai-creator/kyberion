@@ -7,7 +7,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, pathResolver } from '../../libs/core/index.js';
+import { logger, pathResolver, platform } from '../../libs/core/index.js';
 
 const execAsync = promisify(exec);
 const ROOT_DIR = process.cwd();
@@ -35,8 +35,8 @@ async function captureFrame() {
   const filePath = path.join(FRAMES_DIR, fileName);
 
   try {
-    // macOS screencapture: -x (silent), -t jpg (compact)
-    await execAsync(`screencapture -x -t jpg "${filePath}"`);
+    // Uses platform-specific driver
+    await platform.captureScreen(filePath);
     return { id, ts: timestamp, file: fileName };
   } catch (err: any) {
     logger.error(`[VisualBuffer] Capture failed: ${err.message}`);
