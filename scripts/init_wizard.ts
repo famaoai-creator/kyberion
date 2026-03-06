@@ -84,15 +84,31 @@ async function main() {
 
   logger.info(`Initializing environment for role: ${roleName}...`);
 
-  // 3. Ensure Directory Structure
-  const personalDir = path.resolve(rootDir, 'knowledge/personal');
-  const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
-  
-  if (!fs.existsSync(personalDir)) {
-    fs.mkdirSync(personalDir, { recursive: true });
-    logger.info('Created local personal directory: knowledge/personal');
-  }
-  safeWriteFile(path.join(personalDir, '.gitkeep'), '');
+  // 3. Ensure Sovereign Directory Standard (The Physical Shield)
+  const essentialDirs = [
+    'knowledge/personal',
+    'knowledge/confidential',
+    'vault',
+    'active/projects',
+    'active/missions',
+    'active/shared/governance',
+    'active/shared/runtime/vision/frames',
+    'scratch',
+    'presence/bridge',
+    'presence/sensors'
+  ];
+
+  essentialDirs.forEach(dir => {
+    const fullPath = path.resolve(rootDir, dir);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+      logger.info(`Created standard directory: ${dir}`);
+    }
+  });
+
+  safeWriteFile(path.join(rootDir, 'knowledge/personal/.gitkeep'), '');
+  safeWriteFile(path.join(rootDir, 'knowledge/confidential/.gitkeep'), '');
+  safeWriteFile(path.join(rootDir, 'vault/.gitkeep'), '');
 
   // 3.2. Confidential Knowledge Sync
   const syncConf = await askQuestion('\nStep 3: Sync Confidential knowledge with a remote repository? (y/N): ');
@@ -158,18 +174,24 @@ async function main() {
     logger.info('Legacy role-config.json renamed to .bak');
   }
 
-  // 5. Final Output
   console.log(`\n${chalk.bold('='.repeat(60))}`);
   console.log(`Setup complete for role: ${roleName}`);
   console.log(`Domain: ${selectedDomain.name}`);
   console.log(chalk.bold('='.repeat(60)) + '\n');
 
+  // Next Steps Guidance
+  console.log(chalk.bold('🚀 Next Steps (Critical):'));
+  console.log(`1. ${chalk.cyan('npm run build')}        - Generate binary logic in dist/`);
+  console.log(`2. ${chalk.cyan('npm run portal')}       - Explore your knowledge base`);
+  console.log(`3. ${chalk.cyan('npm run vision:start')} - Activate your agent's sight (Vision Buffer)`);
+  
+  console.log('\nTo begin your first task, run:');
+  console.log(chalk.green('node dist/scripts/cli.js run codebase-mapper -- .'));
+  
   if (roleConfig.playbook) {
-    console.log(`Recommended Playbook: ${roleConfig.playbook}`);
+    console.log(`\nRecommended Playbook: ${roleConfig.playbook}`);
   }
-
-  console.log('\nNext Step: node dist/scripts/cli.js run codebase-mapper -- .');
-  console.log('Or visit the Knowledge Portal: npm run portal\n');
+  console.log('\n');
 
   rl.close();
 }
