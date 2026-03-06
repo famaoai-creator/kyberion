@@ -47,8 +47,12 @@ async function main() {
   // Resolve Vision Reference
   let resolvedVision = visionRef;
   if (!resolvedVision) {
+    const personalVisionPath = path.join(pathResolver.rootDir, 'knowledge/personal/my-vision.md');
     const tenantVisionPath = pathResolver.vision(`${tenantId}.md`);
-    if (fs.existsSync(tenantVisionPath)) {
+    
+    if (fs.existsSync(personalVisionPath)) {
+      resolvedVision = '/knowledge/personal/my-vision.md';
+    } else if (fs.existsSync(tenantVisionPath)) {
       resolvedVision = `/vision/${tenantId}.md`;
     } else {
       resolvedVision = '/vision/_default.md';
