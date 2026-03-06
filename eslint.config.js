@@ -62,6 +62,29 @@ module.exports = [
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
       'prefer-const': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'fs',
+              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeReadFile, safeWriteFile) instead of direct fs access.',
+            },
+            {
+              name: 'node:fs',
+              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeReadFile, safeWriteFile) instead of direct node:fs access.',
+            },
+            {
+              name: 'child_process',
+              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeExec) instead of direct child_process access.',
+            },
+            {
+              name: 'node:child_process',
+              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeExec) instead of direct node:child_process access.',
+            }
+          ]
+        }
+      ]
     },
   },
 ];
