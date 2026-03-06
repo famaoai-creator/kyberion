@@ -166,6 +166,21 @@ async function main() {
   safeWriteFile(sessionPath, JSON.stringify(sessionConfig, null, 2));
   logger.success('Active role saved to active/shared/governance/session.json');
 
+  // --- 4.2. Vision Infusion (The Soul of Kyberion) ---
+  console.clear();
+  console.log(chalk.bold.magenta('\n✨ Step 4: Vision Infusion (The Soul)'));
+  console.log(chalk.dim('Kyberion is not just a tool; it is an extension of your intent.'));
+  console.log('What is your overarching vision for this ecosystem? What aesthetics or goals should guide the agent?');
+  
+  const userVision = await askQuestion(chalk.cyan('\nYour Vision: '));
+  
+  if (userVision) {
+    const visionPath = path.join(rootDir, 'knowledge/personal/my-vision.md');
+    const visionContent = `# My Sovereign Vision\n\n**Stated on**: ${new Date().toLocaleDateString()}\n\n> ${userVision}\n\n---\n*This vision serves as the ultimate guiding light for all agent actions within this ecosystem.*\n`;
+    safeWriteFile(visionPath, visionContent);
+    logger.success('Vision infused into knowledge/personal/my-vision.md');
+  }
+
   // Legacy cleanup
   const legacyConfigPath = path.join(personalDir, 'role-config.json');
   if (fs.existsSync(legacyConfigPath)) {
