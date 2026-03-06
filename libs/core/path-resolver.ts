@@ -25,6 +25,7 @@ const ACTIVE_ROOT = path.join(PROJECT_ROOT_DIR, 'active');
 const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
 const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
+const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
 const INDEX_PATH = path.join(KNOWLEDGE_ROOT, 'orchestration/global_skill_index.json');
 
 export function rootDir() { return PROJECT_ROOT_DIR; }
@@ -32,12 +33,14 @@ export function knowledge(subPath = '') { return path.join(KNOWLEDGE_ROOT, subPa
 export function active(subPath = '') { return path.join(ACTIVE_ROOT, subPath); }
 export function scripts(subPath = '') { return path.join(SCRIPTS_ROOT, subPath); }
 export function vault(subPath = '') { return path.join(VAULT_ROOT, subPath); }
+export function vision(subPath = '') { return path.join(VISION_ROOT, subPath); }
 export function shared(subPath = '') { return path.join(ACTIVE_ROOT, 'shared', subPath); }
 
 export function isProtected(filePath: string) {
   const resolved = path.resolve(filePath);
   if (resolved.startsWith(KNOWLEDGE_ROOT)) return true;
   if (resolved.startsWith(VAULT_ROOT)) return true;
+  if (resolved.startsWith(VISION_ROOT)) return true;
   if (resolved.startsWith(SCRIPTS_ROOT) && !resolved.includes('active')) return true;
   return false;
 }
@@ -79,10 +82,12 @@ export const pathResolver = {
   knowledgeRoot: () => KNOWLEDGE_ROOT,
   scriptsRoot: () => SCRIPTS_ROOT,
   vaultRoot: () => VAULT_ROOT,
+  visionRoot: () => VISION_ROOT,
   knowledge,
   active,
   scripts,
   vault,
+  vision,
   shared,
   isProtected,
   skillDir,

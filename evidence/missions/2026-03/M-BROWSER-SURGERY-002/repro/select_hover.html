@@ -1,0 +1,26 @@
+<html>
+<head>
+<style>
+  .dropdown { position: relative; display: inline-block; }
+  .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+  .dropdown:hover .dropdown-content { display: block; }
+</style>
+</head>
+<body>
+  <h1>Select & Hover Repro</h1>
+  <select id="myselect" onchange="document.getElementById('sel-msg').innerText = 'SELECTED_' + this.value">
+    <option value="A">Option A</option>
+    <option value="B">Option B</option>
+    <option value="C">Option C</option>
+  </select>
+  <div id="sel-msg"></div>
+
+  <div class="dropdown">
+    <button id="hover-me">Hover Over Me</button>
+    <div class="dropdown-content">
+      <a href="#" id="hidden-link" onclick="document.getElementById('hov-msg').innerText = 'HOVER_SUCCESS'">Hidden Link</a>
+    </div>
+  </div>
+  <div id="hov-msg"></div>
+</body>
+</html>

@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import { logger, safeReadFile, safeWriteFile } from '@agent/core';
 import * as pathResolver from '@agent/core/path-resolver';
 
@@ -18,10 +19,45 @@ interface KnowledgeItem {
   score?: number;
 }
 
+function detectActiveMission(): string | null {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+    if (branch.startsWith('mission/')) {
+      return branch.replace('mission/', '').toUpperCase();
+    }
+  } catch (_) {}
+  return process.env.MISSION_ID || null;
+}
+
+function getVisionContext(missionId: string): KnowledgeItem | null {
+  try {
+    const missionDir = pathResolver.missionDir(missionId);
+    const statePath = path.join(missionDir, 'mission-state.json');
+    if (fs.existsSync(statePath)) {
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      if (state.vision_ref) {
+        const fullPath = pathResolver.rootDir() + state.vision_ref;
+        if (fs.existsSync(fullPath)) {
+          return {
+            id: 'vision_context',
+            title: `Vision: ${state.tenant_id}`,
+            category: 'Vision',
+            score: 100 // Highest priority
+          };
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
+  const activeMission = detectActiveMission();
+  const visionItem = activeMission ? getVisionContext(activeMission) : null;
+  
   if (!fs.existsSync(indexPath)) {
     logger.error('[Ranker] Index not found. Run generate_knowledge_index.ts first.');
-    return [];
+    return visionItem ? [visionItem] : [];
   }
 
   try {
@@ -49,13 +85,15 @@ export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
       return { ...item, score };
     });
 
-    return scoredItems
+    const ranked = scoredItems
       .filter((item: any) => item.score > 0)
       .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, limit);
+      .slice(0, visionItem ? limit - 1 : limit);
+
+    return visionItem ? [visionItem, ...ranked] : ranked;
   } catch (err: any) {
     logger.error(`Ranking Failed: ${err.message}`);
-    return [];
+    return visionItem ? [visionItem] : [];
   }
 }
 

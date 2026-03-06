@@ -1,0 +1,10 @@
+{
+  "name": "Dialogs Repro",
+  "steps": [
+    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-002/repro/dialogs.html" },
+    { "action": "click", "locator": "#alert-btn", "reasoning": "Dismiss alert" },
+    { "action": "click", "locator": "#confirm-btn", "reasoning": "Confirm dialog" },
+    { "action": "wait", "ms": 1000 },
+    { "action": "extract", "save_path": "dialog_result.txt" }
+  ]
+}

@@ -2,31 +2,73 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Mission State Protocol (MSP) v1.0",
   "type": "object",
-  "required": ["mission_id", "version", "status", "priority"],
+  "required": [
+    "mission_id",
+    "version",
+    "status",
+    "priority"
+  ],
   "properties": {
-    "mission_id": { "type": "string", "description": "Unique mission identifier" },
-    "version": { "type": "string", "default": "1.0" },
+    "mission_id": {
+      "type": "string",
+      "description": "Unique mission identifier"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0"
+    },
     "status": {
       "type": "string",
-      "enum": ["draft", "planned", "active", "paused", "done", "failed", "archived"]
+      "enum": [
+        "draft",
+        "planned",
+        "active",
+        "paused",
+        "done",
+        "failed",
+        "archived"
+      ]
     },
-    "priority": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
-    "owner": { "type": "string", "default": "famao" },
-    "assigned_persona": { "type": "string" },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 5
+    },
+    "owner": {
+      "type": "string",
+      "default": "famao"
+    },
+    "assigned_persona": {
+      "type": "string"
+    },
     "git": {
       "type": "object",
       "properties": {
-        "branch": { "type": "string" },
-        "start_commit": { "type": "string" },
-        "latest_commit": { "type": "string" },
+        "branch": {
+          "type": "string"
+        },
+        "start_commit": {
+          "type": "string"
+        },
+        "latest_commit": {
+          "type": "string"
+        },
         "checkpoints": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "task_id": { "type": "string" },
-              "commit_hash": { "type": "string" },
-              "ts": { "type": "string", "format": "date-time" }
+              "task_id": {
+                "type": "string"
+              },
+              "commit_hash": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string",
+                "format": "date-time"
+              }
             }
           }
         }
@@ -36,37 +78,94 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "title", "status"],
+        "required": [
+          "id",
+          "title",
+          "status"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
-          "completed_at": { "type": ["string", "null"], "format": "date-time" }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in-progress",
+              "completed"
+            ]
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
         }
       }
     },
     "context": {
       "type": "object",
       "properties": {
-        "last_action": { "type": "string" },
-        "next_step": { "type": "string" },
-        "blockers": { "type": "array", "items": { "type": "string" } },
-        "associated_projects": { "type": "array", "items": { "type": "string" } }
+        "last_action": {
+          "type": "string"
+        },
+        "next_step": {
+          "type": "string"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "associated_projects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "history": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["ts", "event"],
+        "required": [
+          "ts",
+          "event"
+        ],
         "properties": {
-          "ts": { "type": "string", "format": "date-time" },
-          "event": { "type": "string" },
-          "from": { "type": "string" },
-          "to": { "type": "string" },
-          "note": { "type": "string" }
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
         }
       }
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant to which this mission belongs, linking it to a specific Vision."
+    },
+    "vision_ref": {
+      "type": "string",
+      "description": "Reference to the specific Vision document or concept guiding this mission."
     }
   }
 }

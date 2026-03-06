@@ -1,0 +1,21 @@
+<html>
+<body>
+  <h1>Login Page</h1>
+  <form id="login-form">
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button type="submit">Login</button>
+  </form>
+  <div id="status">Not logged in</div>
+  <script>
+    document.getElementById('login-form').onsubmit = (e) => {
+      e.preventDefault();
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      if (u === 'testuser' && p === 'testpassword') {
+        document.getElementById('status').innerText = 'LOGGED_IN_SUCCESS';
+      }
+    };
+  </script>
+</body>
+</html>

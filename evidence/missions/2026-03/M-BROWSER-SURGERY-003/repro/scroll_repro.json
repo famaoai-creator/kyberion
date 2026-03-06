@@ -1,0 +1,11 @@
+{
+  "name": "Scroll Repro",
+  "steps": [
+    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-003/repro/scroll.html" },
+    { "action": "wait_until_idle", "reasoning": "Wait for things to settle" },
+    { "action": "scroll", "direction": "down", "distance": 1800, "reasoning": "Scroll to bottom" },
+    { "action": "wait", "ms": 1000 },
+    { "action": "click", "locator": "#bottom-btn", "reasoning": "Click newly visible bottom button" },
+    { "action": "extract", "save_path": "scroll_result.txt" }
+  ]
+}
