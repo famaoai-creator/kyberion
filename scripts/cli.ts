@@ -117,8 +117,9 @@ async function main() {
   const roleConfig = fileUtils.getFullRoleConfig() || { active_role: 'Ecosystem Architect', persona: 'The Architect' };
   const currentRole = roleConfig.active_role;
 
-  console.log(chalk.bold.cyan('\n=== Gemini Ecosystem CLI (TS) ==='));
-  console.log(`Role: ${chalk.bold(currentRole)} | Mission: ${process.env.MISSION_ID || 'None'}\n`);
+  console.log(chalk.bold.magenta('\n🌌 KYBERION CONSOLE'));
+  console.log(chalk.dim('The High-Fidelity Autonomous Engineering Ecosystem'));
+  console.log(`Role: ${chalk.bold.cyan(currentRole)} | Mission: ${process.env.MISSION_ID ? chalk.yellow(process.env.MISSION_ID) : 'None'}\n`);
 
   await checkHealth(currentRole);
 

@@ -145,6 +145,7 @@ export interface SkillOutput<T = unknown> {
     timestamp?: string;
     role?: string;
     execution_tier?: TierLevel;
+    system_directive?: string;
   };
   error?: {
     code: string;

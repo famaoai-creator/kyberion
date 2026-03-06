@@ -379,4 +379,11 @@ export const fileUtils = {
       errorHandler(err, 'fileUtils.writeJson');
     }
   },
+  getGoldenRule: () => {
+    const rulePath = path.resolve(process.cwd(), 'vision/_default.md');
+    if (fs.existsSync(rulePath)) {
+      return fs.readFileSync(rulePath, 'utf8');
+    }
+    return 'Logic is a Hygiene Factor. Vision is the Compass.';
+  },
 };
