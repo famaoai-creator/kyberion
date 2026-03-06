@@ -1,3 +1,12 @@
+---
+title: Mission Types & Categories
+category: Orchestration
+tags: [orchestration, mission, types]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Mission Types & Categories
 
 本ドキュメントは、当エコシステムにおけるミッションの分類と、それぞれの実行規程を定義する。

@@ -1,3 +1,12 @@
+---
+title: Tenant-Aware Vision-Mission Model
+category: Architecture
+tags: [architecture, tenant, vision, model]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Tenant-Aware Vision-Mission Model
 
 ## 1. 存在意義 (The Core Concept)

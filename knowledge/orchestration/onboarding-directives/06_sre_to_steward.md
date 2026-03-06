@@ -1,3 +1,12 @@
+---
+title: MISSION: Incident Response & SRE Wisdom
+category: Orchestration
+tags: [orchestration, onboarding-directives, sre, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Incident Response & SRE Wisdom
 
 - **FROM**: Reliability Engineer

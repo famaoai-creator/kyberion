@@ -1,3 +1,12 @@
+---
+title: Blueprint: RAID Log (Risks, Assumptions, Issues, Dependencies)
+category: Templates
+tags: [templates, blueprints, raid, log, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: RAID Log (Risks, Assumptions, Issues, Dependencies)
 <!-- Owner: Project Manager / ACE Engine -->
 <!-- Visibility: [L2: MANAGEMENT] -->

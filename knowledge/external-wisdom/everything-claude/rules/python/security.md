@@ -1,3 +1,12 @@
+---
+title: Python Security
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, python, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Python Security
 
 > This file extends [common/security.md](../common/security.md) with Python specific content.

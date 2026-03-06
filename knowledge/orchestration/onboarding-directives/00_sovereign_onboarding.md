@@ -1,3 +1,12 @@
+---
+title: Directive: Sovereign Onboarding (シミュレーション開始指令)
+category: Orchestration
+tags: [orchestration, onboarding-directives, sovereign, onboarding, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Directive: Sovereign Onboarding (シミュレーション開始指令)
 
 このディレクティブは、主権者がエコシステムに初めて足を踏み入れた際の最初の行動指針である。

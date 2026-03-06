@@ -1,3 +1,12 @@
+---
+title: Test Viewpoint Catalog: Non-Functional Excellence
+category: Quality-management
+tags: [quality-management, test, viewpoints, catalog]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Test Viewpoint Catalog: Non-Functional Excellence
 
 ## 1. Reliability (SRE Focus)

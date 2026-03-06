@@ -1,3 +1,12 @@
+---
+title: Brand & Visual Identity Engineering
+category: Design
+tags: [design, brand, visual, identity]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Brand & Visual Identity Engineering
 
 システムやドキュメントが、一貫したブランド体験（UX）を提供するための工学的アプローチ。

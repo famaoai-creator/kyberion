@@ -1,3 +1,12 @@
+---
+title: アプリケーション方式設計標準 (Nablarch/AWS参考)
+category: Sdlc
+tags: [sdlc, design, standard, nablarch, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # アプリケーション方式設計標準 (Nablarch/AWS参考)
 
 このナレッジは、Nablarchフレームワークを用いたAWS上のアプリケーション方式設計における標準的な構成と記述内容をまとめたものです。

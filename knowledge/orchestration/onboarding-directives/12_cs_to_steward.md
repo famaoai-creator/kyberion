@@ -1,3 +1,12 @@
+---
+title: MISSION: Voice of Customer (VoC) Data Collection
+category: Orchestration
+tags: [orchestration, onboarding-directives, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Voice of Customer (VoC) Data Collection
 
 - **FROM**: Customer Success

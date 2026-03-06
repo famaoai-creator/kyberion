@@ -1,3 +1,12 @@
+---
+title: Blueprint: Architecture Decision Record (ADR)
+category: Templates
+tags: [templates, blueprints, architecture, decision, record]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Architecture Decision Record (ADR)
 <!-- Owner: System Architect -->
 <!-- Visibility: [L2: MANAGEMENT] -->

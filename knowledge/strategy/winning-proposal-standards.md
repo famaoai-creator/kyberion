@@ -1,3 +1,12 @@
+---
+title: Winning Proposal Standards (Strategic Communication)
+category: Strategy
+tags: [strategy, winning, proposal, standards]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Winning Proposal Standards (Strategic Communication)
 
 These standards define the requirements for any business draft intended for executive-level decision-makers.

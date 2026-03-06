@@ -1,3 +1,12 @@
+---
+title: Agent Wallet & Passkey Approval Protocol (2026-03-04)
+category: Architecture
+tags: [architecture, agent, wallet, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Agent Wallet & Passkey Approval Protocol (2026-03-04)
 
 ## 1. Concept: The Sovereign Signer

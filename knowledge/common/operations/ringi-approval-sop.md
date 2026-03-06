@@ -1,3 +1,12 @@
+---
+title: 稟議承認 標準運用手順書 (Ringi Approval SOP)
+category: Common
+tags: [common, operations, ringi, approval, sop]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 稟議承認 標準運用手順書 (Ringi Approval SOP)
 
 *Version: 1.0.0*

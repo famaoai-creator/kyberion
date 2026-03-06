@@ -1,3 +1,12 @@
+---
+title: Self-Refinement Protocol: The Path to Perpetual Growth
+category: Orchestration
+tags: [orchestration, self, refinement, protocol, ace]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Self-Refinement Protocol: The Path to Perpetual Growth
 
 AIエージェントが自身の System Instructions やスキルを自律的に改善するための厳格な手続き。

@@ -1,3 +1,12 @@
+---
+title: SOP: Unit Test Modernization & Alias Integrity
+category: Governance
+tags: [governance, test, modernization, sop]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # SOP: Unit Test Modernization & Alias Integrity
 
 大規模なテストスイートをレガシー（.cjs）から TypeScript/Vitest へ移行する際の標準手順と、多層的なエイリアス管理の規律。

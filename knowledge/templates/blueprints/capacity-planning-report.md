@@ -1,3 +1,12 @@
+---
+title: Blueprint: Capacity & Scalability Report
+category: Templates
+tags: [templates, blueprints, capacity, planning, report]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Capacity & Scalability Report
 <!-- Owner: SRE / PMO -->
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->

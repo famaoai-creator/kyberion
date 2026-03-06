@@ -1,3 +1,12 @@
+---
+title: 技術デューデリジェンス (Tech DD) 標準基準
+category: Ceo
+tags: [ceo, investment, tech, standard]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 技術デューデリジェンス (Tech DD) 標準基準
 
 投資検討先（Startup）の技術的価値とリスクを評価するためのフレームワーク。コードアクセス権がない場合でも適用可能な「ブラックボックス評価」を含む。

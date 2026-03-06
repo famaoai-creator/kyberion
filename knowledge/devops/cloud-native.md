@@ -1,3 +1,12 @@
+---
+title: クラウドネイティブ ＆ インフラ設計
+category: Devops
+tags: [devops, cloud, native]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # クラウドネイティブ ＆ インフラ設計
 
 ## 1. 12-Factor App (現代的クラウドアプリケーションの指針)

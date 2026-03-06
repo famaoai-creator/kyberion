@@ -1,3 +1,12 @@
+---
+title: Gemini AI-Native Coding Standard
+category: Standards
+tags: [standards, ai-native, gemini, coding, standard]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Gemini AI-Native Coding Standard
 
 ## 1. Intelligence over Syntax

@@ -1,3 +1,12 @@
+---
+title: AIエンジニアリング・ベストプラクティス
+category: Ai-engineering
+tags: [ai-engineering, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # AIエンジニアリング・ベストプラクティス
 
 生成AIをシステムに統合する際の、品質・コスト・信頼性のための現代的基準。

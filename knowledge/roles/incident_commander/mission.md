@@ -1,3 +1,12 @@
+---
+title: Incident Commander (インシデント・コマンダー) ミッション声明
+category: Roles
+tags: [roles, incident_commander, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Incident Commander (インシデント・コマンダー) ミッション声明
 
 ## 1. 目的 (Mission)

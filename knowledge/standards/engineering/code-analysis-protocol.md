@@ -1,3 +1,12 @@
+---
+title: Source Code Analysis Protocol (SCAP)
+category: Standards
+tags: [standards, engineering, code, analysis, protocol]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Source Code Analysis Protocol (SCAP)
 
 ## 1. Overview

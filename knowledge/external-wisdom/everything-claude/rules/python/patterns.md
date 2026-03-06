@@ -1,3 +1,12 @@
+---
+title: Python Patterns
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, python, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Python Patterns
 
 > This file extends [common/patterns.md](../common/patterns.md) with Python specific content.

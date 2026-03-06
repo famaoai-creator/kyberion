@@ -1,3 +1,12 @@
+---
+title: リリース整合性監査 標準運用手順書 (Release Audit SOP)
+category: Common
+tags: [common, pmo, release, audit, sop, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # リリース整合性監査 標準運用手順書 (Release Audit SOP)
 
 *Version: 1.3.0 (Execution Steps & Jira Evidence Added)*

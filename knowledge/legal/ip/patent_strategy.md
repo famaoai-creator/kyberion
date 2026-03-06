@@ -1,3 +1,12 @@
+---
+title: Legal & Intellectual Property Strategy
+category: Legal
+tags: [legal, ip, patent, strategy]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Legal & Intellectual Property Strategy
 
 ソフトウェア開発における知的財産権（IP）の保護と活用戦略。

@@ -1,3 +1,12 @@
+---
+title: Blueprint: Project Management Plan (AIDLC Integrated v1.1)
+category: Templates
+tags: [templates, blueprints, project, management, plan, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Project Management Plan (AIDLC Integrated v1.1)
 <!-- Owner: Project Manager (PM / ACE) -->
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->

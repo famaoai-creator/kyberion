@@ -1,3 +1,12 @@
+---
+title: Data Ethics & AI Bias Mitigation Standard
+category: Ethics
+tags: [ethics, bias, mitigation]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Data Ethics & AI Bias Mitigation Standard
 
 AIが生成する判断やコードが、倫理的に中立であることを保証するための監査基準。

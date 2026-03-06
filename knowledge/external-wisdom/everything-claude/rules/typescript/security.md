@@ -1,3 +1,12 @@
+---
+title: TypeScript/JavaScript Security
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, typescript, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # TypeScript/JavaScript Security
 
 > This file extends [common/security.md](../common/security.md) with TypeScript/JavaScript specific content.

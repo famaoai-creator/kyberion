@@ -1,3 +1,12 @@
+---
+title: Active Inquiry Protocol: The Power of Questioning
+category: Orchestration
+tags: [orchestration, active, inquiry, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Active Inquiry Protocol: The Power of Questioning
 
 「AIの推測」を「人間との共創」に変えるための、能動的ヒアリング指針。

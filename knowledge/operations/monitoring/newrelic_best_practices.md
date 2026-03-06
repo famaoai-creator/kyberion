@@ -1,3 +1,12 @@
+---
+title: New Relic 導入・運用ベストプラクティス
+category: Operations
+tags: [operations, monitoring, newrelic, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # New Relic 導入・運用ベストプラクティス
 
 ## 1. Full-Stack Observability

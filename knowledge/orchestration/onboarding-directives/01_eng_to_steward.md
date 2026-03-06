@@ -1,3 +1,12 @@
+---
+title: MISSION: Infrastructure & Environment Mapping
+category: Orchestration
+tags: [orchestration, onboarding-directives, eng, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Infrastructure & Environment Mapping
 
 - **FROM**: Software Engineer

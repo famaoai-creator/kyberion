@@ -1,3 +1,12 @@
+---
+title: ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)
+category: Orchestration
+tags: [orchestration, hybrid, development, flow]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)
 
 「信頼性（TDD）」と「効率性（AI-Direct）」を両立し、最小のトークンコストで最大の品質（カバレッジ 90% 以上）を達成するための標準手順。

@@ -1,3 +1,12 @@
+---
+title: Architecture Decision Record (ADR) Standard
+category: Standards
+tags: [standards, adr, standard, ace]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Architecture Decision Record (ADR) Standard
 
 ACE Engine での合意形成を公式な記録として残すための標準フォーマット。

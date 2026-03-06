@@ -1,3 +1,12 @@
+---
+title: プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)
+category: Templates
+tags: [templates, themes, theme, design, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)
 
 このガイドでは、Geminiエージェントがビジネスシーンで高く評価されるスライドテーマを設計するためのベストプラクティスをまとめています。

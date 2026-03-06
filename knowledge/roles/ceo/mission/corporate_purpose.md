@@ -1,3 +1,12 @@
+---
+title: コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)
+category: Roles
+tags: [roles, ceo, mission, corporate, purpose]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)
 
 本ドキュメントは、AIエージェントがあらゆる経営・技術判断を行う際の「最上位の行動規範」として機能する。

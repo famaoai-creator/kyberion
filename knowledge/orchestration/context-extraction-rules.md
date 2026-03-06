@@ -1,3 +1,12 @@
+---
+title: コンテキスト抽出・要約ルール (Context Extraction Rules)
+category: Orchestration
+tags: [orchestration, context, extraction, rules]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # コンテキスト抽出・要約ルール (Context Extraction Rules)
 
 `asset-token-economist` が情報を圧縮する際に、品質を維持するための優先基準。

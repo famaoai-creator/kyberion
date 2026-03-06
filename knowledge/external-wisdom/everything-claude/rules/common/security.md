@@ -1,3 +1,12 @@
+---
+title: Security Guidelines
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Security Guidelines
 
 ## Mandatory Security Checks

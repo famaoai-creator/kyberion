@@ -1,3 +1,12 @@
+---
+title: Software Development Life Cycle (SDLC) Methodologies
+category: Standards
+tags: [standards, sdlc, methodologies]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Software Development Life Cycle (SDLC) Methodologies
 
 ## 1. Waterfall (ウォーターフォール)

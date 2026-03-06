@@ -1,3 +1,12 @@
+---
+title: Blueprint: Issue Log (課題管理表)
+category: Templates
+tags: [templates, blueprints, issue, log, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Issue Log (課題管理表)
 <!-- Owner: Project Manager / ACE Engine -->
 <!-- Visibility: [L2: MANAGEMENT] -->

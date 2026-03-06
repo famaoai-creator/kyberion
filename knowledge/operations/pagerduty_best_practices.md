@@ -1,3 +1,12 @@
+---
+title: PagerDuty Best Practices
+category: Operations
+tags: [operations, pagerduty, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # PagerDuty Best Practices
 
 PagerDutyを効果的に運用し、インシデント対応の迅速化とチームの疲労軽減を両立させるためのベストプラクティスを以下にまとめます。

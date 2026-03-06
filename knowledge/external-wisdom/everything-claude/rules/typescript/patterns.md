@@ -1,3 +1,12 @@
+---
+title: TypeScript/JavaScript Patterns
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, typescript, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # TypeScript/JavaScript Patterns
 
 > This file extends [common/patterns.md](../common/patterns.md) with TypeScript/JavaScript specific content.

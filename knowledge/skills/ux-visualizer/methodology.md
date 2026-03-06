@@ -1,3 +1,12 @@
+---
+title: Methodology: High-Fidelity SPA Reverse Engineering
+category: Skills
+tags: [skills, ux-visualizer, methodology, protocol]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Methodology: High-Fidelity SPA Reverse Engineering
 
 SPA (Single Page Applications) require a different visualization strategy than traditional multi-page apps. This document defines the protocol for `ux-visualizer`.

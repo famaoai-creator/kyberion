@@ -1,3 +1,12 @@
+---
+title: Python Hooks
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, python, hooks]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Python Hooks
 
 > This file extends [common/hooks.md](../common/hooks.md) with Python specific content.

@@ -1,3 +1,12 @@
+---
+title: Blueprint: Data Flow & Lifecycle Map
+category: Templates
+tags: [templates, blueprints, data, flow, lifecycle, map]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Data Flow & Lifecycle Map
 <!-- Owner: System Architect / Data Guardian -->
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->

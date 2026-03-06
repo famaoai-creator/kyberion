@@ -1,3 +1,12 @@
+---
+title: Blueprint: Business Impact Analysis
+category: Templates
+tags: [templates, blueprints, business, impact, analysis]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Business Impact Analysis
 <!-- Owner: Strategic Sales / Business Analyst -->
 <!-- Visibility: [L1: EXECUTIVE, L2: MANAGEMENT] -->

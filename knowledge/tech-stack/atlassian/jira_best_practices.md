@@ -1,3 +1,12 @@
+---
+title: Jira 運用ベストプラクティス
+category: Tech-stack
+tags: [tech-stack, atlassian, jira, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Jira 運用ベストプラクティス
 
 ## 1. チケットの階層構造

@@ -1,3 +1,12 @@
+---
+title: Project Plan Master Template (Consulting Standard)
+category: Templates
+tags: [templates, reporting, project, plan, master, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Project Plan Master Template (Consulting Standard)
 
 大規模プロジェクトの合意形成を目的とした、高密度・戦略的プロジェクト計画書の標準構成。

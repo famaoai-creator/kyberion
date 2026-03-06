@@ -1,3 +1,12 @@
+---
+title: Maestro Syntax Standard (v1.35.0)
+category: Standards
+tags: [standards, testing, maestro, spec]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Maestro Syntax Standard (v1.35.0)
 
 このドキュメントは、Maestro において AI が構文を誤認しないための「絶対的な正解」である。

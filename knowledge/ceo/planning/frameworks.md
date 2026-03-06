@@ -1,3 +1,12 @@
+---
+title: 事業計画 ＆ 戦略フレームワーク (Planning Frameworks)
+category: Ceo
+tags: [ceo, planning, frameworks]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 事業計画 ＆ 戦略フレームワーク (Planning Frameworks)
 
 ## 1. OKR (Objectives and Key Results)

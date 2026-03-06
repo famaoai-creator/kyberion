@@ -1,3 +1,12 @@
+---
+title: Biometric & Mood Data Privacy Protocol
+category: Evolution
+tags: [evolution, biometric, privacy, protocol]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Biometric & Mood Data Privacy Protocol
 
 The `biometric-context-adapter` processes sensitive behavioral data. This protocol ensures your privacy.

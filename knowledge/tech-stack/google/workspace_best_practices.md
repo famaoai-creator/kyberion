@@ -1,3 +1,12 @@
+---
+title: Google Workspace 連携ベストプラクティス
+category: Tech-stack
+tags: [tech-stack, google, workspace, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Google Workspace 連携ベストプラクティス
 
 ## 1. データの可視化 (Sheets)

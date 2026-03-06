@@ -1,3 +1,12 @@
+---
+title: Visual & Design Testing Standards
+category: Standards
+tags: [standards, design, visual, testing]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Visual & Design Testing Standards
 
 このドキュメントは、アプリケーションの視覚的品質（色、タイポグラフィ、ラベル、アクセシビリティ）を保証するための試験戦略である。

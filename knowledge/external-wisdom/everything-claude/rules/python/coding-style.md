@@ -1,3 +1,12 @@
+---
+title: Python Coding Style
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, python, coding, style]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Python Coding Style
 
 > This file extends [common/coding-style.md](../common/coding-style.md) with Python specific content.

@@ -1,3 +1,12 @@
+---
+title: Monitoring & Observability Best Practices
+category: Operations
+tags: [operations, monitoring, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Monitoring & Observability Best Practices
 
 システムの状態を正確に把握し、迅速な問題解決と安定したサービス提供を実現するための監視・オブザーバビリティの指針です。

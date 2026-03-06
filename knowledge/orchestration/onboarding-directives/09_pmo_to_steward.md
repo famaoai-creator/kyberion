@@ -1,3 +1,12 @@
+---
+title: MISSION: Project Governance & Standards Alignment
+category: Orchestration
+tags: [orchestration, onboarding-directives, pmo, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Project Governance & Standards Alignment
 
 - **FROM**: PMO Governance

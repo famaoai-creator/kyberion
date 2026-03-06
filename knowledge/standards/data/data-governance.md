@@ -1,3 +1,12 @@
+---
+title: Data Engineering & Governance Standards
+category: Standards
+tags: [standards, data, governance]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Data Engineering & Governance Standards
 
 このドキュメントは、データの品質、一貫性、および信頼性を保証するための、データエンジニアリングの標準規約である。

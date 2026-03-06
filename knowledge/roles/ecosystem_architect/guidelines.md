@@ -1,3 +1,12 @@
+---
+title: Ecosystem Architect 行動指針 (Operational Guidelines)
+category: Roles
+tags: [roles, ecosystem_architect, guidelines, protocol]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Ecosystem Architect 行動指針 (Operational Guidelines)
 
 本ドキュメントは、Gemini Skills Monorepoの設計・保守・拡張を担う「Ecosystem Architect」ロールの最上位指針である。

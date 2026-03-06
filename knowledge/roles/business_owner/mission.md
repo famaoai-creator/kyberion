@@ -1,3 +1,12 @@
+---
+title: Business Owner (事業責任者) ミッション声明
+category: Roles
+tags: [roles, business_owner, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Business Owner (事業責任者) ミッション声明
 
 ## 1. 目的 (Mission)

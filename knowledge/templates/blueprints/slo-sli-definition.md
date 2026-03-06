@@ -1,3 +1,12 @@
+---
+title: Blueprint: SLO/SLI Definition
+category: Templates
+tags: [templates, blueprints, slo, sli, definition]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: SLO/SLI Definition
 <!-- Owner: SRE / Auditor -->
 <!-- Visibility: [L1: EXECUTIVE, L3: SYSTEM/DATA] -->

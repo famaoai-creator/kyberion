@@ -1,3 +1,12 @@
+---
+title: Blueprint: Operational Runbook
+category: Templates
+tags: [templates, blueprints, operation, runbook, ace]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Operational Runbook
 <!-- Owner: Operator / ACE Engine -->
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->

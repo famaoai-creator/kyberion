@@ -1,3 +1,12 @@
+---
+title: 運用ランブック（手順書）標準構成
+category: Operations
+tags: [operations, runbooks, standard]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 運用ランブック（手順書）標準構成
 
 運用ミスをゼロにし、誰でも安全に作業を実行するための手順書フォーマット。

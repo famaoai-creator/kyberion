@@ -1,3 +1,12 @@
+---
+title: The Gemini Runtime Interop Standard: TypeScript Authority with CJS Continuity
+category: Tech-stack
+tags: [tech-stack, runtime, interop]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # The Gemini Runtime Interop Standard: TypeScript Authority with CJS Continuity
 
 This document clarifies the architectural relationship between CommonJS (CJS) and TypeScript (TS) within the Gemini Skills Monorepo.

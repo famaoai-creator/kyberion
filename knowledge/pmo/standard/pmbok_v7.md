@@ -1,3 +1,12 @@
+---
+title: PMBOK v7 Project Management Principles
+category: Pmo
+tags: [pmo, standard, pmbok, ace]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # PMBOK v7 Project Management Principles
 
 大規模システム更改において、PMOロールが依拠すべき12の行動原則。

@@ -1,3 +1,12 @@
+---
+title: Blueprint: Test & Validation Report (AIDLC Evidence)
+category: Templates
+tags: [templates, blueprints, test, validation, report]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Test & Validation Report (AIDLC Evidence)
 <!-- Visibility: [L1: EXECUTIVE, L2: MANAGEMENT, L3: SYSTEM/DATA] -->
 

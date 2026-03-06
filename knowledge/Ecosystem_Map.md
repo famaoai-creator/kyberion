@@ -1,3 +1,12 @@
+---
+title: Ecosystem Knowledge Map
+category: General
+tags: [ecosystem, map, ace, protocol, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Ecosystem Knowledge Map
 
 Automatically generated graph of knowledge relationships.

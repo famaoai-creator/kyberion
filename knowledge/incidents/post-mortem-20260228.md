@@ -1,3 +1,12 @@
+---
+title: ポストモーテム: モノレポ安定化失敗と負の連鎖 (2026-02-28)
+category: Incidents
+tags: [incidents, post, mortem, 20260228]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ポストモーテム: モノレポ安定化失敗と負の連鎖 (2026-02-28)
 
 ## 📋 事象の概要

@@ -1,3 +1,12 @@
+---
+title: Cross-Role Directive Protocol (CRDP)
+category: Orchestration
+tags: [orchestration, directives, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Cross-Role Directive Protocol (CRDP)
 
 本プロトコルは、Gemini Skills エコシステム内の異なるロール間でタスクを依頼・委譲する際の標準フォーマットを定義する。

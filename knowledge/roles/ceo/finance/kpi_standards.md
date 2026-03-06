@@ -1,3 +1,12 @@
+---
+title: 財務KPI標準基準 (Financial KPI Standards)
+category: Roles
+tags: [roles, ceo, finance, kpi, standards]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 財務KPI標準基準 (Financial KPI Standards)
 
 IT企業経営における、健全性と成長性を測定するための最優先メトリクス。

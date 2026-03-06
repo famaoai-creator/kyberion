@@ -1,3 +1,12 @@
+---
+title: Web Test Automation Standard
+category: Standards
+tags: [standards, testing, web, automation]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Web Test Automation Standard
 
 モダンなWebアプリケーションのための、高速かつ安定したE2Eテスト基準。

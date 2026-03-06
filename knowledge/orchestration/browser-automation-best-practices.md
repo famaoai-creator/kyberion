@@ -1,3 +1,12 @@
+---
+title: Browser Automation Best Practices (Omni-Browser v2)
+category: Orchestration
+tags: [orchestration, browser, automation, best, practices]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Browser Automation Best Practices (Omni-Browser v2)
 
 ## 1. Interaction Strategy: The Hybrid Model

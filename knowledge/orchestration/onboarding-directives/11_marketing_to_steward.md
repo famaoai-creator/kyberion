@@ -1,3 +1,12 @@
+---
+title: MISSION: Brand Assets & Trend Harvesting
+category: Orchestration
+tags: [orchestration, onboarding-directives, marketing, steward]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # MISSION: Brand Assets & Trend Harvesting
 
 - **FROM**: Marketing & Growth

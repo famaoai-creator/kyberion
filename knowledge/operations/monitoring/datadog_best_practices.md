@@ -1,3 +1,12 @@
+---
+title: Datadog 導入・運用ベストプラクティス
+category: Operations
+tags: [operations, monitoring, datadog, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Datadog 導入・運用ベストプラクティス
 
 ## 1. 導入の基本 (Setup)

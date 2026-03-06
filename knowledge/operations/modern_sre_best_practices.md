@@ -1,3 +1,12 @@
+---
+title: Modern SRE Best Practices (Advanced Operations)
+category: Operations
+tags: [operations, modern, sre, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Modern SRE Best Practices (Advanced Operations)
 
 システムの信頼性、保守性、およびセキュリティを高度なレベルで維持するための実践ガイドラインです。

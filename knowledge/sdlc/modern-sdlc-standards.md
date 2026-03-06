@@ -1,3 +1,12 @@
+---
+title: Modern SDLC Standards: Agile, Shift-Left & Quality-First
+category: Sdlc
+tags: [sdlc, modern, standards]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Modern SDLC Standards: Agile, Shift-Left & Quality-First
 
 このドキュメントは、現代的なソフトウェア開発ライフサイクル (SDLC) における、スピードと品質を両立させるための標準規約である。

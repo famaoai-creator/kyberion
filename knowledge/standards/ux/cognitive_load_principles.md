@@ -1,3 +1,12 @@
+---
+title: Cognitive Load Principles for UX Design
+category: Standards
+tags: [standards, ux, cognitive, load, principles]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Cognitive Load Principles for UX Design
 
 `ux-visualizer` が設計・解析を行う際に遵守すべき、人間中心のUX原則。

@@ -1,3 +1,12 @@
+---
+title: Knowledge Management Standard (Semantic Indexing) v1.0
+category: Standards
+tags: [standards, knowledge, management]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Knowledge Management Standard (Semantic Indexing) v1.0
 
 この文書は、Kyberion エコシステムにおけるナレッジファイルの構造化およびインデックス管理の標準を定義する。
@@ -29,3 +38,14 @@ npm run generate-index
 2.  **Role Match**: アクティブなロールと `related_roles` の一致。
 3.  **Importance**: `importance` 値による加重。
 4.  **Recency**: `last_updated` に基づく新しさの加味。
+
+## 5. 自動メタデータ補完 (Auto-Enrichment)
+既存のナレッジにメタデータを一括適用する際は、以下の推論ルールを推奨する：
+- **Title**: ファイル内の最初の `# ` 見出し。
+- **Category**: 親ディレクトリ名のキャメルケース。
+- **Importance**: 
+    - 10: `governance/`, `standards/`
+    - 8: `orchestration/`, `architecture/`
+    - 7: `roles/`
+    - 4: `templates/`
+- **Tags**: ディレクトリ名、ファイル名、および内容に含まれるプロトコル名。

@@ -1,3 +1,12 @@
+---
+title: Autonomous Sentinel Operations
+category: Orchestration
+tags: [orchestration, sentinel, operations, security]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Autonomous Sentinel Operations
 
 ## Overview

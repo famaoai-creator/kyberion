@@ -1,3 +1,12 @@
+---
+title: ロール別教育ロードマップ (Learning Paths by Role)
+category: Onboarding
+tags: [onboarding, learning, paths, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ロール別教育ロードマップ (Learning Paths by Role)
 
 Gemini エコシステムへ参加するメンバーが、それぞれの役割において専門性を発揮するための学習パス。

@@ -1,3 +1,12 @@
+---
+title: Agent Orchestration
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, agents, security]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Agent Orchestration
 
 ## Available Agents

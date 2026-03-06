@@ -1,3 +1,12 @@
+---
+title: テスト観点カタログ (TIS株式会社 公開版 v1.6)
+category: Testing
+tags: [testing, viewpoint-catalogs, tis, catalog]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # テスト観点カタログ (TIS株式会社 公開版 v1.6)
 
 このナレッジは、TIS株式会社が提供する「テスト種別&観点カタログ」に基づき、アプリケーション開発における標準的なテスト観点をまとめたものです。

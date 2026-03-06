@@ -1,3 +1,12 @@
+---
+title: Professional Proposal Pipeline (Orchestration Pattern)
+category: Orchestration
+tags: [orchestration, proposal, pipeline]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Professional Proposal Pipeline (Orchestration Pattern)
 
 This workflow defines the autonomous sequence for generating high-impact, brand-aligned business proposals.

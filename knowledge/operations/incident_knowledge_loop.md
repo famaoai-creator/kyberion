@@ -1,3 +1,12 @@
+---
+title: Incident Knowledge Loop: Learning from Failures
+category: Operations
+tags: [operations, incident, knowledge, loop]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Incident Knowledge Loop: Learning from Failures
 
 ## 1. Overview

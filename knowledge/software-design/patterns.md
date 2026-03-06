@@ -1,3 +1,12 @@
+---
+title: ソフトウェアデザインパターン & 設計原則
+category: Software-design
+tags: [software-design, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ソフトウェアデザインパターン & 設計原則
 
 ## 1. SOLID原則 (S.O.L.I.D)

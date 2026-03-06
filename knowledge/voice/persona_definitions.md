@@ -1,3 +1,12 @@
+---
+title: 音声ペルソナ定義 (Voice Persona Definitions)
+category: Voice
+tags: [voice, persona, definitions]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 音声ペルソナ定義 (Voice Persona Definitions)
 
 エージェントが発話する際の「声色」と「話し方」の標準定義。

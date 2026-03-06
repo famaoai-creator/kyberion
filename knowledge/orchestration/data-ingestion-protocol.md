@@ -1,3 +1,12 @@
+---
+title: The Data Ingestion Protocol (外部データ持ち込み規約)
+category: Orchestration
+tags: [orchestration, data, ingestion, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # The Data Ingestion Protocol (外部データ持ち込み規約)
 
 このドキュメントは、エコシステム（サンドボックス）外部のデータを安全かつ統制された形で内部に取り込むための唯一の公式ルール（Ingestion Vectors）と、取り込んだデータのライフサイクルを定義する。

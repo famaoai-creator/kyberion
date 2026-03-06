@@ -1,3 +1,12 @@
+---
+title: QA/QC 重点チェックポイント：非同期通信と物理制約
+category: Roles
+tags: [roles, qa_lead, checkpoints]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # QA/QC 重点チェックポイント：非同期通信と物理制約
 
 ## 1. ネットワーク・ウォーターフォール監査

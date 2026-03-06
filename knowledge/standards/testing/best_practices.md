@@ -1,3 +1,12 @@
+---
+title: Test Automation Best Practices
+category: Standards
+tags: [standards, testing, best, practices, ace]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Test Automation Best Practices
 
 「自動化されたテストが負債にならない」ための、継続的な品質維持の鉄則。

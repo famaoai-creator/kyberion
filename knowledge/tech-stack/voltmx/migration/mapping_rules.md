@@ -1,3 +1,12 @@
+---
+title: VoltMX to React Technical Mapping Rules
+category: Tech-stack
+tags: [tech-stack, voltmx, migration, mapping, rules]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # VoltMX to React Technical Mapping Rules
 
 開発者が実装レベルで参照する変換ガイド。

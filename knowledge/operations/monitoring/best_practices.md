@@ -1,3 +1,12 @@
+---
+title: 監視設定ベストプラクティス・チェックリスト
+category: Operations
+tags: [operations, monitoring, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 監視設定ベストプラクティス・チェックリスト
 
 サービス稼働率（SLO）を維持するために、最低限設定すべき監視項目の基準。

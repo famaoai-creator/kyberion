@@ -1,3 +1,12 @@
+---
+title: Security Best Practices
+category: Security
+tags: [security, best, practices]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Security Best Practices
 
 Comprehensive security reference for application development, covering vulnerability awareness, secure coding patterns, and tooling.

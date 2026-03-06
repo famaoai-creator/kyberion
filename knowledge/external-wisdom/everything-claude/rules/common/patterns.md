@@ -1,3 +1,12 @@
+---
+title: Common Patterns
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Common Patterns
 
 ## Skeleton Projects

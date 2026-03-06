@@ -1,3 +1,12 @@
+---
+title: Accessibility (A11y) Excellence Standards
+category: Standards
+tags: [standards, qa, accessibility]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Accessibility (A11y) Excellence Standards
 
 このドキュメントは、全てのユーザーが障壁なくサービスを利用できるようにするための、アクセシビリティ設計・検証基準である。

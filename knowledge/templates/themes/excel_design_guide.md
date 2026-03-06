@@ -1,3 +1,12 @@
+---
+title: プロフェッショナル・エクセル設計書テーマガイド
+category: Templates
+tags: [templates, themes, excel, design, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # プロフェッショナル・エクセル設計書テーマガイド
 
 高品質な設計書（エクセル）を出力するための、レイアウトとビジュアルの標準基準。

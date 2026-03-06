@@ -1,3 +1,12 @@
+---
+title: Python Testing
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, python, testing]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Python Testing
 
 > This file extends [common/testing.md](../common/testing.md) with Python specific content.

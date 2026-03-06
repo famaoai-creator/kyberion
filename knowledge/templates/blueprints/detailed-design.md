@@ -1,3 +1,12 @@
+---
+title: Blueprint: Detailed Design
+category: Templates
+tags: [templates, blueprints, detailed, design]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Detailed Design
 <!-- Owner: Engineer / Developer -->
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->

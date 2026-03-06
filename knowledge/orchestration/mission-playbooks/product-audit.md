@@ -1,3 +1,12 @@
+---
+title: ミッション・プレイブック：プロダクト健全性 ＆ リリース監査
+category: Orchestration
+tags: [orchestration, mission-playbooks, product, audit, security]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # ミッション・プレイブック：プロダクト健全性 ＆ リリース監査
 
 本プレイブックは、既存のプロジェクトが本番レベルの品質基準を満たしているかを客観的に評価し、納品責任を果たすための「勝利条件」を定義する。

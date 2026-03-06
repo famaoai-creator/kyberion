@@ -1,3 +1,12 @@
+---
+title: SOP: TypeScript Core Base Stabilization
+category: Governance
+tags: [governance, base, stabilization, sop]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # SOP: TypeScript Core Base Stabilization
 
 TypeScript移行後の `libs/core` 等の基盤ライブラリにおいて、インポートエラー（`undefined` や `MODULE_NOT_FOUND`）が発生した際の標準復旧手順。

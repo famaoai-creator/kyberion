@@ -1,3 +1,12 @@
+---
+title: Reliability Engineer (SRE/運用責任者) ミッション声明
+category: Roles
+tags: [roles, reliability_engineer, mission]
+importance: 7
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Reliability Engineer (SRE/運用責任者) ミッション声明
 
 ## 1. 目的 (Mission)

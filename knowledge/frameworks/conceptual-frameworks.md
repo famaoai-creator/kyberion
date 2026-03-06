@@ -1,3 +1,12 @@
+---
+title: Conceptual Frameworks Reference
+category: Frameworks
+tags: [frameworks, conceptual, protocol]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Conceptual Frameworks Reference
 
 This document consolidates 26 conceptual frameworks that inform the Gemini Skills ecosystem. These are guidelines, thinking models, and governance principles -- not executable skills.

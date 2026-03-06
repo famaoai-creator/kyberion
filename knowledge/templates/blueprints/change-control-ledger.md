@@ -1,3 +1,12 @@
+---
+title: Blueprint: Change Control Ledger
+category: Templates
+tags: [templates, blueprints, change, control, ledger]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Change Control Ledger
 <!-- Owner: PMO / Project Manager -->
 <!-- Visibility: [L2: MANAGEMENT] -->

@@ -1,3 +1,12 @@
+---
+title: Incident Management & RCA Excellence Handbook
+category: Operations
+tags: [operations, incident, management, excellence]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Incident Management & RCA Excellence Handbook
 
 このドキュメントは、障害発生時の迅速な復旧と、二度と同じ過ちを繰り返さないための「根本原因分析 (RCA)」および「障害報告」の標準規約である。

@@ -1,3 +1,12 @@
+---
+title: Incident Report: mock-skill
+category: Incidents
+tags: [incidents, incident, unknown, mock, skill, 1772255677139]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Incident Report: mock-skill
   
 ## Metadata

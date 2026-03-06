@@ -1,3 +1,12 @@
+---
+title: Standard: Office Open XML (OOXML) for PowerPoint (.pptx)
+category: Standards
+tags: [standards, media, pptx, ooxml]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Standard: Office Open XML (OOXML) for PowerPoint (.pptx)
 
 - **Source**: ECMA-376 / ISO/IEC 29500

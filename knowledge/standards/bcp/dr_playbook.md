@@ -1,3 +1,12 @@
+---
+title: Disaster Recovery & BCP Playbook
+category: Standards
+tags: [standards, bcp, playbook, ace]
+importance: 10
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Disaster Recovery & BCP Playbook
 
 大規模システム障害が発生した際、AIエージェントが自律的に状況を統制するための標準手順。

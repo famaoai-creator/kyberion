@@ -1,3 +1,12 @@
+---
+title: Wisdom: Agentic Evolution & Architecture Patterns
+category: Common
+tags: [common, wisdom, agentic, evolution, patterns]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Wisdom: Agentic Evolution & Architecture Patterns
 
 このドキュメントは、Gemini Skills エコシステムの進化過程から得られた、自律型 AI エージェント基盤における普遍的な設計指針（知恵）を蓄積したものである。

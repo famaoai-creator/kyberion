@@ -1,3 +1,12 @@
+---
+title: Sensory Bridge Protocol (GUSP v1.0)
+category: Architecture
+tags: [architecture, sensory, bridge, protocol]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Sensory Bridge Protocol (GUSP v1.0)
 
 本ドキュメントは、Gemini エコシステムにおける外部刺激（Sensory Stimulus）の受容から、AI による自律実行、およびフィードバックまでの通信規約を定義する。

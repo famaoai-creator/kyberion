@@ -1,3 +1,12 @@
+---
+title: Blueprint: Stakeholder Communication Register
+category: Templates
+tags: [templates, blueprints, stakeholder, communication, register]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Stakeholder Communication Register
 <!-- Owner: PMO / Project Manager -->
 <!-- Visibility: [L1: EXECUTIVE, L2: MANAGEMENT] -->

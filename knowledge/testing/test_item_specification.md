@@ -1,3 +1,12 @@
+---
+title: テスト項目表・実施結果標準仕様 (Test Item Specification)
+category: Testing
+tags: [testing, test, item, specification]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # テスト項目表・実施結果標準仕様 (Test Item Specification)
 
 ウォーターフォール開発における「証跡」としてのテスト項目表の標準的な構成。

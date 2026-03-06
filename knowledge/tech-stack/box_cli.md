@@ -1,3 +1,12 @@
+---
+title: Box CLI 活用ガイド
+category: Tech-stack
+tags: [tech-stack, box, cli]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Box CLI 活用ガイド
 
 大量のファイル操作や、スクリプトレスでの定型処理に適した Box CLI の利用方法。

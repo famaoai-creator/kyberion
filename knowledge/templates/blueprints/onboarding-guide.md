@@ -1,3 +1,12 @@
+---
+title: Blueprint: Onboarding Guide
+category: Templates
+tags: [templates, blueprints, onboarding, guide]
+importance: 4
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Blueprint: Onboarding Guide
 <!-- Visibility: [L2: MANAGEMENT, L3: SYSTEM/DATA] -->
 

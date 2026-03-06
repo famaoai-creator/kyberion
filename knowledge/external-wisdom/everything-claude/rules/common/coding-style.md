@@ -1,3 +1,12 @@
+---
+title: Coding Style
+category: External-wisdom
+tags: [external-wisdom, everything-claude, rules, common, coding, style]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Coding Style
 
 ## Immutability (CRITICAL)

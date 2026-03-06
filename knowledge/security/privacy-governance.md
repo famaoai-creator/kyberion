@@ -1,3 +1,12 @@
+---
+title: Data Privacy & Governance: APPI & GDPR Compliance
+category: Security
+tags: [security, privacy, governance]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Data Privacy & Governance: APPI & GDPR Compliance
 
 このドキュメントは、日本の個人情報保護法 (APPI) および EU 一般データ保護規則 (GDPR) に基づき、データのライフサイクル全体における法的遵守とユーザーの権利を保護するための標準規約である。

@@ -1,3 +1,12 @@
+---
+title: Continuous Learning Loop Protocol
+category: Orchestration
+tags: [orchestration, fusion-protocols, learning, loop, protocol, security]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # Continuous Learning Loop Protocol
 
 This protocol defines how the ecosystem evolves when new external knowledge is harvested.

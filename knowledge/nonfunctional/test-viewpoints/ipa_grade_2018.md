@@ -1,3 +1,12 @@
+---
+title: 非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)
+category: Nonfunctional
+tags: [nonfunctional, test-viewpoints, ipa, grade, 2018]
+importance: 5
+author: Ecosystem Architect
+last_updated: 2026-03-06
+---
+
 # 非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)
 
 ## 1. 可用性 (Availability)
