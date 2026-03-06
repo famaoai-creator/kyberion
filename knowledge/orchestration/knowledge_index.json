@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 310,
-  "u": "2026-03-06T01:39:11.419Z",
+  "t": 311,
+  "u": "2026-03-06T03:48:31.067Z",
   "items": [
     {
       "id": "Ecosystem_Map.md",
@@ -992,6 +992,14 @@
       "title": "Mission Portability Standard (MEP v0.1)",
       "author": "Unknown",
       "last_updated": "2026-03-05",
+      "tier": "public",
+      "category": "orchestration"
+    },
+    {
+      "id": "orchestration/mission-types.md",
+      "title": "Mission Types & Categories",
+      "author": "Unknown",
+      "last_updated": "2026-03-06",
       "tier": "public",
       "category": "orchestration"
     },

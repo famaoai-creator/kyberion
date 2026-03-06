@@ -1,32 +1,37 @@
 [
   {
-    "pattern": "ENOENT",
+    "pattern": "ENOENT|No such file or directory",
     "cause": "Required file or directory is missing from the filesystem.",
     "impact": "Data processing halted due to missing inputs.",
-    "recommendation": "Check if the path is correct or if a previous step failed to generate the file."
+    "recommendation": "Check if the path is correct or if a previous step failed to generate the file.",
+    "action": "ls -R"
   },
   {
     "pattern": "EACCES|permission denied",
     "cause": "Process lacks sufficient permissions to read/write the target path.",
     "impact": "Security policy or OS-level restriction blocked the operation.",
-    "recommendation": "Run with elevated privileges or check directory ownership."
-  },
-  {
-    "pattern": "timeout",
-    "cause": "The operation exceeded its allocated time budget.",
-    "impact": "Potential resource exhaustion or external service hang.",
-    "recommendation": "Increase the timeout or check network stability / CPU load."
+    "recommendation": "Run with elevated privileges or check directory ownership.",
+    "action": "ls -la"
   },
   {
     "pattern": "MODULE_NOT_FOUND",
     "cause": "A required Node.js dependency is not installed.",
     "impact": "Code execution cannot start.",
-    "recommendation": "Run 'npm install' in the project root or skill directory."
+    "recommendation": "Run 'npm install' in the project root or skill directory.",
+    "action": "pnpm install"
   },
   {
-    "pattern": "forbidden tokens|SOVEREIGN_VIOLATION",
-    "cause": "Output contains sensitive data (Personal/Confidential) that is blocked by Tier Guard.",
-    "impact": "Security leak prevented, but execution results are hidden.",
-    "recommendation": "Review the output for secrets (API keys, PII) and mask them before returning."
+    "pattern": "timeout",
+    "cause": "The operation exceeded its allocated time budget.",
+    "impact": "Potential resource exhaustion or external service hang.",
+    "recommendation": "Increase the timeout or check network stability / CPU load.",
+    "action": "check_resource_usage"
+  },
+  {
+    "pattern": "Property '.*' does not exist on type",
+    "cause": "TypeScript compilation error: Interface mismatch.",
+    "impact": "Build failure.",
+    "recommendation": "Update the type definition or check for typos.",
+    "action": "inspect_types"
   }
 ]
