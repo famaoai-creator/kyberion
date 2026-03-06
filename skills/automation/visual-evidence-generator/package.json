@@ -1,0 +1,22 @@
+{
+  "name": "@kyberion/skill-visual-evidence-generator",
+  "version": "1.0.0",
+  "description": "Compiles the 10-frame visual buffer into a GIF or video for audit evidence.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "gif-encoder-2": "^1.0.5",
+    "jimp": "^0.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@agent/core": "workspace:*"
+  },
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "private": true
+}

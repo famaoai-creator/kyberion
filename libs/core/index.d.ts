@@ -9,7 +9,7 @@ export { safeReadFile, safeWriteFile, safeAppendFile, safeUnlink, safeMkdir, saf
 export * as pathResolver from './path-resolver.js';
 export { rootDir, knowledge, active, scripts, vault, shared, isProtected, skillDir, missionDir, resolve, rootResolve } from './path-resolver.js';
 export * as pathUtils from './path-resolver.js';
-export { logger, ui, fileUtils, errorHandler, Cache } from './core.js';
+export { logger, ui, fileUtils, errorHandler, Cache, sre } from './core.js';
 export * from './validators.js';
 export * from './validate.js';
 export { getAllFiles } from './fs-utils.js';
@@ -27,5 +27,5 @@ export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
-export * from './shared-business-types.js';
+export * as visionJudge from './vision-judge.js';
 //# sourceMappingURL=index.d.ts.map

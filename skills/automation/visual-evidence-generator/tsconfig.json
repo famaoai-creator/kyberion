@@ -1,0 +1,13 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@agent/core": ["../../../libs/core/index.js"],
+      "@agent/core/*": ["../../../libs/core/*.js"]
+    }
+  },
+  "include": ["src/**/*"]
+}

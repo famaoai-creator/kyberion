@@ -23,7 +23,7 @@ export declare function runPipeline(steps: any[], initialData?: {}): {
     totalSteps: number;
     completedSteps: number;
     duration_ms: number;
-    steps: never[];
+    steps: any[];
 };
 export declare function runParallel(steps: any[]): Promise<any>;
 export declare function loadPipeline(yamlPath: string): {
@@ -34,7 +34,7 @@ export declare function loadPipeline(yamlPath: string): {
         totalSteps: number;
         completedSteps: number;
         duration_ms: number;
-        steps: never[];
+        steps: any[];
     };
 };
 //# sourceMappingURL=orchestrator.d.ts.map
