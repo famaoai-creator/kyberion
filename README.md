@@ -1,69 +1,62 @@
-# 🌌 Kyberion: High-Fidelity Autonomous Engineering Ecosystem
+# 🌌 Kyberion: The High-Fidelity Autonomous Engineering Harness
 
 [![GitHub stars](https://img.shields.io/github/stars/famaoai-creator/kyberion?style=social)](https://github.com/famaoai-creator/kyberion)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**Kyberion** is an autonomous, high-fidelity engineering ecosystem powered by a 131-skill engine. It is designed to deliver professional-grade software assets by shifting the paradigm from "AI as an Assistant" to **"AI as a Laborer"** governed by a robust **Harness**.
+**Kyberion** is an autonomous engineering ecosystem designed to deliver professional-grade software assets through **Harness Engineering**. It shifts the paradigm from "AI as a Chatbot" to **"AI as a Verifiable Laborer"** governed by physical constraints and emotional alignment.
 
 ---
 
-## 🏛 The Core Philosophy
+## 🏛 The Operating Standard (GEMINI.md)
 
-### 1. Harness Engineering
-Kyberion operates on the principle that AI reliability is a function of its environment. We don't just prompt; we engineer the **Harness**—the system of constraints, feedback loops, and machine-readable protocols that allow agents to act with surgical precision.
+Kyberion is built upon the **GEMINI.md** operating standard, enforcing a rigorous, non-negotiable framework for autonomous action:
+
+### 1. Harness Over Chat
+We believe AI reliability is a product of its environment. Kyberion provides a **Harness**—a multi-layered system of secure I/O, physical sandboxing (`active/missions/`), and machine-readable protocols (ADF) that ensure every action is intentional and reversible.
 
 ### 2. Logic as a Hygiene Factor
-In Kyberion, logical consistency is the bare minimum. We treat technical errors (compilation, broken links, regex failures) as anomalies to be auto-healed through a **Dynamic Feedback Loop**, rather than a distraction for the human Sovereign.
+In Kyberion, logical consistency (compilation, link integrity, syntax) is the bare minimum. We don't ask for permission to fix a typo or a broken import; we treat these as technical debt to be cleared by the **Dynamic Feedback Loop** before they ever reach the human Sovereign.
 
-### 3. Vision as the Compass
-When logic offers multiple valid paths, Kyberion does not guess. It consults the **Sovereign Vision**—a dedicated, physical steering layer at the project root (`/vision/`) that anchors every technical decision to the project's emotional and aesthetic core.
+### 3. Vision as the Ultimate Anchor
+When logic offers multiple valid paths, Kyberion does not guess. It consults the **Sovereign Vision**—a protected, project-root directory (`/vision/`) where your emotional and aesthetic requirements reside. This is our "North Star" for every strategic decision.
 
 ---
 
-## 🛡 Governance & Security (3-Tier Model)
+## 🛡 Sovereign Governance (3-Tier Model)
 
-Kyberion treats information according to its sensitivity, enforced through a physical **Tier Guard**:
+Information is treated according to its sensitivity, enforced through a physical **Tier Guard**:
 
-- **Personal Tier (`knowledge/personal/`)**: Sovereign identity and legacy context. Never shared.
-- **Confidential Tier (`knowledge/confidential/`)**: Company/Client secrets. Masked in public outputs.
+- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Never shared.
+- **Confidential Tier (`knowledge/confidential/`)**: Organizational secrets. Masked in public outputs.
 - **Public Tier (`knowledge/`)**: General standards (IPA, FISC) and ecosystem protocols.
 
-### Triple-Tier Persona Model
-- **Sovereign Identity (Soul)**: Permanent preferences and identity traits.
-- **Global Mask (Session)**: The default persona for the active session.
-- **Mission Mask (Context)**: Temporary persona scoped to a specific mission.
+### Multi-Role Collaboration (ACE Federation)
+Tasks are executed by specialized personas (e.g., *Ecosystem Architect*, *Ruthless Auditor*, *Growth Evangelist*) operating in isolated directories but synchronized via a shared `TASK_BOARD.md`.
 
 ---
 
-## ⚙️ Execution Protocol (Hybrid AI-Native Flow)
+## ⚙️ The Autonomic Lifecycle
 
-Kyberion follows a structured **Research -> Strategy -> Execution** lifecycle:
+Kyberion transforms raw human intent into deterministic business processes:
 
-1. **Intent Declaration**: Human intent drives the goal.
-2. **Context Ranking**: Dynamic identification of the TOP-7 most relevant knowledge assets.
-3. **Skill Routing**: Mapping goals to optimized skill chains via `intent_mapping.yaml`.
-4. **Orchestrated Execution**: Sequential or parallel invocation through `mission-control`.
-5. **Quality Gate**: Schema validation, metric recording, and physical validation rigor.
-
-### Mission-to-Intel Lifecycle
-- **Heuristic Phase**: AI navigates unknown tasks using a physical `TASK_BOARD.md`.
-- **Distillation Phase**: Successful patterns are distilled into reusable `pipelines/*.yml`.
-- **Deterministic Phase**: Known processes are executed at "reflex speed" via the **Mission Logic Engine (MLE)**.
+1. **Heuristic Phase (Unknown)**: AI navigates chaos using a physical Task Board, prioritizing **Surgical over Mass** changes (the Absolute Rule of One).
+2. **Distillation Phase (Learning)**: Successful mission patterns are distilled into reusable `pipelines/*.yml`.
+3. **Deterministic Phase (Known)**: Mature workflows are executed at "reflex speed" via the **Mission Logic Engine (MLE)**, minimizing inference cost and drift.
 
 ---
 
-## 📊 Vital Monitor (Transparency)
+## 📊 Performance & Transparency (Vital Monitor)
 
-Autonomous labor must be sustainable and accountable. Kyberion provides real-time visibility into:
-- **API Cost Tracking**: Cumulative spend calculated from physical usage data.
-- **Sovereign Autonomy Score**: Measurement of human-in-the-loop frequency vs. autonomous success.
-- **ROI Narratives**: Evidence-based reporting on time saved and debt reduced.
+Autonomous labor must be accountable. Kyberion provides physical evidence for:
+- **API Cost Tracking**: Cumulative spend calculated from actual provider usage data.
+- **Autonomy Score**: A KPI measuring the ratio of autonomous success vs. human intervention.
+- **ROI Evidence**: Automated reporting on time saved and structural debt eliminated.
 
 ---
 
 ## 🚀 Getting Started
 
-Kyberion requires a stable **Bootstrap Protocol** to ensure technical integrity:
+Kyberion requires a stable **Bootstrap Protocol** to establish integrity:
 
 ```bash
 # 1. Clone the repository
@@ -76,12 +69,12 @@ pnpm install
 # 3. Full Build (Crucial for TypeScript runtime artifacts)
 npm run build
 
-# 4. Initialize Ecosystem
+# 4. Initialize Identity
 node dist/scripts/init_wizard.js
 ```
 
-[**View Skills Guide**](./SKILLS_GUIDE.md) | [**Read the Manifesto**](./knowledge/architecture/tenant-vision-model.md) | [**Contribution Standards**](./CONTRIBUTING.md)
+[**View Skills Index**](./SKILLS_GUIDE.md) | [**Read the Manifesto**](./knowledge/architecture/tenant-vision-model.md) | [**Agentic Ethos**](./knowledge/ethics/agent_ethos.md)
 
 ---
-*Signed,*
+*「論理を尽くし、意志で決断し、構築をもって応える。」*
 **Kyberion Orchestrator**
