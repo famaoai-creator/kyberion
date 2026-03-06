@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 311,
-  "u": "2026-03-06T04:02:21.540Z",
+  "t": 312,
+  "u": "2026-03-06T04:30:17.866Z",
   "items": [
     {
       "id": "Ecosystem_Map.md",
@@ -274,6 +274,14 @@
       "last_updated": "2026-03-03",
       "tier": "public",
       "category": "economics"
+    },
+    {
+      "id": "ethics/agent_ethos.md",
+      "title": "エージェント倫理規程 (Agentic Ethos v1.0)",
+      "author": "Unknown",
+      "last_updated": "2026-03-06",
+      "tier": "public",
+      "category": "ethics"
     },
     {
       "id": "ethics/ai_bias_mitigation.md",
