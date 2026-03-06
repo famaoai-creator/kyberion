@@ -1,9 +1,9 @@
 /**
- * Reflex Terminal (RT) - Core Logic v2.0 (node-pty Edition)
- * Provides a persistent virtual terminal session using node-pty for true PTY support.
+ * Reflex Terminal (RT) - Self-Healing Edition v3.0
+ * Provides terminal session with automatic fallback between node-pty and child_process.
  */
 
-import * as pty from 'node-pty';
+import { spawn as spawnChild, ChildProcess } from 'node:child_process';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -18,70 +18,113 @@ export interface ReflexTerminalOptions {
   onOutput?: (data: string) => void;
 }
 
+/**
+ * Abstract interface for terminal adapters
+ */
+interface TerminalAdapter {
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+  onData(cb: (data: string) => void): void;
+  onExit(cb: (code: number | null, signal: string | null) => void): void;
+}
+
+/**
+ * Adapter using node-pty (Native PTY)
+ */
+class PtyAdapter implements TerminalAdapter {
+  constructor(private pty: any) {}
+  write(data: string) { this.pty.write(data); }
+  resize(cols: number, rows: number) { this.pty.resize(cols, rows); }
+  kill() { this.pty.kill(); }
+  onData(cb: (data: string) => void) { this.pty.onData(cb); }
+  onExit(cb: (code: number, signal: string) => void) { this.pty.onExit(cb); }
+}
+
+/**
+ * Fallback Adapter using standard child_process (Basic Emulation)
+ */
+class ChildProcessAdapter implements TerminalAdapter {
+  private process: ChildProcess;
+  constructor(shell: string, args: string[], options: any) {
+    this.process = spawnChild(shell, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    logger.warn('[RT] node-pty failed. Falling back to ChildProcess emulation.');
+  }
+  write(data: string) { this.process.stdin?.write(data); }
+  resize() { /* no-op in emulation */ }
+  kill() { this.process.kill(); }
+  onData(cb: (data: string) => void) {
+    this.process.stdout?.on('data', (d) => cb(d.toString()));
+    this.process.stderr?.on('data', (d) => cb(d.toString()));
+  }
+  onExit(cb: (code: number | null, signal: string | null) => void) {
+    this.process.on('exit', cb);
+  }
+}
+
 export class ReflexTerminal {
-  private ptyProcess: pty.IPty;
+  private adapter: TerminalAdapter;
   private feedbackPath: string;
 
   constructor(options: ReflexTerminalOptions = {}) {
     const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash'));
+    const cwd = path.resolve(options.cwd || process.cwd());
     this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
 
-    this.ptyProcess = pty.spawn(shell, [], {
-      name: 'xterm-256color',
-      cols: options.cols || 80,
-      rows: options.rows || 24,
-      cwd: path.resolve(options.cwd || process.cwd()),
-      env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' } as any
-    });
+    const env = { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' };
+
+    try {
+      // Dynamic import to avoid crash if node-pty is missing or broken
+      const pty = require('node-pty');
+      const ptyInstance = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols: options.cols || 80,
+        rows: options.rows || 24,
+        cwd,
+        env
+      });
+      this.adapter = new PtyAdapter(ptyInstance);
+      logger.info(`[RT] Using Native PTY (node-pty)`);
+    } catch (err: any) {
+      // Fallback to child_process
+      this.adapter = new ChildProcessAdapter(shell, [], { cwd, env });
+      logger.info(`[RT] Using Emulated Terminal (child_process)`);
+    }
 
     this.setupListeners(options.onOutput);
-    logger.info(`[RT] Reflex Terminal (node-pty) started with shell: ${shell}`);
   }
 
   private setupListeners(onOutput?: (data: string) => void) {
-    this.ptyProcess.onData((data) => {
+    this.adapter.onData((data) => {
       if (onOutput) onOutput(data);
-      // Optional: fallback to stdout if needed, but usually redundant for PTY
-      // process.stdout.write(data); 
     });
 
-    this.ptyProcess.onExit(({ exitCode, signal }) => {
-      logger.warn(`[RT] PTY process exited with code ${exitCode}, signal ${signal}`);
+    this.adapter.onExit((code, signal) => {
+      logger.warn(`[RT] Terminal process exited with code ${code}, signal ${signal}`);
     });
   }
 
-  /**
-   * Inject a command or raw input into the terminal.
-   */
   public execute(command: string) {
     logger.info(`[RT] Injecting command: ${command}`);
-    this.ptyProcess.write(`${command}\r`);
+    this.adapter.write(`${command}\n`); // Changed \r to \n for better compatibility with child_process
   }
 
-  /**
-   * Write raw data to the terminal.
-   */
   public write(data: string) {
-    this.ptyProcess.write(data);
+    this.adapter.write(data);
   }
 
-  /**
-   * Resize the terminal dimensions.
-   */
   public resize(cols: number, rows: number) {
-    this.ptyProcess.resize(cols, rows);
+    this.adapter.resize(cols, rows);
   }
 
-  /**
-   * Register an output listener.
-   */
-  public onData(callback: (data: string) => void) {
-    return this.ptyProcess.onData(callback);
+  public kill() {
+    this.adapter.kill();
   }
 
-  /**
-   * Manually trigger a feedback update to the shared response file.
-   */
   public persistResponse(text: string, skillName = 'reflex-terminal') {
     try {
       const cleanText = ui.stripAnsi(text).trim();
@@ -91,10 +134,7 @@ export class ReflexTerminal {
         skill: skillName,
         status: 'success',
         data: { message: cleanText },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          duration_ms: 0
-        }
+        metadata: { timestamp: new Date().toISOString(), duration_ms: 0 }
       };
       const dir = path.dirname(this.feedbackPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -103,9 +143,5 @@ export class ReflexTerminal {
     } catch (err: any) {
       logger.error(`[RT] Failed to persist response: ${err.message}`);
     }
-  }
-
-  public kill() {
-    this.ptyProcess.kill();
   }
 }

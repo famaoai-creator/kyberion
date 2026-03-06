@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T16:12:03.375Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T17:56:33.617Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -74,6 +74,9 @@
 - [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md) (public | Ecosystem Architect)
 - [🧠 Autonomous Wisdom Distillation - 2026-03-01](./evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
 
+## 📁 external-wisdom
+- [OpenClaw Architecture and Conceptual Analysis](./external-wisdom/openclaw-analysis.md) (public | Sovereign Concierge)
+
 ## 📁 external-wisdom/everything-claude/agents
 - [ADR-001: Use Redis for Semantic Search Vector Storage](./external-wisdom/everything-claude/agents/architect.md) (public | Unknown)
 - [Build Error Resolver](./external-wisdom/everything-claude/agents/build-error-resolver.md) (public | Unknown)
@@ -136,6 +139,7 @@
 - [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [Dual-Key Policy](./governance/dual-key-policy.md) (public | Unknown)
 - [GIT Strategy: Sovereign Hierarchical Synchronization](./governance/git-strategy.md) (public | Ecosystem Architect)
+- [Dynamic Capability and Skill Governance Policy](./governance/governance-policy.md) (public | Ecosystem Architect)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol](./governance/onboarding-protocol.md) (public | Unknown)
 - [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Ecosystem Architect)
