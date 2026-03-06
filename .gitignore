@@ -24,6 +24,12 @@ tests/_tmp_integration/
 evidence/benchmarks/
 evidence/performance/
 
+# Auto-generated knowledge indices and context
+knowledge/orchestration/knowledge_index.json
+knowledge/orchestration/active_context.json
+tools/chronos-mirror/public/knowledge_index.json
+presence/displays/chronos-mirror/public/stimuli_feed.json
+
 # Plugin runtime data
 *.jsonl
 vault/
