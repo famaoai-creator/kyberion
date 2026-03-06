@@ -110,6 +110,9 @@ async function main() {
   safeWriteFile(path.join(rootDir, 'knowledge/confidential/.gitkeep'), '');
   safeWriteFile(path.join(rootDir, 'vault/.gitkeep'), '');
 
+  const personalDir = path.resolve(rootDir, 'knowledge/personal');
+  const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
+
   // 3.2. Confidential Knowledge Sync
   const syncConf = await askQuestion('\nStep 3: Sync Confidential knowledge with a remote repository? (y/N): ');
   if (syncConf.toLowerCase() === 'y') {

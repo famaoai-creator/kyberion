@@ -31,6 +31,12 @@ last_updated: 2026-03-06
 - 「今の状況は？」→ `PERFORMANCE_DASHBOARD` の要約を読み上げ。
 - 「資料を作って」→ `Executive Reporting Maestro` を召喚。
 
+### 実装済みスキル
+- **voice-notifier**: CLI から直接音声を発生させる基本スキル。
+  ```bash
+  gemini run voice-notifier --text "任務を完了しました。" --voice "Kyoko"
+  ```
+
 ---
 
 _Created: 2026-02-14 | Voice Interface Architect_
