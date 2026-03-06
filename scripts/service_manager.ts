@@ -20,10 +20,12 @@ const SERVICES: Record<string, any> = {
     path: 'presence/sensors/slack-sensor.ts',
     description: 'Listens for Slack mentions and DMs'
   },
-  'terminal-hub': {
-    path: 'presence/bridge/terminal/server.ts',
-    description: 'Persistent AI-native virtual terminal session (API Hub)'
-  },
+  /* 
+   * NOTE: 'terminal-hub' (presence/bridge/terminal/server.ts) is EXCLUDED from automatic background startup.
+   * On macOS, node-pty requires a real TTY to avoid 'posix_spawnp failed'.
+   * Please run it manually in a dedicated foreground terminal tab:
+   * $ npx tsx presence/bridge/terminal/server.ts
+   */
   'nexus-daemon': {
     path: 'presence/bridge/nexus-daemon.ts',
     description: 'Coordinates physical terminal intervention'

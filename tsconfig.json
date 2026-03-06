@@ -20,6 +20,6 @@
       "@agent/core/*": ["libs/core/*"]
     }
   },
-  "include": ["skills/**/src/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts"],
+  "include": ["skills/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts"],
   "exclude": ["node_modules", "dist", "coverage", "test-results"]
 }

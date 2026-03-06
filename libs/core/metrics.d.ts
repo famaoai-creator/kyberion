@@ -12,6 +12,7 @@ export declare class MetricsCollector {
     private _aggregates;
     constructor(options?: MetricsOptions);
     record(skillName: string, durationMs: number, status: 'success' | 'error', extra?: any): void;
+    recordIntervention(context: string, decisionId: string): void;
     summarize(): any[];
     getSkillMetrics(skillName: string): any;
     loadHistory(): any[];

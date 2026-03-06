@@ -3,34 +3,54 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
- * Terminal Bridge v2.9 (Reflex Terminal Integration)
+ * Terminal Bridge v4.0 (Isolated Session Protocol)
+ * Uses file-based I/O at active/shared/runtime/terminal/{sessionId}/
  */
+
+const RUNTIME_BASE = path.join(process.cwd(), 'active/shared/runtime/terminal');
 
 const STRATEGIES: Record<string, any> = {
   ReflexTerminal: {
     findIdle: () => {
-      // Logic to check if the RT session is active (via presence of PID or lock file)
-      const rootDir = process.cwd();
-      const pidFile = path.join(rootDir, 'active/shared/services-pids.json');
-      if (fs.existsSync(pidFile)) {
-        try {
-          const pids = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
-          if (pids['reflex-terminal']) return { winId: 'rt-main', sessionId: 'default', type: 'ReflexTerminal' };
-        } catch (_) {}
+      if (!fs.existsSync(RUNTIME_BASE)) return null;
+      
+      const sessions = fs.readdirSync(RUNTIME_BASE);
+      for (const id of sessions) {
+        const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
+        if (fs.existsSync(stateFile)) {
+          try {
+            const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+            // Simple check if the process is still alive
+            process.kill(state.pid, 0);
+            return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
+          } catch (_) {
+            // Process dead, cleanup state if needed?
+          }
+        }
       }
       return null;
     },
     inject: async (winId: string, sessionId: string, text: string) => {
-      const url = process.env.TERMINAL_HUB_URL || 'http://localhost:4321/inject';
+      const sid = sessionId || 'default';
+      const sessionInDir = path.join(RUNTIME_BASE, sid, 'in');
+      
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, sessionId })
-        });
-        return response.ok;
+        if (!fs.existsSync(sessionInDir)) {
+          fs.mkdirSync(sessionInDir, { recursive: true });
+        }
+        
+        const requestId = `req-${Date.now()}`;
+        const requestPath = path.join(sessionInDir, `${requestId}.json`);
+        
+        fs.writeFileSync(requestPath, JSON.stringify({
+          id: requestId,
+          ts: new Date().toISOString(),
+          text
+        }, null, 2), 'utf8');
+        
+        return true;
       } catch (err: any) {
-        console.error(`[TerminalBridge] API Injection Failed (${url}): ${err.message}`);
+        console.error(`[TerminalBridge] File Injection Failed for ${sid}: ${err.message}`);
         return false;
       }
     }
@@ -40,10 +60,7 @@ const STRATEGIES: Record<string, any> = {
       const script = `
         tell application "iTerm2"
           if not (exists windows) then return "NOT_FOUND"
-          
           set bestSession to "NOT_FOUND"
-          
-          -- First, try to find a session with "Gemini" in its name or content
           repeat with w in windows
             repeat with t in tabs of w
               repeat with s in sessions of t
@@ -59,8 +76,6 @@ const STRATEGIES: Record<string, any> = {
             end repeat
             if bestSession is not "NOT_FOUND" then exit repeat
           end repeat
-          
-          -- Fallback to the current session of the front window
           if bestSession is "NOT_FOUND" then
             try
               set w to front window
@@ -71,7 +86,6 @@ const STRATEGIES: Record<string, any> = {
               return "NOT_FOUND"
             end try
           end if
-          
           return bestSession
         end tell
       `;
@@ -108,63 +122,18 @@ const STRATEGIES: Record<string, any> = {
       `;
       try {
         const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
-        if (result === 'SUCCESS') return true;
-        console.error(`[TerminalBridge] iTerm2 Injection Status: ${result}`);
-        return false;
-      } catch (err: any) {
-        console.error(`[TerminalBridge] iTerm2 Injection Exception: ${err.message}`);
-        return false;
-      }
-    }
-  },
-  VSCode: {
-    findIdle: () => {
-      const script = `
-        tell application "System Events"
-          if (count (processes whose name is "Code")) > 0 then
-            return "CODE_RUNNING"
-          end if
-          return "NOT_FOUND"
-        end tell
-      `;
-      try {
-        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
-        return result === 'CODE_RUNNING' ? { type: 'VSCode' } : null;
-      } catch (_) { return null; }
-    },
-    inject: async (winId: string, sessionId: string, text: string) => {
-      const escapedText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const script = `
-        tell application "Code" to activate
-        delay 0.1
-        tell application "System Events"
-          keystroke "${escapedText}"
-          key code 36
-        end tell
-      `;
-      try {
-        execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'");
-        return true;
-      } catch (err: any) {
-        console.error(`[TerminalBridge] VSCode Injection Error: ${err.message}`);
-        return false;
-      }
+        return result === 'SUCCESS';
+      } catch (_) { return false; }
     }
   }
 };
 
 export const terminalBridge = {
   findIdleSession: () => {
-    // RT has the highest priority for autonomous operations
     const rt = STRATEGIES.ReflexTerminal.findIdle();
     if (rt) return rt;
-
     const iterm = STRATEGIES.iTerm2.findIdle();
     if (iterm) return iterm;
-
-    const vscode = STRATEGIES.VSCode.findIdle();
-    if (vscode) return vscode;
-
     return null;
   },
   injectAndExecute: async (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {
@@ -173,26 +142,17 @@ export const terminalBridge = {
     return await strategy.inject(winId, sessionId, text);
   },
   readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
-    if (terminalType !== 'iTerm2') return '';
-    const script = `
-      tell application "iTerm2"
-        repeat with w in windows
-          repeat with t in tabs of w
-            repeat with s in sessions of t
-              if (unique ID of s as string) is "${sessionId}" then
-                return contents of s
-              end if
-            end repeat
-          end repeat
-        end repeat
-        return "SESSION_NOT_FOUND"
-      end tell
-    `;
-    try {
-      const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
-      return result === 'SESSION_NOT_FOUND' ? '' : result;
-    } catch {
+    if (terminalType === 'ReflexTerminal') {
+      const latestPath = path.join(RUNTIME_BASE, sessionId, 'out', 'latest_response.json');
+      if (fs.existsSync(latestPath)) {
+        try {
+          const content = JSON.parse(fs.readFileSync(latestPath, 'utf8'));
+          return content.data.message || '';
+        } catch (_) { return ''; }
+      }
       return '';
     }
+    // Fallback for iTerm2
+    return '';
   }
 };

@@ -4,6 +4,7 @@ description: Distills mission results into reusable logic pipelines (YAML).
 status: implemented
 category: Intelligence
 last_updated: '2026-03-04'
+tags: gemini-skill
 ---
 
 # Wisdom Distiller

@@ -4,6 +4,7 @@ description: Gatekeeper for agent economic autonomy and external MFA approvals.
 status: planned
 category: Utilities
 last_updated: '2026-03-04'
+tags: gemini-skill
 ---
 
 # Wallet Manager (Draft)

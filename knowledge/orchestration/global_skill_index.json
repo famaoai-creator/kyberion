@@ -1528,6 +1528,39 @@
       "m": "dist/index.js",
       "t": [],
       "u": "2026-03-05T04:05:02.477Z"
+    },
+    {
+      "n": "keyboard-injector",
+      "path": "skills/automation/keyboard-injector",
+      "d": "High-fidelity Keyboard Injection for macOS",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,gemini-skill",
+      "u": "2026-03-06T07:40:18.444Z",
+      "q": 80
+    },
+    {
+      "n": "mouse-injector",
+      "path": "skills/automation/mouse-injector",
+      "d": "High-fidelity Mouse Injection for macOS",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,gemini-skill",
+      "u": "2026-03-06T07:40:18.444Z",
+      "q": 80
+    },
+    {
+      "n": "system-scenario-player",
+      "path": "skills/automation/system-scenario-player",
+      "d": "Brain-like Orchestrator for System Automation Scenarios",
+      "s": "impl",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "automation,gemini-skill",
+      "u": "2026-03-06T07:40:18.444Z",
+      "q": 80
     }
   ]
 }

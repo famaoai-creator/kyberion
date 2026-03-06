@@ -32,17 +32,28 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.metrics = exports.MetricsCollector = void 0;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
-const chalk = require('chalk').default || require('chalk');
+const chalk_1 = __importDefault(require("chalk"));
 /**
  * Lightweight metrics collection for Gemini Skills.
  */
 const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
 const DEFAULT_METRICS_FILE = 'skill-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
+const COST_TABLE = {
+    'gpt-4o': { prompt: 0.005 / 1000, completion: 0.015 / 1000 },
+    'gpt-4o-mini': { prompt: 0.00015 / 1000, completion: 0.0006 / 1000 },
+    'claude-3-5-sonnet': { prompt: 0.003 / 1000, completion: 0.015 / 1000 },
+    'gemini-1.5-pro': { prompt: 0.00125 / 1000, completion: 0.00375 / 1000 },
+    'gemini-1.5-flash': { prompt: 0.000075 / 1000, completion: 0.0003 / 1000 },
+    'default': { prompt: 0.001 / 1000, completion: 0.003 / 1000 },
+};
 class MetricsCollector {
     _metricsDir;
     _metricsFile;
@@ -64,7 +75,7 @@ class MetricsCollector {
             rssMB: Math.round((mem.rss / 1024 / 1024) * 100) / 100,
         };
         if (memory.heapUsedMB > this._memoryBudgetMB) {
-            console.warn(chalk.yellow(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
+            console.warn(chalk_1.default.yellow(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
         }
         let agg = this._aggregates.get(skillName);
         if (!agg) {
@@ -81,6 +92,8 @@ class MetricsCollector {
                 cacheMisses: 0,
                 cachePurges: 0,
                 recoveries: 0,
+                interventions: 0,
+                totalCostUSD: 0,
                 cacheIntegrityFailures: 0,
                 outputSizeKB: 0,
                 promptTokens: 0,
@@ -94,6 +107,8 @@ class MetricsCollector {
             agg.errors++;
         if (extra.recovered)
             agg.recoveries++;
+        if (extra.intervention)
+            agg.interventions++;
         agg.totalMs += durationMs;
         agg.minMs = Math.min(agg.minMs, durationMs);
         agg.maxMs = Math.max(agg.maxMs, durationMs);
@@ -101,9 +116,16 @@ class MetricsCollector {
         agg.peakHeapMB = Math.max(agg.peakHeapMB, memory.heapUsedMB);
         agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
         if (extra.usage) {
-            agg.promptTokens += extra.usage.prompt_tokens || 0;
-            agg.completionTokens += extra.usage.completion_tokens || 0;
-            agg.totalTokens += extra.usage.total_tokens || 0;
+            const pTokens = extra.usage.prompt_tokens || 0;
+            const cTokens = extra.usage.completion_tokens || 0;
+            agg.promptTokens += pTokens;
+            agg.completionTokens += cTokens;
+            agg.totalTokens += (pTokens + cTokens);
+            const model = extra.model || 'default';
+            const rates = COST_TABLE[model] || COST_TABLE['default'];
+            const cost = (pTokens * rates.prompt) + (cTokens * rates.completion);
+            agg.totalCostUSD += cost;
+            extra.cost_usd = Math.round(cost * 100000) / 100000;
         }
         if (extra.outputSize) {
             agg.outputSizeKB = Math.max(agg.outputSizeKB, Math.round(extra.outputSize / 1024));
@@ -124,6 +146,14 @@ class MetricsCollector {
                 ...extra,
             });
         }
+    }
+    recordIntervention(context, decisionId) {
+        this._appendToFile({
+            type: 'intervention',
+            context,
+            decision: decisionId,
+            timestamp: new Date().toISOString(),
+        });
     }
     summarize() {
         const summaries = [];
@@ -158,6 +188,9 @@ class MetricsCollector {
                 outputSizeKB: agg.outputSizeKB || 0,
                 avgTokens: agg.count > 0 ? Math.round(agg.totalTokens / agg.count) : 0,
                 totalTokens: agg.totalTokens,
+                totalCostUSD: Math.round(agg.totalCostUSD * 1000) / 1000,
+                interventions: agg.interventions || 0,
+                interventionRate: agg.count > 0 ? Math.round((agg.interventions / agg.count) * 100) : 0,
             });
         }
         return summaries.sort((a, b) => b.executions - a.executions);
