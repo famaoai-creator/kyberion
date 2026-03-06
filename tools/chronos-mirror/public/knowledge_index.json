@@ -272,6 +272,14 @@
     "category": "economics"
   },
   {
+    "id": "ethics/agent_ethos.md",
+    "title": "エージェント倫理規程 (Agentic Ethos v1.0)",
+    "author": "Unknown",
+    "last_updated": "2026-03-06",
+    "tier": "public",
+    "category": "ethics"
+  },
+  {
     "id": "ethics/ai_bias_mitigation.md",
     "title": "Data Ethics & AI Bias Mitigation Standard",
     "author": "Unknown",
