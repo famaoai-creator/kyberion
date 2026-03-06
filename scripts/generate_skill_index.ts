@@ -13,7 +13,7 @@ import * as pathResolver from '@agent/core/path-resolver';
 const indexFile = pathResolver.knowledge('orchestration/global_skill_index.json');
 
 interface SkillEntry {
-  n: string; path: string; d: string; s: string; r: string; m: string; t: string[]; u: string;
+  n: string; path: string; d: string; s: string; r: string; m: string; t: string[]; u: string; p?: string[];
 }
 
 function initializeSkill(skillPath: string, name: string, category: string) {
@@ -87,12 +87,20 @@ async function main() {
             }
 
             let tags: string[] = [];
+            let platforms: string[] = [];
             const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-            if (fmMatch) { try { const fm: any = yaml.load(fmMatch[1]); tags = fm.tags || []; } catch (_) {} }
+            if (fmMatch) { 
+              try { 
+                const fm: any = yaml.load(fmMatch[1]); 
+                tags = fm.tags || []; 
+                platforms = fm.platforms || [];
+              } catch (_) {} 
+            }
 
             skillsMap.set(relPath, {
               n: dir, path: relPath, d: desc, s: status === 'implemented' ? 'impl' : status.substring(0, 4),
-              r: risk, m: mainScript, t: tags, u: new Date(stat.mtimeMs).toISOString()
+              r: risk, m: mainScript, t: tags, u: new Date(stat.mtimeMs).toISOString(),
+              p: platforms
             });
           }
         }

@@ -1,9 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { execSync } from 'node:child_process';
+import * as yaml from 'js-yaml';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { safeWriteFile } from '@agent/core';
+
+const currentPlatform = os.platform();
 
 interface SkillObj {
   name: string;
@@ -77,10 +81,26 @@ skills.forEach((skillObj) => {
   const skillMdPath = path.join(skillPath, 'SKILL.md');
   let isPlanned = false;
 
-  // Check SKILL.md for status
+  // Check SKILL.md for status and platform
   if (fs.existsSync(skillMdPath)) {
     const mdContent = fs.readFileSync(skillMdPath, 'utf8');
-    if (mdContent.includes('status: planned')) {
+    const fmMatch = mdContent.match(/^---\n([\s\S]*?)\n---/);
+    if (fmMatch) {
+      try {
+        const fm: any = yaml.load(fmMatch[1]);
+        if (fm.status === 'planned') {
+          isPlanned = true;
+          status = '⏳ PLANNED';
+          details.push('Pending implementation');
+        }
+        if (fm.platforms && Array.isArray(fm.platforms) && fm.platforms.length > 0) {
+          if (!fm.platforms.includes(currentPlatform)) {
+            status = '🚫 UNSUPPORTED';
+            details.push(`OS mismatch (Current: ${currentPlatform}, Required: ${fm.platforms.join(', ')})`);
+          }
+        }
+      } catch (_) {}
+    } else if (mdContent.includes('status: planned')) {
       isPlanned = true;
       status = '⏳ PLANNED';
       details.push('Pending implementation');

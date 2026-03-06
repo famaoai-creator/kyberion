@@ -62,6 +62,7 @@ name: my-skill
 description: What it does
 status: implemented
 maturity: beta
+platforms: [darwin, win32, linux] # (Optional) Supported OS
 ---
 ```
 

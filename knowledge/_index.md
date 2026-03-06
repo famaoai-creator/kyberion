@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T15:39:35.191Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T16:12:03.375Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -134,10 +134,10 @@
 - [Active Inquiry Protocol: The Power of Questioning](./governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Config Protocol: The Sovereign Rule of System State](./governance/config-protocol.md) (public | Ecosystem Architect)
 - [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Ecosystem Architect)
-- [Dual-Key Policy: ロール管理と決定権限の標準規約](./governance/dual-key-policy.md) (public | Unknown)
+- [Dual-Key Policy](./governance/dual-key-policy.md) (public | Unknown)
 - [GIT Strategy: Sovereign Hierarchical Synchronization](./governance/git-strategy.md) (public | Ecosystem Architect)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Ecosystem Architect)
-- [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./governance/onboarding-protocol.md) (public | Unknown)
+- [Sovereign Onboarding Protocol](./governance/onboarding-protocol.md) (public | Unknown)
 - [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
 
@@ -191,7 +191,7 @@
 - [ミッション実行規程 (Mission Execution Protocol v1.0)](./orchestration/mission-execution-protocol.md) (public | Ecosystem Architect)
 - [Mission Portability Standard (MEP v0.1)](./orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
 - [Mission Types & Categories](./orchestration/mission-types.md) (public | Ecosystem Architect)
-- [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./orchestration/onboarding-protocol.md) (public | Unknown)
+- [Sovereign Onboarding Protocol](./orchestration/onboarding-protocol.md) (public | Unknown)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./orchestration/optimization-standards.md) (public | Ecosystem Architect)
 - [Polyglot Core Transformation Roadmap (Sidecar Architecture)](./orchestration/polyglot-roadmap.md) (public | Ecosystem Architect)
 - [Professional Proposal Pipeline (Orchestration Pattern)](./orchestration/proposal-pipeline.md) (public | Ecosystem Architect)
@@ -435,7 +435,7 @@
 - [API Compatibility & Evolution Standards](./standards/engineering/api-compatibility-standards.md) (public | Ecosystem Architect)
 - [Source Code Analysis Protocol (SCAP)](./standards/engineering/code-analysis-protocol.md) (public | Ecosystem Architect)
 - [Logging Design & Observability Standards](./standards/engineering/logging-design-standards.md) (public | Ecosystem Architect)
-- [Platform Engineering & DevEx Standards](./standards/engineering/platform-engineering.md) (public | Ecosystem Architect)
+- [Multi-Platform Development Standard](./standards/engineering/platform-engineering.md) (public | Ecosystem Architect)
 - [Reverse Design Protocol (RDP)](./standards/engineering/reverse-design-protocol.md) (public | Ecosystem Architect)
 
 ## 📁 standards/fisc

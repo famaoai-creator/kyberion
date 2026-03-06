@@ -15,7 +15,8 @@ type: number
 default: 1000
 description: Check interval in milliseconds.
 category: Automation
-tags: gemini-skill, vision
+tags: [gemini-skill, vision]
+platforms: [darwin]
 ---
 
 # 👁️ visual-assertion-engine (v1.0)

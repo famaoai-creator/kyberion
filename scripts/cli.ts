@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import { logger, fileUtils, ui } from '@agent/core/core';
@@ -90,6 +91,18 @@ async function runCommand() {
 
   if (!skill) {
     const errorMsg = `Skill "${skillName}" not found in index`;
+    logger.error(errorMsg);
+    logResponse(errorMsg);
+    return;
+  }
+
+  // Platform Compatibility Check
+  const currentPlatform = os.platform();
+  const rawPlatforms = skill.p || [];
+  const supportedPlatforms = Array.isArray(rawPlatforms) ? rawPlatforms : [rawPlatforms];
+  
+  if (supportedPlatforms.length > 0 && !supportedPlatforms.includes(currentPlatform)) {
+    const errorMsg = `❌ Skill "${skillName}" is not supported on ${currentPlatform}. Supported: ${supportedPlatforms.join(', ')}`;
     logger.error(errorMsg);
     logResponse(errorMsg);
     return;
