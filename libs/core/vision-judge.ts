@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { metrics } from './metrics.js';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 
@@ -41,9 +42,11 @@ export async function consultVision(
 
         if (selected) {
           rl.close();
+          metrics.recordIntervention(context, selected.id);
           logger.success(`✅ Vision set to: ${selected.id}`);
           resolve(selected);
-        } else {
+        }
+ else {
           console.log(chalk.red('Invalid selection. Try again.'));
           ask();
         }
