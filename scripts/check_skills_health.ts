@@ -74,6 +74,19 @@ skills.forEach((skillObj) => {
   let needsFix = false;
 
   const pkgPath = path.join(skillPath, 'package.json');
+  const skillMdPath = path.join(skillPath, 'SKILL.md');
+  let isPlanned = false;
+
+  // Check SKILL.md for status
+  if (fs.existsSync(skillMdPath)) {
+    const mdContent = fs.readFileSync(skillMdPath, 'utf8');
+    if (mdContent.includes('status: planned')) {
+      isPlanned = true;
+      status = '⏳ PLANNED';
+      details.push('Pending implementation');
+    }
+  }
+
   if (fs.existsSync(pkgPath)) {
     try {
       const pkg: PackageJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -81,7 +94,7 @@ skills.forEach((skillObj) => {
 
       // 1. Standard Fields Check
       if (pkg.author !== 'Gemini Agent' || pkg.license !== 'MIT' || pkg.private !== true) {
-        details.push('Invalid metadata');
+        if (!isPlanned) details.push('Invalid metadata');
         if (argv.fix) {
           pkg.author = 'Gemini Agent';
           pkg.license = 'MIT';
@@ -92,7 +105,7 @@ skills.forEach((skillObj) => {
 
       // 2. Dependency Check (@agent/core)
       if (!pkg.devDependencies || !pkg.devDependencies['@agent/core']) {
-        details.push('Missing @agent/core devDep');
+        if (!isPlanned) details.push('Missing @agent/core devDep');
         if (argv.fix) {
           if (!pkg.devDependencies) pkg.devDependencies = {};
           pkg.devDependencies['@agent/core'] = 'workspace:*';
@@ -105,45 +118,48 @@ skills.forEach((skillObj) => {
       const isTsSkill = fs.existsSync(srcDir);
 
       if (!mainScript || !fs.existsSync(mainScript)) {
-        details.push(`Broken main: ${pkg.main || 'none'}`);
-        if (argv.fix) {
-          const scriptsDir = path.join(skillPath, 'scripts');
-          const distDir = path.join(skillPath, 'dist');
-          const candidates: string[] = [];
+        if (isPlanned) {
+          status = '⏳ PLANNED';
+          details.push('Pending implementation');
+        } else {
+          details.push(`Broken main: ${pkg.main || 'none'}`);
+          if (argv.fix) {
+            const scriptsDir = path.join(skillPath, 'scripts');
+            const distDir = path.join(skillPath, 'dist');
+            const candidates: string[] = [];
 
-          if (isTsSkill) {
-            // Priority 1: dist/ (built from src/)
-            if (fs.existsSync(distDir)) {
-              const distFiles = fs.readdirSync(distDir, { recursive: true } as any)
-                .filter((f: any) => f.endsWith('.js') || f.endsWith('.cjs'))
-                .map((f: any) => `dist/${f}`);
-              
-              const bestDist = distFiles.find((f: string) => f.includes('index.js') || f.includes('main.js')) || distFiles[0];
-              if (bestDist) candidates.push(bestDist);
+            if (isTsSkill) {
+              if (fs.existsSync(distDir)) {
+                const distFiles = fs.readdirSync(distDir, { recursive: true } as any)
+                  .filter((f: any) => f.endsWith('.js') || f.endsWith('.cjs'))
+                  .map((f: any) => `dist/${f}`);
+                
+                const bestDist = distFiles.find((f: string) => f.includes('index.js') || f.includes('main.js')) || distFiles[0];
+                if (bestDist) candidates.push(bestDist);
+              }
+            } else {
+              if (fs.existsSync(scriptsDir)) {
+                const scriptFiles = fs.readdirSync(scriptsDir)
+                  .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'))
+                  .map((f) => `scripts/${f}`);
+                
+                const bestScript = scriptFiles.find((f) => f.includes('index.js') || f.includes('main.js')) || scriptFiles[0];
+                if (bestScript) candidates.push(bestScript);
+              }
             }
-          } else {
-            // Priority 1: scripts/ (legacy or pure JS skill)
-            if (fs.existsSync(scriptsDir)) {
-              const scriptFiles = fs.readdirSync(scriptsDir)
-                .filter((f) => f.endsWith('.cjs') || f.endsWith('.js'))
-                .map((f) => `scripts/${f}`);
-              
-              const bestScript = scriptFiles.find((f) => f.includes('index.js') || f.includes('main.js')) || scriptFiles[0];
-              if (bestScript) candidates.push(bestScript);
+
+            const bestMatch = candidates[0];
+            if (bestMatch) {
+              pkg.main = bestMatch;
+              mainScript = path.join(skillPath, pkg.main);
+              needsFix = true;
+              details.push(`(Fixed to ${pkg.main})`);
             }
           }
-
-          const bestMatch = candidates[0];
-          if (bestMatch) {
-            pkg.main = bestMatch;
-            mainScript = path.join(skillPath, pkg.main);
-            needsFix = true;
-            details.push(`(Fixed to ${pkg.main})`);
+          if (!needsFix) {
+            status = '❌ BROKEN';
+            issues++;
           }
-        }
-        if (!needsFix) {
-          status = '❌ BROKEN';
-          issues++;
         }
       }
 
