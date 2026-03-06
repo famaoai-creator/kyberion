@@ -44,7 +44,8 @@ export {
   ui, 
   fileUtils, 
   errorHandler, 
-  Cache
+  Cache,
+  sre
 } from './core.js';
 
 // Validation & Schemas

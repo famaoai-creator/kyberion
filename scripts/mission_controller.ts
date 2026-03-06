@@ -153,6 +153,7 @@ async function main() {
     case 'activate': if (arg1) await startMission(arg1); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'automated sync', arg3); break;
     case 'handoff': if (arg1 && arg2) await handoffMission(arg1, arg2, arg3); break;
+    case 'exec': if (arg1) await executeWithRepair(arg1, arg2); break;
     default:
       console.log('Usage: npx tsx scripts/mission_controller.ts <action>');
       console.log('Actions:');
@@ -160,6 +161,37 @@ async function main() {
       console.log('  activate <id>                    Start mission branch and set to active');
       console.log('  checkpoint <task> [note] [id]    Commit and record checkpoint');
       console.log('  handoff <id> <persona> [note]    Handoff mission to another persona');
+      console.log('  exec "<cmd>" [mission_id]        Execute command with auto-repair');
+  }
+}
+
+async function executeWithRepair(command: string, missionId?: string) {
+  const mid = missionId || process.env.MISSION_ID;
+  const logFile = path.join(process.cwd(), 'scratch/last_execution.log');
+  
+  if (!fs.existsSync(path.dirname(logFile))) fs.mkdirSync(path.dirname(logFile), { recursive: true });
+
+  logger.info(`⚡ Executing: ${command}`);
+  
+  try {
+    const output = execSync(command, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+    console.log(output);
+    logger.success('✅ Command completed successfully.');
+  } catch (err: any) {
+    logger.error('❌ Command failed. Triggering Auto-Repair Loop...');
+    
+    const fullLog = `STDOUT:\n${err.stdout}\n\nSTDERR:\n${err.stderr}\n\nERROR:\n${err.message}`;
+    fs.writeFileSync(logFile, fullLog);
+    console.error(err.stderr);
+    
+    const repairCmd = `MISSION_ID=${mid || ''} npx tsx scripts/auto_repair.ts ${logFile}`;
+    try {
+      execSync(repairCmd, { stdio: 'inherit' });
+    } catch (_) {
+      logger.error('Failed to run auto-repair script.');
+    }
+    
+    process.exit(1);
   }
 }
 
