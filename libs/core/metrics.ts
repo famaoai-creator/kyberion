@@ -10,6 +10,15 @@ const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
 const DEFAULT_METRICS_FILE = 'skill-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
+const COST_TABLE: Record<string, { prompt: number; completion: number }> = {
+  'gpt-4o': { prompt: 0.005 / 1000, completion: 0.015 / 1000 },
+  'gpt-4o-mini': { prompt: 0.00015 / 1000, completion: 0.0006 / 1000 },
+  'claude-3-5-sonnet': { prompt: 0.003 / 1000, completion: 0.015 / 1000 },
+  'gemini-1.5-pro': { prompt: 0.00125 / 1000, completion: 0.00375 / 1000 },
+  'gemini-1.5-flash': { prompt: 0.000075 / 1000, completion: 0.0003 / 1000 },
+  'default': { prompt: 0.001 / 1000, completion: 0.003 / 1000 },
+};
+
 export interface MetricsOptions {
   metricsDir?: string;
   metricsFile?: string;
@@ -59,6 +68,8 @@ export class MetricsCollector {
         cacheMisses: 0,
         cachePurges: 0,
         recoveries: 0,
+        interventions: 0,
+        totalCostUSD: 0,
         cacheIntegrityFailures: 0,
         outputSizeKB: 0,
         promptTokens: 0,
@@ -70,6 +81,8 @@ export class MetricsCollector {
     agg.count++;
     if (status === 'error') agg.errors++;
     if (extra.recovered) agg.recoveries++;
+    if (extra.intervention) agg.interventions++;
+    
     agg.totalMs += durationMs;
     agg.minMs = Math.min(agg.minMs, durationMs);
     agg.maxMs = Math.max(agg.maxMs, durationMs);
@@ -78,9 +91,17 @@ export class MetricsCollector {
     agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
 
     if (extra.usage) {
-      agg.promptTokens += extra.usage.prompt_tokens || 0;
-      agg.completionTokens += extra.usage.completion_tokens || 0;
-      agg.totalTokens += extra.usage.total_tokens || 0;
+      const pTokens = extra.usage.prompt_tokens || 0;
+      const cTokens = extra.usage.completion_tokens || 0;
+      agg.promptTokens += pTokens;
+      agg.completionTokens += cTokens;
+      agg.totalTokens += (pTokens + cTokens);
+
+      const model = extra.model || 'default';
+      const rates = COST_TABLE[model] || COST_TABLE['default'];
+      const cost = (pTokens * rates.prompt) + (cTokens * rates.completion);
+      agg.totalCostUSD += cost;
+      extra.cost_usd = Math.round(cost * 100000) / 100000;
     }
 
     if (extra.outputSize) {
@@ -104,6 +125,15 @@ export class MetricsCollector {
         ...extra,
       });
     }
+  }
+
+  recordIntervention(context: string, decisionId: string) {
+    this._appendToFile({
+      type: 'intervention',
+      context,
+      decision: decisionId,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   summarize() {
@@ -146,6 +176,9 @@ export class MetricsCollector {
         outputSizeKB: agg.outputSizeKB || 0,
         avgTokens: agg.count > 0 ? Math.round(agg.totalTokens / agg.count) : 0,
         totalTokens: agg.totalTokens,
+        totalCostUSD: Math.round(agg.totalCostUSD * 1000) / 1000,
+        interventions: agg.interventions || 0,
+        interventionRate: agg.count > 0 ? Math.round((agg.interventions / agg.count) * 100) : 0,
       });
     }
     return summaries.sort((a, b) => b.executions - a.executions);

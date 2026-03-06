@@ -1,0 +1,8 @@
+{
+  "mission_id": "M-EVAL-MOLTBOOK-001",
+  "type": "evaluation",
+  "status": "active",
+  "priority": 5,
+  "tenant_id": "default",
+  "vision_ref": "/vision/_default.md"
+}

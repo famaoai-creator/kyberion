@@ -30,11 +30,15 @@ function buildOutput<T>(
   if (status === 'success') {
     base.data = dataOrError as T;
     const extra: any = {};
-    if (base.data && (base.data as any).metadata?.usage) {
-      extra.usage = (base.data as any).metadata.usage;
+    if (base.data) {
+      const data = base.data as any;
+      if (data.metadata?.usage) extra.usage = data.metadata.usage;
+      if (data.metadata?.model) extra.model = data.metadata.model;
+      if (data.intervention) extra.intervention = true;
     }
     metrics.record(skillName, durationMs, 'success', extra);
-  } else {
+  }
+ else {
     const err = dataOrError as Error;
     base.error = {
       code: (err as any).code || 'EXECUTION_ERROR',
