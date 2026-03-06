@@ -84,6 +84,20 @@ function logResponse(text: string) {
   } catch (_) {}
 }
 
+function isSkillRestricted(name: string): { restricted: boolean; reason?: string } {
+  try {
+    const restrictedPath = path.join(rootDir, 'knowledge/governance/restricted-skills.json');
+    if (fs.existsSync(restrictedPath)) {
+      const data = JSON.parse(fs.readFileSync(restrictedPath, 'utf8'));
+      const restriction = data.restrictions.find((r: any) => r.name === name);
+      if (restriction && restriction.status === 'restricted') {
+        return { restricted: true, reason: restriction.reason };
+      }
+    }
+  } catch (_) {}
+  return { restricted: false };
+}
+
 async function runCommand() {
   const index = loadIndex();
   const skills = index.s || index.skills || [];
@@ -96,7 +110,16 @@ async function runCommand() {
     return;
   }
 
-  // Platform Compatibility Check
+  // 1. Governance Restriction Check
+  const restriction = isSkillRestricted(skillName);
+  if (restriction.restricted) {
+    const errorMsg = `🚫 Skill "${skillName}" is RESTRICTED by governance policy.\nReason: ${restriction.reason}`;
+    logger.error(errorMsg);
+    logResponse(errorMsg);
+    return;
+  }
+
+  // 2. Platform Compatibility Check (Static)
   const currentPlatform = os.platform();
   const rawPlatforms = skill.p || [];
   const supportedPlatforms = Array.isArray(rawPlatforms) ? rawPlatforms : [rawPlatforms];
