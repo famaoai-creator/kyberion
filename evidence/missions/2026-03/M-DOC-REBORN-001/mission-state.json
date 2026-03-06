@@ -1,0 +1,7 @@
+{
+  "mission_id": "M-DOC-REBORN-001",
+  "status": "active",
+  "priority": 7,
+  "tenant_id": "default",
+  "vision_ref": "/vision/_default.md"
+}
