@@ -87,4 +87,4 @@ export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 
 // Shared Business Types
-export * from './shared-business-types.js';
+export * as visionJudge from './vision-judge.js';

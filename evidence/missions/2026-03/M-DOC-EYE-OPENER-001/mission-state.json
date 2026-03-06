@@ -1,0 +1,42 @@
+{
+  "mission_id": "M-DOC-EYE-OPENER-001",
+  "version": "1.1",
+  "status": "planned",
+  "priority": 5,
+  "owner": "famaoai",
+  "tenant_id": "default",
+  "vision_ref": "/vision/_default.md",
+  "assigned_persona": "Ecosystem Architect",
+  "git": {
+    "branch": "mission/m-doc-eye-opener-001",
+    "checkpoints": []
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "title": "Initialization",
+      "status": "completed",
+      "completed_at": "2026-03-06T03:02:22.493Z"
+    },
+    {
+      "id": "M2",
+      "title": "Implementation",
+      "status": "pending"
+    },
+    {
+      "id": "M3",
+      "title": "Validation",
+      "status": "pending"
+    }
+  ],
+  "context": {
+    "associated_projects": []
+  },
+  "history": [
+    {
+      "ts": "2026-03-06T03:02:22.494Z",
+      "event": "CREATED",
+      "note": "Mission created for tenant: default"
+    }
+  ]
+}
