@@ -21,7 +21,7 @@ export declare const ui: {
     stripAnsi: (input: string) => string;
 };
 export declare const sre: {
-    analyzeRootCause: (errorMessage: string) => never;
+    analyzeRootCause: (errorMessage: string) => any;
 };
 export declare class Cache {
     private _maxSize;

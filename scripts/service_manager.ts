@@ -34,6 +34,10 @@ const SERVICES: Record<string, any> = {
     path: 'presence/sensors/log-watcher.ts',
     description: 'Monitors logs for system errors'
   },
+  'visual-buffer': {
+    path: 'presence/sensors/visual-buffer-daemon.ts',
+    description: 'Maintains rolling visual frames for temporal awareness'
+  },
   'system-whisperer': {
     path: 'scripts/system_whisperer.ts',
     description: 'Injects periodic system status to the agent'

@@ -33,10 +33,18 @@ const KEY_MAP: Record<string, number> = {
 
 function generateAppleScript(args: InjectArgs): string {
   const app = args.application || 'iTerm2';
+  
+  // Safety: If the target is "Terminal", ensure we don't accidentally target ourselves.
+  // We'll add an extra check to ensure the target is really active and not just "any" window.
+  
   const delay = (args.delay || 50) / 1000;
   let script = `tell application "${app}" to activate\n`;
-  script += `delay 0.5\n`;
+  script += `delay 0.8\n`; // Increased delay for safety
   script += `tell application "System Events"\n`;
+  script += `  if (name of first process whose frontmost is true) is not "${app}" then\n`;
+  script += `    log "Safety Triggered: Target application ${app} is not frontmost."\n`;
+  script += `    return\n`;
+  script += `  end if\n`;
 
   if (args.text) {
     for (const char of args.text) {

@@ -1,7 +1,7 @@
 # Gemini Skills Ecosystem Guide
 
-Total Skills: 129 (Implemented: 137)
-Last updated: 2026/03/04
+Total Skills: 121 (Implemented: 137)
+Last updated: 2026/03/06
 
 > **Governance Note (The Skill Genesis Lifecycle):**
 > Skills listed in this ecosystem are NOT speculative scripts. They are the result of **Wisdom Distillation**. 

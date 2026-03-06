@@ -1,7 +1,7 @@
 {
   "v": "1.4.0",
-  "t": 140,
-  "u": "2026-03-05T04:16:18.273Z",
+  "t": 145,
+  "u": "2026-03-06T13:56:45.359Z",
   "s": [
     {
       "n": "ai-ethics-auditor",
@@ -11,8 +11,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.314Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.362Z"
     },
     {
       "n": "bug-predictor",
@@ -22,8 +21,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.314Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.367Z"
     },
     {
       "n": "compliance-officer",
@@ -33,8 +31,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.314Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.381Z"
     },
     {
       "n": "license-auditor",
@@ -44,8 +41,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.315Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.386Z"
     },
     {
       "n": "monitoring-config-auditor",
@@ -55,8 +51,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill,observability",
-      "u": "2026-03-04T12:15:27.315Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.390Z"
     },
     {
       "n": "post-quantum-shield",
@@ -66,19 +61,17 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.316Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.394Z"
     },
     {
       "n": "project-health-check",
       "path": "skills/audit/project-health-check",
-      "d": "Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and p...",
+      "d": "Audits the project for modern and Waterfall standards (SDLC, CI/CD, Tests, Quality Metrics) and p",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill,qa",
-      "u": "2026-03-04T12:15:27.316Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.399Z"
     },
     {
       "n": "quality-scorer",
@@ -88,8 +81,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.316Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.403Z"
     },
     {
       "n": "red-team-adversary",
@@ -99,8 +91,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.317Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.407Z"
     },
     {
       "n": "security-scanner",
@@ -110,8 +101,7 @@
       "r": "high",
       "m": "dist/index.js",
       "t": "gemini-skill,security",
-      "u": "2026-03-04T12:15:27.317Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.412Z"
     },
     {
       "n": "skill-quality-auditor",
@@ -121,8 +111,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.317Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.416Z"
     },
     {
       "n": "supply-chain-sentinel",
@@ -132,8 +121,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.318Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.421Z"
     },
     {
       "n": "business-growth-planner",
@@ -143,8 +131,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.318Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.436Z"
     },
     {
       "n": "business-impact-analyzer",
@@ -154,8 +141,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.318Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.440Z"
     },
     {
       "n": "competitive-intel-strategist",
@@ -165,8 +151,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.319Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.443Z"
     },
     {
       "n": "executive-reporting-maestro",
@@ -176,8 +161,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.319Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.446Z"
     },
     {
       "n": "financial-modeling-maestro",
@@ -187,8 +171,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.319Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.449Z"
     },
     {
       "n": "investor-readiness-audit",
@@ -198,8 +181,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.320Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.453Z"
     },
     {
       "n": "pmo-governance-lead",
@@ -209,8 +191,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.321Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.466Z"
     },
     {
       "n": "stakeholder-communicator",
@@ -220,8 +201,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.322Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.475Z"
     },
     {
       "n": "strategic-roadmap-planner",
@@ -231,8 +211,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.322Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.479Z"
     },
     {
       "n": "sunset-architect",
@@ -242,8 +221,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.322Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.482Z"
     },
     {
       "n": "tech-dd-analyst",
@@ -253,8 +231,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.323Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.491Z"
     },
     {
       "n": "unit-economics-optimizer",
@@ -264,8 +241,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,performance",
-      "u": "2026-03-04T12:15:27.323Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.495Z"
     },
     {
       "n": "backlog-connector",
@@ -275,8 +251,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.324Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.499Z"
     },
     {
       "n": "box-connector",
@@ -286,8 +261,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.324Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.504Z"
     },
     {
       "n": "github-repo-auditor",
@@ -297,8 +271,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.324Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.508Z"
     },
     {
       "n": "github-skills-manager",
@@ -308,8 +281,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.325Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.512Z"
     },
     {
       "n": "google-workspace-integrator",
@@ -319,8 +291,7 @@
       "r": "low",
       "m": "dist/skills/connector/google-workspace-integrator/src/index.js",
       "t": "cloud,gemini-skill",
-      "u": "2026-03-04T12:15:27.325Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.516Z"
     },
     {
       "n": "jira-agile-assistant",
@@ -330,8 +301,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.326Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.520Z"
     },
     {
       "n": "mcp-aws-knowledge-connector",
@@ -341,8 +311,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "cloud,gemini-skill",
-      "u": "2026-03-04T12:15:27.326Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.525Z"
     },
     {
       "n": "mcp-terraform-connector",
@@ -352,8 +321,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.326Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.530Z"
     },
     {
       "n": "slack-communicator-pro",
@@ -363,8 +331,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "communication,gemini-skill",
-      "u": "2026-03-04T12:15:27.327Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.533Z"
     },
     {
       "n": "mission-logic-engine",
@@ -373,9 +340,8 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-04T17:19:16.373Z",
-      "q": 80
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.538Z"
     },
     {
       "n": "prompt-optimizer",
@@ -385,8 +351,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,performance",
-      "u": "2026-03-04T12:15:27.327Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.543Z"
     },
     {
       "n": "self-evolution",
@@ -396,8 +361,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.328Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.547Z"
     },
     {
       "n": "self-healing-orchestrator",
@@ -407,8 +371,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.328Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.552Z"
     },
     {
       "n": "skill-evolution-engine",
@@ -418,8 +381,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.329Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.557Z"
     },
     {
       "n": "binary-archaeologist",
@@ -429,8 +391,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.329Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.561Z"
     },
     {
       "n": "code-lang-detector",
@@ -440,8 +401,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.329Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.566Z"
     },
     {
       "n": "codebase-mapper",
@@ -451,8 +411,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.330Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.569Z"
     },
     {
       "n": "dependency-grapher",
@@ -462,8 +421,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,gemini-skill",
-      "u": "2026-03-04T12:15:27.330Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.572Z"
     },
     {
       "n": "dependency-lifeline",
@@ -473,8 +431,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.331Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.575Z"
     },
     {
       "n": "kernel-compiler",
@@ -484,8 +441,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.331Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.579Z"
     },
     {
       "n": "local-reviewer",
@@ -495,19 +451,17 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.331Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.582Z"
     },
     {
       "n": "mobile-test-generator",
       "path": "skills/engineering/mobile-test-generator",
-      "d": "Automatically generates Maestro YAML test flows based on provided scenarios and mobile automation...",
+      "d": "Automatically generates Maestro YAML test flows based on provided scenarios and mobile automation",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,gemini-skill,qa",
-      "u": "2026-03-04T12:15:27.332Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.586Z"
     },
     {
       "n": "pr-architect",
@@ -517,8 +471,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.332Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.589Z"
     },
     {
       "n": "refactoring-engine",
@@ -528,8 +481,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.332Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.593Z"
     },
     {
       "n": "schema-inspector",
@@ -539,8 +491,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.333Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.598Z"
     },
     {
       "n": "sequence-mapper",
@@ -550,8 +501,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.333Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.602Z"
     },
     {
       "n": "technology-porter",
@@ -561,8 +511,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.334Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.606Z"
     },
     {
       "n": "test-genie",
@@ -572,8 +521,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "analytics,gemini-skill,qa",
-      "u": "2026-03-04T12:15:27.334Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.610Z"
     },
     {
       "n": "test-suite-architect",
@@ -583,8 +531,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,qa",
-      "u": "2026-03-04T12:15:27.335Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.615Z"
     },
     {
       "n": "jpx-market-analyzer",
@@ -594,8 +541,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.335Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.619Z"
     },
     {
       "n": "land-price-analyzer",
@@ -605,8 +551,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.335Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.622Z"
     },
     {
       "n": "trust-fund-monitor",
@@ -616,8 +561,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,integration,observability",
-      "u": "2026-03-04T12:15:27.336Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.627Z"
     },
     {
       "n": "visual-imagination",
@@ -627,8 +571,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,cloud,gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.336Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.632Z"
     },
     {
       "n": "auto-context-mapper",
@@ -638,8 +581,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.336Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.635Z"
     },
     {
       "n": "data-collector",
@@ -649,8 +591,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill",
-      "u": "2026-03-04T12:15:27.336Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.640Z"
     },
     {
       "n": "dataset-curator",
@@ -660,8 +601,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill",
-      "u": "2026-03-04T12:15:27.337Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.645Z"
     },
     {
       "n": "db-extractor",
@@ -671,8 +611,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.337Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.647Z"
     },
     {
       "n": "knowledge-auditor",
@@ -682,8 +621,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.338Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.651Z"
     },
     {
       "n": "knowledge-fetcher",
@@ -693,8 +631,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.339Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.655Z"
     },
     {
       "n": "knowledge-harvester",
@@ -704,8 +641,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.339Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.659Z"
     },
     {
       "n": "knowledge-refiner",
@@ -715,8 +651,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.340Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.663Z"
     },
     {
       "n": "source-importer",
@@ -726,8 +661,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.340Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.666Z"
     },
     {
       "n": "sovereign-memory",
@@ -737,8 +671,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.340Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.671Z"
     },
     {
       "n": "sovereign-sync",
@@ -748,8 +681,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.341Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.674Z"
     },
     {
       "n": "text-classifier",
@@ -759,8 +691,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.341Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.678Z"
     },
     {
       "n": "wisdom-distiller",
@@ -769,9 +700,8 @@
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-04T17:19:16.378Z",
-      "q": 80
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.682Z"
     },
     {
       "n": "rakuten-ichiba-connector",
@@ -781,8 +711,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.341Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.686Z"
     },
     {
       "n": "rakuten-travel-connector",
@@ -792,8 +721,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.342Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.690Z"
     },
     {
       "n": "switchbot-controller",
@@ -803,8 +731,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.342Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.694Z"
     },
     {
       "n": "audio-transcriber",
@@ -814,8 +741,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.342Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.697Z"
     },
     {
       "n": "diagram-renderer",
@@ -825,30 +751,27 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T17:19:16.378Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.702Z"
     },
     {
       "n": "doc-to-text",
       "path": "skills/media/doc-to-text",
-      "d": "Extract text content from various file formats. Supports PDF, Excel, Word, Images (OCR), Email, a...",
+      "d": "Document parsing and extraction engine based on the 3-layer model (Soul, Mask, Context). Supports",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.343Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.707Z"
     },
     {
       "n": "excel-artisan",
       "path": "skills/media/excel-artisan",
-      "d": "A specialized artisan for distilling Excel designs into portable ADF (JSON) and re-generating Exc...",
+      "d": "A specialized artisan for distilling Excel designs into portable ADF (JSON) and re-generating Exc",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill",
-      "u": "2026-03-04T12:15:27.343Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.713Z"
     },
     {
       "n": "html-reporter",
@@ -858,19 +781,17 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.344Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.716Z"
     },
     {
       "n": "layout-architect",
       "path": "skills/media/layout-architect",
-      "d": "Converts visual designs into implementation code (CSS, HTML). Generates themes based on master sp...",
+      "d": "Converts visual designs into implementation code (CSS, HTML). Generates themes based on master sp",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,gemini-skill",
-      "u": "2026-03-04T12:15:27.344Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.718Z"
     },
     {
       "n": "pdf-composer",
@@ -880,19 +801,17 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.345Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.723Z"
     },
     {
       "n": "ppt-artisan",
       "path": "skills/media/ppt-artisan",
-      "d": "A specialized artisan for distilling PPTX designs into portable ADF (JSON) and re-generating pres...",
+      "d": "A specialized artisan for distilling PPTX designs into portable ADF (JSON) and re-generating pres",
       "s": "impl",
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.345Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.728Z"
     },
     {
       "n": "word-artisan",
@@ -902,8 +821,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.346Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.733Z"
     },
     {
       "n": "ai-model-orchestrator",
@@ -913,8 +831,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.346Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.741Z"
     },
     {
       "n": "api-doc-generator",
@@ -924,8 +841,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,documentation,gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.347Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.744Z"
     },
     {
       "n": "api-evolution-manager",
@@ -935,8 +851,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.348Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.748Z"
     },
     {
       "n": "api-fetcher",
@@ -946,8 +861,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill,integration",
-      "u": "2026-03-04T12:15:27.348Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.752Z"
     },
     {
       "n": "asset-token-economist",
@@ -957,8 +871,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.348Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.757Z"
     },
     {
       "n": "boilerplate-genie",
@@ -968,8 +881,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.349Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.767Z"
     },
     {
       "n": "browser-navigator",
@@ -979,8 +891,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.349Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.772Z"
     },
     {
       "n": "budget-variance-tracker",
@@ -990,8 +901,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.350Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.776Z"
     },
     {
       "n": "chaos-monkey-orchestrator",
@@ -1001,8 +911,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.350Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.779Z"
     },
     {
       "n": "cloud-waste-hunter",
@@ -1012,8 +921,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.350Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.787Z"
     },
     {
       "n": "completeness-scorer",
@@ -1023,8 +931,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.351Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.792Z"
     },
     {
       "n": "context-injector",
@@ -1034,8 +941,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.351Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.797Z"
     },
     {
       "n": "crisis-manager",
@@ -1045,8 +951,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "automation,gemini-skill",
-      "u": "2026-03-04T12:15:27.352Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.801Z"
     },
     {
       "n": "data-anonymizer",
@@ -1056,8 +961,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill",
-      "u": "2026-03-04T12:15:27.352Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.804Z"
     },
     {
       "n": "data-lineage-guardian",
@@ -1067,8 +971,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "data-engineering,gemini-skill",
-      "u": "2026-03-04T12:15:27.352Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.808Z"
     },
     {
       "n": "diff-visualizer",
@@ -1078,8 +981,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.353Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.813Z"
     },
     {
       "n": "disaster-recovery-planner",
@@ -1089,8 +991,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.353Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.818Z"
     },
     {
       "n": "doc-sync-sentinel",
@@ -1100,8 +1001,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.353Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.822Z"
     },
     {
       "n": "document-generator",
@@ -1111,8 +1011,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "documentation,gemini-skill",
-      "u": "2026-03-04T12:15:27.354Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.826Z"
     },
     {
       "n": "ecosystem-integration-test",
@@ -1122,8 +1021,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,qa",
-      "u": "2026-03-04T12:15:27.354Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.830Z"
     },
     {
       "n": "encoding-detector",
@@ -1133,8 +1031,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.354Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.834Z"
     },
     {
       "n": "environment-provisioner",
@@ -1144,8 +1041,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.355Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.839Z"
     },
     {
       "n": "format-detector",
@@ -1155,8 +1051,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.355Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.842Z"
     },
     {
       "n": "issue-to-solution-bridge",
@@ -1166,8 +1061,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.355Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.846Z"
     },
     {
       "n": "lang-detector",
@@ -1177,8 +1071,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.355Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.850Z"
     },
     {
       "n": "log-analyst",
@@ -1188,8 +1081,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.356Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.856Z"
     },
     {
       "n": "log-to-requirement-bridge",
@@ -1199,8 +1091,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.356Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.860Z"
     },
     {
       "n": "nonfunctional-architect",
@@ -1210,8 +1101,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.357Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.866Z"
     },
     {
       "n": "onboarding-wizard",
@@ -1221,8 +1111,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.357Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.870Z"
     },
     {
       "n": "operational-runbook-generator",
@@ -1232,8 +1121,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.358Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.874Z"
     },
     {
       "n": "performance-monitor-analyst",
@@ -1243,8 +1131,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill,observability",
-      "u": "2026-03-04T12:15:27.358Z",
-      "q": 70
+      "u": "2026-03-06T07:39:27.879Z"
     },
     {
       "n": "release-note-crafter",
@@ -1254,8 +1141,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.358Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.883Z"
     },
     {
       "n": "requirements-wizard",
@@ -1265,8 +1151,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.359Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.887Z"
     },
     {
       "n": "schema-validator",
@@ -1276,8 +1161,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.359Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.890Z"
     },
     {
       "n": "sensitivity-detector",
@@ -1287,8 +1171,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.360Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.895Z"
     },
     {
       "n": "skill-bundle-packager",
@@ -1298,8 +1181,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.360Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.898Z"
     },
     {
       "n": "telemetry-insight-engine",
@@ -1309,8 +1191,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.361Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.911Z"
     },
     {
       "n": "template-renderer",
@@ -1320,8 +1201,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.362Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.916Z"
     },
     {
       "n": "terraform-arch-mapper",
@@ -1331,8 +1211,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.362Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.920Z"
     },
     {
       "n": "localization-maestro",
@@ -1342,8 +1221,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.363Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.944Z"
     },
     {
       "n": "synthetic-user-persona",
@@ -1353,8 +1231,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.364Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.948Z"
     },
     {
       "n": "ux-auditor",
@@ -1364,8 +1241,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "compliance,gemini-skill",
-      "u": "2026-03-04T12:15:27.364Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.954Z"
     },
     {
       "n": "ux-visualizer",
@@ -1375,8 +1251,7 @@
       "r": "low",
       "m": "dist/index.js",
       "t": "gemini-skill",
-      "u": "2026-03-04T12:15:27.364Z",
-      "q": 80
+      "u": "2026-03-06T07:39:27.959Z"
     },
     {
       "n": "wallet-manager",
@@ -1385,9 +1260,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-04T17:19:16.384Z",
-      "q": 60
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.934Z"
     },
     {
       "n": "ip-profitability-architect",
@@ -1396,8 +1270,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.475Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.458Z"
     },
     {
       "n": "ip-strategist",
@@ -1406,8 +1280,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.475Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.462Z"
     },
     {
       "n": "scenario-multiverse-orchestrator",
@@ -1416,8 +1290,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.475Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.470Z"
     },
     {
       "n": "talent-requirement-generator",
@@ -1426,8 +1300,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.486Z"
     },
     {
       "n": "agent-activity-monitor",
@@ -1436,8 +1310,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "gemini-skill,observability",
+      "u": "2026-03-06T07:39:27.737Z"
     },
     {
       "n": "automated-support-architect",
@@ -1446,8 +1320,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.762Z"
     },
     {
       "n": "cloud-cost-estimator",
@@ -1456,8 +1330,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "finops,gemini-skill",
+      "u": "2026-03-06T07:39:27.783Z"
     },
     {
       "n": "sustainability-consultant",
@@ -1466,8 +1340,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.902Z"
     },
     {
       "n": "tech-stack-librarian",
@@ -1476,8 +1350,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.476Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.907Z"
     },
     {
       "n": "test-viewpoint-analyst",
@@ -1486,8 +1360,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.477Z"
+      "t": "gemini-skill,qa",
+      "u": "2026-03-06T07:39:27.924Z"
     },
     {
       "n": "visionary-ethos-keeper",
@@ -1496,8 +1370,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.477Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.929Z"
     },
     {
       "n": "biometric-context-adapter",
@@ -1506,8 +1380,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.477Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.940Z"
     },
     {
       "n": "voice-command-listener",
@@ -1516,8 +1390,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.477Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.963Z"
     },
     {
       "n": "voice-interface-maestro",
@@ -1526,8 +1400,8 @@
       "s": "plan",
       "r": "low",
       "m": "dist/index.js",
-      "t": [],
-      "u": "2026-03-05T04:05:02.477Z"
+      "t": "gemini-skill",
+      "u": "2026-03-06T07:39:27.967Z"
     },
     {
       "n": "keyboard-injector",
@@ -1561,6 +1435,26 @@
       "t": "automation,gemini-skill",
       "u": "2026-03-06T07:40:18.444Z",
       "q": 80
+    },
+    {
+      "n": "visual-assertion-engine",
+      "path": "skills/automation/visual-assertion-engine",
+      "d": "Waits for a specific text or image pattern to appear on the screen using the 10-frame buffer.",
+      "s": "plan",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill, vision",
+      "u": "2026-03-06T13:02:19.168Z"
+    },
+    {
+      "n": "visual-evidence-generator",
+      "path": "skills/automation/visual-evidence-generator",
+      "d": "Compiles the 10-frame visual buffer into an animated GIF with timestamp overlays.",
+      "s": "plan",
+      "r": "low",
+      "m": "dist/index.js",
+      "t": "gemini-skill, vision, audit",
+      "u": "2026-03-06T13:45:05.419Z"
     }
   ]
 }

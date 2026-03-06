@@ -40,8 +40,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.terminalBridge = exports.pptxUtils = exports.excelUtils = exports.orchestrator = exports.isSecretPath = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.validateInjection = exports.canFlowTo = exports.detectTier = exports.tierGuard = exports.classifier = exports.verifyIntegrity = exports.record = exports.ledger = exports.getAllFiles = exports.Cache = exports.errorHandler = exports.fileUtils = exports.ui = exports.logger = exports.pathUtils = exports.rootResolve = exports.resolve = exports.missionDir = exports.skillDir = exports.isProtected = exports.shared = exports.vault = exports.scripts = exports.active = exports.knowledge = exports.rootDir = exports.pathResolver = exports.writeArtifact = exports.sanitizePath = exports.validateUrl = exports.validateFileSize = exports.safeExec = exports.safeMkdir = exports.safeUnlink = exports.safeAppendFile = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
-exports.ReflexTerminal = void 0;
+exports.pptxUtils = exports.excelUtils = exports.orchestrator = exports.isSecretPath = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.validateInjection = exports.canFlowTo = exports.detectTier = exports.tierGuard = exports.classifier = exports.verifyIntegrity = exports.record = exports.ledger = exports.getAllFiles = exports.sre = exports.Cache = exports.errorHandler = exports.fileUtils = exports.ui = exports.logger = exports.pathUtils = exports.rootResolve = exports.resolve = exports.missionDir = exports.skillDir = exports.isProtected = exports.shared = exports.vault = exports.scripts = exports.active = exports.knowledge = exports.rootDir = exports.pathResolver = exports.writeArtifact = exports.sanitizePath = exports.validateUrl = exports.validateFileSize = exports.safeExec = exports.safeMkdir = exports.safeUnlink = exports.safeAppendFile = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
+exports.visionJudge = exports.ReflexTerminal = exports.terminalBridge = void 0;
 // Core Wrapper & Metrics
 __exportStar(require("./skill-wrapper.js"), exports);
 __exportStar(require("./metrics.js"), exports);
@@ -79,6 +79,7 @@ Object.defineProperty(exports, "ui", { enumerable: true, get: function () { retu
 Object.defineProperty(exports, "fileUtils", { enumerable: true, get: function () { return core_js_1.fileUtils; } });
 Object.defineProperty(exports, "errorHandler", { enumerable: true, get: function () { return core_js_1.errorHandler; } });
 Object.defineProperty(exports, "Cache", { enumerable: true, get: function () { return core_js_1.Cache; } });
+Object.defineProperty(exports, "sre", { enumerable: true, get: function () { return core_js_1.sre; } });
 // Validation & Schemas
 __exportStar(require("./validators.js"), exports);
 __exportStar(require("./validate.js"), exports);
@@ -119,5 +120,5 @@ Object.defineProperty(exports, "terminalBridge", { enumerable: true, get: functi
 var reflex_terminal_js_1 = require("./reflex-terminal.js");
 Object.defineProperty(exports, "ReflexTerminal", { enumerable: true, get: function () { return reflex_terminal_js_1.ReflexTerminal; } });
 // Shared Business Types
-__exportStar(require("./shared-business-types.js"), exports);
+exports.visionJudge = __importStar(require("./vision-judge.js"));
 //# sourceMappingURL=index.js.map

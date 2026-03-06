@@ -1,0 +1,30 @@
+[
+  { 
+    "type": "shell", 
+    "params": { "command": "open", "args": ["-a", "TextEdit"] } 
+  },
+  { "type": "wait", "ms": 2000 },
+  { 
+    "type": "keyboard", 
+    "params": { 
+      "application": "TextEdit", 
+      "text": "Hello! This is an automated test by Kyberion.", 
+      "keys": ["enter"] 
+    } 
+  },
+  { "type": "wait", "ms": 1000 },
+  { 
+    "type": "keyboard", 
+    "params": { 
+      "application": "TextEdit", 
+      "keys": ["command+a", "backspace"] 
+    } 
+  },
+  { 
+    "type": "keyboard", 
+    "params": { 
+      "application": "TextEdit", 
+      "text": "Automation Test: SUCCESS" 
+    } 
+  }
+]
