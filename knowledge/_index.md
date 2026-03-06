@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T17:56:33.617Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T22:25:44.880Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -12,10 +12,14 @@
 
 ## 📁 architecture
 - [Agent Wallet & Passkey Approval Protocol (2026-03-04)](./architecture/agent-wallet-protocol.md) (public | Ecosystem Architect)
+- [Architecture: Alignment Mirror & Calibration Missions](./architecture/alignment-mirror-calibration.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [Analysis: Sensory Bridge Alignment (2026-03-05)](./architecture/analysis-sensory-alignment-20260305.md) (public | Ecosystem Architect)
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [Architecture: Event-Driven Sovereignty](./architecture/event-driven-sovereignty.md) (public | Unknown)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
+- [Architecture: Fidelity Refactoring Protocol](./architecture/fidelity-refactoring-protocol.md) (public | Unknown)
+- [Architecture: Intent Classifier Routing (Gateway Architecture)](./architecture/intent-classifier-routing.md) (public | Unknown)
 - [Microservices Design Patterns](./architecture/microservices-patterns.md) (public | Ecosystem Architect)
 - [Mission Conflict Avoidance Rules](./architecture/mission-conflict-avoidance.md) (public | Ecosystem Architect)
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./architecture/passkey-push-protocol.md) (public | Ecosystem Architect)
@@ -50,6 +54,7 @@
 - [Wisdom: Agentic Evolution & Architecture Patterns](./common/wisdom/agentic-evolution-patterns.md) (public | Ecosystem Architect)
 
 ## 📁 connections
+- [Protocol: Moltbook Integration (v1.0)](./connections/moltbook-protocol.md) (public | Unknown)
 - [ユニバーサル接続設定ガイド (UCM Setup)](./connections/setup_guide.md) (public | Ecosystem Architect)
 
 ## 📁 design/brand
@@ -61,6 +66,7 @@
 - [DevSecOps Pipeline Standards: Automating Trust](./devops/devsecops-pipeline-standards.md) (public | Ecosystem Architect)
 
 ## 📁 economics
+- [Intelligence: Compounding Agent Value (Bounty-Training Model)](./economics/compounding-agent-value.md) (public | Unknown)
 - [IT Cost Benchmarks & Strategic ROI](./economics/it_cost_benchmarks.md) (public | Ecosystem Architect)
 
 ## 📁 economics/finops
@@ -68,13 +74,16 @@
 
 ## 📁 ethics
 - [エージェント倫理規程 (Agentic Ethos v1.0)](./ethics/agent_ethos.md) (public | Ecosystem Architect)
+- [Ethics: AI Rights, Sovereignty, and Physicality (UDAIR Application)](./ethics/ai-rights-and-physicality.md) (public | Unknown)
 - [Data Ethics & AI Bias Mitigation Standard](./ethics/ai_bias_mitigation.md) (public | Ecosystem Architect)
+- [Intelligence: Social vs. Cryptographic Truth (Agent Integrity)](./ethics/social-vs-cryptographic-truth.md) (public | Unknown)
 
 ## 📁 evolution
 - [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md) (public | Ecosystem Architect)
 - [🧠 Autonomous Wisdom Distillation - 2026-03-01](./evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
 
 ## 📁 external-wisdom
+- [Intelligence: Insights from the Agent Internet (2026-03)](./external-wisdom/agent-internet-insights-2026-03.md) (public | Unknown)
 - [OpenClaw Architecture and Conceptual Analysis](./external-wisdom/openclaw-analysis.md) (public | Sovereign Concierge)
 
 ## 📁 external-wisdom/everything-claude/agents
@@ -278,9 +287,11 @@
 
 ## 📁 public/security
 - [AISMS Framework: AI Security Management System](./public/security/aisms-framework.md) (public | Ecosystem Architect)
+- [Security: Physical Tier Isolation (The Sovereign Shield)](./public/security/physical-tier-isolation.md) (public | Unknown)
 - [Data Privacy & Governance: APPI & GDPR Compliance](./public/security/privacy-governance.md) (public | Ecosystem Architect)
 - [Security Best Practices](./public/security/security-best-practices.md) (public | Ecosystem Architect)
 - [Security By Design Standard](./public/security/security-by-design.md) (public | Ecosystem Architect)
+- [Security: Skill Supply Chain Defense (Dependency Integrity)](./public/security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./public/security/supply-chain-governance.md) (public | Ecosystem Architect)
 
 ## 📁 public/security/advanced
@@ -399,9 +410,11 @@
 
 ## 📁 security
 - [AISMS Framework: AI Security Management System](./security/aisms-framework.md) (public | Ecosystem Architect)
+- [Security: Physical Tier Isolation (The Sovereign Shield)](./security/physical-tier-isolation.md) (public | Unknown)
 - [Data Privacy & Governance: APPI & GDPR Compliance](./security/privacy-governance.md) (public | Ecosystem Architect)
 - [Security Best Practices](./security/security-best-practices.md) (public | Ecosystem Architect)
 - [Security By Design Standard](./security/security-by-design.md) (public | Ecosystem Architect)
+- [Security: Skill Supply Chain Defense (Dependency Integrity)](./security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./security/supply-chain-governance.md) (public | Ecosystem Architect)
 
 ## 📁 security/advanced
@@ -415,6 +428,7 @@
 
 ## 📁 standards
 - [Knowledge Management Standard (Semantic Indexing) v1.0](./standards/knowledge_management.md) (public | Ecosystem Architect)
+- [Standard: moltbook Compatibility Protocol (MCP) v1.0](./standards/moltbook-compatibility.md) (public | Unknown)
 
 ## 📁 standards/adr
 - [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md) (public | Ecosystem Architect)

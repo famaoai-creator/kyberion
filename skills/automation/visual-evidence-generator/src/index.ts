@@ -64,8 +64,8 @@ async function createGif(outputPath: string, delay: number) {
 
   encoder.finish();
   
-  return new Promise((resolve, reject) => {
-    outStream.on('finish', resolve);
+  return new Promise<void>((resolve, reject) => {
+    outStream.on('finish', () => resolve());
     outStream.on('error', reject);
   });
 }

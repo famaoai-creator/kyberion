@@ -7,13 +7,13 @@ import { logger, safeWriteFile, safeExec, pathResolver } from '@agent/core';
  * [SECURE-IO COMPLIANT VERSION]
  */
 
-async function getGitContext() {
+function getGitContext() {
   try {
-    const branchRes = await safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
-    const hashRes = await safeExec('git', ['rev-parse', '--short', 'HEAD']);
+    const branchRes = safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+    const hashRes = safeExec('git', ['rev-parse', '--short', 'HEAD']);
     return { 
-      branch: branchRes.stdout.trim(), 
-      hash: hashRes.stdout.trim() 
+      branch: branchRes.trim(), 
+      hash: hashRes.trim() 
     };
   } catch (_) {
     return { branch: 'unknown', hash: 'none' };
@@ -32,7 +32,7 @@ async function main() {
     process.exit(1);
   }
 
-  const gitContext = await getGitContext();
+  const gitContext = getGitContext();
   if (gitContext.branch === 'main' || gitContext.branch === 'master') {
     logger.warn(`⚠️  WARNING: Currently on ${gitContext.branch} branch. GEMINI.md requires a feature branch.`);
   }
@@ -40,18 +40,10 @@ async function main() {
   const missionDir = pathResolver.missionDir(missionId);
   const statePath = path.join(missionDir, 'mission-state.json');
 
-  // Use safeWriteFile which handles directory creation and validation
-  // We check for existence implicitly by trying to write if appropriate, 
-  // or we could use a safe existence check if we added one to core.
-  // For now, we follow the secure-io pattern.
-
   // Resolve Vision Reference
   let resolvedVision = visionRef;
   if (!resolvedVision) {
-    const personalVisionPath = path.join(pathResolver.rootDir(), 'knowledge/personal/my-vision.md');
-    // Note: We use pathResolver to keep it clean
     resolvedVision = '/knowledge/personal/my-vision.md'; 
-    // In a real scenario, we'd verify existence via a safe utility.
   }
 
   const state = {
