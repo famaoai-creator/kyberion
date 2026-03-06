@@ -120,22 +120,38 @@ export const ui = {
 export const sre = {
   analyzeRootCause: (errorMessage: string) => {
     const sigPath = path.resolve(process.cwd(), 'knowledge/orchestration/error-signatures.json');
-    if (!fs.existsSync(sigPath)) return null;
-
-    try {
-      const signatures = JSON.parse(fs.readFileSync(sigPath, 'utf8'));
-      for (const sig of signatures) {
-        const regex = new RegExp(sig.pattern, 'i');
-        if (regex.test(errorMessage)) {
-          return {
-            cause: sig.cause,
-            impact: sig.impact,
-            recommendation: sig.recommendation,
-          };
+    const results = [];
+    
+    if (fs.existsSync(sigPath)) {
+      try {
+        const signatures = JSON.parse(fs.readFileSync(sigPath, 'utf8'));
+        for (const sig of signatures) {
+          const regex = new RegExp(sig.pattern, 'i');
+          if (regex.test(errorMessage)) {
+            results.push({
+              cause: sig.cause,
+              impact: sig.impact,
+              recommendation: sig.recommendation,
+              action: sig.action // New field for machine-executable command hint
+            });
+          }
         }
+      } catch (_) {}
+    }
+    
+    // Fallback heuristic for TS/JS errors
+    if (results.length === 0) {
+      if (errorMessage.includes('Property') && errorMessage.includes('does not exist')) {
+        results.push({
+          cause: 'TypeScript Type Mismatch',
+          impact: 'Compilation failure',
+          recommendation: 'Check the object interface and property name.',
+          action: 'inspect_interface'
+        });
       }
-    } catch (_) {}
-    return null;
+    }
+
+    return results[0] || null;
   },
 };
 

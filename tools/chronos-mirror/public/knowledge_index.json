@@ -992,6 +992,14 @@
     "category": "orchestration"
   },
   {
+    "id": "orchestration/mission-types.md",
+    "title": "Mission Types & Categories",
+    "author": "Unknown",
+    "last_updated": "2026-03-06",
+    "tier": "public",
+    "category": "orchestration"
+  },
+  {
     "id": "orchestration/onboarding-directives/00_sovereign_onboarding.md",
     "title": "Directive: Sovereign Onboarding (シミュレーション開始指令)",
     "author": "Unknown",

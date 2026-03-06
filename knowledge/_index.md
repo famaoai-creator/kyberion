@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T01:39:11.419Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T04:02:21.540Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Unknown)
@@ -189,6 +189,7 @@
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./orchestration/knowledge-protocol.md) (public | Unknown)
 - [ミッション実行規程 (Mission Execution Protocol v1.0)](./orchestration/mission-execution-protocol.md) (public | Unknown)
 - [Mission Portability Standard (MEP v0.1)](./orchestration/mission-portability-standard.md) (public | Unknown)
+- [Mission Types & Categories](./orchestration/mission-types.md) (public | Unknown)
 - [主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)](./orchestration/onboarding-protocol.md) (public | Unknown)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./orchestration/optimization-standards.md) (public | Unknown)
 - [Polyglot Core Transformation Roadmap (Sidecar Architecture)](./orchestration/polyglot-roadmap.md) (public | Unknown)
