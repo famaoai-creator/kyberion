@@ -7,13 +7,14 @@
 
 ## 2. セットアップ手順 (The 4-Stage Manifestation)
 
-### Phase 1: Identity & Persona (npm run init)
-最初のステップは、主権者のアイデンティティの確立である。
+### Phase 1: Identity & Vision (npm run init)
+最初のステップは、主権者のアイデンティティの確立と「魂の注入（Vision Infusion）」である。
 - **Action**: `npm run init` を実行する。
 - **Content**:
     - 職業ドメイン（エンジニアリング、経営、セールス等）の選択。
     - 具体的なロール（Ecosystem Architect, Strategic Sales 等）の選択。
-    - `knowledge/personal/my-identity.json` (魂) の生成。
+    - **Vision Infusion**: 主権者が自身のビジョンをエージェントに語り、`knowledge/personal/my-vision.md` (魂) を生成する。
+    - `knowledge/personal/my-identity.json` (属性) の生成。
     - `active/shared/governance/session.json` (状態) の生成。
 
 ### Phase 2: Physical Manifestation (npm run build)
