@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
+import * as yaml from 'js-yaml';
 import { detectTier } from '@agent/core/tier-guard';
 import { safeWriteFile, safeReadFile } from '@agent/core';
 
@@ -14,6 +15,10 @@ interface KnowledgeMeta {
   author: string;
   last_updated: string;
   tier: string;
+  tags: string[];
+  importance: number;
+  related_roles: string[];
+  scope: string;
 }
 
 interface KnowledgeItem extends KnowledgeMeta {
@@ -27,6 +32,10 @@ function extractMetadata(content: string, filePath: string): KnowledgeMeta {
     author: 'Unknown',
     last_updated: '',
     tier: detectTier(filePath),
+    tags: [],
+    importance: 5,
+    related_roles: [],
+    scope: 'global'
   };
 
   const titleMatch = content.match(/^# (.*)/m);
@@ -34,11 +43,20 @@ function extractMetadata(content: string, filePath: string): KnowledgeMeta {
 
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (fmMatch) {
-    const fm = fmMatch[1];
-    const authorMatch = fm.match(/^author:\s*(.*)$/m);
-    const dateMatch = fm.match(/^last_updated:\s*(.*)$/m);
-    if (authorMatch) meta.author = authorMatch[1].trim();
-    if (dateMatch) meta.last_updated = dateMatch[1].trim();
+    try {
+      const fm = yaml.load(fmMatch[1]) as any;
+      if (fm) {
+        if (fm.title) meta.title = fm.title;
+        if (fm.author) meta.author = String(fm.author);
+        if (fm.last_updated) meta.last_updated = String(fm.last_updated);
+        if (fm.tags) meta.tags = Array.isArray(fm.tags) ? fm.tags : [String(fm.tags)];
+        if (fm.importance) meta.importance = Number(fm.importance);
+        if (fm.related_roles) meta.related_roles = Array.isArray(fm.related_roles) ? fm.related_roles : [String(fm.related_roles)];
+        if (fm.scope) meta.scope = String(fm.scope);
+      }
+    } catch (e) {
+      console.warn(chalk.yellow(`  ⚠️ Failed to parse Frontmatter in ${filePath}: ${e}`));
+    }
   }
 
   if (!meta.last_updated) {

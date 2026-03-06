@@ -1,3 +1,12 @@
+---
+title: Dual-Key Policy
+category: Governance
+tags: [ace, protocol, role-management, safety]
+importance: 10
+related_roles: [Ecosystem Architect, Engineering]
+last_updated: 2026-03-06
+---
+
 # Dual-Key Policy: ロール管理と決定権限の標準規約
 
 この規約は、AIエージェントが複数の専門性（ロール）を持ちつつ、ガバナンスと責任の所在を明確に維持するための物理的なルールを定義する。

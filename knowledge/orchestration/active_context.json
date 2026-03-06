@@ -1,63 +1,102 @@
 {
-  "intent": "How to refactor?",
-  "timestamp": "2026-03-06T03:46:14.393Z",
+  "intent": "I want to know about onboarding",
+  "timestamp": "2026-03-06T15:36:56.851Z",
   "top_matches": [
     {
       "id": "vision_context",
-      "title": "Vision: default",
+      "title": "Vision: sovereign",
       "category": "Vision",
       "score": 100
     },
     {
-      "id": "workflow_symphony-test",
-      "title": "Workflow: symphony-test",
-      "category": "Project Workflow",
-      "score": 95
-    },
-    {
-      "id": "architecture/agent-wallet-protocol.md",
-      "title": "Agent Wallet & Passkey Approval Protocol (2026-03-04)",
+      "id": "governance/onboarding-protocol.md",
+      "title": "Sovereign Onboarding Protocol",
       "author": "Unknown",
-      "last_updated": "2026-03-04",
+      "last_updated": "2026-03-06",
       "tier": "public",
-      "category": "architecture",
-      "score": 7
+      "tags": [
+        "[onboarding, setup, concierge, identity]"
+      ],
+      "importance": 8,
+      "related_roles": [
+        "[Sovereign Concierge, Ecosystem Architect]"
+      ],
+      "scope": "global",
+      "category": "governance",
+      "score": 86
     },
     {
-      "id": "architecture/passkey-push-protocol.md",
-      "title": "Sovereign Approval Protocol: Push & Passkey (2026-03-04)",
+      "id": "orchestration/onboarding-protocol.md",
+      "title": "Sovereign Onboarding Protocol",
       "author": "Unknown",
-      "last_updated": "2026-03-04",
+      "last_updated": "2026-03-06",
       "tier": "public",
-      "category": "architecture",
-      "score": 7
+      "tags": [
+        "[onboarding, setup, concierge, identity]"
+      ],
+      "importance": 8,
+      "related_roles": [
+        "[Sovereign Concierge, Ecosystem Architect]"
+      ],
+      "scope": "global",
+      "category": "orchestration",
+      "score": 86
     },
     {
-      "id": "architecture/sensory-bridge-protocol.md",
-      "title": "Sensory Bridge Protocol (GUSP v1.0)",
+      "id": "governance/dual-key-policy.md",
+      "title": "Dual-Key Policy",
       "author": "Unknown",
-      "last_updated": "2026-03-05",
+      "last_updated": "2026-03-06",
       "tier": "public",
-      "category": "architecture",
-      "score": 7
+      "tags": [
+        "[ace, protocol, role-management, safety]"
+      ],
+      "importance": 10,
+      "related_roles": [
+        "[Ecosystem Architect, Engineering]"
+      ],
+      "scope": "global",
+      "category": "governance",
+      "score": 62
     },
     {
-      "id": "governance/active-inquiry-protocol.md",
-      "title": "Active Inquiry Protocol: The Power of Questioning",
+      "id": "onboarding/learning_paths.md",
+      "title": "ロール別教育ロードマップ (Learning Paths by Role)",
       "author": "Unknown",
       "last_updated": "2026-03-03",
       "tier": "public",
-      "category": "governance",
-      "score": 7
+      "tags": [],
+      "importance": 5,
+      "related_roles": [],
+      "scope": "global",
+      "category": "onboarding",
+      "score": 40
     },
     {
-      "id": "governance/config-protocol.md",
-      "title": "Config Protocol: The Sovereign Rule of System State",
+      "id": "orchestration/onboarding-directives/00_sovereign_onboarding.md",
+      "title": "Directive: Sovereign Onboarding (シミュレーション開始指令)",
+      "author": "Unknown",
+      "last_updated": "2026-03-04",
+      "tier": "public",
+      "tags": [],
+      "importance": 5,
+      "related_roles": [],
+      "scope": "global",
+      "category": "orchestration/onboarding-directives",
+      "score": 35
+    },
+    {
+      "id": "roles/knowledge_steward/mission.md",
+      "title": "Knowledge Steward (ナレッジ・スチュワード) ミッション声明",
       "author": "Unknown",
       "last_updated": "2026-03-03",
       "tier": "public",
-      "category": "governance",
-      "score": 7
+      "tags": [],
+      "importance": 5,
+      "related_roles": [],
+      "scope": "global",
+      "category": "roles/knowledge_steward",
+      "score": 35
     }
   ]
 }

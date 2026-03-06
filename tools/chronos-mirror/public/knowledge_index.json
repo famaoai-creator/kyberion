@@ -651,7 +651,7 @@
     "id": "governance/dual-key-policy.md",
     "title": "Dual-Key Policy: ロール管理と決定権限の標準規約",
     "author": "Unknown",
-    "last_updated": "2026-03-03",
+    "last_updated": "2026-03-06",
     "tier": "public",
     "category": "governance"
   },
@@ -675,7 +675,7 @@
     "id": "governance/onboarding-protocol.md",
     "title": "主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)",
     "author": "Unknown",
-    "last_updated": "2026-03-03",
+    "last_updated": "2026-03-06",
     "tier": "public",
     "category": "governance"
   },
@@ -1187,7 +1187,7 @@
     "id": "orchestration/onboarding-protocol.md",
     "title": "主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)",
     "author": "Unknown",
-    "last_updated": "2026-03-03",
+    "last_updated": "2026-03-06",
     "tier": "public",
     "category": "orchestration"
   },
@@ -1974,6 +1974,14 @@
     "last_updated": "2026-03-03",
     "tier": "public",
     "category": "standards/ipa"
+  },
+  {
+    "id": "standards/knowledge_management.md",
+    "title": "Knowledge Management Standard (Semantic Indexing) v1.0",
+    "author": "Unknown",
+    "last_updated": "2026-03-06",
+    "tier": "public",
+    "category": "standards"
   },
   {
     "id": "standards/media/pptx-ooxml-standards.md",

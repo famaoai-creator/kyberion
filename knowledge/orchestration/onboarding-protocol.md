@@ -1,3 +1,12 @@
+---
+title: Sovereign Onboarding Protocol
+category: Orchestration
+tags: [onboarding, setup, concierge, identity]
+importance: 8
+related_roles: [Sovereign Concierge, Ecosystem Architect]
+last_updated: 2026-03-06
+---
+
 # 主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)
 
 この文書は、新規ユーザー（主権者）が Gemini Skills エコシステムに参加する際の標準的な体験設計と、エージェント（Sovereign Concierge）の行動規範を定義する。
