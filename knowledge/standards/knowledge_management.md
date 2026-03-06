@@ -53,12 +53,20 @@ npm run generate-index
 4.  **Recency**: `last_updated` に基づく新しさの加味。
 
 ## 5. 自動メタデータ補完 (Auto-Enrichment)
-既存のナレッジにメタデータを一括適用する際は、以下の推論ルールを推奨する：
-- **Title**: ファイル内の最初の `# ` 見出し。
-- **Category**: 親ディレクトリ名のキャメルケース。
-- **Importance**: 
-    - 10: `governance/`, `standards/`
-    - 8: `orchestration/`, `architecture/`
-    - 7: `roles/`
-    - 4: `templates/`
+...
 - **Tags**: ディレクトリ名、ファイル名、および内容に含まれるプロトコル名。
+
+## 6. ナレッジの輸出入 (Portability)
+ナレッジベースの一部を他のエコシステムへ移管、または外部から取り込む際は、標準のインポート/エクスポートツールを使用しなければならない。
+
+### エクスポート
+```bash
+npx tsx scripts/export_knowledge.ts <category>
+```
+`hub/exports/` に KEP (Knowledge Exchange Package) ファイルが生成される。
+
+### インポート
+```bash
+npx tsx scripts/import_knowledge.ts <path-to-kep-file>
+```
+ファイルが配置され、自動的に `npm run generate-index` が実行される。

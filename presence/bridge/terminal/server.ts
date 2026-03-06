@@ -43,6 +43,19 @@ const sessions = new Map<string, Session>();
 
 app.use(express.static(path.join(ROOT_DIR, 'presence/bridge/terminal/static')));
 
+/**
+ * API: Get all active sessions
+ */
+app.get('/sessions', (req, res) => {
+  const list = Array.from(sessions.values()).map(s => ({
+    id: s.id,
+    name: s.name,
+    active: s.ws !== null,
+    lastActive: s.lastActive
+  }));
+  res.json(list);
+});
+
 function emitGlobalStimulus(text: string, sessionId: string) {
   try {
     const cleanText = text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
@@ -158,7 +171,7 @@ function getOrCreateSession(id: string, cols = 80, rows = 30, name?: string): Se
   newSession.rt = rt;
   sessions.set(id, newSession);
   fs.writeFileSync(paths.state, JSON.stringify({
-    id, pid: (rt as any).ptyProcess.pid, ts: new Date().toISOString(), active: true
+    id, pid: rt.getPid(), ts: new Date().toISOString(), active: true
   }, null, 2));
 
   setupSessionWatcher(newSession);
@@ -168,20 +181,37 @@ function getOrCreateSession(id: string, cols = 80, rows = 30, name?: string): Se
 
 wss.on('connection', (ws) => {
   let assignedSessionId: string | null = null;
+  logger.info(`🔌 [TerminalHub] New WebSocket connection established.`);
 
   ws.on('message', (msg) => {
     try {
       const payload = JSON.parse(msg.toString());
+      logger.info(`📩 [TerminalHub] Received: ${payload.type} from ${assignedSessionId || 'unknown'}`);
+
       if (payload.type === 'init') {
         assignedSessionId = payload.sessionId || `s-${Date.now()}`;
         const session = getOrCreateSession(assignedSessionId!, payload.cols, payload.rows, payload.name);
-        session.ws = ws;
-        ws.send(JSON.stringify({ type: 'session_ready', sessionId: session.id }));
+        session.ws = ws; // Crucial: Bind this physical socket to the session
+        logger.success(`✅ [TerminalHub] Session bound: ${assignedSessionId}`);
+        ws.send(JSON.stringify({ type: 'session_ready', sessionId: session.id, name: session.name }));
+        
+        // Replay backlog to the new client
+        session.backlog.forEach(data => ws.send(data));
       } else if (payload.type === 'input' && assignedSessionId) {
         const s = sessions.get(assignedSessionId);
         if (s) { s.rt.write(payload.data); s.lastActive = Date.now(); }
+      } else if (payload.type === 'resize' && assignedSessionId) {
+        const s = sessions.get(assignedSessionId);
+        if (s) { 
+          const cols = Math.floor(payload.cols);
+          const rows = Math.floor(payload.rows);
+          logger.info(`📏 [TerminalHub] Resizing ${assignedSessionId} to ${cols}x${rows}`);
+          s.rt.resize(cols, rows); 
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      logger.error(`❌ [TerminalHub] Message error: ${e.message}`);
+    }
   });
 
   ws.on('close', () => {
