@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-05T04:48:01.372Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T01:39:11.419Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Unknown)
@@ -22,6 +22,7 @@
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Unknown)
 - [Sensory Bridge Protocol (GUSP v1.0)](./architecture/sensory-bridge-protocol.md) (public | Unknown)
+- [Tenant-Aware Vision-Mission Model](./architecture/tenant-vision-model.md) (public | Unknown)
 - [Terminal Hosting: The Institutional Gateway](./architecture/terminal-hosting.md) (public | Unknown)
 
 ## 📁 ceo
@@ -34,9 +35,6 @@
 
 ## 📁 ceo/investment
 - [技術デューデリジェンス (Tech DD) 標準基準](./ceo/investment/tech_dd_standard.md) (public | Unknown)
-
-## 📁 ceo/mission
-- [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./ceo/mission/corporate_purpose.md) (public | Unknown)
 
 ## 📁 ceo/planning
 - [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./ceo/planning/frameworks.md) (public | Unknown)

@@ -1,0 +1,10 @@
+<html>
+<body>
+  <h1>Upload & Download Repro</h1>
+  <input type="file" id="upload-input" onchange="document.getElementById('up-msg').innerText = 'UPLOADED_' + this.files[0].name">
+  <div id="up-msg"></div>
+
+  <br>
+  <a id="download-link" href="data:text/plain;charset=utf-8,Hello%20World" download="test.txt">Download Text File</a>
+</body>
+</html>

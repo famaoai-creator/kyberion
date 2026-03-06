@@ -1,0 +1,1 @@
+# Tenant Vision: [Tenant Name]\n\n## 1. Core Emotion (The 'Soul')\n- [Describe the driving emotion or aesthetic here]\n\n## 2. Decision Principles (The 'Steering')\n- [Rule 1: e.g., 'UX over Security' or 'Server-side First']\n- [Rule 2]\n\n## 3. Victory Conditions (The 'Destination')\n- [What does success look like for this tenant?]

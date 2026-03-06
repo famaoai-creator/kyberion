@@ -1,0 +1,25 @@
+<html>
+<head>
+<style>
+  #drag { width: 50px; height: 50px; background: red; cursor: move; }
+  #drop { width: 100px; height: 100px; border: 2px dashed black; margin-top: 20px; }
+  .over { background: #ccc; }
+</style>
+</head>
+<body>
+  <h1>Drag & Drop Repro</h1>
+  <div id="drag" draggable="true">DRAG</div>
+  <div id="drop">DROP HERE</div>
+  <div id="msg"></div>
+  <script>
+    const drag = document.getElementById('drag');
+    const drop = document.getElementById('drop');
+    drag.ondragstart = (e) => e.dataTransfer.setData('text', 'dragged');
+    drop.ondragover = (e) => e.preventDefault();
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      document.getElementById('msg').innerText = 'DRAG_SUCCESS';
+    };
+  </script>
+</body>
+</html>

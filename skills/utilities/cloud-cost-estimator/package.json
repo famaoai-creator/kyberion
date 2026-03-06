@@ -7,5 +7,10 @@
   "types": "dist/index.d.ts",
   "dependencies": {
     "@agent/core": "workspace:*"
+  },
+  "author": "Gemini Agent",
+  "license": "MIT",
+  "devDependencies": {
+    "@agent/core": "workspace:*"
   }
 }

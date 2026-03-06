@@ -1,0 +1,15 @@
+{
+  "name": "Loop Repro",
+  "steps": [
+    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-001/repro/list.html" },
+    {
+      "action": "loop_action",
+      "list_locator": "a",
+      "go_back": true,
+      "sub_scenario": [
+        { "action": "click", "locator": "#approve", "reasoning": "Approve this item" },
+        { "action": "screenshot", "save_path": "loop_item.png" }
+      ]
+    }
+  ]
+}

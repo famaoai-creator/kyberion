@@ -1,0 +1,10 @@
+{
+  "mission_id": "M-VISION-001",
+  "vision_concept": "Tenant-Aware Vision & Mission Alignment",
+  "roles": {
+    "ceo": { "status": "PENDING", "opinion": "" },
+    "ecosystem_architect": { "status": "PENDING", "opinion": "" },
+    "software_developer": { "status": "PENDING", "opinion": "" },
+    "pmo_governance": { "status": "PENDING", "opinion": "" }
+  }
+}

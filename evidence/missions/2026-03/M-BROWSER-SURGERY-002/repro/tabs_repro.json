@@ -1,0 +1,10 @@
+{
+  "name": "Multi-Tab Repro",
+  "steps": [
+    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-002/repro/tabs.html" },
+    { "action": "click", "locator": "#new-tab-link", "reasoning": "Open new tab" },
+    { "action": "wait", "ms": 2000 },
+    { "action": "switch_tab", "tab_index": 1, "reasoning": "Switch to newly opened tab" },
+    { "action": "extract", "save_path": "tabs_result.txt" }
+  ]
+}
