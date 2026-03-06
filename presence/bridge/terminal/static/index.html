@@ -8,10 +8,16 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #0d0f14; overflow: hidden; display: flex; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #0d0f14; overflow: hidden; }
+        
         #sidebar { 
-            width: 200px; background: #1a1d23; border-right: 1px solid #333; 
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 200px;
+            background: #1a1d23; border-right: 1px solid #333; 
             display: flex; flex-direction: column; padding: 10px; gap: 10px;
+            box-sizing: border-box;
+            z-index: 10;
         }
         .session-item { 
             padding: 8px; background: #2a2e37; border-radius: 4px; color: #aaa; cursor: pointer; font-size: 12px;
@@ -23,16 +29,37 @@
             padding: 8px; background: #00f2ff; color: #000; border: none; border-radius: 4px; 
             cursor: pointer; font-weight: bold; font-size: 12px;
         }
-        #terminal-container { flex: 1; height: 100vh; position: relative; }
-        #terminal { width: 100%; height: 100%; }
-        #status-bar {
-            position: absolute; top: 10px; right: 20px; color: #00f2ff; font-family: monospace; font-size: 11px;
-            padding: 4px 12px; z-index: 100; background: rgba(13, 15, 20, 0.85); backdrop-filter: blur(4px);
-            border: 1px solid #1a1d23; border-radius: 20px; display: flex; align-items: center; gap: 8px;
+        
+        #main-area {
+            position: absolute;
+            top: 0; left: 200px; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            background: #0d0f14;
         }
+
+        #status-header {
+            height: 30px;
+            background: #1a1d23; padding: 0 15px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+
+        #terminal-wrapper {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #terminal { 
+            position: absolute;
+            top: 5px; left: 5px; right: 5px; bottom: 5px;
+        }
+
         .indicator { width: 8px; height: 8px; border-radius: 50%; background: #333; }
         .indicator.on { background: #00f2ff; box-shadow: 0 0 10px #00f2ff; }
-        .ai-active { color: #ff00ff; animation: pulse 1s infinite; font-weight: bold; }
+        .ai-active { color: #ff00ff; animation: pulse 1s infinite; font-weight: bold; font-size: 11px; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
@@ -42,13 +69,16 @@
         <div id="session-list" style="display: flex; flex-direction: column; gap: 5px; flex: 1; overflow-y: auto;"></div>
         <button id="new-session">+ New Session</button>
     </div>
-    <div id="terminal-container">
-        <div id="status-bar">
+    
+    <div id="main-area">
+        <div id="status-header">
             <div id="conn-indicator" class="indicator"></div>
-            <span id="status-text">CONNECTING...</span>
+            <span id="status-text" style="color: #00f2ff; font-family: monospace; font-size: 12px;">CONNECTING...</span>
             <span id="ai-text" style="display:none;" class="ai-active">AI ACTIVE</span>
         </div>
-        <div id="terminal"></div>
+        <div id="terminal-wrapper">
+            <div id="terminal"></div>
+        </div>
     </div>
     <script>
         const sessionList = document.getElementById('session-list');
@@ -58,15 +88,24 @@
 
         const term = new Terminal({
             theme: { background: '#0d0f14', foreground: '#e0e0e0', cursor: '#00f2ff' },
-            cursorBlink: true, fontSize: 13, fontFamily: 'Menlo, Monaco, "Courier New", monospace'
+            cursorBlink: true, 
+            fontSize: 14, 
+            fontFamily: 'Menlo, Monaco, monospace'
         });
 
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
-        term.open(document.getElementById('terminal'));
         
         let socket;
         let currentSessionId = localStorage.getItem('sovereign_session_id');
+
+        // Defer initialization to ensure flexbox layout is calculated
+        setTimeout(() => {
+            term.open(document.getElementById('terminal'));
+            fitAddon.fit();
+            connect();
+            fetchSessions();
+        }, 50);
 
         async function fetchSessions() {
             try {
@@ -93,6 +132,8 @@
             socket = new WebSocket(`ws://${location.host}`);
             socket.onopen = () => {
                 connIndicator.classList.add('on');
+                // Fit BEFORE sending init to get correct initial size
+                fitAddon.fit();
                 socket.send(JSON.stringify({ 
                     type: 'init', sessionId: currentSessionId, cols: term.cols, rows: term.rows 
                 }));
@@ -104,8 +145,11 @@
                         if (p.type === 'session_ready') {
                             currentSessionId = p.sessionId;
                             localStorage.setItem('sovereign_session_id', currentSessionId);
-                            statusText.innerText = p.name;
+                            statusText.innerText = (p.name || currentSessionId).toUpperCase();
+                            statusText.style.color = '#00f2ff';
                             fitAddon.fit();
+                            // Sync size immediately after session is ready
+                            socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
                             fetchSessions();
                             return;
                         }
@@ -146,8 +190,17 @@
         };
 
         document.body.addEventListener('click', () => term.focus());
-        connect();
-        fetchSessions();
+
+        // Multiple adjustments to ensure DOM is ready
+        [100, 500, 1000].forEach(delay => {
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize')); // Trigger layout recalculation
+                fitAddon.fit();
+                if (socket?.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+                }
+            }, delay);
+        });
     </script>
 </body>
 </html>

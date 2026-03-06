@@ -23,10 +23,11 @@ export interface ReflexTerminalOptions {
  */
 interface TerminalAdapter {
   write(data: string): void;
-  resize(cols: number, rows: number): void;
+  resize(cols: number, rows: number, width?: number, height?: number): void;
   kill(): void;
   onData(cb: (data: string) => void): void;
   onExit(cb: (code: number | null, signal: string | null) => void): void;
+  getPid(): number | undefined;
 }
 
 /**
@@ -39,6 +40,7 @@ class PtyAdapter implements TerminalAdapter {
   kill() { this.pty.kill(); }
   onData(cb: (data: string) => void) { this.pty.onData(cb); }
   onExit(cb: (code: number, signal: string) => void) { this.pty.onExit(cb); }
+  getPid() { return this.pty.pid; }
 }
 
 /**
@@ -64,6 +66,7 @@ class ChildProcessAdapter implements TerminalAdapter {
   onExit(cb: (code: number | null, signal: string | null) => void) {
     this.process.on('exit', cb);
   }
+  getPid() { return this.process.pid; }
 }
 
 export class ReflexTerminal {
@@ -117,8 +120,12 @@ export class ReflexTerminal {
     this.adapter.write(data);
   }
 
-  public resize(cols: number, rows: number) {
-    this.adapter.resize(cols, rows);
+  public resize(cols: number, rows: number, width?: number, height?: number) {
+    this.adapter.resize(cols, rows, width, height);
+  }
+
+  public getPid(): number | undefined {
+    return this.adapter.getPid();
   }
 
   public kill() {
