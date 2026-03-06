@@ -138,7 +138,15 @@ skills.forEach((skillObj) => {
       const isTsSkill = fs.existsSync(srcDir);
 
       if (!mainScript || !fs.existsSync(mainScript)) {
-        if (isPlanned) {
+        // Monorepo nested dist detection (ROOT/dist/skills/CATEGORY/NAME/src/index.js)
+        const relPath = skillObj.path;
+        const nestedDist = path.join(rootDir, 'dist', relPath, 'src', 'index.js');
+        if (fs.existsSync(nestedDist)) {
+          pkg.main = path.relative(skillPath, nestedDist);
+          mainScript = nestedDist;
+          needsFix = true;
+          details.push(`(Fixed to monorepo nested dist)`);
+        } else if (isPlanned) {
           status = '⏳ PLANNED';
           details.push('Pending implementation');
         } else {

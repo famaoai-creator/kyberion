@@ -28,12 +28,19 @@ function findScript(skillDir: string): string | null {
   const distDir = path.join(skillDir, 'dist');
   const scriptsDir = path.join(skillDir, 'scripts');
   
+  // 1. Direct local dist
   if (fs.existsSync(distDir)) {
     const files = fs.readdirSync(distDir);
     const main = files.find(f => f === 'index.js' || f === 'main.js');
     if (main) return path.join(distDir, main);
   }
   
+  // 2. Monorepo nested dist (ROOT/dist/skills/CATEGORY/NAME/src/index.js)
+  const relPath = path.relative(rootDir, skillDir);
+  const nestedDist = path.join(rootDir, 'dist', relPath, 'src', 'index.js');
+  if (fs.existsSync(nestedDist)) return nestedDist;
+
+  // 3. Local scripts
   if (fs.existsSync(scriptsDir)) {
     const files = fs.readdirSync(scriptsDir);
     const main = files.find(f => f === 'index.js' || f === 'main.js') || files.find(f => f === 'index.cjs');
