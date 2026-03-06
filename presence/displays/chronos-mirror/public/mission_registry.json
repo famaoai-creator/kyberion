@@ -1,5 +1,18 @@
 {
-  "last_updated": "2026-03-06T03:26:25.903Z",
+  "last_updated": "2026-03-06T03:47:14.456Z",
   "active_mission_id": null,
-  "missions": []
+  "missions": [
+    {
+      "id": "MSN-ISSUE-42",
+      "status": "planned",
+      "priority": 5,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-TEST-999",
+      "status": "paused",
+      "priority": 5,
+      "persona": "Ruthless Auditor"
+    }
+  ]
 }
