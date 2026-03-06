@@ -6,27 +6,40 @@ importance: 10
 author: Ecosystem Architect
 last_updated: 2026-03-06
 ---
+# Knowledge Management Standard (Semantic Indexing) v1.1
 
-# Knowledge Management Standard (Semantic Indexing) v1.0
-
-この文書は、Kyberion エコシステムにおけるナレッジファイルの構造化およびインデックス管理の標準を定義する。
+この文書は、Kyberion エコシステムにおけるナレッジファイルの構造化、インデックス管理、および**知的な取扱い（Intelligence Layer）**の標準を定義する。
 
 ## 1. Frontmatter 義務化
-すべてのナレッジファイル（`.md`）は、冒頭に YAML Frontmatter を含めなければならない。これにより、エージェントが `context_ranker` を通じて適切に知識を選択可能になる。
+すべてのナレッジファイル（`.md`）は、冒頭に YAML Frontmatter を含めなければならない。
 
-## 2. メタデータ・スキーマ
+## 2. メタデータ・スキーマ (拡張版)
 
 | フィールド | 必須 | 説明 |
 | :--- | :---: | :--- |
 | `title` | ○ | ドキュメントの正式名称。 |
-| `category` | × | 分類カテゴリ。ディレクトリ名と一致させることが推奨される。 |
+| `knowledge_type` | ○ | `explicit` (形式知: 事実・仕様) \| `tacit` (暗黙知: 美学・コツ) |
+| `intelligence_layer` | ○ | `judgment` (判断基準) \| `procedure` (手順) \| `methodology` (調査手法) |
+| `constraint_type` | × | `regulation` (法) \| `standard` (業界基準) \| `specification` (仕様) \| `policy` (内部ルール) |
+| `importance` | ○ | 1 〜 10 の重要度。 |
 | `tags` | ○ | カテゴリを横断するキーワード群（配列）。 |
-| `importance` | ○ | 1（参考）〜 10（憲法・最優先）の重要度。 |
 | `related_roles` | × | この知識を特に重視すべきロール（配列）。 |
-| `scope` | × | `global`, `project`, `internal` 等の適用範囲。 |
-| `last_updated` | ○ | YYYY-MM-DD 形式の最終更新日。 |
+| `last_updated` | ○ | YYYY-MM-DD 形式。 |
 
-## 3. インデックス生成
+## 3. 知的な取扱い基準 (Intelligence Handling)
+
+| 分類 | エージェントの思考・行動規範 |
+| :--- | :--- |
+| **`explicit`** | RAG（検索）においてそのまま引用し、正確性を最優先する。 |
+| **`tacit`** | 推論プロンプトに注入し、意思決定の「トーン」や「美学」として反映する。 |
+| **`judgment`** | トレードオフ発生時の「最終判断の根拠」として使用する。 |
+| **`procedure`** | `Mission Logic Engine` のステップとして解釈し、自動化を試みる。 |
+| **`regulation`** | **絶対遵守制約**。違反の疑いがある場合は `Sudo Gate` で実行を停止する。 |
+| **`specification`** | **唯一の真実 (SSoT)**。想像による補完を禁止し、定義に忠実に従う。 |
+
+## 4. インデックス生成
+...
+
 ナレッジの追加・更新後は、必ず以下のコマンドを実行してインデックスを同期しなければならない。
 ```bash
 npm run generate-index
