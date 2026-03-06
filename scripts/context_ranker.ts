@@ -17,6 +17,20 @@ interface KnowledgeItem {
   category: string;
   last_updated?: string;
   score?: number;
+  importance?: number;
+  tags?: string[];
+  related_roles?: string[];
+}
+
+function getActiveRole(): string | null {
+  try {
+    const sessionPath = path.join(pathResolver.rootDir(), 'active/shared/governance/session.json');
+    if (fs.existsSync(sessionPath)) {
+      const session = JSON.parse(fs.readFileSync(sessionPath, 'utf8'));
+      return session.active_role || null;
+    }
+  } catch (_) {}
+  return null;
 }
 
 function detectActiveMission(): string | null {
@@ -80,6 +94,7 @@ export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
   const activeMission = detectActiveMission();
   const visionItem = activeMission ? getVisionContext(activeMission) : null;
   const projectWorkflows = activeMission ? getProjectWorkflows(activeMission) : [];
+  const activeRole = getActiveRole();
   
   if (!fs.existsSync(indexPath)) {
     logger.error('[Ranker] Index not found. Run generate_knowledge_index.ts first.');
@@ -98,14 +113,26 @@ export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
       const title = (item.title || '').toLowerCase();
       const id = (item.id || '').toLowerCase();
       const cat = (item.category || '').toLowerCase();
+      const tags = (item.tags || []).map(t => t.toLowerCase());
+      const roles = (item.related_roles || []).map(r => r.toLowerCase());
 
       queryWords.forEach(word => {
         if (title.includes(word)) score += 10;
         if (id.includes(word)) score += 5;
         if (cat.includes(word)) score += 3;
+        if (tags.some(t => t.includes(word))) score += 15;
       });
 
       if (query.includes(cat) || cat.includes(query)) score += 15;
+      
+      // Role match bonus
+      if (activeRole && roles.some(r => r.includes(activeRole.toLowerCase()))) {
+        score += 25;
+      }
+
+      // Importance bonus
+      if (item.importance) score += (item.importance * 3);
+
       if (item.last_updated && item.last_updated.startsWith('2026')) score += 2;
       if (id.includes('protocol') || id.includes('policy')) score += 5;
 

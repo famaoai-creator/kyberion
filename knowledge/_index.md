@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T04:59:27.830Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T15:37:25.792Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Unknown)
@@ -408,6 +408,9 @@
 
 ## 📁 software-design
 - [ソフトウェアデザインパターン & 設計原則](./software-design/patterns.md) (public | Unknown)
+
+## 📁 standards
+- [Knowledge Management Standard (Semantic Indexing) v1.0](./standards/knowledge_management.md) (public | Unknown)
 
 ## 📁 standards/adr
 - [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md) (public | Unknown)
