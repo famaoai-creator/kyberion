@@ -25,8 +25,8 @@ Practical recipes for daily use. Each section is a self-contained task you can f
 ## 1. Initial Setup
 
 ```bash
-git clone https://github.com/famaoai-creator/gemini-skills.git
-cd gemini-skills
+git clone https://github.com/famaoai-creator/kyberion.git
+cd kyberion
 
 # Interactive wizard — selects your role, installs dependencies, generates skill index
 node dist/scripts/init_wizard.js

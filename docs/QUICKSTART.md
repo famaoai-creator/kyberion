@@ -19,8 +19,8 @@ The init wizard asks who you are. Based on your answer, it configures the ecosys
 
 ```bash
 # Clone the repository
-git clone https://github.com/famaoai-creator/gemini-skills.git
-cd gemini-skills
+git clone https://github.com/famaoai-creator/kyberion.git
+cd kyberion
 
 # Install dependencies and build the TypeScript artifacts (Crucial)
 pnpm install

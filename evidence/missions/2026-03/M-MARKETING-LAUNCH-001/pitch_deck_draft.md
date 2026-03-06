@@ -39,4 +39,4 @@ When logic offers multiple "correct" paths, we don't guess. We consult the **Sov
 
 ---
 **Build the future, don't just chat with it.**
-GitHub: [https://github.com/famaoai-creator/gemini-skills]
+GitHub: [https://github.com/famaoai-creator/kyberion]
