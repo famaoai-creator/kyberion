@@ -4,7 +4,7 @@ description: Document parsing and extraction engine based on the 3-layer model (
 status: implemented
 category: Media
 last_updated: '2026-03-06'
-tags: ocr,parsing,archaeology
+tags: documentation,gemini-skill
 ---
 
 # Document to Text Reborn (Digital Archaeologist)

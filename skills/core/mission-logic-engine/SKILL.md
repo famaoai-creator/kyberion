@@ -4,6 +4,7 @@ description: Reflexive execution engine for established mission logic (pipelines
 status: implemented
 category: Core
 last_updated: '2026-03-04'
+tags: gemini-skill
 ---
 
 # Mission Logic Engine (MLE)

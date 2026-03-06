@@ -10,13 +10,23 @@ import { logger, pathResolver } from '@agent/core';
 
 const LOGS_DIR = pathResolver.active('shared/logs');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const CHECK_INTERVAL_MS = 10000;
+const CHECK_INTERVAL_MS = 15000; // Increased to 15s
+
+const EXCLUDED_LOGS = [
+  'nexus-daemon.log',
+  'log-watcher.log',
+  'terminal-server.log',
+  'slack-sensor.log',
+  'system-whisperer.log'
+];
 
 const logOffsets = new Map<string, number>();
+let lastAlertTs = 0;
+const MIN_ALERT_INTERVAL_MS = 2000; // Rate limit alerts
 
 async function scanLogs() {
   if (!fs.existsSync(LOGS_DIR)) return;
-  const files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.log'));
+  const files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.log') && !EXCLUDED_LOGS.includes(f));
 
   for (const file of files) {
     const filePath = path.join(LOGS_DIR, file);
@@ -29,7 +39,13 @@ async function scanLogs() {
       
       for (const line of lines) {
         if ((line.toUpperCase().includes('ERROR') || line.toUpperCase().includes('FAILED')) && !line.includes('System Alert Emitted')) {
-          emitAlert(file, line.trim());
+          const now = Date.now();
+          if (now - lastAlertTs > MIN_ALERT_INTERVAL_MS) {
+            emitAlert(file, line.trim());
+            lastAlertTs = now;
+          } else {
+            logger.warn(`[LogWatcher] Alert rate-limited for ${file}`);
+          }
         }
       }
       logOffsets.set(file, stats.size);

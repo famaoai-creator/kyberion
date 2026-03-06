@@ -21,11 +21,7 @@ export declare const ui: {
     stripAnsi: (input: string) => string;
 };
 export declare const sre: {
-    analyzeRootCause: (errorMessage: string) => {
-        cause: any;
-        impact: any;
-        recommendation: any;
-    } | null;
+    analyzeRootCause: (errorMessage: string) => never;
 };
 export declare class Cache {
     private _maxSize;
@@ -52,5 +48,6 @@ export declare const fileUtils: {
     ensureDir: (dirPath: string) => void;
     readJson: (filePath: string) => any;
     writeJson: (filePath: string, data: any) => void;
+    getGoldenRule: () => string;
 };
 //# sourceMappingURL=core.d.ts.map
