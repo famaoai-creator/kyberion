@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T04:02:21.540Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T04:30:17.866Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Unknown)
@@ -67,6 +67,7 @@
 - [Cloud FinOps & Unit Economics Standard](./economics/finops/cloud_optimization.md) (public | Unknown)
 
 ## 📁 ethics
+- [エージェント倫理規程 (Agentic Ethos v1.0)](./ethics/agent_ethos.md) (public | Unknown)
 - [Data Ethics & AI Bias Mitigation Standard](./ethics/ai_bias_mitigation.md) (public | Unknown)
 
 ## 📁 evolution
