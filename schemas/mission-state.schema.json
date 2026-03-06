@@ -166,6 +166,20 @@
     "vision_ref": {
       "type": "string",
       "description": "Reference to the specific Vision document or concept guiding this mission."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "evaluation",
+        "development",
+        "research"
+      ],
+      "default": "development",
+      "description": "Type of mission defining its permissions and focus."
+    },
+    "external_ref": {
+      "type": "string",
+      "description": "Reference to an external issue, ticket, or trigger URL."
     }
   }
 }

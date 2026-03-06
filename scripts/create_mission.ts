@@ -11,10 +11,12 @@ async function main() {
   const args = process.argv.slice(2);
   const missionId = args[0]?.toUpperCase();
   const tenantId = args[1] || 'default';
-  const visionRef = args[2];
+  const missionType = args[2] || 'development';
+  const visionRef = args[3];
 
   if (!missionId) {
-    console.log('Usage: npx tsx scripts/create_mission.ts <mission_id> <tenant_id> [vision_ref]');
+    console.log('Usage: npx tsx scripts/create_mission.ts <mission_id> <tenant_id> [type] [vision_ref]');
+    console.log('Types: development (default), evaluation');
     process.exit(1);
   }
 
@@ -39,6 +41,7 @@ async function main() {
 
   const state = {
     mission_id: missionId,
+    type: missionType,
     version: '1.1',
     status: 'planned',
     priority: 5,

@@ -6,9 +6,9 @@
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger } from '@agent/core';
+import { logger, pathResolver, safeWriteFile } from '@agent/core';
 
-const ROOT_DIR = process.cwd();
+const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = path.join(ROOT_DIR, 'active/missions/registry.json');
 const MISSIONS_DIR = path.join(ROOT_DIR, 'active/missions');
 
@@ -152,13 +152,38 @@ async function main() {
     case 'sync': await syncRegistry(); break;
     case 'activate': if (arg1) await startMission(arg1); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'automated sync', arg3); break;
+    case 'handoff': if (arg1 && arg2) await handoffMission(arg1, arg2, arg3); break;
     default:
       console.log('Usage: npx tsx scripts/mission_controller.ts <action>');
       console.log('Actions:');
       console.log('  sync                             Sync registry with state files');
       console.log('  activate <id>                    Start mission branch and set to active');
       console.log('  checkpoint <task> [note] [id]    Commit and record checkpoint');
+      console.log('  handoff <id> <persona> [note]    Handoff mission to another persona');
   }
+}
+
+async function handoffMission(missionId: string, nextPersona: string, note?: string) {
+  const missionDir = pathResolver.missionDir(missionId);
+  const statePath = path.join(missionDir, 'mission-state.json');
+  
+  if (!fs.existsSync(statePath)) {
+    throw new Error(`Mission ${missionId} not found.`);
+  }
+
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  const prevPersona = state.assigned_persona;
+  state.assigned_persona = nextPersona;
+  state.status = 'paused'; // Pause during handoff
+  
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'HANDOFF',
+    note: `Handoff from ${prevPersona} to ${nextPersona}. ${note || ''}`
+  });
+
+  safeWriteFile(statePath, JSON.stringify(state, null, 2));
+  logger.success(`🤝 Mission ${missionId} handed off to: ${nextPersona}`);
 }
 
 main().catch(err => {

@@ -51,13 +51,40 @@ function getVisionContext(missionId: string): KnowledgeItem | null {
   return null;
 }
 
+function getProjectWorkflows(missionId: string): KnowledgeItem[] {
+  const items: KnowledgeItem[] = [];
+  try {
+    const missionDir = pathResolver.missionDir(missionId);
+    const statePath = path.join(missionDir, 'mission-state.json');
+    if (fs.existsSync(statePath)) {
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      const projects = state.context?.associated_projects || [];
+      
+      projects.forEach((proj: string) => {
+        const workflowPath = pathResolver.active(`projects/${proj}/WORKFLOW.md`);
+        if (fs.existsSync(workflowPath)) {
+          items.push({
+            id: `workflow_${proj}`,
+            title: `Workflow: ${proj}`,
+            category: 'Project Workflow',
+            score: 95 // Just below Vision
+          });
+        }
+      });
+    }
+  } catch (_) {}
+  return items;
+}
+
 export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
   const activeMission = detectActiveMission();
   const visionItem = activeMission ? getVisionContext(activeMission) : null;
+  const projectWorkflows = activeMission ? getProjectWorkflows(activeMission) : [];
   
   if (!fs.existsSync(indexPath)) {
     logger.error('[Ranker] Index not found. Run generate_knowledge_index.ts first.');
-    return visionItem ? [visionItem] : [];
+    const defaults = visionItem ? [visionItem, ...projectWorkflows] : projectWorkflows;
+    return defaults.slice(0, limit);
   }
 
   try {
@@ -85,15 +112,18 @@ export function rankContext(intent: string, limit = 7): KnowledgeItem[] {
       return { ...item, score };
     });
 
+    const priorityItems = visionItem ? [visionItem, ...projectWorkflows] : projectWorkflows;
+
     const ranked = scoredItems
       .filter((item: any) => item.score > 0)
       .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, visionItem ? limit - 1 : limit);
+      .slice(0, limit - priorityItems.length);
 
-    return visionItem ? [visionItem, ...ranked] : ranked;
+    return [...priorityItems, ...ranked];
   } catch (err: any) {
     logger.error(`Ranking Failed: ${err.message}`);
-    return visionItem ? [visionItem] : [];
+    const defaults = visionItem ? [visionItem, ...projectWorkflows] : projectWorkflows;
+    return defaults.slice(0, limit);
   }
 }
 
