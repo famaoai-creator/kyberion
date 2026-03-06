@@ -17,6 +17,7 @@ arguments:
   description: If true, play an alert sound before speaking.
 category: Automation
 tags: [voice, notification, tts, native]
+platforms: [darwin]
 ---
 
 # 🗣️ voice-notifier (v1.0)
