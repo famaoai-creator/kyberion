@@ -64,6 +64,9 @@ export { record, verifyIntegrity } from './ledger.js';
 export * as classifier from './classifier.js';
 export * from './knowledge-provider.js';
 
+// Networking
+export { secureFetch } from './network.js';
+
 // Governance & Security
 export * as tierGuard from './tier-guard.js';
 export { 

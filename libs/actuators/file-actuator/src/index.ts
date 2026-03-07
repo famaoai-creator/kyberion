@@ -1,15 +1,16 @@
-import { logger, runSkillAsync, safeReadFile, safeWriteFile, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
 /**
- * File-Actuator v1.0.0
- * Unified interface for all filesystem operations.
+ * File-Actuator v1.1.0
+ * Unified interface for all high-fidelity filesystem operations.
+ * Optimized for De-monolithized Procedure execution.
  */
 
 interface FileAction {
-  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists';
+  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists' | 'stat';
   path: string;
   content?: string;
   pattern?: string;
@@ -33,11 +34,12 @@ async function handleAction(input: FileAction) {
     case 'search':
       logger.info(`🔍 Searching pattern "${input.pattern}" in ${input.path}`);
       try {
+        // Try ripgrep first for high performance
         const results = safeExec('rg', ['--json', input.pattern || '', resolved]);
         return { results: JSON.parse(results) };
       } catch (err: any) {
-        logger.warn(`ripgrep not found, falling back to native search: ${err.message}`);
-        const results = [];
+        logger.warn(`ripgrep failed/missing, using resilient native search.`);
+        const results: any[] = [];
         const ignoreDirs = ['node_modules', 'dist', '.git', 'coverage'];
         
         function walk(dir: string) {
@@ -59,23 +61,37 @@ async function handleAction(input: FileAction) {
                     results.push({ file: path.relative(process.cwd(), fullPath), line, match: match[0] });
                   }
                 }
-              } catch (e) {
-                // Skip inaccessible files
-              }
+              } catch (e) {}
             }
-          } catch (e) {
-            // Skip inaccessible directories
-          }
+          } catch (e) {}
         }
-        
         walk(resolved);
         return { results };
       }
 
     case 'list':
       logger.info(`📂 Listing directory: ${input.path}`);
-      const files = fs.readdirSync(resolved);
-      return { files };
+      return { files: fs.readdirSync(resolved) };
+
+    case 'stat':
+      logger.info(`📊 Getting metadata for: ${input.path}`);
+      const s = fs.statSync(resolved);
+      return {
+        size: s.size,
+        mtime: s.mtime,
+        birthtime: s.birthtime,
+        isDirectory: s.isDirectory(),
+        isFile: s.isFile()
+      };
+
+    case 'delete':
+      logger.warn(`🗑️  DELETING path: ${input.path}`);
+      if (fs.statSync(resolved).isDirectory()) {
+        fs.rmSync(resolved, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(resolved);
+      }
+      return { status: 'deleted', path: input.path };
 
     case 'exists':
       return { exists: fs.existsSync(resolved) };
