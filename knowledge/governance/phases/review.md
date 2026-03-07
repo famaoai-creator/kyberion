@@ -1,19 +1,27 @@
 # Phase Protocol: ⑤ Review & Distillation
 
 ## Goal
-実行したミッションの知見を蒸留（Distill）し、環境をクリーンアップしてアーカイブする。
+Capitalize on experience and perform environmental cleansing.
 
-## Directive
-Distill both successes and failures into Wisdom. Purge temporary scripts (Scratch) and return a pristine environment to the Sovereign.
+## Directives
+1. **Victory Condition Check**: Verify that all mission goals have been met with objective evidence.
+2. **Wisdom Distillation**: Extract essential learnings (logic, constraints, patterns) from the mission logs and `TASK_BOARD.md` into `knowledge/`.
+3. **Task Closure**: Complete the final report and move the mission folder to the archive.
+4. **Audit Reporting**: Include results from security scanners, test runners, and performance metrics in the final summary.
+
+## Constraints
+- **Scratch Purge**: MUST physically delete all data in the `scratch/` directory.
+- **Evidence Preservation**: Retain structured execution logs and `mission-state.json` in the mission evidence folder.
+- **Intel First**: Do not skip the distillation step; learnings are more valuable than code.
 
 ## Physical Enforcement
-ミッションの終了時、AIエージェントは必ず以下のコマンドを実行して、物理的な環境を清算しなければならない。
+At mission completion, the agent MUST execute the finalization protocol.
 
 - **Command**: `npx tsx scripts/mission_controller.ts finish <MISSION_ID>`
 - **Validation**:
-  - `scratch/` ディレクトリの自動清算（Purge）。
-  - `active/archive/missions/` へのミッションフォルダの移動。
-  - ステータスを `completed` に設定。
+  - Automatic purging of `scratch/` files.
+  - Archiving the mission directory to `active/archive/missions/`.
+  - Setting status to `completed` in the mission state.
 
 ---
 *Status: Mandated by GEMINI.md*

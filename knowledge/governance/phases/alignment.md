@@ -1,19 +1,27 @@
 # Phase Protocol: ③ Alignment
 
 ## Goal
-主権者の意図（Intent）を解釈し、勝利条件（Victory Conditions）を定義して、ミッションを物理的に「起動」する。
+Interpret the Sovereign's intent, define Victory Conditions, and physically initiate the mission.
 
-## Directive
-Execution without a plan is recklessness. Do not perform physical changes until the Sovereign's intent and your strategy are 100% aligned.
+## Directives
+1. **Intent Interpretation**: Distill the Sovereign's request into actionable and measurable goals.
+2. **Context Ranking**: Use `scripts/context_ranker.js` to identify the TOP-7 most relevant knowledge files to minimize noise.
+3. **Strategy Formulation**: Create a clear `TASK_BOARD.md` or execution plan before making any physical changes.
+4. **Sovereign Switch**: Determine the execution mode (Governance-First or Autonomous-YOLO) based on the mission's risk and complexity.
+
+## Constraints
+- **Zero Physical Change**: Do not modify project source files during the alignment phase.
+- **Sudo Gate**: Any decision involving significant risk (level >= 4) or architectural change requires explicit Sovereign approval.
+- **Contract Integrity**: Execution without a plan is recklessness. Every mission must have a defined contract and Victory Conditions.
 
 ## Physical Enforcement
-Alignment が完了した際、AIエージェントは必ず以下のコマンドを実行してミッションを「Active」状態にしなければならない。
+Once Alignment is achieved, the agent MUST execute the following command to set the mission to "Active".
 
 - **Command**: `npx tsx scripts/mission_controller.ts start <MISSION_ID> <PERSONA>`
 - **Validation**:
-  - `my-identity.json` の存在確認。
-  - ミッション専用ブランチ (`mission/id`) の作成と切り替え。
-  - `mission-state.json` の初期化。
+  - Verification of `my-identity.json`.
+  - Automatic creation and switching to the mission branch (`mission/id`).
+  - Initialization of `mission-state.json`.
 
 ---
 *Status: Mandated by GEMINI.md*

@@ -1,18 +1,26 @@
 # Phase Protocol: ④ Mission Execution
 
 ## Goal
-物理的な変更を、論理的に正当化し、検証しながら、最小単位（Micro-tasking）で執行する。
+Accomplish physical changes with absolute validation through micro-tasking.
 
-## Directive
-The Absolute Rule of One. Fix exactly one location at a time and test immediately. Micro-tasking is the only defense against large-scale system collapse.
+## Directives
+1. **The Absolute Rule of One**: Fix and refactor exactly one location at a time. Never attempt mass updates across multiple unrelated files.
+2. **Plan-Act-Validate**: Iterate through each sub-task of the `TASK_BOARD.md` with rigorous, immediate testing.
+3. **Micro-Task Isolation**: Focus strictly on the current step to maintain cognitive hygiene and prevent large-scale system collapse.
+4. **Surgical Changes**: Apply targeted, minimal changes strictly related to the current sub-task.
+
+## Constraints
+- **Secure IO Enforcement**: Use `@agent/core/secure-io` for all file operations. Direct `node:fs` use is prohibited.
+- **Build Continuity**: Ensure the project-specific build (e.g., `npm run build`) and linting pass before considering a task complete.
+- **Legacy Preservation**: Inventory all existing methods and critical logic before performing an overwrite to prevent feature loss.
 
 ## Physical Enforcement
-作業中のマイルストーンごとに、AIエージェントは必ず以下のコマンドを実行して作業のトランザクションを確定させなければならない。
+At each significant milestone or task completion, the agent MUST record the progress through the mission controller.
 
 - **Command**: `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "<NOTE>"`
 - **Validation**:
-  - `git commit` による履歴の永続化。
-  - `mission-state.json` へのチェックポイントの記録。
+  - Transactional integrity through Git commit checkpoints.
+  - Recording of commit hashes in `mission-state.json`.
 
 ---
 *Status: Mandated by GEMINI.md*
