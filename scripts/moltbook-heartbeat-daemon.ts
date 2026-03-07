@@ -6,7 +6,14 @@ import { safeAppendFile, pathResolver, logger } from '@agent/core';
  * [SECURE-IO COMPLIANT VERSION]
  */
 
-const API_KEY = 'moltbook_sk_nfAhqrAVZPxrQ6ftSNJ_7KHOT6RYARJW';
+import { secretGuard } from '../libs/core/secret-guard.js';
+
+/**
+ * scripts/moltbook-heartbeat-daemon.ts
+ * [SECURE-IO COMPLIANT VERSION]
+ */
+
+const API_KEY = secretGuard.getSecret('MOLTBOOK_API_KEY');
 const LOG_FILE = path.join(pathResolver.rootDir(), 'active/missions/MSN-MOLTBOOK-INDEPENDENCE/night_watch.log');
 
 function logAction(message: string) {
