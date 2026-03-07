@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { safeWriteFile, safeReadFile } from '@agent/core';
 
 const ROOT_DIR = process.cwd();
 const MISSIONS_DIR = path.join(ROOT_DIR, 'active/missions');
@@ -28,37 +29,42 @@ export async function runAlignmentMirror() {
     const statePath = path.join(MISSIONS_DIR, missionId, 'mission-state.json');
     if (!fs.existsSync(statePath)) continue;
 
-    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    
-    // Process Completed but un-distilled missions
-    if (state.status === 'Completed' && !state.distilled) {
-      const learningsPath = path.join(MISSIONS_DIR, missionId, 'LEARNINGS.md');
+    try {
+      const stateContent = safeReadFile(statePath, { encoding: 'utf8' }) as string;
+      const state = JSON.parse(stateContent);
       
-      if (fs.existsSync(learningsPath)) {
-        console.log(chalk.yellow(`\n[EVOLUTION] Found latent wisdom in "${missionId}".`));
+      // Process Completed but un-distilled missions
+      if (state.status === 'Completed' && !state.distilled) {
+        const learningsPath = path.join(MISSIONS_DIR, missionId, 'LEARNINGS.md');
         
-        const learnings = fs.readFileSync(learningsPath, 'utf8');
-        const patchId = `patch-${missionId.toLowerCase()}-${Date.now().toString().slice(-4)}`;
-        
-        const patch: PersonaPatch = {
-          id: patchId,
-          source_mission: missionId,
-          timestamp: new Date().toISOString(),
-          deviation_summary: "Automated distillation of divergent success.",
-          delta_rules: learnings.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2)),
-          evidence_path: `active/missions/${missionId}/evidence/`
-        };
+        if (fs.existsSync(learningsPath)) {
+          console.log(chalk.yellow(`\n[EVOLUTION] Found latent wisdom in "${missionId}".`));
+          
+          const learnings = safeReadFile(learningsPath, { encoding: 'utf8' }) as string;
+          const patchId = `patch-${missionId.toLowerCase()}-${Date.now().toString().slice(-4)}`;
+          
+          const patch: PersonaPatch = {
+            id: patchId,
+            source_mission: missionId,
+            timestamp: new Date().toISOString(),
+            deviation_summary: "Automated distillation of divergent success.",
+            delta_rules: learnings.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2)),
+            evidence_path: `active/missions/${missionId}/evidence/`
+          };
 
-        const patchPath = path.join(VAULT_DIR, `${patchId}.json`);
-        fs.writeFileSync(patchPath, JSON.stringify(patch, null, 2));
-        
-        // Update mission state
-        state.distilled = true;
-        state.patch_id = patchId;
-        fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-        
-        console.log(chalk.green(`✅ Distilled: ${patchPath}`));
+          const patchPath = path.join(VAULT_DIR, `${patchId}.json`);
+          safeWriteFile(patchPath, JSON.stringify(patch, null, 2));
+          
+          // Update mission state
+          state.distilled = true;
+          state.patch_id = patchId;
+          safeWriteFile(statePath, JSON.stringify(state, null, 2));
+          
+          console.log(chalk.green(`✅ Distilled: ${patchPath}`));
+        }
       }
+    } catch (err: any) {
+      console.error(chalk.red(`Error processing mission ${missionId}: ${err.message}`));
     }
   }
 
