@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:37:48.043Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:43:17.755Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -289,6 +289,10 @@
 ## 📁 procedures/code
 - [Procedure: Targeted Code Refactoring](./procedures/code/refactor-code.md) (public | Unknown)
 
+## 📁 procedures/core
+- [Procedure: Self-Evolution & Prompt Optimization](./procedures/core/evolve-capabilities.md) (public | Unknown)
+- [Procedure: Mission Orchestration & Self-Healing](./procedures/core/orchestrate-missions.md) (public | Unknown)
+
 ## 📁 procedures/file
 - [Procedure: Analyze Special Formats (Binary, DB, Scenarios)](./procedures/file/analyze-special-formats.md) (public | Unknown)
 - [Procedure: Detect File Specifications (Format, Encoding, Language)](./procedures/file/detect-file-specs.md) (public | Unknown)
@@ -319,6 +323,10 @@
 - [Procedure: Ecosystem Health & Resilience Management](./procedures/utility/manage-ecosystem-resilience.md) (public | Unknown)
 - [Procedure: Infrastructure Architecture Mapping](./procedures/utility/map-infrastructure.md) (public | Unknown)
 - [Procedure: Cloud Resource & Cost Optimization](./procedures/utility/optimize-cloud-resources.md) (public | Unknown)
+
+## 📁 procedures/ux
+- [Procedure: UI/UX Audit & Persona Generation](./procedures/ux/audit-and-personas.md) (public | Unknown)
+- [Procedure: Voice Interface & Localization](./procedures/ux/voice-and-localization.md) (public | Unknown)
 
 ## 📁 procedures/wisdom
 - [Procedure: Identity Evolution & Wisdom Distillation](./procedures/wisdom/evolve-identity.md) (public | Unknown)
