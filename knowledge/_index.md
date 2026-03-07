@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:29:44.268Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:37:48.043Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -270,6 +270,12 @@
 ## 📁 pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
+## 📁 procedures/audit
+- [Procedure: License & Supply Chain Audit](./procedures/audit/audit-licenses.md) (public | Unknown)
+- [Procedure: Predictive Bug Analysis & Red-Teaming](./procedures/audit/predict-risks.md) (public | Unknown)
+- [Procedure: Security & Compliance Scanning](./procedures/audit/scan-security.md) (public | Unknown)
+- [Procedure: Quality Scoring & Project Health Assessment](./procedures/audit/score-quality.md) (public | Unknown)
+
 ## 📁 procedures/browser
 - [Procedure: Web Automation & Navigation](./procedures/browser/navigate-web.md) (public | Unknown)
 
@@ -305,6 +311,14 @@
 
 ## 📁 procedures/system
 - [Procedure: OS Peripheral Control](./procedures/system/control-peripherals.md) (public | Unknown)
+
+## 📁 procedures/utility
+- [Procedure: Data Anonymization & Log Analysis](./procedures/utility/anonymize-and-analyze-logs.md) (public | Unknown)
+- [Procedure: Token Economics & Completeness Scoring](./procedures/utility/audit-efficiency.md) (public | Unknown)
+- [Procedure: Release Documentation & Guided Wizards](./procedures/utility/generate-release-docs.md) (public | Unknown)
+- [Procedure: Ecosystem Health & Resilience Management](./procedures/utility/manage-ecosystem-resilience.md) (public | Unknown)
+- [Procedure: Infrastructure Architecture Mapping](./procedures/utility/map-infrastructure.md) (public | Unknown)
+- [Procedure: Cloud Resource & Cost Optimization](./procedures/utility/optimize-cloud-resources.md) (public | Unknown)
 
 ## 📁 procedures/wisdom
 - [Procedure: Identity Evolution & Wisdom Distillation](./procedures/wisdom/evolve-identity.md) (public | Unknown)
