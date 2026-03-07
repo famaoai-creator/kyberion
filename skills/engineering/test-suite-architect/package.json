@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Generates comprehensive test code (Jest, Pytest, Cypress) from requirements and test viewpoints. Enables Test-Driven Development (TDD) at scale.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/test-suite-architect/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

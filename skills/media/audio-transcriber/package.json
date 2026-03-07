@@ -2,7 +2,7 @@
   "name": "audio-transcriber",
   "version": "0.1.0",
   "description": "Transcribe audio/video files to text using OpenAI Whisper.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/media/audio-transcriber/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

@@ -1,7 +1,7 @@
 {
   "name": "schema-validator",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/schema-validator/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

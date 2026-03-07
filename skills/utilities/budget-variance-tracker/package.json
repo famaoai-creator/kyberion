@@ -1,7 +1,7 @@
 {
   "name": "budget-variance-tracker",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/budget-variance-tracker/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

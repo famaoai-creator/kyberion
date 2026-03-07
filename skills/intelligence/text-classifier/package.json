@@ -2,7 +2,7 @@
   "name": "text-classifier",
   "version": "1.0.0",
   "description": "Universal text classifier supporting multiple rule sets (doc-type, domain).",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/intelligence/text-classifier/src/index.js",
   "scripts": {
     "build": "tsc"
   },

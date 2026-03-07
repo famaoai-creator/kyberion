@@ -58,9 +58,23 @@ function saveRegistry(registry: Registry) {
   }
 }
 
+import { validateFilePath, validateFileFreshness } from '../libs/core/validators.js';
+
+// ... inside loadState or where applicable
 function loadState(id: string) {
   const statePath = path.join(MISSIONS_DIR, id, 'mission-state.json');
   if (!fs.existsSync(statePath)) return null;
+  
+  try {
+    // Enforce 1-hour freshness for active mission states
+    validateFileFreshness(statePath, 60 * 60 * 1000);
+  } catch (err: any) {
+    if (err.message.includes('STALE_STATE_ERROR')) {
+      logger.warn(`⚠️  CRITICAL: ${err.message}`);
+      logger.warn(`To proceed, run 'mission_controller alignment ${id}' to verify current context.`);
+    }
+  }
+
   return JSON.parse(fs.readFileSync(statePath, 'utf8'));
 }
 

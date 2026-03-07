@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/investor-readiness-audit/src/index.js",
   "description": "Prepares documents and audits for fundraising or board meetings. Ensures financial, technical, and compliance data is boardroom-ready.",
   "scripts": {
     "build": "tsc",

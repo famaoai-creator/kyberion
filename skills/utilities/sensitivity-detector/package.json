@@ -1,7 +1,7 @@
 {
   "name": "sensitivity-detector",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/sensitivity-detector/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

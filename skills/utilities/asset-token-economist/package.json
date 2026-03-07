@@ -1,7 +1,7 @@
 {
   "name": "asset-token-economist",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/asset-token-economist/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

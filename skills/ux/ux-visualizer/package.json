@@ -1,7 +1,7 @@
 {
   "name": "ux-visualizer",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/ux/ux-visualizer/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Scans the codebase for security risks.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/audit/security-scanner/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

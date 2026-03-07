@@ -1,7 +1,7 @@
 {
   "name": "browser-navigator",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/browser-navigator/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Gatekeeper for agent economic autonomy and external MFA approvals.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/wallet-manager/src/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",

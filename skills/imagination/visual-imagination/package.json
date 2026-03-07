@@ -2,7 +2,7 @@
   "name": "visual-imagination",
   "version": "1.1.0",
   "description": "Generates and edits images using Gemini Image API.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/imagination/visual-imagination/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

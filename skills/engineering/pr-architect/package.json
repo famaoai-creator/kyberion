@@ -2,7 +2,7 @@
   "name": "pr-architect",
   "version": "0.1.0",
   "description": "Crafts descriptive and high-quality Pull Request bodies. Analyzes code changes to explain \"Why\", \"How\", and the \"Impact\" of the work.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/pr-architect/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

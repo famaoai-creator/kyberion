@@ -2,7 +2,7 @@
   "name": "@kyberion/skill-visual-evidence-generator",
   "version": "1.0.0",
   "description": "Compiles the 10-frame visual buffer into a GIF or video for audit evidence.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/automation/visual-evidence-generator/src/index.js",
   "scripts": {
     "build": "tsc"
   },

@@ -1,7 +1,7 @@
 {
   "name": "doc-sync-sentinel",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/doc-sync-sentinel/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

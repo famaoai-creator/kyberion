@@ -2,7 +2,7 @@
   "name": "skill-evolution-engine",
   "version": "0.1.0",
   "description": "Analyzes skill health and suggests evolutionary improvements.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/core/skill-evolution-engine/src/index.js",
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
