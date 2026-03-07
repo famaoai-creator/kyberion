@@ -1,11 +1,10 @@
-import { logger, runSkillAsync } from '@agent/core';
+import { logger, runSkillAsync, safeExec, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 
 /**
  * mouse-injector v1.0 (macOS Specialized)
  * Uses AppleScript and small Python3 scripts for mouse control.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 interface MouseArgs {
@@ -36,9 +35,11 @@ function generateAppleScript(args: MouseArgs): string {
 
 const main = async (args: MouseArgs) => {
   let effectiveArgs = { ...args };
-  if (args.input && fs.existsSync(args.input)) {
-    const fileData = JSON.parse(fs.readFileSync(args.input, 'utf8'));
-    effectiveArgs = { ...effectiveArgs, ...fileData };
+  if (args.input) {
+    try {
+      const raw = safeReadFile(args.input, { encoding: 'utf8' }) as string;
+      effectiveArgs = { ...effectiveArgs, ...JSON.parse(raw) };
+    } catch (_) {}
   }
 
   logger.info(`🖱️ Injecting mouse events...`);
@@ -46,7 +47,7 @@ const main = async (args: MouseArgs) => {
   try {
     if (effectiveArgs.x !== undefined && effectiveArgs.y !== undefined && effectiveArgs.click !== 'none') {
       const script = generateAppleScript(effectiveArgs);
-      execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+      safeExec('osascript', ['-e', script]);
     }
 
     if (effectiveArgs.scroll) {
@@ -63,7 +64,7 @@ except ImportError:
     sys.exit(1)
 `.trim();
       try {
-        execSync(`python3 -c '${scrollScript}'`);
+        safeExec('python3', ['-c', scrollScript]);
       } catch (_) {
         logger.warn('⚠️ Advanced scroll failed. (Requires PyObjC / Python3 Quartz)');
       }
