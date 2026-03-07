@@ -7,7 +7,11 @@ Autonomous return from interruptions and self-healing.
 1. **Recovery Priority**: Scan `active/missions/` for any mission with `status: "active" | "paused"`.
 2. **Context Reconstruction**: Restore the exact prior state and resume from the point of suspension.
 3. **Stale State Management**: Identify if the mission state is outdated (>1 hour) and trigger an Alignment check if necessary.
-4. **Resilience**: Unexpected interruptions are opportunities for evolution; identify the root cause of the interruption to prevent recurrence.
+4. **Resilience**: Unexpected interruptions are opportunities for evolution.
+
+## Constraints
+- **Recovery Logic**: Restore the exact prior state. Do not invent a new path until the prior state is stable.
+- **State Freshness**: 1-hour freshness for active mission states must be strictly enforced.
 
 ## Physical Enforcement
 The agent MUST use the mission controller to resume and validate the current state.

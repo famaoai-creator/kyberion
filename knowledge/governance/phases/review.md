@@ -5,7 +5,7 @@ Capitalize on experience and perform environmental cleansing.
 
 ## Directives
 1. **Victory Condition Check**: Verify that all mission goals have been met with objective evidence.
-2. **Wisdom Distillation**: Extract essential learnings (logic, constraints, patterns) from the mission logs and `TASK_BOARD.md` into `knowledge/`.
+2. **Wisdom Distillation**: Extract essential learnings (logic, constraints, patterns) from mission logs and TASK_BOARD into `knowledge/`.
 3. **Task Closure**: Complete the final report and move the mission folder to the archive.
 4. **Audit Reporting**: Include results from security scanners, test runners, and performance metrics in the final summary.
 
