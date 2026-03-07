@@ -1,12 +1,13 @@
 /**
  * scripts/mission_controller.ts
  * Advanced Mission Lifecycle Controller with Git Integration and Auto-Detection.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
-import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, pathResolver, safeWriteFile } from '@agent/core';
+import * as fs from 'node:fs';
+import { logger, pathResolver, safeWriteFile, safeReadFile, safeExec } from '@agent/core';
+import { validateFileFreshness } from '../libs/core/validators.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = path.join(ROOT_DIR, 'active/missions/registry.json');
@@ -20,7 +21,8 @@ interface Registry {
 
 function getGitHash() {
   try {
-    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+    const res = safeExec('git', ['rev-parse', 'HEAD']);
+    return res.trim();
   } catch (e) {
     return 'unknown';
   }
@@ -28,7 +30,8 @@ function getGitHash() {
 
 function getCurrentBranch() {
   try {
-    return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+    const res = safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+    return res.trim();
   } catch (e) {
     return 'unknown';
   }
@@ -43,24 +46,23 @@ function detectMissionId(): string | null {
 }
 
 function loadRegistry(): Registry {
-  if (!fs.existsSync(REGISTRY_PATH)) return { last_updated: '', active_mission_id: null, missions: [] };
-  return JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  try {
+    const content = safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string;
+    return JSON.parse(content);
+  } catch (_) {
+    return { last_updated: '', active_mission_id: null, missions: [] };
+  }
 }
 
 function saveRegistry(registry: Registry) {
   registry.last_updated = new Date().toISOString();
   const content = JSON.stringify(registry, null, 2);
-  fs.writeFileSync(REGISTRY_PATH, content);
+  safeWriteFile(REGISTRY_PATH, content);
   
   const mirrorPath = path.join(ROOT_DIR, 'presence/displays/chronos-mirror/public/mission_registry.json');
-  if (fs.existsSync(path.dirname(mirrorPath))) {
-    fs.writeFileSync(mirrorPath, content);
-  }
+  safeWriteFile(mirrorPath, content);
 }
 
-import { validateFilePath, validateFileFreshness } from '../libs/core/validators.js';
-
-// ... inside loadState or where applicable
 function loadState(id: string) {
   const statePath = path.join(MISSIONS_DIR, id, 'mission-state.json');
   if (!fs.existsSync(statePath)) return null;
@@ -68,25 +70,35 @@ function loadState(id: string) {
   try {
     // Enforce 1-hour freshness for active mission states
     validateFileFreshness(statePath, 60 * 60 * 1000);
+    const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
+    return JSON.parse(content);
   } catch (err: any) {
     if (err.message.includes('STALE_STATE_ERROR')) {
       logger.warn(`⚠️  CRITICAL: ${err.message}`);
       logger.warn(`To proceed, run 'mission_controller alignment ${id}' to verify current context.`);
     }
+    
+    // Fallback attempt to read even if stale
+    try {
+       const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
+       return JSON.parse(content);
+    } catch (_) {
+       return null;
+    }
   }
-
-  return JSON.parse(fs.readFileSync(statePath, 'utf8'));
 }
 
 function saveState(id: string, state: any) {
   const statePath = path.join(MISSIONS_DIR, id, 'mission-state.json');
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  safeWriteFile(statePath, JSON.stringify(state, null, 2));
 }
 
 async function syncRegistry() {
   logger.info('🔄 Synchronizing Mission Registry...');
   const registry = loadRegistry();
-  const folders = fs.readdirSync(MISSIONS_DIR).filter(f => fs.statSync(path.join(MISSIONS_DIR, f)).isDirectory());
+  
+  const foldersRes = safeExec('ls', [MISSIONS_DIR]);
+  const folders = foldersRes.trim().split('\n').filter(f => f && !f.includes('.'));
   
   registry.missions = [];
   registry.active_mission_id = detectMissionId();
@@ -118,7 +130,7 @@ async function startMission(id: string) {
 
   logger.info(`🛡️ Initializing mission branch: ${branchName}...`);
   try {
-    execSync(`git checkout -b ${branchName}`, { stdio: 'inherit' });
+    safeExec('git', ['checkout', '-b', branchName]);
     state.status = 'active';
     state.git = { branch: branchName, start_commit: startHash, latest_commit: startHash, checkpoints: [] };
     saveState(id, state);
@@ -144,7 +156,8 @@ async function createCheckpoint(taskId: string, note: string, providedId?: strin
   
   try {
     logger.info(`📸 Creating checkpoint for mission ${missionId}, task ${taskId}...`);
-    execSync(`git add . && git commit -m "checkpoint(${missionId}): ${taskId} - ${note}"`, { stdio: 'inherit' });
+    safeExec('git', ['add', '.']);
+    safeExec('git', ['commit', '-m', `checkpoint(${missionId}): ${taskId} - ${note}`]);
     
     const newHash = getGitHash();
     state.git.latest_commit = newHash;
@@ -170,12 +183,6 @@ async function main() {
     case 'exec': if (arg1) await executeWithRepair(arg1, arg2); break;
     default:
       console.log('Usage: npx tsx scripts/mission_controller.ts <action>');
-      console.log('Actions:');
-      console.log('  sync                             Sync registry with state files');
-      console.log('  activate <id>                    Start mission branch and set to active');
-      console.log('  checkpoint <task> [note] [id]    Commit and record checkpoint');
-      console.log('  handoff <id> <persona> [note]    Handoff mission to another persona');
-      console.log('  exec "<cmd>" [mission_id]        Execute command with auto-repair');
   }
 }
 
@@ -183,24 +190,23 @@ async function executeWithRepair(command: string, missionId?: string) {
   const mid = missionId || process.env.MISSION_ID;
   const logFile = path.join(process.cwd(), 'scratch/last_execution.log');
   
-  if (!fs.existsSync(path.dirname(logFile))) fs.mkdirSync(path.dirname(logFile), { recursive: true });
-
   logger.info(`⚡ Executing: ${command}`);
   
   try {
-    const output = execSync(command, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] });
+    const output = safeExec(command, []); 
     console.log(output);
     logger.success('✅ Command completed successfully.');
   } catch (err: any) {
     logger.error('❌ Command failed. Triggering Auto-Repair Loop...');
     
     const fullLog = `STDOUT:\n${err.stdout}\n\nSTDERR:\n${err.stderr}\n\nERROR:\n${err.message}`;
-    fs.writeFileSync(logFile, fullLog);
+    safeWriteFile(logFile, fullLog);
     console.error(err.stderr);
     
-    const repairCmd = `MISSION_ID=${mid || ''} npx tsx scripts/auto_repair.ts ${logFile}`;
     try {
-      execSync(repairCmd, { stdio: 'inherit' });
+      safeExec('npx', ['tsx', 'scripts/auto_repair.ts', logFile], { 
+        env: { ...process.env, MISSION_ID: mid || '' } 
+      });
     } catch (_) {
       logger.error('Failed to run auto-repair script.');
     }
@@ -213,14 +219,11 @@ async function handoffMission(missionId: string, nextPersona: string, note?: str
   const missionDir = pathResolver.missionDir(missionId);
   const statePath = path.join(missionDir, 'mission-state.json');
   
-  if (!fs.existsSync(statePath)) {
-    throw new Error(`Mission ${missionId} not found.`);
-  }
-
-  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
+  const state = JSON.parse(content);
   const prevPersona = state.assigned_persona;
   state.assigned_persona = nextPersona;
-  state.status = 'paused'; // Pause during handoff
+  state.status = 'paused';
   
   state.history.push({
     ts: new Date().toISOString(),

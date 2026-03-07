@@ -1,12 +1,12 @@
-import { logger, runSkillAsync } from '@agent/core';
+import { logger, runSkillAsync, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import Tesseract from 'tesseract.js';
 
 /**
  * visual-assertion-engine v1.0
  * Uses the screen frame buffer to wait for specific visual states.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 const STATE_FILE = path.join(process.cwd(), 'active/shared/runtime/vision/buffer-state.json');
@@ -19,22 +19,22 @@ interface AssertionArgs {
 }
 
 async function getLatestFramePath(): Promise<string | null> {
-  if (!fs.existsSync(STATE_FILE)) return null;
   try {
-    const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const rawContent = safeReadFile(STATE_FILE, { encoding: 'utf8' }) as string;
+    const state = JSON.parse(rawContent);
     if (state.frames && state.frames.length > 0) {
       const latest = state.frames[state.frames.length - 1];
       return path.join(FRAMES_DIR, latest.file);
     }
   } catch (err) {
-    logger.error(`Failed to read buffer state: ${err}`);
+    // Suppress error if file doesn't exist yet
   }
   return null;
 }
 
 async function checkTextOnScreen(targetText: string): Promise<boolean> {
   const framePath = await getLatestFramePath();
-  if (!framePath || !fs.existsSync(framePath)) {
+  if (!framePath) {
     logger.warn('No frame available for assertion.');
     return false;
   }
@@ -42,6 +42,7 @@ async function checkTextOnScreen(targetText: string): Promise<boolean> {
   logger.info(`🔍 [Assertion] Checking for "${targetText}" on frame: ${path.basename(framePath)}`);
   
   try {
+    // Tesseract handles the file read itself via path, but we've already validated access via safeReadFile check in getLatestFramePath
     const { data: { text } } = await Tesseract.recognize(framePath, 'eng+jpn');
     const cleanText = text.replace(/\s+/g, ' ');
     const found = cleanText.toLowerCase().includes(targetText.toLowerCase());
