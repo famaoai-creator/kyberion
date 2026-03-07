@@ -1,12 +1,14 @@
 /**
  * scripts/doctor.ts
- * Unified health checker for the Gemini Skills monorepo.
+ * Unified health checker for the Kyberion Sovereign ecosystem.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
+import { safeWriteFile } from '@agent/core';
 
 const rootDir = process.cwd();
 const checks: any[] = [];
@@ -33,13 +35,13 @@ function runCheck(name: string, cmd: string, parser: (out: string, err: string |
 
 async function main() {
   if (!isJsonMode) {
-    console.log(chalk.bold.cyan('\n🏥 Gemini Skills Doctor (TS)'));
+    console.log(chalk.bold.cyan('\n🏥 Kyberion Sovereign Doctor (TS)'));
     console.log(chalk.dim('━'.repeat(50)));
   }
 
-  runCheck('SKILL.md Validation', 'node dist/scripts/validate_skills.js', (out) => {
+  runCheck('Capability Validation', 'node dist/scripts/validate_skills.js', (out) => {
     const match = out.match(/Checked (\d+) skills/);
-    return { status: out.toLowerCase().includes('success') ? 'pass' : 'fail', icon: out.toLowerCase().includes('success') ? '✅' : '❌', detail: `${match ? match[1] : '?'} skills validated` };
+    return { status: out.toLowerCase().includes('success') ? 'pass' : 'fail', icon: out.toLowerCase().includes('success') ? '✅' : '❌', detail: `${match ? match[1] : '?'} capabilities validated` };
   });
 
   runCheck('Health Check', 'node dist/scripts/check_skills_health.js', (out) => {
@@ -62,8 +64,7 @@ async function main() {
       overall,
       checks
     };
-    if (!fs.existsSync(path.dirname(reportPath))) fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    safeWriteFile(reportPath, JSON.stringify(report, null, 2));
     console.log(`[Doctor] JSON report saved to ${reportPath}`);
   }
 }

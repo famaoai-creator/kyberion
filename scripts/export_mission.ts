@@ -1,10 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, pathResolver, safeReadFile } from '@agent/core';
+import { logger, pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
 
 /**
+ * scripts/export_mission.ts
  * Mission Export Tool (MEP v0.1 Prototype)
- * Exports a mission with optional evidence and sanitization.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 interface ExportOptions {
@@ -25,7 +26,7 @@ function sanitizeContent(content: string): string {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     sanitized = sanitized.replace(new RegExp(escapedKey, 'g'), value);
   }
-  // Basic Regex for sensitive patterns (can be expanded)
+  // Basic Regex for sensitive patterns
   sanitized = sanitized.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '[EMAIL_REDACTED]');
   sanitized = sanitized.replace(/(https?:\/\/)[^\s/$.?#].[^\s]*/g, (match) => {
     if (match.includes('localhost')) return match;
@@ -56,47 +57,53 @@ async function exportMission({ missionId, includeEvidence, outputFile }: ExportO
     evidence: []
   };
 
-  // 1. Collect Metadata (Contract)
-  const contractPath = path.join(targetPath, 'contract.json');
-  if (fs.existsSync(contractPath)) {
-    const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
-    mep.metadata = {
-      goal: contract.goal,
-      status: contract.status || 'unknown',
-      role: contract.role
-    };
-    mep.blueprint.contract = JSON.parse(sanitizeContent(JSON.stringify(contract)));
-  }
+  try {
+    // 1. Collect Metadata (Contract)
+    const contractPath = path.join(targetPath, 'contract.json');
+    if (fs.existsSync(contractPath)) {
+      const contractContent = safeReadFile(contractPath, { encoding: 'utf8' }) as string;
+      const contract = JSON.parse(contractContent);
+      mep.metadata = {
+        goal: contract.goal,
+        status: contract.status || 'unknown',
+        role: contract.role
+      };
+      mep.blueprint.contract = JSON.parse(sanitizeContent(JSON.stringify(contract)));
+    }
 
-  // 2. Collect Procedure (Task Board)
-  const taskBoardPath = path.join(targetPath, 'TASK_BOARD.md');
-  if (fs.existsSync(taskBoardPath)) {
-    mep.blueprint.procedure = sanitizeContent(fs.readFileSync(taskBoardPath, 'utf8'));
-  }
+    // 2. Collect Procedure (Task Board)
+    const taskBoardPath = path.join(targetPath, 'TASK_BOARD.md');
+    if (fs.existsSync(taskBoardPath)) {
+      const boardContent = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+      mep.blueprint.procedure = sanitizeContent(boardContent);
+    }
 
-  // 3. Collect Evidence (especially for failures)
-  if (includeEvidence) {
-    const evidenceDir = path.join(targetPath, 'evidence');
-    if (fs.existsSync(evidenceDir)) {
-      const files = fs.readdirSync(evidenceDir);
-      for (const file of files) {
-        if (file.endsWith('.json') || file.endsWith('.md') || file.endsWith('.log')) {
-          const content = fs.readFileSync(path.join(evidenceDir, file), 'utf8');
-          mep.evidence.push({
-            name: file,
-            content: file.endsWith('.json') ? JSON.parse(sanitizeContent(content)) : sanitizeContent(content)
-          });
+    // 3. Collect Evidence
+    if (includeEvidence) {
+      const evidenceDir = path.join(targetPath, 'evidence');
+      if (fs.existsSync(evidenceDir)) {
+        const files = fs.readdirSync(evidenceDir);
+        for (const file of files) {
+          if (file.endsWith('.json') || file.endsWith('.md') || file.endsWith('.log')) {
+            const content = safeReadFile(path.join(evidenceDir, file), { encoding: 'utf8' }) as string;
+            mep.evidence.push({
+              name: file,
+              content: file.endsWith('.json') ? JSON.parse(sanitizeContent(content)) : sanitizeContent(content)
+            });
+          }
         }
       }
     }
-  }
 
-  // 4. Output
-  const resultJson = JSON.stringify(mep, null, 2);
-  const outPath = outputFile || path.join(process.cwd(), 'hub/exports/missions', `mep_${missionId}.json`);
-  fs.writeFileSync(outPath, resultJson);
-  
-  logger.success(`✅ Mission exported successfully to: ${outPath}`);
+    // 4. Output
+    const resultJson = JSON.stringify(mep, null, 2);
+    const outPath = outputFile || path.join(process.cwd(), 'hub/exports/missions', `mep_${missionId}.json`);
+    safeWriteFile(outPath, resultJson);
+    
+    logger.success(`✅ Mission exported successfully to: ${outPath}`);
+  } catch (err: any) {
+    logger.error(`Export failed: ${err.message}`);
+  }
 }
 
 // CLI Entry
@@ -111,7 +118,7 @@ if (!mId) {
 
 exportMission({
   missionId: mId,
-  includeEvidence: evFlag || true, // Defaulting to true for prototype to show failures
+  includeEvidence: evFlag || true,
 }).catch(err => {
   logger.error(`Export failed: ${err.message}`);
 });
