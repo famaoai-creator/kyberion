@@ -1,14 +1,18 @@
 /**
  * @agent/core - Unified Entry Point
  * All shared utilities and wrappers are centralized here.
- * [SECURE-IO ENFORCED VERSION]
+ * [STABLE RECONSTRUCTION VERSION 2]
  */
 
-// Core Wrapper & Metrics
+// Core Foundation (logger, ui, sre, Cache, fileUtils, errorHandler)
+export * from './core.js';
+
+// Specific Wrappers & Metrics
 export * from './skill-wrapper.js';
 export * from './metrics.js';
+export * from './error-codes.js';
 
-// Secure IO & Filesystem
+// Secure IO & Filesystem (Shield Layer)
 export * as secureIo from './secure-io.js';
 export { 
   safeReadFile, 
@@ -16,13 +20,13 @@ export {
   safeAppendFile, 
   safeUnlink, 
   safeMkdir, 
-  safeExec,
-  safeReaddir,
-  safeStat,
-  validateUrl,
-  sanitizePath,
-  writeArtifact 
+  safeExec
 } from './secure-io.js';
+
+import * as _secureIo from './secure-io.js';
+export const safeReaddir = (_secureIo as any).safeReaddir;
+export const safeStat = (_secureIo as any).safeStat;
+export const isSecretPath = (_secureIo as any).isSecretPath;
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
@@ -41,16 +45,11 @@ export {
 } from './path-resolver.js';
 
 // Utils
-export { logger } from './logger.js';
-export * as fileUtils from './file-utils.js';
-export * as ui from './ui.js';
-export * from './error-handler.js';
-export * from './cache.js';
-export * from './sre.js';
 export * from './fs-utils.js';
 export * from './ledger.js';
-export * from './record.js';
-export * from './verify-integrity.js';
+export { parseData, stringifyData } from './data-utils.js'; // Explicitly avoid detectFormat conflict
+export * from './detectors.js';
+export * from './validators.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
@@ -59,7 +58,7 @@ export * from './knowledge-provider.js';
 // Networking
 export { secureFetch } from './network.js';
 
-// Governance & Security
+// Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';
 export { 
   detectTier, 
@@ -72,7 +71,7 @@ export {
 } from './tier-guard.js';
 
 export * as secretGuard from './secret-guard.js';
-export { getSecret, getActiveSecrets, isSecretPath } from './secret-guard.js';
+export { getSecret, getActiveSecrets, grantAccess } from './secret-guard.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
@@ -88,4 +87,5 @@ export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 
 // Shared Business Types
+export * from './shared-business-types.js';
 export * as visionJudge from './vision-judge.js';

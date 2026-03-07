@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:52:07.188Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T09:27:20.244Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -15,6 +15,7 @@
 - [Architecture: Alignment Mirror & Calibration Missions](./architecture/alignment-mirror-calibration.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [Analysis: Sensory Bridge Alignment (2026-03-05)](./architecture/analysis-sensory-alignment-20260305.md) (public | Unknown)
+- [Architecture: The 5-Layer Backbone of Kyberion](./architecture/backbone-sovereignty.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Ecosystem Architect)
 - [Architecture: Event-Driven Sovereignty](./architecture/event-driven-sovereignty.md) (public | Unknown)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Unknown)
@@ -80,6 +81,7 @@
 
 ## 📁 evolution
 - [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md) (public | Ecosystem Architect)
+- [Reconstruction Learnings: The Great De-monolithization (2026-03-07)](./evolution/reconstruction-learnings-2026-03-07.md) (public | Unknown)
 - [🧠 Autonomous Wisdom Distillation - 2026-03-01](./evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
 
 ## 📁 external-wisdom
@@ -365,6 +367,7 @@
 - [Security By Design Standard](./public/security/security-by-design.md) (public | Ecosystem Architect)
 - [Security: Skill Supply Chain Defense (Dependency Integrity)](./public/security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./public/security/supply-chain-governance.md) (public | Ecosystem Architect)
+- [Protocol: Temporal Intent-Based Authentication (TIBA)](./public/security/temporal-intent-auth.md) (public | Unknown)
 
 ## 📁 public/security/advanced
 - [Diff-Based Security Scanning Strategy](./public/security/advanced/diff_based_scanning.md) (public | Ecosystem Architect)
@@ -488,6 +491,7 @@
 - [Security By Design Standard](./security/security-by-design.md) (public | Ecosystem Architect)
 - [Security: Skill Supply Chain Defense (Dependency Integrity)](./security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./security/supply-chain-governance.md) (public | Ecosystem Architect)
+- [Protocol: Temporal Intent-Based Authentication (TIBA)](./security/temporal-intent-auth.md) (public | Unknown)
 
 ## 📁 security/advanced
 - [Diff-Based Security Scanning Strategy](./security/advanced/diff_based_scanning.md) (public | Ecosystem Architect)
