@@ -1,31 +1,24 @@
 import { createHmac } from 'node:crypto';
+import { secretGuard } from './secret-guard.js';
 
 /**
- * Pulse Guard: Sovereign Token Manager
+ * Pulse Guard: Ensures Stimuli Integrity via HMAC.
+ * [SECRET-GUARD COMPLIANT VERSION]
  */
 export const pulseGuard = {
-  createToken: (missionId: string, scope: any) => {
-    const secret = process.env.GEMINI_SOVEREIGN_SECRET || 'default-secret';
-    const payload = JSON.stringify({ missionId, scope, ts: Date.now() });
+  sign: (payload: string): string => {
+    const secret = secretGuard.getSecret('GEMINI_SOVEREIGN_SECRET') || 'default-secret';
     const hmac = createHmac('sha256', secret).update(payload).digest('hex');
-    return Buffer.from(payload).toString('base64') + '.' + hmac;
+    return hmac;
   },
 
-  validateToken: (token: string) => {
+  verify: (payload: string, signature: string): boolean => {
     try {
-      const [base64Payload, signature] = token.split('.');
-      const secret = process.env.GEMINI_SOVEREIGN_SECRET || 'default-secret';
-      const payload = Buffer.from(base64Payload, 'base64').toString();
-
+      const secret = secretGuard.getSecret('GEMINI_SOVEREIGN_SECRET') || 'default-secret';
       const expectedHmac = createHmac('sha256', secret).update(payload).digest('hex');
-      if (signature !== expectedHmac) return null;
-
-      const data = JSON.parse(payload);
-      if (Date.now() - data.ts > 3600000) return null;
-
-      return data;
-    } catch (_e) {
-      return null;
+      return expectedHmac === signature;
+    } catch (_) {
+      return false;
     }
-  },
+  }
 };
