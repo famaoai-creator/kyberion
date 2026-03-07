@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:05:28.965Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:26:36.554Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -26,6 +26,7 @@
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./architecture/passkey-push-protocol.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Ecosystem Architect)
+- [Satellite Architecture Model (Hybrid-C)](./architecture/satellite-model.md) (public | Unknown)
 - [Sensory Bridge Protocol (GUSP v1.0)](./architecture/sensory-bridge-protocol.md) (public | Ecosystem Architect)
 - [Tenant-Aware Vision-Mission Model](./architecture/tenant-vision-model.md) (public | Ecosystem Architect)
 - [Terminal Hosting: The Institutional Gateway](./architecture/terminal-hosting.md) (public | Ecosystem Architect)
