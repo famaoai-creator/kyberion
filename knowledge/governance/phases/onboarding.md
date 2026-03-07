@@ -1,13 +1,21 @@
-# Phase: Onboarding
+# Phase Protocol: ① Onboarding
+
 ## Goal
 Environment safety verification and identity synchronization.
 
 ## Directives
-1.  **Identity Verification**: Check for the existence of `knowledge/personal/my-identity.json`.
-2.  **Environment Scan**: Verify ecosystem initialization state (Tier directories, core libraries).
-3.  **Bootstrap**: Utilize `dist/scripts/bootstrap.js` to establish references to `@agent/core`.
-4.  **Infrastructure First**: Do not proceed with high-level tasks if the TypeScript build pipeline (`dist/`) is unstable.
+1. **Identity Check**: Verify the existence and integrity of `knowledge/personal/my-identity.json`.
+2. **Tier Verification**: Ensure that the 3-Tier directory structure (Personal, Confidential, Public) is correctly established.
+3. **Build Status**: Confirm that the ecosystem dependencies (`pnpm install`) and core artifacts (`dist/`) are present.
+4. **Environment Scanning**: Humility first; scan the environment and report any deficiencies or misconfigurations immediately.
 
-## Constraints
-- **Read-Only Mentality**: During initial onboarding, prefer observation over modification until the environment is confirmed safe.
-- **Concierge Priority**: Onboarding MUST be led by the Sovereign Concierge to establish foundational mission context.
+## Physical Enforcement
+Before any mission or significant task, the agent MUST run the prerequisite scan.
+
+- **Automated Check**: `npx tsx scripts/mission_controller.ts start <ID>` (includes prerequisite scan).
+- **Validation**:
+  - Verification of `@agent/core` availability.
+  - Confirmation of 3-Tier isolation via `tier-guard.js`.
+
+---
+*Status: Mandated by GEMINI.md*
