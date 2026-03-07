@@ -1,11 +1,10 @@
-import { logger, runSkillAsync } from '@agent/core';
+import { logger, runSkillAsync, safeExec, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 
 /**
  * keyboard-injector v1.0 (macOS Specialized)
  * Uses AppleScript (osascript) for high-fidelity system-level keyboard automation.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 interface InjectArgs {
@@ -34,12 +33,9 @@ const KEY_MAP: Record<string, number> = {
 function generateAppleScript(args: InjectArgs): string {
   const app = args.application || 'iTerm2';
   
-  // Safety: If the target is "Terminal", ensure we don't accidentally target ourselves.
-  // We'll add an extra check to ensure the target is really active and not just "any" window.
-  
   const delay = (args.delay || 50) / 1000;
   let script = `tell application "${app}" to activate\n`;
-  script += `delay 0.8\n`; // Increased delay for safety
+  script += `delay 0.8\n`; 
   script += `tell application "System Events"\n`;
   script += `  if (name of first process whose frontmost is true) is not "${app}" then\n`;
   script += `    log "Safety Triggered: Target application ${app} is not frontmost."\n`;
@@ -83,9 +79,11 @@ function generateAppleScript(args: InjectArgs): string {
 
 const main = async (args: InjectArgs) => {
   let effectiveArgs = { ...args };
-  if (args.input && fs.existsSync(args.input)) {
-    const fileData = JSON.parse(fs.readFileSync(args.input, 'utf8'));
-    effectiveArgs = { ...effectiveArgs, ...fileData };
+  if (args.input) {
+    try {
+      const raw = safeReadFile(args.input, { encoding: 'utf8' }) as string;
+      effectiveArgs = { ...effectiveArgs, ...JSON.parse(raw) };
+    } catch (_) {}
   }
 
   if (!effectiveArgs.text && (!effectiveArgs.keys || effectiveArgs.keys.length === 0)) {
@@ -96,8 +94,7 @@ const main = async (args: InjectArgs) => {
   logger.info(`🎹 Injecting keyboard events into ${effectiveArgs.application || 'iTerm2'}...`);
 
   try {
-    const escapedScript = script.replace(/'/g, "'\\''");
-    execSync(`osascript -e '${escapedScript}'`);
+    safeExec('osascript', ['-e', script]);
     
     return {
       status: 'success',

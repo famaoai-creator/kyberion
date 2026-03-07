@@ -1,10 +1,8 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
-import { execSync } from 'node:child_process';
+import { safeExec } from '@agent/core';
 
 /**
  * Local Reviewer Core Library.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 export interface ReviewFinding {
@@ -16,7 +14,7 @@ export interface ReviewFinding {
 
 export function getStagedDiff(): string {
   try {
-    return execSync('git diff --staged', { encoding: 'utf8' });
+    return safeExec('git', ['diff', '--staged']);
   } catch (_) {
     return '';
   }
