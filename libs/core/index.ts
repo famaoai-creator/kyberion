@@ -1,6 +1,7 @@
 /**
  * @agent/core - Unified Entry Point
  * All shared utilities and wrappers are centralized here.
+ * [SECURE-IO ENFORCED VERSION]
  */
 
 // Core Wrapper & Metrics
@@ -15,50 +16,41 @@ export {
   safeAppendFile, 
   safeUnlink, 
   safeMkdir, 
-  safeExec, 
-  validateFileSize, 
+  safeExec,
+  safeReaddir,
+  safeStat,
   validateUrl,
   sanitizePath,
   writeArtifact 
 } from './secure-io.js';
 
+// Paths & Navigation
 export * as pathResolver from './path-resolver.js';
 export { 
   rootDir, 
   knowledge, 
-  active, 
   scripts, 
+  active, 
   vault, 
   shared, 
   isProtected, 
   skillDir, 
-  missionDir, 
-  resolve, 
-  rootResolve 
+  missionDir,
+  resolve,
+  rootResolve
 } from './path-resolver.js';
-export * as pathUtils from './path-resolver.js';
 
-// Logging, UI & Utilities
-export { 
-  logger, 
-  ui, 
-  fileUtils, 
-  errorHandler, 
-  Cache,
-  sre
-} from './core.js';
-
-// Validation & Schemas
-export * from './validators.js';
-export * from './validate.js';
-export { getAllFiles } from './fs-utils.js';
-
-// Error Handling
-export * from './error-codes.js';
-
-// Ledger & Auditing
-export * as ledger from './ledger.js';
-export { record, verifyIntegrity } from './ledger.js';
+// Utils
+export { logger } from './logger.js';
+export * as fileUtils from './file-utils.js';
+export * as ui from './ui.js';
+export * from './error-handler.js';
+export * from './cache.js';
+export * from './sre.js';
+export * from './fs-utils.js';
+export * from './ledger.js';
+export * from './record.js';
+export * from './verify-integrity.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
@@ -75,19 +67,22 @@ export {
   validateInjection, 
   validateReadPermission, 
   validateWritePermission, 
-  scanForConfidentialMarkers,
-  validateSovereignBoundary
+  scanForConfidentialMarkers, 
+  validateSovereignBoundary 
 } from './tier-guard.js';
+
 export * as secretGuard from './secret-guard.js';
 export { getSecret, getActiveSecrets, isSecretPath } from './secret-guard.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
 
-// Specialized Utils
+// Domain Engines
 export * as excelUtils from './excel-utils.js';
 export * as pptxUtils from './pptx-utils.js';
-export { speak, say } from './voice-synth.js';
+
+// Voice & Presentation
+export { say } from './voice-synth.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
