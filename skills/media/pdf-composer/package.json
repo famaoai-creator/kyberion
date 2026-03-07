@@ -2,7 +2,7 @@
   "name": "pdf-composer",
   "version": "0.1.0",
   "description": "Generate PDF documents from Markdown with headers/footers.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/media/pdf-composer/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

@@ -9,11 +9,11 @@ import { logger, safeWriteFile, safeExec, pathResolver } from '@agent/core';
 
 async function getGitContext() {
   try {
-    const branchRes = await safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
-    const hashRes = await safeExec('git', ['rev-parse', '--short', 'HEAD']);
+    const branchRes = safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+    const hashRes = safeExec('git', ['rev-parse', '--short', 'HEAD']);
     return { 
-      branch: branchRes.stdout.trim(), 
-      hash: hashRes.stdout.trim() 
+      branch: branchRes.trim(), 
+      hash: hashRes.trim() 
     };
   } catch (_) {
     return { branch: 'unknown', hash: 'none' };

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Reflexive execution engine for established mission logic (pipelines).",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/core/mission-logic-engine/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

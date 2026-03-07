@@ -2,7 +2,7 @@
   "name": "self-healing-orchestrator",
   "version": "0.1.0",
   "description": "Pattern-based automatic repair for known issues.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/core/self-healing-orchestrator/src/index.js",
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",

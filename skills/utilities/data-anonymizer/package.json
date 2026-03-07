@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Masks sensitive fields in JSON data for safe sharing.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/data-anonymizer/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

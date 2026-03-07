@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/sunset-architect/src/index.js",
   "description": "Manages the graceful decommissioning of underused or high-maintenance features. Plans deprecation cycles, handles data archiving, and generates migration paths for legacy users.",
   "scripts": {
     "build": "tsc",

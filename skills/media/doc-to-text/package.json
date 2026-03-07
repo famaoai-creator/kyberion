@@ -2,7 +2,7 @@
   "name": "doc-to-text",
   "version": "0.2.0",
   "description": "Universal document ingestion engine. Supports PDF, Excel, Word, Images (OCR), Email, and ZIP.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/media/doc-to-text/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

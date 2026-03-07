@@ -2,7 +2,7 @@
   "name": "@automation/voice-notifier",
   "version": "1.0.0",
   "description": "Voice Notification Skill for Gemini CLI",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/automation/voice-notifier/src/index.js",
   "type": "module",
   "author": "Gemini Agent",
   "license": "MIT",

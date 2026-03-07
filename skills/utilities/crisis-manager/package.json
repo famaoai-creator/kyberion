@@ -1,7 +1,7 @@
 {
   "name": "crisis-manager",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/crisis-manager/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

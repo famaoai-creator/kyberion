@@ -2,7 +2,7 @@
   "name": "diagram-renderer",
   "version": "1.1.0",
   "description": "Universal Visual Engine supporting Mermaid and HTML/Tailwind UI Rendering.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/media/diagram-renderer/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

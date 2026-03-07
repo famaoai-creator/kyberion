@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/business-growth-planner/src/index.js",
   "description": "Helps define long-term business goals, market entry strategies, and revenue streams. Translates CEO vision into structured OKRs and growth pillars.",
   "scripts": {
     "build": "tsc",

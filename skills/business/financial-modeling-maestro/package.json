@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/financial-modeling-maestro/src/index.js",
   "description": "Generates and analyzes financial models, P&L forecasts, and cash flow projections. Transforms business assumptions into multi-year financial statements.",
   "scripts": {
     "build": "tsc",

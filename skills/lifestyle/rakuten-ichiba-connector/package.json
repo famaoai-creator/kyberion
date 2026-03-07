@@ -2,7 +2,7 @@
   "name": "rakuten-ichiba-connector",
   "version": "1.1.0",
   "description": "Searches for products on Rakuten Ichiba (TS Edition).",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/lifestyle/rakuten-ichiba-connector/src/index.js",
   "scripts": {
     "build": "tsc"
   },

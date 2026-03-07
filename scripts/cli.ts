@@ -16,8 +16,25 @@ const govPath = path.join(rootDir, 'knowledge/personal/role-config.json');
 
 const args = process.argv.slice(2);
 const command = args[0];
-const skillName = args[1];
-const skillArgs = args.slice(2);
+let skillName = args[1];
+let skillArgs = args.slice(2);
+
+// Persona Swapper: Handle --branch flag
+const branchIdx = skillArgs.indexOf('--branch');
+let activeBranch: any = null;
+if (branchIdx !== -1) {
+  const branchId = skillArgs[branchIdx + 1];
+  const patchPath = path.join(rootDir, 'knowledge/evolution/latent-wisdom', `${branchId}.json`);
+  if (fs.existsSync(patchPath)) {
+    activeBranch = JSON.parse(fs.readFileSync(patchPath, 'utf8'));
+    console.log(chalk.magenta(`\n🎭 PERSONA SWAP: Loading latent wisdom from branch "${branchId}"`));
+    console.log(chalk.gray(`Rules: ${activeBranch.delta_rules.join(', ')}`));
+  } else {
+    console.log(chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.`));
+  }
+  // Remove flag and value from args before passing to skill
+  skillArgs.splice(branchIdx, 2);
+}
 
 function loadIndex() {
   if (!fs.existsSync(indexPath)) return { skills: [] };
@@ -28,12 +45,19 @@ function findScript(skillDir: string): string | null {
   const distDir = path.join(skillDir, 'dist');
   const scriptsDir = path.join(skillDir, 'scripts');
   
+  // 1. Direct local dist
   if (fs.existsSync(distDir)) {
     const files = fs.readdirSync(distDir);
     const main = files.find(f => f === 'index.js' || f === 'main.js');
     if (main) return path.join(distDir, main);
   }
   
+  // 2. Monorepo nested dist (ROOT/dist/skills/CATEGORY/NAME/src/index.js)
+  const relPath = path.relative(rootDir, skillDir);
+  const nestedDist = path.join(rootDir, 'dist', relPath, 'src', 'index.js');
+  if (fs.existsSync(nestedDist)) return nestedDist;
+
+  // 3. Local scripts
   if (fs.existsSync(scriptsDir)) {
     const files = fs.readdirSync(scriptsDir);
     const main = files.find(f => f === 'index.js' || f === 'main.js') || files.find(f => f === 'index.cjs');

@@ -1,7 +1,7 @@
 {
   "name": "api-doc-generator",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/api-doc-generator/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

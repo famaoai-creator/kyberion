@@ -2,7 +2,7 @@
   "name": "excel-artisan",
   "version": "0.1.0",
   "description": "Generates and edits Excel (.xlsx) files. Capable of converting JSON/CSV/HTML to Excel, modifying cell values, and applying basic formatting.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/media/excel-artisan/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

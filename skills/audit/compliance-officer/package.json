@@ -1,7 +1,7 @@
 {
   "name": "compliance-officer",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/audit/compliance-officer/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

@@ -1,7 +1,7 @@
 {
   "name": "slack-communicator-pro",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/connector/slack-communicator-pro/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

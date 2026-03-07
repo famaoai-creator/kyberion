@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Compiles core utilities into standalone binaries (Go/Rust) to reduce runtime dependencies. Ensures the ecosystem's \"Self-Bootstrapping\" capability.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/kernel-compiler/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

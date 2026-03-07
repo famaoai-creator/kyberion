@@ -2,7 +2,7 @@
   "name": "@agent-skills/schema-inspector",
   "version": "0.1.0",
   "description": "Automatically locates and displays schema definition files (SQL, Prisma, OpenAPI, etc.).",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/schema-inspector/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

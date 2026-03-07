@@ -1,7 +1,7 @@
 {
   "name": "synthetic-user-persona",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/ux/synthetic-user-persona/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

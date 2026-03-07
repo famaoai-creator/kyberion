@@ -2,7 +2,7 @@
   "name": "mobile-test-generator",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/mobile-test-generator/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Reverse engineers legacy binaries and \"black box\" executables to extract logic and dependencies. Re-integrates lost institutional assets into modern codebases.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/binary-archaeologist/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

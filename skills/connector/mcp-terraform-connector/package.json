@@ -8,7 +8,7 @@
   "author": "Gemini Agent",
   "license": "MIT",
   "description": "Connector for HashiCorp Terraform MCP server",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/connector/mcp-terraform-connector/src/index.js",
   "engines": {
     "node": ">=20.0.0"
   },

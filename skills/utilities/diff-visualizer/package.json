@@ -1,7 +1,7 @@
 {
   "name": "diff-visualizer",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/diff-visualizer/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

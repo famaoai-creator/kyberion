@@ -2,7 +2,7 @@
   "name": "prompt-optimizer",
   "version": "0.1.0",
   "description": "Analyzes SKILL.md files and suggests prompt engineering improvements.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/core/prompt-optimizer/src/index.js",
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",

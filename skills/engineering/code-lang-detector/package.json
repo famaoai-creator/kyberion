@@ -2,7 +2,7 @@
   "name": "code-lang-detector",
   "version": "0.1.0",
   "description": "Detect programming language of source code.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/code-lang-detector/src/index.js",
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",

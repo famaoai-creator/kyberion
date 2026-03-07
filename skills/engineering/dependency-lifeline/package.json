@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Proactively monitors and plans library updates. Assesses the risk of breaking changes and proposes safe update paths.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/dependency-lifeline/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

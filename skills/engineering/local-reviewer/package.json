@@ -2,7 +2,7 @@
   "name": "local-reviewer",
   "version": "0.1.0",
   "description": "Retrieves git diff of staged files for pre-commit AI code review.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/local-reviewer/src/index.js",
   "author": "Gemini Agent",
   "license": "MIT",
   "private": true,

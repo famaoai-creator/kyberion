@@ -87,6 +87,24 @@ export function readJsonFile<T = unknown>(filePath: string, label = 'JSON file')
 }
 
 /**
+ * Validate that a file is 'fresh' (modified within the last X milliseconds).
+ * 
+ * @param filePath  - Path to the file
+ * @param threshold - Maximum allowed age in milliseconds (default: 1 hour)
+ * @throws {Error} If the file is older than the threshold
+ */
+export function validateFileFreshness(filePath: string, threshold = 60 * 60 * 1000): void {
+  const resolved = validateFilePath(filePath);
+  const stats = fs.statSync(resolved);
+  const age = Date.now() - stats.mtimeMs;
+
+  if (age > threshold) {
+    const ageMinutes = Math.round(age / 1000 / 60);
+    throw new Error(`STALE_STATE_ERROR: File at ${filePath} was last modified ${ageMinutes} minutes ago (Threshold: ${threshold / 1000 / 60} minutes). Potential cognitive drift detected.`);
+  }
+}
+
+/**
  * Validate that all required arguments are present in an arguments object.
  *
  * @param argv     - Arguments object (typically from yargs or similar)

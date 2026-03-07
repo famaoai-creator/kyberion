@@ -2,7 +2,7 @@
   "name": "@kyberion/skill-visual-assertion-engine",
   "version": "1.0.0",
   "description": "Waits for specific visual states (text/image) on the screen using the frame buffer.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/automation/visual-assertion-engine/src/index.js",
   "scripts": {
     "build": "tsc"
   },

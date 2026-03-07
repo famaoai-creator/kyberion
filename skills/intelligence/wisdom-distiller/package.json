@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Distills mission results into reusable logic pipelines (YAML).",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/intelligence/wisdom-distiller/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

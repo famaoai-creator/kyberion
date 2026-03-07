@@ -1,7 +1,7 @@
 {
   "name": "document-generator",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/document-generator/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

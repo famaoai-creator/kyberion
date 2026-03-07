@@ -1,7 +1,7 @@
 {
   "name": "disaster-recovery-planner",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/disaster-recovery-planner/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

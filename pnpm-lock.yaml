@@ -373,6 +373,12 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  skills/automation/voice-notifier:
+    devDependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../../libs/core
+
   skills/business/business-growth-planner:
     dependencies:
       '@agent/core':

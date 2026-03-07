@@ -2,7 +2,7 @@
   "name": "knowledge-fetcher",
   "version": "0.1.0",
   "description": "Fetch knowledge from both public and confidential directories.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/intelligence/knowledge-fetcher/src/index.js",
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
