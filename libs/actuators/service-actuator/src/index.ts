@@ -14,6 +14,7 @@ interface ServiceAction {
   service_id: string; // e.g., 'slack', 'jira', 'box'
   mode: 'API' | 'CLI' | 'SDK';
   action: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
   auth?: 'none' | 'secret-guard' | 'session';
 }
@@ -36,11 +37,13 @@ async function handleAction(input: ServiceAction) {
   switch (input.mode) {
     case 'API':
       const baseUrl = input.service_id === 'moltbook' ? 'https://www.moltbook.com/api/v1' : `https://api.${input.service_id}.com/v1`;
+      const httpMethod = input.method || (input.params ? 'POST' : 'GET');
       return await secureFetch({
-        method: 'GET', // Dynamic or based on action
+        method: httpMethod,
         url: `${baseUrl}/${input.action}`,
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        data: input.params
+        data: httpMethod !== 'GET' ? input.params : undefined,
+        params: httpMethod === 'GET' ? input.params : undefined
       });
 
     case 'CLI':
