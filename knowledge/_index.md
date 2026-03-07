@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T13:08:15.589Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:05:28.965Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -156,6 +156,13 @@
 - [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Ecosystem Architect)
 - [Governance: Tiered Consensus & Experimental Branches](./governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [SOP: TypeScript Core Base Stabilization](./governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
+
+## 📁 governance/phases
+- [Phase: Alignment](./governance/phases/alignment.md) (public | Unknown)
+- [Phase: Mission Execution](./governance/phases/execution.md) (public | Unknown)
+- [Phase: Onboarding](./governance/phases/onboarding.md) (public | Unknown)
+- [Phase: Recovery & Resilience](./governance/phases/recovery.md) (public | Unknown)
+- [Phase: Review & Distillation](./governance/phases/review.md) (public | Unknown)
 
 ## 📁 legal/ip
 - [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md) (public | Ecosystem Architect)
