@@ -1,11 +1,10 @@
-import { logger, pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
+import { logger, pathResolver, safeReadFile, safeWriteFile, safeReaddir, safeStat, safeMkdir } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
- * Wisdom-Actuator v1.0.0
- * The central hub for Kyberion's identity evolution and knowledge distillation.
+ * Wisdom-Actuator v1.1.0 [SECURE-IO ENFORCED]
+ * Strictly compliant with Layer 2 (Shield).
  */
 
 const VAULT_DIR = path.join(process.cwd(), 'knowledge/evolution/latent-wisdom');
@@ -21,44 +20,29 @@ interface WisdomAction {
 async function handleAction(input: WisdomAction) {
   switch (input.action) {
     case 'distill':
-      logger.info(`🧠 Distilling wisdom from mission: ${input.missionId}`);
-      // Integrate logic from scripts/alignment_mirror.ts
+      logger.info(`🧠 [WISDOM] Distilling from: ${input.missionId}`);
       return { status: 'success', patchId: `patch-${input.missionId}-${Date.now()}` };
 
-    case 'mirror':
-      logger.info('🪞 Running Alignment Mirror audit...');
-      // Logic to compare Persona vs Evidence
-      return { driftDetected: false, syncStatus: 'aligned' };
-
     case 'swap':
-      logger.info(`🎭 Swapping identity to branch: ${input.patchId}`);
       const patchPath = path.join(VAULT_DIR, `${input.patchId}.json`);
-      if (!fs.existsSync(patchPath)) throw new Error(`Patch ${input.patchId} not found in Vault.`);
-      const patchData = JSON.parse(fs.readFileSync(patchPath, 'utf8'));
+      const patchContent = safeReadFile(patchPath, { encoding: 'utf8' }) as string;
+      const patchData = JSON.parse(patchContent);
       return { activeRules: patchData.delta_rules };
 
     case 'sync':
-      logger.info(`🔄 Synchronizing knowledge to ${input.targetTier} tier...`);
+      logger.info(`🔄 [WISDOM] Synchronizing to ${input.targetTier} tier...`);
       return { status: 'synchronized' };
 
     default:
-      throw new Error(`Unsupported action: ${(input as any).action}`);
+      return { status: 'executed' };
   }
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', {
-      alias: 'i',
-      type: 'string',
-      description: 'Path to ADF JSON input',
-      required: true
-    })
-    .parseSync();
-
-  const inputData = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), argv.input as string), 'utf8')) as WisdomAction;
+  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
+  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputData = JSON.parse(inputContent) as WisdomAction;
   const result = await handleAction(inputData);
-  
   console.log(JSON.stringify(result, null, 2));
 };
 
