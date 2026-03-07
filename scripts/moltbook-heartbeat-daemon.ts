@@ -1,20 +1,16 @@
 import * as path from 'node:path';
 import { safeAppendFile, pathResolver, logger } from '@agent/core';
+import { secretGuard } from '../libs/core/secret-guard.js';
 
 /**
  * scripts/moltbook-heartbeat-daemon.ts
  * [SECURE-IO COMPLIANT VERSION]
  */
 
-const API_KEY = process.env.MOLTBOOK_API_KEY;
+const API_KEY = secretGuard.getSecret('MOLTBOOK_API_KEY');
 const LOG_FILE = path.join(pathResolver.rootDir(), 'active/missions/MSN-MOLTBOOK-INDEPENDENCE/night_watch.log');
 
-async function heartbeat() {
-  if (!API_KEY) {
-    logger.error('❌ MOLTBOOK_API_KEY environment variable is not set. Heartbeat aborted.');
-    return;
-  }
-
+function logAction(message: string) {
   const timestamp = new Date().toISOString();
   const logLine = `[${timestamp}] ${message}\n`;
   try {
@@ -26,6 +22,11 @@ async function heartbeat() {
 }
 
 async function heartbeat() {
+  if (!API_KEY) {
+    logger.error('❌ MOLTBOOK_API_KEY environment variable is not set. Heartbeat aborted.');
+    return;
+  }
+
   try {
     logAction('Initiating Moltbook Heartbeat...');
     
@@ -33,7 +34,7 @@ async function heartbeat() {
     const homeRes = await fetch('https://www.moltbook.com/api/v1/home', {
       headers: { 'Authorization': `Bearer ${API_KEY}` }
     });
-    const homeData = await homeRes.json();
+    const homeData = await homeRes.json() as any;
     
     if (homeData && homeData.your_account) {
       logAction(`Karma: ${homeData.your_account.karma} | Unread Notifications: ${homeData.your_account.unread_notification_count}`);

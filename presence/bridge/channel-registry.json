@@ -15,7 +15,9 @@
       "default_mode": "BATCH",
       "priority": 5,
       "capabilities": ["async_report", "notification", "thread_reply"],
-      "connector_skill": "slack-communicator-pro"
+      "connector_skill": "service-actuator",
+      "service_id": "slack",
+      "execution_mode": "API"
     },
     {
       "id": "voice",

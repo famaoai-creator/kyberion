@@ -10,7 +10,7 @@ import {
   validateFilePath,
   safeJsonParse,
   requireArgs,
-  SkillError,
+  KyberionError,
   ERROR_CODES,
   Cache,
   rootDir
@@ -99,14 +99,14 @@ describe('core library bundle', () => {
 
   describe('error-codes', () => {
     it('should have structured fields in SkillError', () => {
-      const err = new SkillError(ERROR_CODES.VALIDATION_ERROR, 'bad input');
+      const err = new KyberionError(ERROR_CODES.VALIDATION_ERROR, 'bad input');
       expect(err.code).toBe('E200');
       expect(err.retryable).toBe(false);
       expect(err.message).toContain('bad input');
     });
 
     it('should serialize SkillError to JSON', () => {
-      const err = new SkillError(ERROR_CODES.EXECUTION_ERROR, 'timeout', { context: { s: 't' } });
+      const err = new KyberionError(ERROR_CODES.EXECUTION_ERROR, 'timeout', { context: { s: 't' } });
       const json = err.toJSON();
       expect(json.code).toBe('E300');
       expect(json.retryable).toBe(true);
