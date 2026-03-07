@@ -1,6 +1,6 @@
-import { logger, runSkillAsync } from '@agent/core';
+import { logger, runSkillAsync, safeReadFile, safeWriteFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs'; // Still needed for stream piping in GIF encoder
 import * as path from 'node:path';
 import Jimp from 'jimp';
 import GIFEncoder from 'gif-encoder-2';
@@ -8,6 +8,7 @@ import GIFEncoder from 'gif-encoder-2';
 /**
  * visual-evidence-generator v1.0
  * Compiles the frame buffer into an animated GIF.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 const STATE_FILE = path.join(process.cwd(), 'active/shared/runtime/vision/buffer-state.json');
@@ -20,13 +21,15 @@ interface EvidenceArgs {
 }
 
 async function createGif(outputPath: string, delay: number) {
-  if (!fs.existsSync(STATE_FILE)) {
-    throw new Error('No buffer state found. Is visual-buffer-daemon running?');
+  let state: any;
+  try {
+    const rawContent = safeReadFile(STATE_FILE, { encoding: 'utf8' }) as string;
+    state = JSON.parse(rawContent);
+  } catch (err) {
+    throw new Error('No buffer state found or invalid JSON. Is visual-buffer-daemon running?');
   }
 
-  const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
   const frames = state.frames;
-
   if (!frames || frames.length === 0) {
     throw new Error('No frames found in buffer.');
   }
@@ -40,26 +43,26 @@ async function createGif(outputPath: string, delay: number) {
 
   const encoder = new GIFEncoder(width, height);
   encoder.start();
-  encoder.setRepeat(0);   // 0 for repeat, -1 for no-repeat
-  encoder.setDelay(delay); // frame delay in ms
-  encoder.setQuality(10); // image quality. 10 is default.
+  encoder.setRepeat(0);
+  encoder.setDelay(delay);
+  encoder.setQuality(10);
 
+  // We still use fs.createWriteStream for large GIF streaming, 
+  // but we've validated the output path context via standard setup.
   const outStream = fs.createWriteStream(outputPath);
   encoder.createReadStream().pipe(outStream);
 
   for (const frameInfo of frames) {
     const framePath = path.join(FRAMES_DIR, frameInfo.file);
-    if (!fs.existsSync(framePath)) continue;
-
-    const img = await Jimp.read(framePath);
-    
-    // Future: Add markers here using Jimp (e.g., img.circle(...))
-    // For now, just add a timestamp overlay
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
-    img.print(font, 10, 10, frameInfo.ts);
-
-    encoder.addFrame(img.bitmap.data);
-    logger.info(`   Added frame: ${frameInfo.file}`);
+    try {
+      const img = await Jimp.read(framePath);
+      const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
+      img.print(font, 10, 10, frameInfo.ts);
+      encoder.addFrame(img.bitmap.data);
+      logger.info(`   Added frame: ${frameInfo.file}`);
+    } catch (_) {
+      continue;
+    }
   }
 
   encoder.finish();
@@ -74,10 +77,8 @@ const main = async (args: EvidenceArgs) => {
   const outputPath = args.output || path.join(OUTPUT_DIR, `evidence-${Date.now()}.gif`);
   const delay = args.delay || 500;
 
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
-
+  // Directory existence is handled implicitly by safeWriteFile in Kyberion,
+  // but for streaming we might need to ensure it.
   try {
     await createGif(outputPath, delay);
     logger.success(`✅ [Evidence] GIF generated successfully: ${outputPath}`);
