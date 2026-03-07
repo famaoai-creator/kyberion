@@ -26,7 +26,17 @@ Kyberion employs a decoupled **Satellite Hub Model** to maintain a clean, resili
 
 ---
 
-## 🛡 Sovereign Governance (The 5-Phase Protocol)
+## 🛡 Sovereign Governance (3-Tier Knowledge Model)
+
+Information is strictly segregated according to its sensitivity, enforced through a physical **Tier Guard**:
+
+- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated from sync.
+- **Confidential Tier (`knowledge/confidential/`)**: Organizational secrets and logic. Masked in public outputs.
+- **Public Tier (`knowledge/`)**: General standards and ecosystem protocols. Shared through the public repository.
+
+---
+
+## 🛡 Sovereign Lifecycle (The 5-Phase Protocol)
 
 Every mission follows a strict, autonomous lifecycle to ensure absolute reliability:
 
