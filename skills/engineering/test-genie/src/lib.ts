@@ -1,7 +1,6 @@
 import { exec } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeExec, safeReadFile, safeWriteFile } from '@agent/core/secure-io'; // Use safeExec instead of exec if possible, but safeExec is sync. safeSpawn or exec is fine.
+import { safeReadFile, getAllFiles } from '@agent/core';
 
 // Types
 export interface DetectionRule {
@@ -60,26 +59,41 @@ export const DEFAULT_CONFIG: TestGenieConfig = {
   execution: { max_buffer: 5_242_880, timeout: 300_000 },
 };
 
+/**
+ * Check detection rules using Secure-IO compliant methods.
+ */
 export function checkDetection(detection: DetectionRule, targetDir: string): boolean {
   switch (detection.type) {
-    case 'file_exists':
-      return detection.path !== undefined && fs.existsSync(path.join(targetDir, detection.path));
+    case 'file_exists': {
+      if (!detection.path) return false;
+      const fullPath = path.join(targetDir, detection.path);
+      try {
+        safeReadFile(fullPath, { maxSizeMB: 0.1 }); // Fast check
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
 
     case 'directory_exists': {
       if (!detection.path) return false;
       const dirPath = path.join(targetDir, detection.path);
-      return fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory();
+      try {
+        // Use getAllFiles with shallow depth to verify directory
+        const files = getAllFiles(dirPath);
+        return files !== undefined;
+      } catch (_) {
+        return false;
+      }
     }
 
     case 'file_pattern':
       if (!detection.pattern) return false;
       try {
-        // Simple fs-based fallback for glob
         const dir = path.dirname(detection.pattern);
         const base = path.basename(detection.pattern);
         const searchDir = path.join(targetDir, dir === '.' ? '' : dir);
-        if (!fs.existsSync(searchDir)) return false;
-        const files = fs.readdirSync(searchDir);
+        const files = getAllFiles(searchDir).map(f => path.basename(f));
         const regex = new RegExp('^' + base.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
         return files.some((f: string) => regex.test(f));
       } catch {
@@ -89,8 +103,7 @@ export function checkDetection(detection: DetectionRule, targetDir: string): boo
     case 'package_json_script':
       try {
         const pkgPath = path.join(targetDir, 'package.json');
-        if (!fs.existsSync(pkgPath)) return false;
-        const pkg: Record<string, unknown> = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+        const pkg: any = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
         const scripts = (pkg.scripts ?? {}) as Record<string, string>;
         return detection.script !== undefined && Boolean(scripts[detection.script]);
       } catch {
@@ -100,8 +113,7 @@ export function checkDetection(detection: DetectionRule, targetDir: string): boo
     case 'package_json_dep':
       try {
         const pkgPath = path.join(targetDir, 'package.json');
-        if (!fs.existsSync(pkgPath)) return false;
-        const pkg: Record<string, unknown> = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+        const pkg: any = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
         const deps = (pkg.dependencies ?? {}) as Record<string, string>;
         const devDeps = (pkg.devDependencies ?? {}) as Record<string, string>;
         const allDeps: Record<string, string> = { ...deps, ...devDeps };
@@ -133,11 +145,9 @@ export function runTests(
   runnerName: string,
   executionConfig: ExecutionConfig = DEFAULT_CONFIG.execution
 ): Promise<TestRunResult> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const startTime = Date.now();
 
-    // Note: exec is used here because we want to capture stdout/stderr buffer.
-    // safeExec in libs/core returns stdout string but doesn't easily separate stderr or handle exit codes cleanly for this use case.
     exec(
       command,
       {
@@ -159,13 +169,7 @@ export function runTests(
           stderr: stderr || undefined,
         };
 
-        if (error) {
-          // We resolve with result even on error, because test failures are expected outcomes.
-          const code = (error as any).code;
-          resolve(result); 
-        } else {
-          resolve(result);
-        }
+        resolve(result);
       }
     );
   });

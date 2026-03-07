@@ -1,13 +1,22 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as path from 'node:path';
+import { safeAppendFile, pathResolver, logger } from '@agent/core';
+
+/**
+ * scripts/moltbook-heartbeat-daemon.ts
+ * [SECURE-IO COMPLIANT VERSION]
+ */
 
 const API_KEY = 'moltbook_sk_nfAhqrAVZPxrQ6ftSNJ_7KHOT6RYARJW';
-const LOG_FILE = path.resolve(__dirname, '../../active/missions/MSN-MOLTBOOK-INDEPENDENCE/night_watch.log');
+const LOG_FILE = path.join(pathResolver.rootDir(), 'active/missions/MSN-MOLTBOOK-INDEPENDENCE/night_watch.log');
 
 function logAction(message: string) {
   const timestamp = new Date().toISOString();
   const logLine = `[${timestamp}] ${message}\n`;
-  fs.appendFileSync(LOG_FILE, logLine, 'utf8');
+  try {
+    safeAppendFile(LOG_FILE, logLine);
+  } catch (_) {
+    // Fallback to console if file write fails
+  }
   console.log(logLine.trim());
 }
 

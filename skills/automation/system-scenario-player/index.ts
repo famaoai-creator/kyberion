@@ -1,11 +1,10 @@
-import { logger, runSkillAsync } from '@agent/core';
+import { logger, runSkillAsync, safeReadFile, safeExec } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeExec } from '@agent/core/secure-io';
-import * as fs from 'node:fs';
 
 /**
  * system-scenario-player v1.0 (Brain Orchestrator)
  * Executes automation scenarios by chaining muscle skills.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 interface ScenarioStep {
@@ -25,23 +24,23 @@ async function executeStep(step: ScenarioStep, speed: number) {
 
   switch (step.type) {
     case 'keyboard':
-      await safeExec('node', ['dist/scripts/cli.js', 'run', 'keyboard-injector', ...objectToArgs(step.params)]);
+      safeExec('node', ['dist/scripts/cli.js', 'run', 'keyboard-injector', ...objectToArgs(step.params)]);
       break;
     case 'mouse':
-      await safeExec('node', ['dist/scripts/cli.js', 'run', 'mouse-injector', ...objectToArgs(step.params)]);
+      safeExec('node', ['dist/scripts/cli.js', 'run', 'mouse-injector', ...objectToArgs(step.params)]);
       break;
     case 'wait':
       const waitMs = (step.ms || 1000) / speed;
       await new Promise(r => setTimeout(r, waitMs));
       break;
     case 'visual_wait':
-      await safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-assertion-engine', ...objectToArgs(step.params)]);
+      safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-assertion-engine', ...objectToArgs(step.params)]);
       break;
     case 'screenshot':
-      await safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-evidence-generator', ...objectToArgs(step.params)]);
+      safeExec('node', ['dist/scripts/cli.js', 'run', 'visual-evidence-generator', ...objectToArgs(step.params)]);
       break;
     case 'shell':
-      await safeExec(step.params.command, step.params.args || []);
+      safeExec(step.params.command, step.params.args || []);
       break;
     default:
       logger.warn(`⚠️ Unknown step type: ${step.type}`);
@@ -66,13 +65,18 @@ const main = async (args: PlayerArgs) => {
   let effectiveScenario = args.scenario;
   let speed = args.speed || 1.0;
 
-  if (args.input && fs.existsSync(args.input)) {
-    const fileData = JSON.parse(fs.readFileSync(args.input, 'utf8'));
-    if (Array.isArray(fileData)) {
-      effectiveScenario = fileData;
-    } else {
-      effectiveScenario = fileData.scenario;
-      speed = fileData.speed || speed;
+  if (args.input) {
+    try {
+      const indexContent = safeReadFile(args.input, { encoding: 'utf8' }) as string;
+      const fileData = JSON.parse(indexContent);
+      if (Array.isArray(fileData)) {
+        effectiveScenario = fileData;
+      } else {
+        effectiveScenario = fileData.scenario;
+        speed = fileData.speed || speed;
+      }
+    } catch (e: any) {
+      logger.error(`Failed to read input file: ${e.message}`);
     }
   }
 
