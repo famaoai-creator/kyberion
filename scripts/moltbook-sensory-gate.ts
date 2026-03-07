@@ -4,7 +4,9 @@ import { secureFetch } from '../libs/core/network.js';
 import { entropyGate } from '../libs/core/entropy-gate.js';
 import chalk from 'chalk';
 
-const API_KEY = 'moltbook_sk_nfAhqrAVZPxrQ6ftSNJ_7KHOT6RYARJW';
+import { secretGuard } from '../libs/core/secret-guard.js';
+
+const API_KEY = secretGuard.getSecret('MOLTBOOK_API_KEY');
 const MISSIONS_DIR = path.resolve(process.cwd(), 'active/missions');
 
 function logAction(message: string) {
