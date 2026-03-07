@@ -1,5 +1,5 @@
 /**
- * TypeScript version of shared input validators for Gemini skills.
+ * TypeScript version of shared input validators for Kyberion components.
  * [SECURE-IO COMPLIANT VERSION]
  */
 

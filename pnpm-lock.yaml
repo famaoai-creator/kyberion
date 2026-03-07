@@ -33,6 +33,12 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.18.0)
       axios:
         specifier: ^1.13.6
         version: 1.13.6
@@ -122,6 +128,21 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
 
+  libs/actuators/browser-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+      chalk:
+        specifier: ^5.3.0
+        version: 5.6.2
+      playwright:
+        specifier: ^1.58.2
+        version: 1.58.2
+      yargs:
+        specifier: ^17.7.2
+        version: 17.7.2
+
   libs/core:
     dependencies:
       '@types/papaparse':
@@ -157,1482 +178,6 @@ importers:
       yargs:
         specifier: ^18.0.0
         version: 18.0.0
-
-  skills/audit/bug-predictor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/compliance-officer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/license-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/monitoring-config-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/post-quantum-shield:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/project-health-check:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/audit/quality-scorer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/audit/red-team-adversary:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/security-scanner:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/audit/skill-quality-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/audit/supply-chain-sentinel:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/automation/keyboard-injector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/automation/mouse-injector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/automation/system-scenario-player:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/automation/visual-assertion-engine:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      tesseract.js:
-        specifier: ^5.0.0
-        version: 5.1.1(encoding@0.1.13)
-    devDependencies:
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
-
-  skills/automation/voice-notifier:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/business/business-growth-planner:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/business-impact-analyzer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/competitive-intel-strategist:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/executive-reporting-maestro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/financial-modeling-maestro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/investor-readiness-audit:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/ip-profitability-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/business/ip-strategist:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/business/pmo-governance-lead:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/scenario-multiverse-orchestrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/business/stakeholder-communicator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/strategic-roadmap-planner:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/sunset-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/talent-requirement-generator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/business/tech-dd-analyst:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/business/unit-economics-optimizer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/connector/backlog-connector:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/connector/box-connector:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/connector/github-repo-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/connector/google-workspace-integrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/connector/jira-agile-assistant:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/connector/mcp-aws-knowledge-connector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/connector/mcp-terraform-connector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/connector/slack-communicator-pro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/core/mission-logic-engine:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/core/prompt-optimizer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/core/self-evolution:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/core/self-healing-orchestrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/core/skill-evolution-engine:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/kernel-compiler:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/mobile-test-generator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/pr-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/sequence-mapper:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/technology-porter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/engineering/test-suite-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.35
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/finance/jpx-market-analyzer:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/finance/land-price-analyzer:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/finance/trust-fund-monitor:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/imagination/visual-imagination:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/intelligence/knowledge-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/intelligence/knowledge-harvester:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/intelligence/source-importer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/intelligence/sovereign-memory:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/intelligence/text-classifier:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      yargs:
-        specifier: ^17.7.2
-        version: 17.7.2
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/lifestyle/rakuten-ichiba-connector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/lifestyle/rakuten-travel-connector:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/lifestyle/switchbot-controller:
-    devDependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/media/audio-transcriber:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      form-data:
-        specifier: ^4.0.5
-        version: 4.0.5
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/doc-to-text:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      adm-zip:
-        specifier: ^0.5.10
-        version: 0.5.16
-      mammoth:
-        specifier: ^1.6.0
-        version: 1.11.0
-      pdf-parse:
-        specifier: ^1.1.1
-        version: 1.1.4
-      pdfjs-dist:
-        specifier: ^5.5.207
-        version: 5.5.207
-      tesseract.js:
-        specifier: ^5.0.4
-        version: 5.1.1(encoding@0.1.13)
-      xlsx:
-        specifier: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
-        version: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
-    devDependencies:
-      '@types/adm-zip':
-        specifier: ^0.5.5
-        version: 0.5.7
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/pdf-parse':
-        specifier: ^1.1.4
-        version: 1.1.5
-      '@types/pdfjs-dist':
-        specifier: ^2.10.378
-        version: 2.10.378
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/excel-artisan:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      jsdom:
-        specifier: ^24.0.0
-        version: 24.1.3
-    devDependencies:
-      '@types/jsdom':
-        specifier: ^21.1.6
-        version: 21.1.7
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/html-reporter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      marked:
-        specifier: ^12.0.0
-        version: 12.0.2
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/layout-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/ppt-artisan:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/media/word-artisan:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      html-to-docx:
-        specifier: ^1.8.0
-        version: 1.8.0(encoding@0.1.13)
-      marked:
-        specifier: ^12.0.0
-        version: 12.0.2
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/utilities/agent-activity-monitor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/ai-model-orchestrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/api-evolution-manager:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/asset-token-economist:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/automated-support-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/browser-navigator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-      playwright:
-        specifier: ^1.41.0
-        version: 1.58.2
-    devDependencies:
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/budget-variance-tracker:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/chaos-monkey-orchestrator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/cloud-cost-estimator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/cloud-waste-hunter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/completeness-scorer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/context-injector:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/crisis-manager:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/data-anonymizer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.11.16
-        version: 20.19.35
-      '@types/yargs':
-        specifier: ^17.0.32
-        version: 17.0.35
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.2
-        version: 1.6.1(@types/node@20.19.35)(jsdom@24.1.3)
-
-  skills/utilities/data-lineage-guardian:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/disaster-recovery-planner:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/ecosystem-integration-test:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/environment-provisioner:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/issue-to-solution-bridge:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/log-analyst:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/log-to-requirement-bridge:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/nonfunctional-architect:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/onboarding-wizard:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/operational-runbook-generator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/performance-monitor-analyst:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/release-note-crafter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/requirements-wizard:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/skill-bundle-packager:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/sustainability-consultant:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/tech-stack-librarian:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/telemetry-insight-engine:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/terraform-arch-mapper:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/utilities/test-viewpoint-analyst:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/visionary-ethos-keeper:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/utilities/wallet-manager:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/ux/biometric-context-adapter:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/ux/localization-maestro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/synthetic-user-persona:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/ux-auditor:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/ux-visualizer:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-    devDependencies:
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.3.2)(jsdom@24.1.3)
-
-  skills/ux/voice-command-listener:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
-
-  skills/ux/voice-interface-maestro:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../../libs/core
 
 packages:
 
@@ -2104,81 +649,6 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@napi-rs/canvas-android-arm64@0.1.96':
-    resolution: {integrity: sha512-ew1sPrN3dGdZ3L4FoohPfnjq0f9/Jk7o+wP7HkQZokcXgIUD6FIyICEWGhMYzv53j63wUcPvZeAwgewX58/egg==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [android]
-
-  '@napi-rs/canvas-darwin-arm64@0.1.96':
-    resolution: {integrity: sha512-Q/wOXZ5PzTqpdmA5eUOcegCf4Go/zz3aZ5DlzSeDpOjFmfwMKh8EzLAoweQ+mJVagcHQyzoJhaTEnrO68TNyNg==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@napi-rs/canvas-darwin-x64@0.1.96':
-    resolution: {integrity: sha512-UrXiQz28tQEvGM1qvyptewOAfmUrrd5+wvi6Rzjj2VprZI8iZ2KIvBD2lTTG1bVF95AbeDeG7PJA0D9sLKaOFA==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@napi-rs/canvas-linux-arm-gnueabihf@0.1.96':
-    resolution: {integrity: sha512-I90ODxweD8aEP6XKU/NU+biso95MwCtQ2F46dUvhec1HesFi0tq/tAJkYic/1aBSiO/1kGKmSeD1B0duOHhEHQ==}
-    engines: {node: '>= 10'}
-    cpu: [arm]
-    os: [linux]
-
-  '@napi-rs/canvas-linux-arm64-gnu@0.1.96':
-    resolution: {integrity: sha512-Dx/0+RFV++w3PcRy+4xNXkghhXjA5d0Mw1bs95emn5Llinp1vihMaA6WJt3oYv2LAHc36+gnrhIBsPhUyI2SGw==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/canvas-linux-arm64-musl@0.1.96':
-    resolution: {integrity: sha512-UvOi7fii3IE2KDfEfhh8m+LpzSRvhGK7o1eho99M2M0HTik11k3GX+2qgVx9EtujN3/bhFFS1kSO3+vPMaJ0Mg==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
-    libc: [musl]
-
-  '@napi-rs/canvas-linux-riscv64-gnu@0.1.96':
-    resolution: {integrity: sha512-MBSukhGCQ5nRtf9NbFYWOU080yqkZU1PbuH4o1ROvB4CbPl12fchDR35tU83Wz8gWIM9JTn99lBn9DenPIv7Ig==}
-    engines: {node: '>= 10'}
-    cpu: [riscv64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/canvas-linux-x64-gnu@0.1.96':
-    resolution: {integrity: sha512-I/ccu2SstyKiV3HIeVzyBIWfrJo8cN7+MSQZPnabewWV6hfJ2nY7Df2WqOHmobBRUw84uGR6zfQHsUEio/m5Vg==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  '@napi-rs/canvas-linux-x64-musl@0.1.96':
-    resolution: {integrity: sha512-H3uov7qnTl73GDT4h52lAqpJPsl1tIUyNPWJyhQ6gHakohNqqRq3uf80+NEpzcytKGEOENP1wX3yGwZxhjiWEQ==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
-    libc: [musl]
-
-  '@napi-rs/canvas-win32-arm64-msvc@0.1.96':
-    resolution: {integrity: sha512-ATp6Y+djOjYtkfV/VRH7CZ8I1MEtkUQBmKUbuWw5zWEHHqfL0cEcInE4Cxgx7zkNAhEdBbnH8HMVrqNp+/gwxA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [win32]
-
-  '@napi-rs/canvas-win32-x64-msvc@0.1.96':
-    resolution: {integrity: sha512-UYGdTltVd+Z8mcIuoqGmAXXUvwH5CLf2M6mIB5B0/JmX5J041jETjqtSYl7gN+aj3k1by/SG6sS0hAwCqyK7zw==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [win32]
-
-  '@napi-rs/canvas@0.1.96':
-    resolution: {integrity: sha512-6NNmNxvoJKeucVjxaaRUt3La2i5jShgiAbaY3G/72s1Vp3U06XPrAIxkAjBxpDcamEn/t+WJ4OOlGmvILo4/Ew==}
-    engines: {node: '>= 10'}
-
   '@npmcli/fs@1.1.1':
     resolution: {integrity: sha512-8KG5RD0GVP4ydEzRn/I4BNDuxDtqVbOdm8675T49OIG/NGhaK0pjPX7ZcDlvKYbA+ulvVK3ztfcF4uBdOxuJbQ==}
 
@@ -2186,46 +656,6 @@ packages:
     resolution: {integrity: sha512-1SUf/Cg2GzGDyaf15aR9St9TWlb+XvbZXWpDx8YKs7MLzMH/BCeopv+y9vzrzgkfykCGuWOlSu3mZhj2+FQcrg==}
     engines: {node: '>=10'}
     deprecated: This functionality has been moved to @npmcli/fs
-
-  '@oozcitak/dom@1.15.5':
-    resolution: {integrity: sha512-L6v3Mwb0TaYBYgeYlIeBaHnc+2ZEaDSbFiRm5KmqZQSoBlbPlf+l6aIH/sD5GUf2MYwULw00LT7+dOnEuAEC0A==}
-    engines: {node: '>=8.0'}
-
-  '@oozcitak/dom@1.15.6':
-    resolution: {integrity: sha512-k4uEIa6DI3FCrFJMGq/05U/59WnS9DjME0kaPqBRCJAqBTkmopbYV1Xs4qFKbDJ/9wOg8W97p+1E0heng/LH7g==}
-    engines: {node: '>=8.0'}
-
-  '@oozcitak/infra@1.0.3':
-    resolution: {integrity: sha512-9O2wxXGnRzy76O1XUxESxDGsXT5kzETJPvYbreO4mv6bqe1+YSuux2cZTagjJ/T4UfEwFJz5ixanOqB0QgYAag==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/infra@1.0.5':
-    resolution: {integrity: sha512-o+zZH7M6l5e3FaAWy3ojaPIVN5eusaYPrKm6MZQt0DKNdgXa2wDYExjpP0t/zx+GoQgQKzLu7cfD8rHCLt8JrQ==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/url@1.0.0':
-    resolution: {integrity: sha512-LGrMeSxeLzsdaitxq3ZmBRVOrlRRQIgNNci6L0VRnOKlJFuRIkNm4B+BObXPCJA6JT5bEJtrrwjn30jueHJYZQ==}
-    engines: {node: '>=8.0'}
-
-  '@oozcitak/util@1.0.1':
-    resolution: {integrity: sha512-dFwFqcKrQnJ2SapOmRD1nQWEZUtbtIy9Y6TyJquzsalWNJsKIPxmTI0KG6Ypyl8j7v89L2wixH9fQDNrF78hKg==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/util@1.0.2':
-    resolution: {integrity: sha512-4n8B1cWlJleSOSba5gxsMcN4tO8KkkcvXhNWW+ADqvq9Xj+Lrl9uCa90GRpjekqQJyt84aUX015DG81LFpZYXA==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/util@8.0.0':
-    resolution: {integrity: sha512-+9Hq6yuoq/3TRV/n/xcpydGBq2qN2/DEDMqNTG7rm95K6ZE2/YY/sPyx62+1n8QsE9O26e5M1URlXsk+AnN9Jw==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/util@8.3.3':
-    resolution: {integrity: sha512-Ufpab7G5PfnEhQyy5kDg9C8ltWJjsVT1P/IYqacjstaqydG4Q21HAT2HUZQYBrC/a1ZLKCz87pfydlDvv8y97w==}
-    engines: {node: '>=6.0'}
-
-  '@oozcitak/util@8.3.4':
-    resolution: {integrity: sha512-6gH/bLQJSJEg7OEpkH4wGQdA8KXHRbzL1YkGyUO12YNAgV3jxKy4K9kvfXj4+9T0OLug5k58cnPCKSSIKzp7pg==}
-    engines: {node: '>=8.0'}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -2410,9 +840,6 @@ packages:
     resolution: {integrity: sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==}
     engines: {node: '>= 6'}
 
-  '@types/adm-zip@0.5.7':
-    resolution: {integrity: sha512-DNEs/QvmyRLurdQPChqq0Md4zGvPwHerAJYWk9l2jCbD1VPpnzRJorOdiq4zsw09NFbYnhfsoEhWtxIzXpn2yw==}
-
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
 
@@ -2436,9 +863,6 @@ packages:
 
   '@types/js-yaml@4.0.9':
     resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
-
-  '@types/jsdom@21.1.7':
-    resolution: {integrity: sha512-yOriVnggzrnQ3a9OKOCxaVuSug3w3/SbOj5i7VwXWZEyUNl3bLF9V3MfxGbZKuwqJOQyRfqXyROBB1CoZLFWzA==}
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
@@ -2470,13 +894,6 @@ packages:
   '@types/papaparse@5.5.2':
     resolution: {integrity: sha512-gFnFp/JMzLHCwRf7tQHrNnfhN4eYBVYYI897CGX4MY1tzY9l2aLkVyx2IlKZ/SAqDbB3I1AOZW5gTMGGsqWliA==}
 
-  '@types/pdf-parse@1.1.5':
-    resolution: {integrity: sha512-kBfrSXsloMnUJOKi25s3+hRmkycHfLK6A09eRGqF/N8BkQoPUmaCr+q8Cli5FnfohEz/rsv82zAiPz/LXtOGhA==}
-
-  '@types/pdfjs-dist@2.10.378':
-    resolution: {integrity: sha512-TRdIPqdsvKmPla44kVy4jv5Nt5vjMfVjbIEke1CRULIrwKNRC4lIiZvNYDJvbUMNCFPNIUcOKhXTyMJrX18IMA==}
-    deprecated: This is a stub types definition. pdfjs-dist provides its own type definitions, so you do not need this installed.
-
   '@types/qs@6.14.0':
     resolution: {integrity: sha512-eOunJqu0K1923aExK6y8p6fsihYEn/BYuQ4g0CxAAgFc4b/ZLN4CrsRZ55srTdqoiLzU2B2evC+apEIxprEzkQ==}
 
@@ -2491,9 +908,6 @@ packages:
 
   '@types/serve-static@2.2.0':
     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
-
-  '@types/tough-cookie@4.0.5':
-    resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -2577,10 +991,6 @@ packages:
 
   '@vitest/utils@1.6.1':
     resolution: {integrity: sha512-jOrrUvXM4Av9ZWiG1EajNto0u96kWAhJ1LmPmJhXXQx/32MecEKd10pOLYgS2BQx1TgkGhloPU1ArDW2vvaY6g==}
-
-  '@xmldom/xmldom@0.8.11':
-    resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
-    engines: {node: '>=10.0.0'}
 
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
@@ -2688,9 +1098,6 @@ packages:
     engines: {node: ^12.13.0 || ^14.15.0 || >=16.0.0}
     deprecated: This package is no longer supported.
 
-  argparse@1.0.10:
-    resolution: {integrity: sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg==}
-
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
@@ -2756,9 +1163,6 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  browser-split@0.0.1:
-    resolution: {integrity: sha512-JhvgRb2ihQhsljNda3BI8/UcRHVzrVwo3Q+P8vDtSiyobXuFpuZ9mq+MbRGMnC22CjW3RrfXdg6j6ITX8M+7Ow==}
-
   buffer-crc32@0.2.13:
     resolution: {integrity: sha512-VO9Ht/+p3SN7SKWqcrgEzjGbRSJYTx+Q1pTQC0wrWqHx0vpJraQ6GtHx8tvcg1rlK1byhU5gccxgOgj7B0TDkQ==}
 
@@ -2817,9 +1221,6 @@ packages:
     resolution: {integrity: sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==}
     engines: {node: '>=6'}
 
-  camelize@1.0.1:
-    resolution: {integrity: sha512-dU+Tx2fsypxTgtLoE36npi3UqcjSSMNYfkqgmoEhtZrraP5VWq0K7FkWVTYa8eMPtnU/G2txVsfdCJTn9uzpuQ==}
-
   centra@2.7.0:
     resolution: {integrity: sha512-PbFMgMSrmgx6uxCdm57RUos9Tc3fclMvhLSATYN39XsDV29B89zZ3KA89jmY0vwSGazyU+uerqwa6t+KaodPcg==}
 
@@ -2833,6 +1234,10 @@ packages:
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
+
+  chalk@5.6.2:
+    resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
+    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
   check-error@1.0.3:
     resolution: {integrity: sha512-iKEoDYaRmd1mxM90a2OEfWhjsjPpYPuQ+lMYsoxB126+t8fw7ySEO48nmDg5COTjxDI65/Y2OWpeEHk3ZOe8zg==}
@@ -3003,26 +1408,8 @@ packages:
     resolution: {integrity: sha512-EjePK1srD3P08o2j4f0ExnylqRs5B9tJjcp9t1krH2qRi8CCdsYfwe9JgSLurFBWwq4uOlipzfk5fHNvwFKr8Q==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
 
-  dingbat-to-unicode@1.0.1:
-    resolution: {integrity: sha512-98l0sW87ZT58pU4i61wa2OHwxbiYSbuxsCBozaVnYX2iCnr3bLM3fIes1/ej7h1YdOKuKt/MLs706TVnALA65w==}
-
-  dom-serializer@0.1.1:
-    resolution: {integrity: sha512-l0IU0pPzLWSHBcieZbpOKgkIn3ts3vAh7ZuFyXNwJxJXk/c4Gwj9xaTJwIDVQCXawWD0qb3IzMGH5rglQaO0XA==}
-
   dom-walk@0.1.2:
     resolution: {integrity: sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w==}
-
-  domelementtype@1.3.1:
-    resolution: {integrity: sha512-BSKB+TSpMpFI/HOxCNr1O8aMOTZ8hT3pM3GQ0w/mWRmkhEDSFJkkyzz4XQsBV44BChwGkrDfMyjVD0eA2aFV3w==}
-
-  domhandler@2.4.2:
-    resolution: {integrity: sha512-JiK04h0Ht5u/80fdLMCEmV4zkNh2BcoMFBmZ/91WtYZ8qVXSKjiw7fXMgFPnHcSZgOo3XdinHvmnDUeMf5R4wA==}
-
-  domutils@1.7.0:
-    resolution: {integrity: sha512-Lgd2XcJ/NjEw+7tFvfKxOzCYKZsdct5lczQ2ZaQY8Djz7pfAD3Gbp8ySJWtreII/vDlMVmxwa6pHmdxIYgttDg==}
-
-  duck@0.1.12:
-    resolution: {integrity: sha512-wkctla1O6VfP89gQ+J/yDesM0S7B7XLXjKGzXxMDVFg7uEn706niAtyYovKbyq1oT9YwDcly721/iUWoc8MVRg==}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -3059,13 +1446,6 @@ packages:
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
 
-  ent@2.2.2:
-    resolution: {integrity: sha512-kKvD1tO6BM+oK9HzCPpUdRb4vKFQY/FPTFmurMvh6LlN68VMrdj77w8yp51/kDbpkFOS9J8w5W6zIzgM2H8/hw==}
-    engines: {node: '>= 0.4'}
-
-  entities@1.1.2:
-    resolution: {integrity: sha512-f2LZMYl1Fzu7YSBKg+RoROelpOaNrcGmE9AZubeDfrCEia483oW4MI4VyFd5VNHIgQ/7qm1I0wUHK1eJnn2y2w==}
-
   entities@6.0.1:
     resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
     engines: {node: '>=0.12'}
@@ -3080,9 +1460,6 @@ packages:
 
   err-code@2.0.3:
     resolution: {integrity: sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==}
-
-  error@4.4.0:
-    resolution: {integrity: sha512-SNDKualLUtT4StGFP7xNfuFybL2f6iJujFtrWuvJqGbVQGaN+adE23veqzPz1hjUjTunLi2EnJ+0SJxtbJreKw==}
 
   es-define-property@1.0.1:
     resolution: {integrity: sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==}
@@ -3168,9 +1545,6 @@ packages:
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
-
-  ev-store@7.0.0:
-    resolution: {integrity: sha512-otazchNRnGzp2YarBJ+GXKVGvhxVATB1zmaStxJBYet0Dyq7A9VhH8IUEB/gRcL6Ch52lfpgPTRJ2m49epyMsQ==}
 
   event-target-shim@5.0.1:
     resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
@@ -3453,20 +1827,8 @@ packages:
     resolution: {integrity: sha512-Y22oTqIU4uuPgEemfz7NDJz6OeKf12Lsu+QC+s3BVpda64lTiMYCyGwg5ki4vFxkMwQdeZDl2adZoqUgdFuTgQ==}
     engines: {node: '>=18'}
 
-  html-entities@2.6.0:
-    resolution: {integrity: sha512-kig+rMn/QOVRvr7c86gQ8lWXq+Hkv6CbAH1hLu+RG338StTpE8Z0b44SDVaqVu7HGKf27frdmUYEs9hTUX/cLQ==}
-
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
-
-  html-to-docx@1.8.0:
-    resolution: {integrity: sha512-IiMBWIqXM4+cEsW//RKoonWV7DlXAJBmmKI73XJSVWTIXjGUaxSr2ck1jqzVRZknpvO8xsFnVicldKVAWrBYBA==}
-
-  html-to-vdom@0.7.0:
-    resolution: {integrity: sha512-k+d2qNkbx0JO00KezQsNcn6k2I/xSBP4yXYFLvXbcasTTDh+RDLUJS3puxqyNnpdyXWRHFGoKU7cRmby8/APcQ==}
-
-  htmlparser2@3.10.1:
-    resolution: {integrity: sha512-IgieNijUMbkDovyoKObU1DUhm1iwNYE/fuifEoEHfd1oZKZDaONBSkal7Y01shxsM49R4XaMdGez3WnF9UfiCQ==}
 
   http-cache-semantics@4.2.0:
     resolution: {integrity: sha512-dTxcvPXqPvXBQpq5dUr6mEMJX4oIEFv6bwom3FDwKRDsuIjjJGANqhBuoAn9c1RQJIdAKav33ED65E2ys+87QQ==}
@@ -3536,9 +1898,6 @@ packages:
     engines: {node: '>=16.x'}
     hasBin: true
 
-  image-to-base64@2.2.0:
-    resolution: {integrity: sha512-Z+aMwm/91UOQqHhrz7Upre2ytKhWejZlWV/JxUTD1sT7GWWKFDJUEV5scVQKnkzSgPHFuQBUEWcanO+ma0PSVw==}
-
   immediate@3.0.6:
     resolution: {integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==}
 
@@ -3553,9 +1912,6 @@ packages:
   indent-string@4.0.0:
     resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
     engines: {node: '>=8'}
-
-  individual@3.0.0:
-    resolution: {integrity: sha512-rUY5vtT748NMRbEMrTNiFfy29BgGZwGXUi2NFUVMWQrogSLzlJvQV9eeMWi+g1aVaQ53tpyLAQtd5x/JH0Nh1g==}
 
   infer-owner@1.0.4:
     resolution: {integrity: sha512-IClj+Xz94+d7irH5qRyfJonOdfTzuDaifE6ZPWfx0N0+/ATZCbuTPq2prFl526urkQd90WyUKIh1DfBQ2hMz9A==}
@@ -3611,18 +1967,11 @@ packages:
     resolution: {integrity: sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==}
     engines: {node: '>=0.12.0'}
 
-  is-object@1.0.2:
-    resolution: {integrity: sha512-2rRIahhZr2UWb45fIOuvZGpFtz0TyOZLf32KxBbSoUCeZR495zCKlWUKKUByk3geS2eAs7ZAABt0Y/Rx0GiQGA==}
-
   is-potential-custom-element-name@1.0.1:
     resolution: {integrity: sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ==}
 
   is-promise@4.0.0:
     resolution: {integrity: sha512-hvpoI6korhJMnej285dSg6nu1+e6uxs7zG3BYAm5byqDsgJNWwxzM6z6iZiAgQR4TJ30JmBTOwqZUw3WlyH3AQ==}
-
-  is-regex@1.2.1:
-    resolution: {integrity: sha512-MjYsKHO5O7mCsmRGxWcLWheFqN9DJ/2TmngvjKXihe6efViPqc274+Fx/4fYj/r03+ESvBdTXK0V6tA3rgez1g==}
-    engines: {node: '>= 0.4'}
 
   is-stream@2.0.1:
     resolution: {integrity: sha512-hFoiJiTl63nn+kstHGBtewWSKnQLpyb155KHheA1l39uvtO9nWIop1p3udqPcUd/xbF1VLMO4n7OI6p7RbngDg==}
@@ -3822,9 +2171,6 @@ packages:
     resolution: {integrity: sha512-9ie8ItPR6tjY5uYJh8K/Zrv/RMZ5VOlOWvtZdEHYSTFKZfIBPQa9tOAEeAWhd+AnIneLJ22w5fjOYtoutpWq5w==}
     engines: {node: '>=18'}
 
-  lop@0.4.2:
-    resolution: {integrity: sha512-RefILVDQ4DKoRZsJ4Pj22TxE3omDO47yFpkIBoDKzkqPRISs5U1cnAdg/5583YPkWPaLIYHOKRMQSvjFsO26cw==}
-
   loupe@2.3.7:
     resolution: {integrity: sha512-zSMINGVYkdpYSOBmLi0D1Uo7JU9nVdQKrHxC8eYlV+9YKK9WePqAlL7lSlorG/U2Fw1w0hTBmaa/jrQ3UbPHtA==}
 
@@ -3845,11 +2191,6 @@ packages:
   make-fetch-happen@9.1.0:
     resolution: {integrity: sha512-+zopwDy7DNknmwPQplem5lAZX/eCOzSvSNNcSKm5eVwTkOBzoktEfXsa9L23J/GIRhxRsaxzkPEhrJEpE2F4Gg==}
     engines: {node: '>= 10'}
-
-  mammoth@1.11.0:
-    resolution: {integrity: sha512-BcEqqY/BOwIcI1iR5tqyVlqc3KIaMRa4egSoK83YAVrBf6+yqdAAbtUcFDCWX8Zef8/fgNZ6rl4VUv+vVX8ddQ==}
-    engines: {node: '>=12.0.0'}
-    hasBin: true
 
   marked@12.0.2:
     resolution: {integrity: sha512-qXUm7e/YKFoqFPYPa3Ukg9xlI5cyAtGmyEIzMfW//m6kXwCy2Ps9DYf5ioijFKQ8qyuscrHoY04iJGctu2Kg0Q==}
@@ -4006,18 +2347,12 @@ packages:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
 
-  next-tick@0.2.2:
-    resolution: {integrity: sha512-f7h4svPtl+QidoBv4taKXUjJ70G2asaZ8G28nS0OkqaalX8dwwrtWtyxEDPK62AC00ur/+/E0pUwBwY5EPn15Q==}
-
   node-abi@3.87.0:
     resolution: {integrity: sha512-+CGM1L1CgmtheLcBuleyYOn7NWPVu0s0EJH2C4puxgEZb9h8QpR9G2dBfZJOAUhi7VQxuBPMd0hiISWcTyiYyQ==}
     engines: {node: '>=10'}
 
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
-
-  node-ensure@0.0.0:
-    resolution: {integrity: sha512-DRI60hzo2oKN1ma0ckc6nQWlHU69RH6xN0sjQTjMpChPfTYvKZdcQFfdYK2RWbJcKyUizSIy/l8OTGxMAM1QDw==}
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
@@ -4035,9 +2370,6 @@ packages:
 
   node-pty@1.1.0:
     resolution: {integrity: sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg==}
-
-  node-readable-to-web-readable-stream@0.4.2:
-    resolution: {integrity: sha512-/cMZNI34v//jUTrI+UIo4ieHAB5EZRY/+7OmXZgBxaWBMcW2tGdceIw06RFxWxrKZ5Jp3sI2i5TsRo+CBhtVLQ==}
 
   nopt@5.0.0:
     resolution: {integrity: sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==}
@@ -4089,9 +2421,6 @@ packages:
   opencollective-postinstall@2.0.3:
     resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
     hasBin: true
-
-  option@0.2.4:
-    resolution: {integrity: sha512-pkEqbDyl8ou5cpq+VsnQbe/WlEy5qS7xPzMS1U55OCG9KPvwFD46zDbxQIj3egJSFc3D+XhYOPUzz49zQAVy7A==}
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -4192,14 +2521,6 @@ packages:
 
   pathval@1.1.1:
     resolution: {integrity: sha512-Dp6zGqpTdETdR63lehJYPeIOqpiNBNtc7BpWSLrOje7UaIsE5aY92r/AunQA7rsXvet3lrJ3JnZX29UPTKXyKQ==}
-
-  pdf-parse@1.1.4:
-    resolution: {integrity: sha512-XRIRcLgk6ZnUbsHsYXExMw+krrPE81hJ6FQPLdBNhhBefqIQKXu/WeTgNBGSwPrfU0v+UCEwn7AoAUOsVKHFvQ==}
-    engines: {node: '>=6.8.1'}
-
-  pdfjs-dist@5.5.207:
-    resolution: {integrity: sha512-WMqqw06w1vUt9ZfT0gOFhMf3wHsWhaCrxGrckGs5Cci6ybDW87IvPaOd2pnBwT6BJuP/CzXDZxjFgmSULLdsdw==}
-    engines: {node: '>=20.19.0 || >=22.13.0 || >=24'}
 
   peek-readable@4.1.0:
     resolution: {integrity: sha512-ZI3LnwUv5nOGbQzD9c2iDG6toheuXSZP5esSHBjopsXH4dg19soufvpUGA3uohi5anFtGb2lhAVdHzH6R/Evvg==}
@@ -4312,9 +2633,6 @@ packages:
 
   pump@3.0.3:
     resolution: {integrity: sha512-todwxLMY7/heScKmntwQG8CXVkWUOdYxIvY2s0VWAAMh/nd8SoYiRaKjlr7+iCs984f2P8zvrfWcDDYVb73NfA==}
-
-  punycode@1.4.1:
-    resolution: {integrity: sha512-jmYNElW7yvO7TV33CjSmvSiE2yco3bV2czu/OzDKdMNVZQWfxCblURLhf+47syQRBntjfLdd/H0egrzIG+oaFQ==}
 
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
@@ -4431,10 +2749,6 @@ packages:
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
 
-  safe-regex-test@1.1.0:
-    resolution: {integrity: sha512-x/+Cz4YrimQxQccJf5mKEbIa1NzeCRNI5Ecl/ekmlYaampdNLPalVyIcCZNNH3MvmqBugV5TMYZXv0ljslUlaw==}
-    engines: {node: '>= 0.4'}
-
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
@@ -4532,9 +2846,6 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
-  sprintf-js@1.0.3:
-    resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
-
   sqlite3@5.1.7:
     resolution: {integrity: sha512-GGIyOiFaG+TUra3JIfkI/zGP8yZYLPQ0pl1bH+ODjiX57sPhrLU5sQJn1y9bDKZUFYkX1crlrPfSYt0BKKdkog==}
 
@@ -4555,9 +2866,6 @@ packages:
   string-argv@0.3.2:
     resolution: {integrity: sha512-aqD2Q0144Z+/RqG52NeHEkZauTAUWJO8c6yTftGJKO3Tja5tUgIfmIl6kExvhtxSDP7fXB6DvzkfMpCd/F3G+Q==}
     engines: {node: '>=0.6.19'}
-
-  string-template@0.2.1:
-    resolution: {integrity: sha512-Yptehjogou2xm4UJbxJ4CxgZx12HBfeystp0y3x7s4Dj32ltVVG1Gg8YhKjHZkHicuKpZX/ffilA8505VbUbpw==}
 
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
@@ -4626,14 +2934,8 @@ packages:
     resolution: {integrity: sha512-BTLcK0xsDh2+PUe9F6c2TlRp4zOOBMTkoQHQIWSIzI0R7KG46uEwq4OPk2W7bZcprBMsuaeFsqwYr7pjh6CuHg==}
     engines: {node: '>=18'}
 
-  tesseract.js-core@5.1.1:
-    resolution: {integrity: sha512-KX3bYSU5iGcO1XJa+QGPbi+Zjo2qq6eBhNjSGR5E5q0JtzkoipJKOUQD7ph8kFyteCEfEQ0maWLu8MCXtvX5uQ==}
-
   tesseract.js-core@7.0.0:
     resolution: {integrity: sha512-WnNH518NzmbSq9zgTPeoF8c+xmilS8rFIl1YKbk/ptuuc7p6cLNELNuPAzcmsYw450ca6bLa8j3t0VAtq435Vw==}
-
-  tesseract.js@5.1.1:
-    resolution: {integrity: sha512-lzVl/Ar3P3zhpUT31NjqeCo1f+D5+YfpZ5J62eo2S14QNVOmHBTtbchHm/YAbOOOzCegFnKf4B3Qih9LuldcYQ==}
 
   tesseract.js@7.0.0:
     resolution: {integrity: sha512-exPBkd+z+wM1BuMkx/Bjv43OeLBxhL5kKWsz/9JY+DXcXdiBjiAch0V49QR3oAJqCaL5qURE0vx9Eo+G5YE7mA==}
@@ -4733,9 +3035,6 @@ packages:
   ufo@1.6.3:
     resolution: {integrity: sha512-yDJTmhydvl5lJzBmy/hyOAA0d+aqCBuwl818haVdYCRrWV84o7YyeVm4QlVHStqNrrJSTb6jKuFAVqAFsr+K3Q==}
 
-  underscore@1.13.8:
-    resolution: {integrity: sha512-DXtD3ZtEQzc7M8m4cXotyHR+FAS18C64asBYY5vqZexfYryNNnDc02W4hKg3rdQuqOYas1jkseX0+nZXjTXnvQ==}
-
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
@@ -4789,9 +3088,6 @@ packages:
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
-
-  virtual-dom@2.1.1:
-    resolution: {integrity: sha512-wb6Qc9Lbqug0kRqo/iuApfBpJJAq14Sk1faAnSmtqXiwahg7PVTvWMs9L02Z8nNIMqbwsxzBAA90bbtRLbw0zg==}
 
   vite-node@1.6.1:
     resolution: {integrity: sha512-YAXkfvGtuTzwWbDSACdJSg4A4DZiAqckWe90Zapc/sEX3XvHcw1NdurM/6od8J207tSDqNbSsgdCacBgvJKFuA==}
@@ -4931,20 +3227,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  x-is-array@0.1.0:
-    resolution: {integrity: sha512-goHPif61oNrr0jJgsXRfc8oqtYzvfiMJpTqwE7Z4y9uH+T3UozkGqQ4d2nX9mB9khvA8U2o/UbPOFjgC7hLWIA==}
-
-  x-is-string@0.1.0:
-    resolution: {integrity: sha512-GojqklwG8gpzOVEVki5KudKNoq7MbbjYZCbyWzEz7tyPA7eleiE0+ePwOWQQRb5fm86rD3S8Tc0tSFf3AOv50w==}
-
   xhr@2.6.0:
     resolution: {integrity: sha512-/eCGLb5rxjx5e3mF1A7s+pLlR6CGyqWN91fv1JgER5mVWg1MZmlhBvy9kjcsOdRk8RrIujotWyJamfyrp+WIcA==}
-
-  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz:
-    resolution: {integrity: sha512-+nKZ39+nvK7Qq6i0PvWWRA4j/EkfWOtkP/YhMtupm+lJIiHxUrgTr1CcKv1nBk1rHtkRRQ3O2+Ih/q/sA+FXZA==, tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
-    version: 0.20.2
-    engines: {node: '>=0.8'}
-    hasBin: true
 
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
@@ -4956,14 +3240,6 @@ packages:
   xml2js@0.5.0:
     resolution: {integrity: sha512-drPFnkQJik/O+uPKpqSgr22mpuFHqKdbS835iAQrUC73L2F5WkboIRd63ai/2Yg6I1jzifPFKH2NTK+cfglkIA==}
     engines: {node: '>=4.0.0'}
-
-  xmlbuilder2@2.1.2:
-    resolution: {integrity: sha512-PI710tmtVlQ5VmwzbRTuhmVhKnj9pM8Si+iOZCV2g2SNo3gCrpzR2Ka9wNzZtqfD+mnP+xkrqoNy0sjKZqP4Dg==}
-    engines: {node: '>=8.0'}
-
-  xmlbuilder@10.1.1:
-    resolution: {integrity: sha512-OyzrcFLL/nb6fMGHbiRDuPup9ljBycsdCypwuyg5AAHvyWzGfChJpCXMG88AGTIMFhGZ9RccFN1e6lhg3hkwKg==}
-    engines: {node: '>=4.0'}
 
   xmlbuilder@11.0.1:
     resolution: {integrity: sha512-fDlsI/kFEx7gLvbecc0/ohLG50fugQp8ryHzMTuW9vSa1GJ0XYWKnhsUx7oie3G98+r56aTQIUB4kht42R3JvA==}
@@ -5498,54 +3774,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@napi-rs/canvas-android-arm64@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-darwin-arm64@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-darwin-x64@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-arm-gnueabihf@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-arm64-gnu@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-arm64-musl@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-riscv64-gnu@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-x64-gnu@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-linux-x64-musl@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-win32-arm64-msvc@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas-win32-x64-msvc@0.1.96':
-    optional: true
-
-  '@napi-rs/canvas@0.1.96':
-    optionalDependencies:
-      '@napi-rs/canvas-android-arm64': 0.1.96
-      '@napi-rs/canvas-darwin-arm64': 0.1.96
-      '@napi-rs/canvas-darwin-x64': 0.1.96
-      '@napi-rs/canvas-linux-arm-gnueabihf': 0.1.96
-      '@napi-rs/canvas-linux-arm64-gnu': 0.1.96
-      '@napi-rs/canvas-linux-arm64-musl': 0.1.96
-      '@napi-rs/canvas-linux-riscv64-gnu': 0.1.96
-      '@napi-rs/canvas-linux-x64-gnu': 0.1.96
-      '@napi-rs/canvas-linux-x64-musl': 0.1.96
-      '@napi-rs/canvas-win32-arm64-msvc': 0.1.96
-      '@napi-rs/canvas-win32-x64-msvc': 0.1.96
-    optional: true
-
   '@npmcli/fs@1.1.1':
     dependencies:
       '@gar/promisify': 1.1.3
@@ -5557,41 +3785,6 @@ snapshots:
       mkdirp: 1.0.4
       rimraf: 3.0.2
     optional: true
-
-  '@oozcitak/dom@1.15.5':
-    dependencies:
-      '@oozcitak/infra': 1.0.5
-      '@oozcitak/url': 1.0.0
-      '@oozcitak/util': 8.0.0
-
-  '@oozcitak/dom@1.15.6':
-    dependencies:
-      '@oozcitak/infra': 1.0.5
-      '@oozcitak/url': 1.0.0
-      '@oozcitak/util': 8.3.4
-
-  '@oozcitak/infra@1.0.3':
-    dependencies:
-      '@oozcitak/util': 1.0.1
-
-  '@oozcitak/infra@1.0.5':
-    dependencies:
-      '@oozcitak/util': 8.0.0
-
-  '@oozcitak/url@1.0.0':
-    dependencies:
-      '@oozcitak/infra': 1.0.3
-      '@oozcitak/util': 1.0.2
-
-  '@oozcitak/util@1.0.1': {}
-
-  '@oozcitak/util@1.0.2': {}
-
-  '@oozcitak/util@8.0.0': {}
-
-  '@oozcitak/util@8.3.3': {}
-
-  '@oozcitak/util@8.3.4': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -5747,10 +3940,6 @@ snapshots:
   '@tootallnate/once@1.1.2':
     optional: true
 
-  '@types/adm-zip@0.5.7':
-    dependencies:
-      '@types/node': 20.19.35
-
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
@@ -5780,12 +3969,6 @@ snapshots:
   '@types/istanbul-lib-coverage@2.0.6': {}
 
   '@types/js-yaml@4.0.9': {}
-
-  '@types/jsdom@21.1.7':
-    dependencies:
-      '@types/node': 20.19.35
-      '@types/tough-cookie': 4.0.5
-      parse5: 7.3.0
 
   '@types/json-schema@7.0.15': {}
 
@@ -5818,14 +4001,6 @@ snapshots:
     dependencies:
       '@types/node': 20.19.35
 
-  '@types/pdf-parse@1.1.5':
-    dependencies:
-      '@types/node': 20.19.35
-
-  '@types/pdfjs-dist@2.10.378':
-    dependencies:
-      pdfjs-dist: 5.5.207
-
   '@types/qs@6.14.0': {}
 
   '@types/range-parser@1.2.7': {}
@@ -5840,8 +4015,6 @@ snapshots:
     dependencies:
       '@types/http-errors': 2.0.5
       '@types/node': 20.19.35
-
-  '@types/tough-cookie@4.0.5': {}
 
   '@types/ws@8.18.1':
     dependencies:
@@ -5973,8 +4146,6 @@ snapshots:
       loupe: 2.3.7
       pretty-format: 29.7.0
 
-  '@xmldom/xmldom@0.8.11': {}
-
   abbrev@1.1.1:
     optional: true
 
@@ -6100,10 +4271,6 @@ snapshots:
       readable-stream: 3.6.2
     optional: true
 
-  argparse@1.0.10:
-    dependencies:
-      sprintf-js: 1.0.3
-
   argparse@2.0.1: {}
 
   assertion-error@1.1.0: {}
@@ -6180,8 +4347,6 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  browser-split@0.0.1: {}
-
   buffer-crc32@0.2.13: {}
 
   buffer-equal-constant-time@1.0.1: {}
@@ -6256,8 +4421,6 @@ snapshots:
 
   callsites@3.1.0: {}
 
-  camelize@1.0.1: {}
-
   centra@2.7.0:
     dependencies:
       follow-redirects: 1.15.11
@@ -6282,6 +4445,8 @@ snapshots:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
+
+  chalk@5.6.2: {}
 
   check-error@1.0.3:
     dependencies:
@@ -6424,29 +4589,7 @@ snapshots:
 
   diff-sequences@29.6.3: {}
 
-  dingbat-to-unicode@1.0.1: {}
-
-  dom-serializer@0.1.1:
-    dependencies:
-      domelementtype: 1.3.1
-      entities: 1.1.2
-
   dom-walk@0.1.2: {}
-
-  domelementtype@1.3.1: {}
-
-  domhandler@2.4.2:
-    dependencies:
-      domelementtype: 1.3.1
-
-  domutils@1.7.0:
-    dependencies:
-      dom-serializer: 0.1.1
-      domelementtype: 1.3.1
-
-  duck@0.1.12:
-    dependencies:
-      underscore: 1.13.8
 
   dunder-proto@1.0.1:
     dependencies:
@@ -6483,15 +4626,6 @@ snapshots:
     dependencies:
       once: 1.4.0
 
-  ent@2.2.2:
-    dependencies:
-      call-bound: 1.0.4
-      es-errors: 1.3.0
-      punycode: 1.4.1
-      safe-regex-test: 1.1.0
-
-  entities@1.1.2: {}
-
   entities@6.0.1: {}
 
   env-paths@2.2.1:
@@ -6501,12 +4635,6 @@ snapshots:
 
   err-code@2.0.3:
     optional: true
-
-  error@4.4.0:
-    dependencies:
-      camelize: 1.0.1
-      string-template: 0.2.1
-      xtend: 4.0.2
 
   es-define-property@1.0.1: {}
 
@@ -6631,10 +4759,6 @@ snapshots:
   esutils@2.0.3: {}
 
   etag@1.8.1: {}
-
-  ev-store@7.0.0:
-    dependencies:
-      individual: 3.0.0
 
   event-target-shim@5.0.1: {}
 
@@ -6982,41 +5106,7 @@ snapshots:
     dependencies:
       whatwg-encoding: 3.1.1
 
-  html-entities@2.6.0: {}
-
   html-escaper@2.0.2: {}
-
-  html-to-docx@1.8.0(encoding@0.1.13):
-    dependencies:
-      '@oozcitak/dom': 1.15.6
-      '@oozcitak/util': 8.3.4
-      color-name: 1.1.4
-      html-entities: 2.6.0
-      html-to-vdom: 0.7.0
-      image-size: 1.2.1
-      image-to-base64: 2.2.0(encoding@0.1.13)
-      jszip: 3.10.1
-      lodash: 4.17.23
-      mime-types: 2.1.35
-      nanoid: 3.3.11
-      virtual-dom: 2.1.1
-      xmlbuilder2: 2.1.2
-    transitivePeerDependencies:
-      - encoding
-
-  html-to-vdom@0.7.0:
-    dependencies:
-      ent: 2.2.2
-      htmlparser2: 3.10.1
-
-  htmlparser2@3.10.1:
-    dependencies:
-      domelementtype: 1.3.1
-      domhandler: 2.4.2
-      domutils: 1.7.0
-      entities: 1.1.2
-      inherits: 2.0.4
-      readable-stream: 3.6.2
 
   http-cache-semantics@4.2.0:
     optional: true
@@ -7095,12 +5185,6 @@ snapshots:
     dependencies:
       queue: 6.0.2
 
-  image-to-base64@2.2.0(encoding@0.1.13):
-    dependencies:
-      node-fetch: 2.7.0(encoding@0.1.13)
-    transitivePeerDependencies:
-      - encoding
-
   immediate@3.0.6: {}
 
   import-fresh@3.3.1:
@@ -7112,8 +5196,6 @@ snapshots:
 
   indent-string@4.0.0:
     optional: true
-
-  individual@3.0.0: {}
 
   infer-owner@1.0.4:
     optional: true
@@ -7155,18 +5237,9 @@ snapshots:
 
   is-number@7.0.0: {}
 
-  is-object@1.0.2: {}
-
   is-potential-custom-element-name@1.0.1: {}
 
   is-promise@4.0.0: {}
-
-  is-regex@1.2.1:
-    dependencies:
-      call-bound: 1.0.4
-      gopd: 1.2.0
-      has-tostringtag: 1.0.2
-      hasown: 2.0.2
 
   is-stream@2.0.1: {}
 
@@ -7417,12 +5490,6 @@ snapshots:
       strip-ansi: 7.2.0
       wrap-ansi: 9.0.2
 
-  lop@0.4.2:
-    dependencies:
-      duck: 0.1.12
-      option: 0.2.4
-      underscore: 1.13.8
-
   loupe@2.3.7:
     dependencies:
       get-func-name: 2.0.2
@@ -7464,19 +5531,6 @@ snapshots:
       - bluebird
       - supports-color
     optional: true
-
-  mammoth@1.11.0:
-    dependencies:
-      '@xmldom/xmldom': 0.8.11
-      argparse: 1.0.10
-      base64-js: 1.5.1
-      bluebird: 3.4.7
-      dingbat-to-unicode: 1.0.1
-      jszip: 3.10.1
-      lop: 0.4.2
-      path-is-absolute: 1.0.1
-      underscore: 1.13.8
-      xmlbuilder: 10.1.1
 
   marked@12.0.2: {}
 
@@ -7612,15 +5666,11 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next-tick@0.2.2: {}
-
   node-abi@3.87.0:
     dependencies:
       semver: 7.7.4
 
   node-addon-api@7.1.1: {}
-
-  node-ensure@0.0.0: {}
 
   node-fetch@2.7.0(encoding@0.1.13):
     dependencies:
@@ -7648,9 +5698,6 @@ snapshots:
   node-pty@1.1.0:
     dependencies:
       node-addon-api: 7.1.1
-
-  node-readable-to-web-readable-stream@0.4.2:
-    optional: true
 
   nopt@5.0.0:
     dependencies:
@@ -7696,8 +5743,6 @@ snapshots:
       mimic-function: 5.0.1
 
   opencollective-postinstall@2.0.3: {}
-
-  option@0.2.4: {}
 
   optionator@0.9.4:
     dependencies:
@@ -7788,15 +5833,6 @@ snapshots:
   pathe@2.0.3: {}
 
   pathval@1.1.1: {}
-
-  pdf-parse@1.1.4:
-    dependencies:
-      node-ensure: 0.0.0
-
-  pdfjs-dist@5.5.207:
-    optionalDependencies:
-      '@napi-rs/canvas': 0.1.96
-      node-readable-to-web-readable-stream: 0.4.2
 
   peek-readable@4.1.0: {}
 
@@ -7904,8 +5940,6 @@ snapshots:
     dependencies:
       end-of-stream: 1.4.5
       once: 1.4.0
-
-  punycode@1.4.1: {}
 
   punycode@2.3.1: {}
 
@@ -8051,12 +6085,6 @@ snapshots:
 
   safe-buffer@5.2.1: {}
 
-  safe-regex-test@1.1.0:
-    dependencies:
-      call-bound: 1.0.4
-      es-errors: 1.3.0
-      is-regex: 1.2.1
-
   safer-buffer@2.1.2: {}
 
   sax@1.5.0: {}
@@ -8177,8 +6205,6 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-  sprintf-js@1.0.3: {}
-
   sqlite3@5.1.7:
     dependencies:
       bindings: 1.5.0
@@ -8203,8 +6229,6 @@ snapshots:
   std-env@3.10.0: {}
 
   string-argv@0.3.2: {}
-
-  string-template@0.2.1: {}
 
   string-width@4.2.3:
     dependencies:
@@ -8289,24 +6313,7 @@ snapshots:
       minizlib: 3.1.0
       yallist: 5.0.0
 
-  tesseract.js-core@5.1.1: {}
-
   tesseract.js-core@7.0.0: {}
-
-  tesseract.js@5.1.1(encoding@0.1.13):
-    dependencies:
-      bmp-js: 0.1.0
-      idb-keyval: 6.2.2
-      is-electron: 2.2.2
-      is-url: 1.2.4
-      node-fetch: 2.7.0(encoding@0.1.13)
-      opencollective-postinstall: 2.0.3
-      regenerator-runtime: 0.13.11
-      tesseract.js-core: 5.1.1
-      wasm-feature-detect: 1.8.0
-      zlibjs: 0.3.1
-    transitivePeerDependencies:
-      - encoding
 
   tesseract.js@7.0.0(encoding@0.1.13):
     dependencies:
@@ -8408,8 +6415,6 @@ snapshots:
 
   ufo@1.6.3: {}
 
-  underscore@1.13.8: {}
-
   undici-types@6.21.0: {}
 
   undici-types@7.18.2: {}
@@ -8470,35 +6475,6 @@ snapshots:
 
   vary@1.1.2: {}
 
-  virtual-dom@2.1.1:
-    dependencies:
-      browser-split: 0.0.1
-      error: 4.4.0
-      ev-store: 7.0.0
-      global: 4.4.0
-      is-object: 1.0.2
-      next-tick: 0.2.2
-      x-is-array: 0.1.0
-      x-is-string: 0.1.0
-
-  vite-node@1.6.1(@types/node@20.19.35):
-    dependencies:
-      cac: 6.7.14
-      debug: 4.4.3
-      pathe: 1.1.2
-      picocolors: 1.1.1
-      vite: 5.4.21(@types/node@20.19.35)
-    transitivePeerDependencies:
-      - '@types/node'
-      - less
-      - lightningcss
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-
   vite-node@1.6.1(@types/node@25.3.2):
     dependencies:
       cac: 6.7.14
@@ -8517,15 +6493,6 @@ snapshots:
       - supports-color
       - terser
 
-  vite@5.4.21(@types/node@20.19.35):
-    dependencies:
-      esbuild: 0.25.12
-      postcss: 8.5.6
-      rollup: 4.59.0
-    optionalDependencies:
-      '@types/node': 20.19.35
-      fsevents: 2.3.3
-
   vite@5.4.21(@types/node@25.3.2):
     dependencies:
       esbuild: 0.25.12
@@ -8534,41 +6501,6 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.3.2
       fsevents: 2.3.3
-
-  vitest@1.6.1(@types/node@20.19.35)(jsdom@24.1.3):
-    dependencies:
-      '@vitest/expect': 1.6.1
-      '@vitest/runner': 1.6.1
-      '@vitest/snapshot': 1.6.1
-      '@vitest/spy': 1.6.1
-      '@vitest/utils': 1.6.1
-      acorn-walk: 8.3.5
-      chai: 4.5.0
-      debug: 4.4.3
-      execa: 8.0.1
-      local-pkg: 0.5.1
-      magic-string: 0.30.21
-      pathe: 1.1.2
-      picocolors: 1.1.1
-      std-env: 3.10.0
-      strip-literal: 2.1.1
-      tinybench: 2.9.0
-      tinypool: 0.8.4
-      vite: 5.4.21(@types/node@20.19.35)
-      vite-node: 1.6.1(@types/node@20.19.35)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@types/node': 20.19.35
-      jsdom: 24.1.3
-    transitivePeerDependencies:
-      - less
-      - lightningcss
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
 
   vitest@1.6.1(@types/node@25.3.2)(jsdom@24.1.3):
     dependencies:
@@ -8671,18 +6603,12 @@ snapshots:
 
   ws@8.19.0: {}
 
-  x-is-array@0.1.0: {}
-
-  x-is-string@0.1.0: {}
-
   xhr@2.6.0:
     dependencies:
       global: 4.4.0
       is-function: 1.0.2
       parse-headers: 2.0.6
       xtend: 4.0.2
-
-  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz: {}
 
   xml-name-validator@5.0.0: {}
 
@@ -8692,14 +6618,6 @@ snapshots:
     dependencies:
       sax: 1.5.0
       xmlbuilder: 11.0.1
-
-  xmlbuilder2@2.1.2:
-    dependencies:
-      '@oozcitak/dom': 1.15.5
-      '@oozcitak/infra': 1.0.5
-      '@oozcitak/util': 8.3.3
-
-  xmlbuilder@10.1.1: {}
 
   xmlbuilder@11.0.1: {}
 

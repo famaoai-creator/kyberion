@@ -10,10 +10,11 @@ import * as fs from 'node:fs'; // Used only for existsSync check if needed, or m
  */
 
 interface FileAction {
-  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists' | 'stat';
+  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists' | 'stat' | 'replace';
   path: string;
   content?: string;
   pattern?: string;
+  replacement?: string;
   recursive?: boolean;
   options?: any;
 }
@@ -22,6 +23,12 @@ async function handleAction(input: FileAction) {
   const resolved = path.resolve(process.cwd(), input.path);
 
   switch (input.action) {
+    case 'replace':
+      logger.info(`📝 Replacing "${input.pattern}" with "${input.replacement}" in ${input.path}`);
+      const oldContent = safeReadFile(resolved, { encoding: 'utf8' }) as string;
+      const newContent = oldContent.replace(new RegExp(input.pattern || '', 'g'), input.replacement || '[REDACTED]');
+      safeWriteFile(resolved, newContent);
+      return { status: 'success', path: input.path };
     case 'read':
       logger.info(`📖 Reading file: ${input.path}`);
       return { content: safeReadFile(resolved, { encoding: 'utf8' }) };

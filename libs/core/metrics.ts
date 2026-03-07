@@ -7,7 +7,7 @@ import chalk from 'chalk';
  */
 
 const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
-const DEFAULT_METRICS_FILE = 'skill-metrics.jsonl';
+const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
 const COST_TABLE: Record<string, { prompt: number; completion: number }> = {
@@ -41,7 +41,7 @@ export class MetricsCollector {
     this._aggregates = new Map();
   }
 
-  record(skillName: string, durationMs: number, status: 'success' | 'error', extra: any = {}) {
+  record(componentName: string, durationMs: number, status: 'success' | 'error', extra: any = {}) {
     const mem = process.memoryUsage();
     const memory = {
       heapUsedMB: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
@@ -50,10 +50,10 @@ export class MetricsCollector {
     };
 
     if (memory.heapUsedMB > this._memoryBudgetMB) {
-      console.warn(chalk.yellow(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
+      console.warn(chalk.yellow(`[${componentName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
     }
 
-    let agg = this._aggregates.get(skillName);
+    let agg = this._aggregates.get(componentName);
     if (!agg) {
       agg = {
         count: 0,
@@ -76,7 +76,7 @@ export class MetricsCollector {
         completionTokens: 0,
         totalTokens: 0,
       };
-      this._aggregates.set(skillName, agg);
+      this._aggregates.set(componentName, agg);
     }
     agg.count++;
     if (status === 'error') agg.errors++;
@@ -117,7 +117,7 @@ export class MetricsCollector {
 
     if (this._persist) {
       this._appendToFile({
-        skill: skillName,
+        component: componentName,
         duration_ms: durationMs,
         status,
         timestamp: agg.lastRun,
@@ -157,7 +157,7 @@ export class MetricsCollector {
       );
 
       summaries.push({
-        skill: name,
+        component: name,
         executions: agg.count,
         errors: agg.errors,
         errorRate: agg.count > 0 ? Math.round((agg.errors / agg.count) * 1000) / 10 : 0,

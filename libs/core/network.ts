@@ -3,7 +3,7 @@ import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 
 /**
- * Standardized network utilities for Gemini Skills.
+ * Standardized network utilities for Kyberion Components.
  * Enhanced with TIBA (Temporal Intent-Based Authentication) and Endpoint Whitelisting.
  */
 
