@@ -3,6 +3,9 @@
 ## Goal
 実行したミッションの知見を蒸留（Distill）し、環境をクリーンアップしてアーカイブする。
 
+## Directive
+Distill both successes and failures into Wisdom. Purge temporary scripts (Scratch) and return a pristine environment to the Sovereign.
+
 ## Physical Enforcement
 ミッションの終了時、AIエージェントは必ず以下のコマンドを実行して、物理的な環境を清算しなければならない。
 
