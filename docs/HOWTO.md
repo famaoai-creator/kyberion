@@ -325,7 +325,7 @@ In the Gemini Skills Ecosystem, **you do not write skill code first**. Skills mu
 Do not write code yet. First, create a `SKILL.md` in the appropriate category directory to define the intent, inputs, and expected output.
 
 ### Step 2: Mission Execution (Ad-hoc Prototyping)
-When a real task arrives, use the **Alignment Phase** to plan. Write throwaway scripts in the `scratch/` directory to solve the problem dynamically. Use the standard `fs` module if needed, but **never mutate production data directly from scratch scripts**.
+When a real task arrives, follow the **③ Alignment Phase** protocol defined in `knowledge/governance/phases/alignment.md`. Use **KSMC v2.0** (`scripts/mission_controller.ts start`) to initiate the mission. All operations, even in experimentation, MUST use `@agent/core/secure-io`. **Direct use of `node:fs` is strictly prohibited.**
 
 ### Step 3: Validation
 Verify that your ad-hoc solution perfectly solves the mission.

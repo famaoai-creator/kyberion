@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:42:14.196Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:55:16.773Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -148,7 +148,7 @@
 ## 📁 governance
 - [Active Inquiry Protocol: The Power of Questioning](./governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Config Protocol: The Sovereign Rule of System State](./governance/config-protocol.md) (public | Ecosystem Architect)
-- [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Ecosystem Architect)
+- [Kyberion Sovereign Consensus Protocol](./governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [Dual-Key Policy](./governance/dual-key-policy.md) (public | Unknown)
 - [GIT Strategy: Sovereign Hierarchical Synchronization](./governance/git-strategy.md) (public | Ecosystem Architect)
 - [Dynamic Capability and Skill Governance Policy](./governance/governance-policy.md) (public | Ecosystem Architect)
