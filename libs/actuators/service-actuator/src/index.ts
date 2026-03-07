@@ -25,11 +25,11 @@ async function handleAction(input: ServiceAction) {
   let token: string | null = null;
   if (input.auth === 'secret-guard') {
     const secretKey = `${input.service_id.toUpperCase()}_TOKEN`;
-    token = secretGuard.getSecret(secretKey);
+    token = secretGuard.getSecret(secretKey, input.service_id); // Pass service_id as scope
     if (!token) {
       throw new Error(`Access Denied: No secret found for service "${input.service_id}"`);
     }
-    logger.info(`🔐 [AUTH] Securely injected credentials for ${input.service_id}`);
+    logger.info(`🔐 [AUTH] TIBA-Verified credentials for ${input.service_id}`);
   }
 
   // 2. Multi-Mode Execution
