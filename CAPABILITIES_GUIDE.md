@@ -1,18 +1,18 @@
-# Gemini Skills Ecosystem Guide
+# Kyberion Capabilities Guide
 
-Total Skills: 121 (Implemented: 137)
-Last updated: 2026/03/06
+Total Capabilities: 121 (Implemented: 137)
+Last updated: 2026/03/07
 
-> **Governance Note (The Skill Genesis Lifecycle):**
-> Skills listed in this ecosystem are NOT speculative scripts. They are the result of **Wisdom Distillation**. 
-> According to the Strategic Reasoning Protocol (`GEMINI.md` Chapter 9), a skill is only created (compiled into the "Spinal Cord") after it has been proven to solve a real-world mission during ad-hoc Execution (in `scratch/`) and strictly validated. Generic helper logic discovered during this process is instead distilled into `libs/core/`.
+> **Governance Note (The Capability Evolution):**
+> Capabilities in the Kyberion ecosystem are not mere scripts. They represent the **"Spinal Cord"** of the Sovereign Entity, categorized into **Logic** (decision-making and analysis) and **Actuators** (physical world interactions). 
+> According to the Kyberion Sovereign Charter (GEMINI.md), a capability is distilled from proven ad-hoc execution evidence and must satisfy strict logical and physical integrity constraints.
 
-This guide is a domain-driven catalog of the ecosystem. Skills are organized into Namespaces for better governance and accountability.
+This guide provides a domain-driven catalog of the ecosystem's capabilities.
 
 ## 📂 AUDIT
-> Security, quality, and compliance scanning based on IPA/FISC standards.
+> Security, quality, and compliance scanning based on Kyberion standards.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **ai-ethics-auditor** | >- | N/A | - | `npm run cli -- run ai-ethics-auditor` |
 | **bug-predictor** | >- | N/A | - | `npm run cli -- run bug-predictor` |
@@ -30,7 +30,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 BUSINESS
 > Strategy, financial modeling, and executive reporting.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **business-growth-planner** | >- | N/A | - | `npm run cli -- run business-growth-planner` |
 | **business-impact-analyzer** | >- | N/A | - | `npm run cli -- run business-impact-analyzer` |
@@ -52,7 +52,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 CONNECTOR
 > Enterprise tool integrations (Jira, Slack, Box).
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **backlog-connector** | >- | N/A | - | `npm run cli -- run backlog-connector` |
 | **box-connector** | >- | N/A | - | `npm run cli -- run box-connector` |
@@ -68,7 +68,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 CORE
 > Fundamental orchestrators and self-evolution mechanisms.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **intent-classifier** | Classify intent of text (request, question, report). | N/A | - | `npm run cli -- run intent-classifier` |
 | **mission-control** | >- | N/A | - | `npm run cli -- run mission-control` |
@@ -80,7 +80,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 ENGINEERING
 > Development, implementation, and architectural refactoring tools.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **binary-archaeologist** | >- | N/A | - | `npm run cli -- run binary-archaeologist` |
 | **code-lang-detector** | Detect programming language of source code. | N/A | - | `npm run cli -- run code-lang-detector` |
@@ -99,25 +99,25 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 | **test-suite-architect** | >- | N/A | - | `npm run cli -- run test-suite-architect` |
 
 ## 📂 FINANCE
-> General purpose skills.
+> General purpose capabilities.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **jpx-market-analyzer** | Analyzes Japanese stock market data and financials via JPX J-Quants API. | N/A | - | `npm run cli -- run jpx-market-analyzer` |
 | **land-price-analyzer** | Analyzes land prices and real estate transactions via MLIT RE-Infolib API. | N/A | - | `npm run cli -- run land-price-analyzer` |
 | **trust-fund-monitor** | Monitors investment trust NAV and info via MUFG Asset Management WebAPI. | N/A | - | `npm run cli -- run trust-fund-monitor` |
 
 ## 📂 IMAGINATION
-> General purpose skills.
+> General purpose capabilities.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **visual-imagination** | Generates and edits images using Google Gemini Image API (Imagen). | N/A | - | `npm run cli -- run visual-imagination` |
 
 ## 📂 INTELLIGENCE
 > Knowledge harvesting and 3-tier memory management.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **auto-context-mapper** | >- | N/A | - | `npm run cli -- run auto-context-mapper` |
 | **data-collector** | >- | N/A | - | `npm run cli -- run data-collector` |
@@ -134,9 +134,9 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 | **sovereign-sync** | Syncs specific knowledge tiers with external private repositories. | N/A | - | `npm run cli -- run sovereign-sync` |
 
 ## 📂 LIFESTYLE
-> General purpose skills.
+> General purpose capabilities.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **rakuten-ichiba-connector** | Searches for products on Rakuten Ichiba. | N/A | - | `npm run cli -- run rakuten-ichiba-connector` |
 | **rakuten-travel-connector** | Searches for hotels and plans on Rakuten Travel. | N/A | - | `npm run cli -- run rakuten-travel-connector` |
@@ -145,7 +145,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 MEDIA
 > Professional document extraction and media asset generation.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **audio-transcriber** | Transcribe audio/video files to text using OpenAI Whisper. | N/A | - | `npm run cli -- run audio-transcriber` |
 | **diagram-renderer** | >- | N/A | - | `npm run cli -- run diagram-renderer` |
@@ -160,7 +160,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 UTILITIES
 > Shared helpers, background daemons, and general utilities.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **agent-activity-monitor** | >- | N/A | - | `npm run cli -- run agent-activity-monitor` |
 | **ai-model-orchestrator** | >- | N/A | - | `npm run cli -- run ai-model-orchestrator` |
@@ -216,7 +216,7 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 ## 📂 UX
 > Human-centric UI/UX auditing and voice interface control.
 
-| Skill | Description | Score | Avg Time | Usage |
+| Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **biometric-context-adapter** | >- | N/A | - | `npm run cli -- run biometric-context-adapter` |
 | **localization-maestro** | >- | N/A | - | `npm run cli -- run localization-maestro` |
@@ -227,4 +227,4 @@ This guide is a domain-driven catalog of the ecosystem. Skills are organized int
 | **voice-interface-maestro** | >- | N/A | - | `npm run cli -- run voice-interface-maestro` |
 
 ---
-*Generated by Ecosystem Architect Tool | Based on Hierarchical Namespace Model v1.0*
+*Generated by Ecosystem Architect Tool | Based on Kyberion Sovereign Model v2.0*
