@@ -1,5 +1,5 @@
 import { logger, safeWriteFile, pathResolver } from '@agent/core';
-import { safeExec } from '@agent/core/secure-io';
+import { safeExec, safeUnlinkSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
@@ -41,7 +41,7 @@ async function runSecurityScan(): Promise<CheckResult> {
       if (parsed.results && parsed.results.length > 0) {
         results.push(...parsed.results);
       }
-      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(inputPath)) safeUnlinkSync(inputPath);
     } catch (e: any) {
       logger.error(`Security check failed for pattern ${pattern}: ${e.message}`);
     }
