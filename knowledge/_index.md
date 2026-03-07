@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T07:14:47.618Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T07:21:56.596Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -269,6 +269,9 @@
 
 ## 📁 pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Ecosystem Architect)
+
+## 📁 procedures/file
+- [Procedure: Search Pattern in Filesystem](./procedures/file/search-pattern.md) (public | Unknown)
 
 ## 📁 public/ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./public/ai-engineering/best_practices.md) (public | Ecosystem Architect)
