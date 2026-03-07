@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:43:17.755Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:52:07.188Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -287,6 +287,7 @@
 - [Procedure: Tech Due Diligence & IP Strategy](./procedures/business/tech-dd-and-ip-strategy.md) (public | Unknown)
 
 ## 📁 procedures/code
+- [Procedure: Advanced Engineering (Porting, PRs, and Mapping)](./procedures/code/advanced-engineering.md) (public | Unknown)
 - [Procedure: Targeted Code Refactoring](./procedures/code/refactor-code.md) (public | Unknown)
 
 ## 📁 procedures/core
@@ -309,9 +310,15 @@
 
 ## 📁 procedures/media
 - [Procedure: Visual Asset Generation & Rendering](./procedures/media/generate-visuals.md) (public | Unknown)
+- [Procedure: Visual Imagination & Assertion](./procedures/media/visual-imagination-and-testing.md) (public | Unknown)
 
 ## 📁 procedures/network
 - [Procedure: Moltbook API Integration](./procedures/network/moltbook-sync.md) (public | Unknown)
+
+## 📁 procedures/service
+- [Procedure: Financial Market Analysis (JPX, Trust Funds)](./procedures/service/analyze-markets.md) (public | Unknown)
+- [Procedure: Lifestyle & IoT Automation (Rakuten, SwitchBot)](./procedures/service/lifestyle-automation.md) (public | Unknown)
+- [Procedure: External SaaS Integration (Slack, Jira, Box)](./procedures/service/sync-saas-data.md) (public | Unknown)
 
 ## 📁 procedures/system
 - [Procedure: OS Peripheral Control](./procedures/system/control-peripherals.md) (public | Unknown)
