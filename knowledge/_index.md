@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:39:38.187Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:42:14.196Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -161,8 +161,8 @@
 ## 📁 governance/phases
 - [Phase Protocol: ③ Alignment](./governance/phases/alignment.md) (public | Unknown)
 - [Phase Protocol: ④ Mission Execution](./governance/phases/execution.md) (public | Unknown)
-- [Phase: Onboarding](./governance/phases/onboarding.md) (public | Unknown)
-- [Phase: Recovery & Resilience](./governance/phases/recovery.md) (public | Unknown)
+- [Phase Protocol: ① Onboarding](./governance/phases/onboarding.md) (public | Unknown)
+- [Phase Protocol: ② Recovery & Resilience](./governance/phases/recovery.md) (public | Unknown)
 - [Phase Protocol: ⑤ Review & Distillation](./governance/phases/review.md) (public | Unknown)
 
 ## 📁 legal/ip
