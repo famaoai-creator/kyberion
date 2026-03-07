@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T07:21:56.596Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T08:29:44.268Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -270,8 +270,44 @@
 ## 📁 pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
+## 📁 procedures/browser
+- [Procedure: Web Automation & Navigation](./procedures/browser/navigate-web.md) (public | Unknown)
+
+## 📁 procedures/business
+- [Procedure: PMO Governance & Project Health Audit](./procedures/business/audit-governance.md) (public | Unknown)
+- [Procedure: Executive Reporting & Communication](./procedures/business/executive-reporting.md) (public | Unknown)
+- [Procedure: Unit Economics Optimization](./procedures/business/optimize-unit-economics.md) (public | Unknown)
+- [Procedure: Project Lifecycle Management (Talent & Sunset)](./procedures/business/project-lifecycle-management.md) (public | Unknown)
+- [Procedure: Tech Due Diligence & IP Strategy](./procedures/business/tech-dd-and-ip-strategy.md) (public | Unknown)
+
+## 📁 procedures/code
+- [Procedure: Targeted Code Refactoring](./procedures/code/refactor-code.md) (public | Unknown)
+
 ## 📁 procedures/file
+- [Procedure: Analyze Special Formats (Binary, DB, Scenarios)](./procedures/file/analyze-special-formats.md) (public | Unknown)
+- [Procedure: Detect File Specifications (Format, Encoding, Language)](./procedures/file/detect-file-specs.md) (public | Unknown)
+- [Procedure: Sensitivity & PII Detection](./procedures/file/detect-sensitivity.md) (public | Unknown)
+- [Procedure: Generate Files from Templates](./procedures/file/generate-from-template.md) (public | Unknown)
+- [Procedure: IP/Patentable Asset Scan](./procedures/file/ip-scan.md) (public | Unknown)
+- [Procedure: Schema Inspection & Validation](./procedures/file/manage-schemas.md) (public | Unknown)
+- [Procedure: Codebase Structure Mapping](./procedures/file/map-codebase.md) (public | Unknown)
+- [Procedure: Dependency Mapping](./procedures/file/map-dependencies.md) (public | Unknown)
+- [Procedure: Physical File Organization & Curation](./procedures/file/organize-assets.md) (public | Unknown)
+- [Procedure: Knowledge Refinement & Sanitization](./procedures/file/refine-knowledge.md) (public | Unknown)
 - [Procedure: Search Pattern in Filesystem](./procedures/file/search-pattern.md) (public | Unknown)
+- [Procedure: File Diff Visualization](./procedures/file/visualize-diffs.md) (public | Unknown)
+
+## 📁 procedures/media
+- [Procedure: Visual Asset Generation & Rendering](./procedures/media/generate-visuals.md) (public | Unknown)
+
+## 📁 procedures/network
+- [Procedure: Moltbook API Integration](./procedures/network/moltbook-sync.md) (public | Unknown)
+
+## 📁 procedures/system
+- [Procedure: OS Peripheral Control](./procedures/system/control-peripherals.md) (public | Unknown)
+
+## 📁 procedures/wisdom
+- [Procedure: Identity Evolution & Wisdom Distillation](./procedures/wisdom/evolve-identity.md) (public | Unknown)
 
 ## 📁 public/ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./public/ai-engineering/best_practices.md) (public | Ecosystem Architect)
