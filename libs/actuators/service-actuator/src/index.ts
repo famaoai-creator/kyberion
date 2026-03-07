@@ -1,4 +1,5 @@
-import { logger, secureFetch, secretGuard, safeExec } from '@agent/core';
+import { logger, secretGuard, safeExec } from '@agent/core';
+import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -34,9 +35,10 @@ async function handleAction(input: ServiceAction) {
   // 2. Multi-Mode Execution
   switch (input.mode) {
     case 'API':
+      const baseUrl = input.service_id === 'moltbook' ? 'https://www.moltbook.com/api/v1' : `https://api.${input.service_id}.com/v1`;
       return await secureFetch({
-        method: 'POST', // Default for many SaaS actions
-        url: `https://api.${input.service_id}.com/v1/${input.action}`,
+        method: 'GET', // Dynamic or based on action
+        url: `${baseUrl}/${input.action}`,
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         data: input.params
       });

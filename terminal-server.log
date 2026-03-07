@@ -6,3 +6,4 @@
 2026-03-04T17:09:09.075Z [ERROR] [Terminal] Failed to initialize ReflexTerminal: posix_spawnp failed.
 2026-03-04T17:09:09.512Z [INFO]  [Terminal] Client connected via WebSocket
 2026-03-04T17:09:09.512Z [ERROR] [Terminal] Failed to initialize ReflexTerminal: posix_spawnp failed.
+[CLI] Skill "File-Actuator" not found in index.
