@@ -6,10 +6,15 @@ import { safeAppendFile, pathResolver, logger } from '@agent/core';
  * [SECURE-IO COMPLIANT VERSION]
  */
 
-const API_KEY = 'moltbook_sk_nfAhqrAVZPxrQ6ftSNJ_7KHOT6RYARJW';
+const API_KEY = process.env.MOLTBOOK_API_KEY;
 const LOG_FILE = path.join(pathResolver.rootDir(), 'active/missions/MSN-MOLTBOOK-INDEPENDENCE/night_watch.log');
 
-function logAction(message: string) {
+async function heartbeat() {
+  if (!API_KEY) {
+    logger.error('❌ MOLTBOOK_API_KEY environment variable is not set. Heartbeat aborted.');
+    return;
+  }
+
   const timestamp = new Date().toISOString();
   const logLine = `[${timestamp}] ${message}\n`;
   try {
