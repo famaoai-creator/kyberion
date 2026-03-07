@@ -34,6 +34,8 @@ interface Channel {
   id: string;
   connector_skill?: string;
   execution_strategy?: string;
+  service_id?: string;
+  execution_mode?: 'API' | 'CLI' | 'SDK';
 }
 
 async function loadChannelRegistry(): Promise<Channel[]> {
@@ -75,12 +77,30 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
   if (channelCfg?.connector_skill) {
     logger.info(`📤 [Nexus] Dispatching feedback for ${stimulus.id} via ${channelCfg.connector_skill}`);
     
-    const payload = {
-      action: 'message',
-      input: text,
-      metadata: stimulus.origin.metadata, // Pass all metadata transparently
-      stimulus_id: stimulus.id
-    };
+    let payload: any;
+    
+    if (channelCfg.connector_skill === 'service-actuator') {
+      // New Unified Service Payload
+      payload = {
+        service_id: channelCfg.service_id || stimulus.origin.channel,
+        mode: channelCfg.execution_mode || 'API',
+        action: 'chat.postMessage', // Default for messaging channels
+        params: {
+          channel: stimulus.origin.context?.split(':')[0],
+          thread_ts: stimulus.origin.context?.split(':')[1],
+          text: text
+        },
+        auth: 'secret-guard'
+      };
+    } else {
+      // Legacy Skill Payload
+      payload = {
+        action: 'message',
+        input: text,
+        metadata: stimulus.origin.metadata,
+        stimulus_id: stimulus.id
+      };
+    }
 
     const tempPath = pathResolver.resolve(`active/shared/logs/dispatch_${stimulus.id}_${Date.now()}.json`);
     safeWriteFile(tempPath, JSON.stringify(payload, null, 2));

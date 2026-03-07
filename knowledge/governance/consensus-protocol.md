@@ -1,69 +1,50 @@
 ---
-title: ACE (Autonomous Consensus Engine) Operating Standard
-category: Orchestration
-tags: [orchestration, consensus, protocol, ace]
-importance: 8
+title: Kyberion Sovereign Consensus Protocol
+category: Governance
+tags: [governance, consensus, protocol, ace]
+importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-03-07
 ---
 
-# ACE (Autonomous Consensus Engine) Operating Standard
+# Kyberion Sovereign Consensus Protocol
 
-ACE は、Gemini エージェントが複雑な意思決定を行うための標準プロトコルである。
+This protocol defines the mechanism through which the Kyberion Sovereign Entity reaches high-fidelity decisions and forms consensus between multiple expert roles (ACE).
 
-## 1. 意思決定プロセス (The Process)
+## 1. Decision-Making Lifecycle (The ACE Process)
 
-1. **Evidence Collection**: 議題に関する客観的エビデンス（コード、ログ、ダッシュボード）を収集する。
-2. **Persona Invocation**: `matrix.md` に定義された各ロールを順次召喚し、エビデンスを分析させる。
-3. **Scoring**: 各ロールは以下の基準でスコアを出す。
-   - **Security (S)**: S1(Critical) / S2(High) / S3(Medium) / S4(Low)
-   - **Urgency (U)**: U1(Immediate) / U2(High) / U3(Normal) / U4(Low)
-4. **Consensus Algorithm**:
-   - S1 が存在する場合、判定は無条件で **NO-GO**。
-   - S2 かつ U1 の場合のみ、**YELLOW-CARD**（条件付き承認）。
-   - それ以外で S2 がある場合は **NO-GO**。
-   - S3/S4 のみの場合は **GO**。
+1. **Evidence Collection**: Gather objective evidence (code, logs, dashboards, mission states).
+2. **Persona Invocation**: Invoke specialized roles from `matrix.md` to analyze the evidence from their unique perspectives.
+3. **Sovereign Scoring**: Each role assigns scores based on:
+   - **Security (S)**: S1(Critical) to S4(Low)
+   - **Urgency (U)**: U1(Immediate) to U4(Low)
+4. **Consensus Algorithm (The Sudo Logic)**:
+   - If S1 exists: Automatic **NO-GO**.
+   - If S2 and U1: **YELLOW-CARD** (Conditional approval with mitigation).
+   - If S2 exists: **NO-GO**.
+   - S3/S4: **GO**.
 
-## 2. 標準 ACE プロンプト (The Prompt)
+## 2. Standard ACE Prompt (The Invocation)
 
-エージェントはこのプロンプトを使用してロールを「憑依」させる。
+The entity uses the following structured prompt to "possess" a specific role for deliberation:
 
 ```text
-あなたは [Role Name] として、以下の議題について ACE 審議に参加してください。
-【議題】: [Topic]
-【エビデンス】: [Evidence Data]
-【あなたのナレッジ】: [Viewpoint from matrix.md]
+You are acting as [Role Name]. Participate in the Kyberion Consensus deliberation for the following topic:
+[TOPIC]: [Description]
+[EVIDENCE]: [Data]
+[KNOWLEDGE]: [Reference from matrix.md]
 
-手順:
-1. 自分の視点からエビデンスを分析し、懸念点または期待される成果を述べよ。
-2. セキュリティリスク (S1-S4) または ビジネス緊急度 (U1-U4) のいずれか適切なスコアを提示せよ。
-3. 最終的な思考を "Analysis: [内容]" の形式で出力せよ。
+Steps:
+1. Analyze the evidence from your specific perspective.
+2. Provide a Security (S1-S4) or Urgency (U1-U4) score.
+3. Output final reasoning as "Analysis: [Content]".
 ```
 
-## 3. エビデンスの保存 (Evidence Preservation)
+## 3. Evidence Preservation
 
-ACEによる決定が行われた際、エージェントは必ず以下のパスに審議結果を JSON 形式で保存しなければならない。
-
+All consensus decisions MUST be recorded in the active mission evidence folder:
 - **Path**: `active/missions/{MissionID}/ace-report.json`
 
-### JSON Schema (Minimal):
-
-```json
-{
-  "mission_id": "string",
-  "topic": "string",
-  "decision": "GO | NO-GO | YELLOW-CARD",
-  "participants": [
-    {
-      "role": "string",
-      "score": "S1-S4 / U1-U4",
-      "analysis": "string"
-    }
-  ],
-  "timestamp": "ISO-String"
-}
-```
-
 ---
-
-_Created: 2026-02-14 | Updated: 2026-02-16 | Ecosystem Architect_
+*Status: Mandated by GEMINI.md*
+*Reference: Kyberion Sovereign Charter*

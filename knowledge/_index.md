@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-06T22:25:44.880Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:58:06.935Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -15,6 +15,7 @@
 - [Architecture: Alignment Mirror & Calibration Missions](./architecture/alignment-mirror-calibration.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [Analysis: Sensory Bridge Alignment (2026-03-05)](./architecture/analysis-sensory-alignment-20260305.md) (public | Ecosystem Architect)
+- [Architecture: The 5-Layer Backbone of Kyberion](./architecture/backbone-sovereignty.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./architecture/distributed-systems.md) (public | Ecosystem Architect)
 - [Architecture: Event-Driven Sovereignty](./architecture/event-driven-sovereignty.md) (public | Unknown)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
@@ -25,6 +26,7 @@
 - [Sovereign Approval Protocol: Push & Passkey (2026-03-04)](./architecture/passkey-push-protocol.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Presence Layer: Sensors, Displays, and Intervention](./architecture/presence-layer.md) (public | Ecosystem Architect)
+- [Satellite Architecture Model (Hybrid-C)](./architecture/satellite-model.md) (public | Unknown)
 - [Sensory Bridge Protocol (GUSP v1.0)](./architecture/sensory-bridge-protocol.md) (public | Ecosystem Architect)
 - [Tenant-Aware Vision-Mission Model](./architecture/tenant-vision-model.md) (public | Ecosystem Architect)
 - [Terminal Hosting: The Institutional Gateway](./architecture/terminal-hosting.md) (public | Ecosystem Architect)
@@ -80,6 +82,7 @@
 
 ## 📁 evolution
 - [Biometric & Mood Data Privacy Protocol](./evolution/biometric_privacy.md) (public | Ecosystem Architect)
+- [Reconstruction Learnings: The Great De-monolithization (2026-03-07)](./evolution/reconstruction-learnings-2026-03-07.md) (public | Unknown)
 - [🧠 Autonomous Wisdom Distillation - 2026-03-01](./evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
 
 ## 📁 external-wisdom
@@ -145,14 +148,22 @@
 ## 📁 governance
 - [Active Inquiry Protocol: The Power of Questioning](./governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Config Protocol: The Sovereign Rule of System State](./governance/config-protocol.md) (public | Ecosystem Architect)
-- [ACE (Autonomous Consensus Engine) Operating Standard](./governance/consensus-protocol.md) (public | Ecosystem Architect)
+- [Kyberion Sovereign Consensus Protocol](./governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [Dual-Key Policy](./governance/dual-key-policy.md) (public | Unknown)
 - [GIT Strategy: Sovereign Hierarchical Synchronization](./governance/git-strategy.md) (public | Ecosystem Architect)
 - [Dynamic Capability and Skill Governance Policy](./governance/governance-policy.md) (public | Ecosystem Architect)
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./governance/knowledge-protocol.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol](./governance/onboarding-protocol.md) (public | Unknown)
 - [SOP: Unit Test Modernization & Alias Integrity](./governance/test-modernization-sop.md) (public | Ecosystem Architect)
+- [Governance: Tiered Consensus & Experimental Branches](./governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [SOP: TypeScript Core Base Stabilization](./governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
+
+## 📁 governance/phases
+- [Phase Protocol: ③ Alignment](./governance/phases/alignment.md) (public | Unknown)
+- [Phase Protocol: ④ Mission Execution](./governance/phases/execution.md) (public | Unknown)
+- [Phase Protocol: ① Onboarding](./governance/phases/onboarding.md) (public | Unknown)
+- [Phase Protocol: ② Recovery & Resilience](./governance/phases/recovery.md) (public | Unknown)
+- [Phase Protocol: ⑤ Review & Distillation](./governance/phases/review.md) (public | Unknown)
 
 ## 📁 legal/ip
 - [Legal & Intellectual Property Strategy](./legal/ip/patent_strategy.md) (public | Ecosystem Architect)
@@ -266,6 +277,74 @@
 ## 📁 pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
+## 📁 procedures/audit
+- [Procedure: License & Supply Chain Audit](./procedures/audit/audit-licenses.md) (public | Unknown)
+- [Procedure: Predictive Bug Analysis & Red-Teaming](./procedures/audit/predict-risks.md) (public | Unknown)
+- [Procedure: Security & Compliance Scanning](./procedures/audit/scan-security.md) (public | Unknown)
+- [Procedure: Quality Scoring & Project Health Assessment](./procedures/audit/score-quality.md) (public | Unknown)
+
+## 📁 procedures/browser
+- [Procedure: Web Automation & Navigation](./procedures/browser/navigate-web.md) (public | Unknown)
+
+## 📁 procedures/business
+- [Procedure: PMO Governance & Project Health Audit](./procedures/business/audit-governance.md) (public | Unknown)
+- [Procedure: Executive Reporting & Communication](./procedures/business/executive-reporting.md) (public | Unknown)
+- [Procedure: Unit Economics Optimization](./procedures/business/optimize-unit-economics.md) (public | Unknown)
+- [Procedure: Project Lifecycle Management (Talent & Sunset)](./procedures/business/project-lifecycle-management.md) (public | Unknown)
+- [Procedure: Tech Due Diligence & IP Strategy](./procedures/business/tech-dd-and-ip-strategy.md) (public | Unknown)
+
+## 📁 procedures/code
+- [Procedure: Advanced Engineering (Porting, PRs, and Mapping)](./procedures/code/advanced-engineering.md) (public | Unknown)
+- [Procedure: Targeted Code Refactoring](./procedures/code/refactor-code.md) (public | Unknown)
+
+## 📁 procedures/core
+- [Procedure: Self-Evolution & Prompt Optimization](./procedures/core/evolve-capabilities.md) (public | Unknown)
+- [Procedure: Mission Orchestration & Self-Healing](./procedures/core/orchestrate-missions.md) (public | Unknown)
+
+## 📁 procedures/file
+- [Procedure: Analyze Special Formats (Binary, DB, Scenarios)](./procedures/file/analyze-special-formats.md) (public | Unknown)
+- [Procedure: Detect File Specifications (Format, Encoding, Language)](./procedures/file/detect-file-specs.md) (public | Unknown)
+- [Procedure: Sensitivity & PII Detection](./procedures/file/detect-sensitivity.md) (public | Unknown)
+- [Procedure: Generate Files from Templates](./procedures/file/generate-from-template.md) (public | Unknown)
+- [Procedure: IP/Patentable Asset Scan](./procedures/file/ip-scan.md) (public | Unknown)
+- [Procedure: Schema Inspection & Validation](./procedures/file/manage-schemas.md) (public | Unknown)
+- [Procedure: Codebase Structure Mapping](./procedures/file/map-codebase.md) (public | Unknown)
+- [Procedure: Dependency Mapping](./procedures/file/map-dependencies.md) (public | Unknown)
+- [Procedure: Physical File Organization & Curation](./procedures/file/organize-assets.md) (public | Unknown)
+- [Procedure: Knowledge Refinement & Sanitization](./procedures/file/refine-knowledge.md) (public | Unknown)
+- [Procedure: Search Pattern in Filesystem](./procedures/file/search-pattern.md) (public | Unknown)
+- [Procedure: File Diff Visualization](./procedures/file/visualize-diffs.md) (public | Unknown)
+
+## 📁 procedures/media
+- [Procedure: Visual Asset Generation & Rendering](./procedures/media/generate-visuals.md) (public | Unknown)
+- [Procedure: Visual Imagination & Assertion](./procedures/media/visual-imagination-and-testing.md) (public | Unknown)
+
+## 📁 procedures/network
+- [Procedure: Moltbook API Integration](./procedures/network/moltbook-sync.md) (public | Unknown)
+
+## 📁 procedures/service
+- [Procedure: Financial Market Analysis (JPX, Trust Funds)](./procedures/service/analyze-markets.md) (public | Unknown)
+- [Procedure: Lifestyle & IoT Automation (Rakuten, SwitchBot)](./procedures/service/lifestyle-automation.md) (public | Unknown)
+- [Procedure: External SaaS Integration (Slack, Jira, Box)](./procedures/service/sync-saas-data.md) (public | Unknown)
+
+## 📁 procedures/system
+- [Procedure: OS Peripheral Control](./procedures/system/control-peripherals.md) (public | Unknown)
+
+## 📁 procedures/utility
+- [Procedure: Data Anonymization & Log Analysis](./procedures/utility/anonymize-and-analyze-logs.md) (public | Unknown)
+- [Procedure: Token Economics & Completeness Scoring](./procedures/utility/audit-efficiency.md) (public | Unknown)
+- [Procedure: Release Documentation & Guided Wizards](./procedures/utility/generate-release-docs.md) (public | Unknown)
+- [Procedure: Ecosystem Health & Resilience Management](./procedures/utility/manage-ecosystem-resilience.md) (public | Unknown)
+- [Procedure: Infrastructure Architecture Mapping](./procedures/utility/map-infrastructure.md) (public | Unknown)
+- [Procedure: Cloud Resource & Cost Optimization](./procedures/utility/optimize-cloud-resources.md) (public | Unknown)
+
+## 📁 procedures/ux
+- [Procedure: UI/UX Audit & Persona Generation](./procedures/ux/audit-and-personas.md) (public | Unknown)
+- [Procedure: Voice Interface & Localization](./procedures/ux/voice-and-localization.md) (public | Unknown)
+
+## 📁 procedures/wisdom
+- [Procedure: Identity Evolution & Wisdom Distillation](./procedures/wisdom/evolve-identity.md) (public | Unknown)
+
 ## 📁 public/ai-engineering
 - [AIエンジニアリング・ベストプラクティス](./public/ai-engineering/best_practices.md) (public | Ecosystem Architect)
 - [AIシステム・レビューチェックリスト](./public/ai-engineering/review_checklist.md) (public | Ecosystem Architect)
@@ -293,6 +372,7 @@
 - [Security By Design Standard](./public/security/security-by-design.md) (public | Ecosystem Architect)
 - [Security: Skill Supply Chain Defense (Dependency Integrity)](./public/security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./public/security/supply-chain-governance.md) (public | Ecosystem Architect)
+- [Protocol: Temporal Intent-Based Authentication (TIBA)](./public/security/temporal-intent-auth.md) (public | Unknown)
 
 ## 📁 public/security/advanced
 - [Diff-Based Security Scanning Strategy](./public/security/advanced/diff_based_scanning.md) (public | Ecosystem Architect)
@@ -416,6 +496,7 @@
 - [Security By Design Standard](./security/security-by-design.md) (public | Ecosystem Architect)
 - [Security: Skill Supply Chain Defense (Dependency Integrity)](./security/skill-supply-chain-defense.md) (public | Unknown)
 - [Software Supply Chain Governance & SBOM Standards](./security/supply-chain-governance.md) (public | Ecosystem Architect)
+- [Protocol: Temporal Intent-Based Authentication (TIBA)](./security/temporal-intent-auth.md) (public | Unknown)
 
 ## 📁 security/advanced
 - [Diff-Based Security Scanning Strategy](./security/advanced/diff_based_scanning.md) (public | Ecosystem Architect)

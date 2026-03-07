@@ -1,5 +1,5 @@
 /**
- * TypeScript version of shared input validators for Gemini skills.
+ * TypeScript version of shared input validators for Kyberion components.
  * [SECURE-IO COMPLIANT VERSION]
  */
 
@@ -64,6 +64,10 @@ export function readJsonFile<T = unknown>(filePath: string, label = 'JSON file')
 
 /**
  * Validate that a file is 'fresh' (modified within the last X milliseconds).
+ * 
+ * @param filePath  - Path to the file
+ * @param threshold - Maximum allowed age in milliseconds (default: 1 hour)
+ * @throws {Error} If the file is older than the threshold
  */
 export function validateFileFreshness(filePath: string, threshold = 60 * 60 * 1000): void {
   const resolved = validateFilePath(filePath);

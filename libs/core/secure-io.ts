@@ -7,7 +7,7 @@ import * as pathResolver from './path-resolver.js';
 import { validateWritePermission, validateReadPermission } from './tier-guard.js';
 
 /**
- * Secure I/O utilities for Gemini Skills (TypeScript Edition)
+ * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
  * Provides file size validation, safe command execution, and resource guards.
  */
 

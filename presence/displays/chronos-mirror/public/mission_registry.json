@@ -1,18 +1,41 @@
 {
-  "last_updated": "2026-03-06T04:59:19.917Z",
+  "last_updated": "2026-03-06T21:55:45.731Z",
   "active_mission_id": null,
   "missions": [
     {
-      "id": "MSN-ISSUE-42",
+      "id": "MSN-INTENT-GATEWAY-ROUTING",
       "status": "planned",
       "priority": 5,
       "persona": "Ecosystem Architect"
     },
     {
-      "id": "MSN-TEST-999",
-      "status": "paused",
+      "id": "MSN-MOLTBOOK-ADAPT",
+      "status": "planned",
       "priority": 5,
-      "persona": "Ruthless Auditor"
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-MOLTBOOK-INDEPENDENCE",
+      "status": "planned",
+      "priority": 5,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-MOLTBOOK-YOLO",
+      "status": "planned",
+      "priority": 5,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-STALE-STATE-GUARD",
+      "status": "planned",
+      "priority": 5,
+      "persona": "Ecosystem Architect"
+    },
+    {
+      "id": "MSN-TEST-STALE",
+      "status": "Active",
+      "priority": 1
     }
   ]
 }
