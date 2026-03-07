@@ -2,7 +2,7 @@
   "name": "dependency-grapher",
   "version": "0.1.0",
   "description": "Generate dependency graphs (Mermaid/DOT) from project files.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/engineering/dependency-grapher/src/index.js",
   "types": "dist/index.d.ts",
   "author": "Gemini Agent",
   "license": "MIT",

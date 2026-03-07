@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/unit-economics-optimizer/src/index.js",
   "description": "Analyzes LTV, CAC, and churn to ensure product profitability. Proposes pricing and customer retention strategies to maximize unit margins.",
   "scripts": {
     "build": "tsc",

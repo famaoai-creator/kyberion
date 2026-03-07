@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Evaluates technical and textual quality based on IPA benchmarks and readability standards.",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/audit/quality-scorer/src/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",

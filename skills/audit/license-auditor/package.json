@@ -1,7 +1,7 @@
 {
   "name": "license-auditor",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/audit/license-auditor/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

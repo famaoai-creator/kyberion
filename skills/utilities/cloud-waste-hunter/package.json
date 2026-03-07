@@ -1,7 +1,7 @@
 {
   "name": "cloud-waste-hunter",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/cloud-waste-hunter/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

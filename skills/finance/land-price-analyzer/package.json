@@ -1,7 +1,7 @@
 {
   "name": "land-price-analyzer",
   "version": "1.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/finance/land-price-analyzer/src/index.js",
   "scripts": {
     "build": "tsc"
   },

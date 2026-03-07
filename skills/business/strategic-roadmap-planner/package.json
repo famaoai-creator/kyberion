@@ -4,7 +4,7 @@
   "private": true,
   "author": "Gemini Agent",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/business/strategic-roadmap-planner/src/index.js",
   "description": "Analyzes code complexity, technical debt, and industry trends to propose a 3-month strategic roadmap. Aligns engineering effort with business ROI.",
   "scripts": {
     "build": "tsc",

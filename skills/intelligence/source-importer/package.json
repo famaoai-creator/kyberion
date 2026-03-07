@@ -1,7 +1,7 @@
 {
   "name": "source-importer",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/intelligence/source-importer/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

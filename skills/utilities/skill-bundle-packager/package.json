@@ -1,7 +1,7 @@
 {
   "name": "skill-bundle-packager",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/skill-bundle-packager/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

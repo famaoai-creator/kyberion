@@ -1,7 +1,7 @@
 {
   "name": "post-quantum-shield",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/audit/post-quantum-shield/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

@@ -1,7 +1,7 @@
 {
   "name": "log-to-requirement-bridge",
   "version": "0.1.0",
-  "main": "dist/index.js",
+  "main": "../../../dist/skills/utilities/log-to-requirement-bridge/src/index.js",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"
