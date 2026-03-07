@@ -1,42 +1,41 @@
 /**
  * scripts/generate_skill_index.ts
- * Advanced Skill Discovery & Indexer.
- * Automatically initializes new skill directories with standard metadata.
+ * Advanced Capability Discovery & Indexer.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import { logger, safeReadFile, safeWriteFile } from '@agent/core';
-import * as pathResolver from '@agent/core/path-resolver';
+import { logger, safeReadFile, safeWriteFile, pathResolver } from '@agent/core';
 
 const indexFile = pathResolver.knowledge('orchestration/global_skill_index.json');
 
-interface SkillEntry {
+interface CapabilityEntry {
   n: string; path: string; d: string; s: string; r: string; m: string; t: string[]; u: string; p?: string[];
 }
 
-function initializeSkill(skillPath: string, name: string, category: string) {
-  const skillMdPath = path.join(skillPath, 'SKILL.md');
-  const pkgPath = path.join(skillPath, 'package.json');
+function initializeCapability(capabilityPath: string, name: string, category: string) {
+  const skillMdPath = path.join(capabilityPath, 'SKILL.md');
+  const pkgPath = path.join(capabilityPath, 'package.json');
 
   if (!fs.existsSync(skillMdPath)) {
-    const mdContent = `---\nname: ${name}\ndescription: New autonomous skill discovery.\nstatus: planned\ncategory: ${category}\nlast_updated: '${new Date().toISOString().split('T')[0]}'\n---\n\n# ${name}\n\nDescription pending initialization.\n`;
-    fs.writeFileSync(skillMdPath, mdContent);
+    const mdContent = `---\nname: ${name}\ndescription: New autonomous capability discovery.\nstatus: planned\ncategory: ${category}\nlast_updated: '${new Date().toISOString().split('T')[0]}'\n---\n\n# ${name}\n\nDescription pending initialization.\n`;
+    safeWriteFile(skillMdPath, mdContent);
     logger.info(`✨ Auto-Discovery: Initialized SKILL.md for ${name}`);
   }
 
   if (!fs.existsSync(pkgPath)) {
     const pkgContent = {
-      name: `@agent/skill-${name}`,
+      name: `@agent/capability-${name}`,
       version: '1.0.0',
       private: true,
-      description: `Gemini Skill: ${name}`,
+      description: `Kyberion Capability: ${name}`,
       main: 'dist/index.js',
       types: 'dist/index.d.ts',
       dependencies: { "@agent/core": "workspace:*" }
     };
-    fs.writeFileSync(pkgPath, JSON.stringify(pkgContent, null, 2));
+    safeWriteFile(pkgPath, JSON.stringify(pkgContent, null, 2));
     logger.info(`✨ Auto-Discovery: Initialized package.json for ${name}`);
   }
 }
@@ -48,7 +47,7 @@ async function main() {
       try { existingIndex = JSON.parse(safeReadFile(indexFile, { encoding: 'utf8' }) as string); } catch (_) {}
     }
 
-    const skillsMap = new Map<string, SkillEntry>(existingIndex.s.map((s: any) => [s.path, s]));
+    const skillsMap = new Map<string, CapabilityEntry>(existingIndex.s.map((s: any) => [s.path, s]));
     const foundPaths = new Set<string>();
     const skillsRootDir = path.join(process.cwd(), 'skills');
     
@@ -64,9 +63,7 @@ async function main() {
       for (const dir of skillDirs) {
         const relPath = path.join('skills', cat, dir);
         const fullDir = path.join(process.cwd(), relPath);
-        
-        // AUTO-DISCOVERY & INITIALIZATION
-        initializeSkill(fullDir, dir, cat);
+        initializeCapability(fullDir, dir, cat);
 
         const skillMdPath = path.join(fullDir, 'SKILL.md');
         if (fs.existsSync(skillMdPath)) {
@@ -83,7 +80,10 @@ async function main() {
             let mainScript = '';
             const pkgPath = path.join(fullDir, 'package.json');
             if (fs.existsSync(pkgPath)) {
-              try { mainScript = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).main || ''; } catch (_) {}
+              try { 
+                const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+                mainScript = pkg.main || ''; 
+              } catch (_) {}
             }
 
             let tags: string[] = [];
@@ -110,8 +110,8 @@ async function main() {
     for (const pathKey of skillsMap.keys()) { if (!foundPaths.has(pathKey)) skillsMap.delete(pathKey); }
 
     const skills = Array.from(skillsMap.values());
-    safeWriteFile(indexFile, JSON.stringify({ v: '1.4.0', t: skills.length, u: new Date().toISOString(), s: skills }, null, 2));
-    logger.success(`✅ Global Skill Index: ${skills.length} skills (Updated: ${updated})`);
+    safeWriteFile(indexFile, JSON.stringify({ v: '2.0.0', t: skills.length, u: new Date().toISOString(), s: skills }, null, 2));
+    logger.success(`✅ Global Capability Index: ${skills.length} capabilities (Updated: ${updated})`);
   } catch (err: any) {
     logger.error(`Index Generation Failed: ${err.message}`);
   }
