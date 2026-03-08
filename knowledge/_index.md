@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-08T07:37:12.464Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-08T08:38:25.224Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -467,6 +467,9 @@
 ## 📁 roles/marketing_growth
 - [Role Procedure: Growth Evangelist (Marketing Growth)](./roles/marketing_growth/PROCEDURE.md) (public | Unknown)
 - [Marketing & Growth (マーケティング & 成長戦略) ミッション声明](./roles/marketing_growth/mission.md) (public | Ecosystem Architect)
+
+## 📁 roles/mission_controller
+- [Role Procedure: Mission Controller (The Gatekeeper)](./roles/mission_controller/PROCEDURE.md) (public | Unknown)
 
 ## 📁 roles/performance_engineer
 - [Role Procedure: Efficiency Optimizer (Performance Engineer)](./roles/performance_engineer/PROCEDURE.md) (public | Unknown)

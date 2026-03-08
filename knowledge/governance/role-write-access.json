@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "default_allow": ["active/missions/${MISSION_ID}/", "scratch/", "work/metrics/"],
+  "roles": {
+    "ecosystem_architect": {
+      "allow": ["knowledge/", "libs/core/", "scripts/"]
+    },
+    "software_developer": {
+      "allow": ["active/projects/", "tests/"]
+    },
+    "ruthless_auditor": {
+      "allow": ["active/audit/"]
+    },
+    "cyber_security": {
+      "allow": ["active/audit/security/", "knowledge/security/"]
+    },
+    "mission_controller": {
+      "allow": ["active/missions/", "registry.json"]
+    },
+    "strategic_sales": {
+      "allow": ["active/projects/proposals/"]
+    },
+    "knowledge_steward": {
+      "allow": ["knowledge/"]
+    },
+    "ceo": {
+      "allow": ["knowledge/ceo/", "knowledge/personal/my-identity.json"]
+    },
+    "sovereign_concierge": {
+      "allow": ["knowledge/personal/", "active/projects/onboarding/"]
+    }
+  }
+}
