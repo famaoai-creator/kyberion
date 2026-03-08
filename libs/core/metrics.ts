@@ -1,12 +1,19 @@
-import * as fs from 'node:fs';
+import { 
+  safeReadFile, 
+  safeAppendFileSync, 
+  safeMkdir, 
+  safeExistsSync 
+} from './secure-io.js';
+import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
 
 /**
  * Lightweight metrics collection for Gemini Skills.
+ * Standardized with Secure-IO.
  */
 
-const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
+const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');
 const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
@@ -190,9 +197,10 @@ export class MetricsCollector {
 
   loadHistory() {
     const filePath = path.join(this._metricsDir, this._metricsFile);
-    if (!fs.existsSync(filePath)) return [];
+    if (!safeExistsSync(filePath)) return [];
     try {
-      const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(Boolean);
+      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const lines = content.trim().split('\n').filter(Boolean);
       return lines.map((line) => JSON.parse(line));
     } catch (_) {
       return [];
@@ -202,9 +210,9 @@ export class MetricsCollector {
   reportFromHistory() {
     const entries = this.loadHistory();
     const bySkill: Record<string, any> = {};
-    const sloPath = path.resolve(process.cwd(), 'knowledge/orchestration/slo-targets.json');
-    const sloTargets = fs.existsSync(sloPath)
-      ? JSON.parse(fs.readFileSync(sloPath, 'utf8'))
+    const sloPath = pathResolver.resolve('knowledge/orchestration/slo-targets.json');
+    const sloTargets = safeExistsSync(sloPath)
+      ? JSON.parse(safeReadFile(sloPath, { encoding: 'utf8' }) as string)
       : { default: { latency_ms: 5000, success_rate: 99 } };
 
     for (const entry of entries) {
@@ -315,11 +323,11 @@ export class MetricsCollector {
 
   private _appendToFile(entry: any) {
     try {
-      if (!fs.existsSync(this._metricsDir)) {
-        fs.mkdirSync(this._metricsDir, { recursive: true });
+      if (!safeExistsSync(this._metricsDir)) {
+        safeMkdir(this._metricsDir, { recursive: true });
       }
       const filePath = path.join(this._metricsDir, this._metricsFile);
-      fs.appendFileSync(filePath, JSON.stringify(entry) + '\n');
+      safeAppendFileSync(filePath, JSON.stringify(entry) + '\n');
     } catch (_) {}
   }
 }

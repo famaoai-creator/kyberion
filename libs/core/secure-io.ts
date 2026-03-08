@@ -142,6 +142,15 @@ export function safeMkdir(dirPath: string, options: fs.MakeDirectoryOptions = { 
 }
 
 /**
+ * Check if a file or directory exists safely.
+ */
+export function safeExistsSync(filePath: string): boolean {
+  if (!filePath) return false;
+  const resolved = pathResolver.resolve(filePath);
+  return fs.existsSync(resolved);
+}
+
+/**
  * Execute a command safely.
  */
 export function safeExec(command: string, args: string[] = [], options: any = {}): string {

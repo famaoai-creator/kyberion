@@ -88,7 +88,9 @@ export async function extract(filePath: string, mode: ExtractionMode = 'all'): P
 async function processPDF(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   // Mode: Content/Metadata still uses pdf-parse for quick text
   if (mode === 'content' || mode === 'metadata' || mode === 'all') {
-    const data = await pdf_parse(buffer);
+    // pdf-parse can be tricky with ESM/CJS interop. Using any cast to ensure callability.
+    const pdf = pdf_parse as any;
+    const data = await (typeof pdf === 'function' ? pdf(buffer) : pdf.default(buffer));
     if (mode === 'content' || mode === 'all') result.layers.content = data.text;
     if (mode === 'metadata' || mode === 'all') result.layers.metadata = data.info;
   }

@@ -17,12 +17,18 @@ export * as secureIo from './secure-io.js';
 export { 
   safeReadFile, 
   safeWriteFile, 
-  safeAppendFile, 
-  safeUnlink, 
+  safeAppendFileSync, 
+  safeUnlinkSync, 
   safeMkdir, 
+  safeExistsSync, 
   safeExec
 } from './secure-io.js';
 
+// Backward compatibility aliases
+export { 
+  safeAppendFileSync as safeAppendFile,
+  safeUnlinkSync as safeUnlink
+} from './secure-io.js';
 import * as _secureIo from './secure-io.js';
 export const safeReaddir = (_secureIo as any).safeReaddir;
 export const safeStat = (_secureIo as any).safeStat;
