@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QA Contract Schema",
+  "description": "Configuration for automated testing, visual checks, and system health.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "severity": { "enum": ["error", "warning"] }
+        }
+      }
+    },
+    "visual_monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "capture_on_failure": { "type": "boolean" }
+      }
+    }
+  },
+  "required": ["version", "rules"]
+}

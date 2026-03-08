@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "CAPABILITY_VALIDATION",
+      "description": "Ensure all skills have valid metadata.",
+      "severity": "error"
+    },
+    {
+      "id": "UNIT_TESTS",
+      "description": "Ensure all unit tests pass.",
+      "severity": "error"
+    },
+    {
+      "id": "HEALTH_CHECK",
+      "description": "Ensure all skill entry points resolve.",
+      "severity": "warning"
+    }
+  ],
+  "visual_monitoring": {
+    "enabled": true,
+    "capture_on_failure": true
+  }
+}

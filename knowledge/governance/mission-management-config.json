@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "directories": {
+    "active": "active/missions",
+    "archive": "active/archive/missions",
+    "exports": "hub/exports/missions"
+  },
+  "mep_version": "0.1.0",
+  "rehydrate_map": {
+    "{{HOME}}": "/Users",
+    "{{PROJECT_ROOT}}": "."
+  }
+}

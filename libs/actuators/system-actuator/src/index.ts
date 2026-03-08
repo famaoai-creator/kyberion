@@ -1,16 +1,26 @@
-import { logger, safeReadFile, safeExec, safeWriteFile } from '@agent/core';
+import { logger, safeReadFile, safeExec, safeWriteFile, safeMkdir } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as visionJudge from '@agent/shared-vision';
+
+// Dynamic import for chalk (ESM module in CommonJS environment)
+let chalk: any;
+async function initChalk() {
+  if (!chalk) {
+    const m = await import('chalk');
+    chalk = m.default;
+  }
+}
 
 /**
- * System-Actuator v1.3.0 [PHYSICAL IO & GOVERNANCE ENABLED]
- * Unified interface for OS-level interactions and system-wide validation.
+ * System-Actuator v1.4.0 [QA & SIGHT INTEGRATED]
+ * Unified interface for OS-level interactions, system-wide validation, and QA automation.
  * Strictly compliant with Layer 2 (Shield).
  */
 
 interface SystemAction {
-  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity' | 'judge' | 'ace_consensus' | 'alignment_mirror';
+  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity' | 'judge' | 'ace_consensus' | 'alignment_mirror' | 'gen_test_cases' | 'run_tests' | 'visual_auto_heal' | 'visual_capture' | 'verify_vision' | 'doctor';
   text?: string;
   key?: string; 
   x?: number;
@@ -24,6 +34,13 @@ interface SystemAction {
   mission_id?: string; // for 'judge' and 'ace_consensus'
   role?: string; // for 'judge' and 'ace_consensus'
   status?: string; // for 'ace_consensus'
+  requirement_path?: string; // for 'gen_test_cases'
+  command?: string; // for 'visual_auto_heal'
+  args?: string[]; // for 'visual_auto_heal'
+  target?: string; // for 'visual_capture'
+  context?: string; // for 'verify_vision'
+  tie_break_options?: any[]; // for 'verify_vision'
+  json_mode?: boolean; // for 'doctor'
 }
 
 async function handleAction(input: SystemAction) {
@@ -77,6 +94,24 @@ async function handleAction(input: SystemAction) {
 
     case 'alignment_mirror':
       return await performAlignmentMirror(input);
+
+    case 'gen_test_cases':
+      return await performGenTestCases(input);
+
+    case 'run_tests':
+      return await performRunTests(input);
+
+    case 'visual_auto_heal':
+      return await performVisualAutoHeal(input);
+
+    case 'visual_capture':
+      return await performVisualCapture(input);
+
+    case 'verify_vision':
+      return await performVerifyVision(input);
+
+    case 'doctor':
+      return await performDoctor(input);
 
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
@@ -196,7 +231,160 @@ async function performAlignmentMirror(_input: SystemAction) {
   return { status: 'success', distilled: results };
 }
 
-function safeMkdir(dirPath: string, options?: any) {
+async function performGenTestCases(input: SystemAction) {
+  const reqPath = input.requirement_path;
+  if (!reqPath || !fs.existsSync(path.resolve(process.cwd(), reqPath))) {
+    throw new Error(`No requirement file provided or file not found at ${reqPath}`);
+  }
+
+  const adf = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), reqPath), 'utf8'));
+  const reqs = adf.requirements || [];
+  const generated: any[] = [];
+
+  reqs.forEach((req: any) => {
+    const cases = [
+      { id: `TC-${req.id}-01`, title: 'Valid application', type: 'Normal' }
+    ];
+    
+    const rule = (req.rule || '').toLowerCase();
+    if (rule.includes('threshold') || rule.includes('$') || rule.includes('%')) {
+      cases.push({ id: `TC-${req.id}-02`, title: 'Exact threshold handling', type: 'Boundary' });
+    }
+    generated.push({ requirement: req.id, title: req.title, cases });
+  });
+
+  return { status: 'success', adf_title: adf.title, generated };
+}
+
+async function performRunTests(_input: SystemAction) {
+  const rootDir = process.cwd();
+  const dirs = fs.readdirSync(rootDir).filter((f) => {
+    try {
+      const fullPath = path.join(rootDir, f);
+      return (
+        fs.statSync(fullPath).isDirectory() &&
+        !f.startsWith('.') &&
+        !['node_modules', 'scripts', 'knowledge', 'dist'].includes(f)
+      );
+    } catch (_e) { return false; }
+  });
+
+  let total = 0;
+  let passed = 0;
+  let failedCount = 0;
+  const results = [];
+
+  for (const dir of dirs) {
+    const testDir = path.join(rootDir, dir, 'tests');
+    if (fs.existsSync(testDir)) {
+      const tests = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.cjs') || f.endsWith('.test.js') || f.endsWith('.test.ts'));
+      
+      for (const test of tests) {
+        total++;
+        const testPath = path.join(testDir, test);
+        try {
+          if (test.endsWith('.ts')) {
+            safeExec('npx', ['tsx', testPath], { cwd: rootDir });
+          } else {
+            safeExec('node', [testPath], { cwd: rootDir });
+          }
+          passed++;
+          results.push({ test: `${dir}/${test}`, status: 'PASSED' });
+        } catch (_e) {
+          failedCount++;
+          results.push({ test: `${dir}/${test}`, status: 'FAILED' });
+        }
+      }
+    }
+  }
+
+  return { status: failedCount === 0 ? 'success' : 'failed', total, passed, failed: failedCount, results };
+}
+
+async function performVisualAutoHeal(input: SystemAction) {
+  const { command, args = [] } = input;
+  if (!command) throw new Error('command is required for visual_auto_heal');
+
+  const visualSensorPath = path.resolve(process.cwd(), 'presence/sensors/visual-sensor.cjs');
+  const visualSensor = require(visualSensorPath);
+
+  try {
+    safeExec(command, args);
+    return { status: 'success', message: 'Command succeeded. No visual evidence needed.' };
+  } catch (err: any) {
+    logger.error(`❌ Command failed: ${err.message}. Capturing visual evidence...`);
+    try {
+      const artifact = await visualSensor.capture('screen');
+      return { status: 'failed', error: err.message, visual_evidence: artifact.path, advice: '[SIGHT_ADVICE]: Visual state captured. Ready for multimodal analysis.' };
+    } catch (vErr: any) {
+      return { status: 'failed', error: err.message, visual_error: vErr.message };
+    }
+  }
+}
+
+async function performVisualCapture(input: SystemAction) {
+  const target = input.target || 'screen';
+  const visualSensorPath = path.resolve(process.cwd(), 'presence/sensors/visual-sensor.cjs');
+  const visualSensor = require(visualSensorPath);
+
+  try {
+    const artifact = await visualSensor.capture(target);
+    return { status: 'success', artifact };
+  } catch (err: any) {
+    throw new Error(`Capture failed: ${err.message}`);
+  }
+}
+
+async function performVerifyVision(input: SystemAction) {
+  const { context, tie_break_options } = input;
+  if (!context || !tie_break_options) throw new Error('context and tie_break_options are required for verify_vision');
+
+  const decision = await visionJudge.consultVision(context, tie_break_options);
+  return { status: 'success', decision };
+}
+
+async function performDoctor(input: SystemAction) {
+  const isJsonMode = input.json_mode || false;
+  const checks: any[] = [];
+  const rootDir = process.cwd();
+
+  const runCheck = (name: string, cmd: string, args: string[], parser: (out: string) => any) => {
+    try {
+      const output = safeExec(cmd, args, { cwd: rootDir });
+      const result = parser(output);
+      checks.push({ name, ...result });
+    } catch (err: any) {
+      const combined = (err.stdout || '') + (err.stderr || '') + (err.message || '');
+      const result = parser(combined);
+      checks.push({ name, ...result });
+    }
+  };
+
+  runCheck('Capability Validation', 'node', ['dist/scripts/validate_skills.js'], (out) => {
+    const match = out.match(/Checked (\d+) skills/);
+    return { status: out.toLowerCase().includes('success') ? 'pass' : 'fail', detail: `${match ? match[1] : '?'} capabilities validated` };
+  });
+
+  runCheck('Health Check', 'node', ['dist/scripts/check_skills_health.js'], (out) => {
+    const match = out.match(/Total Issues: (\d+)/);
+    const issues = match ? parseInt(match[1]) : 0;
+    return { status: issues === 0 ? 'pass' : 'warn', detail: issues === 0 ? 'All mains resolve' : `${issues} issues found` };
+  });
+
+  const failed = checks.filter(c => c.status === 'fail');
+  const overall = failed.length > 0 ? 'FAILED' : 'PASSED';
+
+  if (isJsonMode) {
+    const reportPath = path.join(rootDir, 'presence/displays/chronos-mirror/public/doctor_report.json');
+    const report = { timestamp: new Date().toISOString(), overall, checks };
+    safeWriteFile(reportPath, JSON.stringify(report, null, 2));
+    return { status: 'success', report_path: reportPath, overall, checks };
+  }
+
+  return { status: 'success', overall, checks };
+}
+
+function safeMkdirLocal(dirPath: string, options?: any) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, options);
 }
 
