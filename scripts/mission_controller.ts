@@ -222,6 +222,63 @@ async function createCheckpoint(taskId: string, note: string) {
   }
 }
 
+async function resumeMission(id?: string) {
+  let targetId = id?.toUpperCase();
+  
+  if (!targetId) {
+    // Auto-detect active mission from registry or directory
+    const missions = fs.readdirSync(MISSIONS_DIR);
+    const active = missions.find(m => {
+      const state = loadState(m);
+      return state?.status === 'active';
+    });
+    if (!active) {
+      logger.warn('No active mission found to resume.');
+      return;
+    }
+    targetId = active;
+  }
+
+  const state = loadState(targetId);
+  if (!state) throw new Error(`Mission ${targetId} not found.`);
+
+  logger.info(`🔄 Resuming Mission: ${targetId}...`);
+  
+  // 1. Checkout to the correct branch
+  const currentBranch = getCurrentBranch();
+  if (currentBranch !== state.git.branch) {
+    safeExec('git', ['checkout', state.git.branch]);
+  }
+
+  // 2. Check Flight Recorder for unfinished business
+  const flightRecorderPath = path.join(MISSIONS_DIR, targetId, 'LATEST_TASK.json');
+  if (fs.existsSync(flightRecorderPath)) {
+    const task = JSON.parse(fs.readFileSync(flightRecorderPath, 'utf8'));
+    logger.warn(`📍 FLIGHT RECORDER DETECTED: Last intended task was: ${task.description}`);
+    logger.info('Please verify the physical state and continue from this point.');
+  }
+
+  state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Session re-established.' });
+  saveState(targetId, state);
+  logger.success(`✅ Mission ${targetId} is back in focus.`);
+}
+
+async function recordTask(missionId: string, description: string, details: any = {}) {
+  const upperId = missionId.toUpperCase();
+  const missionDir = path.join(MISSIONS_DIR, upperId);
+  if (!fs.existsSync(missionDir)) throw new Error(`Mission ${upperId} not found.`);
+
+  const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
+  const taskData = {
+    ts: new Date().toISOString(),
+    description,
+    details
+  };
+  
+  safeWriteFile(flightRecorderPath, JSON.stringify(taskData, null, 2));
+  logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
+}
+
 /**
  * 5. Main Entry
  */
@@ -234,12 +291,14 @@ async function main() {
     case 'start': await startMission(arg1, arg2); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
     case 'finish': await finishMission(arg1); break;
+    case 'resume': await resumeMission(arg1); break;
+    case 'record-task': await recordTask(arg1, arg2, JSON.parse(process.argv[5] || '{}')); break;
     case 'sync': 
         logger.info('Syncing mission registry...');
         // logic for registry sync
         break;
     default:
-      console.log('Usage: ts-node scripts/mission_controller.ts <start|checkpoint|finish|sync> <args>');
+      console.log('Usage: ts-node scripts/mission_controller.ts <start|checkpoint|finish|resume|record-task|sync> <args>');
   }
 }
 
