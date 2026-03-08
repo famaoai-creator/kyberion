@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MetadataSyncContract",
+  "type": "object",
+  "required": ["sync_rules"],
+  "properties": {
+    "sync_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "targets", "mapping"],
+        "properties": {
+          "source": { "type": "string" },
+          "targets": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mapping": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

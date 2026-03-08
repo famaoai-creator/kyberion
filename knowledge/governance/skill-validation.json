@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/skill-validation-contract.schema.json",
+  "rules": [
+    {
+      "name": "metadata-completeness",
+      "check": {
+        "required_fields": ["name", "description", "status"],
+        "valid_statuses": ["implemented", "planned", "conceptual", "unstable"],
+        "required_files": ["package.json", "SKILL.md"]
+      }
+    }
+  ]
+}

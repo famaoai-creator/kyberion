@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schemas/aggregation-job.schema.json",
+  "action": "aggregate",
+  "target_dir": "skills",
+  "output_file": "knowledge/orchestration/global_skill_index.json",
+  "options": {
+    "auto_init": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MissionTemplate",
+  "type": "object",
+  "required": ["templates"],
+  "properties": {
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "files"],
+        "properties": {
+          "name": { "type": "string" },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "content_template"],
+              "properties": {
+                "path": { "type": "string" },
+                "content_template": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

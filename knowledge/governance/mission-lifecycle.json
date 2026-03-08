@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/mission-lifecycle-policy.schema.json",
+  "policies": [
+    {
+      "name": "archive-completed",
+      "condition": {
+        "has_file": "ace-report.json"
+      },
+      "target_dir": "evidence/missions/{YYYY-MM}/",
+      "naming_pattern": "{mission_id}"
+    },
+    {
+      "name": "purge-orphaned",
+      "condition": {
+        "max_age_days": 7
+      },
+      "target_dir": "evidence/missions/orphaned/",
+      "naming_pattern": "{mission_id}"
+    }
+  ]
+}
