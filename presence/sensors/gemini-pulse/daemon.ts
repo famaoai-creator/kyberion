@@ -3,10 +3,16 @@
  * Monitors ecosystem health and emits heartbeats and GUSP-compliant stimuli.
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { logger, safeWriteFile, pathResolver } from '@agent/core';
+import { 
+  logger, 
+  safeWriteFile, 
+  pathResolver, 
+  safeExistsSync, 
+  safeMkdir, 
+  safeAppendFileSync 
+} from '@agent/core';
 
 const HEARTBEAT_INTERVAL_MS = 60000;
 const PULSE_PATH = pathResolver.resolve('presence/bridge/runtime/pulse.json');
@@ -29,7 +35,7 @@ async function pulseLoop() {
 
     try {
       const dir = path.dirname(PULSE_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
       safeWriteFile(PULSE_PATH, JSON.stringify(heartbeat, null, 2));
 
       // Example: If memory usage is high, emit a GUSP stimulus (Whisper)
@@ -53,7 +59,7 @@ async function pulseLoop() {
             evidence: [{ step: 'pulse_detection', ts: date.toISOString(), agent: 'gemini-pulse' }]
           }
         };
-        fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+        safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
         logger.warn(`🚨 High memory stimulus emitted: ${stimulus.id}`);
       }
 

@@ -4,9 +4,8 @@
  */
 
 import { App } from '@slack/bolt';
-import * as fs from 'node:fs';
 import * as crypto from 'node:crypto';
-import { logger, safeReadFile, pathResolver } from '@agent/core';
+import { logger, safeReadFile, pathResolver, safeExistsSync, safeAppendFileSync } from '@agent/core';
 
 const CREDENTIALS_PATH = pathResolver.rootResolve('knowledge/personal/connections/slack/slack-credentials.json');
 const STIMULI_PATH = pathResolver.rootResolve('presence/bridge/runtime/stimuli.jsonl');
@@ -17,7 +16,7 @@ interface SlackCredentials {
 }
 
 async function startSensor() {
-  if (!fs.existsSync(CREDENTIALS_PATH)) {
+  if (!safeExistsSync(CREDENTIALS_PATH)) {
     logger.error(`Slack credentials not found at ${CREDENTIALS_PATH}`);
     process.exit(1);
   }
@@ -67,7 +66,7 @@ async function startSensor() {
 
     logger.info(`📡 [Slack Sensor] GUSP Stimulus produced: ${stimulus.id} (${type})`);
     
-    fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+    safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
     
     try { 
       await app.client.chat.postMessage({ 

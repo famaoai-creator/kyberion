@@ -1,0 +1,15 @@
+{
+  "name": "@agent/shared-vision",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Domain-specific utilities for Visual context and Browser interaction.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "puppeteer": "^22.0.0"
+  }
+}

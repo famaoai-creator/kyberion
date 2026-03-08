@@ -17,7 +17,11 @@
     "sourceMap": true,
     "paths": {
       "@agent/core": ["libs/core/index.ts"],
-      "@agent/core/*": ["libs/core/*"]
+      "@agent/core/*": ["libs/core/*"],
+      "@agent/shared-media": ["libs/shared-media/src/index.ts"],
+      "@agent/shared-vision": ["libs/shared-vision/src/index.ts"],
+      "@agent/shared-network": ["libs/shared-network/src/index.ts"],
+      "@agent/shared-business": ["libs/shared-business/src/index.ts"]
     }
   },
   "include": ["skills/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts"],

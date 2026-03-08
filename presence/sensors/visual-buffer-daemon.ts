@@ -3,19 +3,35 @@
  * Maintains a rolling buffer of recent screen frames for temporal awareness.
  */
 
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, pathResolver, platform } from '../../libs/core/index.js';
+import { 
+  logger, 
+  pathResolver, 
+  platform, 
+  safeExec, 
+  safeWriteFile, 
+  safeReadFile, 
+  safeMkdir, 
+  safeExistsSync, 
+  safeReaddir, 
+  safeUnlink 
+} from '../../libs/core/index.js';
 
-const execAsync = promisify(exec);
-const ROOT_DIR = process.cwd();
+const ROOT_DIR = pathResolver.rootDir();
 const FRAMES_DIR = path.join(ROOT_DIR, 'active/shared/runtime/vision/frames');
 const STATE_FILE = path.join(ROOT_DIR, 'active/shared/runtime/vision/buffer-state.json');
 
 const FRAME_INTERVAL_MS = Number(process.env.VISION_INTERVAL) || 1000;
 const MAX_FRAMES = Number(process.env.VISION_MAX_FRAMES) || 10;
+
+/**
+ * Ensures the frames directory exists using secure-io.
+ */
+function ensureFramesDir() {
+  if (!safeExistsSync(FRAMES_DIR)) {
+    safeMkdir(FRAMES_DIR, { recursive: true });
+  }
+}
 
 interface FrameMetadata {
   id: string;
@@ -49,9 +65,9 @@ async function maintenance(frames: FrameMetadata[]) {
     const toDelete = frames.splice(0, frames.length - MAX_FRAMES);
     for (const frame of toDelete) {
       const filePath = path.join(FRAMES_DIR, frame.file);
-      if (fs.existsSync(filePath)) {
+      if (safeExistsSync(filePath)) {
         try {
-          fs.unlinkSync(filePath);
+          safeUnlink(filePath);
         } catch (_) {}
       }
     }
@@ -62,21 +78,20 @@ async function maintenance(frames: FrameMetadata[]) {
     frames
   };
   
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  safeWriteFile(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
 async function mainLoop() {
   logger.info(`🛡️ Visual Buffer Daemon active. Interval: ${FRAME_INTERVAL_MS}ms, Max Frames: ${MAX_FRAMES}`);
   
-  if (!fs.existsSync(FRAMES_DIR)) {
-    fs.mkdirSync(FRAMES_DIR, { recursive: true });
-  }
+  ensureFramesDir();
 
   // Load existing state if any
   let frames: FrameMetadata[] = [];
-  if (fs.existsSync(STATE_FILE)) {
+  if (safeExistsSync(STATE_FILE)) {
     try {
-      frames = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')).frames;
+      const content = safeReadFile(STATE_FILE, { encoding: 'utf8' }) as string;
+      frames = JSON.parse(content).frames;
     } catch (_) { frames = []; }
   }
 

@@ -9,11 +9,19 @@
  * 3. Unified status reporting for Nexus and Chronos.
  */
 
-import { logger, safeReadFile, safeWriteFile, pathResolver, safeExec } from '@agent/core';
+import { 
+  logger, 
+  safeReadFile, 
+  safeWriteFile, 
+  pathResolver, 
+  safeExec,
+  safeExistsSync,
+  safeStat,
+  safeUnlinkSync
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { sendNerveMessage, NerveMessage } from '../../../core/nerve-bridge.js';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import * as os from 'node:os';
 
 const ROOT_DIR = pathResolver.rootDir();
@@ -53,13 +61,13 @@ async function handleAction(input: DaemonAction) {
       return new Promise((resolve) => {
         const timeout = setTimeout(() => resolve({ status: 'timeout' }), 30000);
         const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-        let lastSize = fs.existsSync(STIMULI_PATH) ? fs.statSync(STIMULI_PATH).size : 0;
+        let lastSize = safeExistsSync(STIMULI_PATH) ? safeStat(STIMULI_PATH).size : 0;
 
         const interval = setInterval(() => {
-          if (!fs.existsSync(STIMULI_PATH)) return;
-          const stats = fs.statSync(STIMULI_PATH);
+          if (!safeExistsSync(STIMULI_PATH)) return;
+          const stats = safeStat(STIMULI_PATH);
           if (stats.size > lastSize) {
-            const content = fs.readFileSync(STIMULI_PATH, 'utf8').substring(lastSize);
+            const content = (safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string).substring(lastSize);
             const lines = content.trim().split('\n');
             for (const line of lines) {
               try {
@@ -126,7 +134,7 @@ async function handleAction(input: DaemonAction) {
       const content = safeReadFile(plistPath, { encoding: 'utf8' }) as string;
       if (content.includes('<key>KeepAlive</key>\n    <false/>')) {
         logger.info(`🧹 [DAEMON] Cleaning up ephemeral plist: ${plistPath}`);
-        fs.unlinkSync(plistPath);
+        safeUnlinkSync(plistPath);
       }
       return { status: 'stopped' };
 
@@ -139,9 +147,9 @@ async function handleAction(input: DaemonAction) {
       }
 
     case 'unregister':
-      if (fs.existsSync(plistPath)) {
+      if (safeExistsSync(plistPath)) {
         await safeExec('launchctl', ['unload', '-w', plistPath]);
-        fs.unlinkSync(plistPath);
+        safeUnlinkSync(plistPath);
       }
       return { status: 'unregistered' };
 

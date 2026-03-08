@@ -3,10 +3,17 @@
  * Monitores system logs and converts errors into sensory stimuli.
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { logger, pathResolver } from '@agent/core';
+import { 
+  logger, 
+  pathResolver, 
+  safeExistsSync, 
+  safeReaddir, 
+  safeStat, 
+  safeReadFile, 
+  safeAppendFileSync 
+} from '@agent/core';
 
 const LOGS_DIR = pathResolver.active('shared/logs');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
@@ -25,16 +32,16 @@ let lastAlertTs = 0;
 const MIN_ALERT_INTERVAL_MS = 2000; // Rate limit alerts
 
 async function scanLogs() {
-  if (!fs.existsSync(LOGS_DIR)) return;
-  const files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.log') && !EXCLUDED_LOGS.includes(f));
+  if (!safeExistsSync(LOGS_DIR)) return;
+  const files = safeReaddir(LOGS_DIR).filter(f => f.endsWith('.log') && !EXCLUDED_LOGS.includes(f));
 
   for (const file of files) {
     const filePath = path.join(LOGS_DIR, file);
-    const stats = fs.statSync(filePath);
+    const stats = safeStat(filePath);
     const lastPos = logOffsets.get(file) || 0;
 
     if (stats.size > lastPos) {
-      const content = fs.readFileSync(filePath, 'utf8').substring(lastPos);
+      const content = (safeReadFile(filePath, { encoding: 'utf8' }) as string).substring(lastPos);
       const lines = content.split('\n');
       
       for (const line of lines) {
@@ -78,7 +85,7 @@ function emitAlert(sourceFile: string, text: string) {
     }
   };
 
-  fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+  safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
   logger.error(`🚨 System Alert Emitted from ${sourceFile}: ${stimulus.id}`);
 }
 

@@ -1,10 +1,9 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import pdf_parse from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
-import { safeWriteFile } from '@agent/core';
+import { safeWriteFile, safeReadFile } from '@agent/core';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
 
@@ -55,7 +54,7 @@ export interface LayoutElement {
  */
 export async function extract(filePath: string, mode: ExtractionMode = 'all'): Promise<ExtractionResult> {
   const ext = path.extname(filePath).toLowerCase();
-  const buffer = fs.readFileSync(filePath);
+  const buffer = safeReadFile(filePath) as Buffer;
   const result: ExtractionResult = {
     file: path.basename(filePath),
     layers: {}

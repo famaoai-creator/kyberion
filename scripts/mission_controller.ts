@@ -11,8 +11,17 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
-import { logger, pathResolver, safeWriteFile, safeReadFile, safeExec } from '@agent/core';
+import { 
+  logger, 
+  pathResolver, 
+  safeWriteFile, 
+  safeReadFile, 
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeUnlinkSync
+} from '@agent/core';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
 const ROOT_DIR = pathResolver.rootDir();
@@ -42,19 +51,19 @@ function checkPrerequisites() {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
   
   const identityPath = path.join(ROOT_DIR, 'knowledge/personal/my-identity.json');
-  if (!fs.existsSync(identityPath)) {
+  if (!safeExistsSync(identityPath)) {
     throw new Error('CRITICAL: Sovereign Identity missing. Run onboarding first.');
   }
 
   const tiers = ['knowledge/personal', 'knowledge/confidential', 'knowledge/public'];
   tiers.forEach(tier => {
-    if (!fs.existsSync(path.join(ROOT_DIR, tier))) {
+    if (!safeExistsSync(path.join(ROOT_DIR, tier))) {
       logger.warn(`Creating missing tier: ${tier}`);
-      fs.mkdirSync(path.join(ROOT_DIR, tier), { recursive: true });
+      safeMkdir(path.join(ROOT_DIR, tier), { recursive: true });
     }
   });
 
-  if (!fs.existsSync(path.join(ROOT_DIR, 'node_modules'))) {
+  if (!safeExistsSync(path.join(ROOT_DIR, 'node_modules'))) {
     throw new Error("Missing dependencies. Run 'pnpm install' first.");
   }
   
@@ -77,7 +86,7 @@ function getCurrentBranch() {
  */
 function loadState(id: string): MissionState | null {
   const statePath = path.join(MISSIONS_DIR, id, 'mission-state.json');
-  if (!fs.existsSync(statePath)) return null;
+  if (!safeExistsSync(statePath)) return null;
   try {
     const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
     return JSON.parse(content);
@@ -86,7 +95,7 @@ function loadState(id: string): MissionState | null {
 
 function saveState(id: string, state: MissionState) {
   const missionDir = path.join(MISSIONS_DIR, id);
-  if (!fs.existsSync(missionDir)) fs.mkdirSync(missionDir, { recursive: true });
+  if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
   safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify(state, null, 2));
 }
 
@@ -152,9 +161,9 @@ function syncRoleProcedure(missionId: string, persona: string) {
   const targetDir = path.join(MISSIONS_DIR, missionId);
   const targetPath = path.join(targetDir, 'ROLE_PROCEDURE.md');
 
-  if (fs.existsSync(sourcePath)) {
-    const procedure = fs.readFileSync(sourcePath, 'utf8');
-    fs.writeFileSync(targetPath, procedure, 'utf8');
+  if (safeExistsSync(sourcePath)) {
+    const procedure = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+    safeWriteFile(targetPath, procedure);
     logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
   } else {
     logger.warn(`⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`);
@@ -182,17 +191,16 @@ async function finishMission(id: string) {
 
   // 3. Purge Scratch
   const scratchDir = path.join(ROOT_DIR, 'scratch');
-  if (fs.existsSync(scratchDir)) {
+  if (safeExistsSync(scratchDir)) {
     logger.info('🧹 Purging scratch files...');
-    // In real scenario: fs.readdirSync(scratchDir).forEach(file => fs.unlinkSync(...))
   }
 
   // 4. Archive
-  if (!fs.existsSync(ARCHIVE_DIR)) fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
+  if (!safeExistsSync(ARCHIVE_DIR)) safeMkdir(ARCHIVE_DIR, { recursive: true });
   const missionDir = path.join(MISSIONS_DIR, upperId);
   const archivePath = path.join(ARCHIVE_DIR, upperId);
   
-  if (fs.existsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
+  if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
   safeExec('mv', [missionDir, archivePath]);
   
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
@@ -227,7 +235,8 @@ async function resumeMission(id?: string) {
   
   if (!targetId) {
     // Auto-detect active mission from registry or directory
-    const missions = fs.readdirSync(MISSIONS_DIR);
+    if (!safeExistsSync(MISSIONS_DIR)) return;
+    const missions = safeReaddir(MISSIONS_DIR);
     const active = missions.find(m => {
       const state = loadState(m);
       return state?.status === 'active';
@@ -252,8 +261,9 @@ async function resumeMission(id?: string) {
 
   // 2. Check Flight Recorder for unfinished business
   const flightRecorderPath = path.join(MISSIONS_DIR, targetId, 'LATEST_TASK.json');
-  if (fs.existsSync(flightRecorderPath)) {
-    const task = JSON.parse(fs.readFileSync(flightRecorderPath, 'utf8'));
+  if (safeExistsSync(flightRecorderPath)) {
+    const content = safeReadFile(flightRecorderPath, { encoding: 'utf8' }) as string;
+    const task = JSON.parse(content);
     logger.warn(`📍 FLIGHT RECORDER DETECTED: Last intended task was: ${task.description}`);
     logger.info('Please verify the physical state and continue from this point.');
   }
@@ -266,7 +276,7 @@ async function resumeMission(id?: string) {
 async function recordTask(missionId: string, description: string, details: any = {}) {
   const upperId = missionId.toUpperCase();
   const missionDir = path.join(MISSIONS_DIR, upperId);
-  if (!fs.existsSync(missionDir)) throw new Error(`Mission ${upperId} not found.`);
+  if (!safeExistsSync(missionDir)) throw new Error(`Mission ${upperId} not found.`);
 
   const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
   const taskData = {

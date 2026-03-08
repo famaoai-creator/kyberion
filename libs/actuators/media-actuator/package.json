@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
+    "@agent/shared-media": "workspace:*",
     "exceljs": "^4.4.0",
     "jsdom": "^24.0.0",
     "pptxgenjs": "^3.12.0",
