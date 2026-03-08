@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-08T08:38:25.224Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-08T16:17:31.808Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -447,6 +447,9 @@
 ## 📁 roles/incident_commander
 - [Role Procedure: Resilient Commander (Incident Commander)](./roles/incident_commander/PROCEDURE.md) (public | Unknown)
 - [Incident Commander (インシデント・コマンダー) ミッション声明](./roles/incident_commander/mission.md) (public | Ecosystem Architect)
+
+## 📁 roles/infrastructure_sentinel
+- [Role: Infrastructure Sentinel](./roles/infrastructure_sentinel/PROCEDURE.md) (public | Unknown)
 
 ## 📁 roles/integration_steward
 - [Role Procedure: Integration Steward](./roles/integration_steward/PROCEDURE.md) (public | Unknown)
