@@ -1,0 +1,28 @@
+{
+  "name": "Gemini Skills Ecosystem Blueprint",
+  "version": "1.0.0",
+  "infrastructure": {
+    "directories": [
+      "knowledge/personal",
+      "knowledge/confidential",
+      "active/shared/logs",
+      "scratch"
+    ],
+    "links": [
+      {
+        "source": "libs/core",
+        "target": "node_modules/@agent/core",
+        "type": "dir"
+      }
+    ],
+    "initial_files": [
+      { "path": "knowledge/personal/.gitkeep", "content": "" },
+      { "path": "knowledge/confidential/.gitkeep", "content": "" }
+    ],
+    "commands": [
+      { "name": "Install Dependencies", "command": "npm", "args": ["install"] },
+      { "name": "Generate Skill Index", "command": "node", "args": ["scripts/migrated/generate_skill_index.cjs"], "optional": true },
+      { "name": "Run Self Audit", "command": "node", "args": ["scripts/migrated/test_all_skills.cjs"], "optional": true }
+    ]
+  }
+}
