@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Maintenance Task",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["maintain"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["all", "skills", "scripts", "libs"]
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["fix_shebangs", "thin_dependencies", "sanitize_deps", "migrate_to_wrapper", "mass_refactor_governance", "maintain_refactor_boilerplate"]
+          }
+        },
+        "policy_path": {
+          "type": "string"
+        }
+      },
+      "required": ["scope", "tasks"]
+    }
+  },
+  "required": ["action", "params"]
+}

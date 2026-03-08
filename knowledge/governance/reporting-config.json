@@ -1,0 +1,15 @@
+{
+  "action": "report",
+  "reports": [
+    {
+      "type": "debt"
+    },
+    {
+      "type": "docs",
+      "output_file": "docs/SKILL-CATALOG.md"
+    },
+    {
+      "type": "vital"
+    }
+  ]
+}

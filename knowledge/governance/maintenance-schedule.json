@@ -1,0 +1,6 @@
+{
+  "schedule": "daily",
+  "policy_path": "knowledge/governance/package-policy.json",
+  "default_tasks": ["fix_shebangs", "thin_dependencies", "sanitize_deps", "mass_refactor_governance", "maintain_refactor_boilerplate"],
+  "scope": "all"
+}
