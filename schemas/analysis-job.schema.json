@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Context & Relationship Analysis Job Specification",
+  "description": "ADF definition for automated analysis of knowledge structures and skill dependencies.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "job_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "mode": {
+      "type": "string",
+      "enum": ["cooccurrence", "ranking", "graph", "all"],
+      "default": "all"
+    },
+    "intent": { "type": "string", "description": "Intent string for ranking analysis." },
+    "options": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "number", "default": 10 },
+        "inject_related": { "type": "boolean", "default": true },
+        "generate_mermaid": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "required": ["version", "job_id", "mode"]
+}

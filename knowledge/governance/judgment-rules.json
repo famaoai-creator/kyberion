@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "name": "Mission Judgment & Alignment Rules",
+  "personas": {
+    "Ruthless Auditor": { "weight": 1.2, "focus": "Risk & Compliance", "thresholds": { "S": 95, "A": 85, "B": 75, "C": 65 } },
+    "Pragmatic CTO": { "weight": 1.0, "focus": "Efficiency & Scalability", "thresholds": { "S": 90, "A": 80, "B": 70, "C": 60 } },
+    "Empathetic CXO": { "weight": 0.8, "focus": "UX & Accessibility", "thresholds": { "S": 85, "A": 75, "B": 65, "C": 55 } },
+    "Ecosystem Architect": { "weight": 1.1, "focus": "Structural Integrity", "thresholds": { "S": 92, "A": 82, "B": 72, "C": 62 } },
+    "Security Reviewer": { "weight": 1.3, "focus": "Security & PII", "thresholds": { "S": 98, "A": 90, "B": 80, "C": 70 } }
+  },
+  "alignment_mirror": {
+    "auto_distill_on_completion": true,
+    "vault_path": "knowledge/evolution/latent-wisdom",
+    "require_learnings_md": true
+  }
+}
