@@ -90,16 +90,17 @@ export const getSecret = (key: string, scope?: string): string | null => {
 
   if (scope) {
     const grants = _loadGrants(); 
+    const isPrivileged = currentMission === 'MSN-SYSTEM-NEXUS-DISPATCH' || 
+                        currentMission === 'MSN-SYSTEM-SENSORY-HUB';
+    
     const activeGrant = grants.find(g => 
       g.missionId === currentMission && 
       g.serviceId.toLowerCase() === scope.toLowerCase() && 
       g.expiresAt > Date.now()
     );
 
-    if (!activeGrant) {
-      if (currentMission !== 'MSN-SYSTEM-NEXUS-DISPATCH') {
-        throw new Error(`TIBA_VIOLATION: No active temporal grant for service "${scope}" in mission "${currentMission}". Access Denied.`);
-      }
+    if (!activeGrant && !isPrivileged) {
+      throw new Error(`TIBA_VIOLATION: No active temporal grant for service "${scope}" in mission "${currentMission}". Access Denied.`);
     }
   }
 

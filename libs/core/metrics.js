@@ -37,13 +37,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.metrics = exports.MetricsCollector = void 0;
-const fs = __importStar(require("node:fs"));
+const secure_io_js_1 = require("./secure-io.js");
+const pathResolver = __importStar(require("./path-resolver.js"));
 const path = __importStar(require("node:path"));
 const chalk_1 = __importDefault(require("chalk"));
 /**
  * Lightweight metrics collection for Gemini Skills.
+ * Standardized with Secure-IO.
  */
-const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
+const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');
 const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 const COST_TABLE = {
@@ -200,10 +202,11 @@ class MetricsCollector {
     }
     loadHistory() {
         const filePath = path.join(this._metricsDir, this._metricsFile);
-        if (!fs.existsSync(filePath))
+        if (!(0, secure_io_js_1.safeExistsSync)(filePath))
             return [];
         try {
-            const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(Boolean);
+            const content = (0, secure_io_js_1.safeReadFile)(filePath, { encoding: 'utf8' });
+            const lines = content.trim().split('\n').filter(Boolean);
             return lines.map((line) => JSON.parse(line));
         }
         catch (_) {
@@ -213,9 +216,9 @@ class MetricsCollector {
     reportFromHistory() {
         const entries = this.loadHistory();
         const bySkill = {};
-        const sloPath = path.resolve(process.cwd(), 'knowledge/orchestration/slo-targets.json');
-        const sloTargets = fs.existsSync(sloPath)
-            ? JSON.parse(fs.readFileSync(sloPath, 'utf8'))
+        const sloPath = pathResolver.resolve('knowledge/orchestration/slo-targets.json');
+        const sloTargets = (0, secure_io_js_1.safeExistsSync)(sloPath)
+            ? JSON.parse((0, secure_io_js_1.safeReadFile)(sloPath, { encoding: 'utf8' }))
             : { default: { latency_ms: 5000, success_rate: 99 } };
         for (const entry of entries) {
             if (!bySkill[entry.skill]) {
@@ -319,11 +322,11 @@ class MetricsCollector {
     }
     _appendToFile(entry) {
         try {
-            if (!fs.existsSync(this._metricsDir)) {
-                fs.mkdirSync(this._metricsDir, { recursive: true });
+            if (!(0, secure_io_js_1.safeExistsSync)(this._metricsDir)) {
+                (0, secure_io_js_1.safeMkdir)(this._metricsDir, { recursive: true });
             }
             const filePath = path.join(this._metricsDir, this._metricsFile);
-            fs.appendFileSync(filePath, JSON.stringify(entry) + '\n');
+            (0, secure_io_js_1.safeAppendFileSync)(filePath, JSON.stringify(entry) + '\n');
         }
         catch (_) { }
     }
