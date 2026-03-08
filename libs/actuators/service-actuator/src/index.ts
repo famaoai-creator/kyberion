@@ -5,39 +5,64 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
- * Service-Actuator v1.0.0
+ * Service-Actuator v1.1.0 [STREAMING SUPPORTED]
  * Unified Reachability Layer for External SaaS/APIs.
  * Enforces Service-Aware Secret Injection (Least Privilege).
  */
 
 interface ServiceAction {
   service_id: string; // e.g., 'slack', 'jira', 'box'
-  mode: 'API' | 'CLI' | 'SDK';
+  mode: 'API' | 'CLI' | 'SDK' | 'STREAM';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
   auth?: 'none' | 'secret-guard' | 'session';
 }
 
-async function handleAction(input: ServiceAction) {
+async function handleAction(input: ServiceAction, onEvent?: (data: any) => void) {
   logger.info(`🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`);
 
   // 1. Service-Aware Guard: Only allow access to requested service's secrets
   let token: string | null = null;
   if (input.auth === 'secret-guard') {
-    // Try both standard and service-specific keys
     const service = input.service_id.toUpperCase();
     token = secretGuard.getSecret(`${service}_BOT_TOKEN`, input.service_id) 
          || secretGuard.getSecret(`${service}_TOKEN`, input.service_id);
     
     if (!token) {
-      throw new Error(`Access Denied: No secret found for service "${input.service_id}" (Keys tried: ${service}_BOT_TOKEN, ${service}_TOKEN)`);
+      throw new Error(`Access Denied: No secret found for service "${input.service_id}"`);
     }
     logger.info(`🔐 [AUTH] Securely injected credentials for ${input.service_id}`);
   }
 
   // 2. Multi-Mode Execution
   switch (input.mode) {
+    case 'STREAM':
+      if (input.service_id === 'slack') {
+        const { App } = await import('@slack/bolt');
+        const botToken = token || secretGuard.getSecret('SLACK_BOT_TOKEN', 'slack');
+        const appToken = secretGuard.getSecret('SLACK_APP_TOKEN', 'slack');
+        
+        if (!botToken || !appToken) throw new Error('Slack tokens missing for streaming.');
+
+        const app = new App({ token: botToken, appToken, socketMode: true, logLevel: 'error' as any });
+        
+        app.event('app_mention', async ({ event }) => {
+          if (onEvent) onEvent({ type: 'mention', event });
+        });
+        
+        app.message(async ({ event }) => {
+          const e = event as any;
+          if (e.channel_type === 'im' || e.channel?.startsWith('D')) {
+            if (onEvent) onEvent({ type: 'dm', event: e });
+          }
+        });
+
+        await app.start();
+        return { status: 'streaming_active' };
+      }
+      throw new Error(`Streaming not implemented for ${input.service_id}`);
+
     case 'API':
       let baseUrl: string;
       if (input.service_id === 'moltbook') {
@@ -58,7 +83,7 @@ async function handleAction(input: ServiceAction) {
       });
 
     case 'CLI':
-      const cliBin = `${input.service_id}`; // e.g., 'gh', 'box'
+      const cliBin = `${input.service_id}`; 
       const args = [input.action, ...Object.values(input.params)];
       logger.info(`⌨️  [CLI] Executing: ${cliBin} ${args.join(' ')}`);
       return { output: safeExec(cliBin, args as string[]) };
@@ -68,6 +93,7 @@ async function handleAction(input: ServiceAction) {
   }
 }
 
+// ... CLI code (unchanged)
 const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
@@ -75,13 +101,20 @@ const main = async () => {
 
   const inputData = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), argv.input as string), 'utf8')) as ServiceAction;
   const result = await handleAction(inputData);
-  
   console.log(JSON.stringify(result, null, 2));
 };
 
-if (require.main === module) {
+// CLI Integration
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('service-actuator/src/index.ts') || 
+  process.argv[1].endsWith('service-actuator/dist/index.js')
+);
+
+if (isMain) {
   main().catch(err => {
     logger.error(err.message);
     process.exit(1);
   });
 }
+
+export { handleAction };

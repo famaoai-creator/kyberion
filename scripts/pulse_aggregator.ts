@@ -22,7 +22,10 @@ interface NerveStatus {
 
 const NERVES: NerveStatus[] = [
   { id: 'nexus', name: 'Nexus Daemon', status: 'DEAD' },
-  { id: 'terminal', name: 'Terminal Server', status: 'DEAD' }
+  { id: 'terminal', name: 'Terminal Server', status: 'DEAD' },
+  { id: 'task-watcher', name: 'Task Watcher', status: 'DEAD' },
+  { id: 'log-watcher', name: 'Log Watcher', status: 'DEAD' },
+  { id: 'visual-buffer', name: 'Visual Buffer', status: 'DEAD' }
 ];
 
 async function refreshPids(): Promise<void> {
@@ -32,7 +35,7 @@ async function refreshPids(): Promise<void> {
     ps.stdout.on('data', (data) => output += data);
     ps.on('close', () => {
       NERVES.forEach(nerve => {
-        const match = output.split('\n').find(line => line.includes(nerve.id) && (line.includes('daemon') || line.includes('server')));
+        const match = output.split('\n').find(line => line.includes(nerve.id));
         if (match) {
           const pidMatch = match.trim().split(/\s+/)[1];
           nerve.status = 'ALIVE';

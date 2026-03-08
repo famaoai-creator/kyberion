@@ -40,10 +40,13 @@ exports.safeWriteFile = safeWriteFile;
 exports.safeAppendFileSync = safeAppendFileSync;
 exports.safeUnlinkSync = safeUnlinkSync;
 exports.safeMkdir = safeMkdir;
+exports.safeExistsSync = safeExistsSync;
 exports.safeExec = safeExec;
 exports.validateUrl = validateUrl;
 exports.sanitizePath = sanitizePath;
 exports.writeArtifact = writeArtifact;
+exports.safeReaddir = safeReaddir;
+exports.safeStat = safeStat;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_child_process_1 = require("node:child_process");
@@ -161,13 +164,24 @@ function safeMkdir(dirPath, options = { recursive: true }) {
     }
 }
 /**
+ * Check if a file or directory exists safely.
+ */
+function safeExistsSync(filePath) {
+    if (!filePath)
+        return false;
+    const resolved = pathResolver.resolve(filePath);
+    return fs.existsSync(resolved);
+}
+/**
  * Execute a command safely.
  */
 function safeExec(command, args = [], options = {}) {
-    const { timeoutMs = exports.DEFAULT_TIMEOUT_MS, cwd = process.cwd(), encoding = 'utf8', maxOutputMB = 10, } = options;
+    const { timeoutMs = exports.DEFAULT_TIMEOUT_MS, cwd = process.cwd(), encoding = 'utf8', maxOutputMB = 10, env = process.env, // Default to current process env
+     } = options;
     return (0, node_child_process_1.execFileSync)(command, args, {
         encoding,
         cwd,
+        env, // Pass environment variables to child process
         timeout: timeoutMs,
         maxBuffer: maxOutputMB * 1024 * 1024,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -234,3 +248,25 @@ function writeArtifact(filePath, data, format) {
 // Alias for compatibility
 exports.safeAppendFile = safeAppendFileSync;
 exports.safeUnlink = safeUnlinkSync;
+/**
+ * Safely read a directory with permission validation.
+ */
+function safeReaddir(dirPath) {
+    const resolved = pathResolver.resolve(dirPath);
+    const check = (0, tier_guard_js_1.validateReadPermission)(resolved);
+    if (!check.allowed) {
+        throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''}`);
+    }
+    return fs.readdirSync(resolved);
+}
+/**
+ * Safely get file status with permission validation.
+ */
+function safeStat(filePath) {
+    const resolved = pathResolver.resolve(filePath);
+    const check = (0, tier_guard_js_1.validateReadPermission)(resolved);
+    if (!check.allowed) {
+        throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''}`);
+    }
+    return fs.statSync(resolved);
+}

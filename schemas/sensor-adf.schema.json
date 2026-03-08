@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Sensor ADF",
+  "description": "Definition for a proactive or reactive sensory organ in the Kyberion ecosystem.",
+  "type": "object",
+  "required": ["id", "type", "action"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique identifier for the sensor nerve." },
+    "name": { "type": "string" },
+    "type": { "enum": ["polling", "streaming", "event-driven"] },
+    "interval_ms": { "type": "number", "minimum": 1000 },
+    "action": {
+      "type": "object",
+      "required": ["actuator", "command"],
+      "properties": {
+        "actuator": { "type": "string", "description": "The name of the actuator to use (e.g., service-actuator)." },
+        "command": { "type": "string", "description": "The specific command to execute via the actuator." },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "extraction": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["regex", "json", "plain"] },
+            "pattern": { "type": "string" },
+            "key": { "type": "string", "description": "For JSON extraction, the property key to check." }
+          }
+        }
+      }
+    },
+    "on_change": {
+      "type": "object",
+      "required": ["intent"],
+      "properties": {
+        "intent": { "type": "string" },
+        "priority": { "type": "number", "default": 5 },
+        "ttl": { "type": "number", "default": 3600 }
+      }
+    }
+  }
+}

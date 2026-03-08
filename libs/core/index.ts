@@ -91,6 +91,7 @@ export { say } from './voice-synth.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
+export * from './sensor-engine.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';

@@ -34,14 +34,15 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ledger = exports.verifyIntegrity = exports.record = void 0;
-const fs = __importStar(require("node:fs"));
+const secure_io_js_1 = require("./secure-io.js");
+const pathResolver = __importStar(require("./path-resolver.js"));
 const path = __importStar(require("node:path"));
 const node_crypto_1 = require("node:crypto");
 /**
- * Ecosystem Ledger v1.0
+ * Ecosystem Ledger v1.1 [STANDARDIZED]
  * Provides a centralized, tamper-evident audit trail for all governance events.
  */
-const LEDGER_PATH = path.join(process.cwd(), 'active/audit/governance-ledger.jsonl');
+const LEDGER_PATH = pathResolver.resolve('active/audit/governance-ledger.jsonl');
 const record = (type, data) => {
     const timestamp = new Date().toISOString();
     const lastHash = _getLastHash();
@@ -55,21 +56,23 @@ const record = (type, data) => {
     };
     const hash = (0, node_crypto_1.createHash)('sha256').update(JSON.stringify(entry)).digest('hex');
     entry.hash = hash;
-    if (!fs.existsSync(path.dirname(LEDGER_PATH))) {
-        fs.mkdirSync(path.dirname(LEDGER_PATH), { recursive: true });
+    const dir = path.dirname(LEDGER_PATH);
+    if (!(0, secure_io_js_1.safeExistsSync)(dir)) {
+        (0, secure_io_js_1.safeMkdir)(dir, { recursive: true });
     }
-    fs.appendFileSync(LEDGER_PATH, JSON.stringify(entry) + '\n');
+    (0, secure_io_js_1.safeAppendFileSync)(LEDGER_PATH, JSON.stringify(entry) + '\n');
     return hash;
 };
 exports.record = record;
 function _getLastHash() {
-    if (!fs.existsSync(LEDGER_PATH))
+    if (!(0, secure_io_js_1.safeExistsSync)(LEDGER_PATH))
         return '0'.repeat(64);
     try {
-        const content = fs.readFileSync(LEDGER_PATH, 'utf8').trim();
-        if (!content)
+        const content = (0, secure_io_js_1.safeReadFile)(LEDGER_PATH, { encoding: 'utf8' });
+        const trimmed = content.trim();
+        if (!trimmed)
             return '0'.repeat(64);
-        const lines = content.split('\n');
+        const lines = trimmed.split('\n');
         const lastEntry = JSON.parse(lines[lines.length - 1]);
         return lastEntry.hash || '0'.repeat(64);
     }
@@ -81,9 +84,10 @@ function _getLastHash() {
  * Verify the integrity of the entire ledger
  */
 const verifyIntegrity = () => {
-    if (!fs.existsSync(LEDGER_PATH))
+    if (!(0, secure_io_js_1.safeExistsSync)(LEDGER_PATH))
         return true;
-    const lines = fs.readFileSync(LEDGER_PATH, 'utf8').trim().split('\n');
+    const content = (0, secure_io_js_1.safeReadFile)(LEDGER_PATH, { encoding: 'utf8' });
+    const lines = content.trim().split('\n');
     let expectedParentHash = '0'.repeat(64);
     for (const line of lines) {
         if (!line)

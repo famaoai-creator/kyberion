@@ -112,9 +112,20 @@ class ReflexTerminal {
         this.setupListeners(options.onOutput);
     }
     setupListeners(onOutput) {
+        const DSR_REQ = /\x1b\[\??6n/g;
+        const DSR_RES = '\x1b[1;1R';
         this.adapter.onData((data) => {
-            if (onOutput)
-                onOutput(data);
+            let processedData = data;
+            // 1. Detect and auto-respond to DSR (Device Status Report)
+            // This prevents interactive tools (less, git, etc.) from hanging.
+            if (DSR_REQ.test(data)) {
+                this.adapter.write(DSR_RES);
+                // Strip the request from the output to keep logs/AI context clean
+                processedData = data.replace(DSR_REQ, '');
+            }
+            if (onOutput && processedData.length > 0) {
+                onOutput(processedData);
+            }
         });
         this.adapter.onExit((code, signal) => {
             core_js_1.logger.warn(`[RT] Terminal process exited with code ${code}, signal ${signal}`);
