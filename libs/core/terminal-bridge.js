@@ -199,4 +199,3 @@ exports.terminalBridge = {
         return '';
     }
 };
-//# sourceMappingURL=terminal-bridge.js.map

@@ -1,7 +1,7 @@
 "use strict";
 /**
- * Reflex Terminal (RT) - Core Logic v2.0 (node-pty Edition)
- * Provides a persistent virtual terminal session using node-pty for true PTY support.
+ * Reflex Terminal (RT) - Self-Healing Edition v3.0
+ * Provides terminal session with automatic fallback between node-pty and child_process.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -38,66 +38,104 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReflexTerminal = void 0;
-const pty = __importStar(require("node-pty"));
+const node_child_process_1 = require("node:child_process");
 const os = __importStar(require("node:os"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const core_js_1 = require("./core.js");
+/**
+ * Adapter using node-pty (Native PTY)
+ */
+class PtyAdapter {
+    pty;
+    constructor(pty) {
+        this.pty = pty;
+    }
+    write(data) { this.pty.write(data); }
+    resize(cols, rows) { this.pty.resize(cols, rows); }
+    kill() { this.pty.kill(); }
+    onData(cb) { this.pty.onData(cb); }
+    onExit(cb) { this.pty.onExit(cb); }
+    getPid() { return this.pty.pid; }
+}
+/**
+ * Fallback Adapter using standard child_process (Basic Emulation)
+ */
+class ChildProcessAdapter {
+    process;
+    constructor(shell, args, options) {
+        this.process = (0, node_child_process_1.spawn)(shell, args, {
+            cwd: options.cwd,
+            env: options.env,
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        core_js_1.logger.warn('[RT] node-pty failed. Falling back to ChildProcess emulation.');
+    }
+    write(data) { this.process.stdin?.write(data); }
+    resize() { }
+    kill() { this.process.kill(); }
+    onData(cb) {
+        this.process.stdout?.on('data', (d) => cb(d.toString()));
+        this.process.stderr?.on('data', (d) => cb(d.toString()));
+    }
+    onExit(cb) {
+        this.process.on('exit', cb);
+    }
+    getPid() { return this.process.pid; }
+}
 class ReflexTerminal {
-    ptyProcess;
+    adapter;
     feedbackPath;
     constructor(options = {}) {
         const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash'));
+        const cwd = path.resolve(options.cwd || process.cwd());
         this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
-        this.ptyProcess = pty.spawn(shell, [], {
-            name: 'xterm-256color',
-            cols: options.cols || 80,
-            rows: options.rows || 24,
-            cwd: path.resolve(options.cwd || process.cwd()),
-            env: { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' }
-        });
+        const env = { ...process.env, TERM: 'xterm-256color', PAGER: 'cat' };
+        try {
+            // Dynamic import to avoid crash if node-pty is missing or broken
+            const pty = require('node-pty');
+            const ptyInstance = pty.spawn(shell, [], {
+                name: 'xterm-256color',
+                cols: options.cols || 80,
+                rows: options.rows || 24,
+                cwd,
+                env
+            });
+            this.adapter = new PtyAdapter(ptyInstance);
+            core_js_1.logger.info(`[RT] Using Native PTY (node-pty)`);
+        }
+        catch (err) {
+            // Fallback to child_process
+            this.adapter = new ChildProcessAdapter(shell, [], { cwd, env });
+            core_js_1.logger.info(`[RT] Using Emulated Terminal (child_process)`);
+        }
         this.setupListeners(options.onOutput);
-        core_js_1.logger.info(`[RT] Reflex Terminal (node-pty) started with shell: ${shell}`);
     }
     setupListeners(onOutput) {
-        this.ptyProcess.onData((data) => {
+        this.adapter.onData((data) => {
             if (onOutput)
                 onOutput(data);
-            // Optional: fallback to stdout if needed, but usually redundant for PTY
-            // process.stdout.write(data); 
         });
-        this.ptyProcess.onExit(({ exitCode, signal }) => {
-            core_js_1.logger.warn(`[RT] PTY process exited with code ${exitCode}, signal ${signal}`);
+        this.adapter.onExit((code, signal) => {
+            core_js_1.logger.warn(`[RT] Terminal process exited with code ${code}, signal ${signal}`);
         });
     }
-    /**
-     * Inject a command or raw input into the terminal.
-     */
     execute(command) {
         core_js_1.logger.info(`[RT] Injecting command: ${command}`);
-        this.ptyProcess.write(`${command}\r`);
+        this.adapter.write(`${command}\n`); // Changed \r to \n for better compatibility with child_process
     }
-    /**
-     * Write raw data to the terminal.
-     */
     write(data) {
-        this.ptyProcess.write(data);
+        this.adapter.write(data);
     }
-    /**
-     * Resize the terminal dimensions.
-     */
-    resize(cols, rows) {
-        this.ptyProcess.resize(cols, rows);
+    resize(cols, rows, width, height) {
+        this.adapter.resize(cols, rows, width, height);
     }
-    /**
-     * Register an output listener.
-     */
-    onData(callback) {
-        return this.ptyProcess.onData(callback);
+    getPid() {
+        return this.adapter.getPid();
     }
-    /**
-     * Manually trigger a feedback update to the shared response file.
-     */
+    kill() {
+        this.adapter.kill();
+    }
     persistResponse(text, skillName = 'reflex-terminal') {
         try {
             const cleanText = core_js_1.ui.stripAnsi(text).trim();
@@ -107,10 +145,7 @@ class ReflexTerminal {
                 skill: skillName,
                 status: 'success',
                 data: { message: cleanText },
-                metadata: {
-                    timestamp: new Date().toISOString(),
-                    duration_ms: 0
-                }
+                metadata: { timestamp: new Date().toISOString(), duration_ms: 0 }
             };
             const dir = path.dirname(this.feedbackPath);
             if (!fs.existsSync(dir))
@@ -122,9 +157,5 @@ class ReflexTerminal {
             core_js_1.logger.error(`[RT] Failed to persist response: ${err.message}`);
         }
     }
-    kill() {
-        this.ptyProcess.kill();
-    }
 }
 exports.ReflexTerminal = ReflexTerminal;
-//# sourceMappingURL=reflex-terminal.js.map

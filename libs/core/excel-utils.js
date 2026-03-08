@@ -39,14 +39,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.distillExcelDesign = distillExcelDesign;
 exports.generateExcelWithDesign = generateExcelWithDesign;
 const ExcelJS = __importStar(require("exceljs"));
-const excel_theme_resolver_1 = require("./excel-theme-resolver");
+const excel_theme_resolver_js_1 = require("./excel-theme-resolver.js");
 /**
  * Distills an Excel file into a portable Design Protocol (ADF).
  */
 async function distillExcelDesign(filePath) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
-    const theme = await (0, excel_theme_resolver_1.extractThemePalette)(filePath);
+    const theme = await (0, excel_theme_resolver_js_1.extractThemePalette)(filePath);
     const protocol = {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
@@ -59,20 +59,20 @@ async function distillExcelDesign(filePath) {
             columns: [],
             rows: [],
             merges: [],
-            autoFilter: sheet.autoFilter,
+            autoFilter: sheet.autoFilter ? JSON.stringify(sheet.autoFilter) : undefined,
             views: sheet.views
         };
         // Extract columns
         for (let i = 1; i <= (sheet.columnCount || 0); i++) {
             const col = sheet.getColumn(i);
-            sheetInfo.columns.push({ index: i, width: col.width });
+            sheetInfo.columns.push({ index: i, width: col.width || 12 });
         }
-        // Extract merges (using any cast for internal property)
+        // Extract merges
         const internalSheet = sheet;
         if (internalSheet._merges) {
             sheetInfo.merges = Object.keys(internalSheet._merges).map(key => internalSheet._merges[key].model);
         }
-        // Extract styles (limit to first 100 rows for templates)
+        // Extract styles
         sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
             if (rowNumber > 100)
                 return;
@@ -92,60 +92,54 @@ async function distillExcelDesign(filePath) {
 /**
  * Re-generates Excel from dynamic data using a Design Protocol as a "template".
  */
-async function generateExcelWithDesign(data, // 2D data array (header included or separate)
-protocol, sheetName = 'Output', headerRowIdx = 3, dataRowIdx = 4) {
+async function generateExcelWithDesign(data, protocol, sheetName = 'Output', headerRowIdx = 1, dataRowIdx = 2) {
     const workbook = new ExcelJS.Workbook();
-    const templateSheet = protocol.sheets.find(s => s.name === sheetName) || protocol.sheets[0];
-    const sheet = workbook.addWorksheet(templateSheet.name);
-    // Apply column widths
-    sheet.columns = templateSheet.columns.map(c => ({ width: c.width }));
+    // Refined: Ensure we have at least one sheet definition
+    const templateSheet = protocol?.sheets?.find(s => s.name === sheetName) ||
+        (protocol?.sheets && protocol.sheets.length > 0 ? protocol.sheets[0] : null);
+    const sheet = workbook.addWorksheet(templateSheet?.name || sheetName || 'Sheet1');
+    // Apply column widths (Defensive)
+    if (templateSheet && templateSheet.columns && Array.isArray(templateSheet.columns)) {
+        sheet.columns = templateSheet.columns.map((c) => ({ width: c.width || 15 }));
+    }
+    else if (data && data.length > 0 && Array.isArray(data[0])) {
+        sheet.columns = data[0].map(() => ({ width: 25 }));
+    }
     // Resolve Theme Colors Helper
     const resolveStyle = (style) => {
         if (!style)
             return style;
-        const s = JSON.parse(JSON.stringify(style));
-        if (s.fill && s.fill.fgColor && s.fill.fgColor.theme !== undefined) {
-            const argb = protocol.theme[s.fill.fgColor.theme];
-            if (argb)
-                s.fill.fgColor = { argb };
+        try {
+            const s = JSON.parse(JSON.stringify(style));
+            if (s.fill && s.fill.fgColor && s.fill.fgColor.theme !== undefined && protocol?.theme) {
+                const argb = protocol.theme[s.fill.fgColor.theme];
+                if (argb)
+                    s.fill.fgColor = { argb };
+            }
+            return s;
         }
-        return s;
+        catch (e) {
+            return style;
+        }
     };
-    // Find styles from template rows
-    const headerRowDef = templateSheet.rows.find(r => r.number === headerRowIdx);
-    const dataRowDef = templateSheet.rows.find(r => r.number === dataRowIdx);
+    const headerRowDef = templateSheet?.rows?.find((r) => r.number === headerRowIdx);
+    const dataRowDef = templateSheet?.rows?.find((r) => r.number === dataRowIdx);
     // Apply dynamic data
-    data.forEach((rowData, idx) => {
-        const rowNumber = headerRowIdx + idx;
-        const targetRow = sheet.getRow(rowNumber);
-        rowData.forEach((val, cIdx) => {
-            const cell = targetRow.getCell(cIdx + 1);
-            cell.value = val;
-            // Apply style based on role
-            const templateRow = (idx === 0) ? headerRowDef : dataRowDef;
-            if (templateRow && templateRow.cells[cIdx + 1]) {
-                cell.style = resolveStyle(templateRow.cells[cIdx + 1].style);
+    if (Array.isArray(data)) {
+        data.forEach((rowData, idx) => {
+            const rowNumber = headerRowIdx + idx;
+            const targetRow = sheet.getRow(rowNumber);
+            if (Array.isArray(rowData)) {
+                rowData.forEach((val, cIdx) => {
+                    const cell = targetRow.getCell(cIdx + 1);
+                    cell.value = val;
+                    const templateRow = (idx === 0) ? headerRowDef : dataRowDef;
+                    if (templateRow && templateRow.cells && templateRow.cells[cIdx + 1]) {
+                        cell.style = resolveStyle(templateRow.cells[cIdx + 1].style);
+                    }
+                });
             }
         });
-    });
-    // Re-apply merges from template if they are static/header areas
-    templateSheet.merges.forEach(range => {
-        // Only apply if the merge is within the header area (rough heuristic)
-        const startRow = parseInt(range.match(/\d+/)[0]);
-        if (startRow <= headerRowIdx) {
-            try {
-                sheet.mergeCells(range);
-            }
-            catch (e) { }
-        }
-    });
-    // Expand AutoFilter
-    if (templateSheet.autoFilter) {
-        sheet.autoFilter = {
-            from: 'A' + headerRowIdx,
-            to: { row: headerRowIdx + data.length - 1, column: data[0].length }
-        };
     }
     return workbook;
 }
-//# sourceMappingURL=excel-utils.js.map
