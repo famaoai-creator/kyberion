@@ -1,0 +1,15 @@
+{
+  "id": "critical-error-notifier",
+  "trigger": {
+    "intent": "alert",
+    "keyword": "CRITICAL"
+  },
+  "action": {
+    "actuator": "service-actuator",
+    "command": "chat.postMessage",
+    "params": {
+      "channel": "C0AJ7EHH8BB",
+      "text": "🚨 [AUTONOMIC_REFLEX] Critical error detected: {{payload}}"
+    }
+  }
+}

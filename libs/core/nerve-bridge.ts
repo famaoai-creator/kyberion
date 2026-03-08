@@ -1,21 +1,25 @@
 /**
  * libs/core/nerve-bridge.ts
- * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.0
+ * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
  * [SECURE-IO COMPLIANT]
  * 
- * Provides structured messaging (To/From/Type) over the stimuli bus.
+ * Provides structured messaging (To/From/Type) over the stimuli bus
+ * with Distributed Node Identification (Nerve Cluster Foundation).
  */
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { logger, pathResolver, safeWriteFile, safeReadFile, safeAppendFileSync } from './index.js';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+const NODE_ID = `${os.hostname()}-${process.pid}`;
 
 export interface NerveMessage {
   id: string;
   ts: string;
   from: string;
+  node_id: string; // Distributed Node Identity
   to: string | 'broadcast';
   type: 'request' | 'response' | 'event';
   intent: string;
@@ -42,6 +46,7 @@ export function sendNerveMessage(input: {
     id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     ts: new Date().toISOString(),
     from: input.from,
+    node_id: NODE_ID,
     to: input.to,
     type: input.type || 'event',
     intent: input.intent,
@@ -53,8 +58,11 @@ export function sendNerveMessage(input: {
     }
   };
 
-  safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
-  logger.info(`📡 [BRIDGE] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
+  try {
+    safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
+    logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
+  } catch (_) {}
+  
   return msg.id;
 }
 
@@ -62,7 +70,7 @@ export function sendNerveMessage(input: {
  * Polling / Listening logic for a specific nerve
  */
 export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) => void) {
-  logger.info(`👂 [BRIDGE] Nerve '${nerveId}' started listening to signals...`);
+  logger.info(`👂 [BRIDGE:${NODE_ID}] Nerve '${nerveId}' started listening...`);
   
   let lastSize = 0;
   if (fs.existsSync(STIMULI_PATH)) {
@@ -81,15 +89,11 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
         if (!line) return;
         try {
           const msg = JSON.parse(line) as NerveMessage;
-          // Check if message is for us or a broadcast
-          if (msg.to === nerveId || msg.to === 'broadcast') {
-            if (msg.from !== nerveId) { // Don't process our own messages
-              onMessage(msg);
-            }
+          // Accept if broadcast or targeted to us, and not from the same node process
+          if ((msg.to === nerveId || msg.to === 'broadcast') && msg.node_id !== NODE_ID) {
+            onMessage(msg);
           }
-        } catch (e) {
-          // Partial line or invalid JSON, ignore
-        }
+        } catch (e) {}
       });
       lastSize = stats.size;
     }

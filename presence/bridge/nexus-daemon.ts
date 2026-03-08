@@ -14,8 +14,11 @@ import {
   safeMkdir,
   safeExistsSync,
   safeUnlinkSync,
-  safeReaddir
+  safeReaddir,
+  sensoryMemory
 } from '../../libs/core/index.js';
+import { reflexEngine } from '../../libs/shared-nerve/src/index.js';
+import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
 import { safeExec } from '../../libs/core/secure-io.js';
 import * as path from 'node:path';
 
@@ -229,6 +232,20 @@ async function nexusLoop() {
 
   ensureSystemMission();
 
+  // Initialize Reflex Engine with a generic dispatcher
+  reflexEngine.setDispatcher(async (actuator, action, params) => {
+    logger.info(`⚡ [Nexus:Reflex] Executing autonomic reaction: ${actuator}.${action}`);
+    if (actuator === 'service-actuator') {
+      await dispatchService({
+        service_id: params.service_id || 'slack',
+        mode: 'API',
+        action: action,
+        params: params,
+        auth: 'secret-guard'
+      });
+    }
+  });
+
   while (true) {
     try {
       const channels = await loadChannelRegistry();
@@ -242,6 +259,12 @@ async function nexusLoop() {
         const pending = allStimuli.filter(s => s.control.status === 'pending');
 
         for (const stimulus of pending) {
+          // 1. Add to Sensory Memory for context
+          sensoryMemory.remember(stimulus as any);
+
+          // 2. Evaluate autonomic reflexes
+          await reflexEngine.evaluate(stimulus as any);
+
           const age = (Date.now() - new Date(stimulus.ts).getTime()) / 1000;
           if (stimulus.ttl > 0 && age > stimulus.ttl) {
             await updateStimulusStatus(stimulus.id, 'expired', 'ttl_expiration');

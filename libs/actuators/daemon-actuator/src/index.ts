@@ -46,14 +46,17 @@ async function handleAction(input: DaemonAction) {
   const label = `kyberion.${input.nerve_id}`;
   const plistPath = path.join(LAUNCH_AGENTS_DIR, `${label}.plist`);
 
-  // Auto-resolve for ADF-driven sensors
+  // Auto-resolve for ADF-driven nerves (Sensors or Reflexes)
   let finalScriptPath = input.script_path;
   let finalArgs: string[] = [];
 
   if (input.adf_path) {
-    finalScriptPath = 'dist/presence/sensors/generic-sensor-host.js';
+    const isReflex = input.adf_path.includes('/reflexes/');
+    const hostFile = isReflex ? 'dist/presence/bridge/reflex-host.js' : 'dist/presence/sensors/generic-sensor-host.js';
+    
+    finalScriptPath = hostFile;
     finalArgs = [path.join(ROOT_DIR, input.adf_path)];
-    logger.info(`🗺️ [DAEMON] ADF detected. Using generic sensor host for: ${input.adf_path}`);
+    logger.info(`🗺️ [DAEMON] ADF detected (${isReflex ? 'Reflex' : 'Sensor'}). Using host: ${hostFile}`);
   }
 
   switch (input.action) {

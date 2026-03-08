@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "policies": [
+    {
+      "id": "incident-recovery-access",
+      "condition": {
+        "intent": "alert",
+        "keyword": "CRITICAL",
+        "lookback_ms": 600000
+      },
+      "grant": {
+        "role": "infrastructure_sentinel",
+        "allow_paths": ["active/archive/", "active/quarantine/"]
+      }
+    }
+  ]
+}

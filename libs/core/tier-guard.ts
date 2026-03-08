@@ -5,6 +5,7 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { dynamicPermGuard } from './dynamic-permission-guard.js';
 import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
 
 export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
