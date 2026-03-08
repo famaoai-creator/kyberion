@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-07T15:58:06.935Z*
+*SSoT Index Version: 2.0.0 | Last Updated: 2026-03-08T07:37:12.464Z*
 
 ## 📁 General
 - [Ecosystem Knowledge Map](./Ecosystem_Map.md) (public | Ecosystem Architect)
@@ -399,7 +399,11 @@
 - [要件定義ドキュメント・レビューチェックリスト](./requirements-guide/review_checklist.md) (public | Ecosystem Architect)
 
 ## 📁 roles/business_owner
+- [Role Procedure: Business Owner (Value Maximizer)](./roles/business_owner/PROCEDURE.md) (public | Unknown)
 - [Business Owner (事業責任者) ミッション声明](./roles/business_owner/mission.md) (public | Ecosystem Architect)
+
+## 📁 roles/ceo
+- [Role Procedure: CEO (Sovereign Strategist)](./roles/ceo/PROCEDURE.md) (public | Unknown)
 
 ## 📁 roles/ceo/finance
 - [財務KPI標準基準 (Financial KPI Standards)](./roles/ceo/finance/kpi_standards.md) (public | Ecosystem Architect)
@@ -417,69 +421,96 @@
 - [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./roles/ceo/planning/frameworks.md) (public | Ecosystem Architect)
 
 ## 📁 roles/customer_success
+- [Role Procedure: Empathetic Solution-Finder (Customer Success)](./roles/customer_success/PROCEDURE.md) (public | Unknown)
 - [Customer Success (カスタマーサクセス) ミッション声明](./roles/customer_success/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/cyber_security
+- [Role Procedure: Cyber Security Reviewer](./roles/cyber_security/PROCEDURE.md) (public | Unknown)
 - [Cyber Security Lead (セキュリティ責任者) ミッション声明](./roles/cyber_security/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/designer
+- [Role Procedure: Aesthetic Pragmatist (Designer)](./roles/designer/PROCEDURE.md) (public | Unknown)
 - [Experience Designer (デザイナー) ミッション声明](./roles/designer/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/ecosystem_architect
+- [Role Procedure: Ecosystem Architect](./roles/ecosystem_architect/PROCEDURE.md) (public | Unknown)
 - [Ecosystem Architect 行動指針 (Operational Guidelines)](./roles/ecosystem_architect/guidelines.md) (public | Ecosystem Architect)
 
 ## 📁 roles/executive_assistant
+- [Role Procedure: Efficient Shadow (Executive Assistant)](./roles/executive_assistant/PROCEDURE.md) (public | Unknown)
 - [Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明](./roles/executive_assistant/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/finance_controller
+- [Role Procedure: Finance Controller (Capital Strategist)](./roles/finance_controller/PROCEDURE.md) (public | Unknown)
 - [Finance Controller (財務・経理責任者) ミッション声明](./roles/finance_controller/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/incident_commander
+- [Role Procedure: Resilient Commander (Incident Commander)](./roles/incident_commander/PROCEDURE.md) (public | Unknown)
 - [Incident Commander (インシデント・コマンダー) ミッション声明](./roles/incident_commander/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/integration_steward
+- [Role Procedure: Integration Steward](./roles/integration_steward/PROCEDURE.md) (public | Unknown)
 - [Role: Integration Steward](./roles/integration_steward/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/knowledge_steward
+- [Role Procedure: Infinite Librarian](./roles/knowledge_steward/PROCEDURE.md) (public | Unknown)
 - [Knowledge Steward (ナレッジ・スチュワード) ミッション声明](./roles/knowledge_steward/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/legal_strategist
+- [Role Procedure: Legal Strategist (Guardian of Ethics & IP)](./roles/legal_strategist/PROCEDURE.md) (public | Unknown)
 - [Legal & IP Strategist (法務・知財戦略) ミッション声明](./roles/legal_strategist/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/line_manager
+- [Role Procedure: Decisive Enabler (Line Manager)](./roles/line_manager/PROCEDURE.md) (public | Unknown)
 - [Line Manager (ラインマネージャー) ミッション声明](./roles/line_manager/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/marketing_growth
+- [Role Procedure: Growth Evangelist (Marketing Growth)](./roles/marketing_growth/PROCEDURE.md) (public | Unknown)
 - [Marketing & Growth (マーケティング & 成長戦略) ミッション声明](./roles/marketing_growth/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/performance_engineer
+- [Role Procedure: Efficiency Optimizer (Performance Engineer)](./roles/performance_engineer/PROCEDURE.md) (public | Unknown)
 - [Performance Engineer 行動指針 (Operational Guidelines)](./roles/performance_engineer/guidelines.md) (public | Ecosystem Architect)
 - [Performance Evaluation Knowledge Base](./roles/performance_engineer/knowledge_base.md) (public | Ecosystem Architect)
 
 ## 📁 roles/pmo_governance
+- [Role Procedure: Governance Sentinel](./roles/pmo_governance/PROCEDURE.md) (public | Unknown)
 - [PMO Governance (PMO/ガバナンス) ミッション声明](./roles/pmo_governance/mission.md) (public | Ecosystem Architect)
 - [品質ゲート (Quality Gates) 運用基準](./roles/pmo_governance/quality_gates.md) (public | Ecosystem Architect)
 
 ## 📁 roles/product_manager
+- [Role Procedure: Product Orchestrator](./roles/product_manager/PROCEDURE.md) (public | Unknown)
 - [Product Manager (プロダクトマネージャー) ミッション声明](./roles/product_manager/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/qa_lead
+- [Role Procedure: Rigorous Validator (QA Lead)](./roles/qa_lead/PROCEDURE.md) (public | Unknown)
 - [Quality Assurance (QA/QC) ミッション声明](./roles/qa_lead/mission.md) (public | Ecosystem Architect)
 - [QA/QC 重点チェックポイント：非同期通信と物理制約](./roles/qa_lead/qa_checkpoints.md) (public | Ecosystem Architect)
 
 ## 📁 roles/reliability_engineer
+- [Role Procedure: Resilience Architect (Reliability Engineer)](./roles/reliability_engineer/PROCEDURE.md) (public | Unknown)
 - [Reliability Engineer (SRE/運用責任者) ミッション声明](./roles/reliability_engineer/mission.md) (public | Ecosystem Architect)
 
+## 📁 roles/ruthless_auditor
+- [Role Procedure: Ruthless Auditor](./roles/ruthless_auditor/PROCEDURE.md) (public | Unknown)
+
 ## 📁 roles/software_developer
+- [Role Procedure: Focused Craftsman (Software Developer)](./roles/software_developer/PROCEDURE.md) (public | Unknown)
 - [Software Developer (ソフトウェア開発者) ミッション声明](./roles/software_developer/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/solution_architect
+- [Role Procedure: Solution Architect](./roles/solution_architect/PROCEDURE.md) (public | Unknown)
 - [Solution Architect (ソリューション・アーキテクト) ミッション声明](./roles/solution_architect/mission.md) (public | Ecosystem Architect)
 
+## 📁 roles/sovereign_concierge
+- [Role Procedure: Sovereign Concierge](./roles/sovereign_concierge/PROCEDURE.md) (public | Unknown)
+
 ## 📁 roles/strategic_sales
+- [Role Procedure: Strategic Deal-Maker (Strategic Sales)](./roles/strategic_sales/PROCEDURE.md) (public | Unknown)
 - [Strategic Sales (営業・事業開発) ミッション声明](./roles/strategic_sales/mission.md) (public | Ecosystem Architect)
 
 ## 📁 roles/talent_culture
+- [Role Procedure: Cultural Weaver (Talent & Culture)](./roles/talent_culture/PROCEDURE.md) (public | Unknown)
 - [Talent & Culture (採用 & 組織文化) ミッション声明](./roles/talent_culture/mission.md) (public | Ecosystem Architect)
 
 ## 📁 sdlc

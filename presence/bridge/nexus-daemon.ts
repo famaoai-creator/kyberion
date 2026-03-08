@@ -1,15 +1,25 @@
 /**
- * Nexus Daemon v6.0 (Stateless Evidence-as-State Edition)
+ * Nexus Daemon v6.1 [STANDARDIZED]
  * Central nerve system that coordinates stimuli ingestion and terminal session routing.
- * No in-memory waiting; uses physical files to track state.
+ * Standardized with Secure-IO and Physical Evidence-as-State.
  */
 
-import { logger, terminalBridge, safeReadFile, safeWriteFile, pathResolver, secretGuard } from '../../libs/core/index.js';
+import { 
+  logger, 
+  terminalBridge, 
+  safeReadFile, 
+  safeWriteFile, 
+  pathResolver, 
+  secretGuard,
+  safeMkdir,
+  safeExistsSync,
+  safeUnlinkSync,
+  safeReaddir
+} from '../../libs/core/index.js';
 import { safeExec } from '../../libs/core/secure-io.js';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const ROOT_DIR = process.cwd();
+const ROOT_DIR = pathResolver.rootDir();
 const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const REGISTRY_PATH = pathResolver.resolve('presence/bridge/channel-registry.json');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
@@ -22,8 +32,8 @@ function ensureSystemMission() {
   const missionDir = path.join(ROOT_DIR, 'active/missions', NEXUS_MISSION_ID);
   const statePath = path.join(missionDir, 'mission-state.json');
   
-  if (!fs.existsSync(missionDir)) {
-    fs.mkdirSync(missionDir, { recursive: true });
+  if (!safeExistsSync(missionDir)) {
+    safeMkdir(missionDir, { recursive: true });
   }
   
   const state = {
@@ -33,7 +43,7 @@ function ensureSystemMission() {
     role: 'System Dispatcher'
   };
   
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf8');
+  safeWriteFile(statePath, JSON.stringify(state, null, 2));
   logger.info(`🛡️ [Nexus] System Mission physical state established.`);
 }
 
@@ -90,55 +100,36 @@ async function updateStimulusStatus(id: string, status: GUSPStimulus['control'][
   }
 }
 
-/**
- * Agnostic Dispatcher: Sends feedback back using the channel's designated skill.
- */
 async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: Channel[]) {
   const channelCfg = channels.find(c => c.id === stimulus.origin.channel);
   
   if (channelCfg?.connector_skill) {
     logger.info(`📤 [Nexus] Dispatching feedback for ${stimulus.id} via ${channelCfg.connector_skill}`);
     
-    let payload: any;
-    
-    if (channelCfg.connector_skill === 'service-actuator') {
-      // Logic for cleaning feedback (removing brain commands if echoed back)
-      const cleanText = text.replace(/^\/(gemini|claude|codex|shell)\s+/i, '').trim();
+    const cleanText = text.replace(/^\/(gemini|claude|codex|shell)\s+/i, '').trim();
+    const contextParts = stimulus.origin.context?.split(':') || [];
+    const targetChannel = contextParts[0] || 'C0AJ7EHH8BB'; 
+    const threadTs = contextParts[1];
 
-      // Extract Channel and Thread from context (e.g., "CHANNEL_ID:THREAD_TS")
-      const contextParts = stimulus.origin.context?.split(':') || [];
-      const targetChannel = contextParts[0] || 'C0AJ7EHH8BB'; // Fallback to #all-famaoai
-      const threadTs = contextParts[1];
-
-      payload = {
-        service_id: channelCfg.service_id || stimulus.origin.channel,
-        mode: channelCfg.execution_mode || 'API',
-        action: 'chat.postMessage', 
-        params: {
-          channel: targetChannel,
-          thread_ts: threadTs,
-          text: cleanText
-        },
-        auth: 'secret-guard'
-      };
-    } else {
-      payload = {
-        action: 'message',
-        input: text,
-        metadata: stimulus.origin.metadata,
-        stimulus_id: stimulus.id
-      };
-    }
+    const payload = {
+      service_id: channelCfg.service_id || stimulus.origin.channel,
+      mode: channelCfg.execution_mode || 'API',
+      action: 'chat.postMessage', 
+      params: {
+        channel: targetChannel,
+        thread_ts: threadTs,
+        text: cleanText
+      },
+      auth: 'secret-guard'
+    };
 
     const tempPath = pathResolver.resolve(`active/shared/logs/dispatch_${stimulus.id}_${Date.now()}.json`);
     safeWriteFile(tempPath, JSON.stringify(payload, null, 2));
 
     try {
-      // 1. Grant temporal access for this dispatch (5 minutes)
       const serviceId = channelCfg.service_id || stimulus.origin.channel || 'slack';
       secretGuard.grantAccess(NEXUS_MISSION_ID, serviceId, 5);
 
-      // 2. Execute Actuator DIRECTLY (Bypassing cli.js wrapper)
       const actuatorPath = path.join(ROOT_DIR, `libs/actuators/${channelCfg.connector_skill}/src/index.ts`);
       logger.info(`🚀 [Nexus] Dispatching via npx tsx ${channelCfg.connector_skill}...`);
       
@@ -146,7 +137,6 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
         env: { ...process.env, MISSION_ID: NEXUS_MISSION_ID }
       });
       
-      // 3. Extract pure JSON from output
       const jsonStart = rawOutput.indexOf('{');
       if (jsonStart === -1) {
         logger.error(`❌ [Nexus] Dispatch Error: No JSON found in output.`);
@@ -155,7 +145,6 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
       }
       const output = rawOutput.substring(jsonStart);
 
-      // 4. Log and Parse
       logger.info(`📡 [Nexus] Actuator Response received (${output.length} bytes)`);
       const result = JSON.parse(output);
       if (result.ok === false) {
@@ -171,21 +160,16 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
   }
 }
 
-/**
- * Extracts the requested brain profile from the signal payload.
- * e.g., "/claude refactor this" -> profile: "claude", payload: "refactor this"
- */
 function extractBrainProfile(payload: string): { profile: string, cleanPayload: string } {
   const match = payload.match(/^\/([a-z0-9_-]+)\s+(.*)/is);
   if (match) {
     const profile = match[1].toLowerCase();
     const cleanPayload = match[2];
     
-    // Validate if profile exists in registry
     try {
-      const registryPath = path.join(process.cwd(), 'knowledge/orchestration/brain-profiles.json');
-      if (fs.existsSync(registryPath)) {
-        const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
+      if (safeExistsSync(registryPath)) {
+        const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
         if (registry.profiles[profile]) {
           return { profile, cleanPayload };
         }
@@ -196,12 +180,8 @@ function extractBrainProfile(payload: string): { profile: string, cleanPayload: 
   return { profile: 'default', cleanPayload: payload };
 }
 
-/**
- * Scans for outputs from Terminal sessions and matches them with injected stimuli.
- * This replaces the in-memory handleFeedback loop.
- */
 async function scanAndDispatch(channels: Channel[]) {
-  if (!fs.existsSync(STIMULI_PATH)) return;
+  if (!safeExistsSync(STIMULI_PATH)) return;
 
   const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
   const allStimuli = content.trim().split('\n')
@@ -211,33 +191,29 @@ async function scanAndDispatch(channels: Channel[]) {
   const injected = allStimuli.filter(s => s.control.status === 'injected');
 
   for (const stimulus of injected) {
-    // 1. Check if we need feedback
     if (stimulus.policy.feedback === 'silent') {
       await updateStimulusStatus(stimulus.id, 'processed', 'ignored_by_silent_policy');
       continue;
     }
 
-    // 2. Find associated terminal output
-    // For ReflexTerminal, we look for metadata.json in the session's out/ directory
-    const sessions = fs.existsSync(RUNTIME_BASE) ? fs.readdirSync(RUNTIME_BASE) : [];
+    const sessions = safeExistsSync(RUNTIME_BASE) ? safeReaddir(RUNTIME_BASE) : [];
     for (const sid of sessions) {
       const outDir = path.join(RUNTIME_BASE, sid, 'out');
       const metaPath = path.join(outDir, 'latest_metadata.json');
       const responsePath = path.join(outDir, 'latest_response.json');
 
-      if (fs.existsSync(metaPath) && fs.existsSync(responsePath)) {
+      if (safeExistsSync(metaPath) && safeExistsSync(responsePath)) {
         try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          const meta = JSON.parse(safeReadFile(metaPath, { encoding: 'utf8' }) as string);
           if (meta.stimulus_id === stimulus.id) {
-            const response = JSON.parse(fs.readFileSync(responsePath, 'utf8'));
+            const response = JSON.parse(safeReadFile(responsePath, { encoding: 'utf8' }) as string);
             const text = response.data?.message || JSON.stringify(response.data || {}, null, 2);
 
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);
             await dispatchFeedback(stimulus, text, channels);
             await updateStimulusStatus(stimulus.id, 'processed', 'feedback_dispatched');
             
-            // Cleanup metadata to prevent double processing
-            fs.unlinkSync(metaPath);
+            safeUnlinkSync(metaPath);
             break;
           }
         } catch (err: any) {
@@ -249,17 +225,15 @@ async function scanAndDispatch(channels: Channel[]) {
 }
 
 async function nexusLoop() {
-  logger.info('🛡️ Nexus Daemon (v6.0) active. Stateless Evidence-as-State established.');
+  logger.info('🛡️ Nexus Daemon (v6.1) standardized. Stateless Evidence-as-State established.');
 
-  // Ensure physical mission existence for TIBA compliance
   ensureSystemMission();
 
   while (true) {
     try {
       const channels = await loadChannelRegistry();
       
-      // 1. Process pending stimuli (Ingestion)
-      if (fs.existsSync(STIMULI_PATH)) {
+      if (safeExistsSync(STIMULI_PATH)) {
         const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
         const allStimuli = content.trim().split('\n')
           .filter(l => l.length > 0)
@@ -268,27 +242,22 @@ async function nexusLoop() {
         const pending = allStimuli.filter(s => s.control.status === 'pending');
 
         for (const stimulus of pending) {
-          // TTL Check
           const age = (Date.now() - new Date(stimulus.ts).getTime()) / 1000;
           if (stimulus.ttl > 0 && age > stimulus.ttl) {
             await updateStimulusStatus(stimulus.id, 'expired', 'ttl_expiration');
             continue;
           }
 
-          // 1. Determine Target Session (with Affinity)
-          // Simple hash-based mapping: source_id -> session_id
           const sessionPrefix = 's-';
           const sessionSuffix = stimulus.origin.source_id.substring(stimulus.origin.source_id.length - 8).toLowerCase();
           const targetSessionId = `${sessionPrefix}${sessionSuffix}`;
 
           logger.info(`🚀 [Nexus] Routing ${stimulus.id} to session ${targetSessionId} (Affinity: ${stimulus.origin.source_id})`);
           
-          // Determine Brain Profile
           const { profile, cleanPayload } = extractBrainProfile(stimulus.signal.payload);
           
-          // Inject stimulus metadata for physical tracking
           const sessionInDir = path.join(RUNTIME_BASE, targetSessionId, 'in');
-          if (!fs.existsSync(sessionInDir)) fs.mkdirSync(sessionInDir, { recursive: true });
+          if (!safeExistsSync(sessionInDir)) safeMkdir(sessionInDir, { recursive: true });
 
           const metaInPath = path.join(sessionInDir, 'metadata.json');
           safeWriteFile(metaInPath, JSON.stringify({
@@ -307,7 +276,6 @@ async function nexusLoop() {
         }
       }
 
-      // 2. Scan for results (Dispatch)
       await scanAndDispatch(channels);
 
     } catch (err: any) {

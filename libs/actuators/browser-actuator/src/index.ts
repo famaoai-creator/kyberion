@@ -16,7 +16,7 @@ import { chromium, Browser } from 'playwright';
  */
 
 interface BrowserAction {
-  action: 'navigate' | 'extract' | 'screenshot' | 'execute_scenario' | 'launch' | 'close';
+  action: 'navigate' | 'extract' | 'screenshot' | 'execute_scenario' | 'launch' | 'close' | 'snapshot';
   url?: string;
   scenario?: any[];
   output_path?: string;

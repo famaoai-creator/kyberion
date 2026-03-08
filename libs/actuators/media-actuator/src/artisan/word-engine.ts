@@ -51,7 +51,8 @@ export async function generateWordArtifact(
       fontSize: t.body.size * 2, // html-to-docx points
     };
 
-    return await HTMLtoDOCX(fullHtml, null, options);
+    const docxBlob = await HTMLtoDOCX(fullHtml, null, options);
+    return Buffer.from(docxBlob as any);
   } catch (err: any) {
     throw new Error(`Word generation failed: ${err.message}`);
   }

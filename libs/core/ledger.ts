@@ -1,13 +1,19 @@
-import * as fs from 'node:fs';
+import { 
+  safeReadFile, 
+  safeAppendFileSync, 
+  safeMkdir, 
+  safeExistsSync 
+} from './secure-io.js';
+import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 
 /**
- * Ecosystem Ledger v1.0
+ * Ecosystem Ledger v1.1 [STANDARDIZED]
  * Provides a centralized, tamper-evident audit trail for all governance events.
  */
 
-const LEDGER_PATH = path.join(process.cwd(), 'active/audit/governance-ledger.jsonl');
+const LEDGER_PATH = pathResolver.resolve('active/audit/governance-ledger.jsonl');
 
 export const record = (type: string, data: any) => {
   const timestamp = new Date().toISOString();
@@ -25,19 +31,22 @@ export const record = (type: string, data: any) => {
   const hash = createHash('sha256').update(JSON.stringify(entry)).digest('hex');
   entry.hash = hash;
 
-  if (!fs.existsSync(path.dirname(LEDGER_PATH))) {
-    fs.mkdirSync(path.dirname(LEDGER_PATH), { recursive: true });
+  const dir = path.dirname(LEDGER_PATH);
+  if (!safeExistsSync(dir)) {
+    safeMkdir(dir, { recursive: true });
   }
-  fs.appendFileSync(LEDGER_PATH, JSON.stringify(entry) + '\n');
+  
+  safeAppendFileSync(LEDGER_PATH, JSON.stringify(entry) + '\n');
   return hash;
 };
 
 function _getLastHash() {
-  if (!fs.existsSync(LEDGER_PATH)) return '0'.repeat(64);
+  if (!safeExistsSync(LEDGER_PATH)) return '0'.repeat(64);
   try {
-    const content = fs.readFileSync(LEDGER_PATH, 'utf8').trim();
-    if (!content) return '0'.repeat(64);
-    const lines = content.split('\n');
+    const content = safeReadFile(LEDGER_PATH, { encoding: 'utf8' }) as string;
+    const trimmed = content.trim();
+    if (!trimmed) return '0'.repeat(64);
+    const lines = trimmed.split('\n');
     const lastEntry = JSON.parse(lines[lines.length - 1]);
     return lastEntry.hash || '0'.repeat(64);
   } catch (_e) {
@@ -49,8 +58,10 @@ function _getLastHash() {
  * Verify the integrity of the entire ledger
  */
 export const verifyIntegrity = (): boolean => {
-  if (!fs.existsSync(LEDGER_PATH)) return true;
-  const lines = fs.readFileSync(LEDGER_PATH, 'utf8').trim().split('\n');
+  if (!safeExistsSync(LEDGER_PATH)) return true;
+  
+  const content = safeReadFile(LEDGER_PATH, { encoding: 'utf8' }) as string;
+  const lines = content.trim().split('\n');
   let expectedParentHash = '0'.repeat(64);
 
   for (const line of lines) {
