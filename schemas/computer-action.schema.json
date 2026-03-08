@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Unified Computer Action (KUCA) v1.0",
+  "description": "ADF for controlling Browser, System, Camera, and Voice using OpenAI ComputerAction style.",
+  "type": "object",
+  "required": ["actions"],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "click", "double_click", "move", "drag", "scroll", "type", "keypress", "wait", "screenshot",
+              "system_mouse_click", "system_mouse_move", "system_keypress",
+              "camera_capture", "voice_output"
+            ]
+          },
+          "x": { "type": "number", "description": "X coordinate (0-1440 for browser, or screen resolution for system)" },
+          "y": { "type": "number", "description": "Y coordinate (0-900 for browser, or screen resolution for system)" },
+          "button": { "type": "string", "enum": ["left", "right", "middle"], "default": "left" },
+          "text": { "type": "string", "description": "Text to type or voice to synthesize" },
+          "key": { "type": "string", "description": "Key to press (e.g., 'Enter', 'Control+C')" },
+          "duration_ms": { "type": "integer", "description": "Wait or action duration" },
+          "target": { "type": "string", "description": "Actuator target (e.g., 'browser', 'os', 'camera-0')" }
+        }
+      }
+    }
+  }
+}

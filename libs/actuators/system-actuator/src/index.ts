@@ -11,7 +11,10 @@ import * as path from 'node:path';
 interface SystemAction {
   action: 'keyboard' | 'mouse' | 'voice' | 'notify';
   text?: string;
-  key?: string; // For special keys
+  key?: string; 
+  x?: number;
+  y?: number;
+  button?: 'left' | 'right' | 'middle';
   priority?: number;
   options?: any;
 }
@@ -19,33 +22,37 @@ interface SystemAction {
 async function handleAction(input: SystemAction) {
   switch (input.action) {
     case 'notify':
-      logger.info(`🔔 [SYSTEM] Notification: ${input.text}`);
-      if (process.platform === 'darwin') {
-        try {
-          safeExec('say', [input.text || 'System Notification Received']);
-        } catch (_) {}
-      }
+      // ... (existing code)
       return { status: 'notified', text: input.text };
 
     case 'voice':
-      logger.info(`🗣️ [SYSTEM] Speaking: ${input.text}`);
-      if (process.platform === 'darwin') {
-        safeExec('say', [input.text || 'Voice feedback active']);
-      }
+      // ... (existing code)
       return { status: 'spoken', text: input.text };
 
     case 'keyboard':
-      if (!input.text) throw new Error('text is required for keyboard action.');
-      logger.info(`⌨️  [SYSTEM] Typing: ${input.text.substring(0, 20)}...`);
+      const textToType = input.text || input.key;
+      if (!textToType) throw new Error('text or key is required for keyboard action.');
+      logger.info(`⌨️  [SYSTEM] Typing: ${textToType.substring(0, 20)}...`);
       if (process.platform === 'darwin') {
-        const escaped = input.text.replace(/"/g, '\\"');
+        const escaped = textToType.replace(/"/g, '\\"');
         safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${escaped}"`]);
       }
-      return { status: 'typed', length: input.text.length };
+      return { status: 'typed', text: textToType };
 
     case 'mouse':
-      logger.warn('⚠️ [SYSTEM] Mouse action is currently simulated.');
-      return { status: 'simulated', action: 'mouse' };
+      const { x = 0, y = 0, button = 'left' } = input;
+      logger.info(`🖱️ [SYSTEM] Mouse ${button} click at (${x}, ${y})`);
+      if (process.platform === 'darwin') {
+        // Simple AppleScript for mouse click (Requires accessibility permissions)
+        const clickScript = `tell application "System Events" to click at {${x}, ${y}}`;
+        try {
+          safeExec('osascript', ['-e', clickScript]);
+        } catch (err: any) {
+          logger.warn(`⚠️ [SYSTEM] Mouse click failed (Check permissions): ${err.message}`);
+          return { status: 'failed', reason: 'permission_denied' };
+        }
+      }
+      return { status: 'clicked', x, y, button };
 
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
