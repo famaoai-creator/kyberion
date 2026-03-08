@@ -97,6 +97,10 @@
     "./shared-business-types": {
       "types": "./shared-business-types.ts",
       "default": "./shared-business-types.ts"
+    },
+    "./nerve-bridge": {
+      "types": "./nerve-bridge.d.ts",
+      "default": "./nerve-bridge.js"
     }
   },
   "dependencies": {

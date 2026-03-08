@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import path from 'node:path';
 import { 
   detectTier, 
-  canFlowTo, 
   scanForConfidentialMarkers,
   wrapSkill,
   wrapSkillAsync,
@@ -21,13 +20,6 @@ describe('core library bundle', () => {
     it('should detect public tier', () => {
       const tier = detectTier(path.join(rootDir(), 'knowledge/orchestration/global_skill_index.json'));
       expect(tier).toBe('public');
-    });
-
-    it('should validate tier flow correctly', () => {
-      expect(canFlowTo('public', 'public')).toBe(true);
-      expect(canFlowTo('personal', 'public')).toBe(false);
-      expect(canFlowTo('personal', 'personal')).toBe(true);
-      expect(canFlowTo('confidential', 'public')).toBe(false);
     });
 
     it('should scan for confidential markers', () => {

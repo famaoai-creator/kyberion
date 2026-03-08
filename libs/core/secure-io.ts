@@ -240,3 +240,27 @@ export function writeArtifact(filePath: string, data: string | Buffer, format: s
 // Alias for compatibility
 export const safeAppendFile = safeAppendFileSync;
 export const safeUnlink = safeUnlinkSync;
+
+/**
+ * Safely read a directory with permission validation.
+ */
+export function safeReaddir(dirPath: string): string[] {
+  const resolved = pathResolver.resolve(dirPath);
+  const check = validateReadPermission(resolved);
+  if (!check.allowed) {
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''}`);
+  }
+  return fs.readdirSync(resolved);
+}
+
+/**
+ * Safely get file status with permission validation.
+ */
+export function safeStat(filePath: string): fs.Stats {
+  const resolved = pathResolver.resolve(filePath);
+  const check = validateReadPermission(resolved);
+  if (!check.allowed) {
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''}`);
+  }
+  return fs.statSync(resolved);
+}

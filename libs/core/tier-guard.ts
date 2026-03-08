@@ -44,8 +44,10 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const resolvedPath = path.resolve(filePath);
   const currentMission = process.env.MISSION_ID;
   
-  // 1. Identify Current Role from physical state
+  // 1. Identify Current Role from physical state or environment
   let currentRole = 'unknown';
+  const envRole = process.env.MISSION_ROLE;
+
   if (currentMission) {
     const statePath = path.join(ROOT_DIR, 'active/missions', currentMission, 'mission-state.json');
     try {
@@ -54,6 +56,11 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
         currentRole = (state.assigned_persona || 'unknown').toLowerCase().replace(/\s+/g, '_');
       }
     } catch (_) {}
+  }
+
+  // Fallback to environment role if unknown (crucial for mission bootstrap)
+  if (currentRole === 'unknown' && envRole) {
+    currentRole = envRole.toLowerCase().replace(/\s+/g, '_');
   }
 
   // 2. Load Role-Based Access Matrix
