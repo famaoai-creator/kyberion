@@ -1,0 +1,18 @@
+{
+  "name": "Standard Integrity Policy",
+  "version": "1.0.0",
+  "checks": [
+    {
+      "id": "schema-validation",
+      "type": "schema",
+      "target": "schemas",
+      "description": "Ensure all JSON schemas are valid and follow conventions"
+    },
+    {
+      "id": "knowledge-links",
+      "type": "knowledge",
+      "target": "knowledge",
+      "description": "Scan for broken internal links in the knowledge base"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
  */
 
 interface SystemAction {
-  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit';
+  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity';
   text?: string;
   key?: string; 
   x?: number;
@@ -20,6 +20,7 @@ interface SystemAction {
   options?: any;
   rules_path?: string; // for 'validate' and 'audit' actions
   target_dir?: string; // for 'validate' action
+  checks?: any[]; // for 'integrity' action
 }
 
 async function handleAction(input: SystemAction) {
@@ -62,9 +63,100 @@ async function handleAction(input: SystemAction) {
     case 'audit':
       return await performAudit(input);
 
+    case 'integrity':
+      return await performIntegrityCheck(input);
+
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
   }
+}
+
+async function performIntegrityCheck(input: SystemAction) {
+  const checks = input.checks || [];
+  const results: any[] = [];
+  let overallStatus = 'passed';
+
+  for (const check of checks) {
+    logger.info(`🛡️ [Integrity] Running check: ${check.type} on ${check.target || 'base'}`);
+    const result: any = { type: check.type, target: check.target, status: 'passed' };
+
+    try {
+      switch (check.type) {
+        case 'schema':
+          const schemaResult = validateSchemas(check.target || 'schemas');
+          result.stats = schemaResult;
+          if (schemaResult.errors > 0) result.status = 'failed';
+          break;
+        case 'knowledge':
+          const knowledgeResult = validateKnowledgeIntegrity(check.target || 'knowledge');
+          result.stats = knowledgeResult;
+          if (knowledgeResult.brokenLinks > 0) result.status = 'failed';
+          break;
+        default:
+          throw new Error(`Unsupported integrity check type: ${check.type}`);
+      }
+    } catch (err: any) {
+      result.status = 'failed';
+      result.error = err.message;
+      overallStatus = 'failed';
+    }
+    
+    if (result.status === 'failed') overallStatus = 'failed';
+    results.push(result);
+  }
+
+  return { status: overallStatus, timestamp: new Date().toISOString(), results };
+}
+
+function validateSchemas(targetDir: string) {
+  const fullPath = path.resolve(process.cwd(), targetDir);
+  if (!fs.existsSync(fullPath)) throw new Error(`Schemas directory not found: ${targetDir}`);
+
+  let errors = 0;
+  const files = fs.readdirSync(fullPath).filter((f) => f.endsWith('.schema.json'));
+
+  for (const file of files) {
+    const filePath = path.join(fullPath, file);
+    const content = fs.readFileSync(filePath, 'utf8');
+    const schema = JSON.parse(content);
+
+    if (!schema.$schema || !schema.title || !schema.type) {
+      logger.error(`❌ [Integrity] Schema error in ${file}: Missing required fields ($schema, title, type)`);
+      errors++;
+    }
+  }
+
+  return { checked: files.length, errors };
+}
+
+function validateKnowledgeIntegrity(targetDir: string) {
+  const fullPath = path.resolve(process.cwd(), targetDir);
+  if (!fs.existsSync(fullPath)) throw new Error(`Knowledge directory not found: ${targetDir}`);
+
+  const files = getAllFiles(fullPath).filter(f => f.endsWith('.md'));
+  let brokenLinks = 0;
+  let totalLinks = 0;
+
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf8');
+    const relFile = path.relative(fullPath, file);
+    const linkRegex = /(?<!`)\[([^\]]+)\]\(([^)]+)\)(?!`)/g;
+    let match;
+
+    while ((match = linkRegex.exec(content)) !== null) {
+      const link = match[2];
+      if (link.startsWith('http') || link.startsWith('#')) continue;
+      
+      totalLinks++;
+      const linkPath = path.resolve(path.dirname(file), link);
+      if (!fs.existsSync(linkPath)) {
+        logger.error(`❌ [Integrity] Broken link in ${relFile}: ${link}`);
+        brokenLinks++;
+      }
+    }
+  }
+
+  return { checkedFiles: files.length, totalLinks, brokenLinks };
 }
 
 async function performAudit(input: SystemAction) {

@@ -1,0 +1,9 @@
+{
+  "action": "ingest",
+  "pipelines": [
+    {
+      "type": "incident",
+      "target": "active/shared/nbs_incidents_all.json"
+    }
+  ]
+}
