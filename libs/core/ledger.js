@@ -109,4 +109,3 @@ const verifyIntegrity = () => {
 exports.verifyIntegrity = verifyIntegrity;
 // Legacy support
 exports.ledger = { record: exports.record, verifyIntegrity: exports.verifyIntegrity };
-//# sourceMappingURL=ledger.js.map

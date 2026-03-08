@@ -44,7 +44,7 @@ const chalk_1 = __importDefault(require("chalk"));
  * Lightweight metrics collection for Gemini Skills.
  */
 const DEFAULT_METRICS_DIR = path.join(process.cwd(), 'work', 'metrics');
-const DEFAULT_METRICS_FILE = 'skill-metrics.jsonl';
+const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 const COST_TABLE = {
     'gpt-4o': { prompt: 0.005 / 1000, completion: 0.015 / 1000 },
@@ -67,7 +67,7 @@ class MetricsCollector {
         this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
         this._aggregates = new Map();
     }
-    record(skillName, durationMs, status, extra = {}) {
+    record(componentName, durationMs, status, extra = {}) {
         const mem = process.memoryUsage();
         const memory = {
             heapUsedMB: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
@@ -75,9 +75,9 @@ class MetricsCollector {
             rssMB: Math.round((mem.rss / 1024 / 1024) * 100) / 100,
         };
         if (memory.heapUsedMB > this._memoryBudgetMB) {
-            console.warn(chalk_1.default.yellow(`[${skillName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
+            console.warn(chalk_1.default.yellow(`[${componentName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
         }
-        let agg = this._aggregates.get(skillName);
+        let agg = this._aggregates.get(componentName);
         if (!agg) {
             agg = {
                 count: 0,
@@ -100,7 +100,7 @@ class MetricsCollector {
                 completionTokens: 0,
                 totalTokens: 0,
             };
-            this._aggregates.set(skillName, agg);
+            this._aggregates.set(componentName, agg);
         }
         agg.count++;
         if (status === 'error')
@@ -138,7 +138,7 @@ class MetricsCollector {
         }
         if (this._persist) {
             this._appendToFile({
-                skill: skillName,
+                component: componentName,
                 duration_ms: durationMs,
                 status,
                 timestamp: agg.lastRun,
@@ -169,7 +169,7 @@ class MetricsCollector {
             const purgePenalty = Math.min(20, (agg.cachePurges || 0) * 5);
             const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - (timeImpact + memImpact) + cacheBonus - purgePenalty)));
             summaries.push({
-                skill: name,
+                component: name,
                 executions: agg.count,
                 errors: agg.errors,
                 errorRate: agg.count > 0 ? Math.round((agg.errors / agg.count) * 1000) / 10 : 0,
@@ -330,4 +330,3 @@ class MetricsCollector {
 }
 exports.MetricsCollector = MetricsCollector;
 exports.metrics = new MetricsCollector();
-//# sourceMappingURL=metrics.js.map

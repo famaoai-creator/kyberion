@@ -177,4 +177,3 @@ function scanForConfidentialMarkers(content) {
     }
     return { hasMarkers: found.length > 0, markers: found };
 }
-//# sourceMappingURL=tier-guard.js.map

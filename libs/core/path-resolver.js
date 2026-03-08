@@ -56,7 +56,7 @@ function findProjectRoot(startDir) {
     let current = startDir;
     while (current !== path.parse(current).root) {
         if (fs.existsSync(path.join(current, 'package.json')) &&
-            fs.existsSync(path.join(current, 'skills'))) {
+            (fs.existsSync(path.join(current, 'libs/actuators')) || fs.existsSync(path.join(current, 'knowledge')))) {
             return current;
         }
         current = path.dirname(current);
@@ -91,11 +91,17 @@ function isProtected(filePath) {
 }
 function skillDir(skillName) {
     if (!fs.existsSync(INDEX_PATH))
-        return path.join(PROJECT_ROOT_DIR, 'skills/utilities', skillName);
+        return path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
     const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
     const skillList = index.s || index.skills || [];
     const skill = skillList.find((s) => (s.n || s.name) === skillName);
-    return skill && skill.path ? path.join(PROJECT_ROOT_DIR, skill.path) : path.join(PROJECT_ROOT_DIR, skillName);
+    if (skill && skill.path)
+        return path.join(PROJECT_ROOT_DIR, skill.path);
+    // Actuator fallback
+    const actuatorPath = path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
+    if (fs.existsSync(actuatorPath))
+        return actuatorPath;
+    return path.join(PROJECT_ROOT_DIR, skillName);
 }
 function missionDir(missionId) {
     const dir = path.join(ACTIVE_ROOT, 'missions', missionId);
@@ -138,4 +144,3 @@ exports.pathResolver = {
     resolve,
     rootResolve,
 };
-//# sourceMappingURL=path-resolver.js.map

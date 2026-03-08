@@ -25,7 +25,7 @@ async function main() {
     try {
       const stateContent = safeReadFile(statePath, { encoding: 'utf8' }) as string;
       const state = JSON.parse(stateContent);
-      console.log(chalk.cyan(`\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status})`));
+      process.stderr.write(chalk.cyan(`\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status})\n`));
     } catch (_) {}
   }
 
@@ -37,10 +37,9 @@ async function main() {
     try {
       const patchContent = safeReadFile(patchPath, { encoding: 'utf8' }) as string;
       const patch = JSON.parse(patchContent);
-      console.log(chalk.magenta(`\n🎭 PERSONA SWAP: Loading latent wisdom from branch "${branchId}"`));
-      console.log(chalk.gray(`Rules: ${patch.delta_rules.join(', ')}`));
+      process.stderr.write(chalk.magenta(`\n🎭 PERSONA SWAP: Loading latent wisdom from branch "${branchId}"\n`));
     } catch (_) {
-      console.log(chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.`));
+      process.stderr.write(chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.\n`));
     }
     skillArgs.splice(branchIdx, 2);
   }
@@ -64,13 +63,24 @@ async function main() {
 
     const cleanArgs = skillArgs.filter(arg => arg !== '--');
     const cmd = `node "${script}" ${cleanArgs.map(a => `"${a}"`).join(' ')}`;
-    console.log(chalk.blue(`🚀 ACTUATING: ${skillName}...`));
+    process.stderr.write(chalk.blue(`🚀 ACTUATING: ${skillName}...\n`));
     
     try {
       const { execSync } = await import('node:child_process');
-      execSync(cmd, { stdio: 'inherit', env: { ...process.env, MISSION_ID: missionId || '' } });
+      // Capture stdout from skill and Relay it to our own stdout
+      const output = execSync(cmd, { 
+        encoding: 'utf8', // Ensure output is a string
+        stdio: ['inherit', 'pipe', 'inherit'], 
+        env: { ...process.env, MISSION_ID: missionId || '' } 
+      });
+      if (output) {
+        process.stdout.write(output);
+      }
     } catch (err: any) {
-      logger.error(`Execution failed: ${err.message}`);
+      process.stderr.write(chalk.red(`\n❌ Execution failed: ${err.message}\n`));
+      if (err.stdout) {
+        process.stdout.write(err.stdout.toString());
+      }
     }
   } else {
     console.log(chalk.yellow('\n🌌 KYBERION CONSOLE v2.1 [SECURE-IO ENFORCED]'));

@@ -415,4 +415,3 @@ exports.fileUtils = {
         return 'Logic is a Hygiene Factor. Vision is the Compass.';
     },
 };
-//# sourceMappingURL=core.js.map
