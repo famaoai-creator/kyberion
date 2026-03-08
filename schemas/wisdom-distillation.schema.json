@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Wisdom Distillation Job Specification",
+  "description": "ADF definition for extracting and consolidating strategic insights from mission evidence and governance logs.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "job_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "mode": {
+      "type": "string",
+      "enum": ["mission", "archive", "ledger", "all"],
+      "default": "all"
+    },
+    "targets": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Specific mission IDs or paths to distill. If empty and mode is 'mission', scans active/missions."
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "include_logs": { "type": "boolean", "default": true },
+        "target_tier": {
+          "type": "string",
+          "enum": ["public", "confidential", "personal"],
+          "default": "confidential"
+        },
+        "output_format": { "type": "string", "enum": ["markdown", "json"], "default": "markdown" }
+      }
+    }
+  },
+  "required": ["version", "job_id", "mode"]
+}

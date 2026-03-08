@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Judgment & Analysis Job Specification",
+  "description": "ADF definition for automated evaluation of mission outcomes and persona alignment.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "job_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "mission_id": { "type": "string" },
+    "role": { "type": "string" },
+    "criteria": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Specific criteria to evaluate against. If empty, uses default persona-based criteria."
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["judge", "ace_consensus", "alignment_mirror", "all"]
+      },
+      "default": ["all"]
+    }
+  },
+  "required": ["version", "job_id", "mission_id"]
+}

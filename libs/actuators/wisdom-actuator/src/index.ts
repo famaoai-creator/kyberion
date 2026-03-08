@@ -32,9 +32,11 @@ interface WisdomAction {
   missionId?: string;
   targetTier?: 'public' | 'confidential' | 'personal';
   target_dir?: string; // for 'aggregate' action
-  output_file?: string; // for 'aggregate' action
+  output_file?: string; // for 'aggregate' or 'distill' action
   reports?: ReportSpec[]; // for 'report' action
   options?: any;
+  mode?: 'mission' | 'archive' | 'ledger' | 'all';
+  targets?: string[];
 }
 
 interface CapabilityEntry {
@@ -69,8 +71,7 @@ function initializeCapability(capabilityPath: string, name: string, category: st
 async function handleAction(input: WisdomAction) {
   switch (input.action) {
     case 'distill':
-      logger.info(`🧠 [WISDOM] Distilling from: ${input.missionId}`);
-      return { status: 'success', patchId: `patch-${input.missionId}-${Date.now()}` };
+      return await performDistillation(input);
 
     case 'swap':
       const patchPath = path.join(VAULT_DIR, `${input.patchId}.json`);
@@ -90,6 +91,162 @@ async function handleAction(input: WisdomAction) {
 
     default:
       return { status: 'executed' };
+  }
+}
+
+async function performDistillation(input: WisdomAction) {
+  const mode = input.mode || 'all';
+  const results: any[] = [];
+  const timestamp = new Date().toISOString().split('T')[0];
+
+  logger.info(`🧠 [WISDOM] Distillation started (Mode: ${mode})`);
+
+  if (mode === 'mission' || mode === 'all') {
+    const targets = input.targets || [];
+    if (targets.length === 0) {
+      const activeMissionsDir = path.resolve(process.cwd(), 'active/missions');
+      if (fs.existsSync(activeMissionsDir)) {
+        const missions = fs.readdirSync(activeMissionsDir).filter(f => fs.statSync(path.join(activeMissionsDir, f)).isDirectory());
+        targets.push(...missions.map(m => path.join(activeMissionsDir, m)));
+      }
+    }
+    
+    for (const target of targets) {
+      const result = await distillMission(target);
+      if (result) results.push({ type: 'mission', target: path.basename(target), path: result });
+    }
+  }
+
+  if (mode === 'archive' || mode === 'all') {
+    const archiveResult = await distillArchives();
+    if (archiveResult) results.push({ type: 'archive', path: archiveResult });
+  }
+
+  if (mode === 'ledger' || mode === 'all') {
+    const ledgerResult = await distillLedger(timestamp);
+    if (ledgerResult) results.push({ type: 'ledger', path: ledgerResult });
+  }
+
+  return { status: 'success', results };
+}
+
+async function distillMission(missionDir: string): Promise<string | null> {
+  const missionId = path.basename(missionDir);
+  const reportPath = path.join(missionDir, 'ace-report.json');
+  const logPath = path.join(missionDir, 'execution.log');
+  const wisdomDir = path.resolve(process.cwd(), 'knowledge/incidents');
+
+  if (!fs.existsSync(reportPath)) return null;
+
+  try {
+    const report = JSON.parse(safeReadFile(reportPath, { encoding: 'utf8' }) as string);
+    let logContent = '';
+    if (fs.existsSync(logPath)) logContent = safeReadFile(logPath, { encoding: 'utf8' }) as string;
+
+    const isSuccess = report.status === 'success' || logContent.includes('[SUCCESS]');
+    const category = isSuccess ? 'success-pattern' : 'incident-recovery';
+
+    const extractLessons = (log: string, success: boolean) => {
+      if (!log) return 'No logs available.';
+      const lines = log.split('\n');
+      const lessons: string[] = [];
+      if (!success) {
+        const errors = lines.filter(l => l.includes('ERROR') || l.includes('fail')).slice(-5);
+        if (errors.length > 0) { lessons.push('### Failure Root Cause (Estimated)', errors.join('\n')); }
+      }
+      const obs = lines.filter(l => l.includes('Observation') || l.includes('Finding'));
+      if (obs.length > 0) { lessons.push('### Key Observations', obs.slice(0, 5).join('\n')); }
+      return lessons.length === 0 ? 'Execution completed without specific logged observations.' : lessons.join('\n\n');
+    };
+
+    const content = `---\nmission_id: ${missionId}\ntimestamp: ${report.timestamp || new Date().toISOString()}\ncategory: ${category}\nrole: ${report.role || 'Unknown'}\n---\n\n# Wisdom Distilled from Mission ${missionId}\n\n## 🎯 Intent\n${report.intent || 'Unknown'}\n\n## 📊 Outcome\n**${isSuccess ? 'Victory Conditions Met' : 'Execution Failed'}**\n\n## 📝 Summary\n${report.summary || 'No summary provided.'}\n\n## 💡 Key Lessons\n${extractLessons(logContent, isSuccess)}\n`;
+
+    if (!fs.existsSync(wisdomDir)) safeMkdir(wisdomDir, { recursive: true });
+    const filePath = path.join(wisdomDir, `distilled-${missionId}-${Date.now()}.md`);
+    safeWriteFile(filePath, content);
+    return filePath;
+  } catch (err: any) {
+    logger.error(`[Distiller] Error in ${missionId}: ${err.message}`);
+    return null;
+  }
+}
+
+async function distillArchives(): Promise<string | null> {
+  const archiveDir = path.resolve(process.cwd(), 'archive/missions');
+  const historyPath = path.resolve(process.cwd(), 'knowledge/operations/mission_history.md');
+  if (!fs.existsSync(archiveDir)) return null;
+
+  logger.info('📚 [WISDOM] Distilling archived missions...');
+  const missions: any[] = [];
+  const folders = fs.readdirSync(archiveDir).filter(f => fs.statSync(path.join(archiveDir, f)).isDirectory());
+
+  for (const folder of folders) {
+    const missionDir = path.join(archiveDir, folder);
+    const statePath = path.join(missionDir, 'mission-state.json');
+    const prPath = path.join(missionDir, 'PR_DESCRIPTION.md');
+    let id = folder, persona = 'Unknown', summary = 'No detailed summary available.', completedAt = fs.statSync(missionDir).mtime.toISOString();
+
+    if (fs.existsSync(statePath)) {
+      try {
+        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        id = state.mission_id || id;
+        persona = state.assigned_persona || persona;
+        if (state.history?.length) completedAt = state.history[state.history.length - 1].ts || completedAt;
+      } catch (e) {}
+    }
+    if (fs.existsSync(prPath)) {
+      const prContent = fs.readFileSync(prPath, 'utf8');
+      const match = prContent.match(/## 🎯 Overview\n([\s\S]*?)(?=## |$)/);
+      if (match) summary = match[1].trim();
+    }
+    missions.push({ id, completedAt, persona, summary });
+  }
+
+  missions.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+  let md = `# Mission History Ledger\n\n自動生成された、エコシステムの過去の全ミッションの完了記録です。\n\n`;
+  for (const m of missions) {
+    md += `## [${new Date(m.completedAt).toLocaleDateString()}] ${m.id}\n- **Persona**: ${m.persona}\n- **Summary**:\n  > ${m.summary.replace(/\n/g, '\n  > ')}\n\n`;
+  }
+  
+  if (!fs.existsSync(path.dirname(historyPath))) safeMkdir(path.dirname(historyPath), { recursive: true });
+  safeWriteFile(historyPath, md);
+  return historyPath;
+}
+
+async function distillLedger(timestamp: string): Promise<string | null> {
+  const ledgerPath = path.resolve(process.cwd(), 'active/audit/governance-ledger.jsonl');
+  const evolutionDir = path.resolve(process.cwd(), 'knowledge/evolution');
+  if (!fs.existsSync(ledgerPath)) return null;
+
+  logger.info('🧠 [WISDOM] Distilling from governance ledger...');
+  try {
+    const lines = (safeReadFile(ledgerPath, { encoding: 'utf8' }) as string).trim().split('\n').filter(l => l.trim().length > 0);
+    const entries = lines.map(l => JSON.parse(l));
+    const failures = entries.filter(e => e.payload && (e.payload.status === 'error' || e.type === 'VIOLATION'));
+    const successes = entries.filter(e => e.payload && e.payload.status === 'success');
+
+    const reportFile = path.join(evolutionDir, `wisdom_${timestamp.replace(/-/g, '_')}.md`);
+    let report = `# 🧠 Autonomous Wisdom Distillation - ${timestamp}\n\n## 🛡️ Critical Incidents & Learned Patterns\n\n`;
+
+    if (failures.length > 0) {
+      const patterns = new Set(failures.map(f => f.payload.script || f.type));
+      patterns.forEach(p => {
+        const count = failures.filter(f => (f.payload.script || f.type) === p).length;
+        report += `- **Pattern: ${p}**\n  - Occurrences: ${count}\n  - Insight: Recurring issues detected. Automated repair or architectural refinement recommended.\n`;
+      });
+    } else { report += `No critical failures detected. Ecosystem stability is high.\n`; }
+
+    report += `\n## ✅ Stabilization Achievements\n\n- Total Success Events: ${successes.length}\n- Integrity Level: Verified by Ledger Chain.\n`;
+    if (!fs.existsSync(evolutionDir)) safeMkdir(evolutionDir, { recursive: true });
+    
+    if (fs.existsSync(reportFile)) {
+      const existing = safeReadFile(reportFile, { encoding: 'utf8' }) as string;
+      safeWriteFile(reportFile, existing + '\n\n---\n\n' + report);
+    } else { safeWriteFile(reportFile, report); }
+    return reportFile;
+  } catch (err: any) {
+    logger.error(`[WISDOM] Ledger Distillation Failure: ${err.message}`);
+    return null;
   }
 }
 

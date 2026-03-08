@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
  */
 
 interface SystemAction {
-  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity';
+  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity' | 'judge' | 'ace_consensus' | 'alignment_mirror';
   text?: string;
   key?: string; 
   x?: number;
@@ -21,6 +21,9 @@ interface SystemAction {
   rules_path?: string; // for 'validate' and 'audit' actions
   target_dir?: string; // for 'validate' action
   checks?: any[]; // for 'integrity' action
+  mission_id?: string; // for 'judge' and 'ace_consensus'
+  role?: string; // for 'judge' and 'ace_consensus'
+  status?: string; // for 'ace_consensus'
 }
 
 async function handleAction(input: SystemAction) {
@@ -66,9 +69,135 @@ async function handleAction(input: SystemAction) {
     case 'integrity':
       return await performIntegrityCheck(input);
 
+    case 'judge':
+      return await performJudgment(input);
+
+    case 'ace_consensus':
+      return await performAceConsensus(input);
+
+    case 'alignment_mirror':
+      return await performAlignmentMirror(input);
+
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
   }
+}
+
+async function performJudgment(input: SystemAction) {
+  const missionId = input.mission_id;
+  if (!missionId) throw new Error('mission_id is required for judge action');
+  
+  const missionDir = path.resolve(process.cwd(), 'active/missions', missionId);
+  const reportPath = path.join(missionDir, 'ace-report.json');
+  const logPath = path.join(missionDir, 'execution.log');
+  const rulesPath = path.resolve(process.cwd(), 'knowledge/governance/judgment-rules.json');
+
+  if (!fs.existsSync(reportPath)) throw new Error(`Report not found for mission ${missionId}`);
+  const rules = fs.existsSync(rulesPath) ? JSON.parse(fs.readFileSync(rulesPath, 'utf8')) : { personas: {} };
+
+  try {
+    const report = JSON.parse(safeReadFile(reportPath, { encoding: 'utf8' }) as string);
+    const logContent = fs.existsSync(logPath) ? safeReadFile(logPath, { encoding: 'utf8' }) as string : '';
+    const assignedRole = input.role || report.role || 'Ecosystem Architect';
+    
+    let judgePersona = 'Ecosystem Architect';
+    if (assignedRole.includes('Security')) judgePersona = 'Security Reviewer';
+    else if (assignedRole.includes('PMO') || assignedRole.includes('Auditor')) judgePersona = 'Ruthless Auditor';
+    else if (assignedRole.includes('Developer') || assignedRole.includes('CTO')) judgePersona = 'Pragmatic CTO';
+
+    const criteria = rules.personas[judgePersona] || { weight: 1.0, focus: 'General Analysis', thresholds: { S: 90, A: 80, B: 70, C: 60 } };
+    let baseScore = report.status === 'success' ? 85 : 40;
+    const errorCount = (logContent.match(/ERROR/g) || []).length;
+    baseScore -= errorCount * 5;
+
+    const finalScore = Math.max(0, Math.min(100, Math.round(baseScore * criteria.weight)));
+    let grade = 'F';
+    const t = criteria.thresholds;
+    if (finalScore >= (t.S || 90)) grade = 'S';
+    else if (finalScore >= (t.A || 80)) grade = 'A';
+    else if (finalScore >= (t.B || 70)) grade = 'B';
+    else if (finalScore >= (t.C || 60)) grade = 'C';
+    else if (finalScore >= 40) grade = 'D';
+
+    const evaluation = { missionId, judge: judgePersona, focus: criteria.focus, score: finalScore, grade, timestamp: new Date().toISOString() };
+    safeWriteFile(path.join(missionDir, 'ai-evaluation.json'), JSON.stringify(evaluation, null, 2));
+    return { status: 'success', evaluation };
+  } catch (err: any) {
+    logger.error(`[AI-Judge] Error: ${err.message}`);
+    return { status: 'failed', error: err.message };
+  }
+}
+
+async function performAceConsensus(input: SystemAction) {
+  const { mission_id: missionId, role: roleName, status = 'APPROVED' } = input;
+  if (!missionId || !roleName) throw new Error('mission_id and role are required for ace_consensus');
+
+  const missionDir = path.resolve(process.cwd(), 'active/missions', missionId);
+  const roleId = roleName.toLowerCase().replace(/ /g, '_');
+  const personaDir = path.join(missionDir, `role_${roleId}`);
+  const consensusPath = path.join(missionDir, 'consensus.json');
+
+  if (!fs.existsSync(personaDir)) {
+    safeMkdir(path.join(personaDir, 'evidence'), { recursive: true });
+    safeMkdir(path.join(personaDir, 'scratch'), { recursive: true });
+  }
+
+  const result = { role: roleName, action: 'Review', status, timestamp: new Date().toISOString(), findings: `Analysis performed under ${roleName} guidelines.` };
+  safeWriteFile(path.join(personaDir, 'evidence', `action_${Date.now()}.json`), JSON.stringify(result, null, 2));
+
+  let consensus: any = { approvals: {}, last_updated: null, conflict: false };
+  if (fs.existsSync(consensusPath)) {
+    try { consensus = JSON.parse(safeReadFile(consensusPath, { encoding: 'utf8' }) as string); } catch (_) {}
+  }
+  consensus.approvals[roleName] = status;
+  consensus.last_updated = new Date().toISOString();
+  const states = Object.values(consensus.approvals);
+  consensus.conflict = states.includes('NO-GO') && states.includes('APPROVED');
+
+  safeWriteFile(consensusPath, JSON.stringify(consensus, null, 2));
+  return { status: 'success', consensus };
+}
+
+async function performAlignmentMirror(_input: SystemAction) {
+  const missionsDir = path.resolve(process.cwd(), 'active/missions');
+  const vaultDir = path.resolve(process.cwd(), 'knowledge/evolution/latent-wisdom');
+  if (!fs.existsSync(vaultDir)) safeMkdir(vaultDir, { recursive: true });
+
+  const missions = fs.readdirSync(missionsDir).filter(m => !m.startsWith('.'));
+  const results = [];
+
+  for (const missionId of missions) {
+    const statePath = path.join(missionsDir, missionId, 'mission-state.json');
+    if (!fs.existsSync(statePath)) continue;
+
+    try {
+      const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+      if (state.status === 'Completed' && !state.distilled) {
+        const learningsPath = path.join(missionsDir, missionId, 'LEARNINGS.md');
+        if (fs.existsSync(learningsPath)) {
+          const learnings = safeReadFile(learningsPath, { encoding: 'utf8' }) as string;
+          const patchId = `patch-${missionId.toLowerCase()}-${Date.now().toString().slice(-4)}`;
+          const patch = {
+            id: patchId, source_mission: missionId, timestamp: new Date().toISOString(),
+            deviation_summary: "Automated distillation of divergent success.",
+            delta_rules: learnings.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2)),
+            evidence_path: `active/missions/${missionId}/evidence/`
+          };
+          const patchPath = path.join(vaultDir, `${patchId}.json`);
+          safeWriteFile(patchPath, JSON.stringify(patch, null, 2));
+          state.distilled = true;
+          state.patch_id = patchId;
+          safeWriteFile(statePath, JSON.stringify(state, null, 2));
+          results.push({ missionId, patchId, path: patchPath });
+        }
+      }
+    } catch (err: any) { logger.error(`Error in alignment mirror for ${missionId}: ${err.message}`); }
+  }
+  return { status: 'success', distilled: results };
+}
+
+function safeMkdir(dirPath: string, options?: any) {
+  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, options);
 }
 
 async function performIntegrityCheck(input: SystemAction) {

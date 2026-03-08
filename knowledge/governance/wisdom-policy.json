@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "name": "Global Wisdom Distillation Policy",
+  "description": "Rules for automated insight extraction and knowledge evolution.",
+  "rules": [
+    {
+      "id": "RULE-W001",
+      "trigger": "mission_completion",
+      "action": "distill_mission",
+      "target_tier": "confidential",
+      "output_dir": "knowledge/incidents"
+    },
+    {
+      "id": "RULE-W002",
+      "trigger": "scheduled_weekly",
+      "action": "distill_ledger",
+      "target_tier": "public",
+      "output_dir": "knowledge/evolution"
+    },
+    {
+      "id": "RULE-W003",
+      "trigger": "manual_archive",
+      "action": "distill_archives",
+      "target_tier": "public",
+      "output_dir": "knowledge/operations"
+    }
+  ],
+  "tier_mapping": {
+    "public": "knowledge/evolution",
+    "confidential": "knowledge/incidents",
+    "personal": "vault/private/wisdom"
+  }
+}
