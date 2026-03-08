@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission Management Schema",
+  "description": "Configuration for mission import, export, PR generation, and task management.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string" },
+    "directories": {
+      "type": "object",
+      "properties": {
+        "active": { "type": "string" },
+        "archive": { "type": "string" },
+        "exports": { "type": "string" }
+      }
+    },
+    "mep_version": { "type": "string" },
+    "rehydrate_map": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "required": ["version", "directories"]
+}
