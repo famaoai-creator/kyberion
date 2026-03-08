@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MissionLifecyclePolicy",
+  "type": "object",
+  "required": ["policies"],
+  "properties": {
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "condition", "target_dir"],
+        "properties": {
+          "name": { "type": "string" },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "max_age_days": { "type": "integer" },
+              "has_file": { "type": "string" }
+            }
+          },
+          "target_dir": { "type": "string" },
+          "naming_pattern": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@
  */
 
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { 
   logger, 
   pathResolver, 
@@ -102,7 +103,46 @@ function saveState(id: string, state: MissionState) {
 /**
  * 4. Mission Commands
  */
-async function startMission(id: string, persona: string = 'Ecosystem Architect') {
+async function createMission(id: string, tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect') {
+  const upperId = id.toUpperCase();
+  const missionDir = pathResolver.missionDir(upperId);
+  const templatePath = path.join(ROOT_DIR, 'knowledge/governance/mission-templates.json');
+  
+  if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
+
+  if (safeExistsSync(path.join(missionDir, 'mission-state.json'))) {
+    logger.info(`Mission ${upperId} already exists.`);
+    return;
+  }
+
+  const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
+  const template = templates.find((t: any) => t.name === missionType) || templates[0];
+
+  const gitBranch = getCurrentBranch();
+  const gitHash = getGitHash();
+  const now = new Date().toISOString();
+  const owner = process.env.USER || 'famao';
+  const resolvedVision = visionRef || '/knowledge/personal/my-vision.md';
+
+  for (const file of template.files) {
+    let content = file.content_template
+      .replace(/{MISSION_ID}/g, upperId)
+      .replace(/{TENANT_ID}/g, tenantId)
+      .replace(/{TYPE}/g, missionType)
+      .replace(/{VISION_REF}/g, resolvedVision)
+      .replace(/{PERSONA}/g, persona)
+      .replace(/{OWNER}/g, owner)
+      .replace(/{BRANCH}/g, gitBranch)
+      .replace(/{HASH}/g, gitHash)
+      .replace(/{NOW}/g, now);
+    
+    safeWriteFile(path.join(missionDir, file.path), content);
+  }
+
+  logger.success(`🚀 Mission ${upperId} initialized from template "${template.name}" (ADF-driven).`);
+}
+
+async function startMission(id: string, persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string) {
   checkPrerequisites();
   const upperId = id.toUpperCase();
   const branchName = `mission/${id.toLowerCase()}`;
@@ -122,26 +162,18 @@ async function startMission(id: string, persona: string = 'Ecosystem Architect')
 
     let state = loadState(upperId);
     if (!state) {
-      state = {
-        mission_id: upperId,
-        status: 'active',
-        priority: 1,
-        assigned_persona: persona,
-        confidence_score: 1.0, // Default to full confidence for new missions
-        git: {
-          branch: branchName,
-          start_commit: getGitHash(),
-          latest_commit: getGitHash(),
-          checkpoints: []
-        },
-        history: [{ ts: new Date().toISOString(), event: 'START', note: 'Mission initiated via KSMC.' }]
-      };
+      await createMission(upperId, tenantId, missionType, visionRef, persona);
+      state = loadState(upperId);
     } else {
       state.status = 'active';
       state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Mission resumed.' });
+      saveState(upperId, state);
     }
 
-    saveState(upperId, state);
+    if (state) {
+      state.status = 'active';
+      saveState(upperId, state);
+    }
     
     // Role Procedure Injection
     syncRoleProcedure(upperId, persona);
@@ -289,6 +321,54 @@ async function recordTask(missionId: string, description: string, details: any =
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
 }
 
+async function purgeMissions() {
+  const adfPath = path.join(ROOT_DIR, 'knowledge/governance/mission-lifecycle.json');
+  if (!safeExistsSync(adfPath)) {
+    logger.error('Mission lifecycle ADF not found.');
+    return;
+  }
+
+  const adf = JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string);
+  const missions = safeReaddir(MISSIONS_DIR).filter(m => fs.lstatSync(path.join(MISSIONS_DIR, m)).isDirectory());
+
+  for (const mission of missions) {
+    const missionDir = path.join(MISSIONS_DIR, mission);
+    for (const policy of adf.policies) {
+      let match = false;
+      const { condition } = policy;
+
+      if (condition.has_file) {
+        if (safeExistsSync(path.join(missionDir, condition.has_file))) {
+          match = true;
+        }
+      } else if (condition.max_age_days) {
+        const stat = fs.statSync(missionDir);
+        const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+        if (ageDays > condition.max_age_days) {
+          match = true;
+        }
+      }
+
+      if (match) {
+        let targetPath = policy.target_dir;
+        const now = new Date();
+        targetPath = targetPath.replace('{YYYY-MM}', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+        targetPath = path.join(ROOT_DIR, targetPath, policy.naming_pattern.replace('{mission_id}', mission));
+
+        logger.info(`Archiving mission ${mission} to ${targetPath} (Policy: ${policy.name})`);
+        if (!safeExistsSync(path.dirname(targetPath))) {
+          safeMkdir(path.dirname(targetPath), { recursive: true });
+        }
+        
+        // Use cpSync and rmSync for directory move as safeExec mv might be cleaner but let's stick to Node if it's simpler
+        fs.cpSync(missionDir, targetPath, { recursive: true });
+        fs.rmSync(missionDir, { recursive: true, force: true });
+        break; // One policy per mission
+      }
+    }
+  }
+}
+
 /**
  * 5. Main Entry
  */
@@ -296,19 +376,24 @@ async function main() {
   const action = process.argv[2];
   const arg1 = process.argv[3];
   const arg2 = process.argv[4];
+  const arg3 = process.argv[5];
+  const arg4 = process.argv[6];
+  const arg5 = process.argv[7];
 
   switch (action) {
-    case 'start': await startMission(arg1, arg2); break;
+    case 'create': await createMission(arg1, arg2, arg3, arg4, arg5); break;
+    case 'start': await startMission(arg1, arg2, arg3, arg4, arg5); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
     case 'finish': await finishMission(arg1); break;
     case 'resume': await resumeMission(arg1); break;
     case 'record-task': await recordTask(arg1, arg2, JSON.parse(process.argv[5] || '{}')); break;
+    case 'purge': await purgeMissions(); break;
     case 'sync': 
         logger.info('Syncing mission registry...');
         // logic for registry sync
         break;
     default:
-      console.log('Usage: ts-node scripts/mission_controller.ts <start|checkpoint|finish|resume|record-task|sync> <args>');
+      console.log('Usage: ts-node scripts/mission_controller.ts <create|start|checkpoint|finish|resume|record-task|purge|sync> <args>');
   }
 }
 

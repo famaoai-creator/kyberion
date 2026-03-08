@@ -1,0 +1,19 @@
+{
+  "$schema": "../../schemas/metadata-sync-contract.schema.json",
+  "sync_rules": [
+    {
+      "source": "skills/**/src/index.ts",
+      "targets": ["skills/**/SKILL.md"],
+      "mapping": {
+        "yargs_options": "frontmatter.arguments"
+      }
+    },
+    {
+      "source": "skills/**/SKILL.md",
+      "targets": ["skills/**/package.json"],
+      "mapping": {
+        "frontmatter.description": "json.description"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AggregationJob",
+  "type": "object",
+  "required": ["action", "target_dir", "output_file"],
+  "properties": {
+    "action": { "type": "string", "const": "aggregate" },
+    "target_dir": { "type": "string" },
+    "output_file": { "type": "string" },
+    "options": {
+      "type": "object",
+      "properties": {
+        "auto_init": { "type": "boolean" },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

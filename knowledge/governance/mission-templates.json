@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/mission-template.schema.json",
+  "templates": [
+    {
+      "name": "development",
+      "files": [
+        {
+          "path": "mission-state.json",
+          "content_template": "{\n  \"mission_id\": \"{MISSION_ID}\",\n  \"type\": \"{TYPE}\",\n  \"version\": \"1.1\",\n  \"status\": \"planned\",\n  \"priority\": 5,\n  \"owner\": \"{OWNER}\",\n  \"tenant_id\": \"{TENANT_ID}\",\n  \"vision_ref\": \"{VISION_REF}\",\n  \"assigned_persona\": \"{PERSONA}\",\n  \"git\": {\n    \"branch\": \"{BRANCH}\",\n    \"initial_hash\": \"{HASH}\",\n    \"checkpoints\": []\n  },\n  \"milestones\": [\n    { \"id\": \"M1\", \"title\": \"Initialization\", \"status\": \"completed\", \"completed_at\": \"{NOW}\" },\n    { \"id\": \"M2\", \"title\": \"Implementation\", \"status\": \"pending\" },\n    { \"id\": \"M3\", \"title\": \"Validation\", \"status\": \"pending\" }\n  ],\n  \"context\": { \"associated_projects\": [] },\n  \"history\": [\n    { \"ts\": \"{NOW}\", \"event\": \"CREATED\", \"note\": \"Mission created for tenant: {TENANT_ID}\" }\n  ]\n}"
+        },
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Research and Strategy\n- [ ] Step 2: Implementation\n- [ ] Step 3: Validation\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 4: Knowledge Distillation\n- [ ] Step 5: Mission Logic\n- [ ] Step 6: Final Cleanup\n"
+        }
+      ]
+    }
+  ]
+}
