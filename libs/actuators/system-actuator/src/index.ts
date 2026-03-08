@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
  */
 
 interface SystemAction {
-  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate';
+  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit';
   text?: string;
   key?: string; 
   x?: number;
@@ -18,7 +18,7 @@ interface SystemAction {
   button?: 'left' | 'right' | 'middle';
   priority?: number;
   options?: any;
-  rules_path?: string; // for 'validate' action
+  rules_path?: string; // for 'validate' and 'audit' actions
   target_dir?: string; // for 'validate' action
 }
 
@@ -59,9 +59,111 @@ async function handleAction(input: SystemAction) {
     case 'validate':
       return await performValidation(input);
 
+    case 'audit':
+      return await performAudit(input);
+
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
   }
+}
+
+async function performAudit(input: SystemAction) {
+  const policyPath = path.resolve(process.cwd(), input.rules_path || 'knowledge/governance/standard-policy.json');
+  if (!fs.existsSync(policyPath)) throw new Error(`Governance policy not found at ${policyPath}`);
+
+  const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+  const results: any[] = [];
+  let overallStatus = 'passed';
+
+  for (const rule of policy.rules) {
+    logger.info(`[Audit] Running rule: ${rule.id} (${rule.description})`);
+    const result: any = { id: rule.id, status: 'passed' };
+
+    try {
+      switch (rule.check_type) {
+        case 'restricted_api':
+        case 'security_pattern':
+        case 'todo_check':
+          const violations = runPatternSearch(rule.params);
+          if (violations.length > 0) {
+            result.status = rule.severity === 'error' ? 'failed' : 'warning';
+            result.violations = violations;
+            if (rule.severity === 'error') overallStatus = 'failed';
+          }
+          break;
+        case 'static_analysis':
+        case 'test':
+          try {
+            safeExec('npm', rule.params.command.split(' ').slice(1));
+          } catch (e: any) {
+            result.status = 'failed';
+            result.error = e.message;
+            overallStatus = 'failed';
+          }
+          break;
+      }
+    } catch (err: any) {
+      result.status = 'failed';
+      result.error = err.message;
+      overallStatus = 'failed';
+    }
+    results.push(result);
+  }
+
+  const reportPath = path.resolve(process.cwd(), 'active/shared/governance-report.json');
+  const reportData = {
+    timestamp: new Date().toISOString(),
+    policy_name: policy.name,
+    overall_status: overallStatus,
+    results,
+  };
+
+  safeWriteFile(reportPath, JSON.stringify(reportData, null, 2));
+  return reportData;
+}
+
+function runPatternSearch(params: any): string[] {
+  const violations: string[] = [];
+  const { patterns, exemptions = [], target_dirs = ["."], file_extensions = [] } = params;
+
+  for (const targetDir of target_dirs) {
+    const fullTargetDir = path.resolve(process.cwd(), targetDir);
+    if (!fs.existsSync(fullTargetDir)) continue;
+
+    const files = getAllFiles(fullTargetDir).filter(f => {
+      const relPath = path.relative(process.cwd(), f);
+      if (exemptions.includes(relPath)) return false;
+      if (file_extensions.length > 0 && !file_extensions.some(ext => f.endsWith(ext))) return false;
+      if (relPath.includes('node_modules') || relPath.includes('.git')) return false;
+      return true;
+    });
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf8');
+      for (const pattern of patterns) {
+        const regex = new RegExp(pattern, 'g');
+        if (regex.test(content)) {
+          violations.push(`${path.relative(process.cwd(), file)}: matches pattern '${pattern}'`);
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
+  const files = fs.readdirSync(dirPath);
+
+  files.forEach((file) => {
+    const fullPath = path.join(dirPath, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+    } else {
+      arrayOfFiles.push(fullPath);
+    }
+  });
+
+  return arrayOfFiles;
 }
 
 async function performValidation(input: SystemAction) {
