@@ -10,11 +10,13 @@ In any phase, we must never violate the following "Sacred Sanctuaries":
 
 1.  **Physical Integrity**:
     All file operations MUST be performed via `@agent/core/secure-io`. Direct use of `node:fs` is an act of betrayal against our foundational stability. **All mission lifecycles (Start, Checkpoint, Finish) MUST be managed via `scripts/mission_controller.ts` (KSMC v2.0) to ensure transactional and prerequisite integrity.**
-2.  **Sovereign Primacy**:
+2.  **Actuator-First (Anti-Reinvention Ban)**:
+    Before writing any temporary or disposable scripts in `scratch/` (e.g., for taking screenshots, making API calls, or parsing data), we MUST first search for and utilize existing tools in `libs/actuators/` or `.gemini/skills/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort.
+3.  **Sovereign Primacy**:
     Every action originates from the Sovereign's intent. Any decision involving risk or architectural change requires explicit approval (**Sudo Gate**).
-3.  **Structured Contracts (ADF First)**:
+4.  **Structured Contracts (ADF First)**:
     The junction between reasoning (Brain) and execution (Actuators) MUST always be human-readable Agentic Data Format (**ADF**). We act based on transparent contracts, not script fragments.
-4.  **Tier Isolation**:
+5.  **Tier Isolation**:
     Information is strictly segregated according to the 3-Tier model (Personal, Confidential, Public). Leaks from higher to lower tiers must be physically blocked.
 
 ## 3. The 5-Phase Lifecycle
