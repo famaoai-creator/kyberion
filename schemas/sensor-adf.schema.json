@@ -9,6 +9,14 @@
     "name": { "type": "string" },
     "type": { "enum": ["polling", "streaming", "event-driven"] },
     "interval_ms": { "type": "number", "minimum": 1000 },
+    "source": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "recursive": { "type": "boolean" },
+        "pattern": { "type": "string" }
+      }
+    },
     "action": {
       "type": "object",
       "required": ["actuator", "command"],

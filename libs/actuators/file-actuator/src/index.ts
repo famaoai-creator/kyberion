@@ -9,12 +9,13 @@ import * as path from 'node:path';
  */
 
 interface FileAction {
-  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists' | 'stat' | 'replace';
+  action: 'read' | 'write' | 'search' | 'list' | 'delete' | 'exists' | 'stat' | 'replace' | 'tail';
   path: string;
   content?: string;
   pattern?: string;
   replacement?: string;
   recursive?: boolean;
+  last_pos?: number;
   options?: any;
 }
 
@@ -22,12 +23,26 @@ async function handleAction(input: FileAction) {
   const resolved = path.resolve(process.cwd(), input.path);
 
   switch (input.action) {
-    case 'replace':
+    case 'tail': {
+      logger.info(`🔍 Tailing file: ${input.path} from pos ${input.last_pos || 0}`);
+      const stats = safeStat(resolved);
+      const lastPos = input.last_pos || 0;
+      let newContent = '';
+      if (stats.size > lastPos) {
+        const fullContent = safeReadFile(resolved, { encoding: 'utf8' }) as string;
+        newContent = fullContent.substring(lastPos);
+      } else if (stats.size < lastPos) {
+        return { content: '', last_pos: 0, size: stats.size, truncated: true };
+      }
+      return { content: newContent, last_pos: stats.size, size: stats.size };
+    }
+    case 'replace': {
       logger.info(`📝 Replacing "${input.pattern}" with "${input.replacement}" in ${input.path}`);
       const oldContent = safeReadFile(resolved, { encoding: 'utf8' }) as string;
       const newContent = oldContent.replace(new RegExp(input.pattern || '', 'g'), input.replacement || '[REDACTED]');
       safeWriteFile(resolved, newContent);
       return { status: 'success', path: input.path };
+    }
     case 'read':
       logger.info(`📖 Reading file: ${input.path}`);
       return { content: safeReadFile(resolved, { encoding: 'utf8' }) };

@@ -24,7 +24,7 @@ const NERVES: NerveStatus[] = [
   { id: 'nexus', name: 'Nexus Daemon', status: 'DEAD' },
   { id: 'terminal', name: 'Terminal Server', status: 'DEAD' },
   { id: 'task-watcher', name: 'Task Watcher', status: 'DEAD' },
-  { id: 'log-watcher', name: 'Log Watcher', status: 'DEAD' },
+  { id: 'log-watcher-adf', name: 'Log Watcher', status: 'DEAD' },
   { id: 'visual-buffer', name: 'Visual Buffer', status: 'DEAD' }
 ];
 

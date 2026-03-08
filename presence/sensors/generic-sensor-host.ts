@@ -1,19 +1,24 @@
 /**
  * presence/sensors/generic-sensor-host.ts
- * Kyberion Generic Sensor Host v1.1
+ * Kyberion Generic Sensor Host v1.2
  * [SECURE-IO COMPLIANT]
  */
 
-import { KyberionSensor, PollingSensor, logger, safeReadFile, safeExec, pathResolver } from '../../libs/core/index.js';
+import { KyberionSensor, PollingSensor, logger, safeReadFile, safeExec, pathResolver, safeReaddir, safeStat, safeExistsSync } from '../../libs/core/index.js';
 import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
 import * as path from 'node:path';
 
 interface SensorADF {
   id: string;
   name: string;
-  type: 'polling' | 'streaming';
+  type: 'polling' | 'streaming' | 'event-driven';
   assigned_role?: string;
   interval_ms?: number;
+  source?: {
+    path: string;
+    recursive?: boolean;
+    pattern?: string;
+  };
   connection?: {
     service_id: string;
     auth?: 'secret-guard' | 'none';
@@ -22,6 +27,7 @@ interface SensorADF {
     actuator: string;
     command: string;
     args?: string[];
+    params?: any;
   };
   on_change?: {
     intent: string;
@@ -49,7 +55,6 @@ class GenericPollingSensor extends PollingSensor {
   async poll() {
     logger.info(`🔍 [${this.config.id}] Polling via ${this.adf.action.actuator}...`);
     try {
-      // Execute via Actuator logic (Simplified for POC)
       const output = await safeExec(this.adf.action.command, this.adf.action.args || []);
       if (output !== this.lastHash && output.trim().length > 0) {
         if (this.lastHash !== '') {
@@ -115,6 +120,88 @@ class GenericStreamingSensor extends KyberionSensor {
   }
 }
 
+/**
+ * Watch (Event-driven) Implementation
+ */
+class GenericWatchSensor extends KyberionSensor {
+  private adf: SensorADF;
+  private offsets = new Map<string, number>();
+
+  constructor(adf: SensorADF) {
+    super({
+      id: adf.id,
+      name: adf.name,
+      type: adf.type
+    });
+    this.adf = adf;
+  }
+
+  async start() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+    logger.info(`👁️ [${this.config.id}] Watching path: ${this.adf.source?.path}`);
+
+    setInterval(async () => {
+      if (!this.isRunning) return;
+      await this.scan();
+    }, this.adf.interval_ms || 10000);
+    
+    await this.scan();
+  }
+
+  async scan() {
+    if (!this.adf.source) return;
+    const resolvedPath = path.resolve(process.cwd(), this.adf.source.path);
+    
+    if (!safeExistsSync(resolvedPath)) return;
+
+    try {
+      const files = safeReaddir(resolvedPath).filter(f => {
+        if (!this.adf.source?.pattern) return true;
+        const regex = new RegExp(this.adf.source.pattern.replace(/\*/g, '.*'));
+        return regex.test(f);
+      });
+
+      for (const file of files) {
+        const filePath = path.join(this.adf.source.path, file);
+        const lastPos = this.offsets.get(file) || 0;
+        
+        const stats = safeStat(filePath);
+        if (stats.size > lastPos) {
+          const content = (safeReadFile(filePath, { encoding: 'utf8' }) as string).substring(lastPos);
+          if (content.trim()) {
+            this.handleNewContent(file, content);
+          }
+          this.offsets.set(file, stats.size);
+        }
+      }
+    } catch (err: any) {
+      logger.error(`❌ [${this.config.id}] Scan failed: ${err.message}`);
+    }
+  }
+
+  private handleNewContent(file: string, content: string) {
+    const lines = content.split('\n');
+    const keywords = this.adf.action.params?.keywords || [];
+    
+    for (const line of lines) {
+      const match = keywords.length === 0 || keywords.some((k: string) => line.toUpperCase().includes(k.toUpperCase()));
+      if (match && line.trim()) {
+        this.emit({
+          intent: this.adf.on_change?.intent || 'LOG_ALERT',
+          payload: { file, line: line.trim() },
+          priority: this.adf.on_change?.priority || 5
+        });
+      }
+    }
+  }
+
+  async stop() {
+    this.isRunning = false;
+    logger.info(`🛑 [${this.config.id}] Watcher stopped.`);
+  }
+}
+
 async function main() {
   const adfPath = process.argv[2];
   if (!adfPath) throw new Error('Usage: generic-sensor-host.ts <adf-path>');
@@ -127,9 +214,14 @@ async function main() {
     logger.info(`🛡️ [SensorHost] Context established as: ${adf.assigned_role}`);
   }
 
-  const sensor = adf.type === 'streaming' 
-    ? new GenericStreamingSensor(adf) 
-    : new GenericPollingSensor(adf);
+  let sensor: KyberionSensor;
+  if (adf.type === 'streaming') {
+    sensor = new GenericStreamingSensor(adf);
+  } else if (adf.type === 'event-driven') {
+    sensor = new GenericWatchSensor(adf);
+  } else {
+    sensor = new GenericPollingSensor(adf);
+  }
     
   await sensor.start();
 }
