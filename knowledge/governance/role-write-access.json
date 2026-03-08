@@ -18,7 +18,7 @@
       "allow": ["active/missions/", "registry.json"]
     },
     "infrastructure_sentinel": {
-      "allow": ["active/shared/logs/", "active/shared/runtime/", "../../../Library/LaunchAgents/"]
+      "allow": ["active/shared/logs/", "active/shared/runtime/", "presence/bridge/runtime/", "../../../Library/LaunchAgents/"]
     },
     "strategic_sales": {
       "allow": ["active/projects/proposals/"]
