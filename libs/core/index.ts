@@ -21,7 +21,9 @@ export {
   safeUnlinkSync, 
   safeMkdir, 
   safeExistsSync, 
-  safeExec
+  safeExec,
+  safeReaddir,
+  safeStat
 } from './secure-io.js';
 
 // Backward compatibility aliases
@@ -30,8 +32,6 @@ export {
   safeUnlinkSync as safeUnlink
 } from './secure-io.js';
 import * as _secureIo from './secure-io.js';
-export const safeReaddir = (_secureIo as any).safeReaddir;
-export const safeStat = (_secureIo as any).safeStat;
 export const isSecretPath = (_secureIo as any).isSecretPath;
 
 // Paths & Navigation
@@ -68,8 +68,6 @@ export { secureFetch } from './network.js';
 export * as tierGuard from './tier-guard.js';
 export { 
   detectTier, 
-  canFlowTo, 
-  validateInjection, 
   validateReadPermission, 
   validateWritePermission, 
   scanForConfidentialMarkers, 

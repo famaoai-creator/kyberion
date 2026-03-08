@@ -122,11 +122,18 @@ function emitGlobalStimulus(text: string, session: Session) {
   if (session.syncPending) return;
   try {
     const cleanText = cleanTerminalOutput(text);
-    if (!cleanText || cleanText.length < 10) return;
+    if (!cleanText || cleanText.length < 5) return;
+    
+    const isExecutionFinished = /[%$#]>?\s*$/.test(cleanText.trim());
+    
     const stimulus = {
       id: `term-${Date.now()}`, ts: new Date().toISOString(), ttl: 60,
       origin: { channel: 'terminal', source_id: session.id },
-      signal: { intent: 'broadcast', priority: 5, payload: cleanText },
+      signal: { 
+        intent: isExecutionFinished ? 'EXECUTION_FINISHED' : 'LOG_STREAM', 
+        priority: 5, 
+        payload: cleanText 
+      },
       control: { status: 'processed', feedback: 'silent', evidence: [] }
     };
     const stimuliFile = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
@@ -246,15 +253,26 @@ function getOrCreateSession(id: string, cols = 80, rows = 30): Session {
       }
 
       newSession.captureBuffer = updateSmartBuffer(newSession.captureBuffer, data);
-      emitGlobalStimulus(data, newSession);
+      
+      const promptDetected = /[%$#]>?\s*$/.test(plainText.trim());
       
       if (newSession.idleTimer) clearTimeout(newSession.idleTimer);
-      newSession.idleTimer = setTimeout(() => { 
+      
+      const handleSettle = () => {
         if (newSession.captureBuffer.length > 0) { 
           persistSessionFeedback(newSession, newSession.captureBuffer); 
           newSession.captureBuffer = ''; 
-        } 
-      }, 8000);
+        }
+      };
+
+      if (promptDetected && newSession.captureBuffer.length > 10) {
+        logger.info(`⚡ [Reflex] Prompt detected in ${id}. Triggering immediate feedback.`);
+        handleSettle();
+      } else {
+        newSession.idleTimer = setTimeout(handleSettle, 3000); 
+      }
+
+      emitGlobalStimulus(data, newSession);
     }
   });
 

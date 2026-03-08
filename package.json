@@ -55,7 +55,11 @@
     "generate:types": "node dist/scripts/generate_types.js",
     "vault:mount": "node dist/scripts/vault_mount.js",
     "prepare": "husky",
-    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && pnpm run dev"
+    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && pnpm run dev",
+    "nerve:pulse": "node dist/scripts/pulse_aggregator.js",
+    "nerve:start": "launchctl load -w ~/Library/LaunchAgents/kyberion.*.plist",
+    "nerve:stop": "launchctl unload -w ~/Library/LaunchAgents/kyberion.*.plist",
+    "nerve:status": "cat active/shared/runtime/pulse.json | jq ."
   },
   "lint-staged": {
     "knowledge/**/*.md": [
@@ -71,6 +75,7 @@
     "@types/marked": "^6.0.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/ws": "^8.18.1",
+    "adm-zip": "^0.5.16",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "axios": "^1.13.6",
