@@ -1,0 +1,218 @@
+:root {
+  --bg-color: #0d1117;
+  --panel-bg: rgba(22, 27, 34, 0.8);
+  --border-color: #30363d;
+  --text-main: #c9d1d9;
+  --text-dim: #8b949e;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-yellow: #d29922;
+  --accent-red: #f85149;
+  --accent-purple: #bc8cff;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-image: radial-gradient(circle at 50% 50%, #1a1f26 0%, #0d1117 100%);
+}
+
+#root { height: 100%; }
+
+.dashboard-container {
+  display: grid;
+  grid-template-areas:
+    "header header header"
+    "sidebar mission ace"
+    "footer footer footer";
+  grid-template-columns: 300px 1fr 350px;
+  grid-template-rows: 60px 1fr 100px;
+  gap: 16px;
+  padding: 16px;
+  height: 100vh;
+  width: 100vw;
+}
+
+.header {
+  grid-area: header;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 8px;
+}
+
+.header h1 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--accent-blue);
+  margin: 0;
+  text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+}
+
+.sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.mission-panel {
+  grid-area: mission;
+  display: flex;
+  flex-direction: column;
+}
+
+.ace-panel {
+  grid-area: ace;
+}
+
+.footer {
+  grid-area: footer;
+}
+
+.panel {
+  background-color: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.panel-title {
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  letter-spacing: 0.15em;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Stats Layout in Header or Pulse */
+.pulse-content {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  color: var(--accent-green);
+  font-weight: bold;
+}
+
+.stat-label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+/* Tree View */
+.tree-root {
+  font-size: 0.8rem;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tree-item:hover { background: rgba(88, 166, 255, 0.1); }
+
+/* Mission Items */
+.mission-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.mission-card {
+  border: 1px solid var(--border-color);
+  background: rgba(255,255,255,0.02);
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--accent-blue);
+}
+
+/* Footer Layout */
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+}
+
+.tier-group {
+  display: flex;
+  gap: 8px;
+}
+
+.tier-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: bold;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #0d1117;
+  width: 90%;
+  height: 90%;
+  border-radius: 12px;
+  border: 1px solid var(--accent-blue);
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.live-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
