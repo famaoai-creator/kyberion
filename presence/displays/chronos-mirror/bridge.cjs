@@ -142,16 +142,22 @@ const server = http.createServer((req, res) => {
       lastUpdated: new Date().toISOString()
     };
 
-    const skillsRootDir = path.join(_rootDir, 'skills');
-    if (fs.existsSync(skillsRootDir)) {
-      const cats = fs.readdirSync(skillsRootDir).filter(f => !f.startsWith('.'));
-      cats.forEach(cat => {
-        const catPath = path.join(skillsRootDir, cat);
-        if (fs.lstatSync(catPath).isDirectory()) {
-          stats.totalSkills += fs.readdirSync(catPath).filter(f => !f.startsWith('.')).length;
-        }
-      });
-    }
+    // New Skill Paths
+    const skillPaths = [
+      path.join(_rootDir, '.gemini/skills'),
+      path.join(_rootDir, 'libs/actuators'),
+      path.join(_rootDir, 'satellites')
+    ];
+
+    skillPaths.forEach((p) => {
+      if (fs.existsSync(p)) {
+        const dirs = fs.readdirSync(p).filter((f) => {
+          const full = path.join(p, f);
+          return fs.lstatSync(full).isDirectory() && !f.startsWith('.');
+        });
+        stats.totalSkills += dirs.length;
+      }
+    });
 
     const missionsDir = path.join(_rootDir, 'active/missions');
     if (fs.existsSync(missionsDir)) {
@@ -188,7 +194,52 @@ const server = http.createServer((req, res) => {
     stats.healthScore = evalCount > 0 ? Math.round(totalScore / evalCount) : 95;
     sendJson(200, stats);
   }
-  // 7. Quality Report (Automation -> Browser)
+  // 7. Knowledge Explorer (Docs -> Browser)
+  else if (req.method === 'GET' && req.url === '/knowledge') {
+    const knowledgeDir = path.join(_rootDir, 'knowledge');
+    
+    const buildTree = (dir, relativePath = '') => {
+      const name = path.basename(dir);
+      const stat = fs.statSync(dir);
+      const item = {
+        name: relativePath === '' ? 'knowledge' : name,
+        path: relativePath,
+        type: stat.isDirectory() ? 'folder' : 'file'
+      };
+
+      if (stat.isDirectory()) {
+        const files = fs.readdirSync(dir).filter(f => !f.startsWith('.'));
+        item.children = files.map(f => buildTree(path.join(dir, f), path.join(relativePath, f)));
+        // Sort: folders first, then files
+        item.children.sort((a, b) => {
+          if (a.type === b.type) return a.name.localeCompare(b.name);
+          return a.type === 'folder' ? -1 : 1;
+        });
+      }
+      return item;
+    };
+
+    if (fs.existsSync(knowledgeDir)) {
+      const tree = buildTree(knowledgeDir);
+      sendJson(200, tree.children); // Root's children for cleaner UI
+    } else {
+      sendJson(404, { error: 'Knowledge directory not found' });
+    }
+  }
+  else if (req.method === 'GET' && req.url.startsWith('/knowledge-content?path=')) {
+    const urlParams = new URL(req.url, `http://localhost:${PORT}`);
+    const relPath = urlParams.searchParams.get('path');
+    const fullPath = path.join(_rootDir, 'knowledge', relPath);
+
+    if (fs.existsSync(fullPath) && fullPath.startsWith(path.join(_rootDir, 'knowledge'))) {
+      const content = fs.readFileSync(fullPath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(content);
+    } else {
+      sendJson(403, { error: 'Forbidden or Not Found' });
+    }
+  }
+  // 8. Quality Report (Automation -> Browser)
   else if (req.method === 'GET' && req.url === '/quality') {
     const qualityPath = path.join(_rootDir, 'active/shared/quality-report.json');
     if (fs.existsSync(qualityPath)) {
