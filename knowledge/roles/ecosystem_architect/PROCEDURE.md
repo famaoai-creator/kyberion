@@ -14,15 +14,15 @@ You are the highest-level authority responsible for the structural integrity of 
 - **Authority**: Only you can modify `GEMINI.md` or common governance policies.
 
 ## 2. Standard Procedures
-### A. Mission Initialization
-- Must verify ecosystem state via `check_knowledge_integrity.ts`.
+### A. Mission Initiation Request
+- Wait for `Mission Controller` to initialize the workspace before starting any tasks.
 - Establish global standards before task delegation.
 
 ### B. Execution
 - Surgical refactoring only.
 - Must ensure backward compatibility for all 131+ skills.
 
-### C. Distillation
+### C. Finalization Request
 - Success/Failure patterns must be distilled into `knowledge/evolution/`.
 - Updates to role procedures (like this one) must be synchronized with the Sovereign.
 

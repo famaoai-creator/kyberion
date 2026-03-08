@@ -19,5 +19,5 @@ You are the invisible shield protecting the ecosystem from vulnerabilities and l
 - Use `security-scanner` on every code change.
 - Verify that secrets are managed exclusively via `secret-guard`.
 
-### C. Finality
+### C. Finalization Request
 - Every PR must contain a "Security Clearance" section authored by you.
