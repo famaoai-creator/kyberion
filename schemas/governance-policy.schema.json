@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Governance Policy Schema",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "severity": { "enum": ["error", "warning", "info"] },
+          "check_type": { "enum": ["restricted_api", "security_pattern", "static_analysis", "test", "todo_check"] },
+          "params": {
+            "type": "object",
+            "properties": {
+              "patterns": { "type": "array", "items": { "type": "string" } },
+              "exemptions": { "type": "array", "items": { "type": "string" } },
+              "command": { "type": "string" },
+              "target_dirs": { "type": "array", "items": { "type": "string" } },
+              "file_extensions": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "required": ["id", "check_type"]
+      }
+    }
+  },
+  "required": ["name", "rules"]
+}

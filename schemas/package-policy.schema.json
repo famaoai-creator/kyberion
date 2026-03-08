@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Package Policy",
+  "description": "Definition of dependency governance and normalization rules.",
+  "type": "object",
+  "properties": {
+    "ignore_deps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dependencies to ignore during unused check."
+    },
+    "normalization": {
+      "type": "object",
+      "properties": {
+        "private": { "type": "boolean" },
+        "author": { "type": "string" },
+        "license": { "type": "string" },
+        "ensure_engines": { "type": "boolean" },
+        "ensure_agent_core": { "type": "boolean" }
+      }
+    }
+  },
+  "required": ["ignore_deps", "normalization"]
+}

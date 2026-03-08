@@ -1,0 +1,27 @@
+{
+  "slack-sensor": {
+    "path": "presence/sensors/slack-sensor.ts",
+    "description": "Listens for Slack mentions and DMs",
+    "env": { "PORT": "4321" }
+  },
+  "nexus-daemon": {
+    "path": "presence/bridge/nexus-daemon.ts",
+    "description": "Coordinates physical terminal intervention",
+    "env": { "PORT": "4321" }
+  },
+  "log-watcher": {
+    "path": "presence/sensors/log-watcher.ts",
+    "description": "Monitors logs for system errors",
+    "env": { "PORT": "4321" }
+  },
+  "visual-buffer": {
+    "path": "presence/sensors/visual-buffer-daemon.ts",
+    "description": "Maintains rolling visual frames",
+    "env": { "PORT": "4321" }
+  },
+  "system-whisperer": {
+    "path": "scripts/system_whisperer.ts",
+    "description": "Injects periodic system status",
+    "env": { "PORT": "4321" }
+  }
+}

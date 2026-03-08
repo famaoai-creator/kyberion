@@ -1,0 +1,10 @@
+{
+  "ignore_deps": ["@agent/core", "chalk", "yargs", "axios", "js-yaml"],
+  "normalization": {
+    "private": true,
+    "author": "Gemini Agent",
+    "license": "MIT",
+    "ensure_engines": true,
+    "ensure_agent_core": true
+  }
+}

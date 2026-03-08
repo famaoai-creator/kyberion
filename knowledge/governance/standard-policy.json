@@ -1,0 +1,68 @@
+{
+  "name": "Gemini Ecosystem Governance Policy",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "restricted-api-check",
+      "description": "Ensure skills do not use restricted synchronous FS APIs.",
+      "severity": "error",
+      "check_type": "restricted_api",
+      "params": {
+        "patterns": ["fs.writeFileSync", "fs.appendFileSync", "fs.unlinkSync", "fs.renameSync"],
+        "exemptions": [
+          "scripts/bootstrap.ts",
+          "scripts/setup_ecosystem.sh",
+          "scripts/fix_shebangs.ts",
+          "scripts/mass_refactor_governance.ts"
+        ],
+        "target_dirs": ["skills", "scripts"],
+        "file_extensions": [".ts", ".js", ".cjs"]
+      }
+    },
+    {
+      "id": "security-pattern-scan",
+      "description": "Search for credentials and dangerous functions.",
+      "severity": "error",
+      "check_type": "security_pattern",
+      "params": {
+        "patterns": [
+          "api[_-]?key|secret|password|token",
+          "exec\\(.*[\\$|+]|spawn\\(.*[\\$|+]",
+          "eval\\(|new Function\\("
+        ],
+        "target_dirs": ["."]
+      }
+    },
+    {
+      "id": "stale-todo-check",
+      "description": "Search for TODO or FIXME comments.",
+      "severity": "warning",
+      "check_type": "todo_check",
+      "params": {
+        "patterns": ["TODO", "FIXME"],
+        "target_dirs": ["."]
+      }
+    },
+    {
+      "id": "lint-check",
+      "description": "Static Analysis (Lint)",
+      "severity": "error",
+      "check_type": "static_analysis",
+      "params": { "command": "npm run lint" }
+    },
+    {
+      "id": "type-check",
+      "description": "TypeScript Type Checking",
+      "severity": "error",
+      "check_type": "static_analysis",
+      "params": { "command": "npm run typecheck" }
+    },
+    {
+      "id": "unit-test-check",
+      "description": "Unit Tests",
+      "severity": "error",
+      "check_type": "test",
+      "params": { "command": "npm run test:unit" }
+    }
+  ]
+}
