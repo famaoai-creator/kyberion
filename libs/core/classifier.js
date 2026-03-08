@@ -89,4 +89,3 @@ function classifyFile(filePath, rules, options = {}) {
     const content = fs.readFileSync(filePath, 'utf8');
     return classify(content, rules, options);
 }
-//# sourceMappingURL=classifier.js.map

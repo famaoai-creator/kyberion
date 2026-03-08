@@ -1,28 +1,61 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Gemini Unified Sensory Protocol (GUSP) v1.0",
+  "title": "Gemini Unified Sensory Protocol (GUSP) v2.0",
+  "description": "The Physical Contract for Kyberion Backend Service Sovereignty.",
   "type": "object",
-  "required": ["id", "ts", "origin", "signal", "control"],
+  "required": ["id", "ts", "origin", "signal", "control", "policy"],
   "properties": {
-    "id": { "type": "string", "description": "Unique request identifier" },
-    "ts": { "type": "string", "format": "date-time", "description": "Event occurrence timestamp" },
-    "ttl": { "type": "integer", "default": 3600, "description": "Time-to-live in seconds" },
+    "id": { "type": "string", "description": "Unique stimulus identifier (UUID)" },
+    "ts": { "type": "string", "format": "date-time", "description": "Event occurrence timestamp (ISO8601)" },
+    "ttl": { "type": "integer", "default": 3600, "description": "Time-to-live in seconds. 0 = infinite." },
     "origin": {
       "type": "object",
       "required": ["channel"],
       "properties": {
-        "channel": { "type": "string", "enum": ["slack", "terminal", "voice", "system", "internal"] },
-        "source_id": { "type": "string" },
-        "context": { "type": "string" }
+        "channel": { 
+          "type": "string", 
+          "enum": ["slack", "terminal", "voice", "monitor", "camera", "sensor", "system", "internal"],
+          "description": "Source channel of the stimulus."
+        },
+        "source_id": { "type": "string", "description": "Entity ID that generated the stimulus (e.g., UserID, NodeID)." },
+        "context": { "type": "string", "description": "Traceable context ID (e.g., ThreadID, SessionID, FilePath)." },
+        "metadata": { "type": "object", "description": "Additional domain-specific context." }
       }
     },
     "signal": {
       "type": "object",
-      "required": ["intent", "payload"],
+      "required": ["type", "payload"],
       "properties": {
-        "intent": { "type": "string", "enum": ["command", "whisper", "alert", "broadcast"] },
+        "type": { 
+          "type": "string", 
+          "enum": ["CHAT", "LOG", "ALERT", "COMMAND", "WHISPER"],
+          "description": "Functional type of the signal."
+        },
         "priority": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
-        "payload": { "type": "string" }
+        "payload": { "type": "string", "description": "The raw content of the signal." }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": ["flow"],
+      "properties": {
+        "flow": { 
+          "type": "string", 
+          "enum": ["LOOPBACK", "SINK", "BROADCAST"],
+          "description": "LOOPBACK: Requires bidirectional response. SINK: Terminal termination only. BROADCAST: Multi-channel dispatch."
+        },
+        "feedback": { 
+          "type": "string", 
+          "enum": ["auto", "silent", "manual"], 
+          "default": "auto",
+          "description": "Policy for responding back to the origin."
+        },
+        "retention": { 
+          "type": "string", 
+          "enum": ["ephemeral", "persistent"], 
+          "default": "ephemeral",
+          "description": "Whether to archive the stimulus as Wisdom in Layer 5."
+        }
       }
     },
     "control": {
@@ -30,7 +63,6 @@
       "required": ["status"],
       "properties": {
         "status": { "type": "string", "enum": ["pending", "injected", "processed", "expired", "failed"] },
-        "feedback": { "type": "string", "enum": ["auto", "silent", "manual"], "default": "auto" },
         "evidence": {
           "type": "array",
           "items": {

@@ -51,7 +51,7 @@ const node_crypto_1 = require("node:crypto");
 const pathResolver = __importStar(require("./path-resolver.js"));
 const tier_guard_js_1 = require("./tier-guard.js");
 /**
- * Secure I/O utilities for Gemini Skills (TypeScript Edition)
+ * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
  * Provides file size validation, safe command execution, and resource guards.
  */
 exports.DEFAULT_MAX_FILE_SIZE_MB = 100;
@@ -234,4 +234,3 @@ function writeArtifact(filePath, data, format) {
 // Alias for compatibility
 exports.safeAppendFile = safeAppendFileSync;
 exports.safeUnlink = safeUnlinkSync;
-//# sourceMappingURL=secure-io.js.map

@@ -133,9 +133,31 @@ async function startMission(id: string, persona: string = 'Ecosystem Architect')
     }
 
     saveState(upperId, state);
+    
+    // Role Procedure Injection
+    syncRoleProcedure(upperId, persona);
+
     logger.success(`✅ Mission ${upperId} is now ACTIVE on branch ${branchName}.`);
   } catch (err: any) {
     logger.error(`Failed to start mission: ${err.message}`);
+  }
+}
+
+/**
+ * Synchronizes the role-specific procedure to the active mission directory.
+ */
+function syncRoleProcedure(missionId: string, persona: string) {
+  const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
+  const sourcePath = path.join(ROOT_DIR, 'knowledge/roles', roleSlug, 'PROCEDURE.md');
+  const targetDir = path.join(MISSIONS_DIR, missionId);
+  const targetPath = path.join(targetDir, 'ROLE_PROCEDURE.md');
+
+  if (fs.existsSync(sourcePath)) {
+    const procedure = fs.readFileSync(sourcePath, 'utf8');
+    fs.writeFileSync(targetPath, procedure, 'utf8');
+    logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
+  } else {
+    logger.warn(`⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`);
   }
 }
 

@@ -33,15 +33,48 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.secretGuard = exports.isSecretPath = exports.getActiveSecrets = exports.getSecret = void 0;
+exports.secretGuard = exports.getActiveSecrets = exports.getSecret = exports.grantAccess = void 0;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 /**
- * Sovereign Secret Guard v1.0
+ * Sovereign Secret Guard v1.2 [TIBA COMPLIANT]
+ * Implements Temporal Intent-Based Authentication.
  */
 const SECRETS_FILE = path.join(process.cwd(), 'vault/secrets/secrets.json');
+const GRANTS_FILE = path.join(process.cwd(), 'active/shared/auth-grants.json');
 const _activeSecrets = new Set();
-const getSecret = (key) => {
+/**
+ * Issued by Orchestrator to authorize a secret for a limited time.
+ */
+const grantAccess = (missionId, serviceId, ttlMinutes = 15) => {
+    const grants = _loadGrants();
+    grants.push({
+        missionId,
+        serviceId: serviceId.toLowerCase(),
+        expiresAt: Date.now() + (ttlMinutes * 60 * 1000)
+    });
+    _saveGrants(grants);
+};
+exports.grantAccess = grantAccess;
+/**
+ * Retrieve a secret value, enforcing temporal and intent-based gates.
+ */
+const getSecret = (key, scope) => {
+    const currentMission = process.env.MISSION_ID;
+    // TIBA GATE: If scope is provided, verify active grant
+    if (scope) {
+        const grants = _loadGrants();
+        const activeGrant = grants.find(g => g.missionId === currentMission &&
+            g.serviceId === scope.toLowerCase() &&
+            g.expiresAt > Date.now());
+        if (!activeGrant) {
+            throw new Error(`TIBA_VIOLATION: No active temporal grant for service "${scope}" in mission "${currentMission}". Access Denied.`);
+        }
+    }
+    // Basic Shield Violation Check (prefix match)
+    if (scope && !key.toUpperCase().startsWith(scope.toUpperCase())) {
+        throw new Error(`SHIELD_VIOLATION: Key "${key}" does not match authorized scope "${scope}".`);
+    }
     let value = process.env[key];
     if (!value && fs.existsSync(SECRETS_FILE)) {
         try {
@@ -58,12 +91,24 @@ const getSecret = (key) => {
     return null;
 };
 exports.getSecret = getSecret;
+function _loadGrants() {
+    if (!fs.existsSync(GRANTS_FILE))
+        return [];
+    try {
+        return JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8'));
+    }
+    catch (_) {
+        return [];
+    }
+}
+function _saveGrants(grants) {
+    const dir = path.dirname(GRANTS_FILE);
+    if (!fs.existsSync(dir))
+        fs.mkdirSync(dir, { recursive: true });
+    // Prune expired grants before saving
+    const freshGrants = grants.filter(g => g.expiresAt > Date.now());
+    fs.writeFileSync(GRANTS_FILE, JSON.stringify(freshGrants, null, 2));
+}
 const getActiveSecrets = () => Array.from(_activeSecrets);
 exports.getActiveSecrets = getActiveSecrets;
-const isSecretPath = (filePath) => {
-    const resolved = path.resolve(filePath);
-    return resolved.startsWith(path.join(process.cwd(), 'vault/secrets'));
-};
-exports.isSecretPath = isSecretPath;
-exports.secretGuard = { getSecret: exports.getSecret, getActiveSecrets: exports.getActiveSecrets, isSecretPath: exports.isSecretPath };
-//# sourceMappingURL=secret-guard.js.map
+exports.secretGuard = { getSecret: exports.getSecret, getActiveSecrets: exports.getActiveSecrets, grantAccess: exports.grantAccess };

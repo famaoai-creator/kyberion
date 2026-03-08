@@ -150,11 +150,13 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     cwd = process.cwd(),
     encoding = 'utf8',
     maxOutputMB = 10,
+    env = process.env, // Default to current process env
   } = options;
 
   return execFileSync(command, args, {
     encoding,
     cwd,
+    env, // Pass environment variables to child process
     timeout: timeoutMs,
     maxBuffer: maxOutputMB * 1024 * 1024,
     stdio: ['pipe', 'pipe', 'pipe'],

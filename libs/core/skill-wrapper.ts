@@ -78,9 +78,11 @@ function printOutput<T>(output: SkillOutput<T>) {
       console.log(chalk.yellow(`Code: ${output.error?.code}`));
       console.log(output.error?.message);
     }
-    console.log(
-      chalk.dim(`Duration: ${output.metadata.duration_ms}ms | ${output.metadata.timestamp}\n`)
-    );
+    if (output.metadata) {
+      console.log(
+        chalk.dim(`Duration: ${output.metadata.duration_ms}ms | ${output.metadata.timestamp}\n`)
+      );
+    }
   } else {
     console.log(JSON.stringify(output, null, 2));
   }

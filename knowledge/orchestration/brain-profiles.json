@@ -1,0 +1,30 @@
+{
+  "profiles": {
+    "gemini": {
+      "name": "Gemini 3 CLI (Auto-Confirm)",
+      "cmd": "gemini",
+      "args": ["-y"],
+      "env": { "GEMINI_MODEL": "gemini-3" },
+      "description": "Default AI engine using Gemini 3 with auto-confirm enabled."
+    },
+    "claude": {
+      "name": "Claude CLI (Coding Specialist)",
+      "cmd": "claude",
+      "args": ["--model", "claude-3-7-sonnet"],
+      "description": "Advanced coding and refactoring specialist."
+    },
+    "codex": {
+      "name": "OpenAI Codex (Legacy)",
+      "cmd": "codex",
+      "args": ["--engine", "davinci-002"],
+      "description": "Legacy logic and structured data processing."
+    },
+    "shell": {
+      "name": "Pure System Shell",
+      "cmd": "/bin/zsh",
+      "args": [],
+      "description": "Direct OS access without AI mediation."
+    }
+  },
+  "default_profile": "gemini"
+}

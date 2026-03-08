@@ -32,10 +32,10 @@ export function extractRowsFromHtml(html: string): string[][] {
 
   const rows: string[][] = [];
   const trElements = table.querySelectorAll('tr');
-  for (const tr of Array.from(trElements)) {
+  for (const tr of Array.from(trElements) as Element[]) {
     const cells: string[] = [];
     const tdElements = tr.querySelectorAll('th, td');
-    for (const td of Array.from(tdElements)) {
+    for (const td of Array.from(tdElements) as Element[]) {
       cells.push(td.textContent?.trim() || '');
     }
     rows.push(cells);

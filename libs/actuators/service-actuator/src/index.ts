@@ -25,10 +25,13 @@ async function handleAction(input: ServiceAction) {
   // 1. Service-Aware Guard: Only allow access to requested service's secrets
   let token: string | null = null;
   if (input.auth === 'secret-guard') {
-    const secretKey = `${input.service_id.toUpperCase()}_TOKEN`;
-    token = secretGuard.getSecret(secretKey);
+    // Try both standard and service-specific keys
+    const service = input.service_id.toUpperCase();
+    token = secretGuard.getSecret(`${service}_BOT_TOKEN`, input.service_id) 
+         || secretGuard.getSecret(`${service}_TOKEN`, input.service_id);
+    
     if (!token) {
-      throw new Error(`Access Denied: No secret found for service "${input.service_id}"`);
+      throw new Error(`Access Denied: No secret found for service "${input.service_id}" (Keys tried: ${service}_BOT_TOKEN, ${service}_TOKEN)`);
     }
     logger.info(`🔐 [AUTH] Securely injected credentials for ${input.service_id}`);
   }
@@ -36,7 +39,15 @@ async function handleAction(input: ServiceAction) {
   // 2. Multi-Mode Execution
   switch (input.mode) {
     case 'API':
-      const baseUrl = input.service_id === 'moltbook' ? 'https://www.moltbook.com/api/v1' : `https://api.${input.service_id}.com/v1`;
+      let baseUrl: string;
+      if (input.service_id === 'moltbook') {
+        baseUrl = 'https://www.moltbook.com/api/v1';
+      } else if (input.service_id === 'slack') {
+        baseUrl = 'https://slack.com/api';
+      } else {
+        baseUrl = `https://api.${input.service_id}.com/v1`;
+      }
+
       const httpMethod = input.method || (input.params ? 'POST' : 'GET');
       return await secureFetch({
         method: httpMethod,

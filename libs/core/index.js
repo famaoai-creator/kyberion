@@ -2,6 +2,7 @@
 /**
  * @agent/core - Unified Entry Point
  * All shared utilities and wrappers are centralized here.
+ * [STABLE RECONSTRUCTION VERSION 2]
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -40,12 +41,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pptxUtils = exports.excelUtils = exports.orchestrator = exports.isSecretPath = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.validateInjection = exports.canFlowTo = exports.detectTier = exports.tierGuard = exports.classifier = exports.verifyIntegrity = exports.record = exports.ledger = exports.getAllFiles = exports.sre = exports.Cache = exports.errorHandler = exports.fileUtils = exports.ui = exports.logger = exports.pathUtils = exports.rootResolve = exports.resolve = exports.missionDir = exports.skillDir = exports.isProtected = exports.shared = exports.vault = exports.scripts = exports.active = exports.knowledge = exports.rootDir = exports.pathResolver = exports.writeArtifact = exports.sanitizePath = exports.validateUrl = exports.validateFileSize = exports.safeExec = exports.safeMkdir = exports.safeUnlink = exports.safeAppendFile = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
-exports.visionJudge = exports.ReflexTerminal = exports.terminalBridge = void 0;
-// Core Wrapper & Metrics
+exports.visionJudge = exports.ReflexTerminal = exports.terminalBridge = exports.say = exports.pptxUtils = exports.excelUtils = exports.orchestrator = exports.grantAccess = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.validateInjection = exports.canFlowTo = exports.detectTier = exports.tierGuard = exports.secureFetch = exports.classifier = exports.stringifyData = exports.parseData = exports.rootResolve = exports.resolve = exports.missionDir = exports.skillDir = exports.isProtected = exports.shared = exports.vault = exports.active = exports.scripts = exports.knowledge = exports.rootDir = exports.pathResolver = exports.isSecretPath = exports.safeStat = exports.safeReaddir = exports.safeExec = exports.safeMkdir = exports.safeUnlink = exports.safeAppendFile = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
+// Core Foundation (logger, ui, sre, Cache, fileUtils, errorHandler)
+__exportStar(require("./core.js"), exports);
+// Specific Wrappers & Metrics
 __exportStar(require("./skill-wrapper.js"), exports);
 __exportStar(require("./metrics.js"), exports);
-// Secure IO & Filesystem
+__exportStar(require("./error-codes.js"), exports);
+// Secure IO & Filesystem (Shield Layer)
 exports.secureIo = __importStar(require("./secure-io.js"));
 var secure_io_js_1 = require("./secure-io.js");
 Object.defineProperty(exports, "safeReadFile", { enumerable: true, get: function () { return secure_io_js_1.safeReadFile; } });
@@ -54,16 +57,17 @@ Object.defineProperty(exports, "safeAppendFile", { enumerable: true, get: functi
 Object.defineProperty(exports, "safeUnlink", { enumerable: true, get: function () { return secure_io_js_1.safeUnlink; } });
 Object.defineProperty(exports, "safeMkdir", { enumerable: true, get: function () { return secure_io_js_1.safeMkdir; } });
 Object.defineProperty(exports, "safeExec", { enumerable: true, get: function () { return secure_io_js_1.safeExec; } });
-Object.defineProperty(exports, "validateFileSize", { enumerable: true, get: function () { return secure_io_js_1.validateFileSize; } });
-Object.defineProperty(exports, "validateUrl", { enumerable: true, get: function () { return secure_io_js_1.validateUrl; } });
-Object.defineProperty(exports, "sanitizePath", { enumerable: true, get: function () { return secure_io_js_1.sanitizePath; } });
-Object.defineProperty(exports, "writeArtifact", { enumerable: true, get: function () { return secure_io_js_1.writeArtifact; } });
+const _secureIo = __importStar(require("./secure-io.js"));
+exports.safeReaddir = _secureIo.safeReaddir;
+exports.safeStat = _secureIo.safeStat;
+exports.isSecretPath = _secureIo.isSecretPath;
+// Paths & Navigation
 exports.pathResolver = __importStar(require("./path-resolver.js"));
 var path_resolver_js_1 = require("./path-resolver.js");
 Object.defineProperty(exports, "rootDir", { enumerable: true, get: function () { return path_resolver_js_1.rootDir; } });
 Object.defineProperty(exports, "knowledge", { enumerable: true, get: function () { return path_resolver_js_1.knowledge; } });
-Object.defineProperty(exports, "active", { enumerable: true, get: function () { return path_resolver_js_1.active; } });
 Object.defineProperty(exports, "scripts", { enumerable: true, get: function () { return path_resolver_js_1.scripts; } });
+Object.defineProperty(exports, "active", { enumerable: true, get: function () { return path_resolver_js_1.active; } });
 Object.defineProperty(exports, "vault", { enumerable: true, get: function () { return path_resolver_js_1.vault; } });
 Object.defineProperty(exports, "shared", { enumerable: true, get: function () { return path_resolver_js_1.shared; } });
 Object.defineProperty(exports, "isProtected", { enumerable: true, get: function () { return path_resolver_js_1.isProtected; } });
@@ -71,31 +75,21 @@ Object.defineProperty(exports, "skillDir", { enumerable: true, get: function () 
 Object.defineProperty(exports, "missionDir", { enumerable: true, get: function () { return path_resolver_js_1.missionDir; } });
 Object.defineProperty(exports, "resolve", { enumerable: true, get: function () { return path_resolver_js_1.resolve; } });
 Object.defineProperty(exports, "rootResolve", { enumerable: true, get: function () { return path_resolver_js_1.rootResolve; } });
-exports.pathUtils = __importStar(require("./path-resolver.js"));
-// Logging, UI & Utilities
-var core_js_1 = require("./core.js");
-Object.defineProperty(exports, "logger", { enumerable: true, get: function () { return core_js_1.logger; } });
-Object.defineProperty(exports, "ui", { enumerable: true, get: function () { return core_js_1.ui; } });
-Object.defineProperty(exports, "fileUtils", { enumerable: true, get: function () { return core_js_1.fileUtils; } });
-Object.defineProperty(exports, "errorHandler", { enumerable: true, get: function () { return core_js_1.errorHandler; } });
-Object.defineProperty(exports, "Cache", { enumerable: true, get: function () { return core_js_1.Cache; } });
-Object.defineProperty(exports, "sre", { enumerable: true, get: function () { return core_js_1.sre; } });
-// Validation & Schemas
+// Utils
+__exportStar(require("./fs-utils.js"), exports);
+__exportStar(require("./ledger.js"), exports);
+var data_utils_js_1 = require("./data-utils.js"); // Explicitly avoid detectFormat conflict
+Object.defineProperty(exports, "parseData", { enumerable: true, get: function () { return data_utils_js_1.parseData; } });
+Object.defineProperty(exports, "stringifyData", { enumerable: true, get: function () { return data_utils_js_1.stringifyData; } });
+__exportStar(require("./detectors.js"), exports);
 __exportStar(require("./validators.js"), exports);
-__exportStar(require("./validate.js"), exports);
-var fs_utils_js_1 = require("./fs-utils.js");
-Object.defineProperty(exports, "getAllFiles", { enumerable: true, get: function () { return fs_utils_js_1.getAllFiles; } });
-// Error Handling
-__exportStar(require("./error-codes.js"), exports);
-// Ledger & Auditing
-exports.ledger = __importStar(require("./ledger.js"));
-var ledger_js_1 = require("./ledger.js");
-Object.defineProperty(exports, "record", { enumerable: true, get: function () { return ledger_js_1.record; } });
-Object.defineProperty(exports, "verifyIntegrity", { enumerable: true, get: function () { return ledger_js_1.verifyIntegrity; } });
 // Classification & Knowledge
 exports.classifier = __importStar(require("./classifier.js"));
 __exportStar(require("./knowledge-provider.js"), exports);
-// Governance & Security
+// Networking
+var network_js_1 = require("./network.js");
+Object.defineProperty(exports, "secureFetch", { enumerable: true, get: function () { return network_js_1.secureFetch; } });
+// Governance & Security (Shield Layer)
 exports.tierGuard = __importStar(require("./tier-guard.js"));
 var tier_guard_js_1 = require("./tier-guard.js");
 Object.defineProperty(exports, "detectTier", { enumerable: true, get: function () { return tier_guard_js_1.detectTier; } });
@@ -109,16 +103,20 @@ exports.secretGuard = __importStar(require("./secret-guard.js"));
 var secret_guard_js_1 = require("./secret-guard.js");
 Object.defineProperty(exports, "getSecret", { enumerable: true, get: function () { return secret_guard_js_1.getSecret; } });
 Object.defineProperty(exports, "getActiveSecrets", { enumerable: true, get: function () { return secret_guard_js_1.getActiveSecrets; } });
-Object.defineProperty(exports, "isSecretPath", { enumerable: true, get: function () { return secret_guard_js_1.isSecretPath; } });
+Object.defineProperty(exports, "grantAccess", { enumerable: true, get: function () { return secret_guard_js_1.grantAccess; } });
 // Orchestration
 exports.orchestrator = __importStar(require("./orchestrator.js"));
-// Specialized Utils
+// Domain Engines
 exports.excelUtils = __importStar(require("./excel-utils.js"));
 exports.pptxUtils = __importStar(require("./pptx-utils.js"));
+// Voice & Presentation
+var voice_synth_js_1 = require("./voice-synth.js");
+Object.defineProperty(exports, "say", { enumerable: true, get: function () { return voice_synth_js_1.say; } });
+__exportStar(require("./platform.js"), exports);
 var terminal_bridge_js_1 = require("./terminal-bridge.js");
 Object.defineProperty(exports, "terminalBridge", { enumerable: true, get: function () { return terminal_bridge_js_1.terminalBridge; } });
 var reflex_terminal_js_1 = require("./reflex-terminal.js");
 Object.defineProperty(exports, "ReflexTerminal", { enumerable: true, get: function () { return reflex_terminal_js_1.ReflexTerminal; } });
 // Shared Business Types
+__exportStar(require("./shared-business-types.js"), exports);
 exports.visionJudge = __importStar(require("./vision-judge.js"));
-//# sourceMappingURL=index.js.map

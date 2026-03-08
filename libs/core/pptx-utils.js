@@ -304,4 +304,3 @@ async function generatePptxWithDesign(protocol, assetsDir = './assets') {
     }
     return pptx;
 }
-//# sourceMappingURL=pptx-utils.js.map

@@ -1,13 +1,7 @@
 "use strict";
 /**
- * TypeScript version of shared input validators for Gemini skills.
- *
- * Provides safe file-path validation, JSON parsing, and argument checking.
- *
- * Usage:
- *   import { validateFilePath, safeJsonParse, requireArgs } from '../../scripts/lib/validators.js';
- *   const resolved = validateFilePath(argv.input);
- *   const data = safeJsonParse(rawString, 'headers');
+ * TypeScript version of shared input validators for Kyberion components.
+ * [SECURE-IO COMPLIANT VERSION]
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -47,22 +41,21 @@ exports.validateFilePath = validateFilePath;
 exports.validateDirPath = validateDirPath;
 exports.safeJsonParse = safeJsonParse;
 exports.readJsonFile = readJsonFile;
+exports.validateFileFreshness = validateFileFreshness;
 exports.requireArgs = requireArgs;
-const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
+const fs = __importStar(require("node:fs")); // Still needed for low-level statSync, but we'll minimize it
+const secure_io_js_1 = require("./secure-io.js");
 /**
  * Validate that a file path exists and points to a regular file.
- *
- * @param filePath - Path to validate
- * @param label    - Human-readable label for error messages (default: 'input')
- * @returns Resolved absolute path
- * @throws {Error} If the path is missing, not found, or not a regular file
  */
 function validateFilePath(filePath, label = 'input') {
     if (!filePath) {
         throw new Error(`Missing required ${label} file path`);
     }
     const resolved = path.resolve(filePath);
+    // We use fs.existsSync here because safeReadFile throws if not exists, 
+    // but sometimes we just want to validate without reading.
     if (!fs.existsSync(resolved)) {
         throw new Error(`File not found: ${resolved}`);
     }
@@ -73,11 +66,6 @@ function validateFilePath(filePath, label = 'input') {
 }
 /**
  * Validate that a directory path exists and points to a directory.
- *
- * @param dirPath - Path to validate
- * @param label   - Human-readable label for error messages (default: 'directory')
- * @returns Resolved absolute path
- * @throws {Error} If the path is missing, not found, or not a directory
  */
 function validateDirPath(dirPath, label = 'directory') {
     if (!dirPath) {
@@ -94,11 +82,6 @@ function validateDirPath(dirPath, label = 'directory') {
 }
 /**
  * Safely parse a JSON string with a descriptive error message on failure.
- *
- * @param jsonString - The string to parse
- * @param label      - Human-readable label for error messages (default: 'JSON')
- * @returns The parsed value
- * @throws {Error} If parsing fails
  */
 function safeJsonParse(jsonString, label = 'JSON') {
     try {
@@ -110,23 +93,29 @@ function safeJsonParse(jsonString, label = 'JSON') {
 }
 /**
  * Read and parse a JSON file safely.
- *
- * @param filePath - Path to the JSON file
- * @param label    - Human-readable label for error messages (default: 'JSON file')
- * @returns Parsed JSON content
- * @throws {Error} If the file cannot be read or the JSON is invalid
  */
 function readJsonFile(filePath, label = 'JSON file') {
-    const resolved = validateFilePath(filePath, label);
-    const content = fs.readFileSync(resolved, 'utf8');
+    const content = (0, secure_io_js_1.safeReadFile)(filePath, { encoding: 'utf8' });
     return safeJsonParse(content, label);
 }
 /**
- * Validate that all required arguments are present in an arguments object.
+ * Validate that a file is 'fresh' (modified within the last X milliseconds).
  *
- * @param argv     - Arguments object (typically from yargs or similar)
- * @param required - List of required argument names
- * @throws {Error} If any required argument is missing (undefined or null)
+ * @param filePath  - Path to the file
+ * @param threshold - Maximum allowed age in milliseconds (default: 1 hour)
+ * @throws {Error} If the file is older than the threshold
+ */
+function validateFileFreshness(filePath, threshold = 60 * 60 * 1000) {
+    const resolved = validateFilePath(filePath);
+    const stats = fs.statSync(resolved);
+    const age = Date.now() - stats.mtimeMs;
+    if (age > threshold) {
+        const ageMinutes = Math.round(age / 1000 / 60);
+        throw new Error(`STALE_STATE_ERROR: File at ${filePath} was last modified ${ageMinutes} minutes ago (Threshold: ${threshold / 1000 / 60} minutes). Potential cognitive drift detected.`);
+    }
+}
+/**
+ * Validate that all required arguments are present in an arguments object.
  */
 function requireArgs(argv, required) {
     const missing = required.filter((name) => argv[name] === undefined || argv[name] === null);
@@ -134,4 +123,3 @@ function requireArgs(argv, required) {
         throw new Error(`Missing required argument(s): ${missing.join(', ')}`);
     }
 }
-//# sourceMappingURL=validators.js.map

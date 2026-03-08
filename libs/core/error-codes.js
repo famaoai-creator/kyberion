@@ -3,17 +3,17 @@
  * Standardized Error Codes for Gemini Skills Ecosystem.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SkillError = exports.ERROR_CODES = void 0;
+exports.KyberionError = exports.ERROR_CODES = void 0;
 exports.ERROR_CODES = {
-    // --- Skill Resolution (1xx) ---
-    SKILL_NOT_FOUND: {
+    // --- Logic Resolution (1xx) ---
+    LOGIC_NOT_FOUND: {
         code: 'E100',
-        message: 'Skill not found in index',
+        message: 'Logic component not found in index',
         retryable: false,
     },
     SCRIPT_NOT_FOUND: {
         code: 'E101',
-        message: 'No executable script found for skill',
+        message: 'No executable script found for logic',
         retryable: false,
     },
     AMBIGUOUS_SCRIPT: {
@@ -45,12 +45,12 @@ exports.ERROR_CODES = {
     // --- Execution (3xx) ---
     EXECUTION_ERROR: {
         code: 'E300',
-        message: 'Skill execution failed',
+        message: 'Logic execution failed',
         retryable: true,
     },
     TIMEOUT: {
         code: 'E301',
-        message: 'Skill execution timed out',
+        message: 'Execution timed out',
         retryable: true,
     },
     DEPENDENCY_ERROR: {
@@ -60,7 +60,7 @@ exports.ERROR_CODES = {
     },
     PARSE_ERROR: {
         code: 'E303',
-        message: 'Failed to parse skill output',
+        message: 'Failed to parse execution output',
         retryable: false,
     },
     // --- Pipeline / Orchestration (4xx) ---
@@ -104,7 +104,7 @@ exports.ERROR_CODES = {
 /**
  * Custom error class that carries a structured error code.
  */
-class SkillError extends Error {
+class KyberionError extends Error {
     code;
     retryable;
     context;
@@ -112,7 +112,7 @@ class SkillError extends Error {
     constructor(errorDef, detail, options = {}) {
         const msg = detail ? `${errorDef.message}: ${detail}` : errorDef.message;
         super(msg);
-        this.name = 'SkillError';
+        this.name = 'KyberionError';
         this.code = errorDef.code;
         this.retryable = errorDef.retryable;
         if (options.cause)
@@ -129,5 +129,4 @@ class SkillError extends Error {
         };
     }
 }
-exports.SkillError = SkillError;
-//# sourceMappingURL=error-codes.js.map
+exports.KyberionError = KyberionError;
