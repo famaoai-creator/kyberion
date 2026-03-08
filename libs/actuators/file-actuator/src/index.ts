@@ -1,7 +1,6 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeReaddir, safeStat, safeUnlink, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeReaddir, safeStat, safeUnlink, safeMkdir, safeExistsSync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs'; // Used only for existsSync check if needed, or minimal low-level
 
 /**
  * File-Actuator v1.2.0 [SECURE-IO ENFORCED]

@@ -80,9 +80,11 @@ export { getSecret, getActiveSecrets, grantAccess } from './secret-guard.js';
 // Orchestration
 export * as orchestrator from './orchestrator.js';
 
-// Domain Engines
-export * as excelUtils from './excel-utils.js';
-export * as pptxUtils from './pptx-utils.js';
+// Domain Engines (Moved to @agent/shared-*)
+// export * as excelUtils from './excel-utils.js';
+// export * as pptxUtils from './pptx-utils.js';
+// export * as finance from './finance.js';
+// export * as mcpClient from './mcp-client-engine.js';
 
 // Voice & Presentation
 export { say } from './voice-synth.js';
@@ -92,4 +94,5 @@ export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';
-export * as visionJudge from './vision-judge.js';
+// export * as visionJudge from './vision-judge.js';
+

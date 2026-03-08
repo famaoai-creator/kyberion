@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { metrics } from '@agent/core/metrics';
-import { calculateReinvestment } from '@agent/core/finance';
+import { calculateReinvestment } from '@agent/shared-business';
 import { safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();

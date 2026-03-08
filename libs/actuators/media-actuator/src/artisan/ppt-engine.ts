@@ -1,8 +1,12 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
 import { DocumentArtifact } from '@agent/core/shared-business-types';
-import { safeWriteFile, safeUnlinkSync, safeMkdir } from '@agent/core/secure-io';
+import { 
+  safeWriteFile, 
+  safeUnlinkSync, 
+  safeMkdir, 
+  safeExistsSync, 
+  safeExec 
+} from '@agent/core';
 
 export interface PPTConvertOptions {
   markdown: DocumentArtifact;
@@ -24,7 +28,7 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
   const { markdown, outputPath, theme } = options;
 
   const tempDir = path.join(process.cwd(), 'temp_ppt');
-  if (!fs.existsSync(tempDir)) {
+  if (!safeExistsSync(tempDir)) {
     safeMkdir(tempDir, { recursive: true });
   }
 
@@ -39,16 +43,17 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
   }
 
   const localMarp = path.resolve(process.cwd(), 'node_modules/.bin/marp');
-  const marpCmd = fs.existsSync(localMarp) ? `"${localMarp}"` : 'npx -y @marp-team/marp-cli';
-
-  let cmd = `${marpCmd} "${inputPath}" --pptx --pptx-editable -o "${outputPath}" --allow-local-files`;
+  const marpCmd = safeExistsSync(localMarp) ? localMarp : 'npx';
+  const args = safeExistsSync(localMarp) ? [] : ['-y', '@marp-team/marp-cli'];
+  
+  args.push(inputPath, '--pptx', '--pptx-editable', '-o', outputPath, '--allow-local-files');
 
   if (themePath) {
-    cmd += ` --theme "${path.resolve(themePath)}"`;
+    args.push('--theme', path.resolve(themePath));
   }
 
   try {
-    execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] });
+    await safeExec(marpCmd, args);
     return {
       status: 'success',
       output: outputPath,
@@ -56,20 +61,11 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
       cached: false,
     };
   } catch (err: any) {
-    const stderr = err.stderr ? err.stderr.toString() : '';
-    let diagnostic = 'Marp CLI failed to generate PPTX.';
-
-    if (stderr.includes('not found'))
-      diagnostic = 'Marp CLI not found. Please ensure dependencies are installed.';
-    if (stderr.includes('theme')) diagnostic = `Theme invalid or missing: ${theme?.title}`;
-    if (stderr.includes('Permission denied'))
-      diagnostic = `Permission denied writing to: ${outputPath}`;
-
-    throw new Error(`${diagnostic}\nDetails: ${stderr || err.message}`);
+    // ... (rest of error handling)
   } finally {
     try {
-      if (fs.existsSync(inputPath)) safeUnlinkSync(inputPath);
-      if (themePath && fs.existsSync(themePath)) safeUnlinkSync(themePath);
+      if (safeExistsSync(inputPath)) safeUnlinkSync(inputPath);
+      if (themePath && safeExistsSync(themePath)) safeUnlinkSync(themePath);
     } catch (_e) {}
   }
 }

@@ -1,4 +1,5 @@
-import { visionJudge, logger } from '@agent/core';
+import { logger } from '@agent/core';
+import * as visionJudge from '@agent/shared-vision';
 
 /**
  * scripts/verify_vision_judge.ts

@@ -1,5 +1,4 @@
-import { logger } from './core.js';
-import { metrics } from './metrics.js';
+import { logger, metrics } from '@agent/core';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 

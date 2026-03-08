@@ -1,0 +1,20 @@
+{
+  "name": "@agent/shared-media",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Domain-specific utilities for Media and Office formats.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "exceljs": "^4.4.0",
+    "pptxgenjs": "^4.0.1",
+    "adm-zip": "^0.5.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@agent/shared-network",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": { "@agent/core": "workspace:*", "@modelcontextprotocol/sdk": "^1.27.1" }
+}

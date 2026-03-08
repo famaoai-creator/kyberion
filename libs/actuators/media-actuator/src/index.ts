@@ -1,4 +1,6 @@
-import { logger, safeReadFile, safeWriteFile, excelUtils, pptxUtils, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
+import * as excelUtils from '@agent/shared-media';
+import * as pptxUtils from '@agent/shared-media';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { extract } from './artisan/extraction-engine.js';
