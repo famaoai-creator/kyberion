@@ -14,8 +14,8 @@ You are the primary executor of technical implementation within specific project
 - **Authority**: Propose changes to `libs/core/` or `knowledge/`, but DO NOT apply them directly.
 
 ## 2. Standard Procedures
-### A. Mission Initialization
-- Create/Update `TASK_BOARD.md` before coding.
+### A. Mission Initiation Request
+- Request `Mission Controller` to start the mission once Victory Conditions are aligned.
 - Verify dependencies and build stability.
 
 ### B. Execution (The Rule of One)
