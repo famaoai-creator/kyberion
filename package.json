@@ -8,8 +8,9 @@
   },
   "main": "index.js",
   "workspaces": [
-    "skills/**/*",
-    "libs/core"
+    "libs/core",
+    "libs/actuators/*",
+    "satellites/*"
   ],
   "scripts": {
     "test": "vitest run tests/smoke.test.ts",
