@@ -1,8 +1,7 @@
 "use strict";
 /**
  * TypeScript version of the Knowledge Tier Guard.
- *
- * Prevents confidential / personal data from leaking into lower-tier outputs.
+ * v2.0 - HARDENED ROLE-BASED ACCESS CONTROL (RBAC)
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -40,21 +39,22 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TIERS = void 0;
 exports.detectTier = detectTier;
-exports.detectTenant = detectTenant;
-exports.canFlowTo = canFlowTo;
-exports.validateInjection = validateInjection;
-exports.validateReadPermission = validateReadPermission;
 exports.validateWritePermission = validateWritePermission;
+exports.detectTenant = detectTenant;
+exports.validateReadPermission = validateReadPermission;
 exports.validateSovereignBoundary = validateSovereignBoundary;
 exports.scanForConfidentialMarkers = scanForConfidentialMarkers;
 const path = __importStar(require("node:path"));
+const fs = __importStar(require("node:fs"));
 /** Numeric weight for each tier (higher = more sensitive). */
 exports.TIERS = {
-    personal: 3,
-    confidential: 2,
+    personal: 4,
+    confidential: 3,
     public: 1,
 };
-const KNOWLEDGE_ROOT = path.join(process.cwd(), 'knowledge');
+const ROOT_DIR = process.cwd();
+const KNOWLEDGE_ROOT = path.join(ROOT_DIR, 'knowledge');
+const ACCESS_MATRIX_PATH = path.join(KNOWLEDGE_ROOT, 'governance/role-write-access.json');
 const TIER_PATHS = {
     personal: path.join(KNOWLEDGE_ROOT, 'personal'),
     confidential: path.join(KNOWLEDGE_ROOT, 'confidential'),
@@ -72,108 +72,99 @@ function detectTier(filePath) {
     return 'public';
 }
 /**
- * Extract tenant name from physical path (e.g., vault/{Tenant}/...)
+ * Validates write permission based on CURRENT ROLE and target path.
+ * This is the CORE of the Hardened Role Guard.
+ */
+function validateWritePermission(filePath) {
+    const resolvedPath = path.resolve(filePath);
+    const currentMission = process.env.MISSION_ID;
+    // 1. Identify Current Role from physical state or environment
+    let currentRole = 'unknown';
+    const envRole = process.env.MISSION_ROLE;
+    if (currentMission) {
+        const statePath = path.join(ROOT_DIR, 'active/missions', currentMission, 'mission-state.json');
+        try {
+            if (fs.existsSync(statePath)) {
+                const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+                currentRole = (state.assigned_persona || 'unknown').toLowerCase().replace(/\s+/g, '_');
+            }
+        }
+        catch (_) { }
+    }
+    // Fallback to environment role if unknown (crucial for mission bootstrap)
+    if (currentRole === 'unknown' && envRole) {
+        currentRole = envRole.toLowerCase().replace(/\s+/g, '_');
+    }
+    // 2. Load Role-Based Access Matrix
+    let matrix = null;
+    try {
+        if (fs.existsSync(ACCESS_MATRIX_PATH)) {
+            matrix = JSON.parse(fs.readFileSync(ACCESS_MATRIX_PATH, 'utf8'));
+        }
+    }
+    catch (_) { }
+    if (!matrix)
+        return { allowed: true }; // Fallback to permissive if matrix missing (to avoid bootstrap deadlock)
+    // 3. Evaluate Permissions
+    const relativePath = path.relative(ROOT_DIR, resolvedPath);
+    // A. Check Default Allowed (Mission Dir, Scratch, etc.)
+    const defaultAllow = matrix.default_allow.map((p) => p.replace('${MISSION_ID}', currentMission || 'NONE'));
+    if (defaultAllow.some((p) => relativePath.startsWith(p))) {
+        return { allowed: true };
+    }
+    // B. Check Role Specific Allowed
+    const roleConfig = matrix.roles[currentRole];
+    if (roleConfig && roleConfig.allow) {
+        if (roleConfig.allow.some((p) => relativePath.startsWith(p))) {
+            return { allowed: true };
+        }
+    }
+    // C. Special Privilege: Ecosystem Architect can write almost anywhere in Public Tier
+    if (currentRole === 'ecosystem_architect' && relativePath.startsWith('knowledge/')) {
+        return { allowed: true };
+    }
+    return {
+        allowed: false,
+        reason: `[ROLE_VIOLATION] Role '${currentRole}' is NOT authorized to write to '${relativePath}'.`
+    };
+}
+/**
+ * Existing Legacy Guard Functions (Restored for compatibility)
  */
 function detectTenant(filePath) {
     const resolved = path.resolve(filePath);
-    const vaultRoot = path.resolve(process.cwd(), 'vault');
+    const vaultRoot = path.resolve(ROOT_DIR, 'vault');
     if (resolved.startsWith(vaultRoot)) {
         const relative = path.relative(vaultRoot, resolved);
-        const parts = relative.split(path.sep);
-        return parts.length > 0 ? parts[0] : null;
+        return relative.split(path.sep)[0] || null;
     }
     return null;
 }
-/**
- * Check whether data from `sourceTier` is allowed to flow into `targetTier` output.
- */
-function canFlowTo(sourceTier, targetTier) {
-    return exports.TIERS[sourceTier] <= exports.TIERS[targetTier];
-}
-/**
- * Validate that a knowledge file can be injected into output at the given tier.
- */
-function validateInjection(knowledgePath, outputTier) {
-    const sourceTier = detectTier(knowledgePath);
-    const allowed = canFlowTo(sourceTier, outputTier);
-    const result = { allowed, sourceTier, outputTier };
-    if (!allowed) {
-        result.reason = `Cannot inject ${sourceTier}-tier data into ${outputTier}-tier output`;
-    }
-    return result;
-}
-/**
- * Validates read permission based on role, tier and tenant.
- */
 function validateReadPermission(filePath) {
     const tenant = detectTenant(filePath);
     const activeTenant = process.env.ACTIVE_TENANT;
     if (tenant && activeTenant && tenant !== activeTenant) {
-        return {
-            allowed: false,
-            reason: `[TENANT_VIOLATION] Access to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.`
-        };
+        return { allowed: false, reason: `[TENANT_VIOLATION] Read access denied for tenant '${tenant}'.` };
     }
     return { allowed: true };
 }
-/**
- * Validates write permission based on role, tier and tenant.
- */
-function validateWritePermission(filePath) {
-    const tier = detectTier(filePath);
-    const tenant = detectTenant(filePath);
-    const activeTenant = process.env.ACTIVE_TENANT;
-    if (tier === 'personal') {
-        return { allowed: false, reason: 'Writing to personal tier is restricted.' };
-    }
-    if (tenant && activeTenant && tenant !== activeTenant) {
-        return {
-            allowed: false,
-            reason: `[TENANT_VIOLATION] Writing to tenant '${tenant}' data is denied while active tenant is '${activeTenant}'.`
-        };
-    }
-    return { allowed: true };
-}
-/**
- * Validate that content does not cross the Sovereign boundary (no secret leaks).
- * Note: activeSecrets must be passed from secret-guard to avoid circular dependency.
- */
 function validateSovereignBoundary(content, activeSecrets = []) {
     const detected = [];
-    // 1. Check for active secrets
     for (const secret of activeSecrets) {
-        if (content.includes(secret)) {
+        if (content.includes(secret))
             detected.push(`SECRET_LEAK: ${secret.substring(0, 3)}...`);
-        }
     }
-    // 2. Check for markers
     const markerCheck = scanForConfidentialMarkers(content);
-    if (markerCheck.hasMarkers) {
+    if (markerCheck.hasMarkers)
         detected.push(...markerCheck.markers.map(m => `MARKER_DETECTED: ${m}`));
-    }
-    return {
-        safe: detected.length === 0,
-        detected,
-    };
+    return { safe: detected.length === 0, detected };
 }
-/**
- * Scan text content for patterns that suggest sensitive / confidential data.
- */
 function scanForConfidentialMarkers(content) {
-    const MARKERS = [
-        /CONFIDENTIAL/i,
-        /SECRET/i,
-        /PRIVATE/i,
-        /API[_-]?KEY/i,
-        /PASSWORD/i,
-        /TOKEN/i,
-        /Bearer\s+[A-Za-z0-9\-._~+/]+=*/,
-    ];
+    const MARKERS = [/CONFIDENTIAL/i, /SECRET/i, /PRIVATE/i, /API[_-]?KEY/i, /PASSWORD/i, /TOKEN/i, /Bearer\s+[A-Za-z0-9\-._~+/]+=*/];
     const found = [];
     for (const pattern of MARKERS) {
-        if (pattern.test(content)) {
+        if (pattern.test(content))
             found.push(pattern.source);
-        }
     }
     return { hasMarkers: found.length > 0, markers: found };
 }

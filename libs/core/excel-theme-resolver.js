@@ -45,3 +45,4 @@ async function extractThemePalette(filePath) {
     }
     return palette;
 }
+//# sourceMappingURL=excel-theme-resolver.js.map

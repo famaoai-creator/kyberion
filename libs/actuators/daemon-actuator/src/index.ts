@@ -1,12 +1,12 @@
 /**
- * Daemon-Actuator v1.0.0
+ * Daemon-Actuator v1.2.0
  * Kyberion Nerve Service Manager (KNSM)
  * [SECURE-IO COMPLIANT]
  * 
  * Objectives:
  * 1. Persistent background execution via OS-native daemons (launchd).
  * 2. Auto-recovery of neural processes (KeepAlive).
- * 3. Unified status reporting for Nexus and Chronos.
+ * 3. Support for ADF-driven Sensors via generic-sensor-host.
  */
 
 import { 
@@ -32,6 +32,7 @@ interface DaemonAction {
   action: 'register' | 'start' | 'stop' | 'status' | 'unregister' | 'run-once' | 'post-msg' | 'wait-msg';
   nerve_id: string; 
   script_path?: string; 
+  adf_path?: string; // Path to a Sensor ADF
   options?: {
     ephemeral?: boolean; 
     env?: Record<string, string>;
@@ -44,6 +45,16 @@ interface DaemonAction {
 async function handleAction(input: DaemonAction) {
   const label = `kyberion.${input.nerve_id}`;
   const plistPath = path.join(LAUNCH_AGENTS_DIR, `${label}.plist`);
+
+  // Auto-resolve for ADF-driven sensors
+  let finalScriptPath = input.script_path;
+  let finalArgs: string[] = [];
+
+  if (input.adf_path) {
+    finalScriptPath = 'dist/presence/sensors/generic-sensor-host.js';
+    finalArgs = [path.join(ROOT_DIR, input.adf_path)];
+    logger.info(`🗺️ [DAEMON] ADF detected. Using generic sensor host for: ${input.adf_path}`);
+  }
 
   switch (input.action) {
     case 'post-msg':
@@ -86,42 +97,38 @@ async function handleAction(input: DaemonAction) {
 
     case 'register':
     case 'run-once':
-      if (!input.script_path) throw new Error('script_path is required for registration.');
+      if (!finalScriptPath) throw new Error('script_path or adf_path is required.');
       logger.info(`🛰️ [DAEMON] Registering nerve: ${input.nerve_id} (Ephemeral: ${!!input.options?.ephemeral})`);
       
       let template = safeReadFile(TEMPLATE_PATH, { encoding: 'utf8' }) as string;
       const keepAlive = input.options?.ephemeral ? 'false' : 'true';
       
-      // Dynamic Environment Variables
-      let envDict = `<key>MISSION_ID</key>\n        <string>${process.env.MISSION_ID || 'NONE'}</string>`;
-      if (input.options?.env) {
-        Object.entries(input.options.env).forEach(([k, v]) => {
-          envDict += `\n        <key>${k}</key>\n        <string>${v}</string>`;
-        });
-      }
+      const fullScriptPath = path.isAbsolute(finalScriptPath) ? finalScriptPath : path.join(ROOT_DIR, finalScriptPath);
+      const programArgs = [process.execPath, fullScriptPath, ...finalArgs];
+      let programArgsXml = '';
+      programArgs.forEach(arg => {
+        programArgsXml += `\n        <string>${arg}</string>`;
+      });
 
       const replacements: Record<string, string> = {
         '{{NERVE_ID}}': input.nerve_id,
-        '{{NODE_PATH}}': process.execPath,
-        '{{SCRIPT_PATH}}': path.join(ROOT_DIR, input.script_path),
         '{{LOG_PATH}}': path.join(ROOT_DIR, `active/shared/logs/${input.nerve_id}.log`),
         '{{ERROR_LOG_PATH}}': path.join(ROOT_DIR, `active/shared/logs/${input.nerve_id}.error.log`),
         '{{ROOT_DIR}}': ROOT_DIR,
         '{{ENV_PATH}}': process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
         '<key>KeepAlive</key>\n    <true/>': `<key>KeepAlive</key>\n    <${keepAlive}/>`,
-        '<key>MISSION_ID</key>\n        <string>MSN-SYSTEM-DAEMON-ACTUATOR</string>': envDict
+        '<key>ProgramArguments</key>\n    <array>\n        <string>{{NODE_PATH}}</string>\n        <string>{{SCRIPT_PATH}}</string>\n    </array>': `<key>ProgramArguments</key>\n    <array>${programArgsXml}\n    </array>`
       };
 
       Object.entries(replacements).forEach(([key, val]) => {
         template = template.split(key).join(val);
       });
 
-      // Use __sudo bypass to ensure OS-level write succeeds despite path resolution complexities
       safeWriteFile(plistPath, template, { __sudo: 'sovereign' } as any);
       logger.info(`✅ [DAEMON] Plist created: ${plistPath}`);
       
       if (input.action === 'run-once') {
-        logger.info(`🚀 [DAEMON] Auto-starting ephemeral nerve: ${label}`);
+        logger.info(`🚀 [DAEMON] Auto-starting nerve: ${label}`);
         await safeExec('launchctl', ['load', '-w', plistPath]);
       }
       return { status: 'registered', plist: plistPath };
@@ -130,7 +137,6 @@ async function handleAction(input: DaemonAction) {
       logger.info(`🛑 [DAEMON] Stopping nerve: ${label}`);
       await safeExec('launchctl', ['unload', '-w', plistPath]);
       
-      // Cleanup plist if file is marked as ephemeral in its own content (simple check)
       const content = safeReadFile(plistPath, { encoding: 'utf8' }) as string;
       if (content.includes('<key>KeepAlive</key>\n    <false/>')) {
         logger.info(`🧹 [DAEMON] Cleaning up ephemeral plist: ${plistPath}`);
@@ -143,7 +149,7 @@ async function handleAction(input: DaemonAction) {
         const output = await safeExec('launchctl', ['list', label]);
         return { status: 'alive', raw: output };
       } catch (err) {
-        return { status: 'dead', error: 'Service not found or stopped.' };
+        return { status: 'dead', error: 'Service not found.' };
       }
 
     case 'unregister':
@@ -169,22 +175,20 @@ if (isMain) {
     .option('action', { type: 'string', demandOption: true })
     .option('nerve', { type: 'string', demandOption: true })
     .option('script', { type: 'string' })
+    .option('adf', { type: 'string' })
     .option('options', { type: 'string' })
     .parseSync();
 
   let options = {};
   if (argv.options) {
-    try {
-      options = JSON.parse(argv.options as string);
-    } catch (e) {
-      logger.error(`❌ [DAEMON] Failed to parse options JSON: ${e}`);
-    }
+    try { options = JSON.parse(argv.options as string); } catch (e) {}
   }
 
   handleAction({
     action: argv.action as any,
     nerve_id: argv.nerve as string,
     script_path: argv.script as string,
+    adf_path: argv.adf as string,
     options
   })
     .then(res => console.log(JSON.stringify(res, null, 2)))

@@ -1,0 +1,14 @@
+{
+  "id": "slack-sensor-adf",
+  "name": "Kyberion Slack Ear (ADF)",
+  "type": "streaming",
+  "assigned_role": "sovereign_concierge",
+  "connection": {
+    "service_id": "slack",
+    "auth": "secret-guard"
+  },
+  "action": {
+    "actuator": "service-actuator",
+    "command": "STREAM"
+  }
+}
