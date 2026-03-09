@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "A2A Message Envelope ADF v1.0",
+  "description": "Agent-to-Agent protocol compliant envelope for Kyberion ADF payloads.",
+  "type": "object",
+  "required": ["a2a_version", "header", "payload"],
+  "properties": {
+    "a2a_version": { "const": "1.0" },
+    "header": {
+      "type": "object",
+      "required": ["msg_id", "sender", "performative"],
+      "properties": {
+        "msg_id": { "type": "string", "description": "UUID or unique message identifier" },
+        "parent_id": { "type": "string", "description": "Reference to a previous message ID" },
+        "conversation_id": { "type": "string", "description": "Mission ID or long-running task ID" },
+        "sender": { "type": "string", "description": "Agent identity (e.g., kyberion:brain:gemini)" },
+        "receiver": { "type": "string", "description": "Target identity (e.g., kyberion:nerve)" },
+        "performative": { 
+          "enum": ["request", "propose", "inform", "accept", "reject", "query", "result"],
+          "description": "The speech act of this message"
+        },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "signature": { "type": "string", "description": "Optional cryptographic signature for Sovereign approval" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "The actual ADF instructions (intent, pipeline, or steps)"
+    }
+  }
+}
