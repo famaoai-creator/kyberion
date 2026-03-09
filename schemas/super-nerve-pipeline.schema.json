@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Super-Nerve Pipeline ADF v1.0",
+  "description": "ADF for defining cross-actuator pipelines and composable macros.",
+  "type": "object",
+  "required": ["steps"],
+  "properties": {
+    "context": {
+      "type": "object",
+      "description": "Initial context variables."
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "max_steps": { "type": "integer", "default": 1000 }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op", "params"],
+        "properties": {
+          "id": { "type": "string" },
+          "op": { 
+            "type": "string", 
+            "pattern": "^[a-z]+:[a-z_]+$",
+            "description": "Format: domain:action (e.g., file:read, browser:goto, core:call)"
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}
