@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "get-ips",
+      "type": "capture",
+      "op": "shell",
+      "params": { "cmd": "ifconfig | grep \"inet \" | grep -v 127.0.0.1", "export_as": "raw_ips" }
+    },
+    {
+      "id": "log-ips",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "Local IP Addresses:\n{{raw_ips}}" }
+    }
+  ]
+}
