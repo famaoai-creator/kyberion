@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ecosystem Orchestration Plan",
+  "description": "ADF definition for ecosystem setup, intent mapping, skill scaffolding, and pipeline orchestration.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "plan_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "action": {
+      "type": "string",
+      "enum": ["init_wizard", "intent_gateway", "create_skill", "scaffold_skills", "iterm_schedule", "run_pipeline", "manage_plugin"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "domain": { "type": "string" },
+        "role": { "type": "string" },
+        "query": { "type": "string" },
+        "category": { "type": "string" },
+        "skill_name": { "type": "string" },
+        "pipeline": { "type": "string" },
+        "plugin_action": { "type": "string", "enum": ["register", "uninstall", "list"] },
+        "target": { "type": "string" },
+        "prompt": { "type": "string" },
+        "vars": { "type": "object" }
+      }
+    }
+  },
+  "required": ["version", "plan_id", "action"]
+}

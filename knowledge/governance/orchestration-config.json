@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "name": "Ecosystem Orchestration Governance",
+  "defaults": {
+    "skill_category": "utilities",
+    "namespace": "general",
+    "tier": "personal"
+  },
+  "scaffolding": {
+    "template_dir": "templates/scaffold",
+    "required_files": ["SKILL.md", "package.json", "tsconfig.json", "src/index.ts"]
+  },
+  "pipelines": {
+    "dir": "pipelines",
+    "timeout_ms": 120000
+  },
+  "plugins": {
+    "registry": "knowledge/orchestration/plugin-registry.json",
+    "allowed_categories": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "name": "Knowledge & Documentation Sync Rules",
+  "indexing": {
+    "knowledge_dir": "knowledge",
+    "skills_dir": "skills",
+    "output_json": "knowledge/orchestration/knowledge_index.json",
+    "output_md": "knowledge/_index.md",
+    "exclude": [".*", "node_modules", "incidents"]
+  },
+  "guide": {
+    "template": "SKILLS_GUIDE.md",
+    "namespaces": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
+  },
+  "security": {
+    "pii_patterns": [
+      { "name": "API_KEY", "regex": "AIza[0-9A-Za-z-_]{35}" },
+      { "name": "OAUTH_SECRET", "regex": "[0-9A-Za-z-_]{24,32}\\.apps\\.googleusercontent\\.com" },
+      { "name": "PRIVATE_KEY", "regex": "-----BEGIN PRIVATE KEY-----" },
+      { "name": "GENERIC_SECRET", "regex": "secret[:=]\\s*['\"][0-9A-Za-z-_]{16,}['\"]" }
+    ],
+    "exempt_dirs": ["knowledge/personal"]
+  },
+  "sync": {
+    "readme": true,
+    "skills_guide": true,
+    "last_updated_field": "last_updated"
+  }
+}
