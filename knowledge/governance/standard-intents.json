@@ -1,0 +1,32 @@
+{
+  "intents": [
+    {
+      "id": "reconcile-ecosystem",
+      "description": "Perform full ecosystem reconciliation (dates, docs, integrity).",
+      "trigger_keywords": ["sync", "reconcile", "update all"],
+      "pipeline": [
+        { "op": "wisdom:reconcile", "params": { "strategy_path": "knowledge/governance/wisdom-reconcile-strategy.json" } },
+        { "op": "system:log", "params": { "message": "Full ecosystem reconciliation complete." } }
+      ]
+    },
+    {
+      "id": "audit-security",
+      "description": "Scan for PII and check pulse integrity.",
+      "trigger_keywords": ["security", "audit", "pii", "check"],
+      "pipeline": [
+        { "op": "wisdom:scan_pii", "params": {} },
+        { "op": "system:pulse_status", "params": { "export_as": "ledger_ok" } },
+        { "op": "system:log", "params": { "message": "Security audit finished. Ledger valid: {{ledger_ok}}" } }
+      ]
+    },
+    {
+      "id": "rebuild-env",
+      "description": "Rebuild all actuators and redeploy ecosystem.",
+      "trigger_keywords": ["rebuild", "deploy", "setup"],
+      "pipeline": [
+        { "op": "orchestrator:deploy", "params": {} },
+        { "op": "system:log", "params": { "message": "Ecosystem rebuilt and redeployed." } }
+      ]
+    }
+  ]
+}
