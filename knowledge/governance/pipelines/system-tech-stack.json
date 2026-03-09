@@ -1,0 +1,23 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "list-root",
+      "type": "capture",
+      "op": "shell",
+      "params": { "cmd": "ls -F", "export_as": "files" }
+    },
+    {
+      "id": "detect-node",
+      "type": "transform",
+      "op": "regex_extract",
+      "params": { "from": "files", "pattern": "(package.json)", "export_as": "has_node" }
+    },
+    {
+      "id": "log-stack",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "Tech Stack Detection: Node={{has_node}}" }
+    }
+  ]
+}
