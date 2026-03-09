@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, pathResolver, parseData, stringifyData } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, pathResolver, parseData, stringifyData, safeMkdir } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -12,8 +12,9 @@ import addFormats from 'ajv-formats';
  */
 
 interface ModelingAction {
-  action: 'validate' | 'simulate' | 'optimize' | 'analyze';
+  action: 'validate' | 'simulate' | 'optimize' | 'analyze' | 'graph' | 'parse_nonfunctional';
   schemaPath?: string;
+  // ... rest of interface
   dataPath?: string;
   model?: 'unit_economics' | 'financial_projection' | 'risk_scoring';
   analysisType?: 'skill_cooccurrence' | 'context_ranking' | 'knowledge_graph';
@@ -31,6 +32,10 @@ async function handleAction(input: ModelingAction) {
       return await performValidation(input);
     case 'analyze':
       return await performAnalysis(input);
+    case 'graph':
+      return await performGraphGeneration(input);
+    case 'parse_nonfunctional':
+      return await performNonFunctionalParsing(input);
     case 'simulate':
     case 'optimize':
     default:
@@ -295,6 +300,45 @@ function getProjectWorkflows(missionId: string) {
     }
   } catch (_) {}
   return items;
+}
+
+async function performGraphGeneration(_input: ModelingAction) {
+  const indexPath = pathResolver.knowledge('orchestration/global_skill_index.json');
+  const outputPath = path.resolve(process.cwd(), 'docs/architecture/dependency-graph.mmd');
+  if (!fs.existsSync(indexPath)) return { status: 'failed', reason: 'No index' };
+
+  const index = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
+  const skills = index.s || [];
+
+  let mermaid = 'graph TD\n  subgraph Ecosystem ["Gemini Skills Ecosystem"]\n';
+  const namespaces: Record<string, string[]> = {};
+  
+  skills.forEach((s: any) => {
+    const parts = s.path.split('/');
+    const cat = parts.length > 1 ? parts[1] : 'General';
+    if (!namespaces[cat]) namespaces[cat] = [];
+    namespaces[cat].push(s.n);
+  });
+
+  Object.keys(namespaces).sort().forEach(ns => {
+    mermaid += `    subgraph ${ns} ["📂 ${ns.toUpperCase()}"]\n`;
+    namespaces[ns].forEach(skill => {
+      mermaid += `      ${skill.replace(/-/g, '_')}["${skill}"]\n`;
+    });
+    mermaid += '    end\n';
+  });
+  mermaid += '  end\n';
+
+  if (!fs.existsSync(path.dirname(outputPath))) safeMkdir(path.dirname(outputPath), { recursive: true });
+  safeWriteFile(outputPath, mermaid);
+  return { status: 'success', graph_path: outputPath };
+}
+
+async function performNonFunctionalParsing(input: ModelingAction) {
+  const data = input.data || {};
+  logger.info(`📝 [MODELING] Parsing non-functional requirements to ADF...`);
+  const adf = { type: 'non-functional', requirements: data };
+  return { status: 'success', adf };
 }
 
 const main = async () => {
