@@ -78,8 +78,19 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   const page = browserContext.pages().length > 0 ? browserContext.pages()[0] : await browserContext.newPage();
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
-  const resolve = (val: any) => {
+      const resolve = (val: any) => {
     if (typeof val !== 'string') return val;
+    
+    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
+    const singleVarMatch = val.match(/^{{(.*?)}}$/);
+    if (singleVarMatch) {
+      const parts = singleVarMatch[1].trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? current : '';
+    }
+
+    // 文字列混在の場合は従来通り文字列展開
     return val.replace(/{{(.*?)}}/g, (_, p) => {
       const parts = p.trim().split('.');
       let current = ctx;
@@ -100,12 +111,14 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
         
         if (step.type === 'control') {
           ctx = await opControl(step.op, step.params, page, ctx, options, state, resolve);
+        } else if (step.type === 'capture') {
+          ctx = await opCapture(step.op, step.params, page, ctx, resolve);
+        } else if (step.type === 'transform') {
+          ctx = await opTransform(step.op, step.params, ctx, resolve);
+        } else if (step.type === 'apply') {
+          ctx = await opApply(step.op, step.params, page, ctx, resolve);
         } else {
-          switch (step.type) {
-            case 'capture': ctx = await opCapture(step.op, step.params, page, ctx, resolve); break;
-            case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-            case 'apply': await opApply(step.op, step.params, page, ctx, resolve); break;
-          }
+          throw new Error(`Unknown step type: ${step.type}`);
         }
         results.push({ op: step.op, status: 'success' });
       } catch (err: any) {
@@ -152,7 +165,8 @@ async function opControl(op: string, params: any, page: Page, ctx: any, options:
       }
       return ctx;
 
-    default: return ctx;
+    default: 
+      throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
   }
 }
 
@@ -166,12 +180,14 @@ async function executePipelineInternal(steps: PipelineStep[], page: Page, ctx: a
     try {
       if (step.type === 'control') {
         ctx = await opControl(step.op, step.params, page, ctx, options, state, resolve);
+      } else if (step.type === 'capture') {
+        ctx = await opCapture(step.op, step.params, page, ctx, resolve);
+      } else if (step.type === 'transform') {
+        ctx = await opTransform(step.op, step.params, ctx, resolve);
+      } else if (step.type === 'apply') {
+        ctx = await opApply(step.op, step.params, page, ctx, resolve);
       } else {
-        switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, page, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, page, ctx, resolve); break;
-        }
+        throw new Error(`Unknown step type: ${step.type}`);
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
@@ -207,12 +223,14 @@ async function opCapture(op: string, params: any, page: Page, ctx: any, resolve:
     case 'goto': await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' }); return { ...ctx, last_url: page.url() };
     case 'screenshot':
       const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
+      logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
       if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
       return { ...ctx, [params.export_as || 'last_screenshot']: outPath };
     case 'content': return { ...ctx, [params.export_as || 'last_capture']: params.selector ? await page.innerText(params.selector) : await page.content() };
     case 'evaluate': return { ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) };
-    default: return ctx;
+    default: 
+      throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
 }
 
@@ -231,7 +249,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const res = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
       return { ...ctx, [params.export_as]: res };
     }
-    default: return ctx;
+    default: 
+      throw new Error(`Unsupported transform operator in Browser-Actuator: ${op}`);
   }
 }
 
@@ -248,6 +267,8 @@ async function opApply(op: string, params: any, page: Page, ctx: any, resolve: F
       else { await page.waitForTimeout(params.duration || 1000); }
       break;
     case 'log': logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`); break;
+    default: 
+      throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
 }
 

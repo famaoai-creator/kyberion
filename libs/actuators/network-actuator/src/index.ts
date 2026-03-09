@@ -58,13 +58,24 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ctx = { ...ctx, ...saved };
   }
 
-  const resolve = (val: any) => {
+      const resolve = (val: any) => {
     if (typeof val !== 'string') return val;
+    
+    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
+    const singleVarMatch = val.match(/^{{(.*?)}}$/);
+    if (singleVarMatch) {
+      const parts = singleVarMatch[1].trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? current : '';
+    }
+
+    // 文字列混在の場合は従来通り文字列展開
     return val.replace(/{{(.*?)}}/g, (_, p) => {
       const parts = p.trim().split('.');
       let current = ctx;
       for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? String(current) : '';
+      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
     });
   };
 
