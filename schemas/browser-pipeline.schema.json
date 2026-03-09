@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Browser Pipeline ADF v2.0.0",
+  "description": "ADF for browser automation pipelines based on Playwright semantics.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["capture", "transform", "apply"] },
+          "op": { 
+            "enum": [
+              "goto", "screenshot", "content", "evaluate",
+              "regex_extract", "json_query",
+              "click", "fill", "press", "wait", "log"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "selector": { "type": "string" },
+              "text": { "type": "string" },
+              "key": { "type": "string" },
+              "script": { "type": "string" },
+              "path": { "type": "string" },
+              "timeout": { "type": "integer" },
+              "duration": { "type": "integer" },
+              "waitUntil": { "enum": ["load", "domcontentloaded", "networkidle", "commit"] },
+              "export_as": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
