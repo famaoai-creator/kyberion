@@ -17,7 +17,7 @@ async function main() {
   
   try {
     // Call the orchestrator actuator
-    safeExec('npx', ['ts-node', 'libs/actuators/orchestrator-actuator/src/index.ts', '--input', inputPath]);
+    safeExec('npx', ['tsx', 'libs/actuators/orchestrator-actuator/src/index.ts', '--input', inputPath]);
     logger.success('✅ Mission Management Job completed.');
   } catch (err: any) {
     logger.error(`❌ Mission Management Job failed: ${err.message}`);

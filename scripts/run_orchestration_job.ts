@@ -16,7 +16,7 @@ async function main() {
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
-      const output = safeExec('npx', ['ts-node', 'libs/actuators/orchestrator-actuator/src/index.ts', '--input', tempAdfPath]);
+      const output = safeExec('npx', ['tsx', 'libs/actuators/orchestrator-actuator/src/index.ts', '--input', tempAdfPath]);
       console.log(output);
     } catch (err: any) {
       logger.error(`Orchestration job ${job.name} failed: ${err.message}`);

@@ -14,7 +14,7 @@ async function main() {
 
   try {
     logger.info('🚀 Starting Governance Audit via System-Actuator...');
-    const actuatorPath = 'dist/libs/actuators/system-actuator/src/index.js';
+    const actuatorPath = 'libs/actuators/system-actuator/src/index.ts';
     
     // Ensure actuator is built
     if (!fs.existsSync(actuatorPath)) {
@@ -22,7 +22,7 @@ async function main() {
       safeExec('npm', ['run', 'build', '--workspace=libs/actuators/system-actuator']);
     }
 
-    const output = safeExec('node', [actuatorPath, '--input', inputPath]);
+    const output = safeExec('npx', ['tsx', actuatorPath, '--input', inputPath]);
     const result = JSON.parse(output);
 
     console.log('\n--- Governance Audit Summary ---');

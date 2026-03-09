@@ -18,7 +18,7 @@ async function main() {
 
   try {
     logger.info('🚀 Starting Reporting Job via Wisdom-Actuator...');
-    const actuatorPath = 'dist/libs/actuators/wisdom-actuator/src/index.js';
+    const actuatorPath = 'libs/actuators/wisdom-actuator/src/index.ts';
     
     // Check if built actuator exists
     if (!fs.existsSync(actuatorPath)) {
@@ -28,7 +28,7 @@ async function main() {
       safeExec('pnpm', ['run', 'build', '--filter', '@actuator/wisdom']);
     }
 
-    const output = safeExec('node', [actuatorPath, '--input', inputPath]);
+    const output = safeExec('npx', ['tsx', actuatorPath, '--input', inputPath]);
     const result = JSON.parse(output);
 
     if (result.status === 'success') {

@@ -14,7 +14,7 @@ async function main() {
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
-      const output = safeExec('npx', ['ts-node', 'libs/actuators/modeling-actuator/src/index.ts', '--input', tempAdfPath]);
+      const output = safeExec('npx', ['tsx', 'libs/actuators/modeling-actuator/src/index.ts', '--input', tempAdfPath]);
       console.log(output);
     } catch (err: any) {
       logger.error(`Modeling job ${job.name} failed: ${err.message}`);

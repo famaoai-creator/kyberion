@@ -259,9 +259,21 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      ajv:
+        specifier: ^8.12.0
+        version: 8.18.0
+      ajv-formats:
+        specifier: ^2.1.1
+        version: 2.1.1(ajv@8.18.0)
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
+      papaparse:
+        specifier: ^5.4.1
+        version: 5.5.3
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -316,6 +328,12 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-business':
+        specifier: workspace:*
+        version: link:../../shared-business
+      '@agent/shared-vision':
+        specifier: workspace:*
+        version: link:../../shared-vision
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -377,6 +395,12 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+
+  libs/shared-nerve:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
 
   libs/shared-network:
     dependencies:
@@ -1479,6 +1503,14 @@ packages:
   aggregate-error@3.1.0:
     resolution: {integrity: sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==}
     engines: {node: '>=8'}
+
+  ajv-formats@2.1.1:
+    resolution: {integrity: sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -3430,6 +3462,9 @@ packages:
 
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
+
+  papaparse@5.5.3:
+    resolution: {integrity: sha512-5QvjGxYVjxO59MGU2lHVYpRWBBtKHnlIAcSe1uNFCkkptUh63NFRj0FJQm7nR67puEruUci/ZkjmEFrjCAyP4A==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -5684,6 +5719,10 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
     optional: true
+
+  ajv-formats@2.1.1(ajv@8.18.0):
+    optionalDependencies:
+      ajv: 8.18.0
 
   ajv-formats@3.0.1(ajv@8.18.0):
     optionalDependencies:
@@ -7989,6 +8028,8 @@ snapshots:
   package-json-from-dist@1.0.1: {}
 
   pako@1.0.11: {}
+
+  papaparse@5.5.3: {}
 
   parent-module@1.0.1:
     dependencies:

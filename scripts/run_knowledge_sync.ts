@@ -16,7 +16,7 @@ async function main() {
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
-      const output = safeExec('npx', ['ts-node', 'libs/actuators/wisdom-actuator/src/index.ts', '--input', tempAdfPath]);
+      const output = safeExec('npx', ['tsx', 'libs/actuators/wisdom-actuator/src/index.ts', '--input', tempAdfPath]);
       console.log(output);
     } catch (err: any) {
       logger.error(`Knowledge sync ${job.action} failed: ${err.message}`);

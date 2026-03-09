@@ -42,7 +42,7 @@ async function runModelingActuator(input: any) {
   safeWriteFile(tempAdfPath, JSON.stringify(input, null, 2));
 
   try {
-    const output = safeExec('npx', ['ts-node', 'libs/actuators/modeling-actuator/src/index.ts', '--input', tempAdfPath]);
+    const output = safeExec('npx', ['tsx', 'libs/actuators/modeling-actuator/src/index.ts', '--input', tempAdfPath]);
     console.log(output);
   } catch (err: any) {
     logger.error(`Action ${input.analysisType || input.action} failed: ${err.message}`);
