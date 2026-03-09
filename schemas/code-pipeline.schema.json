@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Code Pipeline ADF v2.0.0",
+  "description": "ADF for defining source code analysis, refactoring, and maintenance pipelines.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["capture", "transform", "apply"] },
+          "op": { 
+            "enum": [
+              "read_file", "glob_files", "shell", "discover_skills",
+              "regex_replace", "json_update", "run_js",
+              "write_file", "log"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}
