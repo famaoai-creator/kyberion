@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Intent Dictionary ADF v1.0",
+  "description": "ADF for mapping high-level semantic intents to Super-Nerve pipeline steps.",
+  "type": "object",
+  "required": ["intents"],
+  "properties": {
+    "intents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "pipeline"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique intent identifier (e.g., 'docs-sync')" },
+          "description": { "type": "string" },
+          "trigger_keywords": { "type": "array", "items": { "type": "string" } },
+          "pipeline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["op", "params"],
+              "properties": {
+                "op": { "type": "string" },
+                "params": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
