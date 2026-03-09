@@ -35,9 +35,16 @@ async function handleAction(input: FileAction) {
  * Universal File Pipeline Engine
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}) {
-  let ctx = { ...initialCtx, root: process.cwd() };
-  const results = [];
+  const rootDir = process.cwd();
+  let ctx = { ...initialCtx, root: rootDir };
+  
+  // Load persistent context if provided
+  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    ctx = { ...ctx, ...saved };
+  }
 
+  const results = [];
   for (const step of steps) {
     try {
       logger.info(`  [FILE_PIPELINE] Executing ${step.type}:${step.op}...`);
@@ -53,6 +60,12 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}) {
       break; 
     }
   }
+
+  // Persist context if requested
+  if (initialCtx.context_path) {
+    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+  }
+
   return { status: 'finished', results, final_context_keys: Object.keys(ctx) };
 }
 
