@@ -38,7 +38,7 @@ async function main() {
   try {
     const actuatorPath = 'libs/actuators/code-actuator/src/index.ts';
     // We use ts-node to run the actuator for now, or it could be a built version.
-    const result = safeExec('npx', ['ts-node', actuatorPath, '--input', inputPath]);
+    const result = safeExec('npx', ['tsx', 'libs/actuators/code-actuator/src/index.ts', '--input', inputPath]);
     console.log(result);
     logger.success('✅ [ADF] Maintenance Task Completed.');
   } catch (err: any) {

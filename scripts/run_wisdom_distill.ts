@@ -32,7 +32,7 @@ async function main() {
 
   // Invoke wisdom-actuator
   try {
-    const output = safeExec('npx', ['ts-node', 'libs/actuators/wisdom-actuator/src/index.ts', '--input', fullAdfPath]);
+    const output = safeExec('npx', ['tsx', 'libs/actuators/wisdom-actuator/src/index.ts', '--input', fullAdfPath]);
     console.log(output);
     logger.success('✅ Wisdom Distillation Job completed.');
   } catch (err: any) {

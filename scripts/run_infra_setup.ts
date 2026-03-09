@@ -14,7 +14,7 @@ async function main() {
 
   try {
     logger.info('🚀 Starting Infrastructure Setup via Orchestrator-Actuator...');
-    const actuatorPath = 'dist/libs/actuators/orchestrator-actuator/src/index.js';
+    const actuatorPath = 'libs/actuators/orchestrator-actuator/src/index.ts';
     
     // Ensure actuator is built
     if (!fs.existsSync(actuatorPath)) {
@@ -22,7 +22,7 @@ async function main() {
       safeExec('npm', ['run', 'build', '--workspace=libs/actuators/orchestrator-actuator']);
     }
 
-    const output = safeExec('node', [actuatorPath, '--input', inputPath]);
+    const output = safeExec('npx', ['tsx', actuatorPath, '--input', inputPath]);
     const result = JSON.parse(output);
 
     if (result.status === 'success') {
