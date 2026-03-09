@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "get-stack",
+      "type": "capture",
+      "op": "shell",
+      "params": { "cmd": "ls -F", "export_as": "stack_files" }
+    },
+    {
+      "id": "log-stack",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "Current directory stack: {{stack_files}}" }
+    }
+  ]
+}

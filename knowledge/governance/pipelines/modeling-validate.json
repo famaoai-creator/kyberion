@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "load-schema",
+      "type": "capture",
+      "op": "read_json",
+      "params": { "path": "{{schema_path}}", "export_as": "schema_data" }
+    },
+    {
+      "id": "load-data",
+      "type": "capture",
+      "op": "read_json",
+      "params": { "path": "{{data_path}}", "export_as": "data_to_validate" }
+    },
+    {
+      "id": "validate-step",
+      "type": "transform",
+      "op": "ajv_validate",
+      "params": { "schema_from": "schema_data", "data_from": "data_to_validate", "export_as": "is_valid" }
+    },
+    {
+      "id": "log-result",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "Validation result for {{data_path}}: {{is_valid}}" }
+    }
+  ]
+}
