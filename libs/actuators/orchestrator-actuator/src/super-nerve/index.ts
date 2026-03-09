@@ -1,0 +1,149 @@
+import { logger, safeReadFile, safeWriteFile, safeExec } from '@agent/core';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+
+/**
+ * Super-Nerve Engine: Cross-Actuator Orchestration & Composable Pipelines
+ * This module routes 'op' commands to their respective underlying Actuator APIs.
+ */
+
+export interface SuperPipelineStep {
+  op: string; // Format: "domain:action" (e.g., "file:read", "browser:goto", "core:call")
+  params: any;
+  id?: string;
+}
+
+export async function executeSuperPipeline(steps: SuperPipelineStep[], initialCtx: any = {}, options: any = {}) {
+  const rootDir = process.cwd();
+  const MAX_STEPS = options.max_steps || 1000;
+  
+  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let stepCount = 0;
+  const results = [];
+
+  for (const step of steps) {
+    stepCount++;
+    if (stepCount > MAX_STEPS) throw new Error(`[SUPER_NERVE] Exceeded max steps (${MAX_STEPS})`);
+    
+    logger.info(`  [NERVE] Executing ${step.op}...`);
+    
+    try {
+      const [domain, action] = step.op.split(':');
+      
+      if (domain === 'core') {
+        // Handle native macro control like "call"
+        ctx = await handleCoreAction(action, step.params, ctx, options, stepCount);
+      } else {
+        // Delegate to specific actuator logic via dynamic execution or library calls
+        // For architectural safety and context sharing, we dispatch via CLI/RPC or inline wrapper
+        ctx = await dispatchToActuator(domain, action, step.params, ctx);
+      }
+      
+      results.push({ op: step.op, status: 'success' });
+    } catch (err: any) {
+      logger.error(`  [NERVE] Step failed (${step.op}): ${err.message}`);
+      results.push({ op: step.op, status: 'failed', error: err.message });
+      break;
+    }
+  }
+
+  return { status: 'finished', results, context: ctx };
+}
+
+async function handleCoreAction(action: string, params: any, ctx: any, options: any, stepCount: number) {
+  if (action === 'call') {
+    // Load sub-pipeline from file (Composable Macros)
+    const macroPath = path.resolve(process.cwd(), resolveVars(params.path, ctx));
+    if (!fs.existsSync(macroPath)) throw new Error(`Macro not found: ${macroPath}`);
+    
+    const macroDef = JSON.parse(safeReadFile(macroPath, { encoding: 'utf8' }) as string);
+    // Execute macro in current context
+    const res = await executeSuperPipeline(macroDef.steps || [], ctx, options);
+    return res.context; // Merge updated context back
+  }
+  
+  if (action === 'set') {
+    return { ...ctx, [params.export_as]: resolveVars(params.value, ctx) };
+  }
+  
+  throw new Error(`Unknown core action: ${action}`);
+}
+
+async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
+  // To keep full isolation but share context, we build a single-step ADF, 
+  // invoke the target Actuator, and capture its final context output.
+  
+  // Mapping domain to actual actuator paths
+  const domainMap: Record<string, string> = {
+    'file': 'libs/actuators/file-actuator/src/index.ts',
+    'system': 'libs/actuators/system-actuator/src/index.ts',
+    'wisdom': 'libs/actuators/wisdom-actuator/src/index.ts',
+    'network': 'libs/actuators/network-actuator/src/index.ts',
+    'browser': 'libs/actuators/browser-actuator/src/index.ts',
+    'code': 'libs/actuators/code-actuator/src/index.ts'
+  };
+
+  const actuatorPath = domainMap[domain];
+  if (!actuatorPath) throw new Error(`Unknown actuator domain: ${domain}`);
+
+  // We map the unified "action" back to "capture/transform/apply" based on a heuristic or dictionary,
+  // but for a truly Unified Nerve, the target Actuator needs to accept raw ops.
+  // For this transition, we use a wrapper approach.
+  
+  const tempAdfPath = path.resolve(process.cwd(), `scratch/nerve-dispatch-${Date.now()}-${Math.random().toString(36).substring(7)}.json`);
+  const outCtxPath = tempAdfPath.replace('.json', '-out.json');
+
+  // We wrap the single operation in a standard pipeline payload
+  const adf = {
+    action: 'pipeline',
+    context: { ...ctx, context_path: path.relative(process.cwd(), outCtxPath) }, // Tell actuator to save context here
+    steps: [
+      {
+        type: determineType(domain, action),
+        op: action,
+        params: params
+      }
+    ]
+  };
+
+  safeWriteFile(tempAdfPath, JSON.stringify(adf));
+
+  try {
+    // Execute via safeExec to maintain Layer 2 isolation boundaries
+    safeExec('npx', ['tsx', actuatorPath, '--input', tempAdfPath]);
+    
+    // Read the resulting context exported by the actuator
+    if (fs.existsSync(outCtxPath)) {
+      const updatedCtx = JSON.parse(safeReadFile(outCtxPath, { encoding: 'utf8' }) as string);
+      return updatedCtx;
+    }
+    return ctx;
+  } finally {
+    if (fs.existsSync(tempAdfPath)) fs.unlinkSync(tempAdfPath);
+    if (fs.existsSync(outCtxPath)) fs.unlinkSync(outCtxPath);
+  }
+}
+
+function determineType(domain: string, action: string): string {
+  // Simple heuristic dictionary to map unified op back to capture/transform/apply for underlying actuators
+  const captureOps = ['read', 'read_file', 'read_json', 'fetch', 'shell', 'list', 'glob_files', 'search', 'goto', 'content'];
+  const transformOps = ['regex_extract', 'regex_replace', 'json_query', 'run_js', 'yaml_update'];
+  const applyOps = ['write', 'write_file', 'log', 'click', 'fill', 'delete', 'mkdir'];
+  
+  if (captureOps.includes(action)) return 'capture';
+  if (transformOps.includes(action)) return 'transform';
+  if (applyOps.includes(action)) return 'apply';
+  
+  // Default fallback
+  return 'apply';
+}
+
+function resolveVars(val: string, ctx: any): string {
+  if (typeof val !== 'string') return val;
+  return val.replace(/{{(.*?)}}/g, (_, p) => {
+    const parts = p.trim().split('.');
+    let current = ctx;
+    for (const part of parts) { current = current?.[part]; }
+    return current !== undefined ? String(current) : '';
+  });
+}

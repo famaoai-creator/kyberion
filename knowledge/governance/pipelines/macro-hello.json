@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo 'Hello from Macro'",
+        "export_as": "macro_output"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Macro executed. Output: {{macro_output}}"
+      }
+    }
+  ]
+}

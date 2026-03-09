@@ -195,13 +195,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'write': {
       const out = path.resolve(rootDir, resolve(params.path));
-      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || params.content;
+      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || resolve(params.content);
       safeWriteFile(out, content);
       break;
     }
     case 'append': {
       const out = path.resolve(rootDir, resolve(params.path));
-      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || params.content;
+      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || resolve(params.content);
       fs.appendFileSync(out, content + (params.newline !== false ? '\n' : ''));
       break;
     }
