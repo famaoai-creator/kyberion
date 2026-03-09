@@ -13,11 +13,50 @@ export interface SuperPipelineStep {
   id?: string;
 }
 
-export async function executeSuperPipeline(steps: SuperPipelineStep[], initialCtx: any = {}, options: any = {}) {
+export interface A2AMessage {
+  a2a_version: string;
+  header: {
+    msg_id: string;
+    parent_id?: string;
+    sender: string;
+    receiver?: string;
+    conversation_id?: string;
+    performative: 'request' | 'propose' | 'inform' | 'accept' | 'reject' | 'query' | 'result';
+    timestamp?: string;
+    signature?: string;
+  };
+  payload: any;
+}
+
+export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessage, initialCtx: any = {}, options: any = {}) {
   const rootDir = process.cwd();
   const MAX_STEPS = options.max_steps || 1000;
   
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let steps: SuperPipelineStep[];
+  let conversationCtx: any = { ...initialCtx };
+
+  // 1. A2A Envelope Unwrapping
+  if ('header' in input && 'payload' in input) {
+    logger.info(`📬 [A2A] Incoming ${input.header.performative} from ${input.header.sender}`);
+    conversationCtx = { 
+      ...conversationCtx, 
+      _a2a_header: input.header,
+      conversation_id: input.header.conversation_id 
+    };
+    
+    // If payload is an intent, resolve it (using the resolver if available)
+    if (input.payload.intent) {
+      const { resolveIntentToSteps } = await import('./resolver.js');
+      steps = await resolveIntentToSteps(input.payload.intent);
+      conversationCtx = { ...conversationCtx, ...input.payload.context };
+    } else {
+      steps = input.payload.steps || [];
+    }
+  } else {
+    steps = input as SuperPipelineStep[];
+  }
+
+  let ctx = { ...conversationCtx, timestamp: new Date().toISOString() };
   let stepCount = 0;
   const results = [];
 
