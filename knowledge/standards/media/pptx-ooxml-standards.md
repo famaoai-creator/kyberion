@@ -23,23 +23,25 @@ Instead of defining colors directly, objects often use a reference index:
 - **`fillStyleLst`**: Defines 3-level fills (Subtle, Moderate, Intense).
 - **`lnStyleLst`**: Defines 3-level line styles.
 - **`effectStyleLst`**: Defines effects like shadows or reflections.
-- **Problem**: Most high-level libraries (pptxgenjs) only support direct color/line properties, missing these Matrix-based "Quick Styles."
+- **Native Engine Solution**: The Native Engine captures the raw `<p:style>` and `<p:spPr>` blocks during extraction, meaning matrix-based "Quick Styles" are preserved with 100% fidelity without needing manual reverse-engineering.
 
-## 3. SmartArt (`ppt/diagrams/`)
-SmartArt is not a simple shape. It is a cluster of logic defined by:
-- **Data (`data.xml`)**: The structured hierarchy of text and relationships.
-- **Layout (`layout.xml`)**: The visual algorithm to arrange shapes.
-- **Style (`quickStyle.xml`)**: Advanced MS-specific 3D effects, gradients, and bevels.
-- **AI Constraint**: Re-generating SmartArt from scratch using ADF requires a complex rendering engine. 
+## 3. SmartArt (`ppt/diagrams/`) and Charts (`ppt/charts/`)
+SmartArt and Charts are clusters of logic defined by separate internal XML files:
+- **Data**: `data.xml` for SmartArt, `chart.xml` + embedded `xlsx` for Charts.
+- **Layout**: The visual algorithm to arrange shapes (`layout.xml`).
+- **Style/Colors**: Advanced MS-specific 3D effects and gradients (`quickStyle.xml`, `colors.xml`).
+- **Native Engine Solution**: The engine natively intercepts `<a:graphicData>` blocks, extracting the raw relational trees and writing them back into the generated archive, maintaining full editability in PowerPoint.
 
 ## 4. Constraint Strategy (Architectural Guardrails)
 When replicating PowerPoint via pure text (ADF):
-1. **Fidelity Goal**: Aim for 100% Text, Position, and Physical Color (ARGB) accuracy.
-2. **Acceptable Distortion**: Master-inherited complex gradients and MS-proprietary SmartArt layouts may be rendered as simplified shapes or flattened images.
-3. **The Bypass**: If 100% SmartArt fidelity is required, the "Direct XML Injection" (V5 Pattern) is the only viable path, though it limits dynamic content expansion.
+1. **Fidelity Goal**: Achieved 100% Text, Position, Physical Color, and Structural accuracy.
+2. **Text Typographical Fidelity**: Extracts the raw `<a:pXmlLst>` and `<a:rPr>` (Run Properties), allowing surgical modifications to `bold`, `italic`, or `fontSize` without destroying original Japanese/English typeface selections.
+3. **Microsoft Extensions**: Advanced features encoded in `p14` and `p15` namespaces (like custom layout guides or ribbon customizations) are preserved via `<p:extLst>` extraction.
 
-## 5. Implementation Pattern (V15+)
-To maximize fidelity, the agent must:
-- [x] Resolve `schemeClr` into `srgbClr` (Physical ARGB).
-- [x] Synchronize EMU coordinates to Inch scales.
-- [ ] Attempt to map `fmtScheme` indices to physical fill/line properties (Best effort).
+## 5. Implementation Pattern (V19 Native Engine)
+To maximize fidelity, the Native Engine MUST:
+- [x] Bypass intermediate libraries (`pptxgenjs`).
+- [x] Construct `[Content_Types].xml` and `_rels/` layers from scratch natively.
+- [x] Extract and re-inject raw OOXML properties (`spPrXml`, `pXmlLst`).
+- [x] Ensure slide layouts explicitly set `showMasterSp="0"` when hiding inherited static decorations.
+- [x] Rebind Slide Number fields natively (`<a:fld type="slidenum">`).
