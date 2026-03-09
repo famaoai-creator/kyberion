@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "System Monitoring & Performance Config",
+  "description": "ADF definition for performance benchmarking, health checks, SLO monitoring, and ecosystem pulse.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "job_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "action": {
+      "type": "string",
+      "enum": ["benchmark", "check_performance", "gen_dashboard", "pulse_check", "pulse_trigger", "pulse_aggregate"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "fail_on_regression": { "type": "boolean", "default": false },
+        "out_file": { "type": "string" },
+        "type": { "type": "string" },
+        "payload": { "type": "string" },
+        "priority": { "type": "number" },
+        "options": { "type": "object" }
+      }
+    }
+  },
+  "required": ["version", "job_id", "action"]
+}

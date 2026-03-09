@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Knowledge & Documentation Sync Plan",
+  "description": "ADF definition for knowledge indexing, skills guide generation, and documentation synchronization.",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "sync_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "action": {
+      "type": "string",
+      "enum": ["gen_index", "gen_guide", "sync_readme", "sync_skill_dates", "scan_pii"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "target_dir": { "type": "string" },
+        "out_file": { "type": "string" },
+        "options": { "type": "object" }
+      }
+    }
+  },
+  "required": ["version", "sync_id", "action"]
+}

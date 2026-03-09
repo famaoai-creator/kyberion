@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "name": "System Monitoring & Performance Rules",
+  "slo": {
+    "default": {
+      "latency_ms": 5000,
+      "success_rate": 99
+    },
+    "critical_path": {
+      "codebase-mapper": { "latency_ms": 3000, "success_rate": 100 },
+      "sovereign-sync": { "latency_ms": 10000, "success_rate": 95 }
+    }
+  },
+  "benchmarking": {
+    "iterations": 3,
+    "output_dir": "evidence/benchmarks"
+  },
+  "pulse": {
+    "error_thresholds": {
+      "degraded": 20,
+      "critical": 50
+    },
+    "interval_ms": 5000,
+    "stimuli_path": "presence/bridge/stimuli.jsonl"
+  },
+  "quarantine": {
+    "enabled": true,
+    "consecutive_breaches_threshold": 3,
+    "target_status": "unstable"
+  }
+}

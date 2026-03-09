@@ -2,6 +2,7 @@ import { logger, pathResolver, safeReadFile, safeWriteFile, safeReaddir, safeSta
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
 import * as yaml from 'js-yaml';
 
 // Dynamic import for chalk (ESM module in CommonJS environment)
@@ -27,7 +28,7 @@ interface ReportSpec {
 }
 
 interface WisdomAction {
-  action: 'distill' | 'mirror' | 'swap' | 'sync' | 'aggregate' | 'report';
+  action: 'distill' | 'mirror' | 'swap' | 'sync' | 'aggregate' | 'report' | 'sync_docs' | 'sync_skill_dates' | 'scan_pii';
   patchId?: string;
   missionId?: string;
   targetTier?: 'public' | 'confidential' | 'personal';
@@ -89,8 +90,164 @@ async function handleAction(input: WisdomAction) {
     case 'report':
       return await performReporting(input);
 
+    case 'sync_docs':
+      return await performSyncDocs();
+
+    case 'sync_skill_dates':
+      return await performSyncSkillDates();
+
+    case 'scan_pii':
+      return await performScanPII();
+
     default:
       return { status: 'executed' };
+  }
+}
+
+async function performSyncDocs() {
+  const rootDir = process.cwd();
+  const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
+  const readmePath = path.join(rootDir, 'README.md');
+  const guidePath = path.join(rootDir, 'SKILLS_GUIDE.md');
+
+  if (!fs.existsSync(indexPath)) {
+    return { status: 'failed', error: 'Index not found. Run aggregate action first.' };
+  }
+
+  try {
+    const indexRaw = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
+    const index = JSON.parse(indexRaw);
+    const skills = index.s || [];
+    
+    const implemented = skills.filter((s: any) => s.s === 'impl').length;
+
+    logger.info(`Syncing docs: ${index.t} total, ${implemented} implemented...`);
+
+    // 1. Update README.md
+    if (fs.existsSync(readmePath)) {
+      let readme = safeReadFile(readmePath, { encoding: 'utf8' }) as string;
+      readme = readme.replace(
+        /\*\*(\d+) skills\*\* \(all implemented\)/,
+        `**${implemented} skills** (all implemented)`
+      );
+      readme = readme.replace(/Implemented Skills \((\d+)\)/, `Implemented Skills (${implemented})`);
+      safeWriteFile(readmePath, readme);
+    }
+
+    // 2. Update SKILLS_GUIDE.md
+    if (fs.existsSync(guidePath)) {
+      let guide = safeReadFile(guidePath, { encoding: 'utf8' }) as string;
+      guide = guide.replace(/Total Skills: (\d+)/, `Total Skills: ${implemented}`);
+      guide = guide.replace(
+        /Last updated: \d{4}\/\d{1,2}\/\d{1,2}/,
+        `Last updated: ${new Date().toISOString().split('T')[0].replace(/-/g, '/')}`
+      );
+      safeWriteFile(guidePath, guide);
+    }
+
+    return { status: 'success', implemented };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message };
+  }
+}
+
+async function performSyncSkillDates() {
+  const rootDir = process.cwd();
+  const skillsRootDir = path.join(rootDir, 'skills');
+  const skills: { name: string; path: string }[] = [];
+
+  if (fs.existsSync(skillsRootDir)) {
+    const categories = fs.readdirSync(skillsRootDir).filter((f) => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+    for (const cat of categories) {
+      const catPath = path.join(skillsRootDir, cat);
+      const skillDirs = fs.readdirSync(catPath).filter((f) => fs.lstatSync(path.join(catPath, f)).isDirectory());
+      for (const dir of skillDirs) {
+        skills.push({ name: dir, path: path.join('skills', cat, dir) });
+      }
+    }
+  }
+
+  logger.info(`Syncing dates for ${skills.length} skills...`);
+  let updatedCount = 0;
+
+  for (const skillObj of skills) {
+    const skillMdPath = path.join(rootDir, skillObj.path, 'SKILL.md');
+    if (!fs.existsSync(skillMdPath)) continue;
+
+    let gitDate;
+    try {
+      gitDate = execSync(`git log -1 --format=%cs -- "${skillMdPath}"`, { encoding: 'utf8' }).trim();
+    } catch (_) {
+      gitDate = new Date().toISOString().split('T')[0];
+    }
+    if (!gitDate) gitDate = new Date().toISOString().split('T')[0];
+
+    const content = safeReadFile(skillMdPath, { encoding: 'utf8' }) as string;
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
+    if (!fmMatch) continue;
+
+    try {
+      const fm = yaml.load(fmMatch[1]) as any;
+      if (fm.last_updated !== gitDate) {
+        fm.last_updated = gitDate;
+        const newFm = yaml.dump(fm, { lineWidth: -1 }).trim();
+        const newContent = content.replace(/^---\n[\s\S]*?\n---/m, `---\n${newFm}\n---`);
+        safeWriteFile(skillMdPath, newContent);
+        logger.info(`  [${skillObj.name}] last_updated -> ${gitDate}`);
+        updatedCount++;
+      }
+    } catch (err: any) {
+      logger.error(`Failed to sync date for ${skillObj.name}: ${err.message}`);
+    }
+  }
+
+  return { status: 'success', updated: updatedCount };
+}
+
+async function performScanPII() {
+  const rootDir = process.cwd();
+  const knowledgeDir = path.resolve(rootDir, 'knowledge');
+  const personalDir = path.join(knowledgeDir, 'personal');
+
+  const FORBIDDEN_PATTERNS = [
+    { name: 'API_KEY', regex: /AIza[0-9A-Za-z-_]{35}/ },
+    { name: 'OAUTH_SECRET', regex: /[0-9A-Za-z-_]{24,32}\.apps\.googleusercontent\.com/ },
+    { name: 'PRIVATE_KEY', regex: /-----BEGIN PRIVATE KEY-----/ },
+    { name: 'GENERIC_SECRET', regex: /secret[:=]\s*['"][0-9A-Za-z-_]{16,}['"]/i },
+  ];
+
+  const violations: any[] = [];
+
+  function walk(dir: string) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const p = path.join(dir, entry.name);
+      if (p.startsWith(personalDir)) continue;
+
+      if (entry.isDirectory()) {
+        walk(p);
+      } else if (entry.name.endsWith('.md') || entry.name.endsWith('.json')) {
+        const content = fs.readFileSync(p, 'utf8');
+        FORBIDDEN_PATTERNS.forEach((pattern) => {
+          if (pattern.regex.test(content)) {
+            violations.push({ file: path.relative(rootDir, p), type: pattern.name });
+          }
+        });
+      }
+    }
+  }
+
+  walk(knowledgeDir);
+
+  if (violations.length > 0) {
+    logger.error('🚨 SECURITY ALERT: Forbidden tokens detected in Knowledge Base!');
+    violations.forEach((v) => logger.error(`  [${v.type}] ${v.file}`));
+    return { status: 'violation', violations };
+  } else {
+    logger.success('Documentation safety verified. No sensitive tokens found.');
+    return { status: 'success' };
   }
 }
 
