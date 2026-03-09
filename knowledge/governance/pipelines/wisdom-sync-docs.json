@@ -1,0 +1,59 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "load-index",
+      "type": "capture",
+      "op": "read_json",
+      "params": { "path": "knowledge/orchestration/global_skill_index.json", "export_as": "index_data" }
+    },
+    {
+      "id": "count-impl",
+      "type": "transform",
+      "op": "array_count",
+      "params": { "from": "index_data.s", "where": { "s": "implemented" }, "export_as": "impl_count" }
+    },
+    {
+      "id": "read-readme",
+      "type": "capture",
+      "op": "read_file",
+      "params": { "path": "README.md", "export_as": "readme_orig" }
+    },
+    {
+      "id": "update-readme",
+      "type": "transform",
+      "op": "regex_replace",
+      "params": { "from": "readme_orig", "pattern": "Implemented Skills \\(\\d+\\)", "template": "Implemented Skills ({{impl_count}})", "export_as": "readme_new" }
+    },
+    {
+      "id": "write-readme",
+      "type": "apply",
+      "op": "write_file",
+      "params": { "path": "README.md", "from": "readme_new" }
+    },
+    {
+      "id": "read-guide",
+      "type": "capture",
+      "op": "read_file",
+      "params": { "path": "CAPABILITIES_GUIDE.md", "export_as": "guide_orig" }
+    },
+    {
+      "id": "update-guide-count",
+      "type": "transform",
+      "op": "regex_replace",
+      "params": { "from": "guide_orig", "pattern": "Implemented: \\d+", "template": "Implemented: {{impl_count}}", "export_as": "guide_step1" }
+    },
+    {
+      "id": "update-guide-date",
+      "type": "transform",
+      "op": "regex_replace",
+      "params": { "from": "guide_step1", "pattern": "Last updated: \\d{4}/\\d{1,2}/\\d{1,2}", "template": "Last updated: {{today}}", "export_as": "guide_final" }
+    },
+    {
+      "id": "write-guide",
+      "type": "apply",
+      "op": "write_file",
+      "params": { "path": "CAPABILITIES_GUIDE.md", "from": "guide_final" }
+    }
+  ]
+}
