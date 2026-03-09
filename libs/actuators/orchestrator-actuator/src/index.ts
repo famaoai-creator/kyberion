@@ -7,14 +7,13 @@ import { execSync } from 'node:child_process';
 import yaml from 'js-yaml';
 
 /**
- * Orchestrator-Actuator v2.0.0 [ULTIMATE PIPELINE ENGINE]
+ * Orchestrator-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
  * Strictly compliant with Layer 2 (Shield).
- * Unified ADF-driven engine for Mission & Task Management.
- * Zero hardcoded domain logic; all behaviors are defined in ADF contracts.
+ * Unified ADF-driven engine for Mission & Task Management with Control Flow.
  */
 
 interface PipelineStep {
-  type: 'capture' | 'transform' | 'apply';
+  type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
 }
@@ -24,6 +23,10 @@ interface OrchestratorAction {
   steps?: PipelineStep[];
   strategy_path?: string;
   context?: Record<string, any>;
+  options?: {
+    max_steps?: number;
+    timeout_ms?: number;
+  };
 }
 
 /**
@@ -33,23 +36,51 @@ async function handleAction(input: OrchestratorAction) {
   if (input.action === 'reconcile') {
     return await performReconcile(input);
   }
-  return await executePipeline(input.steps || [], input.context || {});
+  return await executePipeline(input.steps || [], input.context || {}, input.options);
 }
 
 /**
- * Universal Pipeline Engine
+ * Universal Pipeline Engine with Control Flow & Safety Guards
  */
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}) {
-  let ctx = { ...initialCtx, root: process.cwd(), HOME: process.env.HOME || '/Users' };
-  const results = [];
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+  const rootDir = process.cwd();
+  const MAX_STEPS = options.max_steps || 1000;
+  const TIMEOUT = options.timeout_ms || 60000;
 
+  let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
+  
+  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    ctx = { ...ctx, ...saved };
+  }
+
+  const resolve = (val: any) => {
+    if (typeof val !== 'string') return val;
+    return val.replace(/{{(.*?)}}/g, (_, p) => {
+      const parts = p.trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? String(current) : '';
+    });
+  };
+
+  const results = [];
   for (const step of steps) {
+    state.stepCount++;
+    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
+
     try {
-      logger.info(`  [ORCH_PIPELINE] Executing ${step.type}:${step.op}...`);
-      switch (step.type) {
-        case 'capture': ctx = await opCapture(step.op, step.params, ctx); break;
-        case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
-        case 'apply': await opApply(step.op, step.params, ctx); break;
+      logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      
+      if (step.type === 'control') {
+        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
+      } else {
+        switch (step.type) {
+          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
+          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
+          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
+        }
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
@@ -58,36 +89,77 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}) {
       break; 
     }
   }
-  return { status: 'finished', results, final_context_keys: Object.keys(ctx) };
+
+  if (initialCtx.context_path) {
+    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+  }
+
+  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+}
+
+/**
+ * CONTROL Operators
+ */
+async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
+  switch (op) {
+    case 'if':
+      if (evaluateCondition(params.condition, ctx)) {
+        const res = await executePipeline(params.then, ctx, options, state);
+        return res.context;
+      } else if (params.else) {
+        const res = await executePipeline(params.else, ctx, options, state);
+        return res.context;
+      }
+      return ctx;
+
+    case 'while':
+      let iterations = 0;
+      const maxIter = params.max_iterations || 100;
+      while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
+        const res = await executePipeline(params.pipeline, ctx, options, state);
+        ctx = res.context;
+        iterations++;
+      }
+      return ctx;
+
+    default: return ctx;
+  }
+}
+
+function evaluateCondition(cond: any, ctx: any): boolean {
+  if (!cond) return true;
+  const parts = cond.from.split('.');
+  let val = ctx;
+  for (const part of parts) { val = val?.[part]; }
+  
+  switch (cond.operator) {
+    case 'exists': return val !== undefined && val !== null;
+    case 'not_exists': return val === undefined || val === null;
+    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
+    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
+    case 'eq': return val === cond.value;
+    case 'ne': return val !== cond.value;
+    default: return !!val;
+  }
 }
 
 /**
  * CAPTURE Operators
  */
-async function opCapture(op: string, params: any, ctx: any) {
+async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
-  const resolve = (val: string) => typeof val === 'string' ? val.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '') : val;
-
   switch (op) {
     case 'read_json':
-      const json = JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string);
-      return { ...ctx, [params.export_as || 'last_capture_data']: json };
-
+      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string) };
     case 'read_file':
-      const content = safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string;
-      return { ...ctx, [params.export_as || 'last_capture']: content };
-
+      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
     case 'shell':
-      const output = execSync(resolve(params.cmd), { encoding: 'utf8' }).trim();
-      return { ...ctx, [params.export_as || 'last_capture']: output };
-
+      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
     case 'intent_detect':
-      // Simplified intent gateway logic
       const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolve(params.mapping_path)), { encoding: 'utf8' }) as string) as any;
       const query = resolve(params.query).toLowerCase();
       const detected = mapping.intents.find((i: any) => i.trigger_phrases.some((p: string) => query.includes(p.toLowerCase())));
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
-
     default: return ctx;
   }
 }
@@ -95,25 +167,21 @@ async function opCapture(op: string, params: any, ctx: any) {
 /**
  * TRANSFORM Operators
  */
-async function opTransform(op: string, params: any, ctx: any) {
-  const resolve = (val: string) => typeof val === 'string' ? val.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '') : val;
-
+async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'json_query':
-      const sourceData = ctx[params.from || 'last_capture_data'];
-      const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], sourceData);
+      const data = ctx[params.from || 'last_capture_data'];
+      const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
       return { ...ctx, [params.export_as]: result };
-
     case 'variable_hydrate':
       const input = typeof ctx[params.from] === 'object' ? JSON.stringify(ctx[params.from]) : String(ctx[params.from]);
-      const hydrated = input.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '');
+      const hydrated = input.replace(/{{(.*?)}}/g, (_, p) => {
+        const parts = p.trim().split('.');
+        let cur = ctx;
+        for (const pt of parts) { cur = cur?.[pt]; }
+        return cur !== undefined ? String(cur) : '';
+      });
       return { ...ctx, [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated };
-
-    case 'regex_extract':
-      const text = String(ctx[params.from || 'last_capture'] || '');
-      const match = text.match(new RegExp(params.pattern, 'm'));
-      return { ...ctx, [params.export_as]: match ? match[1] : null };
-
     default: return ctx;
   }
 }
@@ -121,22 +189,16 @@ async function opTransform(op: string, params: any, ctx: any) {
 /**
  * APPLY Operators
  */
-async function opApply(op: string, params: any, ctx: any) {
+async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
-  const resolve = (val: string) => typeof val === 'string' ? val.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '') : val;
-
   switch (op) {
     case 'write_file':
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      safeWriteFile(outPath, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+      safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       break;
-
-    case 'mkdir':
-      safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
-      break;
-
+    case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
     case 'symlink':
       const target = path.resolve(rootDir, resolve(params.target));
       const source = path.resolve(rootDir, resolve(params.source));
@@ -144,16 +206,11 @@ async function opApply(op: string, params: any, ctx: any) {
       if (!fs.existsSync(path.dirname(target))) safeMkdir(path.dirname(target), { recursive: true });
       fs.symlinkSync(path.relative(path.dirname(target), source), target, params.type || 'dir');
       break;
-
     case 'git_checkpoint':
-      const msg = resolve(params.message || 'checkpoint: state preservation');
       execSync('git add .');
-      execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
+      execSync(`git commit -m "${resolve(params.message || 'checkpoint').replace(/"/g, '\\"')}"`);
       break;
-
-    case 'log':
-      logger.info(`[ORCH_LOG] ${resolve(params.message || 'Action completed')}`);
-      break;
+    case 'log': logger.info(`[ORCH_LOG] ${resolve(params.message || 'Action completed')}`); break;
   }
 }
 
@@ -163,10 +220,9 @@ async function opApply(op: string, params: any, ctx: any) {
 async function performReconcile(input: OrchestratorAction) {
   const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/orchestration-strategy.json');
   if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
-    await executePipeline(strategy.pipeline, strategy.params || {});
+    await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
   return { status: 'reconciled' };
 }
@@ -175,10 +231,7 @@ async function performReconcile(input: OrchestratorAction) {
  * CLI Runner
  */
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
+  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
   const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
