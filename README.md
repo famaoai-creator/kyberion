@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-**Kyberion** is a high-fidelity **Sovereign Operating Ecosystem** designed to manifest digital reality through the safest and most efficient path. It is not a tool to be managed, but an autonomous partner—a **Sovereign Entity** that evolves through minimal physical implementations (**Actuators**) and maximum distilled wisdom (**Procedures**).
+**Kyberion** is a high-fidelity **Sovereign Operating Ecosystem** designed to manifest digital reality through the safest and most efficient path. It is an autonomous partner—a **Sovereign Entity** that evolves through a unified nerve system, intent-driven automation, and generic data pipelines.
 
 ---
 
@@ -10,19 +10,19 @@
 
 Kyberion operates under the **Sovereign Operating Charter**, a non-negotiable framework for autonomous action and environmental integrity:
 
-1. **Frictionless Engineering**: Logical consistency (compilation, link integrity, syntax) is a baseline requirement. We eliminate engineering friction through automated feedback loops and "reflex-speed" execution.
-2. **Visionary Decision-Making**: When logic offers multiple valid paths (trade-offs), Kyberion does not guess. It consults the **Sovereign Vision**—your emotional and aesthetic "North Star" defined in `/vision/`.
+1. **Frictionless Engineering**: We eliminate engineering friction through automated feedback loops, pure ADF-driven execution, and "reflex-speed" coordination.
+2. **Intent-Driven Autonomy**: No more hardcoded scripts. Kyberion resolves high-level **Semantic Intents** into dynamic execution pipelines.
 3. **Physical Integrity**: All physical changes are governed by the **KSMC (Kyberion Sovereign Mission Controller)**, ensuring every action is transactional, reversible, and validated.
 
 ---
 
-## 🛰 Satellite Hub Architecture (Core-Nerves Model)
+## 🧠 A2A Nerve Center Architecture
 
-Kyberion employs a decoupled **Satellite Hub Model** to maintain a clean, resilient ecosystem:
+Kyberion employs a unified **Nerve Center Model** powered by the **A2A (Agent-to-Agent) Protocol**:
 
-- **Core Brain (The Monorepo)**: Houses the immutable logic, decision-making engines, and UI portals. Powered by Node.js/TypeScript.
-- **Satellite Nerves (Pluggable Drivers)**: Houses platform-dependent actuators (e.g., Swift for macOS, Python for ML/Audio). These are physically isolated from the core build pipeline to eliminate dependency friction.
-- **ADF Protocol**: Communication between the Brain and Satellites is strictly governed by the **Agentic Data Format (ADF)**, a machine-readable JSON contract.
+- **Super-Nerve Engine**: The central routing brain that orchestrates cross-actuator workflows.
+- **A2A Compliance**: All communication is encapsulated in A2A envelopes, ensuring full traceability, conversation context, and multi-agent coordination readiness.
+- **Universal Actuators (v2.1.x)**: Generic pipeline engines (System, File, Wisdom, Network, Browser, Code) that execute any ADF instruction with built-in **Control Flow (if/while)** and **Safety Guards**.
 
 ---
 
@@ -30,9 +30,9 @@ Kyberion employs a decoupled **Satellite Hub Model** to maintain a clean, resili
 
 Information is strictly segregated according to its sensitivity, enforced through a physical **Tier Guard**:
 
-- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated from sync.
+- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated.
 - **Confidential Tier (`knowledge/confidential/`)**: Organizational secrets and logic. Masked in public outputs.
-- **Public Tier (`knowledge/`)**: General standards and ecosystem protocols. Shared through the public repository.
+- **Public Tier (`knowledge/`)**: General standards and ecosystem protocols.
 
 ---
 
@@ -40,26 +40,30 @@ Information is strictly segregated according to its sensitivity, enforced throug
 
 Every mission follows a strict, autonomous lifecycle to ensure absolute reliability:
 
-1. **① Onboarding**: Safety verification and identity synchronization (`my-identity.json`).
-2. **② Recovery**: Autonomous restoration from interruptions and stale-state detection.
-3. **③ Alignment**: Intent interpretation and definition of **Victory Conditions** before execution.
-4. **④ Execution**: The **Absolute Rule of One**. Micro-tasking is the only defense against system-wide collapse.
-5. **⑤ Review & Distillation**: Purging of temporary scripts and distillation of experience into **Wisdom Assets** (`knowledge/`).
+1. **① Onboarding**: Safety verification and identity synchronization.
+2. **② Recovery**: Autonomous restoration from interruptions and self-healing logic.
+3. **③ Alignment**: Intent interpretation and JIT pipeline synthesis.
+4. **④ Execution**: The **Absolute Rule of One**. Micro-tasking via pipeline steps.
+5. **⑤ Review & Distillation**: Extraction of **Wisdom Assets** and environmental cleansing.
 
 ---
 
-## ⚙️ Transactional Lifecycle (KSMC v2.0)
+## ⚙️ Transactional Interface (KSMC v2.0+)
 
-Autonomous labor is managed through the **KSMC (Kyberion Sovereign Mission Controller)**, enforcing transactional integrity:
+Autonomous labor is managed through high-level semantic commands and A2A messages:
 
 ```bash
-# Start a new mission (Initializes branch and prerequisites)
+# 🎯 Intent-Driven Execution (Recommended)
+npx tsx scripts/run_intent.ts <INTENT_ID>
+
+# 📬 A2A Protocol Communication
+npx tsx scripts/run_a2a.ts --input <A2A_MESSAGE_JSON>
+
+# 🧘 Strategic Reconciliation
+npx tsx scripts/run_wisdom_reconcile.ts
+
+# 🛡️ Mission Control (Transactional)
 npx tsx scripts/mission_controller.ts start <MISSION_ID> <PERSONA>
-
-# Record a progress checkpoint (Transactional commit)
-npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "Note"
-
-# Finalize and archive (Purges scratch and distills wisdom)
 npx tsx scripts/mission_controller.ts finish <MISSION_ID>
 ```
 
@@ -67,10 +71,10 @@ npx tsx scripts/mission_controller.ts finish <MISSION_ID>
 
 ## 📊 Evidence-Driven Delivery
 
-Kyberion provides physical evidence of its labor and performance:
-- **Autonomy Score**: Ratio of autonomous success vs. human intervention (Sudo Gates).
-- **Wisdom Density**: Growth of the `knowledge/` base through mission distillation.
-- **Structural Integrity**: Continuous monitoring of the ecosystem's health and security posture.
+Kyberion provides physical evidence of its labor:
+- **Autonomy Score**: Ratio of autonomous goal achievement vs. human intervention.
+- **Pipeline Traceability**: Full A2A logs showing exactly how intents were resolved and executed.
+- **Structural Integrity**: Real-time pulse monitoring of ecosystem health and ledger validity.
 
 ---
 
@@ -81,13 +85,11 @@ To manifest the Kyberion Entity in your environment:
 ```bash
 # 1. Establish the Physical Foundation
 git clone https://github.com/famaoai-creator/kyberion.git && cd kyberion
-pnpm install && npm run build
+pnpm install && pnpm run build
 
-# 2. Synchronize Identity
-npx tsx scripts/init_wizard.ts
-
-# 3. Align and Initiate
-npx tsx scripts/mission_controller.ts start MSN-ONBOARDING "Sovereign Concierge"
+# 2. Align and Initiate
+npx tsx scripts/run_intent.ts reconcile-ecosystem
+npx tsx scripts/mission_controller.ts start MSN-STARTUP "Sovereign Concierge"
 ```
 
 [**View Procedures**](./knowledge/procedures/) | [**Read the Charter**](./GEMINI.md) | [**Explore the Map**](./knowledge/Ecosystem_Map.md)
