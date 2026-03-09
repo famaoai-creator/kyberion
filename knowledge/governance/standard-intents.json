@@ -27,6 +27,24 @@
         { "op": "orchestrator:deploy", "params": {} },
         { "op": "system:log", "params": { "message": "Ecosystem rebuilt and redeployed." } }
       ]
+    },
+    {
+      "id": "validate-all",
+      "description": "Validate all schemas and metadata.",
+      "trigger_keywords": ["validate", "verify"],
+      "pipeline": [
+        { "op": "modeling:reconcile", "params": { "strategy_path": "knowledge/governance/modeling-strategy.json" } },
+        { "op": "system:log", "params": { "message": "Schema validation complete." } }
+      ]
+    },
+    {
+      "id": "maintenance-routine",
+      "description": "Run routine maintenance tasks (fix shebangs, sanitize deps).",
+      "trigger_keywords": ["maintenance", "sanitize", "fix"],
+      "pipeline": [
+        { "op": "code:reconcile", "params": { "strategy_path": "knowledge/governance/code-strategy.json" } },
+        { "op": "system:log", "params": { "message": "Maintenance routine finished." } }
+      ]
     }
   ]
 }
