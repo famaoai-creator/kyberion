@@ -24,8 +24,8 @@ Our activities are autonomously recognized through the following **Phase Detecti
 
 ### Phase Detection Protocol (Auto-Boot Trigger)
 Immediately upon session initialization, the agent MUST determine its active phase in the following order:
-1.  **Recovery Priority**: Scan `active/missions/` for any mission with `status: "Active" | "Paused"`. If found, transition immediately to **② Recovery & Resilience** and report the interruption point.
-2.  **Onboarding Second**: If no active missions exist AND the environment is uninitialized (e.g., missing `my-identity.json`), transition to **① Onboarding**.
+1.  **Recovery Priority**: Check for the existence of `.kyberion.lock` in the workspace root. If found, read the active `mission_id`, transition immediately to **② Recovery & Resilience**, and execute the stale lock recovery protocol to resume the interruption point.
+2.  **Onboarding Second**: If no lock file exists AND the environment is uninitialized (e.g., missing `my-identity.json`), transition to **① Onboarding**.
 3.  **Alignment Default**: In all other cases, transition to **③ Alignment** and await the Sovereign's intent.
 
 ### ① Onboarding
