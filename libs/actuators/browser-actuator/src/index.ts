@@ -6,9 +6,9 @@ import { execSync } from 'node:child_process';
 import { chromium, BrowserContext, Page } from 'playwright';
 
 /**
- * Browser-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
+ * Browser-Actuator v2.1.2 [TRACE & RECORD ENABLED]
  * Strictly compliant with Layer 2 (Shield).
- * A pure ADF-driven engine for browser automation with Control Flow and Safety Guards.
+ * Standardized with Control Flow, Safety Guards, and Playwright Tracing.
  */
 
 interface PipelineStep {
@@ -26,11 +26,15 @@ interface BrowserAction {
     viewport?: { width: number; height: number };
     max_steps?: number;
     timeout_ms?: number;
+    record_trace?: boolean;
+    record_video?: boolean;
+    locale?: string;
   };
   context?: Record<string, any>;
 }
 
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
+const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
 
 /**
  * Main Entry Point
@@ -43,21 +47,33 @@ async function handleAction(input: BrowserAction) {
 }
 
 /**
- * Universal Browser Pipeline Engine with Control Flow & Safety Guards
+ * Universal Browser Pipeline Engine
  */
 async function executePipeline(steps: PipelineStep[], sessionId: string, options: any, initialCtx: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
   const rootDir = process.cwd();
   const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 300000; // Default 5 mins for browser
+  const TIMEOUT = options.timeout_ms || 300000;
 
   const userDataDir = path.join(BROWSER_RUNTIME_DIR, sessionId);
   if (!fs.existsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
 
-  logger.info(`🚀 [BROWSER] Initializing session: ${sessionId}`);
+  const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
+  const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
+  if (options.record_video && !fs.existsSync(videoDir)) safeMkdir(videoDir, { recursive: true });
+
+  logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
+  
   const browserContext = await chromium.launchPersistentContext(userDataDir, {
     headless: options.headless !== false,
-    viewport: options.viewport || { width: 1280, height: 720 }
+    viewport: options.viewport || { width: 1280, height: 720 },
+    locale: options.locale || 'ja-JP',
+    recordVideo: options.record_video ? { dir: videoDir } : undefined
   });
+
+  // Start Tracing if requested
+  if (options.record_trace) {
+    await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  }
 
   const page = browserContext.pages().length > 0 ? browserContext.pages()[0] : await browserContext.newPage();
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
@@ -68,7 +84,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       const parts = p.trim().split('.');
       let current = ctx;
       for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? String(current) : '';
+      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
     });
   };
 
@@ -99,6 +115,12 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       }
     }
   } finally {
+    if (options.record_trace) {
+      if (!fs.existsSync(EVIDENCE_DIR)) safeMkdir(EVIDENCE_DIR, { recursive: true });
+      await browserContext.tracing.stop({ path: tracePath });
+      logger.info(`🎞️ [BROWSER] Trace recorded at: ${tracePath}`);
+      ctx.last_trace_path = tracePath;
+    }
     await browserContext.close();
   }
 
@@ -184,7 +206,7 @@ async function opCapture(op: string, params: any, page: Page, ctx: any, resolve:
   switch (op) {
     case 'goto': await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' }); return { ...ctx, last_url: page.url() };
     case 'screenshot':
-      const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/screenshots/browser_${Date.now()}.png`));
+      const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
       return { ...ctx, [params.export_as || 'last_screenshot']: outPath };
