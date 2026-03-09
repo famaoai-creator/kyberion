@@ -94,7 +94,6 @@
     "marked": "^12.0.2",
     "node-pty": "^1.1.0",
     "pdf-parse": "^2.4.5",
-    "pptxgenjs": "^4.0.1",
     "puppeteer": "^24.38.0",
     "sqlite3": "^5.1.7",
     "tesseract.js": "^7.0.0",

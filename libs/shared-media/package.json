@@ -10,9 +10,8 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "exceljs": "^4.4.0",
-    "pptxgenjs": "^4.0.1",
-    "adm-zip": "^0.5.12"
+    "adm-zip": "^0.5.12",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

@@ -20,6 +20,17 @@
       "border": { "top": { "style": "thin" }, "bottom": { "style": "double" } }
     }
   },
+  "table_presets": {
+    "TableStyleMedium2": {
+      "header_row": { "bg": "FF4472C4", "font": "FFFFFFFF", "bold": true },
+      "stripe_row": { "bg": "FFD9E1F2" },
+      "whole_table": { "border": "FF4472C4" }
+    },
+    "TableStyleLight1": {
+      "header_row": { "bg": "FFFFFFFF", "font": "FF000000", "bold": true, "border_bottom": "medium" },
+      "whole_table": { "border": "FFD9D9D9" }
+    }
+  },
   "layout": {
     "default_column_width": 25,
     "hide_gridlines": true
