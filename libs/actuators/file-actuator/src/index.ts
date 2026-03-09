@@ -1,13 +1,14 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeStat, safeUnlink, safeReaddir } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 
 /**
- * File-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
+ * File-Actuator v2.1.1 [RESILIENT PIPELINE]
  * Strictly compliant with Layer 2 (Shield).
  * A pure ADF-driven engine for filesystem operations with Control Flow and Safety Guards.
+ * Restored specialized ops: tail, append, exists, copy, move.
  */
 
 interface PipelineStep {
@@ -37,7 +38,7 @@ async function handleAction(input: FileAction) {
 }
 
 /**
- * Universal File Pipeline Engine with Control Flow & Safety Guards
+ * Universal File Pipeline Engine
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
   const rootDir = process.cwd();
@@ -149,13 +150,24 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     case 'read':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
     case 'list':
-      return { ...ctx, [params.export_as || 'file_list']: fs.readdirSync(path.resolve(rootDir, resolve(params.path))) };
+      return { ...ctx, [params.export_as || 'file_list']: safeReaddir(path.resolve(rootDir, resolve(params.path))) };
     case 'stat':
-      const s = fs.statSync(path.resolve(rootDir, resolve(params.path)));
+      const s = safeStat(path.resolve(rootDir, resolve(params.path)));
       return { ...ctx, [params.export_as || 'last_stat']: { size: s.size, mtime: s.mtime, isFile: s.isFile(), isDirectory: s.isDirectory() } };
+    case 'exists':
+      return { ...ctx, [params.export_as || 'exists']: fs.existsSync(path.resolve(rootDir, resolve(params.path))) };
     case 'search':
       const rgOutput = execSync(`rg --json "${resolve(params.pattern)}" "${path.resolve(rootDir, resolve(params.path))}"`, { encoding: 'utf8' });
       return { ...ctx, [params.export_as || 'search_results']: JSON.parse(rgOutput) };
+    case 'tail': {
+      const tailPath = path.resolve(rootDir, resolve(params.path));
+      const stats = safeStat(tailPath);
+      const posKey = params.pos_key || 'last_pos';
+      const lastPos = ctx[posKey] || 0;
+      const fullText = safeReadFile(tailPath, { encoding: 'utf8' }) as string;
+      const newText = fullText.substring(lastPos);
+      return { ...ctx, [params.export_as || 'last_capture']: newText, [posKey]: stats.size };
+    }
     default: return ctx;
   }
 }
@@ -181,22 +193,42 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
-    case 'write':
+    case 'write': {
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || params.content;
       safeWriteFile(out, content);
       break;
-    case 'delete':
+    }
+    case 'append': {
+      const out = path.resolve(rootDir, resolve(params.path));
+      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || params.content;
+      fs.appendFileSync(out, content + (params.newline !== false ? '\n' : ''));
+      break;
+    }
+    case 'delete': {
       const target = path.resolve(rootDir, resolve(params.path));
       if (fs.existsSync(target)) {
         if (fs.statSync(target).isDirectory()) {
           execSync(`rm -rf "${target}"`);
         } else {
-          fs.unlinkSync(target);
+          safeUnlink(target);
         }
       }
       break;
+    }
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
+    case 'copy': {
+      const src = path.resolve(rootDir, resolve(params.from));
+      const dest = path.resolve(rootDir, resolve(params.to));
+      fs.copyFileSync(src, dest);
+      break;
+    }
+    case 'move': {
+      const src = path.resolve(rootDir, resolve(params.from));
+      const dest = path.resolve(rootDir, resolve(params.to));
+      fs.renameSync(src, dest);
+      break;
+    }
   }
 }
 
