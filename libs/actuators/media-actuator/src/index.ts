@@ -1,83 +1,138 @@
 import { logger, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
-import * as excelUtils from '@agent/shared-media';
-import * as pptxUtils from '@agent/shared-media';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { extract } from './artisan/extraction-engine.js';
-import { generateWordContent } from './artisan/word-engine.js';
-import { marked } from 'marked';
-import puppeteer from 'puppeteer';
+import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
+import * as excelUtils from '@agent/shared-media';
+import * as pptxUtils from '@agent/shared-media';
 
 /**
- * Media-Actuator v1.8.0 [SECURE-IO ENFORCED]
+ * Media-Actuator v2.1.3 [SECURE-IO REINFORCED]
  * Strictly compliant with Layer 2 (Shield).
+ * Uses standard safeWriteFile for all physical outputs.
  */
 
+interface PipelineStep {
+  type: 'capture' | 'transform' | 'apply' | 'control';
+  op: string;
+  params: any;
+}
+
 interface MediaAction {
-  action: 'render' | 'convert' | 'assemble' | 'gif' | 'extract';
-  type?: 'mermaid' | 'pdf' | 'excel' | 'ppt' | 'html' | 'word';
-  input_path?: string;
-  output_path: string;
-  data?: any;
-  options?: any;
+  action: 'pipeline';
+  steps: PipelineStep[];
+  context?: Record<string, any>;
+  options?: {
+    max_steps?: number;
+    timeout_ms?: number;
+  };
 }
 
 async function handleAction(input: MediaAction) {
-  const resolvedInput = input.input_path ? path.resolve(process.cwd(), input.input_path) : '';
-  const resolvedOutput = input.output_path ? path.resolve(process.cwd(), input.output_path) : '';
+  if (input.action !== 'pipeline') throw new Error('Unsupported action');
+  return await executePipeline(input.steps || [], input.context || {}, input.options);
+}
 
-  if (resolvedOutput) {
-    safeMkdir(path.dirname(resolvedOutput));
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+  const rootDir = process.cwd();
+  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  
+  const resolve = (val: any) => {
+    if (typeof val !== 'string') return val;
+    const singleVarMatch = val.match(/^{{(.*?)}}$/);
+    if (singleVarMatch) {
+      const parts = singleVarMatch[1].trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? current : '';
+    }
+    return val.replace(/{{(.*?)}}/g, (_, p) => {
+      const parts = p.trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
+    });
+  };
+
+  const results = [];
+  for (const step of steps) {
+    state.stepCount++;
+    try {
+      logger.info(`  [MEDIA_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      switch (step.type) {
+        case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
+        case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
+        case 'apply': ctx = await opApply(step.op, step.params, ctx, resolve); break;
+      }
+      results.push({ op: step.op, status: 'success' });
+    } catch (err: any) {
+      logger.error(`  [MEDIA_PIPELINE] Step failed (${step.op}): ${err.message}`);
+      results.push({ op: step.op, status: 'failed', error: err.message });
+      break; 
+    }
   }
 
-  const markdownContent = (resolvedInput) ? (safeReadFile(resolvedInput, { encoding: 'utf8' }) as string) : (input.data?.markdown || '');
+  if (initialCtx.context_path) {
+    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+  }
 
-  switch (input.action) {
-    case 'assemble':
-    case 'render':
-      if (input.type === 'excel') {
-        logger.info(`📊 [MEDIA] Generating Excel: ${input.output_path}`);
-        const dynamicData = input.data.dynamic_data || input.data.rows || [];
-        const protocol = input.data.protocol || { version: '1.0.0', theme: {}, sheets: input.data.sheets || [] };
-        const workbook = await excelUtils.generateExcelWithDesign(dynamicData, protocol, input.data.sheet_name || 'Sheet1');
-        await workbook.xlsx.writeFile(resolvedOutput);
-        return { status: 'success', path: input.output_path };
-      }
+  return { status: 'finished', results, context: ctx };
+}
+
+async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
+  const rootDir = process.cwd();
+  switch (op) {
+    case 'pptx_extract':
+      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const assetsDir = path.resolve(rootDir, `scratch/assets_${Date.now()}`);
+      const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
+      return { ...ctx, [params.export_as || 'last_pptx_design']: design, last_assets_dir: assetsDir };
+    default: return ctx;
+  }
+}
+
+async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
+  return ctx;
+}
+
+async function opApply(op: string, params: any, ctx: any, resolve: Function) {
+  const rootDir = process.cwd();
+  switch (op) {
+    case 'pptx_render': {
+      const protocol = ctx[params.design_from || 'last_pptx_design'];
+      const assetsDir = ctx.last_assets_dir || './assets';
+      const outPath = path.resolve(rootDir, resolve(params.path));
       
-      if (input.type === 'pdf') {
-        logger.info(`📄 [MEDIA] Generating PDF: ${input.output_path}`);
-        const html = await marked.parse(markdownContent);
-        const fullHtml = `<html><head><style>body { font-family: sans-serif; padding: 40px; }</style></head><body>${html}</body></html>`;
-        const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-        const page = await browser.newPage();
-        await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-        await page.pdf({ path: resolvedOutput, format: 'A4', printBackground: true });
-        await browser.close();
-        return { status: 'success', path: input.output_path };
-      }
-
-      if (input.type === 'word') {
-        logger.info(`📝 [MEDIA] Generating Word: ${input.output_path}`);
-        const buffer = await generateWordContent(markdownContent, input.data?.specs || {});
-        safeWriteFile(resolvedOutput, buffer);
-        return { status: 'success', path: input.output_path };
+      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      
+      logger.info(`🚀 [MEDIA] Generating PPTX buffer via shared-media...`);
+      const pres = await pptxUtils.generatePptxWithDesign(protocol, assetsDir);
+      
+      // Use stream/base64 to get data and use safeWriteFile for reliability
+      const data = await pres.write({ outputType: 'nodebuffer' }) as Buffer;
+      safeWriteFile(outPath, data);
+      
+      const exists = fs.existsSync(outPath);
+      logger.info(`✅ [MEDIA] PPTX physically secured at: ${outPath} (${data.length} bytes). Exists verify: ${exists}`);
+      
+      if (exists) {
+        const check = execSync(`ls -l "${outPath}"`, { encoding: 'utf8' });
+        logger.info(`[DIR_CHECK] ${check}`);
       }
       break;
-
-    case 'extract':
-      if (input.type === 'excel') return await excelUtils.distillExcelDesign(resolvedInput);
-      if (input.type === 'ppt') return await pptxUtils.distillPptxDesign(resolvedInput);
-      return await extract(resolvedInput, input.options?.mode || 'all');
-
-    default:
-      throw new Error(`Unsupported action: ${input.action}`);
+    }
+    case 'write_file':
+      safeWriteFile(path.resolve(rootDir, resolve(params.path)), ctx[params.from] || params.content);
+      break;
+    case 'log': logger.info(`[MEDIA_LOG] ${resolve(params.message)}`); break;
   }
+  return ctx;
 }
 
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputData = JSON.parse(safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string) as MediaAction;
-  const result = await handleAction(inputData);
+  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };
 
@@ -87,3 +142,5 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+export { handleAction };

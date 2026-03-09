@@ -11,7 +11,7 @@ export interface PptxPos {
 }
 
 export interface PptxStyle {
-  fill?: string;
+  fill?: string | { transparent: boolean };
   line?: string;
   lineWidth?: number;
   color?: string;
@@ -21,20 +21,28 @@ export interface PptxStyle {
   headArrow?: boolean;
   tailArrow?: boolean;
   margin?: [number, number, number, number];
+  isConnector?: boolean;
+}
+
+export interface PptxTextRun {
+  text: string;
+  options?: Partial<PptxStyle>;
 }
 
 export interface PptxElement {
-  type: 'shape' | 'text' | 'line' | 'image';
+  type: 'shape' | 'text' | 'line' | 'image' | 'table';
   name?: string;
   pos: PptxPos;
   text?: string;
+  textRuns?: PptxTextRun[]; // For rich text
   style?: PptxStyle;
   imagePath?: string;
+  tableData?: any[][]; // For tables
 }
 
 export interface PptxSlideDef {
   id: string;
-  background?: string;
+  background?: string | { color: string };
   elements: PptxElement[];
 }
 
@@ -43,6 +51,10 @@ export interface PptxDesignProtocol {
   generatedAt: string;
   canvas: { w: number; h: number };
   theme: { [key: string]: string };
-  master: { elements: PptxElement[] };
+  master: { 
+    background?: string | { color: string };
+    elements: PptxElement[] 
+  };
   slides: PptxSlideDef[];
 }
+

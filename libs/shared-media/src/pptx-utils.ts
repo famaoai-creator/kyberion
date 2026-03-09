@@ -2,7 +2,7 @@ import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
 import PptxGenJS from 'pptxgenjs';
-import { PptxDesignProtocol, PptxElement, PptxPos, PptxStyle } from './types/pptx-protocol';
+import { PptxDesignProtocol, PptxElement, PptxPos, PptxStyle, PptxTextRun } from './types/pptx-protocol';
 
 function emuToIn(emu: string | undefined | null): number {
   return emu ? parseFloat((parseInt(emu) / 914400).toFixed(3)) : 0;
@@ -25,8 +25,9 @@ function extractTheme(zip: AdmZip, palette: { [key: string]: string }) {
   palette['bg2'] = palette['lt2'] || 'D5D5D5';
 }
 
-function resolveColor(xml: string | undefined, palette: { [key: string]: string }): string | undefined {
-  if (!xml || xml.includes('<a:noFill')) return undefined;
+function resolveColor(xml: string | undefined, palette: { [key: string]: string }): string | { transparent: boolean } | undefined {
+  if (!xml) return undefined;
+  if (xml.includes('<a:noFill')) return { transparent: true };
   const srgb = xml.match(/val="([0-9A-F]{6})"/);
   if (srgb) return srgb[1];
   const scheme = xml.match(/<a:schemeClr val="([^"]*)"/);
@@ -74,9 +75,10 @@ function findInheritedBackground(zip: AdmZip, slideName: string): string | undef
   return undefined;
 }
 
-function extractObjects(xml: string, palette: { [key: string]: string }, rels: { [key: string]: string } = {}): PptxElement[] {
+function extractObjects(xml: string, palette: { [key: string]: string }, rels: { [key: string]: string } = {}, canvas?: { w: number, h: number }): { elements: PptxElement[], background?: string } {
   const elements: PptxElement[] = [];
-  const objectRegex = /<(p:sp|p:cxnSp|p:pic)>([\s\S]*?)<\/\1>/g;
+  let background: string | undefined;
+  const objectRegex = /<(p:sp|p:cxnSp|p:pic|p:graphicFrame)>([\s\S]*?)<\/\1>/g;
   let match;
   while ((match = objectRegex.exec(xml)) !== null) {
     const typeTag = match[1];
@@ -85,24 +87,79 @@ function extractObjects(xml: string, palette: { [key: string]: string }, rels: {
     const y = emuToIn(body.match(/<a:off.*?y="(\d+)"/)?.[1]);
     const cx = emuToIn(body.match(/<a:ext cx="(\d+)"/)?.[1]);
     const cy = emuToIn(body.match(/<a:ext.*?cy="(\d+)"/)?.[1]);
+    const pos: PptxPos = { x, y, w: cx, h: cy };
+
+    if (typeTag === 'p:pic' && canvas) {
+      if (x === 0 && y === 0 && Math.abs(cx - canvas.w) < 0.1 && Math.abs(cy - canvas.h) < 0.1) {
+        const rId = body.match(/r:embed="([^"]*)"/)?.[1];
+        if (rId && rels[rId]) {
+          background = rels[rId];
+          continue;
+        }
+      }
+    }
+
+    if (typeTag === 'p:graphicFrame' && body.includes('<a:tbl>')) {
+      const tableData: any[][] = [];
+      const trRegex = /<a:tr[^>]*>([\s\S]*?)<\/a:tr>/g;
+      let trMatch;
+      while ((trMatch = trRegex.exec(body)) !== null) {
+        const row: any[] = [];
+        const tcRegex = /<a:tc[^>]*>([\s\S]*?)<\/a:tc>/g;
+        let tcMatch;
+        while ((tcMatch = tcRegex.exec(trMatch[1])) !== null) {
+          const cellTextNodes = tcMatch[1].match(/<a:t>([^<]*)<\/a:t>/g) || [];
+          const cellText = cellTextNodes.map(t => t.replace(/<[^>]*>/g, '')).join('').trim();
+          row.push(cellText);
+        }
+        tableData.push(row);
+      }
+      elements.push({ type: 'table', pos, tableData });
+      continue;
+    }
+
+    const textRuns: PptxTextRun[] = [];
+    const pRegex = /<a:p>([\s\S]*?)<\/a:p>/g;
+    let pMatch;
+    while ((pMatch = pRegex.exec(body)) !== null) {
+      const rRegex = /<a:r>([\s\S]*?)<\/a:r>/g;
+      let rMatch;
+      while ((rMatch = rRegex.exec(pMatch[1])) !== null) {
+        const rPrMatch = rMatch[1].match(/<a:rPr[^>]*>([\s\S]*?)<\/a:rPr>/);
+        const tMatch = rMatch[1].match(/<a:t>([^<]*)<\/a:t>/);
+        if (tMatch) {
+          const runColor = resolveColor(rPrMatch?.[0], palette);
+          textRuns.push({
+            text: tMatch[1],
+            options: {
+              color: typeof runColor === 'string' ? runColor : undefined,
+              fontSize: parseFloat(rPrMatch?.[0]?.match(/sz="(\d+)"/)?.[1] || '1800') / 100,
+            }
+          });
+        }
+      }
+    }
+
     const textNodes = body.match(/<a:t>([^<]*)<\/a:t>/g) || [];
     const text = textNodes.map(t => t.replace(/<[^>]*>/g, '')).join(' ').trim();
 
     const spPr = body.match(/<p:spPr>([\s\S]*?)<\/p:spPr>/)?.[1] || '';
-    const fillMatch = spPr.match(/<a:solidFill>([\s\S]*?)<\/a:solidFill>/);
+    const fillMatch = spPr.match(/<(a:solidFill|a:noFill)[^>]*>([\s\S]*?)<\/\1>/) || spPr.match(/<a:noFill\/>/);
     const lnXml = spPr.match(/<a:ln[^>]*>([\s\S]*?)<\/a:ln>/)?.[0];
     
     const bodyPr = body.match(/<a:bodyPr([\s\S]*?)\/?>/)?.[1] || '';
     const anchorMatch = bodyPr.match(/anchor="([^"]*)"/)?.[1];
     const anchor = anchorMatch === 'ctr' ? 'middle' : (anchorMatch === 'b' ? 'bottom' : 'top');
 
-    const type: 'shape' | 'text' | 'line' | 'image' = typeTag === 'p:cxnSp' ? 'line' : (typeTag === 'p:pic' ? 'image' : (text ? 'text' : 'shape'));
+    const type: 'shape' | 'text' | 'line' | 'image' | 'table' = typeTag === 'p:cxnSp' ? 'line' : (typeTag === 'p:pic' ? 'image' : (text ? 'text' : 'shape'));
 
+    const textColor = resolveColor(body.match(/<a:rPr[^>]*>([\s\S]*?)<\/a:rPr>/)?.[0], palette);
+    const lineObj = resolveColor(lnXml, palette);
     const style: PptxStyle = {
-      fill: resolveColor(fillMatch?.[0], palette),
-      line: resolveColor(lnXml, palette),
+      fill: type === 'line' ? undefined : resolveColor(fillMatch?.[0], palette),
+      line: typeof lineObj === 'string' ? lineObj : undefined,
       lineWidth: emuToPt(lnXml?.match(/w="(\d+)"/)?.[1]),
-      color: resolveColor(body.match(/<a:rPr[^>]*>([\s\S]*?)<\/a:rPr>/)?.[0], palette) || '000000',
+      color: typeof textColor === 'string' ? textColor : '000000',
       fontSize: parseFloat(body.match(/sz="(\d+)"/)?.[1] || '1800') / 100,
       align: body.includes('algn="ctr"') ? 'center' : (body.includes('algn="r"') ? 'right' : 'left'),
       valign: anchor
@@ -115,8 +172,9 @@ function extractObjects(xml: string, palette: { [key: string]: string }, rels: {
 
     const el: PptxElement = {
       type,
-      pos: { x, y, w: cx, h: cy },
+      pos,
       text: text,
+      textRuns: textRuns.length > 0 ? textRuns : undefined,
       style
     };
 
@@ -126,7 +184,7 @@ function extractObjects(xml: string, palette: { [key: string]: string }, rels: {
     }
     elements.push(el);
   }
-  return elements;
+  return { elements, background };
 }
 
 /**
@@ -145,6 +203,7 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
 
   const masterXmlEntry = zip.getEntry('ppt/slideMasters/slideMaster1.xml');
   let masterElements: PptxElement[] = [];
+  let masterBackground: string | undefined;
   if (masterXmlEntry) {
     const masterXml = masterXmlEntry.getData().toString('utf8');
     const masterRels: { [key: string]: string } = {};
@@ -155,7 +214,9 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
         return '';
       });
     }
-    masterElements = extractObjects(masterXml, palette, masterRels);
+    const extracted = extractObjects(masterXml, palette, masterRels, canvas);
+    masterElements = extracted.elements;
+    masterBackground = extracted.background;
   }
 
   const protocol: PptxDesignProtocol = {
@@ -163,7 +224,7 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
     generatedAt: new Date().toISOString(),
     canvas,
     theme: palette,
-    master: { elements: masterElements },
+    master: { elements: masterElements, background: masterBackground },
     slides: []
   };
 
@@ -180,10 +241,11 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
         return '';
       });
     }
+    const extracted = extractObjects(entry.getData().toString('utf8'), palette, slideRels, canvas);
     protocol.slides.push({
       id: slideName,
-      background: findInheritedBackground(zip, slideName),
-      elements: extractObjects(entry.getData().toString('utf8'), palette, slideRels)
+      background: extracted.background || findInheritedBackground(zip, slideName),
+      elements: extracted.elements
     });
   }
 
@@ -213,28 +275,41 @@ export async function generatePptxWithDesign(protocol: PptxDesignProtocol, asset
     if (el.type === 'image' && el.imagePath) {
       masterObjects.push({ image: { ...pos, path: path.join(assetsDir, path.basename(el.imagePath)) } });
     } else if (el.type === 'shape' && el.style?.fill) {
-      masterObjects.push({ rect: { ...pos, fill: { color: el.style.fill } } });
+      const fill = typeof el.style.fill === 'object' && el.style.fill.transparent ? { transparency: 100 } : { color: el.style.fill };
+      masterObjects.push({ rect: { ...pos, fill } });
     }
   }
 
-  pptx.defineSlideMaster({
+  const masterDef: any = {
     title: "MASTER_SLIDE",
     objects: masterObjects
-  });
+  };
+  if (protocol.master.background) {
+    if (typeof protocol.master.background === 'string') {
+      const imgPath = path.join(assetsDir, path.basename(protocol.master.background));
+      if (fs.existsSync(imgPath)) masterDef.background = { path: imgPath };
+    } else {
+      masterDef.background = { fill: protocol.master.background.color };
+    }
+  }
+
+  pptx.defineSlideMaster(masterDef);
 
   for (const slideDef of protocol.slides) {
     const slide = pptx.addSlide({ masterName: "MASTER_SLIDE" });
 
     if (slideDef.background) {
-      const imgPath = path.join(assetsDir, path.basename(slideDef.background));
-      if (fs.existsSync(imgPath)) {
-        slide.addImage({ path: imgPath, x: 0, y: 0, w: protocol.canvas.w, h: protocol.canvas.h });
+      if (typeof slideDef.background === 'string') {
+        const imgPath = path.join(assetsDir, path.basename(slideDef.background));
+        if (fs.existsSync(imgPath)) slide.background = { path: imgPath };
+      } else {
+        slide.background = { fill: slideDef.background.color };
       }
     }
 
     for (const el of slideDef.elements) {
-      const w = Math.max(el.pos.w, 0.01);
-      const h = Math.max(el.pos.h, 0.01);
+      const w = Math.max(el.pos.w, 0.05);
+      const h = Math.max(el.pos.h, 0.05);
       const pos = { x: el.pos.x, y: el.pos.y, w, h };
       
       if (el.type === 'image' && el.imagePath) {
@@ -245,6 +320,8 @@ export async function generatePptxWithDesign(protocol: PptxDesignProtocol, asset
         if (el.style?.headArrow) lineProps.endArrowType = 'arrow';
         if (el.style?.tailArrow) lineProps.beginArrowType = 'arrow';
         slide.addShape(pptx.ShapeType.line, { ...pos, line: lineProps });
+      } else if (el.type === 'table' && el.tableData) {
+        slide.addTable(el.tableData, pos);
       } else {
         const options: any = {
           ...pos,
@@ -253,14 +330,28 @@ export async function generatePptxWithDesign(protocol: PptxDesignProtocol, asset
           align: el.style?.align || 'left',
           valign: el.style?.valign || 'top',
         };
-        if (el.style?.fill) options.fill = { color: el.style.fill };
+        if (el.style?.fill) {
+          if (typeof el.style.fill === 'object' && el.style.fill.transparent) {
+            options.fill = { transparency: 100 };
+          } else {
+            options.fill = { color: el.style.fill };
+          }
+        }
         if (el.style?.line) options.line = { color: el.style.line, width: el.style?.lineWidth || 1 };
 
-        if (el.type === 'text' && el.text) {
+        if (el.textRuns && el.textRuns.length > 0) {
+          const runs = el.textRuns.map(run => ({
+            text: run.text,
+            options: {
+              color: run.options?.color,
+              fontSize: run.options?.fontSize
+            }
+          }));
+          slide.addText(runs, options);
+        } else if (el.text) {
           slide.addText(el.text, options);
         } else if (el.type === 'shape') {
-          if (el.text) slide.addText(el.text, options);
-          else slide.addShape(pptx.ShapeType.rect, options);
+          slide.addShape(pptx.ShapeType.rect, options);
         }
       }
     }

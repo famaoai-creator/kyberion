@@ -54,15 +54,24 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ctx = { ...ctx, ...saved };
   }
 
-  const resolve = (val: any) => {
+      const resolve = (val: any) => {
     if (typeof val !== 'string') return val;
+    
+    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
+    const singleVarMatch = val.match(/^{{(.*?)}}$/);
+    if (singleVarMatch) {
+      const parts = singleVarMatch[1].trim().split('.');
+      let current = ctx;
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? current : '';
+    }
+
+    // 文字列混在の場合は従来通り文字列展開
     return val.replace(/{{(.*?)}}/g, (_, p) => {
       const parts = p.trim().split('.');
       let current = ctx;
-      for (const part of parts) {
-        current = current?.[part];
-      }
-      return current !== undefined ? String(current) : '';
+      for (const part of parts) { current = current?.[part]; }
+      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
     });
   };
 
@@ -77,15 +86,18 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
       if (step.type === 'control') {
         ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
+      } else if (step.type === 'capture') {
+        ctx = await opCapture(step.op, step.params, ctx, resolve);
+      } else if (step.type === 'transform') {
+        ctx = await opTransform(step.op, step.params, ctx, resolve);
+      } else if (step.type === 'apply') {
+        ctx = await opApply(step.op, step.params, ctx, resolve);
       } else {
-        switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
-        }
+        throw new Error(`Unknown step type: ${step.type}`);
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
+
       logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
       break; 
@@ -159,7 +171,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     case 'pulse_status':
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
-    default: return ctx;
+    default: 
+      throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }
 }
 
@@ -191,7 +204,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
       return { ...sandbox.ctx };
     }
-    default: return ctx;
+    default: 
+      throw new Error(`Unsupported transform operator in System-Actuator: ${op}`);
   }
 }
 
@@ -217,7 +231,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
     case 'log': logger.info(`[SYSTEM_LOG] ${resolve(params.message || 'Action completed')}`); break;
+    default: 
+      throw new Error(`Unsupported apply operator in System-Actuator: ${op}`);
   }
+  return ctx;
 }
 
 
