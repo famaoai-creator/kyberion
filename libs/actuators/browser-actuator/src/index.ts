@@ -1,132 +1,173 @@
-import { logger, safeReadFile, safeWriteFile } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { chromium, BrowserContext, Page } from 'playwright';
 
 /**
- * Browser-Actuator v1.1.0 [SECURE-IO ENFORCED]
+ * Browser-Actuator v2.0.0 [PLAYWRIGHT PIPELINE DRIVEN]
  * Strictly compliant with Layer 2 (Shield).
+ * A pure ADF-driven engine for browser automation aligned with Playwright semantics.
  */
 
-import { chromium, Browser } from 'playwright';
-
-/**
- * Browser-Actuator v1.2.0 [PLAYWRIGHT ENABLED]
- * Strictly compliant with Layer 2 (Shield).
- */
+interface PipelineStep {
+  type: 'capture' | 'transform' | 'apply';
+  op: string;
+  params: any;
+}
 
 interface BrowserAction {
-  action: 'navigate' | 'extract' | 'screenshot' | 'execute_scenario' | 'launch' | 'close' | 'snapshot';
-  url?: string;
-  scenario?: any[];
-  output_path?: string;
+  action: 'pipeline';
+  steps: PipelineStep[];
   session_id?: string;
-  options?: any;
+  options?: {
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+  };
+  context?: Record<string, any>;
 }
 
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
 
+/**
+ * Main Entry Point
+ */
 async function handleAction(input: BrowserAction) {
-  const sessionId = input.session_id || 'default';
+  if (input.action !== 'pipeline') {
+    throw new Error(`Unsupported action: ${input.action}. Browser-Actuator v2.0 is pure pipeline-driven.`);
+  }
+  return await executePipeline(input.steps || [], input.session_id || 'default', input.options || {}, input.context || {});
+}
+
+/**
+ * Universal Browser Pipeline Engine
+ */
+async function executePipeline(steps: PipelineStep[], sessionId: string, options: any, initialCtx: any = {}) {
   const userDataDir = path.join(BROWSER_RUNTIME_DIR, sessionId);
-  
-  if (!fs.existsSync(userDataDir)) {
-    fs.mkdirSync(userDataDir, { recursive: true });
+  if (!fs.existsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
+
+  logger.info(`🚀 [BROWSER] Initializing session: ${sessionId}`);
+  const browserContext = await chromium.launchPersistentContext(userDataDir, {
+    headless: options.headless !== false,
+    viewport: options.viewport || { width: 1280, height: 720 }
+  });
+
+  const page = browserContext.pages().length > 0 ? browserContext.pages()[0] : await browserContext.newPage();
+  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  const results = [];
+
+  try {
+    for (const step of steps) {
+      try {
+        logger.info(`  [BROWSER_PIPELINE] Executing ${step.type}:${step.op}...`);
+        switch (step.type) {
+          case 'capture': ctx = await opCapture(step.op, step.params, page, ctx); break;
+          case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
+          case 'apply': await opApply(step.op, step.params, page, ctx); break;
+        }
+        results.push({ op: step.op, status: 'success' });
+      } catch (err: any) {
+        logger.error(`  [BROWSER_PIPELINE] Step failed (${step.op}): ${err.message}`);
+        results.push({ op: step.op, status: 'failed', error: err.message });
+        break; 
+      }
+    }
+  } finally {
+    await browserContext.close();
   }
 
-  let browserContext: any = null;
-  
-  try {
-    if (input.action === 'launch') {
-      logger.info(`🚀 [BROWSER] Launching persistent session: ${sessionId}`);
-      const browser = await chromium.launchPersistentContext(userDataDir, {
-        headless: input.options?.headless !== false,
-        viewport: { width: 1280, height: 720 }
-      });
-      // In persistent mode, we don't close the browser in finally unless requested
-      return { status: 'launched', sessionId, userDataDir };
-    }
+  return { status: 'finished', results, final_context_keys: Object.keys(ctx) };
+}
 
-    if (input.action === 'extract' && input.url) {
-      const browser = await chromium.launchPersistentContext(userDataDir, { headless: true });
-      const page = await browser.newPage();
-      await page.goto(input.url, { waitUntil: 'networkidle' });
-      const content = await page.innerText('body');
-      await browser.close();
-      return { status: 'success', content };
-    }
+/**
+ * CAPTURE Operators: Bring browser data INTO the context
+ */
+async function opCapture(op: string, params: any, page: Page, ctx: any) {
+  const resolve = (val: string) => typeof val === 'string' ? val.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '') : val;
 
-    if (input.action === 'screenshot' || input.action === 'snapshot') {
-      const outputPath = input.output_path || `evidence/screenshots/browser_${Date.now()}.png`;
-      const fullPath = path.resolve(process.cwd(), outputPath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  switch (op) {
+    case 'goto':
+      await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' });
+      return { ...ctx, last_url: page.url() };
 
-      const browser = await chromium.launchPersistentContext(userDataDir, { headless: true });
-      const page = browser.pages().length > 0 ? browser.pages()[0] : await browser.newPage();
-      
-      // If snaphot, don't navigate, just capture current state
-      if (input.action === 'screenshot' && input.url) {
-        await page.goto(input.url, { waitUntil: 'networkidle' });
-      }
-      
-      await page.screenshot({ path: fullPath });
-      const title = await page.title();
-      const url = page.url();
-      await browser.close();
-      
-      return { status: 'captured', path: outputPath, url, title };
-    }
+    case 'screenshot':
+      const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/screenshots/browser_${Date.now()}.png`));
+      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      await page.screenshot({ path: outPath, fullPage: params.fullPage });
+      return { ...ctx, [params.export_as || 'last_screenshot']: outPath };
 
-    if (input.action === 'execute_scenario' && input.scenario) {
-      const browser = await chromium.launchPersistentContext(userDataDir, { 
-        headless: input.options?.headless !== false 
-      });
-      
-      // Use existing page if available, otherwise create one
-      const page = browser.pages().length > 0 ? browser.pages()[0] : await browser.newPage();
-      
-      let extractionResult: any = null;
+    case 'content':
+      const content = params.selector ? await page.innerText(params.selector) : await page.content();
+      return { ...ctx, [params.export_as || 'last_capture']: content };
 
-      // Initial navigation if URL is provided at top level
-      if (input.url) {
-        logger.info(`🌐 [BROWSER] Navigating to: ${input.url}`);
-        await page.goto(input.url, { waitUntil: 'domcontentloaded' });
-      }
+    case 'evaluate':
+      const result = await page.evaluate(params.script);
+      return { ...ctx, [params.export_as || 'last_capture']: result };
 
-      for (const step of input.scenario) {
-        logger.info(`🌐 [BROWSER] Executing step: ${step.action}`);
-        try {
-          if (step.action === 'goto') {
-            await page.goto(step.url, { waitUntil: 'networkidle' });
-          } else if (step.action === 'click') {
-            await page.click(step.selector, { timeout: 5000 });
-          } else if (step.action === 'fill') {
-            await page.fill(step.selector, step.text, { timeout: 5000 });
-          } else if (step.action === 'press') {
-            await page.press(step.selector, step.key, { timeout: 5000 });
-          } else if (step.action === 'wait_for_selector') {
-            await page.waitForSelector(step.selector, { timeout: 10000 });
-          } else if (step.action === 'evaluate') {
-            extractionResult = await page.evaluate(step.script);
-          }
-        } catch (stepError: any) {
-          logger.warn(`⚠️ [BROWSER] Step ${step.action} failed: ${stepError.message}`);
-        }
-      }
-      
-      await browser.close();
-      return { status: 'success', result: extractionResult };
-    }
-    
-    return { status: 'executed', action: input.action };
-  } catch (e: any) {
-    logger.error(`Browser action failed: ${e.message}`);
-    return { status: 'error', error: e.message };
+    default: return ctx;
   }
 }
 
+/**
+ * TRANSFORM Operators
+ */
+async function opTransform(op: string, params: any, ctx: any) {
+  switch (op) {
+    case 'regex_extract':
+      const input = String(ctx[params.from || 'last_capture'] || '');
+      const match = input.match(new RegExp(params.pattern, 'm'));
+      return { ...ctx, [params.export_as]: match ? match[1] : null };
+
+    case 'json_query':
+      const data = ctx[params.from || 'last_capture'];
+      const res = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
+      return { ...ctx, [params.export_as]: res };
+
+    default: return ctx;
+  }
+}
+
+/**
+ * APPLY Operators: Interactions with the browser page
+ */
+async function opApply(op: string, params: any, page: Page, ctx: any) {
+  const resolve = (val: string) => typeof val === 'string' ? val.replace(/{{(.*?)}}/g, (_, p) => ctx[p.trim()] || '') : val;
+
+  switch (op) {
+    case 'click':
+      await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
+      break;
+
+    case 'fill':
+      await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });
+      break;
+
+    case 'press':
+      await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 });
+      break;
+
+    case 'wait':
+      if (params.selector) {
+        await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 });
+      } else {
+        await page.waitForTimeout(params.duration || 1000);
+      }
+      break;
+
+    case 'log':
+      logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`);
+      break;
+  }
+}
+
+/**
+ * CLI Runner
+ */
 const main = async () => {
-  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
+  const argv = await createStandardYargs()
+    .option('input', { alias: 'i', type: 'string', required: true })
+    .parseSync();
+
   const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
@@ -138,3 +179,5 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+export { handleAction };
