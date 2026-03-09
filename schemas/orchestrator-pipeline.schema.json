@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Orchestrator Pipeline ADF v2.0.0",
+  "description": "ADF for defining mission orchestration, task management, and environment setup pipelines.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["capture", "transform", "apply"] },
+          "op": { 
+            "enum": [
+              "read_json", "read_file", "shell", "intent_detect",
+              "json_query", "variable_hydrate", "regex_extract",
+              "write_file", "mkdir", "symlink", "git_checkpoint", "log"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

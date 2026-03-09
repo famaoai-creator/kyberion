@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "checkpoint-step",
+      "type": "apply",
+      "op": "git_checkpoint",
+      "params": { "message": "mission({{mission_id}}): persistent state preservation" }
+    },
+    {
+      "id": "log-success",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "Checkpoint created for mission {{mission_id}}" }
+    }
+  ]
+}
