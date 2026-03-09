@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "System Pipeline ADF v2.0.0",
+  "description": "ADF for defining OS-level pipelines including keyboard, mouse, and system governance.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["capture", "transform", "apply"] },
+          "op": { 
+            "enum": [
+              "shell", "read_file", "read_json", "glob_files", "vision_consult", "pulse_status",
+              "regex_extract", "json_query", "sre_analyze",
+              "keyboard", "mouse_click", "voice", "notify", "write_file", "mkdir", "log"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string", "description": "Text for keyboard or voice output" },
+              "x": { "type": "number", "description": "X coordinate for mouse" },
+              "y": { "type": "number", "description": "Y coordinate for mouse" },
+              "cmd": { "type": "string", "description": "Shell command to execute" },
+              "path": { "type": "string", "description": "File or directory path" },
+              "pattern": { "type": "string", "description": "Regex pattern" },
+              "template": { "type": "string", "description": "Replacement template with {{var}} support" },
+              "export_as": { "type": "string", "description": "Context key to store the result" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
