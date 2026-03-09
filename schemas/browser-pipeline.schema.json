@@ -1,11 +1,29 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Browser Pipeline ADF v2.0.0",
+  "title": "Browser Pipeline ADF v2.1.0",
   "description": "ADF for browser automation pipelines based on Playwright semantics.",
   "type": "object",
   "required": ["action", "steps"],
   "properties": {
     "action": { "const": "pipeline" },
+    "options": {
+      "type": "object",
+      "properties": {
+        "headless": { "type": "boolean" },
+        "viewport": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer" },
+            "height": { "type": "integer" }
+          }
+        },
+        "locale": { "type": "string", "default": "ja-JP" },
+        "record_trace": { "type": "boolean" },
+        "record_video": { "type": "boolean" },
+        "max_steps": { "type": "integer" },
+        "timeout_ms": { "type": "integer" }
+      }
+    },
     "steps": {
       "type": "array",
       "items": {
@@ -13,29 +31,16 @@
         "required": ["type", "op"],
         "properties": {
           "id": { "type": "string" },
-          "type": { "enum": ["capture", "transform", "apply"] },
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
           "op": { 
             "enum": [
               "goto", "screenshot", "content", "evaluate",
               "regex_extract", "json_query",
-              "click", "fill", "press", "wait", "log"
+              "click", "fill", "press", "wait", "log",
+              "if", "while"
             ]
           },
-          "params": {
-            "type": "object",
-            "properties": {
-              "url": { "type": "string" },
-              "selector": { "type": "string" },
-              "text": { "type": "string" },
-              "key": { "type": "string" },
-              "script": { "type": "string" },
-              "path": { "type": "string" },
-              "timeout": { "type": "integer" },
-              "duration": { "type": "integer" },
-              "waitUntil": { "enum": ["load", "domcontentloaded", "networkidle", "commit"] },
-              "export_as": { "type": "string" }
-            }
-          }
+          "params": { "type": "object" }
         }
       }
     }
