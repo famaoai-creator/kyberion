@@ -49,3 +49,31 @@ footer {
   border-bottom: none;
   font-size: 80px;
 }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #34495e;
+  border: 1px solid #7f8c8d;
+  font-size: 24px;
+}
+
+thead th {
+  background-color: #3498db;
+  color: white;
+  font-weight: bold;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #7f8c8d;
+}
+
+tbody td {
+  padding: 10px;
+  border: 1px solid #7f8c8d;
+  color: #ecf0f1;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #2c3e50;
+}
