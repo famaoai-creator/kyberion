@@ -16,6 +16,9 @@ export interface PptxStyle {
   lineWidth?: number;
   color?: string;
   fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
   align?: 'left' | 'center' | 'right';
   valign?: 'top' | 'middle' | 'bottom';
   headArrow?: boolean;
@@ -37,7 +40,7 @@ export interface PptxElement {
   textRuns?: PptxTextRun[]; // For rich text
   style?: PptxStyle;
   imagePath?: string;
-  tableData?: any[][]; // For tables
+  tableData?: (string | { text: string; options: PptxStyle })[][]; // For tables
 }
 
 export interface PptxSlideDef {

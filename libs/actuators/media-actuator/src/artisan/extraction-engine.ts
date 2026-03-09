@@ -4,6 +4,7 @@ import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile } from '@agent/core';
+import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
 
@@ -29,6 +30,7 @@ export interface Aesthetic {
   layout?: 'single-column' | 'multi-column' | 'grid' | 'unknown';
   elements?: LayoutElement[];
   branding?: Branding;
+  table_styles?: string[]; // ECMA-376 Standard Table Styles
 }
 
 export interface Branding {
@@ -185,14 +187,92 @@ async function processXlsx(buffer: Buffer, mode: ExtractionMode, result: Extract
     result.layers.metadata = { sheets: workbook.SheetNames, props: workbook.Props };
   }
   if (mode === 'aesthetic' || mode === 'all') {
-    result.layers.aesthetic = { layout: 'grid', branding: { logo_presence: false, tone: 'technical' } };
+    const tableStyles = new Set<string>();
+    try {
+      const zip = new AdmZip(buffer);
+      const stylesEntry = zip.getEntry('xl/styles.xml');
+      if (stylesEntry) {
+        const stylesXml = stylesEntry.getData().toString('utf8');
+        const defaultTableStyle = stylesXml.match(/defaultTableStyle="([^"]+)"/);
+        if (defaultTableStyle) {
+          tableStyles.add(defaultTableStyle[1]);
+        }
+        const customTableStyles = stylesXml.match(/<tableStyle name="([^"]+)"/g);
+        if (customTableStyles) {
+          customTableStyles.forEach(m => tableStyles.add(m.replace(/<tableStyle name="|"/g, '')));
+        }
+      }
+    } catch (e) {
+      // Ignore ZIP parsing errors
+    }
+    result.layers.aesthetic = { 
+      layout: 'grid', 
+      branding: { logo_presence: false, tone: 'technical' },
+      table_styles: Array.from(tableStyles)
+    };
   }
 }
 
 async function processPptx(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
-  result.layers.content = 'PowerPoint content extraction pending full implementation.';
-  result.layers.metadata = { type: 'PowerPoint' };
-  result.layers.aesthetic = { layout: 'unknown' };
+  try {
+    const zip = new AdmZip(buffer);
+    
+    if (mode === 'content' || mode === 'all') {
+      let content = '';
+      const slides = zip.getEntries().filter(e => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
+      for (const slide of slides) {
+        const xml = slide.getData().toString('utf8');
+        const textMatches = xml.match(/<a:t>([^<]*)<\/a:t>/g);
+        if (textMatches) {
+          content += textMatches.map(t => t.replace(/<\/?a:t>/g, '')).join(' ') + '\n\n';
+        }
+      }
+      result.layers.content = content.trim() || 'No text content found in PowerPoint.';
+    }
+
+    if (mode === 'metadata' || mode === 'all') {
+      const presEntry = zip.getEntry('ppt/presentation.xml');
+      let slideCount = 0;
+      if (presEntry) {
+        const presXml = presEntry.getData().toString('utf8');
+        const sldIdLst = presXml.match(/<p:sldId /g);
+        slideCount = sldIdLst ? sldIdLst.length : 0;
+      }
+      result.layers.metadata = { type: 'PowerPoint', slides: slideCount };
+    }
+
+    if (mode === 'aesthetic' || mode === 'all') {
+      const tableStyles = new Set<string>();
+      
+      const tableStylesEntry = zip.getEntry('ppt/tableStyles.xml');
+      if (tableStylesEntry) {
+        const tsXml = tableStylesEntry.getData().toString('utf8');
+        const styleMatches = tsXml.match(/styleName="([^"]+)"/g);
+        if (styleMatches) {
+          styleMatches.forEach(m => tableStyles.add(m.replace(/styleName="|"/g, '')));
+        }
+      }
+      
+      const slides = zip.getEntries().filter(e => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
+      for (const slide of slides) {
+        const xml = slide.getData().toString('utf8');
+        const styleIdMatches = xml.match(/<a:tblStyleId>([^<]+)<\/a:tblStyleId>/g);
+        if (styleIdMatches) {
+          styleIdMatches.forEach(m => tableStyles.add(m.replace(/<\/?a:tblStyleId>/g, '')));
+        }
+      }
+
+      result.layers.aesthetic = { 
+        layout: 'grid',
+        table_styles: Array.from(tableStyles),
+        branding: { logo_presence: false, tone: 'professional' }
+      };
+    }
+  } catch (e: any) {
+    result.layers.content = 'PowerPoint content extraction failed: ' + e.message;
+    result.layers.metadata = { type: 'PowerPoint' };
+    result.layers.aesthetic = { layout: 'unknown' };
+  }
 }
 
 async function processImage(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
