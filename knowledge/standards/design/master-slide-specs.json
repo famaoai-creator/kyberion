@@ -20,6 +20,13 @@
     "background_alt": "#f4f7f9",
     "border_muted": "#d5dbdb"
   },
+  "table_style": {
+    "header_bg": "#232f3e",
+    "header_text": "#ffffff",
+    "row_stripe_bg": "#f4f7f9",
+    "border_color": "#d5dbdb",
+    "body_text": "#1a1a1a"
+  },
   "layout_specs": {
     "padding": "60px",
     "header_height": "40px",

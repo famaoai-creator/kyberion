@@ -16,33 +16,97 @@ export interface PptxStyle {
   lineWidth?: number;
   color?: string;
   fontSize?: number;
-  align?: 'left' | 'center' | 'right';
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  align?: 'left' | 'center' | 'right' | 'justify';
   valign?: 'top' | 'middle' | 'bottom';
   headArrow?: boolean;
   tailArrow?: boolean;
+  rotate?: number;
+  opacity?: number;
   margin?: [number, number, number, number];
 }
 
+export interface PptxSmartArtData {
+  dataXml?: string;
+  layoutXml?: string;
+  colorsXml?: string;
+  quickStyleXml?: string;
+  rels?: { [id: string]: { type: string, target: string } };
+}
+
+export interface PptxChartData {
+  chartXml?: string;
+  workbookBlob?: string; // Base64 encoded or path to extracted XLSX
+  workbookTarget?: string;
+  rels?: { [id: string]: { type: string, target: string } };
+}
+
 export interface PptxElement {
-  type: 'shape' | 'text' | 'line' | 'image';
+  type: 'shape' | 'text' | 'line' | 'image' | 'table' | 'smartart' | 'chart' | 'raw';
   name?: string;
+  placeholderType?: 'title' | 'body' | 'ctrTitle' | 'subTitle' | 'dt' | 'ftr' | 'sldNum';
   pos: PptxPos;
   text?: string;
   style?: PptxStyle;
   imagePath?: string;
+  shapeType?: string;
+  rows?: string[][];
+  colWidths?: number[];
+  tableData?: any[][];
+  textRuns?: PptxTextRun[];
+  extensions?: string;
+  spPrXml?: string;
+  styleXml?: string;
+  bodyPrXml?: string;
+  lstStyleXml?: string;
+  pXmlLst?: string[];
+  smartArtData?: PptxSmartArtData;
+  chartData?: PptxChartData;
+  altText?: string;
+  linkTarget?: string;
+  rawXml?: string;
+  rawRels?: { [oldId: string]: string };
 }
 
-export interface PptxSlideDef {
+export interface PptxTextRun {
+  text: string;
+  options?: {
+    color?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strike?: boolean;
+    highlight?: string;
+    linkTarget?: string;
+  };
+}
+
+export interface PptxSlide {
   id: string;
   background?: string;
+  backgroundFill?: string;
+  bgXml?: string;
+  transitionXml?: string;
+  notesXml?: string;
   elements: PptxElement[];
+  extensions?: string;
 }
 
 export interface PptxDesignProtocol {
   version: string;
   generatedAt: string;
-  canvas: { w: number; h: number };
+  canvas: { w: number, h: number };
   theme: { [key: string]: string };
-  master: { elements: PptxElement[] };
-  slides: PptxSlideDef[];
+  extensions?: string;
+  master: { 
+    elements: PptxElement[],
+    extensions?: string,
+    bgXml?: string
+  };
+  slides: PptxSlide[];
 }
