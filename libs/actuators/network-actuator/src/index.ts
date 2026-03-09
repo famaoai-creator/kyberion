@@ -48,8 +48,8 @@ interface IngestPipeline {
 }
 
 interface IngestAction {
-  action: 'ingest';
-  pipelines: IngestPipeline[];
+  action: 'ingest' | 'ip-grep';
+  pipelines?: IngestPipeline[];
 }
 
 type ActuatorInput = (NetworkAction & { action?: undefined }) | IngestAction;
@@ -322,6 +322,18 @@ async function exportKnowledge(pipeline: IngestPipeline) {
   return { category, files: files.length, path: path.relative(process.cwd(), outPath) };
 }
 
+async function handleIpGrep() {
+  const { execSync } = await import('node:child_process');
+  logger.info('🔍 [NETWORK] Searching for local IP addresses...');
+  try {
+    const output = execSync('ifconfig | grep "inet " | grep -v 127.0.0.1', { encoding: 'utf8' });
+    const ips = output.split('\n').map(line => line.trim().split(' ')[1]).filter(Boolean);
+    return { status: 'success', ips };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message };
+  }
+}
+
 const main = async () => {
   const argv = await createStandardYargs()
     .option('input', {
@@ -338,6 +350,8 @@ const main = async () => {
   let result;
   if (inputData.action === 'ingest') {
     result = await handleIngest(inputData as IngestAction);
+  } else if (inputData.action === 'ip-grep') {
+    result = await handleIpGrep();
   } else {
     result = await handleNetworkRequest(inputData as NetworkAction);
   }

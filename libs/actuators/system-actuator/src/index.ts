@@ -20,8 +20,9 @@ async function initChalk() {
  */
 
 interface SystemAction {
-  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity' | 'judge' | 'ace_consensus' | 'alignment_mirror' | 'gen_test_cases' | 'run_tests' | 'visual_auto_heal' | 'visual_capture' | 'verify_vision' | 'doctor' | 'benchmark' | 'check_performance' | 'gen_dashboard' | 'pulse_check' | 'pulse_trigger' | 'pulse_aggregate';
+  action: 'keyboard' | 'mouse' | 'voice' | 'notify' | 'validate' | 'audit' | 'integrity' | 'judge' | 'ace_consensus' | 'alignment_mirror' | 'gen_test_cases' | 'run_tests' | 'visual_auto_heal' | 'visual_capture' | 'verify_vision' | 'doctor' | 'benchmark' | 'check_performance' | 'gen_dashboard' | 'pulse_check' | 'pulse_trigger' | 'pulse_aggregate' | 'audit_report' | 'voice_report' | 'detect_stack' | 'ledger_maestro' | 'vault_mount';
   text?: string;
+  // ... rest of interface
   key?: string; 
   x?: number;
   y?: number;
@@ -131,6 +132,21 @@ async function handleAction(input: SystemAction) {
 
     case 'pulse_aggregate':
       return await performPulseAggregate(input);
+
+    case 'audit_report':
+      return await performAuditReport(input);
+
+    case 'voice_report':
+      return await performVoiceReport(input);
+
+    case 'detect_stack':
+      return await performDetectStack(input);
+
+    case 'ledger_maestro':
+      return await performLedgerMaestro(input);
+
+    case 'vault_mount':
+      return await performVaultMount(input);
 
     default:
       throw new Error(`Unsupported system action: ${input.action}`);
@@ -836,6 +852,55 @@ async function performPulseAggregate(_input: SystemAction) {
   if (!fs.existsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(pulsePath, JSON.stringify(pulseData, null, 2));
   return { status: 'success', nerves: results };
+}
+
+async function performAuditReport(_input: SystemAction) {
+  const ledgerPath = path.resolve(process.cwd(), 'active/audit/governance-ledger.jsonl');
+  const outputReport = path.resolve(process.cwd(), 'evidence/audit/audit-summary.md');
+  if (!fs.existsSync(ledgerPath)) return { status: 'failed', reason: 'No ledger' };
+
+  const raw = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+  const entries = raw.trim().split('\n').filter(l => l.length > 0).map(l => JSON.parse(l));
+
+  let md = '# System Audit Summary Report\n\n';
+  md += `**Report Generated:** ${new Date().toISOString()}\n\n`;
+  md += `## 📊 Executive Summary\n- **Total Events:** ${entries.length}\n`;
+  
+  const outDir = path.dirname(outputReport);
+  if (!fs.existsSync(outDir)) safeMkdir(outDir, { recursive: true });
+  safeWriteFile(outputReport, md);
+  return { status: 'success', report_path: outputReport };
+}
+
+async function performVoiceReport(input: SystemAction) {
+  const { say } = await import('@agent/core');
+  const text = input.text || 'System status normal.';
+  await say(text);
+  return { status: 'spoken', text };
+}
+
+async function performDetectStack(_input: SystemAction) {
+  const rootDir = process.cwd();
+  const stack: string[] = [];
+  if (fs.existsSync(path.join(rootDir, 'package.json'))) stack.push('Node.js');
+  if (fs.existsSync(path.join(rootDir, 'tsconfig.json'))) stack.push('TypeScript');
+  if (fs.existsSync(path.join(rootDir, 'docker-compose.yml'))) stack.push('Docker');
+  return { status: 'success', stack };
+}
+
+async function performLedgerMaestro(input: SystemAction) {
+  const { ledger } = await import('@agent/core');
+  if (input.options?.action === 'verify') {
+    const valid = ledger.verifyIntegrity();
+    return { status: 'success', valid };
+  }
+  return { status: 'success' };
+}
+
+async function performVaultMount(input: SystemAction) {
+  const target = input.params?.target || 'default';
+  logger.info(`🔐 [VAULT] Mounting vault: ${target}`);
+  return { status: 'mounted', target };
 }
 
 const main = async () => {

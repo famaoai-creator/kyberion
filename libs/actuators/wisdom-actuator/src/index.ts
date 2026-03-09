@@ -28,8 +28,9 @@ interface ReportSpec {
 }
 
 interface WisdomAction {
-  action: 'distill' | 'mirror' | 'swap' | 'sync' | 'aggregate' | 'report' | 'sync_docs' | 'sync_skill_dates' | 'scan_pii';
+  action: 'distill' | 'mirror' | 'swap' | 'sync' | 'aggregate' | 'report' | 'sync_docs' | 'sync_skill_dates' | 'scan_pii' | 'git_summary' | 'cloud_cost' | 'suggest_skill';
   patchId?: string;
+  // ... rest of interface
   missionId?: string;
   targetTier?: 'public' | 'confidential' | 'personal';
   target_dir?: string; // for 'aggregate' action
@@ -98,6 +99,15 @@ async function handleAction(input: WisdomAction) {
 
     case 'scan_pii':
       return await performScanPII();
+
+    case 'git_summary':
+      return await performGitSummary();
+
+    case 'cloud_cost':
+      return await performCloudCost(input);
+
+    case 'suggest_skill':
+      return await performSuggestSkill(input);
 
     default:
       return { status: 'executed' };
@@ -689,6 +699,37 @@ async function performAggregation(input: WisdomAction) {
     logger.error(`Index Generation Failed: ${err.message}`);
     return { status: 'failed', error: err.message };
   }
+}
+
+async function performGitSummary() {
+  const { execSync } = await import('node:child_process');
+  const summary = execSync('git log -n 5 --pretty=format:"%h - %s (%cr)"', { encoding: 'utf8' });
+  return { status: 'success', summary: summary.split('\n') };
+}
+
+async function performCloudCost(input: WisdomAction) {
+  const UNIT_PRICES: Record<string, Record<string, number>> = {
+    compute: { small: 15, medium: 45, large: 120, xlarge: 300 },
+    database: { small: 30, medium: 90, large: 240, xlarge: 600 },
+    storage: { small: 5, medium: 20, large: 100, xlarge: 250 },
+    serverless: { small: 2, medium: 10, large: 50, xlarge: 100 },
+  };
+
+  const resources = input.options?.resources || [];
+  let totalMonthly = 0;
+  const breakdown = resources.map((r: any) => {
+    const cost = (UNIT_PRICES[r.type]?.[r.size] || 10) * (r.count || 1);
+    totalMonthly += cost;
+    return { name: r.name, type: r.type, size: r.size, cost };
+  });
+
+  return { status: 'success', total_monthly: totalMonthly, total_yearly: totalMonthly * 12, breakdown };
+}
+
+async function performSuggestSkill(input: WisdomAction) {
+  const intent = input.options?.intent || 'automation';
+  logger.info(`💡 [WISDOM] Suggesting new skills for intent: ${intent}`);
+  return { status: 'success', suggestions: [`${intent}-optimizer`, `${intent}-orchestrator`] };
 }
 
 const main = async () => {

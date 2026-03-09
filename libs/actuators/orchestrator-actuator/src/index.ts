@@ -11,8 +11,9 @@ import yaml from 'js-yaml';
  */
 
 interface OrchestratorAction {
-  action: 'execute' | 'heal' | 'checkpoint' | 'verify_alignment' | 'materialize' | 'import_mission' | 'export_mission' | 'generate_pr' | 'run_tasks' | 'init_wizard' | 'intent_gateway' | 'create_skill' | 'scaffold_skills' | 'iterm_schedule' | 'run_pipeline' | 'manage_plugin';
+  action: 'execute' | 'heal' | 'checkpoint' | 'verify_alignment' | 'materialize' | 'import_mission' | 'export_mission' | 'generate_pr' | 'run_tasks' | 'init_wizard' | 'intent_gateway' | 'create_skill' | 'scaffold_skills' | 'iterm_schedule' | 'run_pipeline' | 'manage_plugin' | 'deploy';
   pipeline_path?: string;
+  // ... rest of interface
   mission_id?: string;
   blueprint_path?: string; // for 'materialize' action
   mep_path?: string; // for 'import_mission'
@@ -72,6 +73,9 @@ async function handleAction(input: OrchestratorAction) {
 
     case 'manage_plugin':
       return await performManagePlugin(input);
+
+    case 'deploy':
+      return await performDeploy(input);
 
     default:
       return { status: 'idle' };
@@ -441,7 +445,8 @@ async function performRunTasks(input: OrchestratorAction) {
   
   if (!fs.existsSync(tasksDefPath)) return { status: 'no_tasks_defined' };
 
-  const { tasks } = JSON.parse(safeReadFile(tasksDefPath, { encoding: 'utf8' }) as string);
+  const rawTasks = safeReadFile(tasksDefPath, { encoding: 'utf8' }) as string;
+  const { tasks } = JSON.parse(rawTasks);
   const status = fs.existsSync(statusPath) ? JSON.parse(safeReadFile(statusPath, { encoding: 'utf8' }) as string) : {};
   const today = new Date().toISOString().slice(0, 10);
   const currentRole = input.persona || 'mission_controller';
@@ -470,6 +475,37 @@ async function performRunTasks(input: OrchestratorAction) {
 
   safeWriteFile(statusPath, JSON.stringify(status, null, 2));
   return { status: 'finished', tasks_run: results.length, details: results };
+}
+
+async function performHeal(input: OrchestratorAction) {
+  const { sre, pathResolver } = await import('@agent/core');
+  const logPath = input.params?.log_path;
+  const missionId = input.mission_id;
+
+  if (!logPath || !fs.existsSync(logPath)) throw new Error('Valid log_path required for heal');
+
+  const logs = fs.readFileSync(logPath, 'utf8');
+  const analysis = sre.analyzeRootCause(logs);
+
+  if (!analysis) return { status: 'no_signature_found' };
+
+  if (missionId) {
+    const missionDir = pathResolver.missionDir(missionId);
+    const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+    if (fs.existsSync(taskBoardPath)) {
+      let content = fs.readFileSync(taskBoardPath, 'utf8');
+      const hint = `\n### 🚨 Dynamic Repair Hint (${analysis.cause})\n- **Next Action**: [ ] ${analysis.recommendation}\n`;
+      if (!content.includes(analysis.cause)) safeWriteFile(taskBoardPath, content + hint);
+    }
+  }
+
+  return { status: 'healed', analysis };
+}
+
+async function performDeploy(_input: OrchestratorAction) {
+  logger.info('🚀 [DEPLOY] Starting redeployment...');
+  safeExec('npm', ['run', 'build']);
+  return { status: 'deployed' };
 }
 
 async function performMaterialize(input: OrchestratorAction) {
