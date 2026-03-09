@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
-Total Capabilities: 121 (Implemented: 137)
-Last updated: 2026/03/07
+Total Capabilities: 10 (Implemented: 10)
+Last updated: 2026-03-09
 
 > **Governance Note (The Capability Evolution):**
 > Capabilities in the Kyberion ecosystem are not mere scripts. They represent the **"Spinal Cord"** of the Sovereign Entity, categorized into **Logic** (decision-making and analysis) and **Actuators** (physical world interactions). 
