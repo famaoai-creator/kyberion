@@ -1,0 +1,46 @@
+{
+  "strategies": [
+    {
+      "id": "git-date-provenance",
+      "type": "git-provenance",
+      "params": {
+        "scope": "skills/**/SKILL.md",
+        "field": "last_updated"
+      }
+    },
+    {
+      "id": "skill-metadata-mapping",
+      "type": "bidirectional-mapping",
+      "params": {
+        "source": "skills/**/SKILL.md",
+        "mapping": [
+          { "from": "description", "to": "package.json:description" },
+          { "from": "name", "to": "package.json:name", "prefix": "@agent/capability-" }
+        ]
+      }
+    },
+    {
+      "id": "ecosystem-docs-injection",
+      "type": "template-injection",
+      "params": {
+        "source": "knowledge/orchestration/global_skill_index.json",
+        "targets": [
+          {
+            "file": "README.md",
+            "rules": [
+              { "pattern": "\\*\\*(\\d+) skills\\*\\* \\(all implemented\\)", "template": "**{{impl_count}} skills** (all implemented)" },
+              { "pattern": "Implemented Skills \\((\\d+)\\)", "template": "Implemented Skills ({{impl_count}})" }
+            ]
+          },
+          {
+            "file": "SKILLS_GUIDE.md",
+            "rules": [
+              { "pattern": "Total Skills: (\\d+)", "template": "Total Skills: {{impl_count}}" },
+              { "pattern": "Last updated: \\d{4}/\\d{1,2}/\\d{1,2}", "template": "Last updated: {{today}}" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
