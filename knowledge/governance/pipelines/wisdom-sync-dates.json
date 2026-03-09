@@ -1,0 +1,34 @@
+{
+  "action": "reconcile",
+  "strategies": [
+    {
+      "id": "git-provenance-sync",
+      "for_each": {
+        "op": "glob_files",
+        "params": { "dir": ".gemini/skills", "ext": "SKILL.md", "export_as": "skills_to_sync" }
+      },
+      "pipeline": [
+        {
+          "type": "capture",
+          "op": "shell",
+          "params": { "cmd": "git log -1 --format=%cs -- \"{{item}}\"", "export_as": "git_date" }
+        },
+        {
+          "type": "capture",
+          "op": "read_file",
+          "params": { "path": "{{item}}", "export_as": "content" }
+        },
+        {
+          "type": "transform",
+          "op": "yaml_update",
+          "params": { "from": "content", "field": "last_updated", "value": "{{git_date}}", "export_as": "updated" }
+        },
+        {
+          "type": "apply",
+          "op": "write_file",
+          "params": { "path": "{{item}}", "from": "updated" }
+        }
+      ]
+    }
+  ]
+}

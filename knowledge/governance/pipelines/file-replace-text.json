@@ -1,0 +1,23 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "read-target",
+      "type": "capture",
+      "op": "read",
+      "params": { "path": "{{file_path}}", "export_as": "original_text" }
+    },
+    {
+      "id": "replace-logic",
+      "type": "transform",
+      "op": "regex_replace",
+      "params": { "from": "original_text", "pattern": "{{old_pattern}}", "template": "{{new_string}}", "export_as": "modified_text" }
+    },
+    {
+      "id": "apply-change",
+      "type": "apply",
+      "op": "write",
+      "params": { "path": "{{file_path}}", "from": "modified_text" }
+    }
+  ]
+}
