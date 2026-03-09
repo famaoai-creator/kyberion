@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "check-ledger",
+      "type": "capture",
+      "op": "pulse_status",
+      "params": { "export_as": "is_valid" }
+    },
+    {
+      "id": "log-pulse",
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "System Pulse Integrity: {{is_valid}}" }
+    }
+  ]
+}
