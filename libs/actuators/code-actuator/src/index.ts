@@ -11,8 +11,9 @@ import * as fs from 'node:fs';
  */
 
 interface CodeAction {
-  action: 'analyze' | 'refactor' | 'verify' | 'test' | 'run_live_js' | 'sanitize-deps' | 'maintain';
+  action: 'analyze' | 'refactor' | 'verify' | 'test' | 'run_live_js' | 'sanitize-deps' | 'maintain' | 'generate-types' | 'sanitize';
   path?: string;
+  // ... rest of interface
   code?: string; // For run_live_js
   command?: string;
   changes?: Array<{ old: string; new: string }>;
@@ -314,32 +315,13 @@ async function handleAction(input: CodeAction) {
   const rootDir = process.cwd();
   switch (input.action) {
     case 'maintain':
-      const maintenanceResults: any = {};
-      const tasks = input.params.tasks || [];
-      const rootPkgRaw = safeReadFile(path.join(rootDir, 'package.json'), { encoding: 'utf8' }) as string;
-      const rootPkg = JSON.parse(rootPkgRaw);
+      return await performMaintenance(input);
 
-      if (tasks.includes('fix_shebangs')) {
-        maintenanceResults.fix_shebangs = await runFixShebangs(rootDir);
-      }
-      if (tasks.includes('thin_dependencies')) {
-        maintenanceResults.thin_dependencies = await runThinDependencies(rootDir, rootPkg);
-      }
-      if (tasks.includes('sanitize_deps')) {
-        const policyPath = path.resolve(rootDir, input.params.policy_path);
-        const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
-        maintenanceResults.sanitize_deps = await runSanitizeDeps(rootDir, policy, rootPkg);
-      }
-      if (tasks.includes('mass_refactor_governance')) {
-        maintenanceResults.mass_refactor_governance = await runMassRefactorGovernance(rootDir);
-      }
-      if (tasks.includes('maintain_refactor_boilerplate')) {
-        maintenanceResults.maintain_refactor_boilerplate = await runMaintainRefactorBoilerplate(rootDir);
-      }
-      // Note: migrate_to_wrapper logic omitted for brevity/safety unless explicitly needed.
-      // It's mostly a scanner in the original script.
-      
-      return { status: 'maintained', details: maintenanceResults };
+    case 'generate-types':
+      return await performTypeGeneration(input);
+
+    case 'sanitize':
+      return await performSanitization(input);
 
     case 'sanitize-deps':
       const policyPath = path.resolve(rootDir, input.params.policy_path);
@@ -420,6 +402,53 @@ async function handleAction(input: CodeAction) {
     default:
       throw new Error(`Unsupported action: ${input.action}`);
   }
+}
+
+async function performMaintenance(input: CodeAction) {
+  const rootDir = process.cwd();
+  const maintenanceResults: any = {};
+  const tasks = input.params.tasks || [];
+  const rootPkgRaw = safeReadFile(path.join(rootDir, 'package.json'), { encoding: 'utf8' }) as string;
+  const rootPkg = JSON.parse(rootPkgRaw);
+
+  if (tasks.includes('fix_shebangs')) maintenanceResults.fix_shebangs = await runFixShebangs(rootDir);
+  if (tasks.includes('thin_dependencies')) maintenanceResults.thin_dependencies = await runThinDependencies(rootDir, rootPkg);
+  if (tasks.includes('sanitize_deps')) {
+    const pPath = path.resolve(rootDir, input.params.policy_path || 'knowledge/governance/package-governance.json');
+    const policy = JSON.parse(safeReadFile(pPath, { encoding: 'utf8' }) as string);
+    maintenanceResults.sanitize_deps = await runSanitizeDeps(rootDir, policy, rootPkg);
+  }
+  if (tasks.includes('mass_refactor_governance')) maintenanceResults.mass_refactor_governance = await runMassRefactorGovernance(rootDir);
+  if (tasks.includes('maintain_refactor_boilerplate')) maintenanceResults.maintain_refactor_boilerplate = await runMaintainRefactorBoilerplate(rootDir);
+  
+  return { status: 'maintained', details: maintenanceResults };
+}
+
+async function performTypeGeneration(_input: CodeAction) {
+  logger.info('🏷️ [CODE] Generating TypeScript declarations...');
+  try {
+    safeExec('npx', ['tsc', '--emitDeclarationOnly']);
+    return { status: 'success' };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message };
+  }
+}
+
+async function performSanitization(_input: CodeAction) {
+  const skills = discoverSkills(process.cwd());
+  let fixed = 0;
+  for (const s of skills) {
+    const mdPath = path.join(process.cwd(), s.path, 'SKILL.md');
+    if (fs.existsSync(mdPath)) {
+      let content = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
+      if (!content.startsWith('---\n')) {
+        content = `---\nname: ${s.name}\nstatus: impl\n---\n\n` + content;
+        safeWriteFile(mdPath, content);
+        fixed++;
+      }
+    }
+  }
+  return { status: 'sanitized', count: fixed };
 }
 
 const main = async () => {
