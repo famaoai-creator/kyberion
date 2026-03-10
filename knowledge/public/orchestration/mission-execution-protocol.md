@@ -1,13 +1,13 @@
 ---
-title: ミッション実行規程 (Mission Execution Protocol v1.0)
+title: ミッション実行規程 (Mission Execution Protocol v2.0)
 category: Orchestration
-tags: [orchestration, mission, execution, protocol]
-importance: 8
-author: Ecosystem Architect
-last_updated: 2026-03-06
+tags: [orchestration, mission, execution, protocol, security]
+importance: 10
+author: Kyberion Sovereign Entity
+last_updated: 2026-03-10
 ---
 
-# ミッション実行規程 (Mission Execution Protocol v1.0)
+# ミッション実行規程 (Mission Execution Protocol v2.0)
 
 ## 1. 動作レイヤーの分離定義
 
@@ -15,56 +15,38 @@ last_updated: 2026-03-06
 
 - **入力**: ユーザーの意図、Publicナレッジ、実行ログ。
 - **処理**: ロールに基づく戦略立案、パラメータの特定、`MissionContract` の生成。
-- **制約**: コンテキストウィンドウの肥大化を防ぐため、決定的なログやバイナリデータは保持しない。
+- **制約**: コンテキストウィンドウの肥大化を防ぐため、詳細な実行ログやバイナリデータは保持せず、Evidenceへのポインタのみを扱う。
 
-### 1.2 脊髄レイヤー (Reflex: Mission Control / Scripts)
+### 1.2 脊髄レイヤー (Reflex: Mission Control / KSMC)
 
-- **入力**: `MissionContract` (JSON), Confidential/Personalナレッジ。
+- **入力**: `MissionContract` (JSON), 3-Tier ナレッジ。
 - **処理**:
-  1. `knowledge_injections` に基づく動的変数（Secrets等）の注入。
-  2. スクリプトの決定的実行。
-  3. 結果の物理的な検証（Victory Conditionの確認）。
-- **制約**: 独自の「思考」は行わず、受け取った契約の範囲内でのみ執行する。
+  1. **ティア判定**: 注入されるナレッジに基づき、ミッションの機密ティアを自動決定（Escalation）。
+  2. **リポジトリ初期化**: 独立した Micro-Git リポジトリをミッションディレクトリ内に生成。
+  3. **決定的実行**: スクリプトの実行と、チェックポイントによる履歴の記録。
+  4. **証跡記録**: Hybrid Ledger へのメタデータ（Global）と詳細ログ（Mission）の書き込み。
+- **制約**: システム本体の Git 履歴には一切干渉せず、独立した物理境界内でのみ動作する。
 
-## 2. MissionContract スキーマ (標準インターフェース)
+## 2. 3-Tier ミッション・アーキテクチャ
 
-大脳が脊髄へ渡すデータ構造。
+ミッションは、その性質と使用する情報資産に基づき以下の3つのティアに分類される。
 
-```json
-{
-  "mission_id": "uuid",
-  "role": "SRE",
-  "skill": "jira-agile-assistant",
-  "action": "create-issue",
-  "static_params": {
-    "summary": "Example issue",
-    "description": "..."
-  },
-  "knowledge_injections": ["personal/connections/jira.json:api_token"],
-  "safety_gate": {
-    "risk_level": 3,
-    "require_sudo": false
-  }
-}
-```
+| ティア | 格納パス | 保護レベル | 履歴管理 |
+| :--- | :--- | :--- | :--- |
+| **Personal** | `knowledge/personal/missions/` | **Secret** (主権者の魂) | 独立リポジトリ (Git非追跡) |
+| **Confidential** | `active/missions/confidential/` | **Confidential** (組織機密) | 独立リポジトリ (Git非追跡) |
+| **Public** | `active/missions/public/` | **Public** (標準・公開) | 独立リポジトリ (Git追跡可) |
 
-## 3. 特権昇格 (sudo) プロトコル
+## 3. トランザクションと整合性 (Sovereign Shield)
 
-以下の条件時、脊髄は大脳へ「人間への介入」を要求する。
+### 3.1 独立リポジトリ (Micro-Repo)
+すべてのミッションは開始時に独自の `git init` を行い、メインシステムとは独立した歴史を持つ。これにより、試行錯誤の過程がシステムコアを汚染することを物理的に防止する。
 
-1. `risk_level` が 4（本番変更）以上の場合。
-2. 注入パスが現在のロールに許可されていない場合。
-3. 未知のエラーが発生し、大脳による再戦略が必要な場合。
+### 3.2 チェックポイント (Checkpoint)
+主要なタスクの完了ごとに `checkpoint` コマンドを実行し、ミッション固有の歴史に刻む。失敗時には、メインシステムに影響を与えることなく、ミッション内部の状態のみを過去のチェックポイントへロールバック可能。
 
-## 4. 自律修復と学習 (Self-Healing & Learning)
+## 4. 証跡とエビデンス (Hybrid Ledger)
 
-実行失敗時、大脳は以下の順序で「反射の正常化」を試みる。
-
-1.  **パラメータ再調整 (Re-Configuration)**:
-    ナレッジを再探索し、`static_params` または `knowledge_injections` を修正して再実行する。
-2.  **外科的パッチ (Live Patching)**:
-    エラーログから既存スキルのスクリプト（JS/TS等）のバグを特定した場合、`replace` や `write_file` を用いて直接ソースコードを修正・改善する。**新規スキルの作成よりも、既存スキルの進化を優先する。**
-3.  **スキル新造 (Autonomous Design)**:
-    既存スキルの機能不足が致命的であり、パッチでは対応不能な場合に限り、`autonomous-skill-designer` を用いて新スキルを設計する。
-4.  **不承認からの学習 (Sovereign Alignment)**:
-    人間に `sudo` またはプランを却下された場合、その理由を `knowledge/personal/constraints.md` に記録し、以降の「思考」における禁止事項として永続化する。
+- **Evidence Vault**: 実行結果、ログ、中間生成物はすべて `[MISSION_ID]/evidence/` に集約される。
+- **Global Ledger**: システム全体のイベント（誰が、いつ、どのミッションを動かしたか）のみを中央台帳に記録。
+- **Mission Ledger**: 具体的な引数や処理の詳細は、ミッション内の機密境界に閉じたレジャーに記録。

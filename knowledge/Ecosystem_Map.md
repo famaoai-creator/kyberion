@@ -15,15 +15,16 @@ last_updated: 2026-03-10
 
 エコシステムは以下の4つの主要層（Tier）で構成される。
 
-| 層 (Tier) | ディレクトリ | 役割・用途 | Git管理 | 機密レベル |
+| 層 (Tier) | ディレクトリ | 役割・用途 | Git管理 (メイン) | 機密レベル |
 | :--- | :--- | :--- | :--- | :--- |
 | **Hub** | `hub/imports/` | 外部からのミッション/データ搬入口 | No | Confidential |
 | | `hub/exports/` | 成果物・レポートの外部搬出口 | No | Confidential |
 | **Knowledge** | `knowledge/personal/` | 主権者のアイデンティティ・ビジョン | **No** | **Secret** |
 | | `knowledge/confidential/` | ミッション固有の機密知識 | No | Confidential |
 | | `knowledge/public/` | 共有プロトコル・公開ナレッジ | Yes | Public |
-| **Mission** | `active/missions/` | 実行中のミッションの状態と契約 | No | Confidential |
-| | `[MISSION_ID]/evidence/` | ミッション実行の証拠・ログ（Tierを継承） | No/Yes | Tier-Dependent |
+| **Mission** | `active/missions/` | **[Tiered]** 各ミッションの実行領域 | **No** | Tier-Dependent |
+| | `[MISSION_ID]/.git/` | **独立履歴 (Micro-Git)**: 各ミッション固有のリポジトリ | **No** | Tier-Dependent |
+| | `[MISSION_ID]/evidence/` | ミッション実行の証拠・詳細ログ | No | Tier-Dependent |
 | | `[MISSION_ID]/evidence/ledger.jsonl` | ミッション固有の詳細な実行台帳 | No | Tier-Dependent |
 | | `work/` | 大規模データ処理用ワークスペース | No | Internal |
 | | `scratch/` | 一時的なスクリプト・実験場 | No | Internal |

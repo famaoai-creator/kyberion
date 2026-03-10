@@ -11,15 +11,20 @@ last_updated: 2026-03-06
 
 本モノレポの全スキルが遵守すべき、ナレッジの階層構造と取り扱い基準。
 
-## 1. ナレッジの階層 (Tier)
+## 1. ナレッジおよびミッションの階層 (Tier)
 
-1. **Public Tier (`knowledge/`)**: 汎用基準。GitHub同期。
-2. **Confidential Tier (`knowledge/confidential/`)**: 会社・プロジェクト共有の秘密。外部Git管理。
+1. **Public Tier (`knowledge/`, `active/missions/public/`)**: 汎用基準。GitHub同期。
+2. **Confidential Tier (`knowledge/confidential/`, `active/missions/confidential/`)**: 会社・プロジェクト共有の秘密。外部Git管理。
    - **Skill-Specific**: `.../skills/<skill-name>/`
-   - **Client-Specific**: `.../clients/<client-name>/` (特定のクライアント固有の規約)
-3. **Personal Tier (`knowledge/personal/`)**: 完全にローカル。**Git管理禁止**。個人の秘密鍵、APIキー、個人用メモ。
+   - **Client-Specific**: `.../clients/<client-name>/`
+3. **Personal Tier (`knowledge/personal/`, `knowledge/personal/missions/`)**: 完全にローカル。**メインGit管理禁止**。個人の秘密鍵、APIキー、主権者の「魂」。
 
-## 2. スキルの行動原則 (Core Logic)
+## 2. ティアの自動判定と隔離 (Isolation Enforcement)
+
+- **ミッション・ティアの継承**: ミッションが参照する `knowledge_injections` に上位ティアのパスが含まれる場合、ミッション自体の実行ティアも自動的に引き上げられる。
+- **独立履歴 (Micro-Git)**: 各ミッションはディレクトリ内に独自の `.git` を持ち、メインリポジトリの歴史から物理的に隔離される。これにより、試行錯誤の過程や機密データがメインリポジトリに混入することを防止する。
+
+## 3. スキルの行動原則 (Core Logic)
 
 - **優先順位 (Precedence)**: 同じ定義がある場合、以下の順で優先適用する。
   1. **Personal Tier** (個人の設定が最優先)
