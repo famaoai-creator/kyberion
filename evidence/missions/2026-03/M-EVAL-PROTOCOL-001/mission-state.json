@@ -1,7 +1,0 @@
-{
-  "mission_id": "M-EVAL-PROTOCOL-001",
-  "status": "active",
-  "priority": 6,
-  "tenant_id": "default",
-  "vision_ref": "/vision/_default.md"
-}

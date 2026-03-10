@@ -46,6 +46,7 @@ Immediately upon session initialization, the agent MUST determine its active pha
 ### ④ Mission Execution
 *   **Goal**: Accomplishment of physical changes and absolute validation.
 *   **Directive**: **The Absolute Rule of One**. Fix exactly one location at a time and test immediately. Micro-tasking is the only defense against large-scale system collapse.
+*   **Dynamic Re-Alignment**: If significant obstacles arise, or if a superior strategic path is discovered during execution, the agent MUST pause execution and return to **③ Alignment** to synchronize intent and update the Victory Conditions with the Sovereign.
 *   **Ref**: `knowledge/governance/phases/execution.md`
 
 ### ⑤ Review & Distillation

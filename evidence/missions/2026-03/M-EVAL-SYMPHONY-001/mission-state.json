@@ -1,8 +1,0 @@
-{
-  "mission_id": "M-EVAL-SYMPHONY-001",
-  "type": "evaluation",
-  "status": "active",
-  "priority": 7,
-  "tenant_id": "default",
-  "vision_ref": "/vision/_default.md"
-}

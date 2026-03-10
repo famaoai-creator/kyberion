@@ -1,8 +1,0 @@
-{
-  "name": "Login Repro",
-  "steps": [
-    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-001/repro/login.html" },
-    { "action": "login", "connection_id": "test-service", "reasoning": "Try to login automatically" },
-    { "action": "extract", "save_path": "login_status.txt" }
-  ]
-}

@@ -1,9 +1,0 @@
-{
-  "name": "Drag & Drop Repro",
-  "steps": [
-    { "action": "goto", "url": "file:///Users/famaoai/gemini/skills/github/active/missions/M-BROWSER-SURGERY-003/repro/drag_drop.html" },
-    { "action": "drag_and_drop", "locator": "#drag", "target_locator": "#drop", "reasoning": "Drag red box to dash box" },
-    { "action": "wait", "ms": 1000 },
-    { "action": "extract", "save_path": "drag_result.txt" }
-  ]
-}
