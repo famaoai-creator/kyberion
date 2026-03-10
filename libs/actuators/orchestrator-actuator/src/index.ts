@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, resolveVars, evaluateCondition } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, resolveVars, evaluateCondition, withRetry } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -127,7 +127,9 @@ async function opCapture(op: string, params: any, ctx: any) {
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
     case 'shell':
-      return { ...ctx, [params.export_as || 'last_capture']: safeExec(resolveVars(params.cmd, ctx)).trim() };
+      const cmd = resolveVars(params.cmd, ctx);
+      const shellResult = await withRetry(async () => safeExec(cmd), params.retry || { maxRetries: 2 });
+      return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
     case 'intent_detect':
       const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), { encoding: 'utf8' }) as string) as any;
       const query = resolveVars(params.query, ctx).toLowerCase();
@@ -164,7 +166,9 @@ async function opApply(op: string, params: any, ctx: any) {
       const out = path.resolve(rootDir, resolveVars(params.path, ctx));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
       if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      await withRetry(async () => {
+        safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      }, params.retry || { maxRetries: 3 });
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true }); break;
     case 'symlink':
@@ -175,8 +179,10 @@ async function opApply(op: string, params: any, ctx: any) {
       fs.symlinkSync(path.relative(path.dirname(target), source), target, params.type || 'dir');
       break;
     case 'git_checkpoint':
-      safeExec('git', ['add', '.'], { cwd: rootDir });
-      safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], { cwd: rootDir });
+      await withRetry(async () => {
+        safeExec('git', ['add', '.'], { cwd: rootDir });
+        safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], { cwd: rootDir });
+      }, { maxRetries: 2, initialDelayMs: 1000 });
       break;
     case 'log': logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
   }
