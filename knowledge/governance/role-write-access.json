@@ -3,7 +3,7 @@
   "default_allow": ["active/missions/${MISSION_ID}/", "scratch/", "work/metrics/"],
   "roles": {
     "ecosystem_architect": {
-      "allow": ["knowledge/", "libs/core/", "scripts/", "README.md", "CAPABILITIES_GUIDE.md", "CONTRIBUTING.md", "evidence/browser/"]
+      "allow": ["active/missions/", "knowledge/", "libs/core/", "scripts/", "README.md", "CAPABILITIES_GUIDE.md", "CONTRIBUTING.md", "evidence/browser/"]
     },
     "software_developer": {
       "allow": ["active/projects/", "tests/"]
