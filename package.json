@@ -93,6 +93,7 @@
     "mammoth": "^1.11.0",
     "marked": "^12.0.2",
     "node-pty": "^1.1.0",
+    "papaparse": "^5.5.3",
     "pdf-parse": "^2.4.5",
     "puppeteer": "^24.38.0",
     "sqlite3": "^5.1.7",

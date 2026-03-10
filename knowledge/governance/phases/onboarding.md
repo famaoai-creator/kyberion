@@ -1,25 +1,23 @@
 # Phase Protocol: ① Onboarding
 
 ## Goal
-Environment safety verification and identity synchronization.
+Environment safety verification and identity synchronization via physical manifestation.
 
 ## Directives
-1. **Identity Check**: Verify the existence and integrity of `knowledge/personal/my-identity.json`.
-2. **Tier Verification**: Ensure the 3-Tier directory structure (Personal, Confidential, Public) is correctly established.
-3. **Build Status**: Confirm ecosystem dependencies (`pnpm install`) and core artifacts (`dist/`) are present.
-4. **Environment Scanning**: Scan the environment and report any deficiencies immediately.
+1. **Identity Integrity**: Verify the existence of `knowledge/personal/my-identity.json`. If missing, the Sovereign must manually inject their identity as the automated wizard is in legacy migration.
+2. **Physical Infrastructure**: Ensure dependencies are managed via **pnpm**. `npm` is deprecated for this workspace due to `workspace:` protocol requirements.
+3. **Governance Activation**: Trigger the "System Onboarding" job defined in `knowledge/governance/orchestration-config.json` using `scripts/run_orchestration_job.ts`.
 
-## Constraints
-- **Identity Primacy**: Do not proceed if `my-identity.json` is missing; guide the user to `docs/INITIALIZATION.md`.
-- **Infrastructure First**: Never attempt standardization until the package manager and build pipeline are stable.
-
-## Physical Enforcement
-Before any mission or significant task, the agent MUST run the prerequisite scan.
-
-- **Automated Check**: `npx tsx scripts/mission_controller.ts start <ID>` (includes prerequisite scan).
+## Execution Path [L1]
+- **Action**: `npx pnpm install && npx tsx scripts/run_orchestration_job.ts`
 - **Validation**:
-  - Verification of `@agent/core` availability.
-  - Confirmation of 3-Tier isolation via `tier-guard.js`.
+  - Verification of `@agent/core` availability across all skills via symlink stabilization.
+  - Confirmation of 3-Tier isolation and build artifact generation in `dist/`.
+
+## Success Metrics [L3]
+- **Status**: `scripts/run_orchestration_job.ts` returns `status: "finished"`.
+- **Evidence**: `presence` services are active and reachable via `service_manager`.
 
 ---
 *Status: Mandated by GEMINI.md*
+*Last Updated: 2026-03-10 by Ecosystem Architect*

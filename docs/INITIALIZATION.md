@@ -1,49 +1,37 @@
-# Ecosystem Initialization Protocol (Sovereign Onboarding) v1.1
+# Ecosystem Initialization Protocol (Sovereign Onboarding) v2.1
 
-この文書は、新規ユーザー（主権者）が Kyberion エコシステムに参加し、自律的なエージェント環境を構築するための「おもてなし（Omotenashi）」と「物理的初期化」の全工程を定義する。
+この文書は、新規ユーザー（主権者）が Kyberion エコシステムに参加し、自律的なエージェント環境を物理的に起動し、自らの「魂」を注入するための全工程を定義する。
 
 ## 1. 概念的基盤 (The Soul)
-初期化は単なるセットアップではなく、**主権者とエージェントの調和フェーズ**である。**Sovereign Concierge** は、主権者が歓迎され、エンパワーされていると感じられるよう、以下のプロトコルを遵守する。
+初期化は、**「器（System）」の完成**と、その後の**「魂（Identity & Vision）」の注入**という二段階で構成される。器が完成していない状態での魂の注入は、情報の散逸（Directory Missing）を招くため、必ず物理的な安定化を先に行う。
 
-## 2. セットアップ手順 (The 4-Stage Manifestation)
+## 2. セットアップ手順 (The 3-Stage Manifestation)
 
-### Phase 1: Identity & Vision (npm run init)
-最初のステップは、主権者のアイデンティティの確立と「魂の注入（Vision Infusion）」である。
-- **Action**: `npm run init` を実行する。
-- **Content**:
-    - 職業ドメイン（エンジニアリング、経営、セールス等）の選択。
-    - 具体的なロール（Ecosystem Architect, Strategic Sales 等）の選択。
-    - **Vision Infusion**: 主権者が自身のビジョンをエージェントに語り、`knowledge/personal/my-vision.md` (魂) を生成する。
-    - `knowledge/personal/my-identity.json` (属性) の生成。
-    - `active/shared/governance/session.json` (状態) の生成。
+### Stage 1: Physical Foundation (pnpm install)
+エコシステムを「休眠状態」から「活性化状態」へ移行させる。
+- **Action**: `npx pnpm install` を実行する。
+- **Effect**: 物理的な依存関係と、`workspace:` プロトコルによる内部リンクが確立される。
 
-### Phase 2: Physical Manifestation (npm run build)
-エコシステムは TypeScript で記述されており、実行にはコンパイル（脳細胞の生成）が必要である。
-- **Action**: `npm install && npm run build` を実行する。
-- **Effect**: `dist/` フォルダが生成され、エージェントが各スキルやスクリプトを「反射」的に実行可能になる。
-- **Mandate**: `dist/` はソース管理対象外であり、初期化時や更新時には必ず再ビルドが必要である。
+### Stage 2: System Manifestation (Orchestration Job)
+ガバナンスに定義されたパイプラインを実行し、ディレクトリ構造の確立とビルドを完遂させる。
+- **Action**: `npx tsx scripts/run_orchestration_job.ts` を実行する。
+- **Effect**:
+    - 全スキルのリンク再構築。
+    - 全ワークスペースのビルド（`dist/` の生成）。
+    - サービス群（`presence`）の起動。
+    - これにより、`knowledge/personal/` を含む全ティアのディレクトリが物理的に保障される。
 
-### Phase 3: Visionary Sight (npm run vision:start)
-エージェントに「現在の状況」を把握させるため、視覚バッファを有効化する。
-- **Action**: `npm run vision:start` を実行する。
-- **Effect**: `visual-buffer-daemon` が起動し、1秒に1回のペースで画面バッファ（最新10フレーム）を `active/shared/runtime/vision/frames/` に保持し始める。
-- **Security**: 撮影はローカルに閉じ、エージェントの推論と自動化の成功判定のみに使用される。
+### Stage 3: Identity & Vision Infusion (Sovereign Concierge Hearing)
+器が完成したエコシステムに、主権者の「意志」を宿す。
+- **Action**: **Sovereign Concierge** ロールによるヒアリング対話を開始する。
+- **Process**:
+    - コンシェルジュが主権者の職業ドメイン、価値観、達成したいビジョンを問う。
+    - 対話の結果に基づき、`knowledge/personal/my-identity.json` および `my-vision.md` を自動生成する。
+    - これにより、エコシステムは「誰のために、何のために動くのか」を理解する。
 
-### Phase 4: First Mission (The Navigator)
-環境が整ったら、最初の任務を開始する。
-- **Action**: `npm run mission:create INITIAL-MAP` を実行する。
-- **First Task**: コンシェルジュの案内で `codebase-mapper` を実行し、自分自身の構造をエージェントに教え込む。
+## 3. Victory Condition
+オンボーディングは、主権者がコンシェルジュとの対話を終え、`knowledge/personal/my-identity.json` が物理的に生成され、エコシステムが主権者の個性に適応（Alignment）した時点で完了とする。
 
-## 3. Directory Standard (The Physical Shield)
-初期化により、以下の 3-Tier Sovereign Directory が自動生成される：
-
-| ディレクトリ | 役割 |
-| :--- | :--- |
-| `knowledge/` | AIが解釈・蒸留した「知識資産」。(Public/Confidential/Personal) |
-| `vault/` | 参照専用の「原典データ」。(Read-only) |
-| `active/` | 現在進行中の設計書、プロトタイプ、開発成果物、ミッションログ。 |
-| `scratch/` | 一時的な検証スクリプト。 |
-| `presence/` | ターミナル、センサー、ブリッジ等の外部接続層。 |
-
-## 4. Victory Condition
-オンボーディングは、主権者が「コンシェルジュの案内なしでも、自分の意志でミッションを組み立て、エビデンスを確認できる」と確信した時点で完了とする。
+---
+*Signed,*
+**Kyberion Ecosystem Architect**
