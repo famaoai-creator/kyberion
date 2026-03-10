@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Mission State Protocol (MSP) v1.0",
+  "title": "Mission State Protocol (MSP) v2.0",
   "type": "object",
   "required": [
     "mission_id",
@@ -15,7 +15,7 @@
     },
     "version": {
       "type": "string",
-      "default": "1.0"
+      "default": "2.0"
     },
     "status": {
       "type": "string",
@@ -24,10 +24,52 @@
         "planned",
         "active",
         "paused",
-        "done",
+        "validating",
+        "distilling",
+        "completed",
         "failed",
         "archived"
       ]
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": [
+        "local",
+        "delegated"
+      ],
+      "default": "local"
+    },
+    "delegation": {
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "a2a_message_id": {
+          "type": "string"
+        },
+        "remote_repo_url": {
+          "type": "string"
+        },
+        "last_sync_ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verification_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "verified",
+            "rejected"
+          ]
+        },
+        "evidence_hashes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
     },
     "priority": {
       "type": "integer",

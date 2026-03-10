@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
+import chalk from 'chalk';
 import { 
   logger, 
   pathResolver, 
@@ -79,7 +80,37 @@ async function runOnboarding() {
 
   console.log('\n✅ Sovereign Identity established successfully!');
   console.log(`Saved to: ${identityPath}\n`);
-  
+
+  // --- NEW: Agent Greeting & Naming ---
+  console.log('--------------------------------------------------');
+  console.log('🤖 Agent Greeting & Naming Ceremony');
+  console.log('--------------------------------------------------');
+  console.log('\nNice to meet you, ' + name + '. I am your autonomous partner.');
+  console.log('To collaborate with other agents (A2A) and record immutable evidence,');
+  console.log('I also require a formal Agent ID.\n');
+
+  const proposedAgentId = 'KYBERION-PRIME';
+  console.log(`I propose the Agent ID: [${chalk.bold.cyan(proposedAgentId)}]`);
+  const agentNameChoice = await ask(`Accept this name or provide a new one? (Enter to accept / [Name]): `);
+  const finalAgentId = (agentNameChoice || proposedAgentId).toUpperCase();
+
+  const agentIdentity = {
+    agent_id: finalAgentId,
+    version: '1.0.0',
+    role: 'Ecosystem Architect / Senior Partner',
+    owner: name,
+    trust_tier: 'sovereign',
+    created_at: new Date().toISOString(),
+    description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.`
+  };
+
+  const agentIdentityPath = path.join(personalDir, 'agent-identity.json');
+  safeWriteFile(agentIdentityPath, JSON.stringify(agentIdentity, null, 2));
+
+  console.log(`\n✨ Agent Identity established: ${chalk.bold.green(finalAgentId)}`);
+  console.log(`Saved to: ${agentIdentityPath}\n`);
+  // ------------------------------------
+
   console.log('Next steps:');
   console.log('1. Run missions with: pnpm mission:create');
   console.log('2. Check health with: pnpm vital');

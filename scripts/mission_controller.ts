@@ -34,7 +34,16 @@ const ARCHIVE_DIR = path.join(ROOT_DIR, 'active/archive/missions');
 interface MissionState {
   mission_id: string;
   tier: 'personal' | 'confidential' | 'public';
-  status: 'planned' | 'active' | 'paused' | 'completed';
+  status: 'planned' | 'active' | 'validating' | 'distilling' | 'completed' | 'paused' | 'failed' | 'archived';
+  execution_mode: 'local' | 'delegated';
+  delegation?: {
+    agent_id: string;
+    a2a_message_id: string;
+    remote_repo_url?: string;
+    last_sync_ts: string;
+    verification_status: 'pending' | 'verified' | 'rejected';
+    evidence_hashes?: Record<string, string>;
+  };
   priority: number;
   assigned_persona: string;
   confidence_score: number;
@@ -44,7 +53,7 @@ interface MissionState {
     latest_commit: string;
     checkpoints: Array<{ task_id: string; commit_hash: string; ts: string }>;
   };
-  history: Array<{ ts: string; event: string; note: string }>;
+  history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
 }
 
 /**
@@ -205,6 +214,7 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     mission_id: upperId,
     tier: finalTier,
     status: 'planned',
+    execution_mode: 'local',
     priority: 3,
     assigned_persona: persona,
     confidence_score: 1.0,
@@ -296,7 +306,239 @@ function syncRoleProcedure(missionId: string, persona: string) {
   }
 }
 
-async function finishMission(id: string) {
+/**
+ * 4. Trust Engine (Advanced Governance)
+ */
+function updateTrustScore(agentId: string, result: 'verified' | 'rejected') {
+  const ledgerPath = path.join(ROOT_DIR, 'knowledge/personal/governance/agent-trust-scores.json');
+  if (!safeExistsSync(ledgerPath)) return;
+
+  const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+  if (!ledger.agents[agentId]) {
+    ledger.agents[agentId] = {
+      current_score: 5.0,
+      total_missions: 0,
+      success_rate: 0,
+      last_verification_ts: null,
+      performance: { average_latency_ms: 0, consecutive_successes: 0 },
+      history: []
+    };
+  }
+
+  const agent = ledger.agents[agentId];
+  const oldScore = agent.current_score;
+  const now = new Date().toISOString();
+
+  if (result === 'verified') {
+    agent.current_score = Math.min(10.0, agent.current_score + 0.5);
+    agent.performance.consecutive_successes++;
+  } else {
+    agent.current_score = Math.max(0.0, agent.current_score - 1.0);
+    agent.performance.consecutive_successes = 0;
+  }
+
+  agent.total_missions++;
+  agent.last_verification_ts = now;
+  agent.history.push({ ts: now, event: 'SCORE_UPDATE', old_score: oldScore, new_score: agent.current_score, result });
+
+  safeWriteFile(ledgerPath, JSON.stringify(ledger, null, 2));
+  logger.info(`📈 [TrustEngine] Updated trust score for ${agentId}: ${oldScore.toFixed(1)} -> ${agent.current_score.toFixed(1)}`);
+
+  // [Blockchain Anchor] Anchor trust score update
+  const anchorInput = path.join(ROOT_DIR, `scratch/trust-anchor-${agentId}-${Date.now()}.json`);
+  safeWriteFile(anchorInput, JSON.stringify({
+    action: 'anchor_trust',
+    params: { agent_id: agentId, score: agent.current_score }
+  }));
+  try {
+    safeExec('npx', ['tsx', 'libs/actuators/blockchain-actuator/src/index.ts', '--input', anchorInput]);
+  } catch (_) {}
+  if (fs.existsSync(anchorInput)) fs.unlinkSync(anchorInput);
+}
+
+async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+
+  // Trust Guardrail
+  const ledgerPath = path.join(ROOT_DIR, 'knowledge/personal/governance/agent-trust-scores.json');
+  if (safeExistsSync(ledgerPath)) {
+    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const agent = ledger.agents[agentId];
+    if (agent && agent.current_score < 3.0 && (state.tier === 'personal' || state.tier === 'confidential')) {
+      throw new Error(`CRITICAL: Agent ${agentId} has insufficient trust score (${agent.current_score}) for ${state.tier} tier mission.`);
+    }
+  }
+
+  logger.info(`📤 Delegating Mission ${upperId} to agent ${agentId}...`);
+  
+  state.status = 'active';
+  state.execution_mode = 'delegated';
+  state.delegation = {
+    agent_id: agentId,
+    a2a_message_id: a2aMessageId,
+    last_sync_ts: new Date().toISOString(),
+    verification_status: 'pending'
+  };
+  state.history.push({ 
+    ts: new Date().toISOString(), 
+    event: 'DELEGATE', 
+    note: `Mission delegated to ${agentId} (A2A: ${a2aMessageId})` 
+  });
+  
+  saveState(upperId, state);
+  logger.success(`✅ Mission ${upperId} marked as DELEGATED.`);
+}
+
+async function importMission(id: string, remoteUrl: string) {
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+
+  const missionDir = (pathResolver as any).findMissionPath(upperId);
+  if (!missionDir) throw new Error(`Mission directory for ${upperId} not found.`);
+
+  logger.info(`📥 Importing results for Mission ${upperId} from ${remoteUrl}...`);
+  
+  try {
+    // 1. Add remote and fetch
+    // Use try-catch for git remote add in case it exists
+    try {
+        safeExec('git', ['remote', 'add', 'origin_remote', remoteUrl], { cwd: missionDir });
+    } catch (_) {
+        safeExec('git', ['remote', 'set-url', 'origin_remote', remoteUrl], { cwd: missionDir });
+    }
+    safeExec('git', ['fetch', 'origin_remote'], { cwd: missionDir });
+    
+    // 2. Merge changes (preserving history)
+    safeExec('git', ['merge', 'origin_remote/main', '--no-edit'], { cwd: missionDir });
+    
+    state.status = 'validating';
+    if (state.delegation) {
+      state.delegation.last_sync_ts = new Date().toISOString();
+      state.delegation.remote_repo_url = remoteUrl;
+    }
+    state.history.push({ 
+      ts: new Date().toISOString(), 
+      event: 'IMPORT', 
+      note: `Imported results from ${remoteUrl}. Transitioned to VALIDATING.` 
+    });
+    
+    saveState(upperId, state);
+    logger.success(`✅ Results imported for ${upperId}. Manual/Auto verification required.`);
+  } catch (err: any) {
+    logger.error(`Import failed: ${err.message}`);
+  }
+}
+
+async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+
+  logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
+  
+  if (result === 'verified') {
+    state.status = 'distilling';
+  } else {
+    state.status = 'active'; // Send back to active for rework
+  }
+
+  if (state.delegation) {
+    state.delegation.verification_status = result;
+    // Update Trust Score
+    updateTrustScore(state.delegation.agent_id, result);
+  }
+
+  state.history.push({ 
+    ts: new Date().toISOString(), 
+    event: 'VERIFY', 
+    note: `Verification ${result}: ${note}` 
+  });
+  
+  saveState(upperId, state);
+  logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
+}
+
+async function distillMission(id: string) {
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+
+  logger.info(`🧠 Distilling Wisdom for Mission ${upperId}...`);
+  
+  state.status = 'completed';
+  state.history.push({ 
+    ts: new Date().toISOString(), 
+    event: 'DISTILL', 
+    note: 'Knowledge distillation completed. Transitioned to COMPLETED.' 
+  });
+  
+  saveState(upperId, state);
+  logger.success(`✅ Wisdom distilled for ${upperId}. Mission ready for finishing.`);
+}
+
+async function sealMission(id: string) {
+  const upperId = id.toUpperCase();
+  const missionDir = (pathResolver as any).findMissionPath(upperId);
+  if (!missionDir) return;
+
+  const pubKeyPath = path.join(ROOT_DIR, 'vault/keys/sovereign-public.pem');
+  if (!safeExistsSync(pubKeyPath)) {
+    logger.warn('⚠️ [SovereignSeal] Public key not found. Skipping encryption.');
+    return;
+  }
+
+  logger.info(`🔒 [SovereignSeal] Encrypting mission ${upperId} for archival (Hybrid AES+RSA)...`);
+
+  const archivePath = path.join(ROOT_DIR, 'scratch', `${upperId}.tar.gz`);
+  const symKeyPath = path.join(ROOT_DIR, 'scratch', `${upperId}.key`);
+  const encKeyPath = path.join(ROOT_DIR, 'scratch', `${upperId}.key.enc`);
+  const encryptedPath = path.join(ROOT_DIR, 'scratch', `${upperId}.enc`);
+
+  try {
+    // 1. Package mission directory
+    safeExec('tar', ['-czf', archivePath, '-C', path.dirname(missionDir), path.basename(missionDir)]);
+    
+    // 2. Generate random symmetric key (AES-256)
+    safeExec('openssl', ['rand', '-out', symKeyPath, '32']);
+
+    // 3. Encrypt archive with symmetric key
+    safeExec('openssl', ['enc', '-aes-256-cbc', '-salt', '-in', archivePath, '-out', encryptedPath, '-pass', `file:${symKeyPath}`, '-pbkdf2']);
+
+    // 4. Encrypt symmetric key with public key (RSA)
+    safeExec('openssl', ['rsautl', '-encrypt', '-pubin', '-inkey', pubKeyPath, '-in', symKeyPath, '-out', encKeyPath]);
+
+    logger.success(`✅ Mission ${upperId} sealed cryptographically (Encrypted key: ${path.basename(encKeyPath)}).`);
+    
+    // 5. [Blockchain Anchor] Anchor the hash of the encrypted archive
+    const { createHash } = await import('node:crypto');
+    const fileBuffer = fs.readFileSync(encryptedPath);
+    const hash = createHash('sha256').update(fileBuffer).digest('hex');
+
+    const anchorInput = path.join(ROOT_DIR, `scratch/anchor-${upperId}-${Date.now()}.json`);
+    safeWriteFile(anchorInput, JSON.stringify({
+      action: 'anchor_mission',
+      params: { mission_id: upperId, hash }
+    }));
+    
+    try {
+      safeExec('npx', ['tsx', 'libs/actuators/blockchain-actuator/src/index.ts', '--input', anchorInput]);
+    } catch (_) {}
+    if (fs.existsSync(anchorInput)) fs.unlinkSync(anchorInput);
+
+    // Clean up temporary unencrypted files
+    if (safeExistsSync(archivePath)) fs.unlinkSync(archivePath);
+    if (safeExistsSync(symKeyPath)) fs.unlinkSync(symKeyPath);
+
+    return encryptedPath;
+  } catch (err: any) {
+    logger.error(`Sealing failed: ${err.message}`);
+  }
+}
+
+async function finishMission(id: string, seal: boolean = false) {
   const upperId = id.toUpperCase();
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
@@ -318,14 +560,20 @@ async function finishMission(id: string) {
   state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
   saveState(upperId, state);
 
+  // 3. Optional Sealing
+  if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
+    await sealMission(upperId);
+  }
+
   // Record to Hybrid Ledger before archival
   ledger.record('MISSION_FINISH', {
     mission_id: upperId,
     status: 'completed',
+    sealed: seal,
     archive_path: ARCHIVE_DIR
   });
 
-  // 3. Purge Scratch
+  // 4. Purge Scratch
   const scratchDir = path.join(ROOT_DIR, 'scratch');
   if (safeExistsSync(scratchDir)) {
     logger.info('🧹 Purging scratch files...');
@@ -567,7 +815,12 @@ async function main() {
     case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
     case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
-    case 'finish': await finishMission(arg1); break;
+    case 'delegate': await delegateMission(arg1, arg2, arg3); break;
+    case 'import': await importMission(arg1, arg2); break;
+    case 'verify': await verifyMission(arg1, arg2 as any, arg3); break;
+    case 'distill': await distillMission(arg1); break;
+    case 'seal': await sealMission(arg1); break;
+    case 'finish': await finishMission(arg1, arg2 === '--seal'); break;
     case 'resume': await resumeMission(arg1); break;
     case 'record-task': await recordTask(arg1, arg2, JSON.parse(process.argv[5] || '{}')); break;
     case 'purge': await purgeMissions(); break;

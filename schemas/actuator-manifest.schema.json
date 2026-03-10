@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Actuator Capability Manifest",
+  "type": "object",
+  "required": ["actuator_id", "version", "capabilities"],
+  "properties": {
+    "actuator_id": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op", "platforms"],
+        "properties": {
+          "op": { "type": "string" },
+          "platforms": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["darwin", "linux", "win32"] }
+          },
+          "requirements": {
+            "type": "object",
+            "properties": {
+              "bin": { "type": "array", "items": { "type": "string" } },
+              "lib": { "type": "array", "items": { "type": "string" } },
+              "env": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

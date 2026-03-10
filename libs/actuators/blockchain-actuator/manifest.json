@@ -1,0 +1,17 @@
+{
+  "actuator_id": "blockchain-actuator",
+  "version": "1.0.0",
+  "description": "Immutable Ledger Anchoring System",
+  "capabilities": [
+    {
+      "op": "anchor_mission",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {}
+    },
+    {
+      "op": "anchor_trust",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {}
+    }
+  ]
+}

@@ -4,7 +4,7 @@ category: General
 tags: [ecosystem, map, architecture, security, governance]
 importance: 10
 author: Kyberion Sovereign Entity
-last_updated: 2026-03-10
+last_updated: 2026-03-11
 ---
 
 # Kyberion Ecosystem Map
@@ -17,41 +17,38 @@ last_updated: 2026-03-10
 
 | 層 (Tier) | ディレクトリ | 役割・用途 | Git管理 (メイン) | 機密レベル |
 | :--- | :--- | :--- | :--- | :--- |
-| **Hub** | `hub/imports/` | 外部からのミッション/データ搬入口 | No | Confidential |
-| | `hub/exports/` | 成果物・レポートの外部搬出口 | No | Confidential |
-| **Knowledge** | `knowledge/personal/` | 主権者のアイデンティティ・ビジョン | **No** | **Secret** |
-| | `knowledge/confidential/` | ミッション固有の機密知識 | No | Confidential |
+| **Knowledge** | `knowledge/personal/` | 主権者の魂（アイデンティティ）・秘密鍵 | **No** | **Sovereign Secret** |
+| | `knowledge/confidential/` | 組織の機密知識・ビジネスロジック | No | Confidential |
 | | `knowledge/public/` | 共有プロトコル・公開ナレッジ | Yes | Public |
-| **Mission** | `active/missions/` | **[Tiered]** 各ミッションの実行領域 | **No** | Tier-Dependent |
-| | `[MISSION_ID]/.git/` | **独立履歴 (Micro-Git)**: 各ミッション固有のリポジトリ | **No** | Tier-Dependent |
-| | `[MISSION_ID]/evidence/` | ミッション実行の証拠・詳細ログ | No | Tier-Dependent |
-| | `[MISSION_ID]/evidence/ledger.jsonl` | ミッション固有の詳細な実行台帳 | No | Tier-Dependent |
-| | `work/` | 大規模データ処理用ワークスペース | No | Internal |
-| | `scratch/` | 一時的なスクリプト・実験場 | No | Internal |
-| **System** | `active/audit/system-ledger.jsonl` | システム全体のメタデータ台帳（Hybrid Ledger） | No | Internal |
-| | `libs/` | コアロジック・アクチュエータ | Yes | Public/Code |
-| | `presence/` | 外部センサー・インターフェース | Yes | Internal/Code |
-| | `satellites/` | 外部サービス連携用ブリッジ | Yes | Internal/Code |
-| | `vault/mounts/` | セキュアな外部ストレージマウント | No | Secret |
+| **Mission** | `active/missions/` | 各ミッションの実行領域 | **No** | Tier-Dependent |
+| | `[MISSION_ID]/.git/` | **独立履歴 (Micro-Git)**: 物理的に隔離された履歴 | **No** | Tier-Dependent |
+| | `active/archive/` | 完了したミッションの保管庫（暗号化封印対応） | No | Tier-Dependent |
+| **System** | `active/audit/` | **不変台帳**: Hybrid Ledger & Mock Blockchain | No | Internal |
+| | `libs/actuators/` | 物理実行エンジン（能力申告マニフェスト付き） | Yes | Public/Code |
+| | `libs/core/` | 統治ロジック・神経系コア | Yes | Internal/Code |
+| | `vault/keys/` | 主権者公開鍵・Keychain連携秘密鍵 | No | Secret |
 
-## 2. Data Flow (Operational Layer)
+## 2. Dynamic Governance Flow (Operational Layer)
 
 ```mermaid
-graph LR
-    External((External World)) -->|Import| HubIn[hub/imports]
-    HubIn -->|Initialize| Active[active/missions]
-    Active -->|Execute| Work[work/scratch]
-    Active -->|Update| Knowledge[knowledge/confidential]
-    Active -->|Export| HubOut[hub/exports]
-    HubOut -->|Deliver| External
-    
-    Identity[(knowledge/personal)] -.->|Guide| Active
-    PublicProtocol[knowledge/public] -->|Standard| Active
+graph TD
+    Intent((Sovereign Intent)) --> Orchestrator[Orchestrator]
+    Orchestrator --> Discovery{Capability Discovery}
+    Discovery -->|Match| MC[Mission Controller]
+    MC -->|Start| Mission[Active Mission]
+    Mission -->|Execute| Actuators[Actuators: Secret/Blockchain/etc.]
+    Mission -->|Verify| Trust[Trust Engine]
+    Trust -->|Score Update| Blockchain[Blockchain Anchor]
+    Mission -->|Finish| Seal[Sovereign Seal: AES+RSA]
+    Seal --> Archive[Encrypted Archive]
 ```
 
-## 3. Knowledge Relationships (Logic Layer)
+## 3. Core Governance Components
 
-ナレッジ間の依存関係は、各ディレクトリ内の `README.md` および `_index.md` を参照せよ。主要なプロトコルは `knowledge/public/governance/` に集約されている。
+- **Sovereign Shield**: 独立した Micro-Git リポジトリによる、ミッション間の物理的な履歴隔離。
+- **Trust Engine**: エージェントの実績に基づく動的スコアリングと、委託制限ガードレール。
+- **Blockchain Anchor**: 全ミッションの指紋（ハッシュ）をブロックチェーンに刻印し、不変性を担保。
+- **Secret Bridge**: OS（macOS Keychain等）と連携し、秘密情報をメモリ外に永続化させない仕組み。
 
 ---
-*Status: Verified by Sovereign Onboarding v1.0*
+*Status: Verified by Sovereign Architecture v2.0*

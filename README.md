@@ -1,112 +1,84 @@
 # 🌌 Kyberion: The Sovereign Operating Ecosystem
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
+[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
 
-**Kyberion** is a high-fidelity **Sovereign Operating Ecosystem** designed to manifest digital reality through the safest and most efficient path. It is an autonomous partner—a **Sovereign Entity** that evolves through a unified nerve system, intent-driven automation, and generic data pipelines.
-
----
-
-## 🏛 The Sovereign Charter (GEMINI.md)
-
-Kyberion operates under the **Sovereign Operating Charter**, a non-negotiable framework for autonomous action and environmental integrity:
-
-1. **Frictionless Engineering**: We eliminate engineering friction through automated feedback loops, pure ADF-driven execution, and "reflex-speed" coordination.
-2. **Intent-Driven Autonomy**: No more hardcoded scripts. Kyberion resolves high-level **Semantic Intents** into dynamic execution pipelines.
-3. **Physical Integrity**: All physical changes are governed by the **KSMC (Kyberion Sovereign Mission Controller)**, ensuring every action is transactional, reversible, and validated.
+**Kyberion** は、主権者（Sovereign）の意志をデジタル世界に具現化するための、高信頼性かつ自律的な **主権型OSエコシステム** です。単なる自動化ツールではなく、統一された神経系、意図駆動型の実行、そしてブロックチェーンによる不変の証跡を備えた「自律的なパートナー」として進化します。
 
 ---
 
-## 🧠 A2A Nerve Center Architecture
+## 🏛 主権者憲章 (GEMINI.md)
 
-Kyberion employs a unified **Nerve Center Model** powered by the **A2A (Agent-to-Agent) Protocol**:
+Kyberion は、非交渉的な統治フレームワークである **主権者憲章（GEMINI.md）** に基づいて動作し、環境の整合性と主権者の機密を絶対的に保護します：
 
-- **Super-Nerve Engine**: The central routing brain that orchestrates cross-actuator workflows.
-- **A2A Compliance**: All communication is encapsulated in A2A envelopes, ensuring full traceability, conversation context, and multi-agent coordination readiness.
-- **Universal Actuators (v2.1.x)**: Generic pipeline engines (System, File, Wisdom, Network, Browser, Code) that execute any ADF instruction with built-in **Control Flow (if/while)** and **Safety Guards**.
-
----
-
-## 🛡 Sovereign Governance (3-Tier Knowledge Model)
-
-Information is strictly segregated according to its sensitivity, enforced through a physical **Tier Guard** and **Isolated Mission History**:
-
-- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated. **Missions in this tier have independent Git repositories.**
-- **Confidential Tier (`active/missions/confidential/`)**: Organizational secrets and logic. Masked in public outputs.
-- **Public Tier (`active/missions/public/`)**: General standards and ecosystem protocols.
+1. **摩擦ゼロのエンジニアリング**: 自動フィードバックループと ADF 駆動の実行により、技術的な摩擦を排除。
+2. **意図駆動型自律性 (Intent-Driven)**: 抽象的な「意図」を動的な実行パイプラインへと自己解釈し解決。
+3. **物理的整合性と封印**: **KSMC (Sovereign Mission Controller)** が全変更を管理し、完了時には暗号学的に封印（Seal）可能。
 
 ---
 
-## 🛡 Sovereign Shield: Isolated Mission History
+## 🧠 進化したコア機能 (Advanced Capabilities)
 
-Kyberion ensures that mission activities never "pollute" the system core. Every mission operates within its own **independent Micro-Git repository**.
-- **System Stability**: Core logic remains on the `main` branch.
-- **Transactional Integrity**: Atomic checkpoints and rollbacks per mission.
-- **Absolute Privacy**: Mission history is physically stored in tiered folders, invisible to the main repository.
+### 1. 次世代ミッション・ライフサイクル
+5段階の厳格なステート管理（Planned, Active, Validating, Distilling, Completed）を導入し、A2A（Agent-to-Agent）プロトコルによる他者への委託・成果の統合をサポート。
 
----
+### 2. 動的信頼スコア・エンジン (Dynamic Trust Engine)
+他エージェントの実績（検証結果、遅延、精度）に基づき、信頼スコアをリアルタイムに更新。低スコアのエージェントに対する機密任務の委託を自動遮断するガードレール機能を搭載。
 
-## 🛡 Sovereign Lifecycle (The 5-Phase Protocol)
+### 3. 主権的封印 (Sovereign Seal)
+ミッション完了時に、実行履歴とエビデンスを **AES-256 + RSA ハイブリッド暗号** でアーカイブ。秘密鍵のパスフレーズは **macOS Keychain** 等の OS ネイティブ領域で安全に保護。
 
-Every mission follows a strict, autonomous lifecycle to ensure absolute reliability:
+### 4. 不変の証跡 (Blockchain Anchoring)
+重要なイベントや封印されたアーカイブのハッシュ値をブロックチェーンへアンカリング。ローカルの整合性（Hybrid Ledger）と外部の不変性を結合し、数学的な潔白証明を実現。
 
-1. **① Onboarding**: Safety verification and identity synchronization.
-2. **② Recovery**: Autonomous restoration from interruptions and self-healing logic.
-3. **③ Alignment**: Intent interpretation and JIT pipeline synthesis.
-4. **④ Execution**: The **Absolute Rule of One**. Micro-tasking via pipeline steps.
-5. **⑤ Review & Distillation**: Extraction of **Wisdom Assets** and environmental cleansing.
+### 5. 動的ケイパビリティ・ディスカバリー
+各アクチュエータが自身の能力（OS依存性、必要バイナリ）を自己申告。実行前に「その環境で何ができるか」を自動ネゴシエーションし、環境の断絶を未然に防止。
 
 ---
 
-## ⚙️ Transactional Interface (KSMC v2.0+)
-
-Autonomous labor is managed through high-level semantic commands and A2A messages:
+## ⚙️ 統治用コマンド (Sovereign Interface)
 
 ```bash
-# 🎯 Intent-Driven Execution (Recommended)
-npx tsx scripts/run_intent.ts <INTENT_ID>
+# 📜 ミッション・ジャーナルの閲覧 (全履歴の可視化)
+pnpm mission:journal
 
-# 📬 A2A Protocol Communication
-npx tsx scripts/run_a2a.ts --input <A2A_MESSAGE_JSON>
+# 🔍 現在の環境の能力診断 (OS依存性の確認)
+pnpm capabilities
 
-# 🧘 Strategic Reconciliation
-npx tsx scripts/run_wisdom_reconcile.ts
+# 🛡️ ミッションの開始と終了 (暗号化封印付き)
+npx tsx scripts/mission_controller.ts start MSN-ID personal
+npx tsx scripts/mission_controller.ts finish MSN-ID --seal
 
-# 🛡️ Mission Control (Transactional & Tiered)
-npx tsx scripts/mission_controller.ts start <MISSION_ID> <TIER> <PERSONA>
-npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "Note"
-npx tsx scripts/mission_controller.ts finish <MISSION_ID>
+# 🩺 エコシステム・バイタルチェック
+pnpm vital
 ```
 
 ---
 
-## 📊 Evidence-Driven Delivery
+## 🛡 3-Tier ガバナンス・モデル
 
-Kyberion provides physical evidence of its labor:
-- **Evidence Vault**: Detailed logs and execution results stored in `[MISSION_ID]/evidence/`.
-- **Hybrid Ledger**: Global metadata ledger linked to detailed mission-specific audit trails.
-- **Autonomy Score**: Ratio of autonomous goal achievement vs. human intervention.
-- **Pipeline Traceability**: Full A2A logs showing exactly how intents were resolved and executed.
-- **Structural Integrity**: Real-time pulse monitoring of ecosystem health and ledger validity.
+情報は機密性に応じて物理的に隔離され、独立した Git 履歴（Micro-Repo）によって管理されます：
+
+- **Personal Tier (`knowledge/personal/`)**: あなたの魂（ビジョン）と秘密鍵。完全に隔離。
+- **Confidential Tier (`active/missions/confidential/`)**: 組織の機密とビジネスロジック。
+- **Public Tier (`active/missions/public/`)**: 共通プロトコルと標準。
 
 ---
 
-## 🚀 Bootstrap Protocol
+## 🚀 ブートストラップ・プロトコル
 
-To manifest the Kyberion Entity in your environment:
+Kyberion をあなたの環境に具現化する手順：
 
 ```bash
-# 1. Establish the Physical Foundation
+# 1. 物理的基盤の確立
 git clone https://github.com/famaoai-creator/kyberion.git && cd kyberion
 pnpm install
 
-# 2. Align and Initiate (Interactive Setup)
+# 2. システムの具現化と初期化 (詳細: docs/INITIALIZATION.md)
+npx tsx scripts/run_orchestration_job.ts
 pnpm onboard
-
-# 3. Your First Mission
-npx tsx scripts/mission_controller.ts start MSN-STARTUP personal "Ecosystem Architect"
 ```
-
-[**View Procedures**](./knowledge/procedures/) | [**Read the Charter**](./GEMINI.md) | [**Explore the Map**](./knowledge/Ecosystem_Map.md)
 
 ---
 *「論理を尽くし、意志で決断し、エンジニアリングの摩擦をゼロにする。」*
