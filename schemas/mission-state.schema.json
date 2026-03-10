@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Mission State Protocol (MSP) v2.0",
+  "title": "Mission State Protocol (MSP) v2.1",
   "type": "object",
   "required": [
     "mission_id",
@@ -15,7 +15,7 @@
     },
     "version": {
       "type": "string",
-      "default": "2.0"
+      "default": "2.1"
     },
     "status": {
       "type": "string",
@@ -38,6 +38,27 @@
         "delegated"
       ],
       "default": "local"
+    },
+    "relationships": {
+      "type": "object",
+      "description": "Causal and dependency relationships with other missions.",
+      "properties": {
+        "prerequisites": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Missions that must be COMPLETED before this one starts."
+        },
+        "successors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Missions triggered or proposed after this one is COMPLETED."
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Missions that cannot run simultaneously with this one."
+        }
+      }
     },
     "delegation": {
       "type": "object",

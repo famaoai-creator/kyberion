@@ -36,6 +36,11 @@ interface MissionState {
   tier: 'personal' | 'confidential' | 'public';
   status: 'planned' | 'active' | 'validating' | 'distilling' | 'completed' | 'paused' | 'failed' | 'archived';
   execution_mode: 'local' | 'delegated';
+  relationships?: {
+    prerequisites?: string[];
+    successors?: string[];
+    blockers?: string[];
+  };
   delegation?: {
     agent_id: string;
     a2a_message_id: string;
@@ -157,7 +162,7 @@ function saveState(id: string, state: MissionState) {
 /**
  * 4. Mission Commands
  */
-async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect') {
+async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
   const upperId = id.toUpperCase();
   const templatePath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-templates.json');
   const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
@@ -215,6 +220,7 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     tier: finalTier,
     status: 'planned',
     execution_mode: 'local',
+    relationships: relationships,
     priority: 3,
     assigned_persona: persona,
     confidence_score: 1.0,
@@ -240,7 +246,25 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
   logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven).`);
 }
 
-async function startMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string) {
+/**
+ * 5. Dependency & Relationship Management
+ */
+function checkDependencies(missionId: string): { ok: boolean; missing: string[] } {
+  const state = loadState(missionId);
+  if (!state || !state.relationships?.prerequisites) return { ok: true, missing: [] };
+
+  const missing: string[] = [];
+  for (const pre of state.relationships.prerequisites) {
+    const preState = loadState(pre);
+    if (!preState || preState.status !== 'completed') {
+      missing.push(pre);
+    }
+  }
+
+  return { ok: missing.length === 0, missing };
+}
+
+async function startMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, relationships: any = {}) {
   checkPrerequisites();
   const upperId = id.toUpperCase();
   
@@ -248,11 +272,31 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
   let state = loadState(upperId);
   const finalTier = state ? state.tier : tier; // Use existing tier if found, otherwise use requested
   
+  // Check Dependencies unless forced
+  const force = process.argv.includes('--force');
+  if (!force) {
+    const prereqs = state?.relationships?.prerequisites || relationships?.prerequisites;
+    if (prereqs) {
+      const missing: string[] = [];
+      for (const pre of prereqs) {
+        const preState = loadState(pre);
+        if (!preState || preState.status !== 'completed') {
+          missing.push(pre);
+        }
+      }
+      if (missing.length > 0) {
+        logger.error(`🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`);
+        logger.info('Use --force to bypass this check.');
+        return;
+      }
+    }
+  }
+
   logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
   
   try {
     if (!state) {
-      await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona);
+      await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona, relationships);
       state = loadState(upperId);
     } else {
       state.status = 'active';
@@ -810,10 +854,11 @@ async function main() {
   const arg4 = process.argv[6];
   const arg5 = process.argv[7];
   const arg6 = process.argv[8];
+  const arg7 = process.argv[9];
 
   switch (action) {
-    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
-    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
+    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
+    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
     case 'delegate': await delegateMission(arg1, arg2, arg3); break;
     case 'import': await importMission(arg1, arg2); break;
