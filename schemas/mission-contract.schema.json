@@ -2,9 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MissionContract",
   "type": "object",
-  "required": ["mission_id", "skill", "action"],
+  "required": ["mission_id", "skill", "action", "tier"],
   "properties": {
     "mission_id": { "type": "string", "pattern": "^[a-z0-9\\-_]+$" },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"],
+      "description": "The security tier of the mission. 'personal' missions are stored in knowledge/personal/missions, 'confidential' in active/missions/confidential, and 'public' in active/missions/public."
+    },
     "role": { "type": "string" },
     "skill": { "type": "string" },
     "action": { "type": "string" },
