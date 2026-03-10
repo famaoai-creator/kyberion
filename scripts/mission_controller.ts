@@ -21,17 +21,18 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeUnlinkSync
+  safeUnlinkSync,
+  detectTier
 } from '@agent/core';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = path.join(ROOT_DIR, 'active/missions/registry.json');
-const MISSIONS_DIR = path.join(ROOT_DIR, 'active/missions');
 const ARCHIVE_DIR = path.join(ROOT_DIR, 'active/archive/missions');
 
 interface MissionState {
   mission_id: string;
+  tier: 'personal' | 'confidential' | 'public';
   status: 'planned' | 'active' | 'paused' | 'completed';
   priority: number;
   assigned_persona: string;
@@ -56,10 +57,14 @@ function checkPrerequisites() {
     throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
   }
 
-  const tiers = ['knowledge/personal', 'knowledge/confidential', 'knowledge/public'];
+  const tiers = [
+    'knowledge/personal/missions', 
+    'active/missions/confidential', 
+    'active/missions/public'
+  ];
   tiers.forEach(tier => {
     if (!safeExistsSync(path.join(ROOT_DIR, tier))) {
-      logger.warn(`Creating missing tier: ${tier}`);
+      logger.warn(`Creating missing tier directory: ${tier}`);
       safeMkdir(path.join(ROOT_DIR, tier), { recursive: true });
     }
   });
@@ -72,8 +77,30 @@ function checkPrerequisites() {
 }
 
 /**
- * 2. Git Utilities
+ * 2. Tier & Git Utilities
  */
+function calculateRequiredTier(injections: string[] = [], requestedTier?: string): 'personal' | 'confidential' | 'public' {
+  const tierWeight: Record<string, number> = {
+    'public': 1,
+    'confidential': 3,
+    'personal': 4
+  };
+
+  let maxWeight = requestedTier ? tierWeight[requestedTier] || 1 : 1;
+  let currentTier: 'personal' | 'confidential' | 'public' = (requestedTier as any) || 'public';
+
+  // Scan injections for highest tier
+  for (const filePath of injections) {
+    const tier = detectTier(filePath);
+    if (tierWeight[tier] > (maxWeight || 0)) {
+      maxWeight = tierWeight[tier];
+      currentTier = tier as any;
+    }
+  }
+
+  return currentTier;
+}
+
 function getGitHash() {
   return safeExec('git', ['rev-parse', 'HEAD']).trim();
 }
@@ -86,7 +113,9 @@ function getCurrentBranch() {
  * 3. State & Registry Management
  */
 function loadState(id: string): MissionState | null {
-  const statePath = path.join(MISSIONS_DIR, id, 'mission-state.json');
+  const missionPath = (pathResolver as any).findMissionPath(id);
+  if (!missionPath) return null;
+  const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
   try {
     const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
@@ -95,7 +124,7 @@ function loadState(id: string): MissionState | null {
 }
 
 function saveState(id: string, state: MissionState) {
-  const missionDir = path.join(MISSIONS_DIR, id);
+  const missionDir = (pathResolver as any).findMissionPath(id) || (pathResolver as any).missionDir(id, state.tier);
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
   safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify(state, null, 2));
 }
@@ -103,20 +132,22 @@ function saveState(id: string, state: MissionState) {
 /**
  * 4. Mission Commands
  */
-async function createMission(id: string, tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect') {
+async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect') {
   const upperId = id.toUpperCase();
-  const missionDir = pathResolver.missionDir(upperId);
   const templatePath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-templates.json');
+  const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
+  const template = templates.find((t: any) => t.name === missionType) || templates[0];
+
+  // Auto-calculate tier based on template injections
+  const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
+  const missionDir = (pathResolver as any).missionDir(upperId, finalTier);
   
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
 
   if (safeExistsSync(path.join(missionDir, 'mission-state.json'))) {
-    logger.info(`Mission ${upperId} already exists.`);
+    logger.info(`Mission ${upperId} already exists at ${missionDir}.`);
     return;
   }
-
-  const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
-  const template = templates.find((t: any) => t.name === missionType) || templates[0];
 
   const gitBranch = getCurrentBranch();
   const gitHash = getGitHash();
@@ -139,15 +170,37 @@ async function createMission(id: string, tenantId: string = 'default', missionTy
     safeWriteFile(path.join(missionDir, file.path), content);
   }
 
-  logger.success(`🚀 Mission ${upperId} initialized from template "${template.name}" (ADF-driven).`);
+  // Initial state with tier
+  const initialState: MissionState = {
+    mission_id: upperId,
+    tier: finalTier,
+    status: 'planned',
+    priority: 3,
+    assigned_persona: persona,
+    confidence_score: 1.0,
+    git: {
+      branch: gitBranch,
+      start_commit: gitHash,
+      latest_commit: gitHash,
+      checkpoints: []
+    },
+    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier (Auto-calculated).` }]
+  };
+  saveState(upperId, initialState);
+
+  logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven).`);
 }
 
-async function startMission(id: string, persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string) {
+async function startMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string) {
   checkPrerequisites();
   const upperId = id.toUpperCase();
   const branchName = `mission/${id.toLowerCase()}`;
   
-  logger.info(`🚀 Activating Mission: ${upperId}...`);
+  // Try to find existing mission first
+  let state = loadState(upperId);
+  const finalTier = state ? state.tier : tier; // Use existing tier if found, otherwise use requested
+  
+  logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
   
   try {
     // Branching logic
@@ -160,9 +213,8 @@ async function startMission(id: string, persona: string = 'Ecosystem Architect',
       }
     }
 
-    let state = loadState(upperId);
     if (!state) {
-      await createMission(upperId, tenantId, missionType, visionRef, persona);
+      await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona);
       state = loadState(upperId);
     } else {
       state.status = 'active';
@@ -190,7 +242,13 @@ async function startMission(id: string, persona: string = 'Ecosystem Architect',
 function syncRoleProcedure(missionId: string, persona: string) {
   const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
   const sourcePath = path.join(ROOT_DIR, 'knowledge/roles', roleSlug, 'PROCEDURE.md');
-  const targetDir = path.join(MISSIONS_DIR, missionId);
+  const targetDir = (pathResolver as any).findMissionPath(missionId);
+  
+  if (!targetDir) {
+    logger.warn(`⚠️ [Governance] Mission directory not found for ${missionId}.`);
+    return;
+  }
+  
   const targetPath = path.join(targetDir, 'ROLE_PROCEDURE.md');
 
   if (safeExistsSync(sourcePath)) {
@@ -229,11 +287,15 @@ async function finishMission(id: string) {
 
   // 4. Archive
   if (!safeExistsSync(ARCHIVE_DIR)) safeMkdir(ARCHIVE_DIR, { recursive: true });
-  const missionDir = path.join(MISSIONS_DIR, upperId);
+  const missionDir = (pathResolver as any).findMissionPath(upperId);
+  if (!missionDir) return;
+  
   const archivePath = path.join(ARCHIVE_DIR, upperId);
   
   if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
-  safeExec('mv', [missionDir, archivePath]);
+  // Use shell cp and rm to handle potential cross-device move if tier is in knowledge/
+  safeExec('cp', ['-r', missionDir, archivePath]);
+  safeExec('rm', ['-rf', missionDir]);
   
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
@@ -266,18 +328,33 @@ async function resumeMission(id?: string) {
   let targetId = id?.toUpperCase();
   
   if (!targetId) {
-    // Auto-detect active mission from registry or directory
-    if (!safeExistsSync(MISSIONS_DIR)) return;
-    const missions = safeReaddir(MISSIONS_DIR);
-    const active = missions.find(m => {
-      const state = loadState(m);
-      return state?.status === 'active';
-    });
-    if (!active) {
+    // Scan all tiers for active mission
+    const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
+    let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+    if (safeExistsSync(configPath)) {
+      try {
+        const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+        searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+      } catch (_) {}
+    }
+
+    for (const dir of searchDirs) {
+      if (!safeExistsSync(dir)) continue;
+      const missions = safeReaddir(dir);
+      const active = missions.find(m => {
+        const state = loadState(m);
+        return state?.status === 'active';
+      });
+      if (active) {
+        targetId = active;
+        break;
+      }
+    }
+    
+    if (!targetId) {
       logger.warn('No active mission found to resume.');
       return;
     }
-    targetId = active;
   }
 
   const state = loadState(targetId);
@@ -292,7 +369,8 @@ async function resumeMission(id?: string) {
   }
 
   // 2. Check Flight Recorder for unfinished business
-  const flightRecorderPath = path.join(MISSIONS_DIR, targetId, 'LATEST_TASK.json');
+  const missionPath = (pathResolver as any).findMissionPath(targetId);
+  const flightRecorderPath = path.join(missionPath!, 'LATEST_TASK.json');
   if (safeExistsSync(flightRecorderPath)) {
     const content = safeReadFile(flightRecorderPath, { encoding: 'utf8' }) as string;
     const task = JSON.parse(content);
@@ -307,8 +385,8 @@ async function resumeMission(id?: string) {
 
 async function recordTask(missionId: string, description: string, details: any = {}) {
   const upperId = missionId.toUpperCase();
-  const missionDir = path.join(MISSIONS_DIR, upperId);
-  if (!safeExistsSync(missionDir)) throw new Error(`Mission ${upperId} not found.`);
+  const missionDir = (pathResolver as any).findMissionPath(upperId);
+  if (!missionDir) throw new Error(`Mission ${upperId} not found.`);
 
   const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
   const taskData = {
@@ -329,41 +407,58 @@ async function purgeMissions() {
   }
 
   const adf = JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string);
-  const missions = safeReaddir(MISSIONS_DIR).filter(m => fs.lstatSync(path.join(MISSIONS_DIR, m)).isDirectory());
+  
+  // Need to scan all tiers
+  const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
+  let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+  if (safeExistsSync(configPath)) {
+    try {
+      const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+      searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+    } catch (_) {}
+  }
 
-  for (const mission of missions) {
-    const missionDir = path.join(MISSIONS_DIR, mission);
-    for (const policy of adf.policies) {
-      let match = false;
-      const { condition } = policy;
+  for (const dir of searchDirs) {
+    if (!safeExistsSync(dir)) continue;
+    const missions = safeReaddir(dir).filter(m => {
+      try {
+        return fs.lstatSync(path.join(dir, m)).isDirectory();
+      } catch (_) { return false; }
+    });
 
-      if (condition.has_file) {
-        if (safeExistsSync(path.join(missionDir, condition.has_file))) {
-          match = true;
+    for (const mission of missions) {
+      const missionDir = path.join(dir, mission);
+      for (const policy of adf.policies) {
+        let match = false;
+        const { condition } = policy;
+
+        if (condition.has_file) {
+          if (safeExistsSync(path.join(missionDir, condition.has_file))) {
+            match = true;
+          }
+        } else if (condition.max_age_days) {
+          const stat = fs.statSync(missionDir);
+          const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+          if (ageDays > condition.max_age_days) {
+            match = true;
+          }
         }
-      } else if (condition.max_age_days) {
-        const stat = fs.statSync(missionDir);
-        const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
-        if (ageDays > condition.max_age_days) {
-          match = true;
-        }
-      }
 
-      if (match) {
-        let targetPath = policy.target_dir;
-        const now = new Date();
-        targetPath = targetPath.replace('{YYYY-MM}', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-        targetPath = path.join(ROOT_DIR, targetPath, policy.naming_pattern.replace('{mission_id}', mission));
+        if (match) {
+          let targetPath = policy.target_dir;
+          const now = new Date();
+          targetPath = targetPath.replace('{YYYY-MM}', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+          targetPath = path.join(ROOT_DIR, targetPath, policy.naming_pattern.replace('{mission_id}', mission));
 
-        logger.info(`Archiving mission ${mission} to ${targetPath} (Policy: ${policy.name})`);
-        if (!safeExistsSync(path.dirname(targetPath))) {
-          safeMkdir(path.dirname(targetPath), { recursive: true });
+          logger.info(`Archiving mission ${mission} to ${targetPath} (Policy: ${policy.name})`);
+          if (!safeExistsSync(path.dirname(targetPath))) {
+            safeMkdir(path.dirname(targetPath), { recursive: true });
+          }
+          
+          fs.cpSync(missionDir, targetPath, { recursive: true });
+          fs.rmSync(missionDir, { recursive: true, force: true });
+          break; // One policy per mission
         }
-        
-        // Use cpSync and rmSync for directory move as safeExec mv might be cleaner but let's stick to Node if it's simpler
-        fs.cpSync(missionDir, targetPath, { recursive: true });
-        fs.rmSync(missionDir, { recursive: true, force: true });
-        break; // One policy per mission
       }
     }
   }
@@ -379,10 +474,11 @@ async function main() {
   const arg3 = process.argv[5];
   const arg4 = process.argv[6];
   const arg5 = process.argv[7];
+  const arg6 = process.argv[8];
 
   switch (action) {
-    case 'create': await createMission(arg1, arg2, arg3, arg4, arg5); break;
-    case 'start': await startMission(arg1, arg2, arg3, arg4, arg5); break;
+    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
+    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6); break;
     case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
     case 'finish': await finishMission(arg1); break;
     case 'resume': await resumeMission(arg1); break;

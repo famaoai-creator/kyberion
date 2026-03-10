@@ -60,10 +60,48 @@ export function skillDir(skillName: string) {
   return path.join(PROJECT_ROOT_DIR, skillName);
 }
 
-export function missionDir(missionId: string) {
-  const dir = path.join(ACTIVE_ROOT, 'missions', missionId);
+export function missionDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
+  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  let subPath = 'active/missions';
+  
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      subPath = config.directories?.[tier] || subPath;
+    } catch (_) { /* Fallback to default */ }
+  }
+
+  const dir = path.join(PROJECT_ROOT_DIR, subPath, missionId);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+/**
+ * Searches for a mission directory across all available tiers.
+ * Priority: personal -> confidential -> public
+ */
+export function findMissionPath(missionId: string): string | null {
+  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  const tiers: ('personal' | 'confidential' | 'public')[] = ['personal', 'confidential', 'public'];
+  
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      for (const tier of tiers) {
+        const subPath = config.directories?.[tier];
+        if (subPath) {
+          const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
+          if (fs.existsSync(fullPath)) return fullPath;
+        }
+      }
+    } catch (_) { /* Fallback to legacy search */ }
+  }
+
+  // Legacy fallback
+  const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
+  if (fs.existsSync(legacyPath)) return legacyPath;
+
+  return null;
 }
 
 export function resolve(logicalPath: string) {
@@ -99,6 +137,7 @@ export const pathResolver = {
   isProtected,
   skillDir,
   missionDir,
+  findMissionPath,
   resolve,
   rootResolve,
 };
