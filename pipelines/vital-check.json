@@ -1,0 +1,17 @@
+{
+  "name": "Ecosystem Vital Check",
+  "description": "Checks for critical ecosystem paths and active missions.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🩺 [KYBERION] Ecosystem Vital Report (ADF-driven)" } },
+    { "op": "system:shell", "params": { "cmd": "[ -d node_modules ] && echo 'OK' || echo 'MISSING'", "export_as": "status_node_modules" } },
+    { "op": "system:shell", "params": { "cmd": "[ -d dist ] && echo 'OK' || echo 'MISSING'", "export_as": "status_dist" } },
+    { "op": "system:shell", "params": { "cmd": "[ -f knowledge/personal/my-identity.json ] && echo 'OK' || echo 'MISSING'", "export_as": "status_identity" } },
+    { "op": "system:shell", "params": { "cmd": "[ -f knowledge/personal/my-vision.md ] && echo 'OK' || echo 'MISSING'", "export_as": "status_vision" } },
+    { "op": "system:shell", "params": { "cmd": "find active/missions knowledge/personal/missions -name 'mission-state.json' -exec grep -l '\"status\": \"active\"' {} + 2>/dev/null | wc -l", "export_as": "active_mission_count" } },
+    { "op": "system:log", "params": { "message": "✅ Physical Foundation: {{status_node_modules}}" } },
+    { "op": "system:log", "params": { "message": "✅ System Build: {{status_dist}}" } },
+    { "op": "system:log", "params": { "message": "✅ Sovereign Identity: {{status_identity}}" } },
+    { "op": "system:log", "params": { "message": "✅ Sovereign Vision: {{status_vision}}" } },
+    { "op": "system:log", "params": { "message": "🚀 Active Missions: {{active_mission_count}}" } }
+  ]
+}
