@@ -96,6 +96,9 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
+      papaparse:
+        specifier: ^5.5.3
+        version: 5.5.3
       pdf-parse:
         specifier: ^2.4.5
         version: 2.4.5
