@@ -1,4 +1,4 @@
-import { logger, secretGuard, safeExec, safeReadFile, safeWriteFile, safeAppendFile } from '@agent/core';
+import { logger, secretGuard, safeExec, safeReadFile, safeWriteFile, safeAppendFile, withRetry } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { spawn } from 'node:child_process';
@@ -81,14 +81,16 @@ async function handleAction(input: any, onEvent?: (data: any) => void) {
     let ctx = { ...input.context };
     for (const step of input.steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await handleSingleAction({
-        service_id: step.params.service_id,
-        mode: step.op.toUpperCase() as any,
-        action: step.params.action,
-        params: step.params.params,
-        auth: step.params.auth,
-        method: step.params.method
-      });
+      const stepResult = await withRetry(async () => {
+        return await handleSingleAction({
+          service_id: step.params.service_id,
+          mode: step.op.toUpperCase() as any,
+          action: step.params.action,
+          params: step.params.params,
+          auth: step.params.auth,
+          method: step.params.method
+        });
+      }, step.params.retry || { maxRetries: 2 });
       
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
