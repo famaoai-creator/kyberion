@@ -301,14 +301,17 @@ async function finishMission(id: string) {
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
 
+  const missionDir = (pathResolver as any).findMissionPath(upperId);
+  if (!missionDir) return;
+
   logger.info(`🏁 Finishing Mission: ${upperId}...`);
 
-  // 1. Commit final changes
+  // 1. Commit final changes to Micro-Repo
   try {
-    safeExec('git', ['add', '.']);
-    safeExec('git', ['commit', '-m', `feat: complete mission ${upperId}`]);
-    state.git.latest_commit = getGitHash();
-  } catch (_) { logger.info('No changes to commit.'); }
+    safeExec('git', ['add', '.'], { cwd: missionDir });
+    safeExec('git', ['commit', '-m', `feat: complete mission ${upperId}`], { cwd: missionDir });
+    state.git.latest_commit = getGitHash(missionDir);
+  } catch (_) { logger.info('No changes to commit in mission repo.'); }
 
   // 2. Update state
   state.status = 'completed';
