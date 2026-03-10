@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs } from '@agent/core';
+import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
  * In a real-world scenario, this would use Web3.js or Ethers.js to talk to an RPC node.
  */
 
-const MOCK_CHAIN_PATH = path.resolve(process.cwd(), 'active/audit/mock_blockchain.jsonl');
+const MOCK_CHAIN_PATH = pathResolver.active('audit/mock_blockchain.jsonl');
 
 interface BlockchainAction {
   action: 'anchor_mission' | 'anchor_trust' | 'verify_anchor';
@@ -81,7 +81,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
     
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

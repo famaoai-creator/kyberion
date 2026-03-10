@@ -1,7 +1,5 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
-import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '../libs/core/index.js';
+import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeExec } from '../libs/core/index.js';
 import chalk from 'chalk';
 
 const ROOT_DIR = pathResolver.rootDir();
@@ -24,7 +22,7 @@ interface ActuatorManifest {
 
 function checkBinary(bin: string): boolean {
   try {
-    execSync(`command -v ${bin}`, { stdio: 'ignore' });
+    safeExec('command', ['-v', bin]);
     return true;
   } catch (_) {
     return false;
@@ -32,7 +30,7 @@ function checkBinary(bin: string): boolean {
 }
 
 function discoverCapabilities() {
-  const actuatorsDir = path.join(ROOT_DIR, 'libs/actuators');
+  const actuatorsDir = pathResolver.rootResolve('libs/actuators');
   const items = safeReaddir(actuatorsDir);
   const currentPlatform = process.platform;
 
@@ -45,7 +43,7 @@ function discoverCapabilities() {
     if (!safeExistsSync(manifestPath)) continue;
 
     try {
-      const manifest: ActuatorManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const manifest: ActuatorManifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
       console.log(`${chalk.bold.white(manifest.actuator_id)} (${manifest.version})`);
       console.log(`${chalk.dim(manifest.description)}`);
 

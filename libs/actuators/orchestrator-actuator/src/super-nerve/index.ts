@@ -139,7 +139,8 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     'browser': 'libs/actuators/browser-actuator/src/index.ts',
     'code': 'libs/actuators/code-actuator/src/index.ts',
     'orchestrator': 'libs/actuators/orchestrator-actuator/src/index.ts',
-    'media': 'libs/actuators/media-actuator/src/index.ts'
+    'media': 'libs/actuators/media-actuator/src/index.ts',
+    'service': 'libs/actuators/service-actuator/src/index.ts'
   };
 
   const actuatorPath = domainMap[domain];

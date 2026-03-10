@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, resolveVars, evaluateCondition } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -54,27 +54,6 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ctx = { ...ctx, ...saved };
   }
 
-      const resolve = (val: any) => {
-    if (typeof val !== 'string') return val;
-    
-    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
-    }
-
-    // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
-    });
-  };
-
   const results = [];
   for (const step of steps) {
     state.stepCount++;
@@ -85,12 +64,12 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
       logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       
       if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
+        ctx = await opControl(step.op, step.params, ctx, options, state);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
+          case 'capture': ctx = await opCapture(step.op, step.params, ctx); break;
+          case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
+          case 'apply': await opApply(step.op, step.params, ctx); break;
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -111,7 +90,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 /**
  * CONTROL Operators
  */
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -137,38 +116,21 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
   }
 }
 
-function evaluateCondition(cond: any, ctx: any): boolean {
-  if (!cond) return true;
-  const parts = cond.from.split('.');
-  let val = ctx;
-  for (const part of parts) { val = val?.[part]; }
-  
-  switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    default: return !!val;
-  }
-}
-
 /**
  * CAPTURE Operators
  */
-async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
+async function opCapture(op: string, params: any, ctx: any) {
   const rootDir = process.cwd();
   switch (op) {
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string) };
+      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) as string) };
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
+      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
     case 'shell':
-      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+      return { ...ctx, [params.export_as || 'last_capture']: safeExec(resolveVars(params.cmd, ctx)).trim() };
     case 'intent_detect':
-      const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolve(params.mapping_path)), { encoding: 'utf8' }) as string) as any;
-      const query = resolve(params.query).toLowerCase();
+      const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), { encoding: 'utf8' }) as string) as any;
+      const query = resolveVars(params.query, ctx).toLowerCase();
       const detected = mapping.intents.find((i: any) => i.trigger_phrases.some((p: string) => query.includes(p.toLowerCase())));
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
     default: return ctx;
@@ -178,7 +140,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 /**
  * TRANSFORM Operators
  */
-async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
+async function opTransform(op: string, params: any, ctx: any) {
   switch (op) {
     case 'json_query':
       const data = ctx[params.from || 'last_capture_data'];
@@ -186,12 +148,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       return { ...ctx, [params.export_as]: result };
     case 'variable_hydrate':
       const input = typeof ctx[params.from] === 'object' ? JSON.stringify(ctx[params.from]) : String(ctx[params.from]);
-      const hydrated = input.replace(/{{(.*?)}}/g, (_, p) => {
-        const parts = p.trim().split('.');
-        let cur = ctx;
-        for (const pt of parts) { cur = cur?.[pt]; }
-        return cur !== undefined ? String(cur) : '';
-      });
+      const hydrated = resolveVars(input, ctx);
       return { ...ctx, [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated };
     default: return ctx;
   }
@@ -200,28 +157,28 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 /**
  * APPLY Operators
  */
-async function opApply(op: string, params: any, ctx: any, resolve: Function) {
+async function opApply(op: string, params: any, ctx: any) {
   const rootDir = process.cwd();
   switch (op) {
     case 'write_file':
-      const out = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(rootDir, resolveVars(params.path, ctx));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
       if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       break;
-    case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
+    case 'mkdir': safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true }); break;
     case 'symlink':
-      const target = path.resolve(rootDir, resolve(params.target));
-      const source = path.resolve(rootDir, resolve(params.source));
+      const target = path.resolve(rootDir, resolveVars(params.target, ctx));
+      const source = path.resolve(rootDir, resolveVars(params.source, ctx));
       if (fs.existsSync(target)) fs.unlinkSync(target);
       if (!fs.existsSync(path.dirname(target))) safeMkdir(path.dirname(target), { recursive: true });
       fs.symlinkSync(path.relative(path.dirname(target), source), target, params.type || 'dir');
       break;
     case 'git_checkpoint':
-      execSync('git add .');
-      execSync(`git commit -m "${resolve(params.message || 'checkpoint').replace(/"/g, '\\"')}"`);
+      safeExec('git', ['add', '.'], { cwd: rootDir });
+      safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], { cwd: rootDir });
       break;
-    case 'log': logger.info(`[ORCH_LOG] ${resolve(params.message || 'Action completed')}`); break;
+    case 'log': logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
   }
 }
 
