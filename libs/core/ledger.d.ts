@@ -1,10 +1,10 @@
 export declare const record: (type: string, data: any) => string;
 /**
- * Verify the integrity of the entire ledger
+ * Verify the integrity of a specific ledger file
  */
-export declare const verifyIntegrity: () => boolean;
+export declare const verifyIntegrity: (ledgerPath?: string) => boolean;
 export declare const ledger: {
     record: (type: string, data: any) => string;
-    verifyIntegrity: () => boolean;
+    verifyIntegrity: (ledgerPath?: string) => boolean;
 };
 //# sourceMappingURL=ledger.d.ts.map

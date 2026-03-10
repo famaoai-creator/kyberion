@@ -1,8 +1,7 @@
 /**
- * Reflex Terminal (RT) - Core Logic v2.0 (node-pty Edition)
- * Provides a persistent virtual terminal session using node-pty for true PTY support.
+ * Reflex Terminal (RT) - Self-Healing Edition v3.0
+ * Provides terminal session with automatic fallback between node-pty and child_process.
  */
-import * as pty from 'node-pty';
 export interface ReflexTerminalOptions {
     shell?: string;
     cwd?: string;
@@ -12,30 +11,15 @@ export interface ReflexTerminalOptions {
     onOutput?: (data: string) => void;
 }
 export declare class ReflexTerminal {
-    private ptyProcess;
+    private adapter;
     private feedbackPath;
     constructor(options?: ReflexTerminalOptions);
     private setupListeners;
-    /**
-     * Inject a command or raw input into the terminal.
-     */
     execute(command: string): void;
-    /**
-     * Write raw data to the terminal.
-     */
     write(data: string): void;
-    /**
-     * Resize the terminal dimensions.
-     */
-    resize(cols: number, rows: number): void;
-    /**
-     * Register an output listener.
-     */
-    onData(callback: (data: string) => void): pty.IDisposable;
-    /**
-     * Manually trigger a feedback update to the shared response file.
-     */
-    persistResponse(text: string, skillName?: string): void;
+    resize(cols: number, rows: number, width?: number, height?: number): void;
+    getPid(): number | undefined;
     kill(): void;
+    persistResponse(text: string, skillName?: string): void;
 }
 //# sourceMappingURL=reflex-terminal.d.ts.map

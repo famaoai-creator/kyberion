@@ -23,9 +23,12 @@ last_updated: 2026-03-10
 | | `knowledge/confidential/` | ミッション固有の機密知識 | No | Confidential |
 | | `knowledge/public/` | 共有プロトコル・公開ナレッジ | Yes | Public |
 | **Mission** | `active/missions/` | 実行中のミッションの状態と契約 | No | Confidential |
+| | `[MISSION_ID]/evidence/` | ミッション実行の証拠・ログ（Tierを継承） | No/Yes | Tier-Dependent |
+| | `[MISSION_ID]/evidence/ledger.jsonl` | ミッション固有の詳細な実行台帳 | No | Tier-Dependent |
 | | `work/` | 大規模データ処理用ワークスペース | No | Internal |
 | | `scratch/` | 一時的なスクリプト・実験場 | No | Internal |
-| **System** | `libs/` | コアロジック・アクチュエータ | Yes | Public/Code |
+| **System** | `active/audit/system-ledger.jsonl` | システム全体のメタデータ台帳（Hybrid Ledger） | No | Internal |
+| | `libs/` | コアロジック・アクチュエータ | Yes | Public/Code |
 | | `presence/` | 外部センサー・インターフェース | Yes | Internal/Code |
 | | `satellites/` | 外部サービス連携用ブリッジ | Yes | Internal/Code |
 | | `vault/mounts/` | セキュアな外部ストレージマウント | No | Secret |
