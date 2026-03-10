@@ -53,7 +53,7 @@ function checkPrerequisites() {
   
   const identityPath = path.join(ROOT_DIR, 'knowledge/personal/my-identity.json');
   if (!safeExistsSync(identityPath)) {
-    throw new Error('CRITICAL: Sovereign Identity missing. Run onboarding first.');
+    throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
   }
 
   const tiers = ['knowledge/personal', 'knowledge/confidential', 'knowledge/public'];
@@ -106,7 +106,7 @@ function saveState(id: string, state: MissionState) {
 async function createMission(id: string, tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect') {
   const upperId = id.toUpperCase();
   const missionDir = pathResolver.missionDir(upperId);
-  const templatePath = path.join(ROOT_DIR, 'knowledge/governance/mission-templates.json');
+  const templatePath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-templates.json');
   
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
 
