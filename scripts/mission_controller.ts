@@ -28,8 +28,8 @@ import {
 import { validateFileFreshness } from '../libs/core/validators.js';
 
 const ROOT_DIR = pathResolver.rootDir();
-const REGISTRY_PATH = path.join(ROOT_DIR, 'active/missions/registry.json');
-const ARCHIVE_DIR = path.join(ROOT_DIR, 'active/archive/missions');
+const REGISTRY_PATH = pathResolver.active('missions/registry.json');
+const ARCHIVE_DIR = pathResolver.active('archive/missions');
 
 interface MissionState {
   mission_id: string;
@@ -67,7 +67,7 @@ interface MissionState {
 function checkPrerequisites() {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
   
-  const identityPath = path.join(ROOT_DIR, 'knowledge/personal/my-identity.json');
+  const identityPath = pathResolver.knowledge('personal/my-identity.json');
   if (!safeExistsSync(identityPath)) {
     throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
   }
@@ -78,13 +78,14 @@ function checkPrerequisites() {
     'active/missions/public'
   ];
   tiers.forEach(tier => {
-    if (!safeExistsSync(path.join(ROOT_DIR, tier))) {
+    const fullPath = pathResolver.rootResolve(tier);
+    if (!safeExistsSync(fullPath)) {
       logger.warn(`Creating missing tier directory: ${tier}`);
-      safeMkdir(path.join(ROOT_DIR, tier), { recursive: true });
+      safeMkdir(fullPath, { recursive: true });
     }
   });
 
-  if (!safeExistsSync(path.join(ROOT_DIR, 'node_modules'))) {
+  if (!safeExistsSync(pathResolver.rootResolve('node_modules'))) {
     throw new Error("Missing dependencies. Run 'pnpm install' first.");
   }
   
@@ -164,7 +165,7 @@ function saveState(id: string, state: MissionState) {
  */
 async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
   const upperId = id.toUpperCase();
-  const templatePath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-templates.json');
+  const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
   const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
   const template = templates.find((t: any) => t.name === missionType) || templates[0];
 
@@ -331,7 +332,7 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
  */
 function syncRoleProcedure(missionId: string, persona: string) {
   const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
-  const sourcePath = path.join(ROOT_DIR, 'knowledge/roles', roleSlug, 'PROCEDURE.md');
+  const sourcePath = pathResolver.knowledge(`roles/${roleSlug}/PROCEDURE.md`);
   const targetDir = (pathResolver as any).findMissionPath(missionId);
   
   if (!targetDir) {
@@ -354,7 +355,7 @@ function syncRoleProcedure(missionId: string, persona: string) {
  * 4. Trust Engine (Advanced Governance)
  */
 function updateTrustScore(agentId: string, result: 'verified' | 'rejected') {
-  const ledgerPath = path.join(ROOT_DIR, 'knowledge/personal/governance/agent-trust-scores.json');
+  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (!safeExistsSync(ledgerPath)) return;
 
   const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
@@ -389,7 +390,7 @@ function updateTrustScore(agentId: string, result: 'verified' | 'rejected') {
   logger.info(`📈 [TrustEngine] Updated trust score for ${agentId}: ${oldScore.toFixed(1)} -> ${agent.current_score.toFixed(1)}`);
 
   // [Blockchain Anchor] Anchor trust score update
-  const anchorInput = path.join(ROOT_DIR, `scratch/trust-anchor-${agentId}-${Date.now()}.json`);
+  const anchorInput = pathResolver.rootResolve(`scratch/trust-anchor-${agentId}-${Date.now()}.json`);
   safeWriteFile(anchorInput, JSON.stringify({
     action: 'anchor_trust',
     params: { agent_id: agentId, score: agent.current_score }
@@ -406,7 +407,7 @@ async function delegateMission(id: string, agentId: string, a2aMessageId: string
   if (!state) throw new Error(`Mission ${upperId} not found.`);
 
   // Trust Guardrail
-  const ledgerPath = path.join(ROOT_DIR, 'knowledge/personal/governance/agent-trust-scores.json');
+  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (safeExistsSync(ledgerPath)) {
     const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
     const agent = ledger.agents[agentId];
@@ -528,7 +529,7 @@ async function sealMission(id: string) {
   const missionDir = (pathResolver as any).findMissionPath(upperId);
   if (!missionDir) return;
 
-  const pubKeyPath = path.join(ROOT_DIR, 'vault/keys/sovereign-public.pem');
+  const pubKeyPath = pathResolver.vault('keys/sovereign-public.pem');
   if (!safeExistsSync(pubKeyPath)) {
     logger.warn('⚠️ [SovereignSeal] Public key not found. Skipping encryption.');
     return;
@@ -536,10 +537,10 @@ async function sealMission(id: string) {
 
   logger.info(`🔒 [SovereignSeal] Encrypting mission ${upperId} for archival (Hybrid AES+RSA)...`);
 
-  const archivePath = path.join(ROOT_DIR, 'scratch', `${upperId}.tar.gz`);
-  const symKeyPath = path.join(ROOT_DIR, 'scratch', `${upperId}.key`);
-  const encKeyPath = path.join(ROOT_DIR, 'scratch', `${upperId}.key.enc`);
-  const encryptedPath = path.join(ROOT_DIR, 'scratch', `${upperId}.enc`);
+  const archivePath = pathResolver.rootResolve(`scratch/${upperId}.tar.gz`);
+  const symKeyPath = pathResolver.rootResolve(`scratch/${upperId}.key`);
+  const encKeyPath = pathResolver.rootResolve(`scratch/${upperId}.key.enc`);
+  const encryptedPath = pathResolver.rootResolve(`scratch/${upperId}.enc`);
 
   try {
     // 1. Package mission directory
@@ -561,7 +562,7 @@ async function sealMission(id: string) {
     const fileBuffer = fs.readFileSync(encryptedPath);
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
 
-    const anchorInput = path.join(ROOT_DIR, `scratch/anchor-${upperId}-${Date.now()}.json`);
+    const anchorInput = pathResolver.rootResolve(`scratch/anchor-${upperId}-${Date.now()}.json`);
     safeWriteFile(anchorInput, JSON.stringify({
       action: 'anchor_mission',
       params: { mission_id: upperId, hash }
@@ -618,7 +619,7 @@ async function finishMission(id: string, seal: boolean = false) {
   });
 
   // 4. Purge Scratch
-  const scratchDir = path.join(ROOT_DIR, 'scratch');
+  const scratchDir = pathResolver.rootResolve('scratch');
   if (safeExistsSync(scratchDir)) {
     logger.info('🧹 Purging scratch files...');
   }
@@ -638,12 +639,12 @@ async function finishMission(id: string, seal: boolean = false) {
 
 async function createCheckpoint(taskId: string, note: string) {
   // Find current active mission by scanning tiers
-  const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
-  let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+  const configPath = pathResolver.knowledge('public/governance/mission-management-config.json');
+  let searchDirs = [pathResolver.active('missions')];
   if (safeExistsSync(configPath)) {
     try {
       const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
-      searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+      searchDirs = Object.values(config.directories || {}).map(d => pathResolver.rootResolve(String(d)));
     } catch (_) {}
   }
 
@@ -704,12 +705,12 @@ async function resumeMission(id?: string) {
   
   if (!targetId) {
     // Scan all tiers for active mission
-    const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
-    let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+    const configPath = pathResolver.knowledge('public/governance/mission-management-config.json');
+    let searchDirs = [pathResolver.active('missions')];
     if (safeExistsSync(configPath)) {
       try {
         const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
-        searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+        searchDirs = Object.values(config.directories || {}).map(d => pathResolver.rootResolve(String(d)));
       } catch (_) {}
     }
 
@@ -779,7 +780,7 @@ async function recordTask(missionId: string, description: string, details: any =
 }
 
 async function purgeMissions() {
-  const adfPath = path.join(ROOT_DIR, 'knowledge/governance/mission-lifecycle.json');
+  const adfPath = pathResolver.knowledge('governance/mission-lifecycle.json');
   if (!safeExistsSync(adfPath)) {
     logger.error('Mission lifecycle ADF not found.');
     return;
@@ -788,12 +789,12 @@ async function purgeMissions() {
   const adf = JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string);
   
   // Need to scan all tiers
-  const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
-  let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+  const configPath = pathResolver.knowledge('public/governance/mission-management-config.json');
+  let searchDirs = [pathResolver.active('missions')];
   if (safeExistsSync(configPath)) {
     try {
       const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
-      searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+      searchDirs = Object.values(config.directories || {}).map(d => pathResolver.rootResolve(String(d)));
     } catch (_) {}
   }
 
@@ -827,7 +828,7 @@ async function purgeMissions() {
           let targetPath = policy.target_dir;
           const now = new Date();
           targetPath = targetPath.replace('{YYYY-MM}', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-          targetPath = path.join(ROOT_DIR, targetPath, policy.naming_pattern.replace('{mission_id}', mission));
+          targetPath = pathResolver.rootResolve(path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission)));
 
           logger.info(`Archiving mission ${mission} to ${targetPath} (Policy: ${policy.name})`);
           if (!safeExistsSync(path.dirname(targetPath))) {

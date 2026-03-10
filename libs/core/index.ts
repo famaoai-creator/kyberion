@@ -54,6 +54,7 @@ export {
 export * from './fs-utils.js';
 export * from './cli-utils.js';
 export * from './ledger.js';
+export * from './src/logic-utils.js';
 export { parseData, stringifyData } from './data-utils.js'; // Explicitly avoid detectFormat conflict
 export * from './detectors.js';
 export * from './validators.js';

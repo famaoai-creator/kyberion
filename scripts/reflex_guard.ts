@@ -9,10 +9,10 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathResolver } = require('../libs/core/index.js');
 
 // Constants
-const ROOT_DIR = process.cwd();
-const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
+const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const PROMPT_PATTERN = /[%$#]>?\s*$/m;
 
 console.log('🛡️ [ReflexGuard] Initializing... Watching for neural signals in stimuli.jsonl');

@@ -25,10 +25,10 @@ interface Mission {
 
 function scanMissions() {
   const searchDirs = [
-    path.join(ROOT_DIR, 'active/missions/public'),
-    path.join(ROOT_DIR, 'active/missions/confidential'),
-    path.join(ROOT_DIR, 'knowledge/personal/missions'),
-    path.join(ROOT_DIR, 'active/archive/missions')
+    pathResolver.active('missions/public'),
+    pathResolver.active('missions/confidential'),
+    pathResolver.knowledge('personal/missions'),
+    pathResolver.active('archive/missions')
   ];
 
   const missions: Mission[] = [];
@@ -102,9 +102,9 @@ function renderJournal() {
   console.log(`  - TOTAL MISSIONS: ${missions.length}\n`);
 
   // Trust Scores Summary
-  const ledgerPath = path.join(ROOT_DIR, 'knowledge/personal/governance/agent-trust-scores.json');
+  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
+    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
     console.log(chalk.bold('🤝 Agent Trust Scores:'));
     Object.keys(ledger.agents).forEach(a => {
       const score = ledger.agents[a].current_score;
