@@ -1,4 +1,4 @@
-import { logger, safeReadFile } from '@agent/core';
+import { logger, safeReadFile, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { executeSuperPipeline } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
@@ -8,7 +8,7 @@ async function main() {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const pipeline = JSON.parse(inputContent);
 

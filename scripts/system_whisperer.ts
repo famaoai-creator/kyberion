@@ -9,9 +9,8 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { logger, pathResolver } from '@agent/core';
 
-const ROOT_DIR = process.cwd();
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const PID_FILE = path.join(ROOT_DIR, 'active/shared/services-pids.json');
+const PID_FILE = pathResolver.shared('services-pids.json');
 const WHISPER_INTERVAL_MS = 1800000; // 30 minutes
 
 async function whisper() {

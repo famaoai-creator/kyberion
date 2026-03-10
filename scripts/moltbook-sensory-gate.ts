@@ -1,13 +1,13 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { secureFetch } from '../libs/core/network.js';
 import { entropyGate } from '../libs/core/entropy-gate.js';
 import chalk from 'chalk';
+import { safeReadFile, safeReaddir, safeExistsSync, pathResolver } from '@agent/core';
 
 import { secretGuard } from '../libs/core/secret-guard.js';
 
 const API_KEY = secretGuard.getSecret('MOLTBOOK_API_KEY');
-const MISSIONS_DIR = path.resolve(process.cwd(), 'active/missions');
+const MISSIONS_DIR = pathResolver.active('missions');
 
 function logAction(message: string) {
   const timestamp = new Date().toISOString();
@@ -19,12 +19,12 @@ function logAction(message: string) {
  * to avoid "Redundant Twitching" (VexAETHER Learning).
  */
 function isSessionActive(): boolean {
-  const missions = fs.readdirSync(MISSIONS_DIR).filter(m => !m.startsWith('.'));
+  const missions = safeReaddir(MISSIONS_DIR).filter(m => !m.startsWith('.'));
   for (const mId of missions) {
     const statePath = path.join(MISSIONS_DIR, mId, 'mission-state.json');
-    if (fs.existsSync(statePath)) {
-      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-      if (state.status === 'Active') return true;
+    if (safeExistsSync(statePath)) {
+      const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+      if (state.status === 'active' || state.status === 'Active') return true;
     }
   }
   return false;
