@@ -22,19 +22,18 @@ The init wizard asks who you are. Based on your answer, it configures the ecosys
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 
-# Install dependencies and build the TypeScript artifacts (Crucial)
+# Install dependencies
 pnpm install
-npm run build
 
-# The wizard configures your role and knowledge tiers
-npm run cli -- system init
+# The interactive wizard configures your identity and environment
+pnpm onboard
 ```
 
-The wizard will ask you to choose your role:
-
-- **Engineer** — Code analysis, testing, DevOps, refactoring
-- **CEO / Executive** — Strategy, finance, organizational decisions
-- **PM / Auditor** — Compliance, quality assurance, project governance
+The wizard will help you establish your:
+- **Name** — How the ecosystem should address you.
+- **Language** — Preferred communication language.
+- **Interaction Style** — Senior Partner, Concierge, or Minimalist.
+- **Primary Domain** — Software Engineering, CEO, PM, etc.
 
 ## Step 2: Verify Your Environment
 

@@ -85,11 +85,13 @@ To manifest the Kyberion Entity in your environment:
 ```bash
 # 1. Establish the Physical Foundation
 git clone https://github.com/famaoai-creator/kyberion.git && cd kyberion
-pnpm install && pnpm run build
+pnpm install
 
-# 2. Align and Initiate
-npx tsx scripts/run_intent.ts reconcile-ecosystem
-npx tsx scripts/mission_controller.ts start MSN-STARTUP "Sovereign Concierge"
+# 2. Align and Initiate (Interactive Setup)
+pnpm onboard
+
+# 3. Your First Mission
+npx tsx scripts/mission_controller.ts start MSN-STARTUP "Ecosystem Architect"
 ```
 
 [**View Procedures**](./knowledge/procedures/) | [**Read the Charter**](./GEMINI.md) | [**Explore the Map**](./knowledge/Ecosystem_Map.md)
