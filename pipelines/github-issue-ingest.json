@@ -1,0 +1,32 @@
+{
+  "name": "GitHub Issue to Mission Ingest",
+  "description": "Automatically converts GitHub Issues with 'mission' label into active Kyberion missions.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🔍 Scanning GitHub for new mission issues..." } },
+    {
+      "op": "service:cli",
+      "params": {
+        "service_id": "gh",
+        "action": "issue",
+        "params": ["list", "--label", "mission", "--json", "number,title,body"],
+        "export_as": "raw_issues"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo '{{raw_issues.output}}' | jq -c '.'",
+        "export_as": "parsed_issues"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📦 Found issues: {{parsed_issues}}" } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; npx tsx scripts/mission_controller.ts start \"${title}\" personal; done",
+        "export_as": "ingest_summary"
+      }
+    },
+    { "op": "system:log", "params": { "message": "✅ Ingest complete: {{ingest_summary}}" } }
+  ]
+}

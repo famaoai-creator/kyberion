@@ -75,7 +75,34 @@ async function startService(id: string, service: any, pids: any) {
   logger.success(`  - ${id} started (PID: ${child.pid}).`);
 }
 
-async function handleAction(input: ServiceAction, onEvent?: (data: any) => void) {
+async function handleAction(input: any, onEvent?: (data: any) => void) {
+  if (input.action === 'pipeline') {
+    const results = [];
+    let ctx = { ...input.context };
+    for (const step of input.steps) {
+      logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
+      const stepResult = await handleSingleAction({
+        service_id: step.params.service_id,
+        mode: step.op.toUpperCase() as any,
+        action: step.params.action,
+        params: step.params.params,
+        auth: step.params.auth,
+        method: step.params.method
+      });
+      
+      const exportKey = step.params.export_as || 'last_service_result';
+      ctx[exportKey] = stepResult;
+      results.push({ op: step.op, status: 'success' });
+    }
+    if (input.context?.context_path) {
+      safeWriteFile(path.resolve(process.cwd(), input.context.context_path), JSON.stringify(ctx, null, 2));
+    }
+    return { status: 'finished', results, ...ctx };
+  }
+  return await handleSingleAction(input, onEvent);
+}
+
+async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) => void) {
   logger.info(`🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`);
 
   // 1. Service-Aware Guard: Only allow access to requested service's secrets
