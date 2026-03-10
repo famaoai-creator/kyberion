@@ -77,6 +77,17 @@ export function missionDir(missionId: string, tier: 'personal' | 'confidential' 
 }
 
 /**
+ * Returns the path to the evidence directory for a given mission.
+ */
+export function missionEvidenceDir(missionId: string) {
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return null;
+  const dir = path.join(missionPath, 'evidence');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
  * Searches for a mission directory across all available tiers.
  * Priority: personal -> confidential -> public
  */
@@ -137,6 +148,7 @@ export const pathResolver = {
   isProtected,
   skillDir,
   missionDir,
+  missionEvidenceDir,
   findMissionPath,
   resolve,
   rootResolve,
