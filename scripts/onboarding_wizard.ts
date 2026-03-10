@@ -7,7 +7,8 @@ import {
   pathResolver, 
   safeWriteFile, 
   safeMkdir,
-  safeExistsSync
+  safeExistsSync,
+  withLock
 } from '../libs/core/index.js';
 
 const rl = readline.createInterface({
@@ -76,7 +77,9 @@ async function runOnboarding() {
   }
 
   // Write identity file
-  safeWriteFile(identityPath, JSON.stringify(identity, null, 2));
+  await withLock('sovereign-identity', async () => {
+    safeWriteFile(identityPath, JSON.stringify(identity, null, 2));
+  });
 
   console.log('\n✅ Sovereign Identity established successfully!');
   console.log(`Saved to: ${identityPath}\n`);
@@ -105,7 +108,9 @@ async function runOnboarding() {
   };
 
   const agentIdentityPath = path.join(personalDir, 'agent-identity.json');
-  safeWriteFile(agentIdentityPath, JSON.stringify(agentIdentity, null, 2));
+  await withLock('agent-identity', async () => {
+    safeWriteFile(agentIdentityPath, JSON.stringify(agentIdentity, null, 2));
+  });
 
   console.log(`\n✨ Agent Identity established: ${chalk.bold.green(finalAgentId)}`);
   console.log(`Saved to: ${agentIdentityPath}\n`);
