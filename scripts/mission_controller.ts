@@ -333,8 +333,6 @@ async function finishMission(id: string) {
 
   // 4. Archive
   if (!safeExistsSync(ARCHIVE_DIR)) safeMkdir(ARCHIVE_DIR, { recursive: true });
-  const missionDir = (pathResolver as any).findMissionPath(upperId);
-  if (!missionDir) return;
   
   const archivePath = path.join(ARCHIVE_DIR, upperId);
   

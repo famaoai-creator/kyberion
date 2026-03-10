@@ -28,11 +28,20 @@ Kyberion employs a unified **Nerve Center Model** powered by the **A2A (Agent-to
 
 ## 🛡 Sovereign Governance (3-Tier Knowledge Model)
 
-Information is strictly segregated according to its sensitivity, enforced through a physical **Tier Guard**:
+Information is strictly segregated according to its sensitivity, enforced through a physical **Tier Guard** and **Isolated Mission History**:
 
-- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated.
-- **Confidential Tier (`knowledge/confidential/`)**: Organizational secrets and logic. Masked in public outputs.
-- **Public Tier (`knowledge/`)**: General standards and ecosystem protocols.
+- **Personal Tier (`knowledge/personal/`)**: Your identity, soul, and legacy context. Permanently isolated. **Missions in this tier have independent Git repositories.**
+- **Confidential Tier (`active/missions/confidential/`)**: Organizational secrets and logic. Masked in public outputs.
+- **Public Tier (`active/missions/public/`)**: General standards and ecosystem protocols.
+
+---
+
+## 🛡 Sovereign Shield: Isolated Mission History
+
+Kyberion ensures that mission activities never "pollute" the system core. Every mission operates within its own **independent Micro-Git repository**.
+- **System Stability**: Core logic remains on the `main` branch.
+- **Transactional Integrity**: Atomic checkpoints and rollbacks per mission.
+- **Absolute Privacy**: Mission history is physically stored in tiered folders, invisible to the main repository.
 
 ---
 
@@ -62,8 +71,9 @@ npx tsx scripts/run_a2a.ts --input <A2A_MESSAGE_JSON>
 # 🧘 Strategic Reconciliation
 npx tsx scripts/run_wisdom_reconcile.ts
 
-# 🛡️ Mission Control (Transactional)
-npx tsx scripts/mission_controller.ts start <MISSION_ID> <PERSONA>
+# 🛡️ Mission Control (Transactional & Tiered)
+npx tsx scripts/mission_controller.ts start <MISSION_ID> <TIER> <PERSONA>
+npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "Note"
 npx tsx scripts/mission_controller.ts finish <MISSION_ID>
 ```
 
@@ -72,6 +82,8 @@ npx tsx scripts/mission_controller.ts finish <MISSION_ID>
 ## 📊 Evidence-Driven Delivery
 
 Kyberion provides physical evidence of its labor:
+- **Evidence Vault**: Detailed logs and execution results stored in `[MISSION_ID]/evidence/`.
+- **Hybrid Ledger**: Global metadata ledger linked to detailed mission-specific audit trails.
 - **Autonomy Score**: Ratio of autonomous goal achievement vs. human intervention.
 - **Pipeline Traceability**: Full A2A logs showing exactly how intents were resolved and executed.
 - **Structural Integrity**: Real-time pulse monitoring of ecosystem health and ledger validity.
@@ -91,7 +103,7 @@ pnpm install
 pnpm onboard
 
 # 3. Your First Mission
-npx tsx scripts/mission_controller.ts start MSN-STARTUP "Ecosystem Architect"
+npx tsx scripts/mission_controller.ts start MSN-STARTUP personal "Ecosystem Architect"
 ```
 
 [**View Procedures**](./knowledge/procedures/) | [**Read the Charter**](./GEMINI.md) | [**Explore the Map**](./knowledge/Ecosystem_Map.md)
