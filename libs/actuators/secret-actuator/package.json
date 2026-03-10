@@ -1,0 +1,11 @@
+{
+  "name": "@agent/secret-actuator",
+  "version": "1.0.0",
+  "description": "OS Native Secret Actuator for Kyberion Ecosystem",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "private": true,
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}
