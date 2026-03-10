@@ -25,5 +25,5 @@
     }
   },
   "include": ["skills/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts"],
-  "exclude": ["node_modules", "dist", "coverage", "test-results"]
+  "exclude": ["node_modules", "dist", "coverage", "test-results", "presence/displays/kyberion-dashboard/"]
 }
