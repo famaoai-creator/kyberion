@@ -26,7 +26,7 @@ const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
 const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
-const INDEX_PATH = path.join(KNOWLEDGE_ROOT, 'orchestration/global_skill_index.json');
+const INDEX_PATH = path.join(KNOWLEDGE_ROOT, 'public/orchestration/global_skill_index.json');
 
 export function rootDir() { return PROJECT_ROOT_DIR; }
 export function knowledge(subPath = '') { return path.join(KNOWLEDGE_ROOT, subPath); }

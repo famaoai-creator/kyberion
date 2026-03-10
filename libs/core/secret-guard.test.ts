@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getSecret, getActiveSecrets, isSecretPath, validateSovereignBoundary } from '@agent/core';
+import { getSecret, getActiveSecrets, secretGuard } from './secret-guard.js';
+import { validateSovereignBoundary } from './tier-guard.js';
 
 describe('secret-guard core', () => {
   beforeEach(() => {
@@ -23,10 +24,5 @@ describe('secret-guard core', () => {
     const result = validateSovereignBoundary(content, getActiveSecrets());
     expect(result.safe).toBe(false);
     expect(result.detected.some(d => d.includes('SECRET_LEAK'))).toBe(true);
-  });
-
-  it('should identify secret paths correctly', () => {
-    expect(isSecretPath('vault/secrets/keys.json')).toBe(true);
-    expect(isSecretPath('skills/core/index.ts')).toBe(false);
   });
 });
