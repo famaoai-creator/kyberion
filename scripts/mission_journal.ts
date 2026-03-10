@@ -16,6 +16,11 @@ interface Mission {
   status: string;
   tier: string;
   history: MissionHistoryEntry[];
+  relationships?: {
+    prerequisites?: string[];
+    successors?: string[];
+    blockers?: string[];
+  };
 }
 
 function scanMissions() {
@@ -65,6 +70,16 @@ function renderJournal() {
     
     console.log(`${tierIcon} ${chalk.bold(m.mission_id.padEnd(25))} [${statusColor(m.status.toUpperCase())}] (${m.tier})`);
     
+    // Relationships
+    if (m.relationships) {
+      if (m.relationships.prerequisites?.length) {
+        console.log(`   ${chalk.blue('← Prerequisites:')} ${m.relationships.prerequisites.join(', ')}`);
+      }
+      if (m.relationships.successors?.length) {
+        console.log(`   ${chalk.magenta('→ Successors:')} ${m.relationships.successors.join(', ')}`);
+      }
+    }
+
     m.history.forEach((h, idx) => {
       const isLast = idx === m.history.length - 1;
       const prefix = isLast ? ' └── ' : ' ├── ';
