@@ -22,7 +22,8 @@ import {
   safeMkdir,
   safeReaddir,
   safeUnlinkSync,
-  detectTier
+  detectTier,
+  ledger
 } from '@agent/core';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
@@ -101,12 +102,27 @@ function calculateRequiredTier(injections: string[] = [], requestedTier?: string
   return currentTier;
 }
 
-function getGitHash() {
-  return safeExec('git', ['rev-parse', 'HEAD']).trim();
+function getGitHash(cwd: string = ROOT_DIR) {
+  return safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim();
 }
 
-function getCurrentBranch() {
-  return safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+function initMissionRepo(missionDir: string) {
+  if (!safeExistsSync(path.join(missionDir, '.git'))) {
+    logger.info(`🌱 Initializing independent Git repo for mission at ${missionDir}...`);
+    safeExec('git', ['init'], { cwd: missionDir });
+    safeExec('git', ['config', 'user.name', 'Kyberion Sovereign Entity'], { cwd: missionDir });
+    safeExec('git', ['config', 'user.email', 'sovereign@kyberion.local'], { cwd: missionDir });
+    safeExec('git', ['add', '.'], { cwd: missionDir });
+    safeExec('git', ['commit', '-m', 'chore: initial mission state'], { cwd: missionDir });
+  }
+}
+
+function getCurrentBranch(cwd: string = ROOT_DIR) {
+  try {
+    return safeExec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd }).trim();
+  } catch (_) {
+    return 'detached';
+  }
 }
 
 /**
@@ -170,6 +186,20 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     safeWriteFile(path.join(missionDir, file.path), content);
   }
 
+  // Create Evidence directory
+  const evidenceDir = path.join(missionDir, 'evidence');
+  if (!safeExistsSync(evidenceDir)) {
+    safeMkdir(evidenceDir, { recursive: true });
+    safeWriteFile(path.join(evidenceDir, '.gitkeep'), '');
+    logger.info(`📁 [Architecture] Created evidence directory for mission ${upperId}.`);
+  }
+
+  // Initialize Micro-Repo
+  initMissionRepo(missionDir);
+
+  // Initial state with tier
+  const missionGitHash = getGitHash(missionDir);
+
   // Initial state with tier
   const initialState: MissionState = {
     mission_id: upperId,
@@ -179,14 +209,23 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     assigned_persona: persona,
     confidence_score: 1.0,
     git: {
-      branch: gitBranch,
-      start_commit: gitHash,
-      latest_commit: gitHash,
+      branch: 'main', // Missions always start on their own main branch
+      start_commit: missionGitHash,
+      latest_commit: missionGitHash,
       checkpoints: []
     },
-    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier (Auto-calculated).` }]
+    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier (Independent Micro-Repo).` }]
   };
   saveState(upperId, initialState);
+
+  // Record to Hybrid Ledger
+  ledger.record('MISSION_CREATE', {
+    mission_id: upperId,
+    tier: finalTier,
+    type: missionType,
+    persona: persona,
+    owner: owner
+  });
 
   logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven).`);
 }
@@ -194,7 +233,6 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
 async function startMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string) {
   checkPrerequisites();
   const upperId = id.toUpperCase();
-  const branchName = `mission/${id.toLowerCase()}`;
   
   // Try to find existing mission first
   let state = loadState(upperId);
@@ -203,16 +241,6 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
   logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
   
   try {
-    // Branching logic
-    const currentBranch = getCurrentBranch();
-    if (currentBranch !== branchName) {
-      try {
-        safeExec('git', ['checkout', '-b', branchName]);
-      } catch {
-        safeExec('git', ['checkout', branchName]);
-      }
-    }
-
     if (!state) {
       await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona);
       state = loadState(upperId);
@@ -222,15 +250,23 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
       saveState(upperId, state);
     }
 
-    if (state) {
-      state.status = 'active';
-      saveState(upperId, state);
+    const missionDir = (pathResolver as any).findMissionPath(upperId);
+    if (missionDir) {
+      // Ensure it's a repo
+      initMissionRepo(missionDir);
     }
     
     // Role Procedure Injection
     syncRoleProcedure(upperId, persona);
 
-    logger.success(`✅ Mission ${upperId} is now ACTIVE on branch ${branchName}.`);
+    // Record to Hybrid Ledger
+    ledger.record('MISSION_ACTIVATE', {
+      mission_id: upperId,
+      branch: state?.git.branch || 'main',
+      persona: persona
+    });
+
+    logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
   } catch (err: any) {
     logger.error(`Failed to start mission: ${err.message}`);
   }
@@ -279,6 +315,13 @@ async function finishMission(id: string) {
   state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
   saveState(upperId, state);
 
+  // Record to Hybrid Ledger before archival
+  ledger.record('MISSION_FINISH', {
+    mission_id: upperId,
+    status: 'completed',
+    archive_path: ARCHIVE_DIR
+  });
+
   // 3. Purge Scratch
   const scratchDir = path.join(ROOT_DIR, 'scratch');
   if (safeExistsSync(scratchDir)) {
@@ -301,24 +344,63 @@ async function finishMission(id: string) {
 }
 
 async function createCheckpoint(taskId: string, note: string) {
-  const branch = getCurrentBranch();
-  if (!branch.startsWith('mission/')) {
-    logger.error('Not on a mission branch. Checkpoint aborted.');
+  // Find current active mission by scanning tiers
+  const configPath = path.join(ROOT_DIR, 'knowledge/public/governance/mission-management-config.json');
+  let searchDirs = [path.join(ROOT_DIR, 'active/missions')];
+  if (safeExistsSync(configPath)) {
+    try {
+      const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+      searchDirs = Object.values(config.directories || {}).map(d => path.join(ROOT_DIR, String(d)));
+    } catch (_) {}
+  }
+
+  let activeMissionId: string | null = null;
+  let missionPath: string | null = null;
+
+  for (const dir of searchDirs) {
+    if (!safeExistsSync(dir) || !fs.lstatSync(dir).isDirectory()) continue;
+    const missions = safeReaddir(dir).filter(m => {
+      try {
+        return fs.lstatSync(path.join(dir, m)).isDirectory();
+      } catch (_) { return false; }
+    });
+    for (const m of missions) {
+      const state = loadState(m);
+      if (state?.status === 'active') {
+        activeMissionId = m;
+        missionPath = path.join(dir, m);
+        break;
+      }
+    }
+    if (activeMissionId) break;
+  }
+
+  if (!activeMissionId || !missionPath) {
+    logger.error('No active mission found. Checkpoint aborted.');
     return;
   }
-  const id = branch.replace('mission/', '').toUpperCase();
-  const state = loadState(id);
+
+  const state = loadState(activeMissionId);
   if (!state) return;
 
-  logger.info(`📸 Checkpoint: ${taskId}...`);
+  logger.info(`📸 Checkpoint for ${activeMissionId}: ${taskId}...`);
   try {
-    safeExec('git', ['add', '.']);
-    safeExec('git', ['commit', '-m', `checkpoint(${id}): ${taskId} - ${note}`]);
-    const hash = getGitHash();
+    safeExec('git', ['add', '.'], { cwd: missionPath });
+    safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], { cwd: missionPath });
+    const hash = getGitHash(missionPath);
     state.git.latest_commit = hash;
     state.git.checkpoints.push({ task_id: taskId, commit_hash: hash, ts: new Date().toISOString() });
-    saveState(id, state);
-    logger.success(`✅ Recorded checkpoint ${hash}`);
+    saveState(activeMissionId, state);
+
+    // Record to Hybrid Ledger
+    ledger.record('MISSION_CHECKPOINT', {
+      mission_id: activeMissionId,
+      task_id: taskId,
+      commit_hash: hash,
+      note: note
+    });
+
+    logger.success(`✅ Recorded checkpoint ${hash} in mission repo.`);
   } catch (err: any) {
     logger.error(`Checkpoint failed: ${err.message}`);
   }
@@ -339,8 +421,12 @@ async function resumeMission(id?: string) {
     }
 
     for (const dir of searchDirs) {
-      if (!safeExistsSync(dir)) continue;
-      const missions = safeReaddir(dir);
+      if (!safeExistsSync(dir) || !fs.lstatSync(dir).isDirectory()) continue;
+      const missions = safeReaddir(dir).filter(m => {
+        try {
+          return fs.lstatSync(path.join(dir, m)).isDirectory();
+        } catch (_) { return false; }
+      });
       const active = missions.find(m => {
         const state = loadState(m);
         return state?.status === 'active';

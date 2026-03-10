@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 /**
- * Secure I/O utilities for Gemini Skills (TypeScript Edition)
+ * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
  * Provides file size validation, safe command execution, and resource guards.
  */
 export declare const DEFAULT_MAX_FILE_SIZE_MB = 100;
@@ -44,6 +44,10 @@ export declare function safeUnlinkSync(filePath: string): void;
  */
 export declare function safeMkdir(dirPath: string, options?: fs.MakeDirectoryOptions): void;
 /**
+ * Check if a file or directory exists safely.
+ */
+export declare function safeExistsSync(filePath: string): boolean;
+/**
  * Execute a command safely.
  */
 export declare function safeExec(command: string, args?: string[], options?: any): string;
@@ -67,4 +71,12 @@ export declare function writeArtifact(filePath: string, data: string | Buffer, f
 };
 export declare const safeAppendFile: typeof safeAppendFileSync;
 export declare const safeUnlink: typeof safeUnlinkSync;
+/**
+ * Safely read a directory with permission validation.
+ */
+export declare function safeReaddir(dirPath: string): string[];
+/**
+ * Safely get file status with permission validation.
+ */
+export declare function safeStat(filePath: string): fs.Stats;
 //# sourceMappingURL=secure-io.d.ts.map

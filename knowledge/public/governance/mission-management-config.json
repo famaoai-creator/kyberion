@@ -5,7 +5,8 @@
     "confidential": "active/missions/confidential",
     "public": "active/missions/public",
     "archive": "active/archive/missions",
-    "exports": "hub/exports/missions"
+    "exports": "hub/exports/missions",
+    "global_ledger": "active/audit/system-ledger.jsonl"
   },
   "mep_version": "0.1.0",
   "rehydrate_map": {

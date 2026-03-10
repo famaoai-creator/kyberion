@@ -2,7 +2,7 @@
  * Excel Utilities - Advanced Design Distillation and Tailored Re-generation.
  */
 import * as ExcelJS from 'exceljs';
-import { ExcelDesignProtocol } from './types/excel-protocol';
+import { ExcelDesignProtocol } from './types/excel-protocol.js';
 /**
  * Distills an Excel file into a portable Design Protocol (ADF).
  */
@@ -10,6 +10,5 @@ export declare function distillExcelDesign(filePath: string): Promise<ExcelDesig
 /**
  * Re-generates Excel from dynamic data using a Design Protocol as a "template".
  */
-export declare function generateExcelWithDesign(data: any[][], // 2D data array (header included or separate)
-protocol: ExcelDesignProtocol, sheetName?: string, headerRowIdx?: number, dataRowIdx?: number): Promise<ExcelJS.Workbook>;
+export declare function generateExcelWithDesign(data: any[][], protocol: ExcelDesignProtocol, sheetName?: string, headerRowIdx?: number, dataRowIdx?: number): Promise<ExcelJS.Workbook>;
 //# sourceMappingURL=excel-utils.d.ts.map

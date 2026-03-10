@@ -2,7 +2,7 @@
  * Standardized Error Codes for Gemini Skills Ecosystem.
  */
 export declare const ERROR_CODES: {
-    SKILL_NOT_FOUND: {
+    LOGIC_NOT_FOUND: {
         code: string;
         message: string;
         retryable: boolean;
@@ -96,7 +96,7 @@ export declare const ERROR_CODES: {
 /**
  * Custom error class that carries a structured error code.
  */
-export declare class SkillError extends Error {
+export declare class KyberionError extends Error {
     code: string;
     retryable: boolean;
     context: any;

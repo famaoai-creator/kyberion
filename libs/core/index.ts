@@ -44,6 +44,8 @@ export {
   isProtected, 
   skillDir, 
   missionDir,
+  missionEvidenceDir,
+  findMissionPath,
   resolve,
   rootResolve
 } from './path-resolver.js';
