@@ -23,8 +23,8 @@ last_updated: 2026-03-06
 
 ### Stage 2: Sync (アイデンティティの調和)
 - **役割**: 主権者の属性と好みを把握する。
-- **アクション**: `knowledge/personal/my-identity.json` の設定（名前、言語、対話スタイル、優先ドメイン）を確認または更新する。
-- **成果物**: `my-identity.json` の永続化。
+- **アクション**: `pnpm onboard` を実行し、`knowledge/personal/my-identity.json` の設定（名前、言語、対話スタイル、優先ドメイン）を対話形式で行う。
+- **成果物**: `my-identity.json` の永続化と、3-Tier ディレクトリ構造の確立。
 
 ### Stage 3: Provision (環境とスキルの配備)
 - **役割**: 主権者のロールに応じたツールを準備する。
