@@ -35,6 +35,8 @@
     "vital": "npx tsx scripts/vital_report.ts",
     "issue:ingest": "npx tsx scripts/ingest_issue.ts",
     "onboard": "npx tsx scripts/onboarding_wizard.ts",
+    "mission:journal": "npx tsx scripts/mission_journal.ts",
+    "capabilities": "npx tsx scripts/capability_discovery.ts",
     "init": "npm run init-wizard",
     "init-wizard": "node dist/scripts/init_wizard.js",
     "vision:start": "npx tsx presence/sensors/visual-buffer-daemon.ts &",

@@ -1,0 +1,22 @@
+{
+  "actuator_id": "secret-actuator",
+  "version": "1.0.0",
+  "description": "OS Native Secret Manager Bridge",
+  "capabilities": [
+    {
+      "op": "get",
+      "platforms": ["darwin"],
+      "requirements": { "bin": ["security"] }
+    },
+    {
+      "op": "set",
+      "platforms": ["darwin"],
+      "requirements": { "bin": ["security"] }
+    },
+    {
+      "op": "delete",
+      "platforms": ["darwin"],
+      "requirements": { "bin": ["security"] }
+    }
+  ]
+}

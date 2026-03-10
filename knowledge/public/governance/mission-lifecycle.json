@@ -1,20 +1,51 @@
 {
   "$schema": "../../schemas/mission-lifecycle-policy.schema.json",
+  "version": "2.0",
+  "description": "Kyberion Sovereign Mission Lifecycle Policy with A2A Delegation support.",
+  "states": [
+    {
+      "id": "planned",
+      "description": "Mission defined, not yet active."
+    },
+    {
+      "id": "active",
+      "description": "Mission currently being executed (Local or Delegated)."
+    },
+    {
+      "id": "validating",
+      "description": "Implementation complete. Awaiting verification of results/evidence."
+    },
+    {
+      "id": "distilling",
+      "description": "Verification passed. Extracting wisdom and knowledge assets."
+    },
+    {
+      "id": "completed",
+      "description": "All steps finished. Ready for archival."
+    }
+  ],
+  "delegation_policy": {
+    "require_git_history": true,
+    "require_evidence_signature": true,
+    "verification_strategy": "manual_review",
+    "allowed_agent_tiers": ["trusted", "sovereign"]
+  },
   "policies": [
     {
       "name": "archive-completed",
       "condition": {
-        "has_file": "ace-report.json"
+        "status": "completed"
       },
-      "target_dir": "evidence/missions/{YYYY-MM}/",
+      "target_dir": "active/archive/missions/",
       "naming_pattern": "{mission_id}"
     },
     {
       "name": "purge-orphaned",
       "condition": {
-        "max_age_days": 7
+        "max_age_days": 30,
+        "status": "failed"
       },
-      "target_dir": "evidence/missions/orphaned/",
+      "target_dir": "active/archive/failed_missions/",
       "naming_pattern": "{mission_id}"
     }
   ]
