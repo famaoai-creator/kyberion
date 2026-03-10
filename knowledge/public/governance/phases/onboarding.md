@@ -1,23 +1,37 @@
-# Phase Protocol: ① Onboarding
+# Phase Protocol: ① Onboarding (Ecosystem Initialization)
 
 ## Goal
 Environment safety verification and identity synchronization via physical manifestation.
+This phase transforms the ecosystem from a "dormant state" to an "activated state" where the Sovereign's intent is physically manifest.
 
 ## Directives
-1. **Identity Integrity**: Verify the existence of `knowledge/personal/my-identity.json`. If missing, the Sovereign must manually inject their identity as the automated wizard is in legacy migration.
-2. **Physical Infrastructure**: Ensure dependencies are managed via **pnpm**. `npm` is deprecated for this workspace due to `workspace:` protocol requirements.
-3. **Governance Activation**: Trigger the "System Onboarding" job defined in `knowledge/governance/orchestration-config.json` using `scripts/run_orchestration_job.ts`.
 
-## Execution Path [L1]
-- **Action**: `npx pnpm install && npx tsx scripts/run_orchestration_job.ts`
-- **Validation**:
-  - Verification of `@agent/core` availability across all skills via symlink stabilization.
-  - Confirmation of 3-Tier isolation and build artifact generation in `dist/`.
+### Stage 1: Physical Foundation (物理的基盤の確立)
+Establish the neurological link between modules.
+- **Action**: `pnpm install`
+- **Effect**: All workspace dependencies and internal `@agent` links are realized.
+
+### Stage 2: System Manifestation (システムの具現化)
+Construct the physical structure and activate services based on governance.
+- **Action**: `npx tsx scripts/run_orchestration_job.ts` (Running the "System Onboarding" job).
+- **Effect**:
+  - Build artifacts (`dist/`) are generated.
+  - `presence` (external interface) services are initialized.
+  - Personal Tier (`knowledge/personal/`) is physically secured.
+
+### Stage 3: Soul Infusion (アイデンティティとビジョンの注入)
+Inject the Sovereign's unique "Soul" into the established vessel.
+- **Action**: Concierge hearing process and automated generation.
+- **Output**:
+  - `knowledge/personal/my-identity.json`: Defines values, domain, and role.
+  - `knowledge/personal/my-vision.md`: Defines the "North Star" (Vision).
+- **Effect**: The ecosystem aligns its autonomy with the Sovereign's personality.
 
 ## Success Metrics [L3]
-- **Status**: `scripts/run_orchestration_job.ts` returns `status: "finished"`.
-- **Evidence**: `presence` services are active and reachable via `service_manager`.
+1. **Physical Integrity**: `pnpm install` completed with no resolution errors.
+2. **Operational Status**: `scripts/run_orchestration_job.ts` returns `status: "finished"`.
+3. **Identity Alignment**: Both `my-identity.json` and `my-vision.md` exist in the Personal Tier.
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by GEMINI.md (Consolidated with docs/INITIALIZATION.md)*
 *Last Updated: 2026-03-10 by Ecosystem Architect*
