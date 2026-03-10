@@ -23,7 +23,8 @@ import {
   safeReaddir,
   safeUnlinkSync,
   detectTier,
-  ledger
+  ledger,
+  withLock
 } from '@agent/core';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
@@ -154,10 +155,13 @@ function loadState(id: string): MissionState | null {
   } catch (_) { return null; }
 }
 
-function saveState(id: string, state: MissionState) {
+async function saveState(id: string, state: MissionState) {
   const missionDir = (pathResolver as any).findMissionPath(id) || (pathResolver as any).missionDir(id, state.tier);
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
-  safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify(state, null, 2));
+  
+  await withLock(`mission-${id}`, async () => {
+    safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify(state, null, 2));
+  });
 }
 
 /**
@@ -233,7 +237,7 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     },
     history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier (Independent Micro-Repo).` }]
   };
-  saveState(upperId, initialState);
+  await saveState(upperId, initialState);
 
   // Record to Hybrid Ledger
   ledger.record('MISSION_CREATE', {
@@ -302,7 +306,7 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
     } else {
       state.status = 'active';
       state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Mission resumed.' });
-      saveState(upperId, state);
+      await saveState(upperId, state);
     }
 
     const missionDir = (pathResolver as any).findMissionPath(upperId);
@@ -432,7 +436,7 @@ async function delegateMission(id: string, agentId: string, a2aMessageId: string
     note: `Mission delegated to ${agentId} (A2A: ${a2aMessageId})` 
   });
   
-  saveState(upperId, state);
+  await saveState(upperId, state);
   logger.success(`✅ Mission ${upperId} marked as DELEGATED.`);
 }
 
@@ -470,7 +474,7 @@ async function importMission(id: string, remoteUrl: string) {
       note: `Imported results from ${remoteUrl}. Transitioned to VALIDATING.` 
     });
     
-    saveState(upperId, state);
+    await saveState(upperId, state);
     logger.success(`✅ Results imported for ${upperId}. Manual/Auto verification required.`);
   } catch (err: any) {
     logger.error(`Import failed: ${err.message}`);
@@ -502,7 +506,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
     note: `Verification ${result}: ${note}` 
   });
   
-  saveState(upperId, state);
+  await saveState(upperId, state);
   logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
 }
 
@@ -520,7 +524,7 @@ async function distillMission(id: string) {
     note: 'Knowledge distillation completed. Transitioned to COMPLETED.' 
   });
   
-  saveState(upperId, state);
+  await saveState(upperId, state);
   logger.success(`✅ Wisdom distilled for ${upperId}. Mission ready for finishing.`);
 }
 
@@ -603,7 +607,7 @@ async function finishMission(id: string, seal: boolean = false) {
   // 2. Update state
   state.status = 'completed';
   state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
-  saveState(upperId, state);
+  await saveState(upperId, state);
 
   // 3. Optional Sealing
   if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
@@ -679,22 +683,25 @@ async function createCheckpoint(taskId: string, note: string) {
 
   logger.info(`📸 Checkpoint for ${activeMissionId}: ${taskId}...`);
   try {
-    safeExec('git', ['add', '.'], { cwd: missionPath });
-    safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], { cwd: missionPath });
-    const hash = getGitHash(missionPath);
-    state.git.latest_commit = hash;
-    state.git.checkpoints.push({ task_id: taskId, commit_hash: hash, ts: new Date().toISOString() });
-    saveState(activeMissionId, state);
+    await withLock(`mission-${activeMissionId}`, async () => {
+      safeExec('git', ['add', '.'], { cwd: missionPath });
+      safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], { cwd: missionPath });
+      const hash = getGitHash(missionPath);
+      const currentState = loadState(activeMissionId!)!;
+      currentState.git.latest_commit = hash;
+      currentState.git.checkpoints.push({ task_id: taskId, commit_hash: hash, ts: new Date().toISOString() });
+      await saveState(activeMissionId!, currentState);
 
-    // Record to Hybrid Ledger
-    ledger.record('MISSION_CHECKPOINT', {
-      mission_id: activeMissionId,
-      task_id: taskId,
-      commit_hash: hash,
-      note: note
+      // Record to Hybrid Ledger
+      ledger.record('MISSION_CHECKPOINT', {
+        mission_id: activeMissionId!,
+        task_id: taskId,
+        commit_hash: hash,
+        note: note
+      });
+
+      logger.success(`✅ Recorded checkpoint ${hash} in mission repo.`);
     });
-
-    logger.success(`✅ Recorded checkpoint ${hash} in mission repo.`);
   } catch (err: any) {
     logger.error(`Checkpoint failed: ${err.message}`);
   }
@@ -759,7 +766,7 @@ async function resumeMission(id?: string) {
   }
 
   state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Session re-established.' });
-  saveState(targetId, state);
+  await saveState(targetId, state);
   logger.success(`✅ Mission ${targetId} is back in focus.`);
 }
 
