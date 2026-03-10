@@ -3,7 +3,11 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 
 async function main() {
-  const configPath = rootResolve('knowledge/governance/orchestration-config.json');
+  let configPath = rootResolve('knowledge/governance/orchestration-config.json');
+  if (!fs.existsSync(configPath)) {
+    configPath = rootResolve('knowledge/public/governance/orchestration-config.json');
+  }
+  
   if (!fs.existsSync(configPath)) {
     logger.warn('Orchestration config not found.');
     return;
