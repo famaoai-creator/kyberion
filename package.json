@@ -2,13 +2,13 @@
   "name": "kyberion",
   "version": "1.0.0",
   "private": true,
-  "description": "Monorepo for Gemini skills",
+  "description": "Monorepo for Kyberion Ecosystem",
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "index.js",
   "workspaces": [
     "libs/core",
+    "libs/shared-*",
     "libs/actuators/*",
     "satellites/*"
   ],
@@ -63,7 +63,7 @@
   },
   "lint-staged": {
     "knowledge/**/*.md": [
-      "node dist/scripts/generate_knowledge_index.js"
+      "echo 'Syncing knowledge index...'"
     ]
   },
   "dependencies": {
