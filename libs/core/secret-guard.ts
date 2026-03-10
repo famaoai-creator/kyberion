@@ -2,9 +2,9 @@ import {
   safeReadFile, 
   safeWriteFile, 
   safeReaddir, 
-  safeStat, 
-  logger 
-} from './index.js';
+  safeStat
+} from './secure-io.js';
+import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -152,4 +152,20 @@ function _saveGrants(grants: AuthGrant[]) {
 }
 
 export const getActiveSecrets = () => Array.from(_activeSecrets);
-export const secretGuard = { getSecret, getActiveSecrets, grantAccess };
+
+/**
+ * Checks if a given path points to a known secret location.
+ */
+export const isSecretPath = (filePath: string): boolean => {
+  const resolved = path.resolve(filePath);
+  const secretPaths = [
+    SECRETS_FILE,
+    PERSONAL_CONNECTIONS_DIR,
+    GRANTS_FILE,
+    pathResolver.resolve('vault/secrets/'),
+    pathResolver.resolve('knowledge/personal/connections/')
+  ];
+  return secretPaths.some(p => resolved.startsWith(p));
+};
+
+export const secretGuard = { getSecret, getActiveSecrets, grantAccess, isSecretPath };

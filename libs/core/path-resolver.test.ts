@@ -10,7 +10,7 @@ describe('path-resolver core', () => {
   it('should find the project root', () => {
     const root = rootDir();
     expect(root).toBeDefined();
-    expect(root.endsWith('github')).toBe(true); 
+    expect(root.endsWith('kyberion')).toBe(true); 
     expect(path.isAbsolute(root)).toBe(true);
   });
 

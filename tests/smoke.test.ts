@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const rootDir = process.cwd();
-const indexPath = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
+const indexPath = path.join(rootDir, 'knowledge/public/orchestration/global_skill_index.json');
 
 describe('Ecosystem Smoke Tests', () => {
   if (!fs.existsSync(indexPath)) {

@@ -31,8 +31,6 @@ export {
   safeAppendFileSync as safeAppendFile,
   safeUnlinkSync as safeUnlink
 } from './secure-io.js';
-import * as _secureIo from './secure-io.js';
-export const isSecretPath = (_secureIo as any).isSecretPath;
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
@@ -75,7 +73,7 @@ export {
 } from './tier-guard.js';
 
 export * as secretGuard from './secret-guard.js';
-export { getSecret, getActiveSecrets, grantAccess } from './secret-guard.js';
+export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';

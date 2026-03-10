@@ -13,7 +13,7 @@ describe('metrics core', () => {
     expect(Array.isArray(summaries)).toBe(true);
     expect(summaries).toHaveLength(2);
 
-    const skillA = summaries.find((s) => s.skill === 'test-skill-a');
+    const skillA = summaries.find((s) => s.component === 'test-skill-a');
     expect(skillA).toBeDefined();
     expect(skillA!.executions).toBe(3);
     expect(skillA!.errors).toBe(1);
@@ -22,7 +22,7 @@ describe('metrics core', () => {
     expect(skillA!.minMs).toBe(50);
     expect(skillA!.maxMs).toBe(200);
 
-    const skillB = summaries.find((s) => s.skill === 'test-skill-b');
+    const skillB = summaries.find((s) => s.component === 'test-skill-b');
     expect(skillB).toBeDefined();
     expect(skillB!.executions).toBe(1);
     expect(skillB!.errors).toBe(0);

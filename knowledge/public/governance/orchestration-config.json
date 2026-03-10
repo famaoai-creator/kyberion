@@ -15,7 +15,7 @@
     "timeout_ms": 120000
   },
   "plugins": {
-    "registry": "knowledge/orchestration/plugin-registry.json",
+    "registry": "knowledge/public/orchestration/plugin-registry.json",
     "allowed_categories": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
   },
   "jobs": [
