@@ -1,0 +1,151 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Lint check
+        run: pnpm run lint
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage
+
+      - name: Check coverage threshold
+        env:
+          COVERAGE_THRESHOLD: ${{ vars.COVERAGE_THRESHOLD || '60' }}
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+            echo "Coverage: $COVERAGE%"
+            echo "Threshold: $COVERAGE_THRESHOLD%"
+            
+            if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
+              echo "❌ Coverage $COVERAGE% is below threshold $COVERAGE_THRESHOLD%"
+              echo "::error::Coverage threshold not met. Current: $COVERAGE%, Required: $COVERAGE_THRESHOLD%"
+              exit 1
+            else
+              echo "✅ Coverage $COVERAGE% meets threshold $COVERAGE_THRESHOLD%"
+            fi
+          else
+            echo "❌ Coverage report not found"
+            echo "::error::Coverage report file not found at coverage/coverage-summary.json"
+            exit 1
+          fi
+
+      - name: Report coverage
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: always()
+        with:
+          json-summary-path: ./coverage/coverage-summary.json
+
+      - name: Security scan
+        run: pnpm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Measure build size
+        id: build-size
+        run: |
+          if [ -d dist/ ]; then
+            echo "📊 Measuring build size..."
+            npx tsx scripts/measure-build-size.ts > build-size-report.md
+            echo "✅ Build size measured successfully"
+            
+            # Also save JSON format for programmatic access
+            npx tsx scripts/measure-build-size.ts --json --no-save > build-size-report.json
+            
+            # Display summary in logs
+            cat build-size-report.md
+          else
+            echo "⚠️ dist/ directory not found"
+            exit 1
+          fi
+
+      - name: Comment build size report on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Check if report file exists
+            if (!fs.existsSync('build-size-report.md')) {
+              console.log('Build size report not found, skipping comment');
+              return;
+            }
+
+            const report = fs.readFileSync('build-size-report.md', 'utf8');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📦 Build Size Report')
+            );
+
+            const commentBody = report;
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+              console.log('Updated existing build size comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+              console.log('Created new build size comment');
+            }
+
+      - name: Upload build size artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-size-reports
+          path: |
+            build-size-report.md
+            build-size-report.json
+            .kiro/metrics/build-size-history.json
+          retention-days: 30
