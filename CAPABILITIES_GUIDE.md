@@ -5,7 +5,7 @@ Last updated: 2026-03-09
 
 > **Governance Note (The Capability Evolution):**
 > Capabilities in the Kyberion ecosystem are not mere scripts. They represent the **"Spinal Cord"** of the Sovereign Entity, categorized into **Logic** (decision-making and analysis) and **Actuators** (physical world interactions). 
-> According to the Kyberion Sovereign Charter (GEMINI.md), a capability is distilled from proven ad-hoc execution evidence and must satisfy strict logical and physical integrity constraints.
+> According to the Kyberion Sovereign Charter (AGENTS.md), a capability is distilled from proven ad-hoc execution evidence and must satisfy strict logical and physical integrity constraints.
 
 This guide provides a domain-driven catalog of the ecosystem's capabilities.
 

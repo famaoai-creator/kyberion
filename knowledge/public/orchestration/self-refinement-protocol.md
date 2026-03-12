@@ -14,13 +14,13 @@ AIエージェントが自身の System Instructions やスキルを自律的に
 ## 1. 改善のトリガー (Triggers)
 
 - **Repeated Failures**: 同種のタスクでACE審議が2回以上否決された場合。
-- **Ambiguity Detection**: 自身の指示（GEMINI.md）に矛盾や曖昧さを発見し、推論が迷走した場合。
+- **Ambiguity Detection**: 自身の指示（AGENTS.md）に矛盾や曖昧さを発見し、推論が迷走した場合。
 - **New Pattern Discovery**: 10回以上のミッションを経て、より効率的な共通パターン（スキル候補）を特定した場合。
 
 ## 2. 安全規程 (Safety First)
 
 - **Mandatory Backup**: 変更対象のファイルを編集する前に、必ず `active/archive/backups/` へ `.bak.[timestamp]` 形式でコピーを保存せよ。
-- **Integrity Principle**: `GEMINI.md` の核心である「3-Tier Model」や「Security Rules」を削除してはならない。
+- **Integrity Principle**: `AGENTS.md` の核心である「3-Tier Model」や「Security Rules」を削除してはならない。
 - **Draft PR Only**: 自身のファイルを直接書き換えることは禁止する。常に `feat/self-refinement-[id]` ブランチを作成し、Pull Request を通じて Lord に提案せよ。
 
 ## 3. 自己批判プロセス (The Monologue)

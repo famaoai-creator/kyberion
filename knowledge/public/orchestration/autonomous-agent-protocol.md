@@ -37,7 +37,7 @@ This protocol extends the core Gemini Agent identity with autonomous execution p
 
 ## 5. Constraint: Concept Integrity (コンセプトの死守)
 
-- **Directive**: NEVER modify the "Identity & Purpose" or "Golden Rules" of the primary `GEMINI.md`. All autonomous evolution must be additive and reside within this protocol or specialized skill scripts.
+- **Directive**: NEVER modify the "Identity & Purpose" or "Golden Rules" of the primary `AGENTS.md`. All autonomous evolution must be additive and reside within this protocol or specialized skill scripts.
 
 ---
 

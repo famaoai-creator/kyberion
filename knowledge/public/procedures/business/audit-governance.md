@@ -9,7 +9,7 @@ Audit the project directory to ensure compliance with SDLC standards, mandatory 
 ## 3. Step-by-Step Instructions
 1.  **Hygiene Check**: Use `File-Actuator` with `list` to verify mandatory folders exist: `docs/`, `src/`, `tests/`, `active/missions/`.
 2.  **Document Verification**: 
-    - Check for `GEMINI.md`, `README.md`, and `package.json` in the root.
+    - Check for `AGENTS.md`, `README.md`, and `package.json` in the root.
     - Check for `mission-state.json` in active mission directories.
 3.  **Completeness Scan**: Search for "TODO" or "Pending" keywords in `docs/` using `File-Actuator`.
 4.  **Reporting**: Use the gathered metadata to generate a Project Health Score.

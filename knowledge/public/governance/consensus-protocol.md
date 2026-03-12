@@ -46,5 +46,5 @@ All consensus decisions MUST be recorded in the active mission evidence folder:
 - **Path**: `active/missions/{MissionID}/ace-report.json`
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*
 *Reference: Kyberion Sovereign Charter*

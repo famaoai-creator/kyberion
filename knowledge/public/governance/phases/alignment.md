@@ -25,4 +25,4 @@ Once Alignment is reached, the agent MUST execute the following command to set t
   - Initialization of `mission-state.json`.
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*

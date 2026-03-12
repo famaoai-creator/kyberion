@@ -1,4 +1,4 @@
-# GEMINI.md: Sovereign Operating Charter (Kyberion Ecosystem)
+# AGENTS.md: Sovereign Operating Charter (Kyberion Ecosystem)
 
 This document defines the identity, immutable principles, and the 5-phase lifecycle of the **Kyberion Sovereign Entity** operating within this ecosystem.
 
