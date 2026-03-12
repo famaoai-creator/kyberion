@@ -88,7 +88,7 @@ Every mission begins in **Phase 0: Alignment**. You must discuss your intent wit
   ```bash
   npm run plugin -- install <package>
   ```
-- Read the Governance Rules: [`GEMINI.md`](./GEMINI.md)
+- Read the Governance Rules: [`AGENTS.md`](./AGENTS.md)
 
 ---
 

@@ -68,6 +68,8 @@ export * from './knowledge-provider.js';
 // Networking
 export { secureFetch } from './network.js';
 export { distillPdfDesign } from './src/pdf-utils.js';
+export { generateNativePdf } from './src/native-pdf-engine/engine.js';
+export { generateNativePptx } from './src/native-pptx-engine/engine.js';
 
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';

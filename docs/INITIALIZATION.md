@@ -67,5 +67,5 @@ pnpm vital
 - ✅ [OK] Sovereign Vision
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*
 *Last Updated: 2026-03-11 by Ecosystem Architect*
