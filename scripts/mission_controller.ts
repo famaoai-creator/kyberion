@@ -22,6 +22,7 @@ import {
   safeMkdir,
   safeReaddir,
   safeUnlinkSync,
+  safeAppendFileSync,
   detectTier,
   ledger,
   withLock
@@ -31,6 +32,7 @@ import { validateFileFreshness } from '../libs/core/validators.js';
 const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = pathResolver.active('missions/registry.json');
 const ARCHIVE_DIR = pathResolver.active('archive/missions');
+const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 
 interface MissionState {
   mission_id: string;
@@ -167,6 +169,62 @@ async function saveState(id: string, state: MissionState) {
 /**
  * 4. Mission Commands
  */
+async function enqueueMission(id: string, tier: string, priority: number = 5, deps: string[] = []) {
+  const upperId = id.toUpperCase();
+  const entry = {
+    mission_id: upperId,
+    tier,
+    priority,
+    status: 'pending',
+    enqueued_at: new Date().toISOString(),
+    dependencies: deps
+  };
+
+  await withLock('mission-queue', async () => {
+    safeAppendFileSync(QUEUE_PATH, JSON.stringify(entry) + '\n');
+  });
+  logger.success(`📥 Mission ${upperId} added to queue (Priority: ${priority}).`);
+}
+
+async function dispatchNextMission() {
+  await withLock('mission-queue', async () => {
+    if (!safeExistsSync(QUEUE_PATH)) {
+      logger.info('Queue is empty.');
+      return;
+    }
+
+    const lines = (safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string).split('\n').filter(l => !!l);
+    const queue = lines.map(l => JSON.parse(l));
+    const pending = queue.filter(m => m.status === 'pending');
+
+    if (pending.length === 0) {
+      logger.info('No pending missions in queue.');
+      return;
+    }
+
+    // Sort by priority (desc) and time
+    pending.sort((a, b) => b.priority - a.priority || a.enqueued_at.localeCompare(b.enqueued_at));
+
+    for (const mission of pending) {
+      const { ok, missing } = checkDependencies(mission.mission_id);
+      if (ok) {
+        logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
+        mission.status = 'dispatched';
+        // Update queue file
+        const updatedLines = queue.map(m => JSON.stringify(m)).join('\n') + '\n';
+        safeWriteFile(QUEUE_PATH, updatedLines);
+        
+        // Actually start the mission
+        await startMission(mission.mission_id, mission.tier as any);
+        return;
+      } else {
+        logger.info(`⏳ Skipping ${mission.mission_id}: Waiting for ${missing.join(', ')}`);
+      }
+    }
+    logger.info('No missions ready for dispatch (dependencies not met).');
+  });
+}
+
 async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
   const upperId = id.toUpperCase();
   const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
@@ -587,8 +645,43 @@ async function sealMission(id: string) {
   }
 }
 
+/**
+ * 6. Quality & Finalization Control
+ */
+async function validateMissionQuality(id: string): Promise<{ ok: boolean; reason?: string }> {
+  const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+  if (!safeExistsSync(policyPath)) return { ok: true };
+
+  const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
+  const reqs = policy.quality_requirements;
+  if (!reqs) return { ok: true };
+
+  const state = loadState(id);
+  if (!state) return { ok: false, reason: 'Mission state not found.' };
+
+  if (reqs.require_test_success) {
+    // Check for recent test results or trigger test
+    logger.info(`🧪 [QualityCheck] Verification required: require_test_success=true`);
+    // In a real scenario, we'd check a test-results.json or similar.
+    // For this implementation, we assume successful verification must have happened.
+    if (state.status !== 'distilling' && state.status !== 'validating' && state.status !== 'completed') {
+        return { ok: false, reason: 'Mission must pass validation/verification before finishing.' };
+    }
+  }
+
+  return { ok: true };
+}
+
 async function finishMission(id: string, seal: boolean = false) {
   const upperId = id.toUpperCase();
+  
+  // 0. Quality Guard
+  const quality = await validateMissionQuality(upperId);
+  if (!quality.ok) {
+    logger.error(`❌ [QUALITY_REJECTION] Mission ${upperId} does not meet governance requirements: ${quality.reason}`);
+    return;
+  }
+
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
 
@@ -873,6 +966,8 @@ async function main() {
     case 'verify': await verifyMission(arg1, arg2 as any, arg3); break;
     case 'distill': await distillMission(arg1); break;
     case 'seal': await sealMission(arg1); break;
+    case 'enqueue': await enqueueMission(arg1, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []); break;
+    case 'dispatch': await dispatchNextMission(); break;
     case 'finish': await finishMission(arg1, arg2 === '--seal'); break;
     case 'resume': await resumeMission(arg1); break;
     case 'record-task': await recordTask(arg1, arg2, JSON.parse(process.argv[5] || '{}')); break;

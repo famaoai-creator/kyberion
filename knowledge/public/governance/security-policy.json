@@ -1,0 +1,122 @@
+{
+  "$schema": "../../../schemas/governance-policy.schema.json",
+  "version": "1.1.0",
+  "default_allow": [
+    "active/missions/${MISSION_ID}/",
+    "scratch/",
+    "work/metrics/",
+    "active/shared/runtime/"
+  ],
+  "tier_restrictions": {
+    "personal": {
+      "allow_read": ["personal"],
+      "allow_write": ["personal"],
+      "block_message": "Sovereign Sanctuary: Access restricted to authorized personal processes only."
+    },
+    "confidential": {
+      "allow_read": ["confidential", "public"],
+      "allow_write": ["confidential"],
+      "block_message": "Organization Confidential: Higher tier required."
+    }
+  },
+  "role_permissions": {
+    "ecosystem_architect": {
+      "allow_write": [
+        "active/missions/",
+        "knowledge/",
+        "libs/core/",
+        "libs/actuators/",
+        "scripts/",
+        "pipelines/",
+        "schemas/",
+        "README.md",
+        "CAPABILITIES_GUIDE.md",
+        "CONTRIBUTING.md",
+        "GEMINI.md"
+      ]
+    },
+    "software_developer": {
+      "allow_write": [
+        "active/projects/",
+        "tests/",
+        "libs/actuators/"
+      ]
+    },
+    "ruthless_auditor": {
+      "allow_write": [
+        "active/audit/"
+      ]
+    },
+    "cyber_security": {
+      "allow_write": [
+        "active/audit/security/",
+        "knowledge/security/"
+      ]
+    },
+    "mission_controller": {
+      "allow_write": [
+        "active/missions/",
+        "active/archive/missions/",
+        "knowledge/personal/missions/",
+        "active/shared/runtime/mission_queue.jsonl",
+        "active/audit/system-ledger.jsonl",
+        "registry.json"
+      ]
+    },
+    "infrastructure_sentinel": {
+      "allow_write": [
+        "active/shared/logs/",
+        "active/shared/runtime/",
+        "presence/bridge/runtime/",
+        "Library/LaunchAgents/"
+      ]
+    },
+    "strategic_sales": {
+      "allow_write": [
+        "active/projects/proposals/"
+      ]
+    },
+    "knowledge_steward": {
+      "allow_write": [
+        "knowledge/"
+      ]
+    },
+    "ceo": {
+      "allow_write": [
+        "knowledge/ceo/",
+        "knowledge/personal/my-identity.json"
+      ]
+    },
+    "sovereign_concierge": {
+      "allow_write": [
+        "knowledge/personal/",
+        "active/missions/",
+        "active/projects/onboarding/"
+      ]
+    }
+  },
+  "quality_requirements": {
+    "require_test_success": true,
+    "require_seal": false,
+    "require_blockchain_anchor": false,
+    "min_coverage_pct": 0
+  },
+  "a2a_policy": {
+    "min_trust_score_personal": 8.0,
+    "min_trust_score_confidential": 5.0,
+    "mandatory_external_audit": true
+  },
+  "network_guardrails": {
+    "allowed_domains": [
+      "github.com",
+      "api.github.com",
+      "registry.npmjs.org",
+      "pnpm.io",
+      "google.com",
+      "generativelanguage.googleapis.com"
+    ],
+    "max_request_size_kb": 2048,
+    "max_requests_per_mission": 50,
+    "leak_detection_enabled": true
+  }
+}
