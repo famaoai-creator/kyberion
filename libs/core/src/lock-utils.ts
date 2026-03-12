@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger } from '../logger.js';
+import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeExistsSync, safeUnlinkSync } from '../secure-io.js';
 

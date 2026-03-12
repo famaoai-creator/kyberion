@@ -1,0 +1,50 @@
+{
+  "name": "Sovereign System Upgrade",
+  "description": "Checks for updates on GitHub and self-manages the upgrade mission through validation and merge.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🔍 Step 1: Checking for remote updates on GitHub..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "git fetch origin main && git rev-parse HEAD",
+        "export_as": "local_hash"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "git rev-parse origin/main",
+        "export_as": "remote_hash"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "Local: {{local_hash}} | Remote: {{remote_hash}}" }
+    },
+    {
+      "op": "core:if",
+      "params": {
+        "condition": {
+          "from": "local_hash",
+          "operator": "ne",
+          "value": "{{remote_hash}}"
+        },
+        "then": [
+          { "op": "system:log", "params": { "message": "🚀 Update detected! Initializing upgrade mission..." } },
+          {
+            "op": "system:shell",
+            "params": {
+              "cmd": "npx tsx scripts/mission_controller.ts create MSN-SYS-UPGRADE-{{remote_hash}} confidential 'default' 'development' '/knowledge/personal/my-vision.md' 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'",
+              "export_as": "create_result"
+            }
+          },
+          { "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: npx tsx scripts/mission_controller.ts start MSN-SYS-UPGRADE-{{remote_hash}}" } },
+          { "op": "system:log", "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" } }
+        ],
+        "else": [
+          { "op": "system:log", "params": { "message": "✅ System is already up to date. No action needed." } }
+        ]
+      }
+    }
+  ]
+}
