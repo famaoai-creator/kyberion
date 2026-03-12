@@ -5,6 +5,9 @@ import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as excelUtils from '@agent/shared-media';
 import * as pptxUtils from '@agent/core/pptx-utils';
+import * as xlsxUtils from '@agent/core/src/xlsx-utils.js';
+import * as docxUtils from '@agent/core/src/docx-utils.js';
+import * as pdfUtils from '@agent/core/src/pdf-utils.js';
 
 /**
  * Media-Actuator v2.1.3 [SECURE-IO REINFORCED]
@@ -82,11 +85,27 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
-    case 'pptx_extract':
+    case 'pptx_extract': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
       const assetsDir = path.resolve(rootDir, `scratch/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
       return { ...ctx, [params.export_as || 'last_pptx_design']: design, last_assets_dir: assetsDir };
+    }
+    case 'xlsx_extract': {
+      const xlsxPath = path.resolve(rootDir, resolve(params.path));
+      const xlsxDesign = await xlsxUtils.distillXlsxDesign(xlsxPath);
+      return { ...ctx, [params.export_as || 'last_xlsx_design']: xlsxDesign };
+    }
+    case 'docx_extract': {
+      const docxPath = path.resolve(rootDir, resolve(params.path));
+      const docxDesign = await docxUtils.distillDocxDesign(docxPath);
+      return { ...ctx, [params.export_as || 'last_docx_design']: docxDesign };
+    }
+    case 'pdf_extract': {
+      const pdfPath = path.resolve(rootDir, resolve(params.path));
+      const pdfDesign = await pdfUtils.distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
+      return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
+    }
     default: return ctx;
   }
 }
@@ -100,20 +119,45 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'pptx_render': {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
-      const assetsDir = ctx.last_assets_dir || './assets';
       const outPath = path.resolve(rootDir, resolve(params.path));
-      
+
       if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      
-      const firstTitle = protocol.slides[0]?.elements.find((e: any) => e.type === 'text')?.text;
-      logger.info(`🚀 [MEDIA] Rendering PPTX. Memory title check: "${firstTitle}"`);
 
-      await pptxUtils.generatePptxWithDesign(protocol, outPath);
+      const { generateNativePptx } = await import('@agent/core/src/native-pptx-engine/engine.js');
+      await generateNativePptx(protocol, outPath);
 
-      // EMERGENCY: Attempt to register with Git immediately to prevent auto-cleanup      try { execSync(`git add "${outPath}"`); } catch (_) {}
-      
       const stats = fs.statSync(outPath);
-      logger.info(`✅ [MEDIA] PPTX physically secured and Git-added at: ${outPath} (${stats.size} bytes).`);
+      logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
+      break;
+    }
+    case 'xlsx_render': {
+      const xlsxProtocol = ctx[params.design_from || 'last_xlsx_design'];
+      const xlsxOutPath = path.resolve(rootDir, resolve(params.path));
+      if (!fs.existsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
+      const { generateNativeXlsx } = await import('@agent/core/src/native-xlsx-engine/engine.js');
+      await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
+      const xlsxStats = fs.statSync(xlsxOutPath);
+      logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
+      break;
+    }
+    case 'docx_render': {
+      const docxProtocol = ctx[params.design_from || 'last_docx_design'];
+      const docxOutPath = path.resolve(rootDir, resolve(params.path));
+      if (!fs.existsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
+      const { generateNativeDocx } = await import('@agent/core/src/native-docx-engine/engine.js');
+      await generateNativeDocx(docxProtocol, docxOutPath);
+      const docxStats = fs.statSync(docxOutPath);
+      logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
+      break;
+    }
+    case 'pdf_render': {
+      const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
+      const pdfOutPath = path.resolve(rootDir, resolve(params.path));
+      if (!fs.existsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
+      const { generateNativePdf } = await import('@agent/core/src/native-pdf-engine/engine.js');
+      await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
+      const pdfStats = fs.statSync(pdfOutPath);
+      logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
       break;
     }
     case 'write_file':

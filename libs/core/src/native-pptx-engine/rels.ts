@@ -11,11 +11,12 @@ export function generatePresentationRels(slideCount: number, masterCount: number
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
   let rId = 1;
-  for (let i = 1; i <= slideCount; i++) {
-    xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/>`;
-  }
+  // SlideMaster(s) MUST come first (rId1+) — PowerPoint expects this order
   for (let i = 1; i <= masterCount; i++) {
     xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster${i}.xml"/>`;
+  }
+  for (let i = 1; i <= slideCount; i++) {
+    xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/>`;
   }
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>`;
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>`;

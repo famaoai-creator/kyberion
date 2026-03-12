@@ -18,10 +18,10 @@
     "jsdom": "^24.0.0",
     "mammoth": "^1.7.0",
     "marked": "^12.0.0",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^4.0.379",
-    "puppeteer": "^22.0.0",
-    "tesseract.js": "^5.0.5",
+    "puppeteer": "^24.38.0",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5",
     "yargs": "^17.7.2"
   }

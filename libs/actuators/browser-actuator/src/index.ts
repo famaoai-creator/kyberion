@@ -6,9 +6,10 @@ import { execSync } from 'node:child_process';
 import { chromium, BrowserContext, Page } from 'playwright';
 
 /**
- * Browser-Actuator v2.1.2 [TRACE & RECORD ENABLED]
+ * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
  * Strictly compliant with Layer 2 (Shield).
  * Standardized with Control Flow, Safety Guards, and Playwright Tracing.
+ * Supports {{env.VAR_NAME}} for secure credential injection.
  */
 
 interface PipelineStep {
@@ -76,26 +77,40 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   }
 
   const page = browserContext.pages().length > 0 ? browserContext.pages()[0] : await browserContext.newPage();
+
+  // Auto-accept all dialogs (confirm, alert, prompt)
+  page.on('dialog', async (dialog) => {
+    logger.info(`[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`);
+    await dialog.accept();
+  });
+
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
-      const resolve = (val: any) => {
+  const resolveKey = (key: string): any => {
+    // {{env.VAR_NAME}} → process.env.VAR_NAME
+    if (key.startsWith('env.')) {
+      return process.env[key.slice(4)] || '';
+    }
+    const parts = key.split('.');
+    let current: any = ctx;
+    for (const part of parts) { current = current?.[part]; }
+    return current;
+  };
+
+  const resolve = (val: any): any => {
     if (typeof val !== 'string') return val;
-    
+
     // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
     const singleVarMatch = val.match(/^{{(.*?)}}$/);
     if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
+      const resolved = resolveKey(singleVarMatch[1].trim());
+      return resolved !== undefined ? resolved : '';
     }
 
     // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
+    return val.replace(/{{(.*?)}}/g, (_, p: string) => {
+      const resolved = resolveKey(p.trim());
+      return resolved !== undefined ? (typeof resolved === 'object' ? JSON.stringify(resolved) : String(resolved)) : '';
     });
   };
 
@@ -267,9 +282,10 @@ async function opApply(op: string, params: any, page: Page, ctx: any, resolve: F
       else { await page.waitForTimeout(params.duration || 1000); }
       break;
     case 'log': logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`); break;
-    default: 
+    default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
+  return ctx;
 }
 
 /**
