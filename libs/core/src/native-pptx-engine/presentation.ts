@@ -3,15 +3,15 @@ export function generatePresentation(slideCount: number, masterCount: number, wi
 <p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
   <p:sldMasterIdLst>`;
   
-  let rId = slideCount + 1; // Slide masters start after slides in presentation.xml.rels
+  let rId = 1; // Slide masters come first (rId1+)
   for (let i = 1; i <= masterCount; i++) {
     xml += `\n    <p:sldMasterId id="${2147483648 + i}" r:id="rId${rId++}"/>`;
   }
-  
+
   xml += `\n  </p:sldMasterIdLst>
   <p:sldIdLst>`;
-  
-  rId = 1; // Slides start at rId1
+
+  // Slides follow after masters
   for (let i = 1; i <= slideCount; i++) {
     xml += `\n    <p:sldId id="${255 + i}" r:id="rId${rId++}"/>`;
   }

@@ -52,10 +52,11 @@ export interface PptxElement {
   text?: string;
   style?: PptxStyle;
   imagePath?: string;
+  imageData?: string;   // Base64-encoded image binary (for lossless round-trip without external files)
   shapeType?: string;
   rows?: string[][];
   colWidths?: number[];
-  tableData?: any[][];
+  tableData?: (string | number | boolean | null)[][];
   textRuns?: PptxTextRun[];
   extensions?: string;
   spPrXml?: string;

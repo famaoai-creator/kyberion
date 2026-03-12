@@ -1,8 +1,8 @@
 import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PptxDesignProtocol, PptxElement, PptxPos, PptxStyle, PptxTextRun } from './types/pptx-protocol';
-import { generateNativePptx } from './src/native-pptx-engine/engine';
+import { PptxDesignProtocol, PptxElement, PptxPos, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
+import { generateNativePptx } from './native-pptx-engine/engine.js';
 
 /**
  * PPTX Utilities v3.0.0 [Native Engine]
@@ -405,6 +405,13 @@ function extractObjects(zip: AdmZip, xml: string, palette: { [key: string]: stri
       const rId = body.match(/r:embed="([^"]*)"/)?.[1];
       if (rId && rels[rId]) {
         el.imagePath = assetsDir ? path.join(assetsDir, path.basename(rels[rId].target)) : rels[rId].target;
+        // Embed image data as base64 for lossless round-trip
+        const relTarget = rels[rId].target;
+        const mediaPath = path.posix.join(path.posix.dirname(relsFile.replace('_rels/', '').replace('.rels', '')), relTarget).replace(/^\//, '');
+        const mediaEntry = zip.getEntry(mediaPath);
+        if (mediaEntry) {
+          el.imageData = mediaEntry.getData().toString('base64');
+        }
       }
     }
 

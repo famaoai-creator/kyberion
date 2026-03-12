@@ -1,4 +1,4 @@
-export function generateContentTypes(slideCount: number, layoutCount: number, masterCount: number, imageCount: number): string {
+export function generateContentTypes(slideCount: number, layoutCount: number, masterCount: number, diagramCount: number, chartCount: number = 0, notesCount: number = 0): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="jpeg" ContentType="image/jpeg"/>
@@ -23,14 +23,20 @@ export function generateContentTypes(slideCount: number, layoutCount: number, ma
     xml += `\n  <Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;
   }
 
-  // Support for up to 100 SmartArt diagrams
-  for (let i = 1; i <= 100; i++) {
+  // Only emit diagram/chart/notes entries for parts that actually exist
+  for (let i = 1; i <= diagramCount; i++) {
     xml += `\n  <Override PartName="/ppt/diagrams/data${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"/>`;
     xml += `\n  <Override PartName="/ppt/diagrams/layout${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"/>`;
     xml += `\n  <Override PartName="/ppt/diagrams/colors${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"/>`;
     xml += `\n  <Override PartName="/ppt/diagrams/quickStyle${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"/>`;
   }
-  
+  for (let i = 1; i <= chartCount; i++) {
+    xml += `\n  <Override PartName="/ppt/charts/chart${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`;
+  }
+  for (let i = 1; i <= notesCount; i++) {
+    xml += `\n  <Override PartName="/ppt/notesSlides/notesSlide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>`;
+  }
+
   xml += `\n</Types>`;
   return xml;
 }

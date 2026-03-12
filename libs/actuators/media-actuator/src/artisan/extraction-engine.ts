@@ -7,6 +7,7 @@ import { safeWriteFile, safeReadFile } from '@agent/core';
 import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { distillPdfDesign } from '@agent/core/src/pdf-utils.js';
 
 /**
  * doc-to-text Reborn (Digital Archaeologist)
@@ -87,67 +88,45 @@ export async function extract(filePath: string, mode: ExtractionMode = 'all'): P
 }
 
 async function processPDF(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
-  // Mode: Content/Metadata still uses pdf-parse for quick text
+  // Delegate to shared pdf-utils for content/metadata extraction
   if (mode === 'content' || mode === 'metadata' || mode === 'all') {
-    // pdf-parse can be tricky with ESM/CJS interop. Using any cast to ensure callability.
     const pdf = pdf_parse as any;
     const data = await (typeof pdf === 'function' ? pdf(buffer) : pdf.default(buffer));
     if (mode === 'content' || mode === 'all') result.layers.content = data.text;
     if (mode === 'metadata' || mode === 'all') result.layers.metadata = data.info;
   }
 
-  // Mode: Aesthetic uses pdfjs-dist for coordinate analysis
+  // Aesthetic uses shared pdf-utils layout analysis (via pdfjs-dist)
   if (mode === 'aesthetic' || mode === 'all') {
-    const uint8Array = new Uint8Array(buffer);
-    const loadingTask = PDFJS.getDocument({ data: uint8Array, useSystemFonts: true });
-    const pdfDoc = await loadingTask.promise;
-    
-    const elements: LayoutElement[] = [];
-    const fonts = new Set<string>();
+    try {
+      // Write buffer to temp file for distillPdfDesign (which takes a file path)
+      const tmpPath = path.join(require('os').tmpdir(), `pdf-extract-${Date.now()}.pdf`);
+      require('fs').writeFileSync(tmpPath, buffer);
+      const protocol = await distillPdfDesign(tmpPath, { aesthetic: true });
+      require('fs').unlinkSync(tmpPath);
 
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1.0 });
-
-      textContent.items.forEach((item: any) => {
-        const { str, transform, width, height, fontName } = item;
-        // transform: [scaleX, skewY, skewX, scaleY, translateX, translateY]
-        const x = transform[4];
-        const y = viewport.height - transform[5]; // Flip Y for standard coordinates
-
-        elements.push({
-          type: 'text',
-          x, y, width, height,
-          text: str,
-          font_name: fontName,
-          font_size: transform[0] // Approximation
-        });
-        if (fontName) fonts.add(fontName);
-      });
+      // Map PdfAesthetic to legacy Aesthetic format
+      const aesthetic = protocol.aesthetic;
+      result.layers.aesthetic = {
+        fonts: aesthetic?.fonts,
+        layout: aesthetic?.layout || 'unknown',
+        elements: aesthetic?.elements?.map(e => ({
+          type: e.type,
+          x: e.x, y: e.y,
+          width: e.width, height: e.height,
+          text: e.text,
+          font_name: e.fontName,
+          font_size: e.fontSize,
+        })),
+        branding: {
+          logo_presence: aesthetic?.branding?.logoPresence || false,
+          tone: result.layers.content?.includes('Agreement') ? 'professional' : 'technical',
+        },
+      };
+    } catch {
+      result.layers.aesthetic = { layout: 'unknown', branding: { logo_presence: false } };
     }
-
-    // Heuristic Grid/Layout Detection
-    const layoutType = elements.length > 0 ? detectLayout(elements) : 'unknown';
-
-    result.layers.aesthetic = {
-      fonts: Array.from(fonts),
-      layout: layoutType,
-      elements,
-      branding: {
-        logo_presence: buffer.toString('utf8').includes('/Image'),
-        tone: result.layers.content?.includes('Agreement') ? 'professional' : 'technical'
-      }
-    };
   }
-}
-
-function detectLayout(elements: LayoutElement[]): 'single-column' | 'multi-column' | 'grid' {
-  const xCoords = elements.map(e => Math.round(e.x / 50) * 50); // Bucket by 50px
-  const uniqueX = new Set(xCoords);
-  if (uniqueX.size > 5) return 'grid';
-  if (uniqueX.size > 2) return 'multi-column';
-  return 'single-column';
 }
 
 async function processDocx(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
