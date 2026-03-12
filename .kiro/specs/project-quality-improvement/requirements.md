@@ -13,7 +13,7 @@
 - **Shared_Package**: 複数のアクチュエータで共有されるライブラリパッケージ（shared-media, shared-vision等）
 - **CI_Pipeline**: 継続的インテグレーションパイプライン（GitHub Actions）
 - **Monorepo_Structure**: pnpm workspacesによるモノレポ構成
-- **GEMINI_Framework**: Kyberionの統治フレームワーク（GEMINI.md）
+- **GEMINI_Framework**: Kyberionの統治フレームワーク（AGENTS.md）
 
 ## 要件
 
@@ -138,7 +138,7 @@
 
 ### 要件11: GEMINI準拠の検証強化
 
-**ユーザーストーリー:** 開発者として、GEMINI.mdで定義された原則への準拠を自動的に検証したい。これにより、アーキテクチャの一貫性を保証できる。
+**ユーザーストーリー:** 開発者として、AGENTS.mdで定義された原則への準拠を自動的に検証したい。これにより、アーキテクチャの一貫性を保証できる。
 
 #### 受入基準
 

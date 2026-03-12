@@ -40,7 +40,7 @@ When a new market opportunity arises (e.g., a new regulation like PQC):
 
 - [ ] Every technical debt item has a business ROI assigned via `business-impact-analyzer`.
 - [ ] Every release note is generated with stakeholder context via `release-note-crafter`.
-- [ ] The core identity (`GEMINI.md`) is never compromised during autonomous expansion.
+- [ ] The core identity (`AGENTS.md`) is never compromised during autonomous expansion.
 
 ---
 

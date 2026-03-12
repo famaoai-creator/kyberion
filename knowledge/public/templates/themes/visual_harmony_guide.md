@@ -23,7 +23,7 @@ last_updated: 2026-03-06
 
 ## 3. 設定方法
 
-`GEMINI.md` または実行時の命令で `proposer_context` を指定する。
+`AGENTS.md` または実行時の命令で `proposer_context` を指定する。
 例：「提案者：Gemini-Lab として資料を作成せよ」
 -> `knowledge/templates/themes/proposer/palettes/gemini-lab.json` をロード。
 
