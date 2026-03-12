@@ -67,6 +67,7 @@ export * from './knowledge-provider.js';
 
 // Networking
 export { secureFetch } from './network.js';
+export { distillPdfDesign } from './src/pdf-utils.js';
 
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';
