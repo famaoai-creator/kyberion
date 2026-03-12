@@ -25,4 +25,4 @@ The agent MUST use the mission controller to resume, which handles auto-stashing
   - Automatic git branch verification to match the mission context.
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*

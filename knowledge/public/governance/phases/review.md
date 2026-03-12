@@ -24,4 +24,4 @@ At mission completion, the agent MUST execute the finalization protocol.
   - Setting status to `completed` in the mission state.
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*

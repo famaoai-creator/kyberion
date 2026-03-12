@@ -31,7 +31,7 @@ last_updated: 2026-03-06
 
 ### 2.1 実行原則 (Surgical Refit)
 - `Plan -> Act -> Validate` のサイクルを遵守する。
-- `GEMINI.md` の標準規程に従い、Git Checkpointing を行いながら物理的な成果物を構築する。
+- `AGENTS.md` の標準規程に従い、Git Checkpointing を行いながら物理的な成果物を構築する。
 
 ---
 
