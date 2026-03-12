@@ -37,6 +37,7 @@
     "issue:ingest": "npx tsx scripts/ingest_issue.ts",
     "onboard": "npx tsx scripts/onboarding_wizard.ts",
     "mission:journal": "npx tsx scripts/mission_journal.ts",
+    "dashboard": "npx tsx scripts/sovereign_dashboard.ts",
     "capabilities": "npx tsx scripts/capability_discovery.ts",
     "system:upgrade:check": "npx tsx scripts/run_pipeline.ts --input pipelines/system-upgrade-check.json",
     "system:upgrade:execute": "npx tsx scripts/run_pipeline.ts --input pipelines/system-upgrade-execute.json",
