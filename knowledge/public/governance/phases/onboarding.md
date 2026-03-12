@@ -33,5 +33,5 @@ Inject the Sovereign's unique "Soul" into the established vessel.
 3. **Identity Alignment**: Both `my-identity.json` and `my-vision.md` exist in the Personal Tier.
 
 ---
-*Status: Mandated by GEMINI.md (Consolidated with docs/INITIALIZATION.md)*
+*Status: Mandated by AGENTS.md (Consolidated with docs/INITIALIZATION.md)*
 *Last Updated: 2026-03-10 by Ecosystem Architect*

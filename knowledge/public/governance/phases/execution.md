@@ -24,4 +24,4 @@ At each significant milestone or task completion, the agent MUST record progress
   - Recording of commit hashes in `mission-state.json`.
 
 ---
-*Status: Mandated by GEMINI.md*
+*Status: Mandated by AGENTS.md*

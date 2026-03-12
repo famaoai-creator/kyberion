@@ -693,7 +693,7 @@ class GEMINIViolationError extends Error {
 
 1. 違反箇所を特定
 2. 推奨される代替実装を適用
-3. 必要に応じてGEMINI.mdを参照
+3. 必要に応じてAGENTS.mdを参照
 4. テストを実行して動作を確認
 
 ### CI/CDエラー
@@ -1396,19 +1396,19 @@ module.exports = [
           paths: [
             {
               name: 'fs',
-              message: 'Violation of GEMINI.md: Use @agent/core/secure-io instead.',
+              message: 'Violation of AGENTS.md: Use @agent/core/secure-io instead.',
             },
             {
               name: 'node:fs',
-              message: 'Violation of GEMINI.md: Use @agent/core/secure-io instead.',
+              message: 'Violation of AGENTS.md: Use @agent/core/secure-io instead.',
             },
             {
               name: 'child_process',
-              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeExec) instead.',
+              message: 'Violation of AGENTS.md: Use @agent/core/secure-io (safeExec) instead.',
             },
             {
               name: 'node:child_process',
-              message: 'Violation of GEMINI.md: Use @agent/core/secure-io (safeExec) instead.',
+              message: 'Violation of AGENTS.md: Use @agent/core/secure-io (safeExec) instead.',
             },
           ],
         },
