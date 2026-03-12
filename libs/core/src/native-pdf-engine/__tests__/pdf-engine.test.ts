@@ -2,7 +2,6 @@
  * Native PDF Engine — Unit Tests
  *
  * Tests protocol validation and structure.
- * Note: Full PDF rendering tests require Puppeteer and are heavier.
  */
 import { describe, it, expect } from 'vitest';
 import type { PdfDesignProtocol } from '../../types/pdf-protocol.js';
