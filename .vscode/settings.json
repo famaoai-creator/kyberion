@@ -16,5 +16,6 @@
     "**/dist": true,
     "**/coverage": true,
     "**/evidence/simulations": true
-  }
+  },
+  "kiroAgent.configureMCP": "Disabled"
 }
