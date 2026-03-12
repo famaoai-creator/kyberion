@@ -1,18 +1,24 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
+import * as fs from 'node:fs';
 
 /**
  * Standardized network utilities for Kyberion Components.
- * Enhanced with TIBA (Temporal Intent-Based Authentication) and Endpoint Whitelisting.
+ * v2.2 - POLICY-DRIVEN GUARDRAILS (ADF ENABLED)
  */
 
-const ENDPOINT_WHITELIST: Record<string, string[]> = {
-  'moltbook': ['www.moltbook.com', 'api.moltbook.com'],
-  'slack': ['slack.com', 'api.slack.com'],
-  'github': ['github.com', 'api.github.com'],
-  'google': ['googleapis.com', 'google.com']
-};
+function loadAllowedDomains(): string[] {
+  try {
+    const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+    if (fs.existsSync(policyPath)) {
+      const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+      return policy.network_guardrails.allowed_domains || [];
+    }
+  } catch (_) {}
+  return ['github.com', 'google.com']; // Hard fallback for connectivity
+}
 
 function scrubData(data: any, url: string): any {
   if (!data) return data;
@@ -40,19 +46,14 @@ export async function secureFetch<T = any>(options: AxiosRequestConfig): Promise
   const hostname = new URL(url).hostname;
 
   // 1. Verify Endpoint Integrity
-  // If the request contains sensitive keywords in headers but target is not whitelisted, reject.
   const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['X-API-KEY']);
   
   if (hasAuth) {
-    let isWhitelisted = false;
-    for (const service in ENDPOINT_WHITELIST) {
-      if (ENDPOINT_WHITELIST[service].some(domain => hostname.endsWith(domain))) {
-        isWhitelisted = true;
-        break;
-      }
-    }
+    const allowedDomains = loadAllowedDomains();
+    const isWhitelisted = allowedDomains.some(domain => hostname.endsWith(domain));
+    
     if (!isWhitelisted) {
-      throw new Error(`TIBA_SECURITY_VIOLATION: Attempted authenticated request to non-whitelisted endpoint: ${hostname}`);
+      throw new Error(`[NETWORK_POLICY_VIOLATION] Authenticated request to non-whitelisted domain: ${hostname}`);
     }
   }
 

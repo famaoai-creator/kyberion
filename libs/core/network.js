@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -6,53 +39,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.secureFetch = secureFetch;
 const axios_1 = __importDefault(require("axios"));
 const secret_guard_js_1 = require("./secret-guard.js");
+const path_resolver_js_1 = require("./path-resolver.js");
+const fs = __importStar(require("node:fs"));
+
 /**
  * Standardized network utilities for Kyberion Components.
- * Enhanced with TIBA (Temporal Intent-Based Authentication) and Endpoint Whitelisting.
+ * v2.2 - POLICY-DRIVEN GUARDRAILS (ADF ENABLED)
  */
-const ENDPOINT_WHITELIST = {
-    'moltbook': ['www.moltbook.com', 'api.moltbook.com'],
-    'slack': ['slack.com', 'api.slack.com'],
-    'github': ['github.com', 'api.github.com'],
-    'google': ['googleapis.com', 'google.com']
-};
+
+function loadAllowedDomains() {
+    try {
+        const policyPath = (0, path_resolver_js_1.knowledge)('public/governance/security-policy.json');
+        if (fs.existsSync(policyPath)) {
+            const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+            return policy.network_guardrails.allowed_domains || [];
+        }
+    }
+    catch (_) { }
+    return ['github.com', 'google.com']; // Hard fallback
+}
+
 function scrubData(data, url) {
     if (!data)
         return data;
     let str = typeof data === 'string' ? data : JSON.stringify(data);
-    // Layer 2 Shield: Scrub active secrets tracked by secret-guard
-    const secrets = secret_guard_js_1.secretGuard.getActiveSecrets();
+    const secrets = (0, secret_guard_js_1.getActiveSecrets)();
     for (const secret of secrets) {
         if (secret && secret.length > 5) {
-            // Endpoint Check: If the URL is whitelisted for a service, we might allow the secret 
-            // (This is handled primarily in headers, but we scrub body just in case)
             const escaped = secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             str = str.replace(new RegExp(escaped, 'g'), '[REDACTED_SECRET]');
         }
     }
-    // Scrub absolute local paths
     str = str.replace(/\/Users\/[a-zA-Z0-9._-]+\//g, '[REDACTED_PATH]/');
     return typeof data === 'string' ? str : JSON.parse(str);
 }
+
 async function secureFetch(options) {
     const url = options.url || '';
     const hostname = new URL(url).hostname;
-    // 1. Verify Endpoint Integrity
-    // If the request contains sensitive keywords in headers but target is not whitelisted, reject.
     const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['X-API-KEY']);
     if (hasAuth) {
-        let isWhitelisted = false;
-        for (const service in ENDPOINT_WHITELIST) {
-            if (ENDPOINT_WHITELIST[service].some(domain => hostname.endsWith(domain))) {
-                isWhitelisted = true;
-                break;
-            }
-        }
+        const allowedDomains = loadAllowedDomains();
+        const isWhitelisted = allowedDomains.some(domain => hostname.endsWith(domain));
         if (!isWhitelisted) {
-            throw new Error(`TIBA_SECURITY_VIOLATION: Attempted authenticated request to non-whitelisted endpoint: ${hostname}`);
+            throw new Error(`[NETWORK_POLICY_VIOLATION] Authenticated request to non-whitelisted domain: ${hostname}`);
         }
     }
-    // 2. Automatically scrub outbound payload
     if (options.data)
         options.data = scrubData(options.data, url);
     if (options.params)

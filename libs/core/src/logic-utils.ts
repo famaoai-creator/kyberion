@@ -1,4 +1,4 @@
-import { logger } from '../logger.js';
+import { logger } from '../core.js';
 
 /**
  * Logic Utilities for ADF and Pipeline Processing.

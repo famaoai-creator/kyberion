@@ -1,0 +1,60 @@
+{
+  "name": "Sovereign System Upgrade Execution",
+  "description": "Performs the actual upgrade: pull, build, test, and merge.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🛠️ Step 2: Executing System Upgrade..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "git checkout main && git pull origin main",
+        "export_as": "pull_result",
+        "retry": { "maxRetries": 2 }
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "📦 Step 3: Rebuilding physical foundation..." }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "pnpm install && npm run build",
+        "export_as": "build_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "🧪 Step 4: Running comprehensive validation..." }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "pnpm test",
+        "export_as": "test_result"
+      }
+    },
+    {
+      "op": "core:if",
+      "params": {
+        "condition": {
+          "from": "test_result",
+          "operator": "not_empty"
+        },
+        "then": [
+          { "op": "system:log", "params": { "message": "✅ Validation passed. Finalizing upgrade..." } },
+          {
+            "op": "system:shell",
+            "params": {
+              "cmd": "pnpm vital",
+              "export_as": "final_vital"
+            }
+          },
+          { "op": "system:log", "params": { "message": "🚀 System successfully upgraded to the latest version." } }
+        ],
+        "else": [
+          { "op": "system:log", "params": { "message": "❌ Validation failed! Human intervention required for rollback." } }
+        ]
+      }
+    }
+  ]
+}

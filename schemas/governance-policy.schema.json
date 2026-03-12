@@ -1,33 +1,61 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Governance Policy Schema",
+  "title": "Governance Policy Protocol (GPP)",
   "type": "object",
+  "required": ["version", "default_allow", "tier_restrictions", "role_permissions", "quality_requirements", "network_guardrails"],
   "properties": {
-    "name": { "type": "string" },
     "version": { "type": "string" },
-    "rules": {
+    "default_allow": {
       "type": "array",
-      "items": {
+      "items": { "type": "string" }
+    },
+    "tier_restrictions": {
+      "type": "object",
+      "additionalProperties": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "description": { "type": "string" },
-          "severity": { "enum": ["error", "warning", "info"] },
-          "check_type": { "enum": ["restricted_api", "security_pattern", "static_analysis", "test", "todo_check"] },
-          "params": {
-            "type": "object",
-            "properties": {
-              "patterns": { "type": "array", "items": { "type": "string" } },
-              "exemptions": { "type": "array", "items": { "type": "string" } },
-              "command": { "type": "string" },
-              "target_dirs": { "type": "array", "items": { "type": "string" } },
-              "file_extensions": { "type": "array", "items": { "type": "string" } }
-            }
-          }
-        },
-        "required": ["id", "check_type"]
+          "allow_read": { "type": "array", "items": { "type": "string" } },
+          "allow_write": { "type": "array", "items": { "type": "string" } },
+          "block_message": { "type": "string" }
+        }
+      }
+    },
+    "role_permissions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "allow_write": { "type": "array", "items": { "type": "string" } },
+          "allow_read": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "quality_requirements": {
+      "type": "object",
+      "properties": {
+        "require_test_success": { "type": "boolean", "default": false },
+        "require_seal": { "type": "boolean", "default": false },
+        "require_blockchain_anchor": { "type": "boolean", "default": false },
+        "min_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "a2a_policy": {
+      "type": "object",
+      "properties": {
+        "min_trust_score_personal": { "type": "number", "default": 8.0 },
+        "min_trust_score_confidential": { "type": "number", "default": 5.0 },
+        "mandatory_external_audit": { "type": "boolean", "default": true }
+      }
+    },
+    "network_guardrails": {
+      "type": "object",
+      "required": ["allowed_domains"],
+      "properties": {
+        "allowed_domains": { "type": "array", "items": { "type": "string" } },
+        "max_request_size_kb": { "type": "integer", "default": 1024 },
+        "max_requests_per_mission": { "type": "integer", "default": 100 },
+        "leak_detection_enabled": { "type": "boolean", "default": true }
       }
     }
-  },
-  "required": ["name", "rules"]
+  }
 }
