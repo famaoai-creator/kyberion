@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Mission Queue (KMQ)",
+  "type": "object",
+  "required": ["mission_id", "status", "enqueued_at"],
+  "properties": {
+    "mission_id": { "type": "string" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "priority": { "type": "integer", "default": 5 },
+    "status": { "type": "string", "enum": ["pending", "dispatched", "running", "failed", "cancelled"] },
+    "enqueued_at": { "type": "string", "format": "date-time" },
+    "dependencies": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object" }
+  }
+}
