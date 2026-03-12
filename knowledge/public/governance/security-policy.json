@@ -32,7 +32,9 @@
         "README.md",
         "CAPABILITIES_GUIDE.md",
         "CONTRIBUTING.md",
-        "GEMINI.md"
+        "GEMINI.md",
+        "extracted_design.json",
+        "hoge.pdf"
       ]
     },
     "software_developer": {
