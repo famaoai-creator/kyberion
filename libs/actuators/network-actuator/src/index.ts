@@ -4,17 +4,20 @@ import {
   safeReadFile, 
   safeWriteFile, 
   safeMkdir,
-  safeExec
+  safeExec,
+  pathResolver,
+  resolveVars,
+  evaluateCondition,
+  withRetry
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 
 /**
- * Network-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
- * Strictly compliant with Layer 2 (Shield).
- * A pure ADF-driven engine for all network interactions with Control Flow and Safety Guards.
+ * Network-Actuator v2.2.0 [A2A TRANSPORT ENABLED]
+ * Pure ADF-driven engine for all network and A2A interactions.
  */
 
 interface PipelineStep {
@@ -38,46 +41,25 @@ interface NetworkAction {
  */
 async function handleAction(input: NetworkAction) {
   if (input.action !== 'pipeline') {
-    throw new Error(`Unsupported action: ${input.action}. Network-Actuator v2.1 is pure pipeline-driven.`);
+    throw new Error(`Unsupported action: ${input.action}. Network-Actuator v2.2 is pure pipeline-driven.`);
   }
   return await executePipeline(input.steps || [], input.context || {}, input.options);
 }
 
 /**
- * Universal Network Pipeline Engine with Control Flow & Safety Guards
+ * Universal Network Pipeline Engine
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+  if (initialCtx.context_path && fs.existsSync(pathResolver.rootResolve(initialCtx.context_path))) {
+    const saved = JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
-
-      const resolve = (val: any) => {
-    if (typeof val !== 'string') return val;
-    
-    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
-    }
-
-    // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
-    });
-  };
 
   const results = [];
   for (const step of steps) {
@@ -89,12 +71,12 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
       logger.info(`  [NET_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       
       if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
+        ctx = await opControl(step.op, step.params, ctx, options, state);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
+          case 'capture': ctx = await opCapture(step.op, step.params, ctx); break;
+          case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
+          case 'apply': await opApply(step.op, step.params, ctx); break;
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -106,7 +88,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   }
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
   return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
@@ -115,7 +97,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 /**
  * CONTROL Operators
  */
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -141,32 +123,15 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
   }
 }
 
-function evaluateCondition(cond: any, ctx: any): boolean {
-  if (!cond) return true;
-  const parts = cond.from.split('.');
-  let val = ctx;
-  for (const part of parts) { val = val?.[part]; }
-  
-  switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    default: return !!val;
-  }
-}
-
 /**
  * CAPTURE Operators
  */
-async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
+async function opCapture(op: string, params: any, ctx: any) {
   switch (op) {
     case 'fetch':
       const response = await secureFetch({
         method: params.method || 'GET',
-        url: resolve(params.url),
+        url: resolveVars(params.url, ctx),
         headers: params.headers,
         data: params.data,
         params: params.query,
@@ -175,7 +140,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       return { ...ctx, [params.export_as || 'last_capture']: response };
 
     case 'shell':
-      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+      const cmd = resolveVars(params.cmd, ctx);
+      return { ...ctx, [params.export_as || 'last_capture']: safeExec(cmd).trim() };
+
+    case 'a2a_poll':
+      const messages = await pollA2AInbox();
+      return { ...ctx, [params.export_as || 'inbox_messages']: messages };
 
     default: return ctx;
   }
@@ -184,7 +154,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 /**
  * TRANSFORM Operators
  */
-async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
+async function opTransform(op: string, params: any, ctx: any) {
   switch (op) {
     case 'json_query':
       const data = ctx[params.from || 'last_capture'];
@@ -203,18 +173,26 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 /**
  * APPLY Operators
  */
-async function opApply(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+async function opApply(op: string, params: any, ctx: any) {
   switch (op) {
     case 'write_file':
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const outPath = pathResolver.rootResolve(resolveVars(params.path, ctx));
       const content = typeof ctx.last_capture === 'object' ? JSON.stringify(ctx.last_capture, null, 2) : ctx.last_capture;
       if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       safeWriteFile(outPath, content);
       break;
 
+    case 'a2a_send':
+      const message = resolveVars(params.message, ctx);
+      await sendA2AMessage(message, {
+        method: params.method || 'local',
+        encrypt: params.encrypt !== false,
+        target_public_key: params.target_public_key ? pathResolver.rootResolve(resolveVars(params.target_public_key, ctx)) : undefined
+      });
+      break;
+
     case 'log':
-      logger.info(`[NETWORK_LOG] ${resolve(params.message || 'Action completed')}`);
+      logger.info(`[NETWORK_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
       break;
   }
 }
