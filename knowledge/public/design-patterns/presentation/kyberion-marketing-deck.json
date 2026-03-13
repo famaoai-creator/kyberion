@@ -1,0 +1,63 @@
+{
+  "pattern_id": "KYBERION-MARKETING-DECK",
+  "category": "relational",
+  "target_audience": "Potential Clients, Investors, Partners",
+  "description": "A comprehensive 20-page deck marketing the Kyberion Sovereign Ecosystem.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "1. Cover: Kyberion - The Sovereign Partner",
+      "2. The AI Gap: Why tools alone aren't enough",
+      "3. Solution: The Kyberion Sovereign Ecosystem",
+      "4. Core Value: Trust via Tier Isolation",
+      "5. Core Value: Agility via Actuators",
+      "6. Core Value: Autonomy - From Tool to Partner",
+      "7. Architecture: The Super-Nerve System",
+      "8. Governance: Secure-IO & The Shield",
+      "9. Lifecycle: The 5-Phase Mission Protocol",
+      "10. Case Study: Rapid Software Manifestation",
+      "11. Case Study: Intelligence Distillation",
+      "12. Business Value: Drastic Lead-Time Reduction",
+      "13. Meet KYBERION-PRIME: Your Dedicated Architect",
+      "14. Ecosystem: The A2A Collaborative Network",
+      "15. Roadmap: Vision 2026-2027",
+      "16. Partnership: How we work together",
+      "17. Onboarding: 3-Stage Rapid Setup",
+      "18. Tech Stack: Node.js, TS, & Sovereign AI",
+      "19. Conclusion: Beyond Assistance, Towards Partnership",
+      "20. Contact: Begin Your Sovereign Journey"
+    ],
+    "color_palette": "kyberion-sovereign-navy"
+  },
+  "content_data": [
+    { "slide": 1, "title": "Kyberion", "subtitle": "The Sovereign Operating Ecosystem for the Next Era", "visual": "Large Branding" },
+    { "slide": 2, "title": "The AI Productivity Gap", "body": ["Traditional LLMs are stateless and fragmented.", "Integration requires manual glue-code.", "Security is often an after-thought."], "visual": "Gap Diagram" },
+    { "slide": 3, "title": "The Kyberion Solution", "body": ["A unified autonomous entity.", "Physical execution via Actuators.", "Wisdom retention via Knowledge Tiers."], "visual": "Ecosystem Map" },
+    { "slide": 4, "title": "Trust Through Isolation", "body": ["3-Tier Model: Personal, Confidential, Public.", "Independent Micro-Git repos per mission.", "Zero data-leakage policy."], "visual": "Shield Icon" },
+    { "slide": 5, "title": "Agility Through Actuators", "body": ["Browser, Code, File, System, Media.", "Modular 'hands' for the digital brain.", "No more re-inventing the wheel."], "visual": "Actuator Icons" },
+    { "slide": 6, "title": "From Tool to Partner", "body": ["Kyberion doesn't just answer; it acts.", "Alignment-first mission protocols.", "Continuous evolution via distillation."], "visual": "Partnership Graphic" },
+    { "slide": 7, "title": "The Super-Nerve Architecture", "body": ["Decentralized intelligence nodes.", "ADF-driven communication.", "Scalable from local to global."], "visual": "Nerve Diagram" },
+    { "slide": 8, "title": "Governance & Security", "body": ["Secure-IO compliance.", "Auditability via Hybrid Ledger.", "Sovereign Sanctuary protection."], "visual": "Lock/Audit Graphic" },
+    { "slide": 9, "title": "The 5-Phase Protocol", "body": ["1. Onboarding", "2. Recovery", "3. Alignment", "4. Execution", "5. Review"], "visual": "Circular Flow" },
+    { "slide": 10, "title": "Case Study: Rapid Software", "body": ["From concept to PR in minutes.", "Automated testing & validation.", "Structural integrity guaranteed."], "visual": "Code Snippet Graphic" },
+    { "slide": 11, "title": "Case Study: Distillation", "body": ["Extracting insights from massive data.", "Automated reporting (PDF/PPTX).", "Knowledge permanence."], "visual": "Brain Icon" },
+    { "slide": 12, "title": "Value Proposition", "body": ["80% reduction in routine task time.", "Consistent engineering standards.", "Lower cognitive load for the Sovereign."], "visual": "ROI Chart" },
+    { "slide": 13, "title": "Meet KYBERION-PRIME", "body": ["Primary Architect persona.", "Strategic, Concierge, or Minimalist style.", "Your vision's digital manifestation."], "visual": "Agent Avatar" },
+    { "slide": 14, "title": "A2A Collaboration", "body": ["Agent-to-Agent interaction protocol.", "Multi-agent orchestration.", "Trust-score based delegation."], "visual": "Network Nodes" },
+    { "slide": 15, "title": "Roadmap 2026-2027", "body": ["Q1: Core Stability & MCP Support", "Q2: Multi-Platform Presence", "Q3: Sovereign Cloud Launch"], "visual": "Timeline" },
+    { "slide": 16, "title": "Partnership Model", "body": ["Subscription-based sovereign license.", "Custom actuator development.", "White-glove implementation."], "visual": "Handshake" },
+    { "slide": 17, "title": "Rapid Onboarding", "body": ["Physical foundation in seconds.", "Identity sync in minutes.", "Full activation within the hour."], "visual": "Rocket Icon" },
+    { "slide": 18, "title": "Sovereign Tech Stack", "body": ["Modern TypeScript Core.", "Robust Playwright/Puppeteer automation.", "Schema-first ADF communication."], "visual": "Tech Icons" },
+    { "slide": 19, "title": "The Future of Partnership", "body": ["Beyond 'doing for' to 'being with'.", "A partner that knows your style.", "Your intent, manifested."], "visual": "Future Vision" },
+    { "slide": 20, "title": "Begin Your Journey", "body": ["Connect: sovereign@kyberion.local", "Execute: pnpm mission:create", "Vision: manifested."], "visual": "Contact Details" }
+  ],
+  "media_actuator_config": {
+    "template_id": "marketing-deck-v1",
+    "engine": "pptx",
+    "styles": {
+      "theme": "kyberion-dark",
+      "font_family": "Inter",
+      "transition_effect": "fade"
+    }
+  }
+}

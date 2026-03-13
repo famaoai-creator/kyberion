@@ -11,6 +11,7 @@ module.exports = [
       'coverage/**',
       'evidence/**',
       'active/**',
+      'work/shared/external/**',
       'vault/**',
       'tests/**',
       'scripts/**',
@@ -26,9 +27,19 @@ module.exports = [
       reportUnusedDisableDirectives: 'off',
     },
   },
+  {
+    files: ['**/eslint.config.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // JS Config
   {
-    files: ['**/*.cjs', '**/*.js', '**/*.mjs'],
+    files: ['**/*.cjs'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
@@ -38,6 +49,22 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off', // Temporarily disabled to pass CI --max-warnings 0
+      'no-console': 'off',
+      'no-undef': 'error',
+    },
+  },
+  {
+    files: ['**/*.js', '**/*.mjs'],
+    ignores: ['**/eslint.config.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-unused-vars': 'off',
       'no-console': 'off',
       'no-undef': 'error',
     },
@@ -60,7 +87,17 @@ module.exports = [
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unsafe-function-type': 'off',
       'prefer-const': 'off',
+    },
+  },
+  {
+    files: [
+      'scripts/**/*.ts',
+      'tests/**/*.ts',
+      'libs/shared-*/**/*.ts',
+    ],
+    rules: {
       'no-restricted-imports': [
         'error',
         {

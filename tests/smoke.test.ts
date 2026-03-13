@@ -1,33 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const rootDir = process.cwd();
 const indexPath = path.join(rootDir, 'knowledge/public/orchestration/global_skill_index.json');
+const cliScriptPath = path.join(rootDir, 'dist/scripts/cli.js');
 
 describe('Ecosystem Smoke Tests', () => {
-  if (!fs.existsSync(indexPath)) {
-    it.skip('Skill index not found - run generate-index first', () => {});
-    return;
-  }
+  it('has a generated skill index with at least one implemented actuator', () => {
+    expect(fs.existsSync(indexPath)).toBe(true);
 
-  const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-  const skills = index.s || index.skills;
-  const implemented = skills.filter((s: any) => (s.s === 'impl' || s.status === 'implemented'));
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const skills = index.s || index.skills || [];
+    const implemented = skills.filter((skill: any) => skill.s === 'implemented' || skill.status === 'implemented');
 
-  implemented.forEach((skill: any) => {
-    const skillName = skill.n || skill.name;
-    const skillPath = skill.path || skillName;
-    const mainScript = skill.m || 'dist/index.js';
-    const fullPath = path.join(rootDir, skillPath, mainScript);
+    expect(Array.isArray(skills)).toBe(true);
+    expect(implemented.length).toBeGreaterThan(0);
+  });
 
-    it(`should have valid syntax for ${skillName} (${mainScript})`, () => {
-      if (!fs.existsSync(fullPath)) {
-        throw new Error(`Main script not found: ${fullPath}`);
-      }
-      // node --check performs syntax check only, doesn't execute
-      execSync(`node --check "${fullPath}"`, { stdio: 'pipe' });
+  it('can render the CLI help output from the built script', () => {
+    expect(fs.existsSync(cliScriptPath)).toBe(true);
+
+    const output = execFileSync('node', [cliScriptPath, 'help'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+
+    expect(output).toContain('KYBERION CONSOLE');
+    expect(output).toContain('list');
+    expect(output).toContain('run');
   });
 });

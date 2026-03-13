@@ -1,0 +1,24 @@
+{
+  "pattern_id": "STRAT-ROAD-01",
+  "category": "strategic",
+  "target_audience": "Board Members, Project Sponsors, Clients",
+  "description": "Timeline-based strategic roadmap with key milestones.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "Strategic Vision",
+      "Timeline / Gantt Chart",
+      "Phase-wise Objectives",
+      "Critical Success Factors"
+    ],
+    "color_palette": "kyberion-gold-strategic"
+  },
+  "media_actuator_config": {
+    "template_id": "roadmap-timeline-v1",
+    "engine": "mermaid",
+    "styles": {
+      "gantt_axis_format": "%Y-%m",
+      "theme": "forest"
+    }
+  }
+}

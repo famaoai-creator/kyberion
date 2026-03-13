@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sovereign Identity",
+  "description": "Schema for knowledge/personal/my-identity.json — the Sovereign's core identity profile.",
+  "type": "object",
+  "required": ["name", "language", "interaction_style", "primary_domain", "status", "version", "created_at"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "How the Sovereign wishes to be addressed."
+    },
+    "language": {
+      "type": "string",
+      "description": "Preferred language for interaction (e.g., Japanese, English)."
+    },
+    "interaction_style": {
+      "type": "string",
+      "enum": ["Senior Partner", "Concierge", "Minimalist"],
+      "description": "Senior Partner: professional & strategic. Concierge: polite & proactive. Minimalist: concise & efficient."
+    },
+    "primary_domain": {
+      "type": "string",
+      "description": "Primary domain of expertise or focus (e.g., Software Engineering, Financial Services IT Management)."
+    },
+    "background": {
+      "type": "string",
+      "description": "Optional background context to inform decision-making style."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive"],
+      "default": "active"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}
