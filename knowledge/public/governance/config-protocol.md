@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Config Protocol: The Sovereign Rule of System State
 
-このドキュメントは、Gemini Skills エコシステムの構成（Configuration）に関する基本原則を定義します。全てのミッションおよびエージェントはこのプロトコルを遵守しなければなりません。
+このドキュメントは、Kyberion エコシステムの構成（Configuration）に関する基本原則を定義します。全てのミッションおよびエージェントはこのプロトコルを遵守しなければなりません。
 
 ## 1. 構成項目の物理的配置 (Source of Truth)
 

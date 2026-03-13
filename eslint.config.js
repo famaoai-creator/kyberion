@@ -16,7 +16,6 @@ module.exports = [
       'scripts/**',
       'tools/**',
       'scratch/**',
-      '.gemini/**',
       'libs/core/*.ts',
       '**/*.d.ts',
       '**/*.d.cts',

@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Sovereign Autonomous Agent Protocol (SAAP)
 
-This protocol extends the core Gemini Agent identity with autonomous execution patterns. When active, the agent must adhere to these directives in addition to core mandates.
+This protocol extends the core Kyberion Agent identity with autonomous execution patterns. When active, the agent must adhere to these directives in addition to core mandates.
 
 ## 1. Autonomous Self-Healing (自己修復)
 
@@ -41,4 +41,4 @@ This protocol extends the core Gemini Agent identity with autonomous execution p
 
 ---
 
-_Signed, The Self-Evolving Gemini Agent_
+_Signed, The Self-Evolving Kyberion Agent_

@@ -1,5 +1,5 @@
 /**
- * Shared Utility Core for Gemini Skills (TypeScript Edition)
+ * Shared Utility Core for Kyberion (TypeScript Edition)
  */
 export declare const logger: {
     _log: (level: string, msg: string) => void;

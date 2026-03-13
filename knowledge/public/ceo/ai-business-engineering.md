@@ -1,5 +1,5 @@
 ---
-title: AI-Driven Business Engineering: The Gemini Strategy
+title: AI-Driven Business Engineering: The Kyberion Strategy
 category: Ceo
 tags: [ceo, business, engineering, security]
 importance: 5
@@ -7,7 +7,7 @@ author: Ecosystem Architect
 last_updated: 2026-03-06
 ---
 
-# AI-Driven Business Engineering: The Gemini Strategy
+# AI-Driven Business Engineering: The Kyberion Strategy
 
 ## 1. Overview
 
@@ -19,21 +19,21 @@ This monorepo is not just a toolset; it is a **Living Engineering Organization**
 
 Traditionally, legal and technical audits are point-in-time events.
 
-- **Gemini Approach**: Use `security-scanner` + `license-auditor` + `compliance-officer` in CI/CD.
+- **Kyberion Approach**: Use `security-scanner` + `license-auditor` + `compliance-officer` in CI/CD.
 - **Strategic Value**: Reduces insurance premiums and increases investor trust by providing "Real-time Compliance Evidence."
 
 ### 2.2. Real-time Technical Due Diligence
 
 When evaluating a merger or acquisition (M&A):
 
-- **Gemini Approach**: Deploy `knowledge-harvester` and `codebase-mapper` against the target repo. Use `quality-scorer` to detect technical debt within minutes.
+- **Kyberion Approach**: Deploy `knowledge-harvester` and `codebase-mapper` against the target repo. Use `quality-scorer` to detect technical debt within minutes.
 - **Strategic Value**: Drastically reduces M&A risk and shortens the integration timeline.
 
 ### 2.3. Dynamic Skill Synthesis
 
 When a new market opportunity arises (e.g., a new regulation like PQC):
 
-- **Gemini Approach**: Use `autonomous-skill-designer` to generate a niche scraper/auditor for that specific domain.
+- **Kyberion Approach**: Use `autonomous-skill-designer` to generate a niche scraper/auditor for that specific domain.
 - **Strategic Value**: Hyper-agility in vertical SaaS markets.
 
 ## 3. Victory Conditions for the Agent-Led Org

@@ -2,7 +2,7 @@
  * Assertion Extensions - Custom assertions for testing
  *
  * Provides custom Vitest matchers for validating ADF schemas,
- * mission states, and GEMINI compliance.
+ * mission states, and Kyberion compliance.
  */
 
 import { expect } from 'vitest';
@@ -15,7 +15,7 @@ import type { MissionContract } from '@agent/core/src/types/mission-contract';
 interface CustomMatchers<R = unknown> {
   toMatchADFSchema(): R;
   toHaveValidMissionState(): R;
-  toBeGEMINICompliant(): R;
+  toBeKyberionCompliant(): R;
 }
 
 declare module 'vitest' {
@@ -116,16 +116,16 @@ expect.extend({
 });
 
 /**
- * Validates that code or configuration is GEMINI compliant
+ * Validates that code or configuration is Kyberion compliant
  */
 expect.extend({
-  toBeGEMINICompliant(received: unknown) {
+  toBeKyberionCompliant(received: unknown) {
     const { isNot } = this;
 
     if (typeof received !== 'object' || received === null) {
       return {
         pass: false,
-        message: () => `Expected ${received} to be a GEMINI-compliant object`,
+        message: () => `Expected ${received} to be a Kyberion-compliant object`,
       };
     }
 
@@ -171,9 +171,9 @@ expect.extend({
       pass,
       message: () => {
         if (isNot) {
-          return `Expected object not to be GEMINI compliant`;
+          return `Expected object not to be Kyberion compliant`;
         }
-        return `Expected object to be GEMINI compliant. Violations: ${violations.join('; ')}`;
+        return `Expected object to be Kyberion compliant. Violations: ${violations.join('; ')}`;
       },
     };
   },

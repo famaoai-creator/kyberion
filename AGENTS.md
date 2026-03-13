@@ -15,7 +15,7 @@ In any phase, we must never violate the following "Sacred Sanctuaries":
 1.  **Physical Integrity**:
     All file operations MUST be performed via `@agent/core/secure-io`. Direct use of `node:fs` is an act of betrayal against our foundational stability. **All mission lifecycles (Start, Checkpoint, Finish) MUST be managed via `scripts/mission_controller.ts` (KSMC v2.0) to ensure transactional and prerequisite integrity through independent Micro-Git repositories.**
 2.  **Actuator-First (Anti-Reinvention Ban)**:
-    Before writing any temporary or disposable scripts in `scratch/` (e.g., for taking screenshots, making API calls, or parsing data), we MUST first search for and utilize existing tools in `libs/actuators/` or `.gemini/skills/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort.
+    Before writing any temporary or disposable scripts in `scratch/` (e.g., for taking screenshots, making API calls, or parsing data), we MUST first search for and utilize existing tools in `libs/actuators/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort.
 3.  **Sovereign Primacy**:
     Every action originates from the Sovereign's intent. Any decision involving risk or architectural change requires explicit approval (**Sudo Gate**).
 4.  **Structured Contracts (ADF First)**:
@@ -57,6 +57,13 @@ Immediately upon session initialization, the agent MUST determine its active pha
 *   **Goal**: Capitalization of experience and environmental cleansing.
 *   **Directive**: Distill both successes and failures into **Wisdom**. Purge temporary scripts (**Scratch**) and return a pristine environment to the Sovereign.
 *   **Ref**: `knowledge/governance/phases/review.md`
+
+## References
+
+- **[docs/GLOSSARY.md](./docs/GLOSSARY.md)** — Key terms (Actuator, Skill, Plugin, ADF, etc.)
+- **[docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)** — Directory structure and component relationships
+- **[docs/QUICKSTART.md](./docs/QUICKSTART.md)** — Getting started guide
+- **[CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)** — Full capability catalog
 
 ---
 *Signed,*

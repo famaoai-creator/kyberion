@@ -15,7 +15,7 @@
     ".DS_Store",
     "tmp",
     "temp",
-    ".gemini"
+    ".kyberion"
   ],
   "ignore_extensions": [
     ".png",

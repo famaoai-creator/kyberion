@@ -7,7 +7,7 @@
  */
 
 /**
- * Standard output contract for Gemini Skills
+ * Standard output contract for Kyberion
  */
 export interface SkillOutput {
   /**

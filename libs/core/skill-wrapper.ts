@@ -51,7 +51,7 @@ function buildOutput<T>(
 }
 
 function printOutput<T>(output: SkillOutput<T>) {
-  const isHuman = process.env.GEMINI_FORMAT === 'human' || process.argv.includes('--format=human');
+  const isHuman = process.env.KYBERION_FORMAT === 'human' || process.argv.includes('--format=human');
 
   // Persistence for Feedback Loop: Save the latest response via Secure IO
   try {

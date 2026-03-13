@@ -63,4 +63,4 @@ last_updated: 2026-03-06
 
 ---
 
-_Maintained by Gemini Engineering Standards Board_
+_Maintained by Kyberion Engineering Standards Board_

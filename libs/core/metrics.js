@@ -42,7 +42,7 @@ const pathResolver = __importStar(require("./path-resolver.js"));
 const path = __importStar(require("node:path"));
 const chalk_1 = __importDefault(require("chalk"));
 /**
- * Lightweight metrics collection for Gemini Skills.
+ * Lightweight metrics collection for Kyberion.
  * Standardized with Secure-IO.
  */
 const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');

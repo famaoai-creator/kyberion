@@ -144,7 +144,7 @@ const server = http.createServer((req, res) => {
 
     // New Skill Paths
     const skillPaths = [
-      path.join(_rootDir, '.gemini/skills'),
+      path.join(_rootDir, 'knowledge/public/skills'),
       path.join(_rootDir, 'libs/actuators'),
       path.join(_rootDir, 'satellites')
     ];
@@ -265,5 +265,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n\u26d3 Gemini Omni-Queue Bridge active on http://localhost:${PORT}`);
+  console.log(`\n\u26d3 Kyberion Omni-Queue Bridge active on http://localhost:${PORT}`);
 });

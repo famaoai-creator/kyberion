@@ -6,7 +6,7 @@ import * as readline from 'node:readline';
 import chalk from 'chalk';
 
 /**
- * Shared Utility Core for Gemini Skills (TypeScript Edition)
+ * Shared Utility Core for Kyberion (TypeScript Edition)
  */
 
 export const logger = {

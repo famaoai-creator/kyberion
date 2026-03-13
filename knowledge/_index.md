@@ -32,7 +32,7 @@
 - [Terminal Hosting: The Institutional Gateway](./architecture/terminal-hosting.md) (public | Ecosystem Architect)
 
 ## 📁 ceo
-- [AI-Driven Business Engineering: The Gemini Strategy](./ceo/ai-business-engineering.md) (public | Ecosystem Architect)
+- [AI-Driven Business Engineering: The Kyberion Strategy](./ceo/ai-business-engineering.md) (public | Ecosystem Architect)
 - [Executive Briefing Standards](./ceo/executive_briefing_standards.md) (public | Ecosystem Architect)
 - [Corporate Legal & Tax Essentials (Japan context)](./ceo/legal-tax-essentials-jp.md) (public | Ecosystem Architect)
 
@@ -552,7 +552,7 @@
 - [Architecture Decision Record (ADR) Standard](./standards/adr/adr_standard.md) (public | Ecosystem Architect)
 
 ## 📁 standards/ai-native
-- [Gemini AI-Native Coding Standard](./standards/ai-native/gemini-coding-standard.md) (public | Ecosystem Architect)
+- [Kyberion AI-Native Coding Standard](./standards/ai-native/kyberion-coding-standard.md) (public | Ecosystem Architect)
 
 ## 📁 standards/bcp
 - [Disaster Recovery & BCP Playbook](./standards/bcp/dr_playbook.md) (public | Ecosystem Architect)
@@ -611,7 +611,7 @@
 - [Box CLI 活用ガイド](./tech-stack/box_cli.md) (public | Ecosystem Architect)
 - [MCP (Model Context Protocol) Integration Guide](./tech-stack/mcp-integration-guide.md) (public | Ecosystem Architect)
 - [Triple-Tier Persona Model: Identity, Mask, and Mission](./tech-stack/persona-model.md) (public | Ecosystem Architect)
-- [The Gemini Runtime Interop Standard: TypeScript Authority with CJS Continuity](./tech-stack/runtime-interop.md) (public | Ecosystem Architect)
+- [The Kyberion Runtime Interop Standard: TypeScript Authority with CJS Continuity](./tech-stack/runtime-interop.md) (public | Ecosystem Architect)
 
 ## 📁 tech-stack/atlassian
 - [Jira 運用ベストプラクティス](./tech-stack/atlassian/jira_best_practices.md) (public | Ecosystem Architect)
@@ -655,7 +655,7 @@
 - [Blueprint: Onboarding Guide](./templates/blueprints/onboarding-guide.md) (public | Ecosystem Architect)
 - [Blueprint: Operational Runbook](./templates/blueprints/operation-runbook.md) (public | Ecosystem Architect)
 - [Blueprint: Post-Mortem (事後検証報告書)](./templates/blueprints/post-mortem.md) (public | Ecosystem Architect)
-- [Blueprint: Project Charter (Gemini Standard v1.1)](./templates/blueprints/project-charter.md) (public | Ecosystem Architect)
+- [Blueprint: Project Charter (Kyberion Standard v1.1)](./templates/blueprints/project-charter.md) (public | Ecosystem Architect)
 - [Blueprint: Project Management Plan (AIDLC Integrated v1.1)](./templates/blueprints/project-management-plan.md) (public | Ecosystem Architect)
 - [Blueprint: RAID Log (Risks, Assumptions, Issues, Dependencies)](./templates/blueprints/raid-log.md) (public | Ecosystem Architect)
 - [Blueprint: Requirements Definition (AIDLC Standard)](./templates/blueprints/requirements-definition.md) (public | Ecosystem Architect)

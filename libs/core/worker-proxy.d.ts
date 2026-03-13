@@ -1,5 +1,5 @@
 /**
- * Worker Proxy for Gemini Skills.
+ * Worker Proxy for Kyberion.
  * Offloads CPU-intensive tasks to background threads.
  */
 export declare function runInWorker(scriptPath: string, data: any): Promise<any>;

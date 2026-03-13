@@ -1,10 +1,11 @@
 {
+  "_note": "Profile keys and cmd values refer to external CLI tools (e.g., Google Gemini CLI), not to this project.",
   "profiles": {
     "gemini": {
       "name": "Gemini 3 CLI (Auto-Confirm)",
       "cmd": "gemini",
       "args": ["-y"],
-      "env": { "GEMINI_MODEL": "gemini-3" },
+      "env": { "KYBERION_MODEL": "gemini-3" },
       "description": "Default AI engine using Gemini 3 with auto-confirm enabled."
     },
     "claude": {

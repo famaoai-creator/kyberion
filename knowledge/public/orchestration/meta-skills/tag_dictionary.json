@@ -16,5 +16,5 @@
     { "keyword": "cost", "tag": "finops" },
     { "keyword": "data", "tag": "data-engineering" }
   ],
-  "defaults": ["gemini-skill"]
+  "defaults": ["kyberion-skill"]
 }

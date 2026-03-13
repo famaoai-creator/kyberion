@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Conceptual Frameworks Reference
 
-This document consolidates 26 conceptual frameworks that inform the Gemini Skills ecosystem. These are guidelines, thinking models, and governance principles -- not executable skills.
+This document consolidates 26 conceptual frameworks that inform the Kyberion ecosystem. These are guidelines, thinking models, and governance principles -- not executable skills.
 
 ---
 
@@ -48,7 +48,7 @@ This document consolidates 26 conceptual frameworks that inform the Gemini Skill
 
 ### hive-mind-sync
 
-**Description:** Synchronizes anonymized learning patterns across a federated network of Gemini agents. Enables collective intelligence evolution.
+**Description:** Synchronizes anonymized learning patterns across a federated network of Kyberion agents. Enables collective intelligence evolution.
 
 **Capabilities:**
 

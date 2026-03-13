@@ -1,5 +1,5 @@
 {
-  "master_name": "Gemini-Financial-Master",
+  "master_name": "Kyberion-Financial-Master",
   "styles": {
     "header": {
       "fill": { "type": "pattern", "pattern": "solid", "fgColor": { "argb": "FF232F3E" } },

@@ -13,7 +13,7 @@ import * as path from 'node:path';
 const INBOX_PATH = pathResolver.resolve('active/shared/rt_inbox.jsonl');
 
 async function main() {
-  logger.info('🚀 Initializing Gemini Reflex Terminal (RT)...');
+  logger.info('🚀 Initializing Kyberion Reflex Terminal (RT)...');
 
   const shellPath = '/bin/zsh'; // Explicit absolute path for stability on macOS
   

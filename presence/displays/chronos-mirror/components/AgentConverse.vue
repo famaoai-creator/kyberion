@@ -44,7 +44,7 @@ onUnmounted(() => {
     class="p-6 bg-gray-900 border border-blue-500 rounded-xl shadow-2xl text-left font-sans flex flex-col h-[500px]"
   >
     <h2 class="text-blue-400 font-black mb-4 tracking-tighter flex items-center gap-2 uppercase">
-      <carbon:flow-connection class="animate-pulse" /> Gemini Omni-Queue
+      <carbon:flow-connection class="animate-pulse" /> Kyberion Omni-Queue
     </h2>
 
     <!-- Input -->

@@ -36,4 +36,4 @@ last_updated: 2026-03-06
 データの所在、定義、所有者、機密レベルをメタデータとして集中管理し、データ活用を民主化する。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

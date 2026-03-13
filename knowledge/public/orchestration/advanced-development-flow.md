@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # 高度な自律開発標準ワークフロー (Advanced Development Flow)
 
-Gemini Skills エコシステムが「最高品質」のプロダクトを自律生成するための標準手順。
+Kyberion エコシステムが「最高品質」のプロダクトを自律生成するための標準手順。
 
 ## 1. 計画・定義フェーズ (Define)
 

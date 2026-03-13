@@ -37,7 +37,7 @@ describe('Coverage Boost: Core UI & Logic', () => {
     it('should provide human-readable output when --format=human is present', () => {
       const originalArgv = process.argv;
       process.argv = ['node', 'test', '--format=human'];
-      process.env.GEMINI_FORMAT = 'human';
+      process.env.KYBERION_FORMAT = 'human';
       
       runSkill('test-human', () => ({ message: 'Done' }));
       
@@ -51,7 +51,7 @@ describe('Coverage Boost: Core UI & Logic', () => {
     it('should produce JSON output by default', () => {
       const originalArgv = process.argv;
       process.argv = ['node', 'test'];
-      process.env.GEMINI_FORMAT = 'json';
+      process.env.KYBERION_FORMAT = 'json';
       
       runSkill('test-json', () => ({ ok: true }));
       

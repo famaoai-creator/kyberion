@@ -1,5 +1,5 @@
 /**
- * Standardized Error Codes for Gemini Skills Ecosystem.
+ * Standardized Error Codes for Kyberion Ecosystem.
  */
 
 export const ERROR_CODES = {

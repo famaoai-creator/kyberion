@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Standardized Error Codes for Gemini Skills Ecosystem.
+ * Standardized Error Codes for Kyberion Ecosystem.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KyberionError = exports.ERROR_CODES = void 0;

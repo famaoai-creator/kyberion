@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Gemini Diagram ADF Protocol v1.1",
+  "title": "Kyberion Diagram ADF Protocol v1.1",
   "description": "Integrated visual protocol using intent-driven routing and engine-based rendering.",
   "type": "object",
   "required": ["protocol", "intent", "elements"],

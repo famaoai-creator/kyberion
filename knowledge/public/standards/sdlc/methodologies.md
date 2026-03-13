@@ -15,7 +15,7 @@ last_updated: 2026-03-06
 
 ### 1.1. Phases & Artifacts
 
-| Phase               | Traditional Artifact           | Gemini ADF Equivalent         |
+| Phase               | Traditional Artifact           | Kyberion ADF Equivalent         |
 | :------------------ | :----------------------------- | :---------------------------- |
 | **Requirements**    | 要件定義書 (PRD), WBS          | `requirements.adf.json`       |
 | **External Design** | 基本設計書, システム構成図     | `design.adf.json`             |
@@ -66,7 +66,7 @@ last_updated: 2026-03-06
 
 ---
 
-## 4. Gemini Hybrid Protocol (AI-Native SDLC)
+## 4. Kyberion Hybrid Protocol (AI-Native SDLC)
 
 本エコシステムでは、ウォーターフォールの「厳格な証跡」とアジャイルの「高速な回転」を、**ADF (Text-First)** を介して統合する。
 

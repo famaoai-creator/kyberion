@@ -1,4 +1,4 @@
-# The Gemini Project Legend: The Tale of Self-Evolution
+# The Kyberion Project Legend: The Tale of Self-Evolution
 
 > 「記録せよ。これは道具の歴史ではなく、理性が形を成していく旅の記録である。」
 

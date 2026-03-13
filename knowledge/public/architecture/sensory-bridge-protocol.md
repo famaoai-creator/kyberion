@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Sensory Bridge Protocol (GUSP v1.0)
 
-本ドキュメントは、Gemini エコシステムにおける外部刺激（Sensory Stimulus）の受容から、AI による自律実行、およびフィードバックまでの通信規約を定義する。
+本ドキュメントは、Kyberion エコシステムにおける外部刺激（Sensory Stimulus）の受容から、AI による自律実行、およびフィードバックまでの通信規約を定義する。
 
 ## 1. アーキテクチャ概観
 
@@ -30,7 +30,7 @@ graph LR
 
     subgraph Hub [Incarnation Layer]
         H1[Terminal Hub API]
-        H2[Gemini CLI / Ink]
+        H2[Kyberion CLI / Ink]
     end
 
     S1 & S2 & S3 -->|GUSP v1.0| B1
@@ -42,7 +42,7 @@ graph LR
     B2 -->|Mirror Feedback| S1
 ```
 
-## 2. Gemini Unified Sensory Protocol (GUSP) v1.0
+## 2. Kyberion Unified Sensory Protocol (GUSP) v1.0
 
 すべてのセンサーは、以下のスキーマに従って `presence/bridge/stimuli.jsonl` に「刺激」を書き込まなければならない。
 

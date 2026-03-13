@@ -13,7 +13,7 @@
 - **Shared_Package**: 複数のアクチュエータで共有されるライブラリパッケージ（shared-media, shared-vision等）
 - **CI_Pipeline**: 継続的インテグレーションパイプライン（GitHub Actions）
 - **Monorepo_Structure**: pnpm workspacesによるモノレポ構成
-- **GEMINI_Framework**: Kyberionの統治フレームワーク（AGENTS.md）
+- **Kyberion_Framework**: Kyberionの統治フレームワーク（AGENTS.md）
 
 ## 要件
 
@@ -136,7 +136,7 @@
 4. THE CI_Pipeline SHALL コード複雑度メトリクスを計算する
 5. WHEN メトリクスが悪化する場合、THE CI_Pipeline SHALL 通知を送信する
 
-### 要件11: GEMINI準拠の検証強化
+### 要件11: Kyberion準拠の検証強化
 
 **ユーザーストーリー:** 開発者として、AGENTS.mdで定義された原則への準拠を自動的に検証したい。これにより、アーキテクチャの一貫性を保証できる。
 
@@ -146,7 +146,7 @@
 2. THE Lint_Rule_Engine SHALL @agent/core/secure-ioの使用を推奨する
 3. THE Lint_Rule_Engine SHALL mission_controller.tsを使用しないミッション管理を検出する
 4. THE Lint_Rule_Engine SHALL ADF形式以外のアクチュエータ呼び出しを検出する
-5. WHEN GEMINI原則違反が検出される場合、THE Lint_Rule_Engine SHALL 修正方法を提案する
+5. WHEN Kyberion原則違反が検出される場合、THE Lint_Rule_Engine SHALL 修正方法を提案する
 
 ### 要件12: 段階的移行計画の管理
 
@@ -167,7 +167,7 @@
 1. **フェーズ1（基盤整備）**: 要件9（テストインフラ）、要件7（CI/CD）
 2. **フェーズ2（テスト拡充）**: 要件1（アクチュエータテスト）、要件2（共有パッケージテスト）、要件3（スクリプトテスト）
 3. **フェーズ3（型安全性）**: 要件4（TypeScript厳格化）、要件12（移行管理）
-4. **フェーズ4（コード品質）**: 要件5（ESLint有効化）、要件11（GEMINI準拠）
+4. **フェーズ4（コード品質）**: 要件5（ESLint有効化）、要件11（Kyberion準拠）
 5. **フェーズ5（構造改善）**: 要件6（モノレポ整理）、要件8（ドキュメント統一）
 6. **フェーズ6（可視化）**: 要件10（メトリクス可視化）
 

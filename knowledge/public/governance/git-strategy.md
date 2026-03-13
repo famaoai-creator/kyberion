@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # GIT Strategy: Sovereign Hierarchical Synchronization
 
-本ドキュメントは、Gemini エコシステムにおける Git 管理の基本理念と、機密性と透明性を両立させるための階層的同期モデル（Sovereign Git Strategy）について定義する。
+本ドキュメントは、Kyberion エコシステムにおける Git 管理の基本理念と、機密性と透明性を両立させるための階層的同期モデル（Sovereign Git Strategy）について定義する。
 
 ## 1. 階層的ナレッジ・モデル (Triple-Tier Model)
 

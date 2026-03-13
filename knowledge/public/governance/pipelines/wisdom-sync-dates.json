@@ -5,7 +5,7 @@
       "id": "git-provenance-sync",
       "for_each": {
         "op": "glob_files",
-        "params": { "dir": ".gemini/skills", "ext": "SKILL.md", "export_as": "skills_to_sync" }
+        "params": { "dir": "knowledge/public/skills", "ext": "SKILL.md", "export_as": "skills_to_sync" }
       },
       "pipeline": [
         {

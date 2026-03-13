@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # ACE (Autonomous Consensus Engine) Operating Standard
 
-ACE は、Gemini エージェントが複雑な意思決定を行うための標準プロトコルである。
+ACE は、Kyberion エージェントが複雑な意思決定を行うための標準プロトコルである。
 
 ## 1. 意思決定プロセス (The Process)
 

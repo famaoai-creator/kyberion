@@ -32,4 +32,4 @@ last_updated: 2026-03-06
 コード内でカラーコード（`#FFFFFF`）を直接記述せず、デザイン・トークン（`Color.BrandPrimary`）を使用しているかを静的にチェックする。これにより、一括での色変更を容易にし、一貫性を担保する。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

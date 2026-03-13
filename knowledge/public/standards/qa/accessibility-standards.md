@@ -29,4 +29,4 @@ last_updated: 2026-03-06
 - **Color Alone**: 情報の伝達を「色のみ」に頼らない（例：エラーを赤色だけでなく「×」アイコンやテキストでも伝える）。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

@@ -45,15 +45,15 @@ describe('Plugin System Integration', () => {
       };
     `);
 
-    const configFile = path.join(tmpDir, '.gemini-plugins.json');
+    const configFile = path.join(tmpDir, '.kyberion-plugins.json');
     fs.writeFileSync(configFile, JSON.stringify({ plugins: [pluginFile] }));
 
     const skillScript = path.join(rootDir, 'skills/utilities/format-detector/dist/index.js');
-    
-    // We must pass GEMINI_HOME or ensure .gemini-plugins.json is found in CWD
-    execSync(`node "${skillScript}" -i "${inputFile}"`, { 
-      cwd: tmpDir, 
-      env: { ...process.env, NODE_ENV: 'production', GEMINI_HOME: tmpDir } 
+
+    // We must pass KYBERION_HOME or ensure .kyberion-plugins.json is found in CWD
+    execSync(`node "${skillScript}" -i "${inputFile}"`, {
+      cwd: tmpDir,
+      env: { ...process.env, NODE_ENV: 'production', KYBERION_HOME: tmpDir }
     });
 
     expect(fs.existsSync(markerFile)).toBe(true);

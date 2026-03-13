@@ -1,4 +1,4 @@
-# Contributing to Gemini Skills
+# Contributing to Kyberion
 
 ## Getting Started
 

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/skill-input.json",
   "title": "Skill Input",
-  "description": "Standard input contract for Gemini Skills",
+  "description": "Standard input contract for Kyberion",
   "type": "object",
   "properties": {
     "skill": {

@@ -1,7 +1,7 @@
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 /**
- * Worker Proxy for Gemini Skills.
+ * Worker Proxy for Kyberion.
  * Offloads CPU-intensive tasks to background threads.
  */
 

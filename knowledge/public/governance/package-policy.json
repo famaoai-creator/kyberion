@@ -2,7 +2,7 @@
   "ignore_deps": ["@agent/core", "typescript", "ts-node"],
   "normalization": {
     "private": true,
-    "author": "Gemini Ecosystem",
+    "author": "Kyberion Ecosystem",
     "license": "MIT",
     "ensure_engines": true,
     "ensure_agent_core": true

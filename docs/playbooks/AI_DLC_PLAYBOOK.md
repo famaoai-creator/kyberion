@@ -1,6 +1,6 @@
 # AI-Driven Life Cycle (AI DLC) Playbook
 
-This document outlines the workflow for using the Gemini Skills suite to accelerate software engineering tasks. By delegating specific phases of the development cycle to AI via these skills, you can focus on high-level architecture and decision-making.
+This document outlines the workflow for using the Kyberion suite to accelerate software engineering tasks. By delegating specific phases of the development cycle to AI via these skills, you can focus on high-level architecture and decision-making.
 
 ## 🔄 The Cycle
 
@@ -26,7 +26,7 @@ _Before writing code, the AI must understand the intent and the existing system.
 
 _AI generates code based on the Task Board and context._
 
-1.  **Drafting**: AI writes code (using standard Gemini output or ad-hoc `scratch/` scripts).
+1.  **Drafting**: AI writes code (using standard Kyberion output or ad-hoc `scratch/` scripts).
 2.  **Unit Tests**: Ask AI to generate tests for the new code immediately.
 
 ### Phase 2: Verification (検証)

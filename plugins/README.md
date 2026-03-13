@@ -4,7 +4,7 @@ Extend skill execution with beforeSkill/afterSkill lifecycle hooks.
 
 ## Usage
 
-Create `.gemini-plugins.json` in your working directory:
+Create `.kyberion-plugins.json` in your working directory:
 
 ```json
 {
