@@ -21,7 +21,7 @@ export async function executeMcp(command: string, args: string[], actionRequest:
 
   const client = new Client(
     {
-      name: "Gemini-Connector-Client",
+      name: "Kyberion-Connector-Client",
       version: "1.0.0",
     },
     {

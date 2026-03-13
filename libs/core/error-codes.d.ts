@@ -1,5 +1,5 @@
 /**
- * Standardized Error Codes for Gemini Skills Ecosystem.
+ * Standardized Error Codes for Kyberion Ecosystem.
  */
 export declare const ERROR_CODES: {
     LOGIC_NOT_FOUND: {

@@ -1,4 +1,4 @@
-# Gemini Skills Knowledge Base: Rights & Usage
+# Kyberion Knowledge Base: Rights & Usage
 
 本ディレクトリ（`knowledge/`）に含まれる情報の取り扱いについて。
 

@@ -30,7 +30,7 @@ These metrics represent global and regional industry standards for IT spending.
 
 ---
 
-## 2. Gemini Ecosystem ROI Logic (Tool Efficiency)
+## 2. Kyberion Ecosystem ROI Logic (Tool Efficiency)
 
 How this autonomous system contributes to reducing the "Run" cost.
 

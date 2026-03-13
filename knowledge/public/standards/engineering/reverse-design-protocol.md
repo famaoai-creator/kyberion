@@ -46,7 +46,7 @@ last_updated: 2026-03-06
 
 ## 4. Output Formats (ADF Alignment)
 
-抽出された情報は、Gemini ADF (Architecture Description Format) に変換され、以下の人間用成果物へとレンダリングされる。
+抽出された情報は、Kyberion ADF (Architecture Description Format) に変換され、以下の人間用成果物へとレンダリングされる。
 
 - **System Context Diagram**: `design.adf.json` -> SVG
 - **API/Interface Specification**: `schema.adf.json` -> Excel
@@ -54,4 +54,4 @@ last_updated: 2026-03-06
 
 ---
 
-_Maintained by Gemini Engineering Standards Board_
+_Maintained by Kyberion Engineering Standards Board_

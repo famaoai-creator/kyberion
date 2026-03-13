@@ -56,4 +56,4 @@ last_updated: 2026-03-06
 各テストケースの開始前に、アプリの状態（DB、キャッシュ、ログインセッション）を「クリーン」にするか「特定の状態」から始めるかを明示する。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

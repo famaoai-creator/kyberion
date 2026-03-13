@@ -6,7 +6,7 @@ highlighter: shiki
 drawings:
   persist: false
 transition: slide-left
-title: Chronos Mirror - Gemini Reality Interface
+title: Chronos Mirror - Kyberion Reality Interface
 ---
 
 # Welcome to the Bridge
@@ -21,7 +21,7 @@ title: Chronos Mirror - Gemini Reality Interface
 
 # Chronos Mirror
 
-### Gemini Reality-Mirroring Interface v1.0
+### Kyberion Reality-Mirroring Interface v1.0
 
 <div class="pt-8">
   <CommandCenter />

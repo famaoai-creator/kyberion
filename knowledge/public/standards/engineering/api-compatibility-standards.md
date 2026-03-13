@@ -45,4 +45,4 @@ GraphQLでは、スキーマの「追加のみ」を原則とする。
 - **Null性の考慮**: フィールドを Non-Null (`!`) に設定すると、後からの変更が難しくなるため、初期設計では Nullable を基本とする。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

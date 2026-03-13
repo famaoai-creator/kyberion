@@ -1,5 +1,5 @@
 {
-  "name": "gemini-deepwiki",
+  "name": "kyberion-deepwiki",
   "version": "1.0.0",
   "scripts": {
     "dev": "slidev --open",

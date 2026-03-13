@@ -2,7 +2,7 @@
   "name": "@agent/core",
   "version": "1.0.0",
   "private": true,
-  "description": "Core utilities and wrappers for Gemini Skills.",
+  "description": "Core utilities and wrappers for Kyberion.",
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {

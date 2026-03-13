@@ -24,8 +24,8 @@ last_updated: 2026-03-06
 ## 3. 設定方法
 
 `AGENTS.md` または実行時の命令で `proposer_context` を指定する。
-例：「提案者：Gemini-Lab として資料を作成せよ」
--> `knowledge/templates/themes/proposer/palettes/gemini-lab.json` をロード。
+例：「提案者：Kyberion-Lab として資料を作成せよ」
+-> `knowledge/templates/themes/proposer/palettes/kyberion-lab.json` をロード。
 
 ## 4. Marp-to-PPTX Engineering (Strategic Standards)
 

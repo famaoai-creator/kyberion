@@ -44,7 +44,7 @@ const v8 = __importStar(require("node:v8"));
 const readline = __importStar(require("node:readline"));
 const chalk_1 = __importDefault(require("chalk"));
 /**
- * Shared Utility Core for Gemini Skills (TypeScript Edition)
+ * Shared Utility Core for Kyberion (TypeScript Edition)
  */
 exports.logger = {
     _log: (level, msg) => {

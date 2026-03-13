@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Cross-Role Directive Protocol (CRDP)
 
-本プロトコルは、Gemini Skills エコシステム内の異なるロール間でタスクを依頼・委譲する際の標準フォーマットを定義する。
+本プロトコルは、Kyberion エコシステム内の異なるロール間でタスクを依頼・委譲する際の標準フォーマットを定義する。
 
 ## 1. 指示書の基本構造 (The Template)
 

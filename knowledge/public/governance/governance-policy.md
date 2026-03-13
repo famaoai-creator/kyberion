@@ -31,7 +31,7 @@ last_updated: 2026-03-06
 
 ## 3. 実行時ガードレール (CLI Enforcement)
 
-Gemini CLI は、`run` コマンドの実行直前に以下のチェックを強制する。
+Kyberion CLI は、`run` コマンドの実行直前に以下のチェックを強制する。
 
 1.  **Governance Check**: `restricted-skills.json` に記載があるか。
 2.  **Platform Check**: `SKILL.md` の `platforms` 定義と一致するか。

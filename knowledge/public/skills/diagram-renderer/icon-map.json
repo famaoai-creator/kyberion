@@ -1,5 +1,5 @@
 {
-  "theme_name": "gemini-universal-v3-2026",
+  "theme_name": "kyberion-universal-v3-2026",
   "icons": {
     "/* Cloud & Container Baselines */": "",
     "aws_vpc": "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v18.0/dist/Groups/VPC.png",
