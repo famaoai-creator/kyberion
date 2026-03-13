@@ -1,7 +1,39 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Global Wisdom Distillation Policy",
   "description": "Rules for automated insight extraction and knowledge evolution.",
+  "llm": {
+    "profiles": {
+      "heavy": {
+        "description": "Deep reasoning — distillation, architectural review",
+        "command": "claude",
+        "args": ["-p", "{prompt}", "--model", "opus", "--output-format", "json"],
+        "timeout_ms": 180000,
+        "response_format": "json_envelope"
+      },
+      "standard": {
+        "description": "General purpose — validation, summarization",
+        "command": "claude",
+        "args": ["-p", "{prompt}", "--output-format", "json"],
+        "timeout_ms": 120000,
+        "response_format": "json_envelope"
+      },
+      "light": {
+        "description": "Fast, low-cost — tagging, classification",
+        "command": "claude",
+        "args": ["-p", "{prompt}", "--model", "haiku", "--output-format", "json"],
+        "timeout_ms": 30000,
+        "response_format": "json_envelope"
+      }
+    },
+    "purpose_map": {
+      "distill":   "heavy",
+      "validate":  "standard",
+      "summarize": "light",
+      "classify":  "light"
+    },
+    "default_profile": "standard"
+  },
   "rules": [
     {
       "id": "RULE-W001",

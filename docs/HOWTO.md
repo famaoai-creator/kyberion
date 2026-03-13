@@ -26,10 +26,42 @@ npx tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json
 
 All physical changes to the codebase MUST be performed within a mission context.
 
-1. **Start**: `npx tsx scripts/mission_controller.ts start <ID> <ROLE>`
-2. **Work**: Use `run_intent.ts` or `run_super_pipeline.ts` to perform tasks.
-3. **Checkpoint**: `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "description"`
-4. **Finish**: `npx tsx scripts/mission_controller.ts finish <ID>`
+### Full Lifecycle
+
+```
+start → checkpoint (repeat) → verify → distill → finish
+```
+
+1. **Start**: `npx tsx scripts/mission_controller.ts start <ID> [tier]`
+   Creates and activates a mission. Status: `planned → active`.
+
+2. **Work & Checkpoint**: Perform tasks, then record progress:
+   `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "description"`
+
+3. **Verify**: Mark the mission as verified (or reject for rework):
+   `npx tsx scripts/mission_controller.ts verify <ID> verified "Verification note"`
+   Status: `active → distilling` (or back to `active` if rejected).
+
+4. **Distill**: Extract knowledge from the mission via LLM:
+   `npx tsx scripts/mission_controller.ts distill <ID>`
+   Status: `distilling → completed`. Produces a wisdom file in `knowledge/`.
+
+5. **Finish**: Archive the completed mission:
+   `npx tsx scripts/mission_controller.ts finish <ID> [--seal]`
+   Optionally encrypts with `--seal` (AES+RSA).
+
+### Visibility
+
+```bash
+# List all missions (optionally filter by status)
+npx tsx scripts/mission_controller.ts list [active|completed|...]
+
+# Show detailed status of a specific mission
+npx tsx scripts/mission_controller.ts status <ID>
+
+# Show all commands
+npx tsx scripts/mission_controller.ts help
+```
 
 ---
 

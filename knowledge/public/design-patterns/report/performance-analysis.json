@@ -1,0 +1,24 @@
+{
+  "pattern_id": "ANA-PERF-01",
+  "category": "analytical",
+  "target_audience": "Analysts, Budget Owners, Engineers",
+  "description": "Detailed metrics and performance analysis using charts.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Metric Overview",
+      "Comparative Charts (Before/After)",
+      "Cost Breakdown / Efficiency Analysis",
+      "Insights & Recommendations"
+    ],
+    "color_palette": "kyberion-data-vibrant"
+  },
+  "media_actuator_config": {
+    "template_id": "data-report-v1",
+    "engine": "chartjs",
+    "styles": {
+      "chart_type": "bar",
+      "is_stacked": true
+    }
+  }
+}

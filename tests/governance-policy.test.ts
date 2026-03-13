@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { validateWritePermission, safeWriteFile, safeUnlinkSync, safeExistsSync, pathResolver } from '@agent/core';
+import { validateWritePermission, validateReadPermission, safeWriteFile, safeUnlinkSync, safeExistsSync, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
@@ -53,9 +53,59 @@ describe('Governance Policy-as-Code Enforcement', () => {
     process.env.MISSION_ROLE = 'any_role';
     const check = validateWritePermission(SCRATCH_FILE);
     expect(check.allowed).toBe(true);
-    
+
     safeWriteFile(SCRATCH_FILE, 'test');
     expect(safeExistsSync(SCRATCH_FILE)).toBe(true);
     safeUnlinkSync(SCRATCH_FILE);
+  });
+});
+
+describe('Read Permission Control (validateReadPermission)', () => {
+  afterAll(() => {
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+  });
+
+  it('public knowledge is always readable', () => {
+    const file = pathResolver.knowledge('public/governance/security-policy.json');
+    process.env.MISSION_ROLE = 'any_role';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('non-knowledge paths are always readable', () => {
+    const file = pathResolver.rootResolve('scripts/mission_controller.ts');
+    process.env.MISSION_ROLE = 'any_role';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('personal knowledge is blocked for unknown roles', () => {
+    const file = pathResolver.knowledge('personal/my-identity.json');
+    process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.MISSION_ID = '';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(false);
+  });
+
+  it('confidential knowledge is blocked for unknown roles', () => {
+    const file = pathResolver.knowledge('confidential/secret-doc.md');
+    process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.MISSION_ID = '';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(false);
+  });
+
+  it('mission_controller can read personal knowledge (privileged)', () => {
+    const file = pathResolver.knowledge('personal/my-identity.json');
+    process.env.MISSION_ROLE = 'mission_controller';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('ecosystem_architect can read confidential knowledge (privileged)', () => {
+    const file = pathResolver.knowledge('confidential/secret-doc.md');
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(true);
   });
 });

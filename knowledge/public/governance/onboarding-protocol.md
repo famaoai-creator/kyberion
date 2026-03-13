@@ -47,3 +47,8 @@ last_updated: 2026-03-06
 
 ## 4. 再起動への耐性
 オンボーディングの進捗は `active/missions/{MissionID}/TASK_BOARD.md` に物理的に記録されなければならない。これにより、セッションが揮発しても、次のターンのエージェントが正確にコンテキストを引き継ぐことが可能となる。
+
+## 5. 関連ドキュメントとの関係
+- `governance/phases/onboarding.md`: 技術的実行ステップ (Stage 1-3)。AGENTS.md から参照される主要プロトコル。
+- **この文書**: Sovereign Concierge の行動規範と体験設計。
+- `orchestration/onboarding-directives/00_sovereign_onboarding.md`: 初回ミッションとしての勝利条件定義。

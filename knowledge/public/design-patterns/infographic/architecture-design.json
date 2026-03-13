@@ -1,0 +1,24 @@
+{
+  "pattern_id": "TECH-ARCH-01",
+  "category": "technical",
+  "target_audience": "Architects, Developers, Client Tech Teams",
+  "description": "High-level system architecture and component relationships.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "System Overview",
+      "Infrastructure Diagram (D2/Mermaid)",
+      "Data Flow / Security Layers",
+      "Tech Stack & Integration Points"
+    ],
+    "color_palette": "kyberion-tech-dark"
+  },
+  "media_actuator_config": {
+    "template_id": "architecture-diagram-v1",
+    "engine": "d2",
+    "styles": {
+      "layout": "elk",
+      "theme": "dark"
+    }
+  }
+}

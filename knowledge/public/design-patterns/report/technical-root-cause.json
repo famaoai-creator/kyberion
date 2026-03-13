@@ -1,0 +1,25 @@
+{
+  "pattern_id": "TECH-RCA-01",
+  "category": "operational",
+  "target_audience": "Engineering Teams, CTO, SRE",
+  "description": "Deep dive into incident causes, timelines, and permanent fixes.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Incident ID & Severity",
+      "Event Timeline (Mermaid Diagram)",
+      "Root Cause Analysis (5-Whys)",
+      "Impact Scope",
+      "Preventive Action Items"
+    ],
+    "color_palette": "kyberion-tech-monochrome"
+  },
+  "media_actuator_config": {
+    "template_id": "technical-report-v1",
+    "engine": "mermaid",
+    "styles": {
+      "diagram_orientation": "TD",
+      "code_syntax_highlight": "dracula"
+    }
+  }
+}

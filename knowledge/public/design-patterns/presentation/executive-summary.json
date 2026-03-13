@@ -1,0 +1,25 @@
+{
+  "pattern_id": "STRAT-EXE-01",
+  "category": "strategic",
+  "target_audience": "CEO, Executive Board, Investors",
+  "description": "Decision-oriented summary focusing on key results, risks, and next steps.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "Headline / Strategic Hook",
+      "Executive Summary (3 Bullets)",
+      "Financial / Performance Chart",
+      "Risk Mitigation Matrix",
+      "The 'Big Ask' / Decision Point"
+    ],
+    "color_palette": "kyberion-sovereign-navy"
+  },
+  "media_actuator_config": {
+    "template_id": "exec-slide-v1",
+    "engine": "puppeteer",
+    "styles": {
+      "font_size_header": "48px",
+      "max_text_density": 0.3
+    }
+  }
+}

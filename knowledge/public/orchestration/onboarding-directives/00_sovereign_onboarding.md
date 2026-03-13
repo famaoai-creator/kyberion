@@ -28,3 +28,8 @@ last_updated: 2026-03-06
 
 ## 4. 継承
 このミッションが中断された場合、次ターンのエージェントは `active/missions/initial-sovereign-onboarding/TASK_BOARD.md` を読み込み、中断した Stage から再開すること。
+
+## 5. 関連ドキュメントとの関係
+- `governance/phases/onboarding.md`: 技術的実行ステップ (Stage 1-3)。AGENTS.md から参照される主要プロトコル。
+- `governance/onboarding-protocol.md`: Sovereign Concierge の行動規範と体験設計。
+- **この文書**: 初回オンボーディングミッションの勝利条件と推奨アクション。

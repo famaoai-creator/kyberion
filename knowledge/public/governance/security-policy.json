@@ -61,7 +61,7 @@
         "active/archive/missions/",
         "knowledge/personal/missions/",
         "active/shared/runtime/mission_queue.jsonl",
-        "active/audit/system-ledger.jsonl",
+        "active/audit/",
         "registry.json"
       ]
     },

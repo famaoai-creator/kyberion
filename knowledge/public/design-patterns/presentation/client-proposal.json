@@ -1,0 +1,26 @@
+{
+  "pattern_id": "REL-PROP-01",
+  "category": "relational",
+  "target_audience": "Clients, Decision Makers, Business Partners",
+  "description": "Problem-solution oriented proposal focused on business value and ROI.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Title / Client Mission Statement",
+      "Current Challenges (AS-IS)",
+      "Proposed Solution (TO-BE)",
+      "Implementation Roadmap",
+      "Value Proposition & ROI",
+      "Next Steps & Contact"
+    ],
+    "color_palette": "kyberion-trust-blue"
+  },
+  "media_actuator_config": {
+    "template_id": "client-proposal-v1",
+    "engine": "puppeteer",
+    "styles": {
+      "accent_color": "#0052cc",
+      "show_case_studies": true
+    }
+  }
+}

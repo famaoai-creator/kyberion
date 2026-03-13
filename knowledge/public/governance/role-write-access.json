@@ -15,7 +15,7 @@
       "allow": ["active/audit/security/", "knowledge/security/"]
     },
     "mission_controller": {
-      "allow": ["active/missions/", "registry.json"]
+      "allow": ["active/missions/", "registry.json", "active/audit/"]
     },
     "infrastructure_sentinel": {
       "allow": ["active/shared/logs/", "active/shared/runtime/", "presence/bridge/runtime/", "../../../Library/LaunchAgents/"]

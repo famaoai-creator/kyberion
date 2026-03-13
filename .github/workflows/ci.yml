@@ -47,6 +47,14 @@ jobs:
       - name: Validate schemas
         run: node dist/scripts/validate_schemas.js
 
+      - name: Verify no build artifacts in source control
+        run: |
+          STALE=$(git diff --name-only -- 'libs/core/' | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5)
+          if [ -n "$STALE" ]; then
+            echo "::error::Build artifacts detected in source tree"
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     needs: lint-and-validate
@@ -80,6 +88,9 @@ jobs:
 
       - name: Establish links
         run: node dist/scripts/bootstrap.js
+
+      - name: Build libs/core (in-place)
+        run: npx tsc -p libs/core/tsconfig.json
 
       - name: Run ${{ matrix.test-suite }} tests
         run: ${{ matrix.command }}
