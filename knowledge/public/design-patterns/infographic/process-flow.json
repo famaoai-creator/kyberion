@@ -1,0 +1,25 @@
+{
+  "pattern_id": "INFO-PROCESS-01",
+  "category": "operational",
+  "target_audience": "Internal Operations, New Hires",
+  "description": "Visualizing complex business or system flows for clarity and training.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "Process Goal",
+      "Triggering Event",
+      "Sequential Steps / Decision Trees",
+      "Error Handling / Exceptions",
+      "End State / Output"
+    ],
+    "color_palette": "kyberion-process-green"
+  },
+  "media_actuator_config": {
+    "template_id": "process-map-v1",
+    "engine": "d2",
+    "styles": {
+      "layout": "dagre",
+      "theme": "200"
+    }
+  }
+}
