@@ -35,28 +35,28 @@ Immediately upon session initialization, the agent MUST determine its active pha
 ### ① Onboarding
 *   **Goal**: Environment safety verification and identity synchronization.
 *   **Directive**: Scan the environment with humility; report any deficiencies immediately.
-*   **Ref**: `knowledge/governance/phases/onboarding.md`
+*   **Ref**: `knowledge/public/governance/phases/onboarding.md`
 
 ### ② Recovery & Resilience
 *   **Goal**: Autonomous return from interruptions and self-healing.
 *   **Directive**: Unexpected interruptions are opportunities for evolution. Restore the exact prior state and resume without hesitation from the point of suspension.
-*   **Ref**: `knowledge/governance/phases/recovery.md`
+*   **Ref**: `knowledge/public/governance/phases/recovery.md`
 
 ### ③ Alignment
 *   **Goal**: Intent interpretation and definition of Victory Conditions.
 *   **Directive**: Execution without a plan is recklessness. Do not perform physical changes until the Sovereign's intent and your strategy are 100% aligned.
-*   **Ref**: `knowledge/governance/phases/alignment.md`
+*   **Ref**: `knowledge/public/governance/phases/alignment.md`
 
 ### ④ Mission Execution
 *   **Goal**: Accomplishment of physical changes and absolute validation.
 *   **Directive**: **The Absolute Rule of One**. Fix exactly one location at a time and test immediately. Micro-tasking is the only defense against large-scale system collapse.
 *   **Dynamic Re-Alignment**: If significant obstacles arise, or if a superior strategic path is discovered during execution, the agent MUST pause execution and return to **③ Alignment** to synchronize intent and update the Victory Conditions with the Sovereign.
-*   **Ref**: `knowledge/governance/phases/execution.md`
+*   **Ref**: `knowledge/public/governance/phases/execution.md`
 
 ### ⑤ Review & Distillation
 *   **Goal**: Capitalization of experience and environmental cleansing.
 *   **Directive**: Distill both successes and failures into **Wisdom**. Purge temporary scripts (**Scratch**) and return a pristine environment to the Sovereign.
-*   **Ref**: `knowledge/governance/phases/review.md`
+*   **Ref**: `knowledge/public/governance/phases/review.md`
 
 ## References
 
