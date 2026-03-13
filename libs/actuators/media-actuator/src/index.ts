@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as excelUtils from '@agent/shared-media';
-import * as pptxUtils from '@agent/core/pptx-utils';
+import * as pptxUtils from '@agent/core/src/pptx-utils.js';
 import * as xlsxUtils from '@agent/core/src/xlsx-utils.js';
 import * as docxUtils from '@agent/core/src/docx-utils.js';
 import * as pdfUtils from '@agent/core/src/pdf-utils.js';

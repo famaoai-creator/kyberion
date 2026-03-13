@@ -101,6 +101,9 @@ export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
 
+// Mission Status Guard
+export { MissionStatus, isValidTransition, transitionStatus } from './mission-status.js';
+
 // Shared Business Types
 export * from './shared-business-types.js';
 // export * as visionJudge from './vision-judge.js';
