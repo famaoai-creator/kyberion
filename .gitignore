@@ -30,6 +30,19 @@ knowledge/orchestration/active_context.json
 tools/chronos-mirror/public/knowledge_index.json
 presence/displays/chronos-mirror/public/stimuli_feed.json
 
+# libs/core compiled output (in-place build)
+libs/core/**/*.js
+libs/core/**/*.js.map
+libs/core/**/*.d.ts
+libs/core/**/*.d.ts.map
+libs/core/tsconfig.tsbuildinfo
+# Hand-written JS (no .ts source)
+!libs/core/finance.js
+!libs/core/mcp-client-engine.js
+!libs/core/vision-judge.js
+!libs/core/types/excel-protocol.js
+!libs/core/types/pptx-protocol.js
+
 # Plugin runtime data
 *.jsonl
 vault/

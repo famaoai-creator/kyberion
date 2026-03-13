@@ -39,9 +39,27 @@ The wizard will help you establish your:
 
 ```bash
 npm run doctor
+pnpm capabilities
 ```
 
-## Step 3: Set Up Your Knowledge
+`npm run doctor` で基本的な健全性を、`pnpm capabilities` で現在の OS / バイナリ環境に対してどのアクチュエータ機能が利用可能かを確認できます。
+
+## Step 3: Discover What You Can Run
+
+Before starting a mission, use the CLI to discover available actuators from the global skill index.
+
+```bash
+# Show all indexed actuators
+pnpm run cli -- list
+
+# Search by keyword
+pnpm run cli -- search browser
+
+# Inspect one actuator in more detail
+pnpm run cli -- info browser-actuator
+```
+
+## Step 4: Set Up Your Knowledge
 
 The wizard created `knowledge/personal/` for you — a Git-ignored directory for your private configuration.
 
@@ -53,7 +71,7 @@ The wizard created `knowledge/personal/` for you — a Git-ignored directory for
 
 Your personal settings always take priority. See [3-Tier Model](./README.md#3-tier-model) for details.
 
-## Step 4: Your First Mission
+## Step 5: Your First Mission
 
 Every mission begins in **Phase 0: Alignment**. You must discuss your intent with the agent and establish a `TASK_BOARD.md` before executing skills.
 
@@ -91,6 +109,7 @@ Every mission begins in **Phase 0: Alignment**. You must discuss your intent wit
 - Read the Governance Rules: [`AGENTS.md`](../AGENTS.md)
 - Understand key terms: [`docs/GLOSSARY.md`](./GLOSSARY.md)
 - Explore the architecture: [`docs/COMPONENT_MAP.md`](./COMPONENT_MAP.md)
+- Browse the full actuator catalog: [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md)
 
 ---
 

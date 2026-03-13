@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Identity",
+  "description": "Schema for knowledge/personal/agent-identity.json — the Agent's formal identity for A2A collaboration.",
+  "type": "object",
+  "required": ["agent_id", "version", "role", "owner", "trust_tier", "created_at", "description"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Formal Agent ID (e.g., KYBERION-PRIME). Used for A2A communication and immutable evidence."
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "role": {
+      "type": "string",
+      "description": "Agent's designated role (e.g., Ecosystem Architect / Senior Partner)."
+    },
+    "owner": {
+      "type": "string",
+      "description": "Name of the Sovereign who owns this agent."
+    },
+    "trust_tier": {
+      "type": "string",
+      "enum": ["sovereign", "confidential", "public"],
+      "default": "sovereign"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
