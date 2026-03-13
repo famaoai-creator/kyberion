@@ -227,26 +227,26 @@ describe('Assertion Extensions', () => {
     });
   });
 
-  describe('toBeGEMINICompliant', () => {
-    it('should pass for GEMINI-compliant objects', () => {
+  describe('toBeKyberionCompliant', () => {
+    it('should pass for Kyberion-compliant objects', () => {
       const compliant = {
         code: "import { safeRead } from '@agent/core/secure-io';",
       };
-      expect(compliant).toBeGEMINICompliant();
+      expect(compliant).toBeKyberionCompliant();
     });
 
     it('should fail for objects with direct fs usage', () => {
       const nonCompliant = {
         code: "import fs from 'fs';",
       };
-      expect(() => expect(nonCompliant).toBeGEMINICompliant()).toThrow();
+      expect(() => expect(nonCompliant).toBeKyberionCompliant()).toThrow();
     });
 
     it('should fail for objects with direct child_process usage', () => {
       const nonCompliant = {
         code: "import { exec } from 'child_process';",
       };
-      expect(() => expect(nonCompliant).toBeGEMINICompliant()).toThrow();
+      expect(() => expect(nonCompliant).toBeKyberionCompliant()).toThrow();
     });
   });
 });

@@ -99,7 +99,7 @@ async function processQueue(): Promise<void> {
 
     // 3. Construct Deep Prompt
     const systemPrompt = `
-あなたは Gemini エコシステムの自律エージェントです。
+あなたは Kyberion エコシステムの自律エージェントです。
 現在のあなたの役割（Persona）は **${currentRole}** です。
 
 【ミッション】: ${intent}
@@ -123,7 +123,7 @@ ${handoffContext}
       agentOutput = execSync(`gemini --prompt "${systemPrompt.replace(/"/g, '"')}"`, {
         encoding: 'utf8',
         cwd: rootDir,
-        env: { ...process.env, MISSION_ID: missionId, GEMINI_FORMAT: 'text' },
+        env: { ...process.env, MISSION_ID: missionId, KYBERION_FORMAT: 'text' },
       });
     } catch (e: any) {
       agentOutput = `Error during execution: ${e.message}\n${e.stdout || ''}`;

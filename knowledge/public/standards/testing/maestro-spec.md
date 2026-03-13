@@ -35,4 +35,4 @@ last_updated: 2026-03-06
 - **`onFlowStart` / `onFlowComplete`**: フローの前後に実行するフック。
 
 ---
-*Reference for Gemini AI to avoid syntax errors and ensure stateful coverage.*
+*Reference for Kyberion AI to avoid syntax errors and ensure stateful coverage.*

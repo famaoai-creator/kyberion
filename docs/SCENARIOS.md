@@ -1,4 +1,4 @@
-# Usage Scenarios / Gemini Skills 活用シナリオ集
+# Usage Scenarios / Kyberion 活用シナリオ集
 
 Each scenario demonstrates how multiple skills chain together to automate complex workflows. These scenarios map to specific personas and can be packaged as [Mission Playbooks](./knowledge/orchestration/mission-playbooks/) or [Skill Bundles](./skill-bundle-packager/).
 

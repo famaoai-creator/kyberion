@@ -41,7 +41,7 @@
   },
   {
     "id": "ceo/ai-business-engineering.md",
-    "title": "AI-Driven Business Engineering: The Gemini Strategy",
+    "title": "AI-Driven Business Engineering: The Kyberion Strategy",
     "author": "Unknown",
     "last_updated": "2026-02-14",
     "tier": "public",
@@ -1464,8 +1464,8 @@
     "category": "standards/adr"
   },
   {
-    "id": "standards/ai-native/gemini-coding-standard.md",
-    "title": "Gemini AI-Native Coding Standard",
+    "id": "standards/ai-native/kyberion-coding-standard.md",
+    "title": "Kyberion AI-Native Coding Standard",
     "author": "Unknown",
     "last_updated": "2026-02-14",
     "tier": "public",
@@ -1897,7 +1897,7 @@
   },
   {
     "id": "templates/blueprints/project-charter.md",
-    "title": "Blueprint: Project Charter (Gemini Standard v1.1)",
+    "title": "Blueprint: Project Charter (Kyberion Standard v1.1)",
     "author": "Unknown",
     "last_updated": "2026-03-01",
     "tier": "public",

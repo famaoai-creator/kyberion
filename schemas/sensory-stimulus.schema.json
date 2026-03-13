@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Gemini Unified Sensory Protocol (GUSP) v2.0",
+  "title": "Kyberion Unified Sensory Protocol (GUSP) v2.0",
   "description": "The Physical Contract for Kyberion Backend Service Sovereignty.",
   "type": "object",
   "required": ["id", "ts", "origin", "signal", "control", "policy"],

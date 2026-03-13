@@ -47,4 +47,4 @@ last_updated: 2026-03-06
 - 例: 「注文失敗」だけでなく、「商品ID: X, 在庫数: 0」といった背景情報を付随させる。
 
 ---
-*Created by Gemini Ecosystem Architect - 2026-02-28*
+*Created by Kyberion Ecosystem Architect - 2026-02-28*

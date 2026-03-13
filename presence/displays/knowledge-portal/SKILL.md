@@ -5,7 +5,7 @@ status: implemented
 category: Documentation
 last_updated: '2026-02-14'
 tags:
-  - gemini-skill
+  - kyberion-skill
 ---
 
 # knowledge-portal

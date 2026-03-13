@@ -2,7 +2,7 @@
   "name": "{{SKILL_NAME}}",
   "version": "1.0.0",
   "private": true,
-  "author": "Gemini Agent",
+  "author": "Kyberion Agent",
   "license": "MIT",
   "description": "{{DESCRIPTION}}",
   "main": "dist/main.js",

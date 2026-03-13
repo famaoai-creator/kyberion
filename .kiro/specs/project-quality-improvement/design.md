@@ -148,7 +148,7 @@ TypeScriptの厳格モードへ段階的に移行します。
 
 #### フェーズ4: コード品質向上
 
-ESLintルールを段階的に有効化し、GEMINI準拠を強化します。
+ESLintルールを段階的に有効化し、Kyberion準拠を強化します。
 
 ```
 ┌─────────────────────────────────────────┐
@@ -164,7 +164,7 @@ ESLintルールを段階的に有効化し、GEMINI準拠を強化します。
 │  │  - New files: strict            │   │
 │  └─────────────────────────────────┘   │
 │  ┌─────────────────────────────────┐   │
-│  │  GEMINI Compliance              │   │
+│  │  Kyberion Compliance              │   │
 │  │  - no-restricted-imports        │   │
 │  │  - custom rules for ADF         │   │
 │  │  - mission_controller checks    │   │
@@ -233,7 +233,7 @@ interface FixtureGenerator {
 interface AssertionExtensions {
   toMatchADFSchema(received: unknown): void;
   toHaveValidMissionState(received: MissionState): void;
-  toBeValidGEMINICompliant(received: unknown): void;
+  toBeValidKyberionCompliant(received: unknown): void;
 }
 ```
 
@@ -675,16 +675,16 @@ class LintViolationOverloadError extends Error {
 3. 段階的に修正（ファイル単位またはディレクトリ単位）
 4. 必要に応じてルールレベルを一時的にwarnに戻す
 
-#### GEMINI準拠違反
+#### Kyberion準拠違反
 
 ```typescript
-class GEMINIViolationError extends Error {
+class KyberionViolationError extends Error {
   constructor(
     public filePath: string,
     public violation: string,
     public suggestion: string
   ) {
-    super(`GEMINI violation in ${filePath}: ${violation}. Suggestion: ${suggestion}`);
+    super(`Kyberion violation in ${filePath}: ${violation}. Suggestion: ${suggestion}`);
   }
 }
 ```
@@ -815,7 +815,7 @@ class CoverageReportError extends Error {
 #### フェーズ4: コード品質向上（3-4週間）
 
 1. ESLintルールの段階的有効化
-2. GEMINI準拠カスタムルールの作成
+2. Kyberion準拠カスタムルールの作成
 3. 既存コードの修正
 4. ルールレベルのerrorへの昇格
 
@@ -1389,7 +1389,7 @@ module.exports = [
       '@typescript-eslint/no-require-imports': 'warn',
       '@typescript-eslint/ban-ts-comment': 'warn',
 
-      // GEMINI準拠ルール（既存）
+      // Kyberion準拠ルール（既存）
       'no-restricted-imports': [
         'error',
         {
@@ -1525,7 +1525,7 @@ collectMetrics().then(saveMetrics);
 
 - **テストカバレッジ**: アクチュエータ60%、共有パッケージ70%、スクリプト50%
 - **型安全性**: TypeScript厳格モードへの段階的移行
-- **コード品質**: ESLintルールの有効化とGEMINI準拠の強化
+- **コード品質**: ESLintルールの有効化とKyberion準拠の強化
 - **開発効率**: 改善されたツールとプロセスによる開発サイクルの高速化
 
 ### 次のステップ

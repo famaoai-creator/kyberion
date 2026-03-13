@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Presence Layer: Sensors, Displays, and Intervention
 
-The **Presence Layer** is the perceptual extension of the Gemini CLI Nexus. It enables the core intelligence to perceive external events (Sensors) and project its internal state to external interfaces (Displays).
+The **Presence Layer** is the perceptual extension of the Kyberion CLI Nexus. It enables the core intelligence to perceive external events (Sensors) and project its internal state to external interfaces (Displays).
 
 ## 1. Philosophy: The Sensory Nexus
 

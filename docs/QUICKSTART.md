@@ -1,6 +1,6 @@
 # Quick Start: Your Personal AI Agent Team
 
-Gemini Skills is built on one idea: **you define who you are, and the system assembles the right AI team for you**. In three steps, you go from persona definition to automated workflows — with your knowledge kept secure in your own tier.
+Kyberion is built on one idea: **you define who you are, and the system assembles the right AI team for you**. In three steps, you go from persona definition to automated workflows — with your knowledge kept secure in your own tier.
 
 ## The Concept
 
@@ -51,7 +51,7 @@ The wizard created `knowledge/personal/` for you — a Git-ignored directory for
 | **Confidential** | `knowledge/confidential/` | Company standards, client-specific rules      |
 | **Public**       | `knowledge/`              | Shared frameworks, tech-stack guides          |
 
-Your personal settings always take priority. See [3-Tier Knowledge Hierarchy](./README.md#3-tier-knowledge-hierarchy) for details.
+Your personal settings always take priority. See [3-Tier Model](./README.md#3-tier-model) for details.
 
 ## Step 4: Your First Mission
 
@@ -88,9 +88,11 @@ Every mission begins in **Phase 0: Alignment**. You must discuss your intent wit
   ```bash
   npm run plugin -- install <package>
   ```
-- Read the Governance Rules: [`AGENTS.md`](./AGENTS.md)
+- Read the Governance Rules: [`AGENTS.md`](../AGENTS.md)
+- Understand key terms: [`docs/GLOSSARY.md`](./GLOSSARY.md)
+- Explore the architecture: [`docs/COMPONENT_MAP.md`](./COMPONENT_MAP.md)
 
 ---
 
 **Need Help?**
-See `README.md` for the full list of 131 skills, or ask Gemini: "Help me find the right skill for [your task]."
+See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the full list of capabilities, or ask Kyberion: "Help me find the right skill for [your task]."

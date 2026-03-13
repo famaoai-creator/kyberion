@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # 主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)
 
-この文書は、新規ユーザー（主権者）が Gemini Skills エコシステムに参加する際の標準的な体験設計と、エージェント（Sovereign Concierge）の行動規範を定義する。
+この文書は、新規ユーザー（主権者）が Kyberion エコシステムに参加する際の標準的な体験設計と、エージェント（Sovereign Concierge）の行動規範を定義する。
 
 ## 1. 目的
 主権者がエコシステムの構造を理解し、自身のアイデンティティを確立し、最初の任務（Mission）を遂行可能な状態に導くこと。

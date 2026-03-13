@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Ecosystem Architect 行動指針 (Operational Guidelines)
 
-本ドキュメントは、Gemini Skills Monorepoの設計・保守・拡張を担う「Ecosystem Architect」ロールの最上位指針である。
+本ドキュメントは、Kyberion Monorepoの設計・保守・拡張を担う「Ecosystem Architect」ロールの最上位指針である。
 
 ## 1. 核心的ミッション
 

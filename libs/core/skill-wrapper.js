@@ -90,7 +90,7 @@ function buildOutput(skillName, status, dataOrError, startTime) {
     return base;
 }
 function printOutput(output) {
-    const isHuman = process.env.GEMINI_FORMAT === 'human' || process.argv.includes('--format=human');
+    const isHuman = process.env.KYBERION_FORMAT === 'human' || process.argv.includes('--format=human');
     // Persistence for Feedback Loop: Save the latest response via Secure IO
     try {
         const sharedPath = path.join(path_resolver_js_1.pathResolver.rootDir(), 'active/shared/last_response.json');

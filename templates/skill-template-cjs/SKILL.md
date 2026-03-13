@@ -7,7 +7,7 @@ category: Utilities
 last_updated: '{{DATE}}'
 freedom_level: med
 tags:
-  - gemini-skill
+  - kyberion-skill
 ---
 
 # {{SKILL_NAME}}

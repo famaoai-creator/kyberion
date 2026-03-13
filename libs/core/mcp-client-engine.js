@@ -14,7 +14,7 @@ async function executeMcp(command, args, actionRequest) {
         stderr: "inherit",
     });
     const client = new index_js_1.Client({
-        name: "Gemini-Connector-Client",
+        name: "Kyberion-Connector-Client",
         version: "1.0.0",
     }, {
         capabilities: {},

@@ -62,7 +62,7 @@ const data = generateTestData<{ name: string; age: number }>({
 
 ### Assertion Extensions
 
-カスタムアサーションを使用してADFスキーマ、ミッション状態、GEMINI準拠を検証します。
+カスタムアサーションを使用してADFスキーマ、ミッション状態、Kyberion準拠を検証します。
 
 ```typescript
 import './utils/assertion-extensions';
@@ -73,8 +73,8 @@ expect(adfObject).toMatchADFSchema();
 // ミッション状態の検証
 expect(missionState).toHaveValidMissionState();
 
-// GEMINI準拠の検証
-expect(codeObject).toBeGEMINICompliant();
+// Kyberion準拠の検証
+expect(codeObject).toBeKyberionCompliant();
 ```
 
 ## ファイル構成

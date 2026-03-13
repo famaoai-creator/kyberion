@@ -1,6 +1,6 @@
 # Kyberion Capabilities Guide
 
-Total Capabilities: 10 (Implemented: 10)
+Total Capabilities: 145 (Implemented: 145)
 Last updated: 2026-03-09
 
 > **Governance Note (The Capability Evolution):**

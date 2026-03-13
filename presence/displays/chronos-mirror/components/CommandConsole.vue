@@ -41,7 +41,7 @@ const execute = async () => {
     <div
       class="bg-gray-800 px-4 py-2 text-[10px] text-gray-400 flex justify-between items-center border-b border-gray-700"
     >
-      <span>GEMINI CLI - REMOTE CONSOLE</span>
+      <span>KYBERION CLI - REMOTE CONSOLE</span>
       <div v-if="isRunning" class="flex gap-1">
         <span class="w-1 h-1 bg-blue-500 animate-ping rounded-full"></span>
         <span class="w-1 h-1 bg-blue-500 animate-ping rounded-full delay-75"></span>

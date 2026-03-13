@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runInWorker = runInWorker;
 const node_worker_threads_1 = require("node:worker_threads");
 /**
- * Worker Proxy for Gemini Skills.
+ * Worker Proxy for Kyberion.
  * Offloads CPU-intensive tasks to background threads.
  */
 function runInWorker(scriptPath, data) {

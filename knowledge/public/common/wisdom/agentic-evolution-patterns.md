@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Wisdom: Agentic Evolution & Architecture Patterns
 
-このドキュメントは、Gemini Skills エコシステムの進化過程から得られた、自律型 AI エージェント基盤における普遍的な設計指針（知恵）を蓄積したものである。
+このドキュメントは、Kyberion エコシステムの進化過程から得られた、自律型 AI エージェント基盤における普遍的な設計指針（知恵）を蓄積したものである。
 
 ## 1. Evidence-based Skill Genesis (実証に基づくスキルの誕生)
 - **Problem**: 想像上のユースケースに基づいたスキルの事前実装は、負債の温床となる。

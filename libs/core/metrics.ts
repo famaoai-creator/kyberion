@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 
 /**
- * Lightweight metrics collection for Gemini Skills.
+ * Lightweight metrics collection for Kyberion.
  * Standardized with Secure-IO.
  */
 
