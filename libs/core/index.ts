@@ -104,6 +104,19 @@ export * from './sensory-memory.js';
 // Mission Status Guard
 export { MissionStatus, isValidTransition, transitionStatus } from './mission-status.js';
 
+// A2UI Protocol
+export * from './a2ui.js';
+
+// PTY Engine (Logical Kernel)
+export * from './pty-engine.js';
+export * from './terminal-keys.js';
+export * from './agent-mediator.js';
+export * from './acp-mediator.js';
+export * from './agent-adapter.js';
+
+// Actuators
+export { handleAction as presenceAction } from '../actuators/presence-actuator/src/index.js';
+
 // Shared Business Types
 export * from './shared-business-types.js';
 // export * as visionJudge from './vision-judge.js';

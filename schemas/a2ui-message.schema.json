@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft-2020-12/schema",
+  "$id": "https://kyberion.ai/schemas/a2ui-message.schema.json",
+  "title": "A2UI Message Schema (Kyberion)",
+  "description": "Describes a JSON payload for Agent-to-UI messages in Kyberion.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/CreateSurfaceMessage" },
+    { "$ref": "#/$defs/UpdateComponentsMessage" },
+    { "$ref": "#/$defs/UpdateDataModelMessage" },
+    { "$ref": "#/$defs/DeleteSurfaceMessage" }
+  ],
+  "$defs": {
+    "CreateSurfaceMessage": {
+      "type": "object",
+      "properties": {
+        "createSurface": {
+          "type": "object",
+          "properties": {
+            "surfaceId": { "type": "string" },
+            "catalogId": { "type": "string" },
+            "title": { "type": "string" }
+          },
+          "required": ["surfaceId", "catalogId"]
+        }
+      },
+      "required": ["createSurface"]
+    },
+    "UpdateComponentsMessage": {
+      "type": "object",
+      "properties": {
+        "updateComponents": {
+          "type": "object",
+          "properties": {
+            "surfaceId": { "type": "string" },
+            "components": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Component" }
+            }
+          },
+          "required": ["surfaceId", "components"]
+        }
+      },
+      "required": ["updateComponents"]
+    },
+    "UpdateDataModelMessage": {
+      "type": "object",
+      "properties": {
+        "updateDataModel": {
+          "type": "object",
+          "properties": {
+            "surfaceId": { "type": "string" },
+            "data": { "type": "object" }
+          },
+          "required": ["surfaceId", "data"]
+        }
+      },
+      "required": ["updateDataModel"]
+    },
+    "DeleteSurfaceMessage": {
+      "type": "object",
+      "properties": {
+        "deleteSurface": {
+          "type": "object",
+          "properties": {
+            "surfaceId": { "type": "string" }
+          },
+          "required": ["surfaceId"]
+        }
+      },
+      "required": ["deleteSurface"]
+    },
+    "Component": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "props": { "type": "object" },
+        "children": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of child component IDs"
+        }
+      },
+      "required": ["id", "type"]
+    }
+  }
+}
