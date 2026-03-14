@@ -34,8 +34,8 @@ class NativePtyAdapter implements TerminalAdapter {
   resize(cols: number, rows: number) { this.pty.resize(cols, rows); }
   kill() { this.pty.kill(); }
   onData(cb: (data: string) => void) { this.pty.onData(cb); }
-  onExit(cb: (code: number, signal: string) => void) { 
-    this.pty.onExit(({ exitCode, signal }) => cb(exitCode, signal)); 
+  onExit(cb: (code: number | null, signal: string | null) => void) {
+    this.pty.onExit(({ exitCode, signal }) => cb(exitCode, String(signal ?? '')));
   }
   get pid() { return this.pty.pid; }
 }

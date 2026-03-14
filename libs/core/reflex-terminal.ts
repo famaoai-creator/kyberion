@@ -35,9 +35,9 @@ export class ReflexTerminal {
     if (options.onOutput) {
       // Setup polling for the legacy onOutput callback
       this.pollTimer = setInterval(() => {
-        const output = ptyEngine.poll(this.sessionId);
-        if (output && options.onOutput) {
-          options.onOutput(output);
+        const result = ptyEngine.poll(this.sessionId);
+        if (result?.output && options.onOutput) {
+          options.onOutput(result.output);
         }
       }, 100);
     }
