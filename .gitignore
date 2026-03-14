@@ -13,6 +13,9 @@ knowledge/confidential/
 # Individual/Personal Knowledge (Non-Git)
 knowledge/personal/
 
+# Next.js build output
+.next/
+
 # Runtime artifacts
 active/
 archive/

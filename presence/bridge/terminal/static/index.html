@@ -115,7 +115,7 @@
                 list.forEach(s => {
                     const div = document.createElement('div');
                     div.className = `session-item ${s.id === currentSessionId ? 'active' : ''}`;
-                    div.innerText = s.name;
+                    div.innerText = `${s.name}${s.connected ? ' • live' : ''}${s.active_brain && s.active_brain !== 'none' ? ` • ${s.active_brain}` : ''}`;
                     div.onclick = () => switchSession(s.id);
                     sessionList.appendChild(div);
                 });
@@ -125,17 +125,19 @@
         function switchSession(id) {
             if (id === currentSessionId) return;
             localStorage.setItem('sovereign_session_id', id);
+            localStorage.removeItem('sovereign_session_name');
             location.reload();
         }
 
         function connect() {
-            socket = new WebSocket(`ws://${location.host}`);
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            socket = new WebSocket(`${protocol}://${location.host}`);
             socket.onopen = () => {
                 connIndicator.classList.add('on');
                 // Fit BEFORE sending init to get correct initial size
                 fitAddon.fit();
                 socket.send(JSON.stringify({ 
-                    type: 'init', sessionId: currentSessionId, cols: term.cols, rows: term.rows 
+                    type: 'init', sessionId: currentSessionId, cols: term.cols, rows: term.rows, name: localStorage.getItem('sovereign_session_name')
                 }));
             };
             socket.onmessage = (event) => {
@@ -145,6 +147,7 @@
                         if (p.type === 'session_ready') {
                             currentSessionId = p.sessionId;
                             localStorage.setItem('sovereign_session_id', currentSessionId);
+                            localStorage.setItem('sovereign_session_name', p.name || currentSessionId);
                             statusText.innerText = (p.name || currentSessionId).toUpperCase();
                             statusText.style.color = '#00f2ff';
                             fitAddon.fit();
@@ -163,6 +166,7 @@
             };
             socket.onclose = () => {
                 connIndicator.classList.remove('on');
+                statusText.innerText = 'RECONNECTING...';
                 setTimeout(connect, 3000);
             };
         }
@@ -178,14 +182,22 @@
             }
         });
 
-        document.getElementById('new-session').onclick = () => {
+        document.getElementById('new-session').onclick = async () => {
             const name = prompt('Session Name:');
             if (name) {
-                localStorage.removeItem('sovereign_session_id');
-                const id = `s-${Date.now()}`;
-                localStorage.setItem('sovereign_session_id', id);
-                // We'll let the init handle creation
-                location.reload();
+                try {
+                    const res = await fetch('/sessions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    const created = await res.json();
+                    localStorage.setItem('sovereign_session_id', created.id);
+                    localStorage.setItem('sovereign_session_name', created.name);
+                    location.reload();
+                } catch (e) {
+                    alert('Failed to create session');
+                }
             }
         };
 

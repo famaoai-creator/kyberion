@@ -5,24 +5,57 @@
   "type": "object",
   "required": ["pattern_id", "category", "target_audience", "layout_strategy"],
   "properties": {
-    "pattern_id": { "type": "string" },
-    "category": { "enum": ["strategic", "technical", "analytical", "operational", "relational"] },
-    "target_audience": { "type": "string" },
-    "description": { "type": "string" },
+    "pattern_id": { "type": "string", "description": "Unique identifier for the design pattern" },
+    "category": {
+      "enum": ["strategic", "technical", "analytical", "operational", "relational"],
+      "description": "Purpose category for audience targeting"
+    },
+    "target_audience": { "type": "string", "description": "Intended audience for the generated document" },
+    "description": { "type": "string", "description": "Human-readable summary of the pattern's purpose" },
     "layout_strategy": {
       "type": "object",
+      "required": ["visual_weight", "structure"],
       "properties": {
         "visual_weight": { "enum": ["visual_heavy", "balanced", "text_heavy"] },
-        "structure": { "type": "array", "items": { "type": "string" } },
-        "color_palette": { "type": "string" }
+        "structure": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered list of sections that define the document flow"
+        },
+        "color_palette": { "type": "string", "description": "Reference to a named palette in themes.json" }
+      }
+    },
+    "content_data": {
+      "type": "array",
+      "description": "Slide/section content for patterns that include pre-defined content",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slide": { "type": "integer" },
+          "title": { "type": "string" },
+          "subtitle": { "type": "string" },
+          "body": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "visual": { "type": "string", "description": "Description of the visual element for the section" }
+        }
       }
     },
     "media_actuator_config": {
       "type": "object",
+      "required": ["engine"],
       "properties": {
         "template_id": { "type": "string" },
-        "engine": { "enum": ["puppeteer", "d2", "mermaid", "chartjs"] },
-        "styles": { "type": "object" }
+        "engine": { "enum": ["pptx", "puppeteer", "d2", "mermaid", "chartjs"] },
+        "output_format": {
+          "enum": ["pptx", "pdf", "docx", "xlsx", "png", "svg"],
+          "description": "Target output format for generation"
+        },
+        "theme": { "type": "string", "description": "Theme name from themes.json to apply" },
+        "styles": { "type": "object", "description": "Engine-specific style overrides" }
       }
     }
   }

@@ -12,11 +12,11 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { 
-  logger, 
-  pathResolver, 
-  safeWriteFile, 
-  safeReadFile, 
+import {
+  logger,
+  pathResolver,
+  safeWriteFile,
+  safeReadFile,
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -28,7 +28,9 @@ import {
   withLock,
   findMissionPath,
   missionDir as resolveMissionDir,
-  transitionStatus
+  transitionStatus,
+  trustEngine,
+  auditChain,
 } from '@agent/core';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
@@ -456,53 +458,23 @@ function syncRoleProcedure(missionId: string, persona: string) {
 }
 
 /**
- * 4. Trust Engine (Advanced Governance)
+ * 4. Trust Engine (Delegated to @agent/core/trust-engine)
  */
 function updateTrustScore(agentId: string, result: 'verified' | 'rejected') {
-  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-  if (!safeExistsSync(ledgerPath)) return;
-
-  const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
-  if (!ledger.agents[agentId]) {
-    ledger.agents[agentId] = {
-      current_score: 5.0,
-      total_missions: 0,
-      success_rate: 0,
-      last_verification_ts: null,
-      performance: { average_latency_ms: 0, consecutive_successes: 0 },
-      history: []
-    };
-  }
-
-  const agent = ledger.agents[agentId];
-  const oldScore = agent.current_score;
-  const now = new Date().toISOString();
+  const oldRecord = trustEngine.getScore(agentId);
+  const oldScore = oldRecord?.score ?? 500;
 
   if (result === 'verified') {
-    agent.current_score = Math.min(10.0, agent.current_score + 0.5);
-    agent.performance.consecutive_successes++;
+    trustEngine.recordEvent(agentId, 'outputQuality', 10, `mission verified`);
+    trustEngine.recordEvent(agentId, 'policyCompliance', 5, `mission compliant`);
   } else {
-    agent.current_score = Math.max(0.0, agent.current_score - 1.0);
-    agent.performance.consecutive_successes = 0;
+    trustEngine.recordEvent(agentId, 'outputQuality', -20, `mission rejected`);
   }
 
-  agent.total_missions++;
-  agent.last_verification_ts = now;
-  agent.history.push({ ts: now, event: 'SCORE_UPDATE', old_score: oldScore, new_score: agent.current_score, result });
+  const newRecord = trustEngine.getScore(agentId);
+  trustEngine.persist();
 
-  safeWriteFile(ledgerPath, JSON.stringify(ledger, null, 2));
-  logger.info(`📈 [TrustEngine] Updated trust score for ${agentId}: ${oldScore.toFixed(1)} -> ${agent.current_score.toFixed(1)}`);
-
-  // [Blockchain Anchor] Anchor trust score update
-  const anchorInput = pathResolver.rootResolve(`scratch/trust-anchor-${agentId}-${Date.now()}.json`);
-  safeWriteFile(anchorInput, JSON.stringify({
-    action: 'anchor_trust',
-    params: { agent_id: agentId, score: agent.current_score }
-  }));
-  try {
-    safeExec('npx', ['tsx', 'libs/actuators/blockchain-actuator/src/index.ts', '--input', anchorInput]);
-  } catch (_) {}
-  if (fs.existsSync(anchorInput)) fs.unlinkSync(anchorInput);
+  auditChain.recordTrustChange(agentId, oldScore, newRecord?.score ?? 0, `mission ${result}`);
 }
 
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {

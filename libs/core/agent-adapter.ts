@@ -1,7 +1,25 @@
 import { logger } from './core';
-import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk';
 import { spawn, ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
+
+const ENV_WHITELIST = [
+  'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'TERM', 'NODE_ENV',
+  'NVM_DIR', 'NVM_BIN', 'GOOGLE_API_KEY', 'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY', 'MISSION_ID', 'MISSION_ROLE',
+  // SSL/Proxy
+  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
+  'http_proxy', 'https_proxy', 'no_proxy',
+];
+function safeEnv(): Record<string, string> {
+  const env: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
+  for (const k of ENV_WHITELIST) { if (process.env[k]) env[k] = process.env[k] as string; }
+  return env;
+}
+
+async function getACPSdk() {
+  return await import('@agentclientprotocol/sdk');
+}
 
 /**
  * Universal Agent Adapter (UAA) v1.5
@@ -28,7 +46,7 @@ interface ACPDialect {
 
 abstract class BaseACPAdapter implements AgentAdapter {
   protected child: ChildProcess | null = null;
-  protected connection: ClientSideConnection | null = null;
+  protected connection: any = null;
   protected acpSessionId: string | null = null;
   protected accumulatedResponse: string = '';
   protected accumulatedThought: string = '';
@@ -45,7 +63,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.child = spawn(this.bootCommand, this.bootArgs, {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, FORCE_COLOR: '0', TERM: 'dumb' }
+      env: safeEnv()
     });
 
     const sdkInput = new PassThrough();
@@ -69,6 +87,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       if (this.child?.stdin?.writable) this.child.stdin.write(msg);
     });
 
+    const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
       (agent) => ({
         sessionUpdate: async (params: any) => {
@@ -105,7 +124,15 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
           findContent(params);
         },
-        async requestPermission(params) { return { outcome: 'approved' }; },
+        async requestPermission(params) {
+          const safeOps = ['read', 'search', 'list', 'view', 'get'];
+          const title = (params.toolCall?.title || '').toLowerCase();
+          if (safeOps.some(op => title.includes(op))) {
+            return { outcome: 'approved' as const };
+          }
+          logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
+          return { outcome: 'denied' as const };
+        },
         async readTextFile(params) { throw new Error('Not implemented'); },
         async writeTextFile(params) { throw new Error('Not implemented'); },
         async createTerminal(params) { throw new Error('Not implemented'); },
@@ -210,7 +237,7 @@ export class CodexAdapter implements AgentAdapter {
       // Pass the text as a single argument to npx/codex exec
       const res = spawnSync('npx', ['codex', 'exec', '--json', text], {
         encoding: 'utf8',
-        env: process.env,
+        env: safeEnv(),
         shell: false 
       });
 
@@ -236,11 +263,153 @@ export class CodexAdapter implements AgentAdapter {
   public async shutdown(): Promise<void> {}
 }
 
+/**
+ * Claude Code Adapter using stream-json mode for rich communication.
+ *
+ * Leverages Claude Code CLI features:
+ * - --output-format stream-json: NDJSON streaming responses
+ * - --system-prompt: Direct system prompt injection
+ * - --allowedTools / --disallowedTools: Native tool restriction
+ * - --model: Model selection (sonnet, opus, haiku)
+ * - --max-budget-usd: Cost control
+ * - --session-id: Session persistence
+ */
+export interface ClaudeAdapterOptions {
+  systemPrompt?: string;
+  cwd?: string;
+  model?: string;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  maxBudgetUsd?: number;
+  sessionId?: string;
+  permissionMode?: 'default' | 'plan' | 'auto' | 'bypassPermissions';
+}
+
+// Map Kyberion actuator names to Claude Code tool names
+const ACTUATOR_TO_CLAUDE_TOOLS: Record<string, string[]> = {
+  'file-actuator': ['Read', 'Write', 'Edit', 'Glob'],
+  'system-actuator': ['Bash'],
+  'browser-actuator': ['WebFetch', 'WebSearch'],
+  'code-actuator': ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob'],
+  'network-actuator': ['WebFetch', 'WebSearch'],
+};
+
+export class ClaudeAdapter implements AgentAdapter {
+  private options: ClaudeAdapterOptions;
+  private logBuffer: { ts: number; type: string; content: string }[] = [];
+
+  constructor(options?: ClaudeAdapterOptions) {
+    this.options = options || {};
+  }
+
+  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    return this.logBuffer.slice(-limit);
+  }
+
+  public async boot(): Promise<void> {
+    logger.info(`[UAA] Claude Code ready (model: ${this.options.model || 'default'}, session: ${this.options.sessionId || 'new'})`);
+  }
+
+  public async ask(text: string): Promise<AgentResponse> {
+    logger.info(`[UAA] Claude asking: "${text.slice(0, 80)}..."`);
+    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    const { spawnSync } = await import('node:child_process');
+
+    try {
+      const args = ['-p', text, '--output-format', 'json'];
+
+      if (this.options.systemPrompt) {
+        args.push('--system-prompt', this.options.systemPrompt);
+      }
+      if (this.options.model) {
+        args.push('--model', this.options.model);
+      }
+      if (this.options.maxBudgetUsd) {
+        args.push('--max-budget-usd', String(this.options.maxBudgetUsd));
+      }
+      if (this.options.sessionId) {
+        args.push('--session-id', this.options.sessionId);
+      }
+      if (this.options.permissionMode) {
+        args.push('--permission-mode', this.options.permissionMode);
+      }
+
+      // Tool restrictions from manifest
+      if (this.options.allowedTools && this.options.allowedTools.length > 0) {
+        args.push('--allowedTools', ...this.options.allowedTools);
+      }
+      if (this.options.disallowedTools && this.options.disallowedTools.length > 0) {
+        args.push('--disallowedTools', ...this.options.disallowedTools);
+      }
+
+      const res = spawnSync('claude', args, {
+        encoding: 'utf8',
+        env: safeEnv(),
+        cwd: this.options.cwd || process.cwd(),
+        shell: false,
+        timeout: 300000, // 5 min for complex tasks
+      });
+
+      if (res.error) throw res.error;
+
+      const output = (res.stdout || '').trim();
+      if (res.stderr) this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
+      this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
+      if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
+      try {
+        const parsed = JSON.parse(output);
+        return {
+          text: parsed.result || parsed.content || parsed.message || output,
+          thought: parsed.thought,
+          stopReason: res.status === 0 ? 'completed' : 'error',
+        };
+      } catch (_) {
+        // Fallback: treat as plain text
+        return { text: output || res.stderr || '', stopReason: res.status === 0 ? 'completed' : 'error' };
+      }
+    } catch (e: any) {
+      logger.error(`[UAA] Claude failed: ${e.message}`);
+      return { text: '', stopReason: 'error' };
+    }
+  }
+
+  public async shutdown(): Promise<void> {}
+
+  /**
+   * Convert Kyberion actuator restrictions to Claude Code tool names.
+   */
+  static resolveToolRestrictions(
+    allowedActuators: string[],
+    deniedActuators: string[]
+  ): { allowedTools: string[]; disallowedTools: string[] } {
+    const allowedTools: Set<string> = new Set();
+    const disallowedTools: Set<string> = new Set();
+
+    if (allowedActuators.length > 0) {
+      for (const actuator of allowedActuators) {
+        const tools = ACTUATOR_TO_CLAUDE_TOOLS[actuator];
+        if (tools) tools.forEach(t => allowedTools.add(t));
+      }
+    }
+
+    for (const actuator of deniedActuators) {
+      const tools = ACTUATOR_TO_CLAUDE_TOOLS[actuator];
+      if (tools) tools.forEach(t => disallowedTools.add(t));
+    }
+
+    return {
+      allowedTools: allowedTools.size > 0 ? Array.from(allowedTools) : [],
+      disallowedTools: Array.from(disallowedTools),
+    };
+  }
+}
+
 export class AgentFactory {
-  public static create(provider: 'gemini' | 'codex'): AgentAdapter {
+  public static create(provider: 'gemini' | 'codex' | 'claude'): AgentAdapter {
     switch (provider) {
       case 'gemini': return new GeminiAdapter();
       case 'codex': return new CodexAdapter();
+      case 'claude': return new ClaudeAdapter();
       default: throw new Error(`Unsupported provider: ${provider}`);
     }
   }
