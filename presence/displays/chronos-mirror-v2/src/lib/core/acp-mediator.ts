@@ -87,7 +87,7 @@ export class ACPMediator {
                 logger.info(`[A2UI_EXTRACTED] Detected UI Surface: ${a2uiPacket.surfaceId || 'unknown'}`);
                 (this as any)._processedA2UI.add(jsonStr);
 
-                const { dispatchA2UI } = await import('./a2ui.js');
+                const { dispatchA2UI } = await import('./a2ui');
                 dispatchA2UI(a2uiPacket);
               } catch (e) {
                 // If it's a partial JSON at the end of a chunk, ignore and wait for next chunk
@@ -97,7 +97,7 @@ export class ACPMediator {
         },
         async requestPermission(params) {
           logger.warn(`[ACP_PERMISSION] Required for: ${params.toolCall.title}`);
-          return { outcome: 'approved' as const };
+          return { outcome: 'approved' as any };
         },
         async readTextFile(params) { throw new Error('Not implemented'); },
         async writeTextFile(params) { throw new Error('Not implemented'); },

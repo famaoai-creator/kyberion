@@ -1,4 +1,5 @@
-import { ptyEngine, logger } from './index.js';
+import { ptyEngine } from './pty-engine';
+import { logger } from './core';
 
 /**
  * Agent Mediator v1.0

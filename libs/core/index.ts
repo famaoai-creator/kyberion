@@ -102,20 +102,20 @@ export * from './sensor-engine.js';
 export * from './sensory-memory.js';
 
 // Mission Status Guard
-export { MissionStatus, isValidTransition, transitionStatus } from './mission-status.js';
+export { MissionStatus, isValidTransition, transitionStatus } from './mission-status';
 
 // A2UI Protocol
-export * from './a2ui.js';
+export * from './a2ui';
 
 // PTY Engine (Logical Kernel)
-export * from './pty-engine.js';
-export * from './terminal-keys.js';
-export * from './agent-mediator.js';
-export * from './acp-mediator.js';
-export * from './agent-adapter.js';
+export * from './pty-engine';
+export * from './terminal-keys';
+export * from './agent-mediator';
+export * from './acp-mediator';
+export * from './agent-adapter';
 
 // Actuators
-export { handleAction as presenceAction } from '../actuators/presence-actuator/src/index.js';
+export { handleAction as presenceAction } from '../actuators/presence-actuator/src/index';
 
 // Shared Business Types
 export * from './shared-business-types.js';
