@@ -74,7 +74,10 @@
     ]
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.16.1",
+    "@anthropic-ai/claude-code": "^2.1.76",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@openai/codex": "^0.114.0",
     "@slack/bolt": "^4.6.0",
     "@slack/web-api": "^7.14.1",
     "@types/express": "^5.0.6",
@@ -88,6 +91,7 @@
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "chokidar": "^5.0.0",
+    "claude-code": "^1.0.0",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "gif-encoder-2": "^1.0.5",
