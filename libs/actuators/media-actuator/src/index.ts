@@ -1,7 +1,7 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs'; // Only for fs.statSync in render operations
 import { execSync } from 'node:child_process';
 import * as excelUtils from '@agent/shared-media';
 import * as pptxUtils from '@agent/core/src/pptx-utils.js';
@@ -111,7 +111,110 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 }
 
 async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
-  return ctx;
+  const rootDir = process.cwd();
+  switch (op) {
+    case 'apply_theme': {
+      const themesPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json');
+      if (!safeExistsSync(themesPath)) {
+        logger.warn('[MEDIA_TRANSFORM] themes.json not found, skipping theme application');
+        return ctx;
+      }
+      const themes = JSON.parse(safeReadFile(themesPath, { encoding: 'utf8' }) as string);
+      const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
+      const theme = themes.themes[themeName];
+      if (!theme) {
+        logger.warn(`[MEDIA_TRANSFORM] Theme "${themeName}" not found, available: ${Object.keys(themes.themes).join(', ')}`);
+        return ctx;
+      }
+      return { ...ctx, active_theme: theme, active_theme_name: themeName };
+    }
+    case 'apply_pattern': {
+      const patternPath = path.resolve(rootDir, resolve(params.pattern_path));
+      if (!safeExistsSync(patternPath)) {
+        throw new Error(`Design pattern not found: ${patternPath}`);
+      }
+      const pattern = JSON.parse(safeReadFile(patternPath, { encoding: 'utf8' }) as string);
+      return { ...ctx, active_pattern: pattern, pattern_id: pattern.pattern_id };
+    }
+    case 'merge_content': {
+      const pattern = ctx.active_pattern;
+      const theme = ctx.active_theme;
+      const contentData = params.content_data || pattern?.content_data || [];
+      const outputFormat = resolve(params.output_format) || pattern?.media_actuator_config?.engine || 'pptx';
+
+      if (outputFormat === 'pptx') {
+        const themeColors = theme?.colors || {};
+        const protocol: any = {
+          version: '3.0.0',
+          generatedAt: new Date().toISOString(),
+          canvas: { w: 10, h: 5.625 },
+          theme: {
+            dk1: (themeColors.primary || '#000000').replace('#', ''),
+            lt1: (themeColors.background || '#FFFFFF').replace('#', ''),
+            accent1: (themeColors.accent || '#38BDF8').replace('#', ''),
+          },
+          master: { elements: [] },
+          slides: contentData.map((data: any, idx: number) => {
+            const elements: any[] = [];
+            // Title
+            if (data.title) {
+              elements.push({
+                type: 'text',
+                placeholderType: 'title',
+                pos: { x: 0.5, y: 0.5, w: 9, h: 1 },
+                text: data.title,
+                style: {
+                  fontSize: 32, bold: true,
+                  color: (themeColors.text || '#000000').replace('#', ''),
+                  fontFamily: theme?.fonts?.heading?.split(',')[0] || 'Inter',
+                  align: 'center',
+                },
+              });
+            }
+            // Body / Subtitle
+            const bodyText = Array.isArray(data.body) ? data.body.join('\n') : (data.subtitle || data.body || '');
+            if (bodyText) {
+              elements.push({
+                type: 'text',
+                placeholderType: 'body',
+                pos: { x: 1, y: 1.8, w: 8, h: 2.8 },
+                text: bodyText,
+                style: {
+                  fontSize: 18,
+                  color: (themeColors.secondary || '#334155').replace('#', ''),
+                  fontFamily: theme?.fonts?.body?.split(',')[0] || 'System-ui',
+                  align: 'left', valign: 'top',
+                },
+              });
+            }
+            // Visual placeholder
+            if (data.visual) {
+              elements.push({
+                type: 'shape', shapeType: 'rect',
+                pos: { x: 1, y: 4.6, w: 8, h: 0.5 },
+                text: `[Visual: ${data.visual}]`,
+                style: { fill: 'F1F5F9', color: '64748B', fontSize: 12, italic: true, align: 'center', valign: 'middle' },
+              });
+            }
+            return { id: `slide${idx + 1}`, elements };
+          }),
+        };
+        return { ...ctx, last_pptx_design: protocol, merged_output_format: 'pptx' };
+      }
+
+      // For non-pptx formats, store the merged data for downstream processing
+      return { ...ctx, merged_content: contentData, merged_output_format: outputFormat };
+    }
+    case 'set': {
+      const key = resolve(params.key);
+      const value = resolve(params.value);
+      if (key) return { ...ctx, [key]: value };
+      return ctx;
+    }
+    default:
+      logger.warn(`[MEDIA_TRANSFORM] Unknown transform op: ${op}`);
+      return ctx;
+  }
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
@@ -121,7 +224,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
       const outPath = path.resolve(rootDir, resolve(params.path));
 
-      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
 
       const { generateNativePptx } = await import('@agent/core/src/native-pptx-engine/engine.js');
       await generateNativePptx(protocol, outPath);
@@ -133,7 +236,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'xlsx_render': {
       const xlsxProtocol = ctx[params.design_from || 'last_xlsx_design'];
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path));
-      if (!fs.existsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
       const { generateNativeXlsx } = await import('@agent/core/src/native-xlsx-engine/engine.js');
       await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
       const xlsxStats = fs.statSync(xlsxOutPath);
@@ -143,7 +246,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'docx_render': {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
       const docxOutPath = path.resolve(rootDir, resolve(params.path));
-      if (!fs.existsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
       const { generateNativeDocx } = await import('@agent/core/src/native-docx-engine/engine.js');
       await generateNativeDocx(docxProtocol, docxOutPath);
       const docxStats = fs.statSync(docxOutPath);
@@ -153,7 +256,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'pdf_render': {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
       const pdfOutPath = path.resolve(rootDir, resolve(params.path));
-      if (!fs.existsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
       const { generateNativePdf } = await import('@agent/core/src/native-pdf-engine/engine.js');
       await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
       const pdfStats = fs.statSync(pdfOutPath);

@@ -1,8 +1,39 @@
 import { logger } from './core';
 import { ptyEngine } from './pty-engine';
-import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk';
+import { dispatchA2UI } from './a2ui';
+import { getAgentManifest, isActuatorAllowed } from './agent-manifest';
 import { spawn, ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
+
+/** Whitelist environment variables passed to child agent processes */
+const ENV_WHITELIST = [
+  'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'LC_ALL', 'TERM',
+  'NODE_ENV', 'NODE_PATH', 'NVM_DIR', 'NVM_BIN',
+  'GOOGLE_API_KEY', 'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'MISSION_ID', 'MISSION_ROLE',
+  // SSL/Proxy
+  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
+  'http_proxy', 'https_proxy', 'no_proxy',
+];
+
+function sanitizeEnvForChild(env: NodeJS.ProcessEnv): Record<string, string> {
+  const safe: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
+  for (const key of ENV_WHITELIST) {
+    if (env[key]) safe[key] = env[key] as string;
+  }
+  return safe;
+}
+
+// Dynamic import for ESM-only @agentclientprotocol/sdk
+let _acpSdk: { ClientSideConnection: any; ndJsonStream: any } | null = null;
+async function getACPSdk() {
+  if (!_acpSdk) {
+    _acpSdk = await import('@agentclientprotocol/sdk');
+  }
+  return _acpSdk;
+}
 
 /**
  * ACP Mediator v5.2 (Model-Aware)
@@ -14,24 +45,44 @@ export interface ACPMediatorOptions {
   threadId: string;
   bootCommand: string;
   bootArgs: string[];
-  modelId?: string; // Optional: specific model to use (e.g. "gemini-2.5-flash")
+  modelId?: string;
+  systemPrompt?: string;
+  cwd?: string;
 }
 
 export class ACPMediator {
   private child: ChildProcess | null = null;
-  private connection: ClientSideConnection | null = null;
+  private connection: any = null;
   private acpSessionId: string | null = null;
   private accumulatedResponse: string = '';
+  private processedA2UIOffsets: Set<number> = new Set();
+  private booted: boolean = false;
+  private systemPromptSent: boolean = false;
+  private logBuffer: { ts: number; type: string; content: string }[] = [];
+  private static readonly MAX_LOG_ENTRIES = 200;
 
   constructor(private options: ACPMediatorOptions) {}
 
+  private log(type: string, content: string): void {
+    this.logBuffer.push({ ts: Date.now(), type, content });
+    if (this.logBuffer.length > ACPMediator.MAX_LOG_ENTRIES) {
+      this.logBuffer = this.logBuffer.slice(-ACPMediator.MAX_LOG_ENTRIES);
+    }
+  }
+
+  /** Get recent terminal log entries */
+  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    return this.logBuffer.slice(-limit);
+  }
+
   public async boot(): Promise<void> {
+    if (this.booted) return;
     logger.info(`[ACP_MEDIATOR] Spawning ACP Agent: ${this.options.bootCommand}`);
 
     this.child = spawn(this.options.bootCommand, this.options.bootArgs, {
-      cwd: process.cwd(),
+      cwd: this.options.cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, FORCE_COLOR: '0', TERM: 'dumb' }
+      env: sanitizeEnvForChild(process.env),
     });
 
     const sdkInput = new PassThrough();
@@ -47,56 +98,91 @@ export class ACPMediator {
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
           sdkInput.write(trimmed + '\n');
           logger.info(`[ACP_JSON_IN] ${trimmed}`);
+          this.log('in', trimmed);
         } else if (trimmed) {
           logger.info(`[ACP_TEXT_IN] ${trimmed}`);
+          this.log('text', trimmed);
         }
       }
     });
 
     this.child.stderr?.on('data', (data) => {
-      logger.info(`[ACP_STDERR] ${data.toString().trim()}`);
+      const msg = data.toString().trim();
+      logger.info(`[ACP_STDERR] ${msg}`);
+      this.log('stderr', msg);
     });
 
     sdkOutput.on('data', (chunk) => {
       const msg = chunk.toString();
       logger.info(`[ACP_JSON_OUT] ${msg.trim()}`);
+      this.log('out', msg.trim());
       this.child?.stdin?.write(msg);
     });
 
+    const { ClientSideConnection, ndJsonStream } = await getACPSdk();
     this.connection = new ClientSideConnection(
-      (agent) => ({
+      (agent: any) => ({
         sessionUpdate: async (params: any) => {
           logger.info(`[ACP_NOTIF] ${JSON.stringify(params)}`);
           if (params.update?.sessionUpdate === 'agent_message_chunk') {
             const text = params.update.content?.text || '';
             this.accumulatedResponse += text;
             logger.info(`[ACP_AGENT_SAYS] ${text}`);
+            this.log('agent', text);
 
-            // A2UI Extraction: Use accumulated response to handle chunks
+            // A2UI Extraction: scan accumulated response for embedded UI payloads
             const A2UI_PATTERN = /```a2ui\n([\s\S]*?)```|>>A2UI(\{[\s\S]*?\})<</g;
             let match;
-            // We search in the FULL accumulated response so far
             while ((match = A2UI_PATTERN.exec(this.accumulatedResponse)) !== null) {
+              if (this.processedA2UIOffsets.has(match.index)) continue;
               try {
                 const jsonStr = match[1] || match[2];
-                // Check if we've already processed this exact string to avoid duplicates
-                if (!(this as any)._processedA2UI) (this as any)._processedA2UI = new Set();
-                if ((this as any)._processedA2UI.has(jsonStr)) continue;
-
                 const a2uiPacket = JSON.parse(jsonStr);
                 logger.info(`[A2UI_EXTRACTED] Detected UI Surface: ${a2uiPacket.surfaceId || 'unknown'}`);
-                (this as any)._processedA2UI.add(jsonStr);
+                this.processedA2UIOffsets.add(match.index);
 
-                const { dispatchA2UI } = await import('./a2ui.js');
                 dispatchA2UI(a2uiPacket);
-              } catch (e) {
-                // If it's a partial JSON at the end of a chunk, ignore and wait for next chunk
+              } catch (_) {
+                // Partial JSON at chunk boundary - wait for next chunk
               }
             }
           }
         },
-        async requestPermission(params) {
-          logger.warn(`[ACP_PERMISSION] Required for: ${params.toolCall.title}`);
+        async requestPermission(params: any) {
+          const title = (params.toolCall?.title || '').toLowerCase();
+
+          // Actuator restriction: check manifest whitelist/blacklist
+          const manifest = getAgentManifest(this.options.threadId);
+          if (manifest) {
+            // Extract actuator name from tool call title (e.g., "run_shell_command" → system, "read_file" → file)
+            const actuatorMap: Record<string, string> = {
+              'shell': 'system-actuator', 'command': 'system-actuator', 'exec': 'system-actuator',
+              'file': 'file-actuator', 'read_file': 'file-actuator', 'write_file': 'file-actuator',
+              'browser': 'browser-actuator', 'navigate': 'browser-actuator',
+              'network': 'network-actuator', 'fetch': 'network-actuator', 'curl': 'network-actuator',
+            };
+            for (const [keyword, actuator] of Object.entries(actuatorMap)) {
+              if (title.includes(keyword) && !isActuatorAllowed(manifest, actuator)) {
+                logger.error(`[ACP_PERMISSION] DENIED by manifest: ${this.options.threadId} cannot use ${actuator} (tool: ${title})`);
+                return { outcome: 'denied' as const };
+              }
+            }
+          }
+
+          // Block explicitly dangerous operations
+          const dangerousPatterns = ['rm -rf', 'format', 'drop table', 'delete', 'eval(', 'exec('];
+          if (dangerousPatterns.some(p => title.includes(p))) {
+            logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
+            return { outcome: 'denied' as const };
+          }
+
+          // Allow safe operations
+          const safePatterns = ['read', 'search', 'list', 'view', 'get', 'ls', 'cat', 'grep', 'find', 'git status', 'git log', 'git diff'];
+          if (safePatterns.some(p => title.includes(p))) {
+            return { outcome: 'approved' as const };
+          }
+
+          logger.info(`[ACP_PERMISSION] Approved: ${title}`);
           return { outcome: 'approved' as const };
         },
         async readTextFile(params) { throw new Error('Not implemented'); },
@@ -123,7 +209,7 @@ export class ACPMediator {
 
     logger.info('[ACP_MEDIATOR] Establishing Session...');
     const sessionRes = await this.connection.newSession({
-      cwd: process.cwd(),
+      cwd: this.options.cwd || process.cwd(),
       mcpServers: []
     });
     this.acpSessionId = sessionRes.sessionId;
@@ -143,8 +229,12 @@ export class ACPMediator {
       logger.warn(`[ACP_MEDIATOR] Model selection failed: ${e}`);
     }
 
-    logger.info('[ACP_MEDIATOR] Letting session settle...');
-    await new Promise(r => setTimeout(r, 2000));
+    // System prompt will be prepended to the first ask() call
+    // instead of sent as a separate prompt during boot.
+    // This avoids boot hanging when the API has capacity issues.
+
+    this.booted = true;
+    logger.info('[ACP_MEDIATOR] Session established.');
   }
 
   public async ask(text: string): Promise<string> {
@@ -165,9 +255,17 @@ export class ACPMediator {
       }
     }
 
+    // Prepend system prompt on first ask
+    if (!this.systemPromptSent && this.options.systemPrompt) {
+      enrichedPrompt = `[System Instructions]\n${this.options.systemPrompt}\n\n[User Request]\n${enrichedPrompt}`;
+      this.systemPromptSent = true;
+    }
+
     this.accumulatedResponse = '';
-    logger.info(`[ACP_MEDIATOR] Asking Gemini: "${enrichedPrompt}"`);
-    
+    this.processedA2UIOffsets.clear();
+    this.log('prompt', enrichedPrompt.slice(0, 200));
+    logger.info(`[ACP_MEDIATOR] Asking: "${enrichedPrompt.slice(0, 100)}..."`);
+
     const response = await this.connection.prompt({
       sessionId: this.acpSessionId,
       prompt: [{ type: 'text', text: enrichedPrompt }]
@@ -175,10 +273,13 @@ export class ACPMediator {
     return this.accumulatedResponse || `(No text, stopReason: ${response.stopReason})`;
   }
 
-  public async shutdown() {
+  public async shutdown(): Promise<void> {
     if (this.child) {
       this.child.kill();
       this.child = null;
     }
+    this.booted = false;
+    this.connection = null;
+    this.acpSessionId = null;
   }
 }

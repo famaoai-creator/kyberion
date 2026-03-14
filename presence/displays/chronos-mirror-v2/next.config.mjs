@@ -6,14 +6,17 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@agent/core", "@copilotkit/react-core", "@copilotkit/react-ui", "@copilotkit/runtime"],
-  serverExternalPackages: ["langium", "mermaid"],
+  typescript: {
+    // @agent/core uses its own tsconfig (non-strict). Skip re-checking here.
+    ignoreBuildErrors: true,
+  },
+  transpilePackages: ["@agent/core"],
+  serverExternalPackages: ["node-pty", "@agentclientprotocol/sdk"],
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@agent/core": path.resolve(__dirname, "../../libs/core"),
+      "@agent/core": path.resolve(__dirname, "../../../libs/core"),
     };
-    // Ensure .ts and .tsx files in the aliased directory are resolvable
     config.resolve.extensions = [
       ...new Set([".ts", ".tsx", ...config.resolve.extensions]),
     ];

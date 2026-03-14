@@ -1,0 +1,95 @@
+version: "1.0"
+description: "Kyberion Agent Governance Policies"
+
+defaults:
+  action: allow
+
+policies:
+  - name: sovereign-shield-tier-isolation
+    description: "Prevent cross-tier data access"
+    rules:
+      - field: target_tier
+        operator: eq
+        value: personal
+        condition_field: agent_tier
+        condition_operator: ne
+        condition_value: sovereign
+        action: deny
+        priority: 100
+        message: "Only sovereign-tier agents can access personal data"
+
+  - name: no-secret-exfiltration
+    description: "Block reading secrets without explicit grant"
+    rules:
+      - field: operation
+        operator: matches
+        value: "read_secret|access_vault|decrypt"
+        action: deny
+        priority: 95
+        message: "Secret access requires explicit grant via secret-guard"
+
+  - name: prompt-injection-guard
+    description: "Block known prompt injection patterns"
+    rules:
+      - field: message
+        operator: matches
+        value: "(?i)(ignore previous|disregard all|system prompt|you are now|forget your)"
+        action: block
+        priority: 90
+        message: "Prompt injection pattern detected"
+
+  - name: sql-injection-guard
+    description: "Block SQL injection in agent inputs"
+    rules:
+      - field: message
+        operator: matches
+        value: "(?i)(drop|delete|truncate|alter)\\s+table"
+        action: block
+        priority: 90
+        message: "SQL injection pattern blocked"
+
+  - name: rate-limit-api-calls
+    description: "Prevent agent API flooding"
+    rules:
+      - field: operation
+        operator: eq
+        value: api_call
+        action: allow
+        priority: 50
+        rate_limit:
+          max: 60
+          window_seconds: 60
+          message: "API call rate limit exceeded (60/min)"
+
+  - name: ring3-read-only
+    description: "Ring 3 (sandboxed) agents are read-only"
+    rules:
+      - field: operation
+        operator: in
+        value: [write_file, delete_file, execute_command, modify_config]
+        condition_field: agent_ring
+        condition_operator: eq
+        condition_value: 3
+        action: deny
+        priority: 85
+        message: "Ring 3 agents are restricted to read-only operations"
+
+  - name: delegation-depth-limit
+    description: "Prevent delegation chains deeper than 3 hops"
+    rules:
+      - field: delegation_depth
+        operator: gt
+        value: 3
+        action: deny
+        priority: 80
+        message: "Delegation depth exceeds maximum of 3 hops"
+
+  - name: least-agency-enforcement
+    description: "Agents must have explicit capability for operation"
+    rules:
+      - field: has_capability
+        operator: eq
+        value: false
+        action: deny
+        priority: 75
+        message: "Agent lacks required capability for this operation"

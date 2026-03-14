@@ -1,0 +1,48 @@
+{
+  "name": "Agent Provider Availability Check",
+  "description": "Checks availability and version of all LLM agent providers (Gemini, Claude, Copilot, Codex). Verifies CLI installation, authentication, and basic prompt execution.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🔍 Checking Agent Provider Availability..." } },
+
+    { "op": "system:log", "params": { "message": "\n=== Gemini CLI ===" } },
+    { "op": "system:shell", "params": { "cmd": "which gemini 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "gemini_installed" } },
+    { "op": "system:shell", "params": { "cmd": "gemini --version 2>/dev/null || echo 'N/A'", "export_as": "gemini_version" } },
+    { "op": "system:shell", "params": { "cmd": "echo 'ping' | gemini -p 'Reply with only the word PONG' 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "gemini_ping" } },
+    { "op": "system:log", "params": { "message": "  Install: {{gemini_installed}}" } },
+    { "op": "system:log", "params": { "message": "  Version: {{gemini_version}}" } },
+    { "op": "system:log", "params": { "message": "  Ping:    {{gemini_ping}}" } },
+
+    { "op": "system:log", "params": { "message": "\n=== Claude Code CLI ===" } },
+    { "op": "system:shell", "params": { "cmd": "which claude 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "claude_installed" } },
+    { "op": "system:shell", "params": { "cmd": "claude --version 2>/dev/null || echo 'N/A'", "export_as": "claude_version" } },
+    { "op": "system:shell", "params": { "cmd": "claude -p 'Reply with only the word PONG' --output-format text 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "claude_ping" } },
+    { "op": "system:log", "params": { "message": "  Install: {{claude_installed}}" } },
+    { "op": "system:log", "params": { "message": "  Version: {{claude_version}}" } },
+    { "op": "system:log", "params": { "message": "  Ping:    {{claude_ping}}" } },
+
+    { "op": "system:log", "params": { "message": "\n=== GitHub Copilot CLI ===" } },
+    { "op": "system:shell", "params": { "cmd": "gh copilot -- --version 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "copilot_installed" } },
+    { "op": "system:shell", "params": { "cmd": "gh copilot -- -p 'Reply with only the word PONG' --allow-all 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "copilot_ping" } },
+    { "op": "system:log", "params": { "message": "  Install: {{copilot_installed}}" } },
+    { "op": "system:log", "params": { "message": "  Ping:    {{copilot_ping}}" } },
+
+    { "op": "system:log", "params": { "message": "\n=== OpenAI Codex CLI ===" } },
+    { "op": "system:shell", "params": { "cmd": "which codex 2>/dev/null && echo 'INSTALLED' || npx codex --version 2>/dev/null && echo 'INSTALLED (npx)' || echo 'NOT_FOUND'", "export_as": "codex_installed" } },
+    { "op": "system:log", "params": { "message": "  Install: {{codex_installed}}" } },
+
+    { "op": "system:log", "params": { "message": "\n=== ACP Protocol Support ===" } },
+    { "op": "system:shell", "params": { "cmd": "gemini --help 2>&1 | grep -q '\\-\\-acp' && echo 'Gemini: ACP ✓' || echo 'Gemini: ACP ✗'", "export_as": "gemini_acp" } },
+    { "op": "system:shell", "params": { "cmd": "gh copilot -- --help 2>&1 | grep -q '\\-\\-acp' && echo 'Copilot: ACP ✓' || echo 'Copilot: ACP ✗'", "export_as": "copilot_acp" } },
+    { "op": "system:shell", "params": { "cmd": "claude --help 2>&1 | grep -q 'stream-json' && echo 'Claude: Stream-JSON ✓' || echo 'Claude: Stream-JSON ✗'", "export_as": "claude_stream" } },
+    { "op": "system:log", "params": { "message": "  {{gemini_acp}}" } },
+    { "op": "system:log", "params": { "message": "  {{copilot_acp}}" } },
+    { "op": "system:log", "params": { "message": "  {{claude_stream}}" } },
+
+    { "op": "system:log", "params": { "message": "\n=== Agent Manifest Definitions ===" } },
+    { "op": "system:shell", "params": { "cmd": "ls knowledge/agents/*.agent.md 2>/dev/null | wc -l | tr -d ' '", "export_as": "manifest_count" } },
+    { "op": "system:shell", "params": { "cmd": "ls knowledge/agents/*.agent.md 2>/dev/null | xargs -I{} basename {} .agent.md | tr '\\n' ', '", "export_as": "manifest_list" } },
+    { "op": "system:log", "params": { "message": "  Manifests: {{manifest_count}} ({{manifest_list}})" } },
+
+    { "op": "system:log", "params": { "message": "\n✅ Agent Provider Check Complete." } }
+  ]
+}
