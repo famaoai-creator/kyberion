@@ -114,6 +114,21 @@ export * from './agent-mediator';
 export * from './acp-mediator';
 export * from './agent-adapter';
 
+// Agent Registry & Lifecycle
+export * from './agent-registry';
+export * from './agent-lifecycle';
+export * from './a2a-bridge';
+export * from './agent-manifest';
+export * from './provider-discovery';
+
+// Governance (Agent Governance Toolkit inspired)
+export * from './policy-engine';
+export * from './trust-engine';
+export * from './audit-chain';
+export * from './agent-slo';
+export * from './kill-switch';
+
+
 // Actuators
 export { handleAction as presenceAction } from '../actuators/presence-actuator/src/index';
 

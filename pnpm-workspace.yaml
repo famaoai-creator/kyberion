@@ -3,3 +3,4 @@ packages:
   - 'libs/shared-*'
   - 'libs/actuators/*'
   - 'satellites/*'
+  - 'presence/displays/chronos-mirror-v2'

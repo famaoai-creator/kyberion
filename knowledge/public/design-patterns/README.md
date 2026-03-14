@@ -1,40 +1,85 @@
-# 🎨 Human-Centric Design Patterns Registry
+# Human-Centric Design Patterns Registry
 
-このリポジトリは、人間向けの資料を作成する際の最適なデザインパターンを管理し、`Media-Actuator` と連携して一貫した視覚的アウトプットを提供するための知識ベースです。
+人間向け資料の最適なデザインパターンを管理し、`Media-Actuator` パイプラインと連携して一貫した視覚的アウトプットを提供するための知識ベース。
 
-## 🎯 用途別デザインパターン (Pattern Catalog)
+## Pattern Catalog
 
-| カテゴリ | 特徴 | 主な構成要素 | ターゲット |
+| カテゴリ | パターン ID | 対象 | エンジン |
 | :--- | :--- | :--- | :--- |
-| **Presentation** | 視認性、インパクト | キーワード、大きな図解、余白 | 全体会議、ピッチ |
-| **Report** | 論理性、エビデンス | 精緻なグラフ、詳細テキスト、構造化データ | 意思決定者、詳細分析者 |
-| **Infographic** | 情報凝縮、フロー | アイコン、プロセスマップ、要約 | クイック・リーディング用 |
+| **Presentation** | `KYBERION-MARKETING-DECK` | クライアント・投資家 | pptx |
+| **Presentation** | `STRAT-EXE-01` | 経営層 | puppeteer |
+| **Presentation** | `REL-PROP-01` | クライアント | puppeteer |
+| **Presentation** | `STRAT-ROAD-01` | ボードメンバー | mermaid |
+| **Report** | `TECH-RCA-01` | エンジニアリング | mermaid |
+| **Report** | `ANA-PERF-01` | アナリスト | chartjs |
+| **Infographic** | `INFO-PROCESS-01` | 社内オペレーション | d2 |
+| **Infographic** | `TECH-ARCH-01` | アーキテクト | d2 |
 
-## ⚙️ Media-Actuator 連携 (ADF-Driven Automation)
+## Media-Actuator Pipeline 連携
 
-`Media-Actuator` に以下の ADF (Agentic Data Format) を渡すことで、パターンに応じた資料が自動生成されます。
+パターンからの資料生成は `transform` ステップを経由して行う。
 
-### 使用例 (ADF Snippet)
+### CLI からの生成
+
+```bash
+# デフォルト（Marketing Deck）
+npx tsx scripts/generate_marketing_deck.ts
+
+# カスタムパターン + テーマ指定
+npx tsx scripts/generate_marketing_deck.ts \
+  --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
+  --theme kyberion-standard \
+  --output scratch/exec-summary.pptx
+```
+
+### ADF Pipeline (JSON)
+
 ```json
 {
-  "action": "generate_slide",
-  "params": {
-    "purpose": "presentation",
-    "theme": "kyberion-dark",
-    "content": {
-      "title": "2026 Strategy",
-      "body": ["Autonomous Evolution", "Secure Foundation"]
-    }
-  },
-  "design_pattern_ref": "knowledge/public/design-patterns/presentation/high-impact-pitch.json"
+  "action": "pipeline",
+  "steps": [
+    { "type": "transform", "op": "apply_theme", "params": { "theme": "kyberion-standard" } },
+    { "type": "transform", "op": "apply_pattern", "params": { "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json" } },
+    { "type": "transform", "op": "merge_content", "params": { "output_format": "pptx" } },
+    { "type": "apply", "op": "pptx_render", "params": { "path": "scratch/output.pptx" } }
+  ]
 }
 ```
 
-## 📂 フォルダ構造
-- `presentation/`: プレゼン資料用テンプレートとガイドライン
-- `report/`: 報告書用フォーマット定義
-- `infographic/`: 図解・プロセスマップ用定義
-- `media-templates/`: Media-Actuator が参照する CSS/JSON スタイル定義
+### Bridge API (HTTP)
+
+```bash
+# パターン一覧
+curl http://localhost:3031/design/patterns
+
+# テーマ一覧
+curl http://localhost:3031/design/themes
+
+# パターンから資料生成
+curl -X POST http://localhost:3031/design/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json", "theme": "kyberion-standard"}'
+```
+
+## フォルダ構造
+
+```
+design-patterns/
+  presentation/   # プレゼン資料パターン
+  report/         # 報告書パターン
+  infographic/    # 図解・フロー可視化パターン
+  media-templates/
+    themes.json   # カラーパレット・フォント・ブランドアセット定義
+```
+
+## Transform Operations
+
+| Op | 説明 |
+| :--- | :--- |
+| `apply_theme` | themes.json からテーマをロードし `active_theme` に設定 |
+| `apply_pattern` | デザインパターン JSON をロードし `active_pattern` に設定 |
+| `merge_content` | テーマ + パターン + コンテンツを統合してレンダリング可能なプロトコルを生成 |
+| `set` | コンテキスト変数を任意に設定 |
 
 ---
 *Status: Managed under MISSION-DESIGN-PATTERNS*

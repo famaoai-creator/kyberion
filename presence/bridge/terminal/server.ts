@@ -14,6 +14,13 @@ import {
   safeReaddir,
   safeAppendFileSync
 } from '../../../libs/core/index.js';
+import {
+  buildSessionPaths,
+  listPersistedSessionStates,
+  mergeSessionSummaries,
+  normalizeSessionName,
+  readPersistedSessionState,
+} from './session-utils.js';
 
 /**
  * Terminal Hub v6.2 [STANDARDIZED]
@@ -43,6 +50,7 @@ interface Session {
   active_brain?: string;
   syncPending?: boolean;
   current_stimulus_id?: string;
+  createdAt: string;
   paths: { base: string; in: string; out: string; state: string; };
 }
 
@@ -89,7 +97,12 @@ function saveSessionState(session: Session) {
   try {
     safeWriteFile(session.paths.state, JSON.stringify({
       id: session.id, pid: session.rt.getPid(), ts: new Date().toISOString(),
-      active: true, active_brain: session.active_brain || 'none', name: session.name
+      active: true,
+      active_brain: session.active_brain || 'none',
+      name: session.name,
+      lastActive: session.lastActive,
+      createdAt: session.createdAt,
+      connected: Boolean(session.ws && session.ws.readyState === WebSocket.OPEN),
     }, null, 2));
   } catch (_) {}
 }
@@ -199,25 +212,48 @@ async function setupSessionWatcher(session: Session) {
   });
 }
 
-function getOrCreateSession(id: string, cols = 80, rows = 30): Session {
-  let session = sessions.get(id);
-  if (session) return session;
+function listSessionSummaries() {
+  const persisted = listPersistedSessionStates(RUNTIME_BASE);
+  const runtime = Array.from(sessions.values()).map(session => ({
+    id: session.id,
+    name: session.name,
+    active_brain: session.active_brain || 'none',
+    lastActive: session.lastActive,
+    connected: Boolean(session.ws && session.ws.readyState === WebSocket.OPEN),
+  }));
 
-  const sessionBase = path.join(RUNTIME_BASE, id);
-  const paths = { 
-    base: sessionBase, 
-    in: path.join(sessionBase, 'in'), 
-    out: path.join(sessionBase, 'out'), 
-    state: path.join(sessionBase, 'state.json') 
-  };
+  return mergeSessionSummaries(persisted, runtime);
+}
+
+function getOrCreateSession(id: string, cols = 80, rows = 30, requestedName?: string): Session {
+  let session = sessions.get(id);
+  if (session) {
+    const nextName = normalizeSessionName(requestedName || session.name, id);
+    if (session.name !== nextName) {
+      session.name = nextName;
+      saveSessionState(session);
+    }
+    return session;
+  }
+
+  const paths = buildSessionPaths(RUNTIME_BASE, id);
+  const persisted = readPersistedSessionState(paths.state);
 
   [paths.in, paths.out].forEach(d => {
     if (!safeExistsSync(d)) safeMkdir(d, { recursive: true });
   });
 
   const newSession: Session = { 
-    id, name: `Session ${id}`, rt: null as any, ws: null, 
-    lastActive: Date.now(), captureBuffer: '', backlog: [], paths 
+    id,
+    name: normalizeSessionName(requestedName || persisted?.name, id),
+    rt: null as any,
+    ws: null,
+    lastActive: persisted?.lastActive || Date.now(),
+    captureBuffer: '',
+    backlog: [],
+    active_brain: persisted?.active_brain || 'none',
+    createdAt: persisted?.createdAt || new Date().toISOString(),
+    paths 
   };
 
   const rt = new ReflexTerminal({
@@ -291,26 +327,59 @@ wss.on('connection', (ws, req) => {
       const p = JSON.parse(msg.toString());
       if (p.type === 'init') {
         const id = p.sessionId || `s-${Date.now()}`;
-        activeSession = getOrCreateSession(id, p.cols, p.rows);
-        activeSession.ws = ws;
-        ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
-        ws.send(activeSession.backlog.join(''));
-      } else if (p.type === 'input' && activeSession) {
-        activeSession.rt.write(p.data);
-        activeSession.lastActive = Date.now();
-      } else if (p.type === 'resize' && activeSession) {
-        activeSession.rt.resize(p.cols, p.rows);
-      }
+         activeSession = getOrCreateSession(id, p.cols, p.rows, p.name);
+         activeSession.ws = ws;
+         activeSession.lastActive = Date.now();
+         saveSessionState(activeSession);
+         ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
+         ws.send(activeSession.backlog.join(''));
+       } else if (p.type === 'input' && activeSession) {
+         activeSession.rt.write(p.data);
+         activeSession.lastActive = Date.now();
+         saveSessionState(activeSession);
+       } else if (p.type === 'resize' && activeSession) {
+         activeSession.rt.resize(p.cols, p.rows);
+       }
     } catch (_) {
       if (activeSession) activeSession.rt.write(msg.toString());
     }
   });
 
-  ws.on('close', () => { if (activeSession) activeSession.ws = null; });
+  ws.on('close', () => {
+    if (activeSession) {
+      activeSession.ws = null;
+      activeSession.lastActive = Date.now();
+      saveSessionState(activeSession);
+    }
+  });
 });
 
 app.get('/sessions', (req, res) => { 
-  res.json(Array.from(sessions.values()).map(s => ({ id: s.id, name: s.name, active_brain: s.active_brain }))); 
+  res.json(listSessionSummaries()); 
+});
+
+app.get('/health', (req, res) => {
+  res.json({
+    ok: true,
+    liveSessions: sessions.size,
+    persistedSessions: listPersistedSessionStates(RUNTIME_BASE).length,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post('/sessions', (req, res) => {
+  const requestedId = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+  const id = requestedId || `s-${Date.now()}`;
+  const requestedName = typeof req.body?.name === 'string' ? req.body.name : undefined;
+  const session = getOrCreateSession(id, 80, 30, requestedName);
+  saveSessionState(session);
+  res.status(201).json({
+    id: session.id,
+    name: session.name,
+    active_brain: session.active_brain || 'none',
+    lastActive: session.lastActive,
+    connected: Boolean(session.ws && session.ws.readyState === WebSocket.OPEN),
+  });
 });
 
 const PORT = process.env.TERMINAL_PORT || 4000;
@@ -318,12 +387,10 @@ server.listen(PORT, () => {
   logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`); 
 
   if (safeExistsSync(RUNTIME_BASE)) {
-    const existing = safeReaddir(RUNTIME_BASE);
-    for (const id of existing) {
-      if (id.startsWith('s-')) {
-        logger.info(`📡 [TerminalHub] Auto-restoring watcher for session: ${id}`);
-        getOrCreateSession(id);
-      }
+    const existing = listPersistedSessionStates(RUNTIME_BASE);
+    for (const session of existing) {
+      logger.info(`📡 [TerminalHub] Auto-restoring watcher for session: ${session.id}`);
+      getOrCreateSession(session.id, 80, 30, session.name);
     }
   }
 });

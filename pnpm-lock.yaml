@@ -185,6 +185,15 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.3.2)(jsdom@24.1.3)(vite@8.0.0(@types/node@25.3.2)(esbuild@0.25.12)(jiti@1.21.7)(yaml@2.8.2))
 
+  libs/actuators/agent-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+      yargs:
+        specifier: ^17.7.2
+        version: 17.7.2
+
   libs/actuators/blockchain-actuator:
     dependencies:
       '@agent/core':
@@ -367,24 +376,6 @@ importers:
       axios:
         specifier: ^1.6.7
         version: 1.13.6
-      chalk:
-        specifier: ^5.3.0
-        version: 5.6.2
-      yargs:
-        specifier: ^17.7.2
-        version: 17.7.2
-
-  libs/actuators/subagent-actuator:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@agent/shared-business':
-        specifier: workspace:*
-        version: link:../../shared-business
-      '@agent/shared-vision':
-        specifier: workspace:*
-        version: link:../../shared-vision
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -3077,8 +3068,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.10.7:
-    resolution: {integrity: sha512-1ghYO3HnxGec0TCGBXiDLVns4eCSx4zJpxnHrlqFQajmhfKMQBzUGDdkMK7fUW7PTHTeLf+j87aTuKuuwWzMGw==}
+  baseline-browser-mapping@2.10.8:
+    resolution: {integrity: sha512-PCLz/LXGBsNTErbtB6i5u4eLpHeMfi93aUv5duMmj6caNu6IphS4q6UevDnL36sZQv9lrP11dbPKGMaXPwMKfQ==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -9688,7 +9679,7 @@ snapshots:
 
   '@types/html-to-docx@1.8.0':
     dependencies:
-      '@types/node': 25.3.2
+      '@types/node': 20.19.35
 
   '@types/http-errors@2.0.5': {}
 
@@ -9758,7 +9749,7 @@ snapshots:
 
   '@types/pdf-parse@1.1.5':
     dependencies:
-      '@types/node': 25.3.2
+      '@types/node': 20.19.35
 
   '@types/promise.allsettled@1.0.6': {}
 
@@ -9831,7 +9822,7 @@ snapshots:
 
   '@types/yauzl@2.10.3':
     dependencies:
-      '@types/node': 25.3.2
+      '@types/node': 20.19.35
     optional: true
 
   '@typescript-eslint/eslint-plugin@8.56.1(@typescript-eslint/parser@8.56.1(eslint@9.39.3(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.3(jiti@1.21.7))(typescript@5.9.3)':
@@ -10278,7 +10269,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.10.7: {}
+  baseline-browser-mapping@2.10.8: {}
 
   basic-ftp@5.2.0: {}
 
@@ -10359,7 +10350,7 @@ snapshots:
 
   browserslist@4.28.1:
     dependencies:
-      baseline-browser-mapping: 2.10.7
+      baseline-browser-mapping: 2.10.8
       caniuse-lite: 1.0.30001778
       electron-to-chromium: 1.5.313
       node-releases: 2.0.36

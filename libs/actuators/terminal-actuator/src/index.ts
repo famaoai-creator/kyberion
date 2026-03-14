@@ -26,7 +26,20 @@ interface TerminalAction {
   };
 }
 
-export async function handleAction(input: TerminalAction) {
+interface TerminalResult {
+  status?: string;
+  sessionId?: string;
+  success?: boolean;
+  sessions?: any[];
+  messages?: any[];
+  exitCode?: number;
+  output?: string;
+  nextOffset?: number;
+  total?: number;
+  [key: string]: any;
+}
+
+export async function handleAction(input: TerminalAction): Promise<TerminalResult> {
   const { action, params } = input;
   const rootDir = process.cwd();
 
@@ -42,7 +55,7 @@ export async function handleAction(input: TerminalAction) {
     case 'poll': {
       if (!params.sessionId) throw new Error('sessionId is required for poll action');
       const result = ptyEngine.poll(params.sessionId, params.offset, params.limit);
-      
+
       // Also fetch messages for the specific persona if threadId is known
       let messages: any[] = [];
       if (params.threadId && params.persona) {
@@ -50,7 +63,7 @@ export async function handleAction(input: TerminalAction) {
       }
 
       const session = ptyEngine.get(params.sessionId);
-      return { 
+      return {
         status: session?.status || 'unknown',
         ...result,
         messages,
@@ -60,7 +73,7 @@ export async function handleAction(input: TerminalAction) {
 
     case 'write': {
       if (!params.sessionId) throw new Error('sessionId is required for write action');
-      
+
       let dataToWrite = '';
       if (params.keys) {
         dataToWrite = encodeTerminalInput(params.keys);

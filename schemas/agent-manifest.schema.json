@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft-2020-12/schema",
+  "$id": "https://kyberion.ai/schemas/agent-manifest.schema.json",
+  "title": "Kyberion Agent Manifest",
+  "description": "Validates the YAML frontmatter of .agent.md files. The Markdown body serves as the agent's system prompt.",
+  "type": "object",
+  "required": ["agentId", "provider"],
+  "properties": {
+    "agentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique agent identifier (lowercase, hyphens allowed)"
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["gemini", "claude", "codex", "copilot"],
+      "description": "LLM provider for this agent"
+    },
+    "modelId": {
+      "type": "string",
+      "description": "Specific model to use (e.g., gemini-2.5-flash, claude-sonnet-4-20250514)"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Self-declared capabilities for A2A routing (e.g., reasoning, a2ui, gateway)"
+    },
+    "auto_spawn": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this agent should be auto-spawned at system startup"
+    },
+    "trust_required": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000,
+      "default": 0,
+      "description": "Minimum trust score required to spawn this agent"
+    },
+    "requires": {
+      "type": "object",
+      "description": "Prerequisites that must be met before this agent can be spawned",
+      "properties": {
+        "env": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required environment variables"
+        },
+        "services": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required external services (e.g., slack, github)"
+        },
+        "actuators": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required actuators that must be installed"
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required files (relative to project root)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "allowed_actuators": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Whitelist of actuators this agent can use. Empty array = unrestricted."
+    },
+    "denied_actuators": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Blacklist of actuators this agent cannot use. Deny always wins over allow."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["ecosystem_architect", "concierge", "specialist", "gateway", "observer"],
+      "description": "Governance role for tier-guard file access control"
+    },
+    "ring": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3],
+      "description": "Override execution ring (normally derived from trust score). Ring 0=system, 1=trusted, 2=standard, 3=sandboxed."
+    },
+    "slo": {
+      "type": "object",
+      "description": "Service Level Objectives for this agent",
+      "properties": {
+        "task_success_rate": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "number", "minimum": 0, "maximum": 1 },
+            "window": { "type": "string" }
+          }
+        },
+        "policy_compliance": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "number", "minimum": 0, "maximum": 1 },
+            "window": { "type": "string" }
+          }
+        },
+        "avg_latency_ms": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "number", "minimum": 0 },
+            "window": { "type": "string" }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
