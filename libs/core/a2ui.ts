@@ -1,4 +1,4 @@
-import { logger } from './core.js';
+import { logger } from './core';
 
 /**
  * Kyberion A2UI (Agent-to-User Interface) Protocol v0.1.0

@@ -1,4 +1,5 @@
-import { logger, ptyEngine } from './index.js';
+import { logger } from './core';
+import { ptyEngine } from './pty-engine';
 import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk';
 import { spawn, ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
@@ -96,7 +97,7 @@ export class ACPMediator {
         },
         async requestPermission(params) {
           logger.warn(`[ACP_PERMISSION] Required for: ${params.toolCall.title}`);
-          return { outcome: 'approved' };
+          return { outcome: 'approved' as const };
         },
         async readTextFile(params) { throw new Error('Not implemented'); },
         async writeTextFile(params) { throw new Error('Not implemented'); },
@@ -112,9 +113,8 @@ export class ACPMediator {
     logger.info('[ACP_MEDIATOR] Negotiating protocol...');
     await this.connection.initialize({
       protocolVersion: 1,
-      capabilities: {},
       clientInfo: { name: 'Kyberion', version: '1.0.0' }
-    });
+    } as any);
 
     logger.info('[ACP_MEDIATOR] Authenticating...');
     await this.connection.authenticate({

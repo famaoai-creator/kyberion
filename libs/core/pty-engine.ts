@@ -1,6 +1,6 @@
 import * as pty from 'node-pty';
 import { spawn as spawnChild, ChildProcess } from 'node:child_process';
-import { logger } from './core.js';
+import { logger } from './core';
 import * as crypto from 'node:crypto';
 import * as os from 'node:os';
 
