@@ -1,4 +1,4 @@
-import { logger } from './core.js';
+import { logger } from './core';
 import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk';
 import { spawn, ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';

@@ -82,6 +82,10 @@
       "types": "./pulse-guard.d.ts",
       "default": "./pulse-guard.js"
     },
+    "./acp-mediator": {
+      "types": "./acp-mediator.d.ts",
+      "default": "./acp-mediator.js"
+    },
     "./shared-business-types": {
       "types": "./shared-business-types.ts",
       "default": "./shared-business-types.ts"
