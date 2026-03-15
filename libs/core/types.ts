@@ -130,12 +130,13 @@ export interface CacheOptions {
 // Skill I/O Envelope
 // ---------------------------------------------------------------------------
 
-/** Overall status of a skill execution. */
+/** Overall status of a capability execution. */
 export type SkillStatus = 'success' | 'error' | 'partial';
 
-/** Standard output envelope wrapping every skill execution result. */
-export interface SkillOutput<T = unknown> {
-  skill: string;
+/** Standard output envelope wrapping every capability execution result. */
+export interface CapabilityOutput<T = unknown> {
+  capability?: string;
+  skill?: string;
   status: SkillStatus;
   data?: T;
   metadata?: {
@@ -155,9 +156,10 @@ export interface SkillOutput<T = unknown> {
   };
 }
 
-/** Standard input envelope for invoking a skill. */
-export interface SkillInput {
-  skill: string;
+/** Standard input envelope for invoking a capability. */
+export interface CapabilityInput {
+  capability?: string;
+  skill?: string;
   action: string;
   params?: Record<string, unknown>;
   context?: {
@@ -167,15 +169,18 @@ export interface SkillInput {
   };
 }
 
+export type SkillOutput<T = unknown> = CapabilityOutput<T>;
+export type SkillInput = CapabilityInput;
+
 // ---------------------------------------------------------------------------
-// Skill Metadata & Index
+// Capability Metadata & Index
 // ---------------------------------------------------------------------------
 
 /** Implementation lifecycle stage. */
 export type ImplementationStatus = 'implemented' | 'planned' | 'conceptual';
 
-/** Metadata describing a single skill (typically parsed from SKILL.md). */
-export interface SkillMetadata {
+/** Metadata describing a single capability. */
+export interface CapabilityMetadata {
   name: string;
   description: string;
   status: ImplementationStatus;
@@ -185,19 +190,23 @@ export interface SkillMetadata {
   knowledge_tier?: TierLevel;
 }
 
-/** Top-level definition used in the generated skill-index.json. */
-export interface SkillDefinition {
+/** Top-level definition used in the generated capability index. */
+export interface CapabilityDefinition {
   name: string;
   description: string;
   status: ImplementationStatus;
 }
 
-/** Aggregate skill index file shape. */
-export interface SkillIndex {
-  total_skills: number;
+/** Aggregate capability index file shape. */
+export interface CapabilityIndex {
+  total_capabilities: number;
   last_updated: string;
-  skills: SkillDefinition[];
+  capabilities: CapabilityDefinition[];
 }
+
+export type SkillMetadata = CapabilityMetadata;
+export type SkillDefinition = CapabilityDefinition;
+export type SkillIndex = CapabilityIndex;
 
 // ---------------------------------------------------------------------------
 // JSON Schema (lightweight internal representation)
@@ -219,6 +228,9 @@ export interface JsonSchema {
   title?: string;
   type?: string;
   required?: string[];
+  anyOf?: Array<{
+    required?: string[];
+  }>;
   properties?: Record<string, SchemaProperty>;
   additionalProperties?: boolean;
 }

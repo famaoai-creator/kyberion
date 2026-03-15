@@ -13,7 +13,7 @@ Establish the neurological link between modules.
 
 ### Stage 2: System Manifestation (システムの具現化)
 Construct the physical structure and activate services based on governance.
-- **Action**: `npx tsx scripts/run_orchestration_job.ts` (Running the "System Onboarding" job).
+- **Action**: `node dist/scripts/run_orchestration_job.js` (Running the "System Onboarding" job).
 - **Effect**:
   - Build artifacts (`dist/`) are generated.
   - `presence` (external interface) services are initialized.
@@ -23,7 +23,7 @@ Construct the physical structure and activate services based on governance.
 Inject the Sovereign's unique "Soul" into the established vessel.
 
 #### Path A: Interactive Terminal (対話型ターミナル)
-- **Action**: `npx tsx scripts/onboarding_wizard.ts`
+- **Action**: `node dist/scripts/onboarding_wizard.js`
 - **Effect**: Wizard guides the Sovereign through identity and agent naming.
 
 #### Path B: Non-Interactive / Agent Environment (非対話環境)

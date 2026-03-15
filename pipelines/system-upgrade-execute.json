@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "Sovereign System Upgrade Execution",
   "description": "Performs the actual upgrade: pull, build, test, and merge.",
   "steps": [

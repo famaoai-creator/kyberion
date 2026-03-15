@@ -1,6 +1,6 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
 const CACHE_DIR = path.join(process.cwd(), 'active/shared/entropy-cache');
 
@@ -15,23 +15,23 @@ export const entropyGate = {
    * If changed, updates cache and returns true (Gate Open - Process).
    */
   shouldWake(key: string, data: any): boolean {
-    if (!fs.existsSync(CACHE_DIR)) {
-      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    if (!safeExistsSync(CACHE_DIR)) {
+      safeMkdir(CACHE_DIR, { recursive: true });
     }
 
     const hashPath = path.join(CACHE_DIR, `${key}.hash`);
     const currentData = typeof data === 'string' ? data : JSON.stringify(data);
     const currentHash = createHash('md5').update(currentData).digest('hex');
 
-    if (fs.existsSync(hashPath)) {
-      const lastHash = fs.readFileSync(hashPath, 'utf8');
+    if (safeExistsSync(hashPath)) {
+      const lastHash = safeReadFile(hashPath, { encoding: 'utf8' }) as string;
       if (lastHash === currentHash) {
         return false; // No change, stay in sleep
       }
     }
 
     // Environmental change detected
-    fs.writeFileSync(hashPath, currentHash);
+    safeWriteFile(hashPath, currentHash);
     return true;
   },
 
@@ -40,6 +40,6 @@ export const entropyGate = {
    */
   reset(key: string): void {
     const hashPath = path.join(CACHE_DIR, `${key}.hash`);
-    if (fs.existsSync(hashPath)) fs.unlinkSync(hashPath);
+    if (safeExistsSync(hashPath)) safeUnlinkSync(hashPath);
   }
 };

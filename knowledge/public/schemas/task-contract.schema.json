@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission Task Contract",
+  "type": "object",
+  "required": ["task_id", "mission_id", "owner_agent_id", "status", "requested_role", "objective"],
+  "properties": {
+    "task_id": { "type": "string" },
+    "mission_id": { "type": "string" },
+    "owner_agent_id": { "type": "string" },
+    "worker_agent_id": { "type": "string" },
+    "requested_role": {
+      "type": "string",
+      "enum": ["owner", "worker", "observer"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "claimed", "in_progress", "submitted", "accepted", "rejected", "cancelled"]
+    },
+    "objective": { "type": "string" },
+    "inputs": { "type": "object" },
+    "expected_outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "write_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "correlation_id": { "type": "string" }
+  },
+  "additionalProperties": true
+}

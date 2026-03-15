@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { pathResolver } from '../../../path-resolver.js';
 
-const OUT = pathResolver.rootResolve('scratch/test-native.pdf');
+const OUT = pathResolver.sharedTmp('tests/native-pdf/test-native.pdf');
 
 function ensureDir(p: string) {
   if (!fs.existsSync(path.dirname(p))) fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -105,7 +105,7 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
 
   it('should embed a JPEG image as DCTDecode Image XObject', async () => {
     ensureDir(OUT);
-    const jpegPath = pathResolver.rootResolve('scratch/test-pixel.jpg');
+    const jpegPath = pathResolver.sharedTmp('tests/native-pdf/test-pixel.jpg');
     if (!fs.existsSync(jpegPath)) {
       const j = Buffer.from([
         0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,
@@ -280,7 +280,7 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
 
   it('should embed an associated file in /EmbeddedFiles', async () => {
     ensureDir(OUT);
-    const dataPath = pathResolver.rootResolve('scratch/sample-data.json');
+    const dataPath = pathResolver.sharedTmp('tests/native-pdf/sample-data.json');
     fs.writeFileSync(dataPath, JSON.stringify({ key: 'value', version: 2 }));
 
     await generateNativePdf({
@@ -495,4 +495,3 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('Appendix');
   });
 });
-

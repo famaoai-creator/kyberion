@@ -74,7 +74,7 @@ start → checkpoint (repeat) → verify → distill → finish
 ```
 
 ```bash
-MC="npx tsx scripts/mission_controller.ts"
+MC="node dist/scripts/mission_controller.js"
 $MC help                                        # all commands
 $MC start MY-FEATURE confidential               # create mission
 $MC checkpoint task-1 "Implemented auth module"  # record progress
@@ -104,11 +104,12 @@ LLM profiles are configurable per purpose (`heavy`/`standard`/`light`) in `wisdo
 
 ## ADF Pipelines & A2A
 
-**ADF (Agent Definition Format)** is Kyberion's declarative workflow language. An ADF pipeline chains actuator operations into a repeatable sequence — this is the primary way an LLM agent drives Kyberion programmatically (not intended for human CLI use).
+**ADF (Agentic Data Format)** is Kyberion's declarative workflow contract. An ADF pipeline chains actuator operations into a repeatable sequence and is validated as a JSON contract before execution.
 
 ```jsonc
 // pipelines/vital-check.json
 {
+  "action": "pipeline",
   "name": "Ecosystem Vital Check",
   "steps": [
     { "op": "system:shell", "params": { "cmd": "...", "export_as": "status" } },
@@ -120,17 +121,28 @@ LLM profiles are configurable per purpose (`heavy`/`standard`/`light`) in `wisdo
 Each `op` maps to an actuator capability (`system:shell`, `service:cli`, `file:read`, etc.). Steps export results via `export_as` and reference them with `{{variable}}` interpolation.
 
 ```bash
-npx tsx scripts/run_intent.ts <intent_id>                        # resolve intent → ADF → execute
-npx tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json  # execute ADF directly
+node dist/scripts/run_intent.js <intent_id>                               # resolve intent → ADF → execute
+node dist/scripts/run_super_pipeline.js --input path/to/pipeline.json     # execute ADF directly
 ```
 
 **A2A (Agent-to-Agent)** wraps ADF payloads in a messaging envelope with routing (`sender`, `receiver`, `performative`) and conversation tracking (`conversation_id`, `parent_id`). This enables external agents to request work from Kyberion and receive structured results.
 
 ```bash
-npx tsx scripts/run_a2a.ts --input message.json
+node dist/scripts/run_a2a.js --input message.json
 ```
 
 Schemas: `schemas/a2a-envelope.schema.json`, `schemas/super-nerve-pipeline.schema.json`, etc.
+
+## Mission Control Model
+
+Kyberion missions now follow a **single-owner, multi-worker** model.
+
+- A mission is the durable contract and audit boundary.
+- One owner agent holds mission write authority.
+- Worker agents may collaborate through explicit task contracts and leases.
+- Short-lived file exclusion uses resource locks; durable authority uses leases.
+
+See `knowledge/public/architecture/agent-mission-control-model.md` for the authoritative model.
 
 ## Governance
 

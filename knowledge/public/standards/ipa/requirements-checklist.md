@@ -5,6 +5,14 @@ tags: [standards, ipa, requirements, checklist]
 importance: 10
 author: Ecosystem Architect
 last_updated: 2026-03-06
+kind: standard
+scope: repository
+authority: standard
+phase: [alignment, execution, review]
+role_affinity: [product_manager, solution_architect, qa_lead, software_developer]
+applies_to: [requirements, nonfunctional, quality]
+owner: product_manager
+status: active
 ---
 
 # IPA-Aligned Requirements Engineering Standard

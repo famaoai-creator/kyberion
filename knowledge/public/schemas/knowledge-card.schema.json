@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Knowledge Card Frontmatter",
+  "type": "object",
+  "required": ["title", "tags", "importance", "last_updated", "kind", "scope", "authority"],
+  "properties": {
+    "title": { "type": "string" },
+    "category": { "type": "string" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "importance": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "author": { "type": "string" },
+    "last_updated": { "type": "string" },
+    "kind": {
+      "type": "string",
+      "enum": ["governance", "standard", "architecture", "capability", "role", "playbook", "incident", "reference"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "repository", "mission", "environment"]
+    },
+    "authority": {
+      "type": "string",
+      "enum": ["policy", "standard", "recipe", "reference", "advisory"]
+    },
+    "phase": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["onboarding", "recovery", "alignment", "execution", "review"]
+      }
+    },
+    "role_affinity": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "applies_to": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "owner": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated", "archived"]
+    }
+  },
+  "additionalProperties": true
+}

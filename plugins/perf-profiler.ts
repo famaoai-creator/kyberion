@@ -1,5 +1,4 @@
-import { safeWriteFile, safeReadFile, safeMkdir } from '@agent/core/secure-io';
-import * as fs from 'node:fs';
+import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 /**
@@ -13,8 +12,8 @@ const REGRESSION_THRESHOLD = 2.0;
 let profiles: Record<string, { times: number[]; avg: number }> = {};
 
 try {
-  if (fs.existsSync(PROFILE_FILE)) {
-    const content = safeReadFile(PROFILE_FILE);
+  if (safeExistsSync(PROFILE_FILE)) {
+    const content = safeReadFile(PROFILE_FILE, { encoding: 'utf8' }) as string;
     if (content) {
       profiles = JSON.parse(content);
     }
@@ -50,7 +49,7 @@ export const afterSkill = (skillName: string, output: any) => {
 
   try {
     const dir = path.dirname(PROFILE_FILE);
-    if (!fs.existsSync(dir)) {
+    if (!safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
     safeWriteFile(PROFILE_FILE, JSON.stringify(profiles, null, 2));

@@ -10,6 +10,8 @@ import {
   createMockActuator,
   createMockFileSystem,
   createMockNetwork,
+  createMockCapabilityInput,
+  createMockCapabilityOutput,
   createMockSkillInput,
   createMockSkillOutput,
 } from './mock-factory';
@@ -27,7 +29,7 @@ describe('Mock Factory', () => {
       const mock = createMockActuator('test-actuator');
       const result = await mock.execute();
 
-      expect(result.skill).toBe('test-actuator');
+      expect(result.capability).toBe('test-actuator');
       expect(result.status).toBe('success');
       expect(mock.execute).toHaveBeenCalledTimes(1);
     });
@@ -74,31 +76,31 @@ describe('Mock Factory', () => {
     });
   });
 
-  describe('createMockSkillInput', () => {
-    it('should create a mock skill input', () => {
-      const input = createMockSkillInput();
+  describe('createMockCapabilityInput', () => {
+    it('should create a mock capability input', () => {
+      const input = createMockCapabilityInput();
 
-      expect(input.skill).toBe('test-skill');
+      expect(input.capability).toBe('test-capability');
       expect(input.action).toBe('test-action');
       expect(input.context?.knowledge_tier).toBe('public');
     });
 
     it('should allow overrides', () => {
-      const input = createMockSkillInput({
-        skill: 'custom-skill',
+      const input = createMockCapabilityInput({
+        capability: 'custom-capability',
         action: 'custom-action',
       });
 
-      expect(input.skill).toBe('custom-skill');
+      expect(input.capability).toBe('custom-capability');
       expect(input.action).toBe('custom-action');
     });
   });
 
-  describe('createMockSkillOutput', () => {
-    it('should create a mock skill output', () => {
-      const output = createMockSkillOutput();
+  describe('createMockCapabilityOutput', () => {
+    it('should create a mock capability output', () => {
+      const output = createMockCapabilityOutput();
 
-      expect(output.skill).toBe('test-skill');
+      expect(output.capability).toBe('test-capability');
       expect(output.status).toBe('success');
       expect(output.metadata?.timestamp).toBeDefined();
     });
@@ -110,7 +112,7 @@ describe('Fixture Generator', () => {
     it('should generate a valid ADF object', () => {
       const adf = generateADF();
 
-      expect(adf.skill).toBeDefined();
+      expect(adf.capability || adf.skill).toBeDefined();
       expect(adf.action).toBeDefined();
       expect(adf.params).toBeDefined();
       expect(adf.context?.knowledge_tier).toBe('public');
@@ -118,12 +120,12 @@ describe('Fixture Generator', () => {
 
     it('should accept custom options', () => {
       const adf = generateADF({
-        skill: 'custom-skill',
+        capability: 'custom-capability',
         action: 'custom-action',
         tier: 'confidential',
       });
 
-      expect(adf.skill).toBe('custom-skill');
+      expect(adf.capability).toBe('custom-capability');
       expect(adf.action).toBe('custom-action');
       expect(adf.context?.knowledge_tier).toBe('confidential');
     });
@@ -210,7 +212,7 @@ describe('Assertion Extensions', () => {
     });
 
     it('should fail for invalid ADF objects', () => {
-      const invalid = { skill: 'test' }; // missing action
+      const invalid = { capability: 'test' }; // missing action
       expect(() => expect(invalid).toMatchADFSchema()).toThrow();
     });
   });

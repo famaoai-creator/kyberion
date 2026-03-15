@@ -1,14 +1,5 @@
 {
-  "slack-sensor": {
-    "path": "presence/sensors/slack-sensor.ts",
-    "description": "Listens for Slack mentions and DMs",
-    "env": { "PORT": "4321" }
-  },
-  "nexus-daemon": {
-    "path": "presence/bridge/nexus-daemon.ts",
-    "description": "Coordinates physical terminal intervention",
-    "env": { "PORT": "4321" }
-  },
+  "_note": "Background surfaces such as slack-bridge, chronos-mirror-v2, nexus-daemon, and terminal-bridge are managed via knowledge/public/governance/active-surfaces.json and scripts/surface_runtime.ts.",
   "log-watcher": {
     "path": "presence/sensors/log-watcher.ts",
     "description": "Monitors logs for system errors",

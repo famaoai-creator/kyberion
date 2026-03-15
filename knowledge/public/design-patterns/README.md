@@ -23,13 +23,13 @@
 
 ```bash
 # デフォルト（Marketing Deck）
-npx tsx scripts/generate_marketing_deck.ts
+node dist/scripts/generate_marketing_deck.js
 
 # カスタムパターン + テーマ指定
-npx tsx scripts/generate_marketing_deck.ts \
+node dist/scripts/generate_marketing_deck.js \
   --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
   --theme kyberion-standard \
-  --output scratch/exec-summary.pptx
+  --output active/shared/exports/exec-summary.pptx
 ```
 
 ### ADF Pipeline (JSON)
@@ -41,7 +41,7 @@ npx tsx scripts/generate_marketing_deck.ts \
     { "type": "transform", "op": "apply_theme", "params": { "theme": "kyberion-standard" } },
     { "type": "transform", "op": "apply_pattern", "params": { "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json" } },
     { "type": "transform", "op": "merge_content", "params": { "output_format": "pptx" } },
-    { "type": "apply", "op": "pptx_render", "params": { "path": "scratch/output.pptx" } }
+    { "type": "apply", "op": "pptx_render", "params": { "path": "active/shared/exports/output.pptx" } }
   ]
 }
 ```

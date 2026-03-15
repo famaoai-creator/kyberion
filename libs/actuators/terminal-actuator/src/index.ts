@@ -1,6 +1,5 @@
-import { logger, ptyEngine, encodeTerminalInput, createStandardYargs } from '@agent/core';
+import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 /**
  * Terminal-Actuator v0.2.0 [PROTOTYPE]
@@ -117,7 +116,7 @@ const main = async () => {
     .parseSync();
   
   const inputPath = path.resolve(process.cwd(), argv.input as string);
-  const inputContent = fs.readFileSync(inputPath, 'utf8');
+  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

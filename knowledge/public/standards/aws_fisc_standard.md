@@ -5,6 +5,14 @@ tags: [public, standards, aws, fisc, standard, security]
 importance: 10
 author: Ecosystem Architect
 last_updated: 2026-03-06
+kind: standard
+scope: repository
+authority: standard
+phase: [alignment, execution, review]
+role_affinity: [solution_architect, cyber_security, software_developer, ruthless_auditor]
+applies_to: [security, compliance, architecture]
+owner: cyber_security
+status: active
 ---
 
 # AWS FISC (金融機関向け安全対策基準) 準拠ガイド

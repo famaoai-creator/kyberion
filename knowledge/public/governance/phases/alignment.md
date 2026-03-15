@@ -18,7 +18,7 @@ Interpret the Sovereign's intent and define Victory Conditions to initiate a mis
 ## Physical Enforcement
 Once Alignment is reached, the agent MUST execute the following command to set the mission to "Active".
 
-- **Command**: `npx tsx scripts/mission_controller.ts start <MISSION_ID> <PERSONA>`
+- **Command**: `node dist/scripts/mission_controller.js start <MISSION_ID> <PERSONA>`
 - **Validation**:
   - Verification of `my-identity.json`.
   - Automatic creation and switching to the mission branch (`mission/id`).

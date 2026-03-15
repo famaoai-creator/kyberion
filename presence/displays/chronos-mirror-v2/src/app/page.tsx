@@ -8,16 +8,16 @@ import { AgentPanel } from "../components/AgentPanel";
 
 const QUICK_ACTIONS = [
   { label: "Dashboard", query: "git status と git log --oneline -10 を実行して、ブランチ状態・最近のコミット・未コミット変更のサマリをダッシュボード表示して", icon: "📊" },
-  { label: "Vital Check", query: "npx tsx scripts/run_pipeline.ts -i pipelines/vital-check.json を実行して結果を表示して", icon: "💓" },
-  { label: "Diagnostics", query: "npx tsx scripts/run_pipeline.ts -i pipelines/system-diagnostics.json を実行して結果を表示して", icon: "🔍" },
+  { label: "Vital Check", query: "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json を実行して結果を表示して", icon: "💓" },
+  { label: "Diagnostics", query: "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json を実行して結果を表示して", icon: "🔍" },
   { label: "Build & Test", query: "pnpm run build と pnpm test を実行して、ビルド結果とテスト結果をステータス表示して", icon: "🔨" },
   { label: "Missions", query: "active/missions/registry.json を読んでミッション一覧をテーブル表示して。なければ「ミッションなし」と表示", icon: "🎯" },
   { label: "Agents", query: "knowledge/agents/ 配下のエージェント定義を一覧表示して。各エージェントのID、プロバイダー、モデル、capabilitiesをテーブルで", icon: "🤖" },
   { label: "Audit Log", query: "evidence/audit/ 配下の最新の監査ログファイルを読んで、直近20件のイベントをタイムライン表示して", icon: "📋" },
   { label: "Policies", query: "knowledge/governance/agent-policies.yaml を読んで、ポリシー一覧をテーブル表示して", icon: "🛡" },
-  { label: "Skill Audit", query: "npx tsx scripts/run_pipeline.ts -i knowledge/public/governance/pipelines/code-skill-audit.json を実行して結果を表示して", icon: "🧩" },
-  { label: "Provider Check", query: "npx tsx scripts/run_pipeline.ts -i pipelines/agent-provider-check.json を実行して、各プロバイダーの状態をステータス表示して", icon: "🔌" },
-  { label: "Upgrade Check", query: "npx tsx scripts/run_pipeline.ts -i pipelines/system-upgrade-check.json を実行して、アップデートの有無を表示して", icon: "⬆" },
+  { label: "Capability Audit", query: "node dist/scripts/run_pipeline.js --input knowledge/public/governance/pipelines/code-skill-audit.json を実行して結果を表示して", icon: "🧩" },
+  { label: "Provider Check", query: "node dist/scripts/run_pipeline.js --input pipelines/agent-provider-check.json を実行して、各プロバイダーの状態をステータス表示して", icon: "🔌" },
+  { label: "Upgrade Check", query: "node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-check.json を実行して、アップデートの有無を表示して", icon: "⬆" },
   { label: "Git History", query: "git log --oneline -20 を実行して、コミット履歴をタイムライン表示して", icon: "📡" },
   { label: "Knowledge", query: "find knowledge/ -name '*.md' -o -name '*.json' | head -30 を実行して、ナレッジファイルをリスト表示して。ディレクトリ別にグループ化", icon: "🧠" },
 ];

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "slack-bridge",
+      "kind": "gateway",
+      "description": "Slack Socket Mode ingress gateway and surface-agent host",
+      "command": "node",
+      "args": ["dist/satellites/slack-bridge/src/index.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    },
+    {
+      "id": "nexus-daemon",
+      "kind": "service",
+      "description": "Background system nerve daemon for stimuli routing and terminal dispatch",
+      "command": "node",
+      "args": ["dist/presence/bridge/nexus-daemon.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    },
+    {
+      "id": "terminal-bridge",
+      "kind": "service",
+      "description": "Background terminal bridge service for runtime sessions",
+      "command": "pnpm",
+      "args": ["--dir", "presence/bridge/terminal", "start"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    },
+    {
+      "id": "chronos-mirror-v2",
+      "kind": "ui",
+      "description": "Interactive Chronos control surface served as a workspace application",
+      "command": "pnpm",
+      "args": ["--dir", "presence/displays/chronos-mirror-v2", "start", "--", "-H", "127.0.0.1", "-p", "3000"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3000,
+      "healthPath": "/api/agents",
+      "enabled": true
+    }
+  ]
+}

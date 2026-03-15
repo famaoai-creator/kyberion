@@ -9,6 +9,7 @@ export * from './core.js';
 
 // Specific Wrappers & Metrics
 export * from './skill-wrapper.js';
+export * from './capability-wrapper.js';
 export * from './metrics.js';
 export * from './error-codes.js';
 
@@ -18,12 +19,20 @@ export {
   safeReadFile, 
   safeWriteFile, 
   safeAppendFileSync, 
+  safeCopyFileSync,
+  safeMoveSync,
+  safeSymlinkSync,
+  safeRmSync,
   safeUnlinkSync, 
   safeMkdir, 
   safeExistsSync, 
   safeExec,
   safeReaddir,
-  safeStat
+  safeStat,
+  safeLstat,
+  safeReadlink,
+  safeOpenAppendFile,
+  safeFsyncFile
 } from './secure-io.js';
 
 // Backward compatibility aliases
@@ -40,8 +49,13 @@ export {
   scripts, 
   active, 
   vault, 
-  shared, 
+  capabilityAssets,
+  shared,
+  sharedTmp,
+  sharedExports,
   isProtected, 
+  capabilityEntry,
+  capabilityDir,
   skillDir, 
   missionDir,
   missionEvidenceDir,
@@ -100,6 +114,7 @@ export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
+export * from './stimuli-journal.js';
 
 // Mission Status Guard
 export { MissionStatus, isValidTransition, transitionStatus } from './mission-status';
@@ -120,6 +135,14 @@ export * from './agent-lifecycle';
 export * from './a2a-bridge';
 export * from './agent-manifest';
 export * from './provider-discovery';
+export * from './runtime-supervisor';
+export * from './surface-runtime';
+export * from './artifact-store';
+export * from './approval-store';
+export * from './managed-process';
+export * from './pipeline-contract';
+export * from './channel-surface';
+export * from './service-binding';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine';
@@ -135,4 +158,3 @@ export { handleAction as presenceAction } from '../actuators/presence-actuator/s
 // Shared Business Types
 export * from './shared-business-types.js';
 // export * as visionJudge from './vision-judge.js';
-

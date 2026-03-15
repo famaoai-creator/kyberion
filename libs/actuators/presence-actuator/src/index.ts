@@ -1,8 +1,8 @@
-import { logger } from '../../../core/index.js';
+import { logger, resolveServiceBinding } from '../../../core/index.js';
 import { createStandardYargs } from '../../../core/cli-utils.js';
+import { safeReadFile } from '../../../core/secure-io.js';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 /**
  * Helper to safely access global ptyEngine
@@ -38,8 +38,15 @@ interface PresenceAction {
 export async function handleAction(input: PresenceAction) {
   const { action, params } = input;
 
-  const botToken = process.env.SLACK_BOT_TOKEN;
-  const slack = botToken ? new WebClient(botToken) : null;
+  let slack: WebClient | null = null;
+  try {
+    const binding = resolveServiceBinding('slack', 'secret-guard');
+    if (binding.accessToken) {
+      slack = new WebClient(binding.accessToken);
+    }
+  } catch (_) {
+    slack = null;
+  }
 
   switch (action) {
     case 'receive_event': {
@@ -74,7 +81,7 @@ export async function handleAction(input: PresenceAction) {
       }
 
       if (!slack) {
-        logger.warn('⚠️ SLACK_BOT_TOKEN not found in environment. Falling back to log-only.');
+        logger.warn('⚠️ Slack service binding not found. Falling back to log-only.');
         logger.info(`[PRESENCE_LOG] >> ${params.payload.text}`);
         return { status: 'logged', text: params.payload.text };
       }
@@ -115,7 +122,7 @@ const main = async () => {
     .parseSync();
   
   const inputPath = path.resolve(process.cwd(), argv.input as string);
-  const inputContent = fs.readFileSync(inputPath, 'utf8');
+  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

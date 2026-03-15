@@ -195,6 +195,10 @@ export class MetricsCollector {
     return this._aggregates.get(skillName) || null;
   }
 
+  getCapabilityMetrics(capabilityName: string) {
+    return this._aggregates.get(capabilityName) || null;
+  }
+
   loadHistory() {
     const filePath = path.join(this._metricsDir, this._metricsFile);
     if (!safeExistsSync(filePath)) return [];

@@ -32,6 +32,14 @@ A human-readable structured contract between reasoning and execution layers. In 
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
 
+### Mission Lease
+
+A durable authority grant over a mission, task, bridge, or resource. Leases define who currently holds control and when that control expires.
+
+### Task Contract
+
+A structured unit of delegated work inside a mission. Task contracts define objective, write scope, expected outputs, and acceptance criteria.
+
 ### KSMC (Kyberion Sovereign Mission Controller)
 
 The mission lifecycle controller referenced in the charter. It handles mission start, checkpoints, finish, and transactional safeguards.
@@ -72,6 +80,10 @@ The actuator layer that performs the physical work chosen by the reasoning layer
 
 Kyberion's background messaging, daemon, and observability model. See `docs/architecture/NERVE_SYSTEM_GUIDE.md`.
 
+### Runtime Supervisor
+
+The runtime ownership registry for PTY sessions, agent runtimes, and services. It tracks liveness, idle reaping, and resource snapshots.
+
 ### Reflex
 
 A predefined automatic response, often expressed declaratively in ADF instead of TypeScript.
@@ -79,6 +91,58 @@ A predefined automatic response, often expressed declaratively in ADF instead of
 ### Pulse
 
 A shared runtime health/state signal, commonly surfaced through files like `active/shared/runtime/pulse.json`.
+
+### Coordination Store
+
+The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams.
+
+### Control Plane
+
+The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
+
+### Gateway
+
+A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the Chronos API surface.
+
+### Channel Outbox
+
+A channel-scoped delivery queue under `active/shared/coordination/channels/<channel>/outbox/` used to return approved responses to external systems such as Slack.
+
+### Service Binding
+
+A governed authenticated access contract for an external service. Service binding resolves service-scoped credentials or session material without turning the channel gateway into the credential source of truth.
+
+### Delivery Actuator
+
+An actuator that sends approved responses or UI events back to external channels. In the current model, `presence-actuator` is the primary delivery actuator for Slack-style channel feedback.
+
+### Artifact Actuator
+
+A governed actuator for reading, writing, listing, and appending coordination and observability artifacts under approved runtime paths such as `active/shared/coordination/` and `active/shared/observability/`.
+
+### Approval Actuator
+
+A narrow actuator for creating, loading, deciding, and listing human approval requests without mixing that state machine into gateways or generic file operations.
+
+### Chronos Gateway
+
+The authenticated interactive control surface behind Chronos Mirror v2. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
+
+### Channel
+
+An external interaction context such as Slack or Chronos. A channel may have multiple concrete ports for ingress, egress, and streaming.
+
+### Port
+
+A concrete ingress or egress interface of a channel, described by role, directionality, transport, binding, durability, and approval mode.
+
+### Surface Agent
+
+A lightweight channel-local agent that improves interaction quality, context shaping, and handoff preparation without becoming the durable mission owner.
+
+### System Actuator
+
+The actuator class for local short-lived shell, OS, and file-control operations. It is distinct from channel gateways and from authenticated service binding.
 
 ## Governance and storage terms
 
@@ -102,6 +166,10 @@ Reusable shared knowledge, governance, and procedures intended for broad reuse w
 
 An independently managed Git-backed mission workspace used to reduce leakage and improve rollback safety.
 
+### Single-Owner, Multi-Worker
+
+Kyberion's mission execution model: one owner agent controls mission state, while worker agents collaborate through delegated task leases.
+
 ### Sovereign Shield
 
 The combined protection model around tier isolation, operational governance, and safe execution boundaries.
@@ -124,6 +192,6 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 `scripts/mission_journal.ts`, the human-readable view over recorded mission history.
 
-### Global Skill Index
+### Global Actuator Index
 
-`knowledge/public/orchestration/global_skill_index.json`, the compact registry of runnable actuators/skills used by the CLI.
+`knowledge/public/orchestration/global_actuator_index.json`, the compact registry of runnable actuators used by the CLI.

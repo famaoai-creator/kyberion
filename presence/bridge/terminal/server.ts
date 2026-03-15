@@ -6,9 +6,11 @@ import { ReflexTerminal } from '../../../libs/core/reflex-terminal.js';
 import { 
   logger, 
   pathResolver, 
+  runtimeSupervisor,
   safeReadFile, 
   safeWriteFile, 
   safeMkdir, 
+  safeRmSync,
   safeExistsSync, 
   safeUnlinkSync, 
   safeReaddir,
@@ -36,16 +38,22 @@ const wss = new WebSocketServer({ server });
 const ROOT_DIR = pathResolver.rootDir();
 const GLOBAL_STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
+const TERMINAL_TOKEN = process.env.KYBERION_TERMINAL_TOKEN || process.env.KYBERION_API_TOKEN;
+const ALLOW_REMOTE = process.env.KYBERION_TERMINAL_ALLOW_REMOTE === 'true';
+const DISCONNECT_TIMEOUT_MS = Number(process.env.KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS || 5 * 60 * 1000);
+const RESTORE_RUNTIME_ON_BOOT = process.env.KYBERION_TERMINAL_RESTORE_RUNTIME === 'true';
+const SESSION_RETENTION_MS = Number(process.env.KYBERION_TERMINAL_SESSION_RETENTION_MS || 7 * 24 * 60 * 60 * 1000);
 
 interface Session {
   id: string;
   name: string;
-  rt: ReflexTerminal;
+  rt: ReflexTerminal | null;
   ws: WebSocket | null;
   lastActive: number;
   captureBuffer: string;
   backlog: string[];
   idleTimer?: NodeJS.Timeout;
+  disconnectTimer?: NodeJS.Timeout;
   watcher?: any;
   active_brain?: string;
   syncPending?: boolean;
@@ -55,6 +63,54 @@ interface Session {
 }
 
 const sessions = new Map<string, Session>();
+
+function getClientIp(req: any): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function isLoopback(ip: string): boolean {
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+
+function extractToken(req: any): string | null {
+  const authHeader = req.headers['authorization'];
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  try {
+    const url = new URL(req.url || '/', 'http://localhost');
+    return url.searchParams.get('token');
+  } catch (_) {
+    return null;
+  }
+}
+
+function authorizeRequest(req: any): { ok: boolean; status: number; reason: string } {
+  const ip = getClientIp(req);
+  const isLocal = isLoopback(ip);
+  if (isLocal) return { ok: true, status: 200, reason: 'local' };
+
+  if (!TERMINAL_TOKEN) {
+    if (ALLOW_REMOTE) return { ok: true, status: 200, reason: 'remote_allowed' };
+    return { ok: false, status: 403, reason: 'Remote access disabled. Set KYBERION_TERMINAL_ALLOW_REMOTE=true or provide KYBERION_TERMINAL_TOKEN.' };
+  }
+
+  const token = extractToken(req);
+  if (token === TERMINAL_TOKEN) return { ok: true, status: 200, reason: 'token' };
+  return { ok: false, status: 401, reason: 'Unauthorized. Provide Authorization: Bearer <token> or ?token=' };
+}
+
+app.use((req, res, next) => {
+  const auth = authorizeRequest(req);
+  if (!auth.ok) {
+    return res.status(auth.status).json({ error: auth.reason });
+  }
+  return next();
+});
 
 app.use(express.static(path.join(ROOT_DIR, 'presence/bridge/terminal/static')));
 
@@ -93,11 +149,11 @@ function updateSmartBuffer(currentBuffer: string, newData: string): string {
   return structured.slice(-20).join('\n');
 }
 
-function saveSessionState(session: Session) {
+function saveSessionState(session: Session, active = Boolean(session.rt)) {
   try {
     safeWriteFile(session.paths.state, JSON.stringify({
-      id: session.id, pid: session.rt.getPid(), ts: new Date().toISOString(),
-      active: true,
+      id: session.id, pid: session.rt?.getPid(), ts: new Date().toISOString(),
+      active,
       active_brain: session.active_brain || 'none',
       name: session.name,
       lastActive: session.lastActive,
@@ -155,6 +211,7 @@ function emitGlobalStimulus(text: string, session: Session) {
 }
 
 async function typeLine(session: Session, text: string, useSync = true) {
+  if (!session.rt) return;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (char === '\n' || char === '\r') {
@@ -177,6 +234,7 @@ async function typeLine(session: Session, text: string, useSync = true) {
 }
 
 async function setupSessionWatcher(session: Session) {
+  if (session.watcher || !session.rt) return;
   const chokidar = await import('chokidar');
   session.watcher = chokidar.watch(session.paths.in, { persistent: true, ignoreInitial: true });
   session.watcher.on('add', (filePath: string) => {
@@ -212,6 +270,136 @@ async function setupSessionWatcher(session: Session) {
   });
 }
 
+function destroySessionRuntime(session: Session, reason: string) {
+  logger.info(`[TerminalHub] Reaping terminal session ${session.id} (${reason})`);
+  if (session.idleTimer) clearTimeout(session.idleTimer);
+  if (session.disconnectTimer) clearTimeout(session.disconnectTimer);
+  session.idleTimer = undefined;
+  session.disconnectTimer = undefined;
+  try {
+    session.watcher?.close?.();
+  } catch (_) {}
+  session.watcher = undefined;
+  session.ws = null;
+  if (session.rt) {
+    session.rt.kill();
+    session.rt = null;
+  }
+  session.lastActive = Date.now();
+  saveSessionState(session, false);
+}
+
+function prunePersistedSessionState() {
+  const now = Date.now();
+  for (const state of listPersistedSessionStates(RUNTIME_BASE)) {
+    const lastActive = state.lastActive || 0;
+    const isExpired = lastActive > 0 && now - lastActive > SESSION_RETENTION_MS;
+    if (!isExpired || state.connected || state.active) continue;
+    const paths = buildSessionPaths(RUNTIME_BASE, state.id);
+    logger.info(`[TerminalHub] Pruning stale terminal session ${state.id}`);
+    try {
+      safeRmSync(paths.base, { recursive: true, force: true });
+    } catch (_) {}
+    sessions.delete(state.id);
+  }
+}
+
+function scheduleDisconnectCleanup(session: Session) {
+  if (session.disconnectTimer) clearTimeout(session.disconnectTimer);
+  session.disconnectTimer = setTimeout(() => {
+    if (!session.ws || session.ws.readyState !== WebSocket.OPEN) {
+      destroySessionRuntime(session, 'disconnect_timeout');
+    }
+  }, DISCONNECT_TIMEOUT_MS);
+  session.disconnectTimer.unref?.();
+}
+
+function attachRuntime(session: Session, cols = 80, rows = 30) {
+  if (session.rt) return;
+
+  const rt = new ReflexTerminal({
+    shell: process.env.SHELL || '/bin/zsh', cols, rows, cwd: ROOT_DIR,
+    onOutput: (data) => {
+      session.backlog.push(data);
+      if (session.backlog.length > 5000) session.backlog = session.backlog.slice(-5000);
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) session.ws.send(data);
+
+      const plainText = cleanTerminalOutput(data);
+
+      if (plainText.includes('Action Required') && (plainText.includes('Allow once') || data.includes('1.'))) {
+        logger.info(`🛡️ [AutoPilot] Approving action in ${session.id}...`);
+        session.rt?.write('1\r');
+        return;
+      }
+      if (plainText.includes('Waiting for auth')) {
+        logger.info(`🛡️ [AutoPilot] Bypassing auth wait in ${session.id}...`);
+        session.rt?.write('\r');
+        return;
+      }
+
+      const isDsrRes = data.includes('\x1b[1;1R');
+      const isAiPrompt = plainText.includes('Type your message');
+
+      if (session.syncPending && (isDsrRes || isAiPrompt)) {
+        session.syncPending = false;
+        if (session.idleTimer) clearTimeout(session.idleTimer);
+        persistSessionFeedback(session, session.captureBuffer + data, true);
+        session.captureBuffer = '';
+        session.current_stimulus_id = undefined;
+        return;
+      }
+
+      session.captureBuffer = updateSmartBuffer(session.captureBuffer, data);
+
+      const promptDetected = /[%$#]>?\s*$/.test(plainText.trim());
+
+      if (session.idleTimer) clearTimeout(session.idleTimer);
+
+      const handleSettle = () => {
+        if (session.captureBuffer.length > 0) {
+          persistSessionFeedback(session, session.captureBuffer);
+          session.captureBuffer = '';
+        }
+      };
+
+      if (promptDetected && session.captureBuffer.length > 10) {
+        logger.info(`⚡ [Reflex] Prompt detected in ${session.id}. Triggering immediate feedback.`);
+        handleSettle();
+      } else {
+        session.idleTimer = setTimeout(handleSettle, 3000);
+      }
+
+      emitGlobalStimulus(data, session);
+    }
+  });
+
+  session.rt = rt;
+  saveSessionState(session);
+  setupSessionWatcher(session);
+}
+
+function hydratePersistedSession(id: string, requestedName?: string): Session {
+  const paths = buildSessionPaths(RUNTIME_BASE, id);
+  const persisted = readPersistedSessionState(paths.state);
+
+  [paths.in, paths.out].forEach(d => {
+    if (!safeExistsSync(d)) safeMkdir(d, { recursive: true });
+  });
+
+  return {
+    id,
+    name: normalizeSessionName(requestedName || persisted?.name, id),
+    rt: null,
+    ws: null,
+    lastActive: persisted?.lastActive || Date.now(),
+    captureBuffer: '',
+    backlog: [],
+    active_brain: persisted?.active_brain || 'none',
+    createdAt: persisted?.createdAt || new Date().toISOString(),
+    paths
+  };
+}
+
 function listSessionSummaries() {
   const persisted = listPersistedSessionStates(RUNTIME_BASE);
   const runtime = Array.from(sessions.values()).map(session => ({
@@ -233,93 +421,24 @@ function getOrCreateSession(id: string, cols = 80, rows = 30, requestedName?: st
       session.name = nextName;
       saveSessionState(session);
     }
+    if (!session.rt) {
+      attachRuntime(session, cols, rows);
+    }
     return session;
   }
 
-  const paths = buildSessionPaths(RUNTIME_BASE, id);
-  const persisted = readPersistedSessionState(paths.state);
-
-  [paths.in, paths.out].forEach(d => {
-    if (!safeExistsSync(d)) safeMkdir(d, { recursive: true });
-  });
-
-  const newSession: Session = { 
-    id,
-    name: normalizeSessionName(requestedName || persisted?.name, id),
-    rt: null as any,
-    ws: null,
-    lastActive: persisted?.lastActive || Date.now(),
-    captureBuffer: '',
-    backlog: [],
-    active_brain: persisted?.active_brain || 'none',
-    createdAt: persisted?.createdAt || new Date().toISOString(),
-    paths 
-  };
-
-  const rt = new ReflexTerminal({
-    shell: process.env.SHELL || '/bin/zsh', cols, rows, cwd: ROOT_DIR,
-    onOutput: (data) => {
-      newSession.backlog.push(data);
-      if (newSession.backlog.length > 5000) newSession.backlog = newSession.backlog.slice(-5000);
-      if (newSession.ws && newSession.ws.readyState === WebSocket.OPEN) newSession.ws.send(data);
-      
-      const plainText = cleanTerminalOutput(data);
-      
-      if (plainText.includes('Action Required') && (plainText.includes('Allow once') || data.includes('1.'))) {
-        logger.info(`🛡️ [AutoPilot] Approving action in ${id}...`);
-        newSession.rt.write('1\r');
-        return;
-      }
-      if (plainText.includes('Waiting for auth')) {
-        logger.info(`🛡️ [AutoPilot] Bypassing auth wait in ${id}...`);
-        newSession.rt.write('\r');
-        return;
-      }
-
-      const isDsrRes = data.includes('\x1b[1;1R');
-      const isAiPrompt = plainText.includes('Type your message');
-
-      if (newSession.syncPending && (isDsrRes || isAiPrompt)) {
-        newSession.syncPending = false;
-        if (newSession.idleTimer) clearTimeout(newSession.idleTimer);
-        persistSessionFeedback(newSession, newSession.captureBuffer + data, true);
-        newSession.captureBuffer = '';
-        newSession.current_stimulus_id = undefined;
-        return;
-      }
-
-      newSession.captureBuffer = updateSmartBuffer(newSession.captureBuffer, data);
-      
-      const promptDetected = /[%$#]>?\s*$/.test(plainText.trim());
-      
-      if (newSession.idleTimer) clearTimeout(newSession.idleTimer);
-      
-      const handleSettle = () => {
-        if (newSession.captureBuffer.length > 0) { 
-          persistSessionFeedback(newSession, newSession.captureBuffer); 
-          newSession.captureBuffer = ''; 
-        }
-      };
-
-      if (promptDetected && newSession.captureBuffer.length > 10) {
-        logger.info(`⚡ [Reflex] Prompt detected in ${id}. Triggering immediate feedback.`);
-        handleSettle();
-      } else {
-        newSession.idleTimer = setTimeout(handleSettle, 3000); 
-      }
-
-      emitGlobalStimulus(data, newSession);
-    }
-  });
-
-  newSession.rt = rt;
+  const newSession = hydratePersistedSession(id, requestedName);
   sessions.set(id, newSession);
-  saveSessionState(newSession);
-  setupSessionWatcher(newSession);
+  attachRuntime(newSession, cols, rows);
   return newSession;
 }
 
 wss.on('connection', (ws, req) => {
+  const auth = authorizeRequest(req);
+  if (!auth.ok) {
+    ws.close(1008, auth.reason);
+    return;
+  }
   let activeSession: Session | null = null;
 
   ws.on('message', (msg) => {
@@ -328,20 +447,27 @@ wss.on('connection', (ws, req) => {
       if (p.type === 'init') {
         const id = p.sessionId || `s-${Date.now()}`;
          activeSession = getOrCreateSession(id, p.cols, p.rows, p.name);
+         if (activeSession.disconnectTimer) clearTimeout(activeSession.disconnectTimer);
+         activeSession.disconnectTimer = undefined;
          activeSession.ws = ws;
          activeSession.lastActive = Date.now();
          saveSessionState(activeSession);
          ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
          ws.send(activeSession.backlog.join(''));
        } else if (p.type === 'input' && activeSession) {
-         activeSession.rt.write(p.data);
+         if (!activeSession.rt) attachRuntime(activeSession);
+         activeSession.rt?.write(p.data);
          activeSession.lastActive = Date.now();
          saveSessionState(activeSession);
        } else if (p.type === 'resize' && activeSession) {
-         activeSession.rt.resize(p.cols, p.rows);
+         if (!activeSession.rt) attachRuntime(activeSession, p.cols, p.rows);
+         activeSession.rt?.resize(p.cols, p.rows);
        }
     } catch (_) {
-      if (activeSession) activeSession.rt.write(msg.toString());
+      if (activeSession) {
+        if (!activeSession.rt) attachRuntime(activeSession);
+        activeSession.rt?.write(msg.toString());
+      }
     }
   });
 
@@ -350,6 +476,7 @@ wss.on('connection', (ws, req) => {
       activeSession.ws = null;
       activeSession.lastActive = Date.now();
       saveSessionState(activeSession);
+      scheduleDisconnectCleanup(activeSession);
     }
   });
 });
@@ -359,10 +486,35 @@ app.get('/sessions', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
+  const runtimeResources = runtimeSupervisor.snapshot();
+  const runtimeByKind = runtimeResources.reduce<Record<string, number>>((acc, record) => {
+    acc[record.kind] = (acc[record.kind] || 0) + 1;
+    return acc;
+  }, {});
+
   res.json({
     ok: true,
-    liveSessions: sessions.size,
+    liveSessions: Array.from(sessions.values()).filter(session => Boolean(session.rt)).length,
     persistedSessions: listPersistedSessionStates(RUNTIME_BASE).length,
+    runtimeResources: runtimeResources.length,
+    runtimeByKind,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/runtime', (req, res) => {
+  res.json({
+    resources: runtimeSupervisor.snapshot().map((record) => ({
+      resourceId: record.resourceId,
+      kind: record.kind,
+      ownerId: record.ownerId,
+      ownerType: record.ownerType,
+      pid: record.pid,
+      state: record.state,
+      shutdownPolicy: record.shutdownPolicy,
+      idleForMs: record.idleForMs,
+      metadata: record.metadata || {},
+    })),
     timestamp: new Date().toISOString(),
   });
 });
@@ -382,15 +534,21 @@ app.post('/sessions', (req, res) => {
   });
 });
 
-const PORT = process.env.TERMINAL_PORT || 4000;
-server.listen(PORT, () => { 
+const PORT = Number(process.env.TERMINAL_PORT || 4000);
+const HOST = process.env.KYBERION_TERMINAL_HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => { 
   logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`); 
 
   if (safeExistsSync(RUNTIME_BASE)) {
+    prunePersistedSessionState();
     const existing = listPersistedSessionStates(RUNTIME_BASE);
     for (const session of existing) {
-      logger.info(`📡 [TerminalHub] Auto-restoring watcher for session: ${session.id}`);
-      getOrCreateSession(session.id, 80, 30, session.name);
+      const hydrated = hydratePersistedSession(session.id, session.name);
+      sessions.set(session.id, hydrated);
+      if (RESTORE_RUNTIME_ON_BOOT && session.active) {
+        logger.info(`📡 [TerminalHub] Restoring runtime for session: ${session.id}`);
+        attachRuntime(hydrated, 80, 30);
+      }
     }
   }
 });

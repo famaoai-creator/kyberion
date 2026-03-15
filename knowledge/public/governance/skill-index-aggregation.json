@@ -1,8 +1,8 @@
 {
   "$schema": "../../schemas/aggregation-job.schema.json",
   "action": "aggregate",
-  "target_dir": "skills",
-  "output_file": "knowledge/orchestration/global_skill_index.json",
+  "target_dir": "libs/actuators",
+  "output_file": "knowledge/public/orchestration/global_actuator_index.json",
   "options": {
     "auto_init": true
   }

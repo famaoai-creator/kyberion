@@ -6,7 +6,7 @@
  */
 
 import { vi } from 'vitest';
-import type { SkillOutput, SkillInput } from '@agent/core/types';
+import type { CapabilityOutput, CapabilityInput } from '@agent/core/types';
 
 /**
  * Mock Actuator interface
@@ -47,17 +47,17 @@ export interface MockNetwork {
  */
 export function createMockActuator(
   type: string,
-  defaultResponse?: Partial<SkillOutput>
+  defaultResponse?: Partial<CapabilityOutput>
 ): MockActuator {
   const execute = vi.fn().mockResolvedValue({
-    skill: type,
+    capability: type,
     status: 'success',
     data: {},
     metadata: {
       timestamp: new Date().toISOString(),
     },
     ...defaultResponse,
-  } as SkillOutput);
+  } as CapabilityOutput);
 
   return {
     execute,
@@ -132,14 +132,14 @@ export function createMockNetwork(): MockNetwork {
 }
 
 /**
- * Creates a mock skill input for testing
+ * Creates a mock capability input for testing
  *
- * @param overrides - Partial SkillInput to override defaults
- * @returns Complete SkillInput object
+ * @param overrides - Partial CapabilityInput to override defaults
+ * @returns Complete CapabilityInput object
  */
-export function createMockSkillInput(overrides?: Partial<SkillInput>): SkillInput {
+export function createMockCapabilityInput(overrides?: Partial<CapabilityInput>): CapabilityInput {
   return {
-    skill: 'test-skill',
+    capability: 'test-capability',
     action: 'test-action',
     params: {},
     context: {
@@ -151,16 +151,16 @@ export function createMockSkillInput(overrides?: Partial<SkillInput>): SkillInpu
 }
 
 /**
- * Creates a mock skill output for testing
+ * Creates a mock capability output for testing
  *
- * @param overrides - Partial SkillOutput to override defaults
- * @returns Complete SkillOutput object
+ * @param overrides - Partial CapabilityOutput to override defaults
+ * @returns Complete CapabilityOutput object
  */
-export function createMockSkillOutput<T = unknown>(
-  overrides?: Partial<SkillOutput<T>>
-): SkillOutput<T> {
+export function createMockCapabilityOutput<T = unknown>(
+  overrides?: Partial<CapabilityOutput<T>>
+): CapabilityOutput<T> {
   return {
-    skill: 'test-skill',
+    capability: 'test-capability',
     status: 'success',
     data: {} as T,
     metadata: {
@@ -170,3 +170,6 @@ export function createMockSkillOutput<T = unknown>(
     ...overrides,
   };
 }
+
+export const createMockSkillInput = createMockCapabilityInput;
+export const createMockSkillOutput = createMockCapabilityOutput;

@@ -1,8 +1,7 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as visionJudge from '@agent/shared-vision';
 
@@ -11,6 +10,20 @@ import * as visionJudge from '@agent/shared-vision';
  * Strictly compliant with Layer 2 (Shield).
  * Standardized with Control Flow (if/while) and Safety Guards.
  */
+const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
+const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+
+function assertUnsafeShellAllowed() {
+  if (!ALLOW_UNSAFE_SHELL) {
+    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+  }
+}
+
+function assertUnsafeJsAllowed() {
+  if (!ALLOW_UNSAFE_JS) {
+    throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
+  }
+}
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -49,7 +62,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -108,7 +121,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
@@ -159,6 +172,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
     case 'shell':
+      assertUnsafeShellAllowed();
       return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
@@ -193,6 +207,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       return { ...ctx, [params.export_as || 'root_cause']: sre.analyzeRootCause(ctx[params.from || 'last_capture']) };
     }
     case 'run_js': {
+      assertUnsafeJsAllowed();
       const { Buffer } = await import('node:buffer');
       const vm = await import('node:vm');
       const util = await import('node:util');
@@ -226,7 +241,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'write_file':
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
@@ -243,7 +258,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
  */
 async function performReconcile(input: SystemAction) {
   const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/system-strategy.json');
-  if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

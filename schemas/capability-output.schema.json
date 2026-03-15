@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/capability-output.json",
+  "title": "Capability Output",
+  "description": "Standard output contract for Kyberion",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "type": "string",
+      "description": "Name of the capability that produced this output"
+    },
+    "skill": {
+      "type": "string",
+      "description": "Legacy alias for capability"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "error", "partial"],
+      "description": "Execution result status"
+    },
+    "data": {
+      "description": "The capability output data"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "duration_ms": { "type": "number" },
+        "token_usage": { "type": "number" },
+        "knowledge_tier_used": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": {}
+      }
+    }
+  },
+  "required": ["status"],
+  "anyOf": [
+    { "required": ["capability"] },
+    { "required": ["skill"] }
+  ]
+}

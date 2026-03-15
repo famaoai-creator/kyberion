@@ -1,3 +1,19 @@
+---
+title: Procedure: Web Automation & Navigation
+tags: [capability, browser, procedure, web-automation, playwright]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-15
+kind: capability
+scope: global
+authority: recipe
+phase: [execution]
+role_affinity: [software_developer, solution_architect, sovereign_concierge]
+applies_to: [browser-actuator, web-automation]
+owner: software_developer
+status: active
+---
+
 # Procedure: Web Automation & Navigation
 
 ## 1. Goal
@@ -12,7 +28,7 @@ Interact with web applications, extract content, and execute complex browser sce
     {
       "action": "extract",
       "url": "https://example.com",
-      "output_path": "scratch/example_content.html"
+      "output_path": "active/shared/tmp/browser/example_content.html"
     }
     ```
 2.  **Screenshot**: Use `screenshot` to capture visual evidence of a page's state.

@@ -11,15 +11,19 @@ last_updated: 2026-03-06
 
 To ensure stability when multiple missions are running in parallel, the following rules apply:
 
-## 1. Resource Locking (Mutex)
-- **Single Active Head**: Only one mission can have the status `active` per project workspace at any given time. Other missions must be `paused` or `planned`.
-- **File Ownership**: If a mission modifies a shared library (e.g., `libs/core/`), it MUST declare this in `mission-state.json` under `context.associated_projects` or a new `locks` field.
-- **Concurrent Writes**: Two missions cannot modify the same file. The `mission-controller` script will enforce this by checking active mission locks.
+## 1. Resource Locking vs Mission Leases
+- **Mission Ownership**: A mission has one owner agent at a time. Ownership is represented by a mission lease, not by an implicit global active head.
+- **File Ownership**: If a mission modifies a shared library (e.g., `libs/core/`), it MUST declare intended write scope and task ownership in mission-local coordination artifacts.
+- **Concurrent Writes**: Two active task leases cannot overlap on the same write scope. Short-lived file mutation still uses resource locks, but authority comes from leases.
 
 ## 2. Context Isolation
-- **Mission Folders**: All mission-specific logic, evidence, and temporary scripts MUST stay within `active/missions/{ID}/`.
-- **Shared Space**: `active/shared/` is strictly for runtime feedback (`last_response.json`) and service coordination.
+- **Mission Folders**: All mission-specific logic, evidence, and coordination MUST stay within `active/missions/{tier}/{ID}/`.
+- **Mission-Local Coordination**: `coordination/tasks`, `coordination/claims`, `coordination/handoffs`, `coordination/reviews`, and `coordination/events` are the canonical collaboration surfaces for that mission.
+- **Shared Space**: `active/shared/` is reserved for global discovery, runtime coordination, mailboxes, leases, and observability summaries.
 
 ## 3. Priority Preemption
-- **Urgent Stimuli**: A mission with `priority: 10` can automatically transition a `priority: 5` mission to `paused` if resource contention occurs.
-- **Graceful Handover**: Before being preempted, the active mission MUST update its `mission-state.json` with the `next_step` to allow seamless resumption.
+- **Urgent Stimuli**: A mission with materially higher priority may force lease renegotiation if resource contention occurs.
+- **Graceful Handover**: Before preemption, the owner agent MUST emit a mission event and handoff artifact describing next step, held leases, and open tasks so another agent can resume safely.
+
+## 4. Collaboration Rule
+- **Single-Owner, Multi-Worker**: Mission state changes are performed by one owner agent. Worker agents may execute delegated tasks concurrently only through explicit task contracts and leases.

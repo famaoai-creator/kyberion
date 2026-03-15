@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Policy Graph Node",
+  "type": "object",
+  "required": ["node_id", "tier", "scope", "authority", "effect"],
+  "properties": {
+    "node_id": { "type": "string" },
+    "title": { "type": "string" },
+    "tier": {
+      "type": "string",
+      "enum": ["public", "confidential", "personal"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "repository", "mission", "environment"]
+    },
+    "authority": {
+      "type": "string",
+      "enum": ["policy", "standard", "recipe", "reference", "advisory"]
+    },
+    "effect": {
+      "type": "string",
+      "enum": ["allow", "deny", "require", "override", "recommend"]
+    },
+    "applies_to": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "supersedes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated", "archived"]
+    }
+  },
+  "additionalProperties": true
+}

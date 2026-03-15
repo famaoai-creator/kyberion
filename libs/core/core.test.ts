@@ -18,12 +18,14 @@ import {
 describe('core library bundle', () => {
   describe('tier-guard', () => {
     it('should detect public tier', () => {
-      const tier = detectTier(path.join(rootDir(), 'knowledge/orchestration/global_skill_index.json'));
+      const tier = detectTier(path.join(rootDir(), 'knowledge/public/orchestration/global_actuator_index.json'));
       expect(tier).toBe('public');
     });
 
     it('should scan for confidential markers', () => {
-      const result = scanForConfidentialMarkers('The API_KEY is abc123 and PASSWORD is secret');
+      const result = scanForConfidentialMarkers(
+        'AIzaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa and secret: "1234567890abcdef1234"'
+      );
       expect(result.hasMarkers).toBe(true);
       expect(result.markers.length).toBeGreaterThanOrEqual(2);
 
