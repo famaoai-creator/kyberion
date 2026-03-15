@@ -13,6 +13,7 @@ describe('Runtime surface operations contract', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     expect(pkg.scripts['surfaces:reconcile']).toBe('node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['surfaces:status']).toBe('node dist/scripts/surface_runtime.js --action status');
+    expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
   });
 
   it('includes surface checks in the vital pipeline', () => {
@@ -31,8 +32,13 @@ describe('Runtime surface operations contract', () => {
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
     const surfaceRuntime = read('scripts/surface_runtime.ts');
+    const lifecycleModel = read('knowledge/public/architecture/runtime-surface-lifecycle-model.md');
+    expect(surfaceRuntime).toContain("../libs/core/index.js");
+    expect(surfaceRuntime).not.toContain("from '@agent/core'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');
+    expect(lifecycleModel).toContain('Waited for background terminal');
+    expect(lifecycleModel).toContain('active/shared/runtime/surfaces/state.json');
   });
 });

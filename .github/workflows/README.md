@@ -1,73 +1,87 @@
-# GitHub Actions ワークフロー設定
+# GitHub Actions Workflows
 
-## PR Validation ワークフロー
+## Current Contracts
 
-`pr-validation.yml` は、プルリクエストに対して自動的に品質チェックを実行するワークフローです。
+The repository currently maintains two GitHub Actions workflows.
 
-### 実行される検証
+1. `ci.yml`
+   Runs on pushes, pull requests to `main`, and the weekly schedule.
 
-1. **ビルド**: プロジェクト全体をビルド
-2. **型チェック**: TypeScriptの型エラーをチェック
-3. **Lintチェック**: ESLintによるコード品質チェック
-4. **テスト実行**: カバレッジ付きでテストを実行
-5. **カバレッジ閾値チェック**: テストカバレッジが閾値を満たしているか確認
-6. **カバレッジレポート**: PRにカバレッジレポートをコメントとして投稿
-7. **セキュリティスキャン**: 依存関係の脆弱性をチェック
-8. **ビルドサイズ測定**: ビルド成果物のサイズを測定
+2. `pr-validation.yml`
+   Runs on pull requests targeting `main` or `develop`.
 
-### カバレッジ閾値の設定
+Both workflows are expected to use **built artifacts** from `dist/` and the current capability/runtime-surface model. They must not depend on removed `skills` scripts or ad hoc `tsx` execution paths when an equivalent built script already exists.
 
-カバレッジ閾値は、リポジトリの変数として設定できます。
+## CI Workflow
 
-#### デフォルト値
+`ci.yml` performs:
 
-- デフォルトの閾値: **60%**
+1. `pnpm install --frozen-lockfile`
+2. `pnpm build`
+3. `pnpm lint`
+4. `pnpm typecheck`
+5. capability discovery validation via `node dist/scripts/capability_discovery.js`
+6. runtime surface manifest/status validation via `node dist/scripts/surface_runtime.js --action status`
+7. smoke/unit/integration tests
+8. security audit
+9. build size audit via `node dist/scripts/measure-build-size.js --json --no-save`
 
-#### カスタム閾値の設定方法
+## PR Validation Workflow
 
-1. GitHubリポジトリの **Settings** > **Secrets and variables** > **Actions** に移動
-2. **Variables** タブを選択
-3. **New repository variable** をクリック
-4. 以下の変数を作成:
-   - **Name**: `COVERAGE_THRESHOLD`
-   - **Value**: 希望する閾値（例: `70` で70%）
+`pr-validation.yml` performs:
 
-#### 閾値の動作
+1. build
+2. typecheck
+3. lint
+4. test coverage
+5. coverage threshold validation
+6. coverage reporting
+7. security scan
+8. build size measurement using `node dist/scripts/measure-build-size.js`
 
-- カバレッジが閾値を下回る場合、PRは**ブロック**されます
-- カバレッジが閾値以上の場合、チェックは成功します
-- カバレッジレポートファイルが見つからない場合、チェックは失敗します
+## Coverage Threshold
 
-### 必要な権限
+The pull request workflow reads `COVERAGE_THRESHOLD` from GitHub Actions repository variables.
 
-ワークフローには以下の権限が設定されています:
+- Default: `60`
+- Location: `Settings -> Secrets and variables -> Actions -> Variables`
 
-- `contents: read` - リポジトリの内容を読み取る
-- `pull-requests: write` - PRにコメントを投稿する
+If `coverage/coverage-summary.json` is missing, the workflow fails by design.
 
-### トラブルシューティング
+## Operational Note: Background Terminal Warnings
 
-#### カバレッジレポートが投稿されない
+Local warnings such as `Waited for background terminal` should not be conflated with GitHub Actions failures.
 
-- ワークフローに `pull-requests: write` 権限があることを確認してください
-- `vitest-coverage-report-action` が正しく設定されていることを確認してください
+- GitHub Actions runs clean ephemeral runners and does not reuse Codex unified exec sessions.
+- Local development can still accumulate residual CLI processes from `tsx`, `mission_controller`, or one-shot diagnostics if the terminal host retains exec sessions.
+- Kyberion-managed long-lived runtimes must be inspected through `pnpm surfaces:status`, not by inferring from editor terminal warnings alone.
 
-#### カバレッジ閾値チェックが失敗する
+When investigating local residue:
 
-- `coverage/coverage-summary.json` ファイルが生成されていることを確認してください
-- `pnpm run test:coverage` コマンドが正しく実行されていることを確認してください
-- 必要に応じて、`COVERAGE_THRESHOLD` 変数を調整してください
+1. Check surface lifecycle status with `pnpm surfaces:status`
+2. Compare with local process listings such as `ps -axo pid,ppid,etime,command`
+3. Distinguish Kyberion-managed surfaces from external terminal host session retention
 
-#### セキュリティスキャンが失敗する
+## Required Permissions
 
-- セキュリティスキャンは `continue-on-error: true` が設定されているため、ワークフロー全体は失敗しません
-- 脆弱性が検出された場合は、依存関係を更新してください
+`pr-validation.yml` requires:
 
-## 今後の拡張
+- `contents: read`
+- `pull-requests: write`
 
-将来的には、以下の機能を追加する予定です:
+## Troubleshooting
 
-- メトリクスの推移グラフ
-- 複雑度メトリクスの計算
-- パフォーマンステスト
-- E2Eテスト
+### Coverage comment is missing
+
+- Confirm the workflow still has `pull-requests: write`
+- Confirm `coverage/coverage-summary.json` was produced
+
+### Build size report failed
+
+- Confirm `pnpm build` produced `dist/`
+- Confirm `dist/scripts/measure-build-size.js` exists
+
+### Surface validation failed
+
+- Confirm `knowledge/public/governance/active-surfaces.json` is valid
+- Confirm `node dist/scripts/surface_runtime.js --action status` succeeds locally

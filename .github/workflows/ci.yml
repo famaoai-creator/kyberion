@@ -27,13 +27,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
-
-      - name: Establish links
-        run: node dist/scripts/bootstrap.js
 
       - name: Lint check
         run: pnpm run lint
@@ -41,11 +38,11 @@ jobs:
       - name: TypeScript type check
         run: pnpm run typecheck
 
-      - name: Validate skill metadata
-        run: node dist/scripts/validate_skills.js
+      - name: Validate capability discovery
+        run: node dist/scripts/capability_discovery.js > /dev/null
 
-      - name: Validate schemas
-        run: node dist/scripts/validate_schemas.js
+      - name: Validate surface runtime contract
+        run: node dist/scripts/surface_runtime.js --action status > /dev/null
 
       - name: Verify no build artifacts in source control
         run: |
@@ -81,16 +78,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
-
-      - name: Establish links
-        run: node dist/scripts/bootstrap.js
-
-      - name: Build libs/core (in-place)
-        run: npx tsc -p libs/core/tsconfig.json
 
       - name: Run ${{ matrix.test-suite }} tests
         run: ${{ matrix.command }}
@@ -118,16 +109,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
 
-      - name: Establish links
-        run: node dist/scripts/bootstrap.js
-
       - name: Security audit (blocking on critical)
         run: pnpm audit --audit-level=critical
 
-      - name: Skill quality audit
-        run: node dist/scripts/audit_skills.js --format json
+      - name: Build size audit
+        run: node dist/scripts/measure-build-size.js --json --no-save > /tmp/build-size-report.json

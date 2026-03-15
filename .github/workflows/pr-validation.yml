@@ -77,11 +77,11 @@ jobs:
         run: |
           if [ -d dist/ ]; then
             echo "📊 Measuring build size..."
-            npx tsx scripts/measure-build-size.ts > build-size-report.md
+            node dist/scripts/measure-build-size.js > build-size-report.md
             echo "✅ Build size measured successfully"
             
             # Also save JSON format for programmatic access
-            npx tsx scripts/measure-build-size.ts --json --no-save > build-size-report.json
+            node dist/scripts/measure-build-size.js --json --no-save > build-size-report.json
             
             # Display summary in logs
             cat build-size-report.md
