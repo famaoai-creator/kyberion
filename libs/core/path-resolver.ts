@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import { rawExistsSync, rawMkdirp, rawReadTextFile } from './fs-primitives.js';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)
@@ -10,8 +10,8 @@ function findProjectRoot(startDir: string): string {
   let current = startDir;
   while (current !== path.parse(current).root) {
     if (
-      fs.existsSync(path.join(current, 'package.json')) &&
-      (fs.existsSync(path.join(current, 'libs/actuators')) || fs.existsSync(path.join(current, 'knowledge')))
+      rawExistsSync(path.join(current, 'package.json')) &&
+      (rawExistsSync(path.join(current, 'libs/actuators')) || rawExistsSync(path.join(current, 'knowledge')))
     ) {
       return current;
     }
@@ -46,8 +46,8 @@ export function isProtected(filePath: string) {
 }
 
 export function skillDir(skillName: string) {
-  if (!fs.existsSync(INDEX_PATH)) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
-  const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
+  if (!rawExistsSync(INDEX_PATH)) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
+  const index = JSON.parse(rawReadTextFile(INDEX_PATH));
   const skillList = index.s || index.skills || [];
   const skill = skillList.find((s: any) => (s.n || s.name) === skillName);
   
@@ -55,7 +55,7 @@ export function skillDir(skillName: string) {
   
   // Actuator fallback
   const actuatorPath = path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
-  if (fs.existsSync(actuatorPath)) return actuatorPath;
+  if (rawExistsSync(actuatorPath)) return actuatorPath;
   
   return path.join(PROJECT_ROOT_DIR, skillName);
 }
@@ -64,15 +64,15 @@ export function missionDir(missionId: string, tier: 'personal' | 'confidential' 
   const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
   let subPath = 'active/missions';
   
-  if (fs.existsSync(configPath)) {
+  if (rawExistsSync(configPath)) {
     try {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const config = JSON.parse(rawReadTextFile(configPath));
       subPath = config.directories?.[tier] || subPath;
     } catch (_) { /* Fallback to default */ }
   }
 
   const dir = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -83,7 +83,7 @@ export function missionEvidenceDir(missionId: string) {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return null;
   const dir = path.join(missionPath, 'evidence');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
 
@@ -95,14 +95,14 @@ export function findMissionPath(missionId: string): string | null {
   const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
   const tiers: ('personal' | 'confidential' | 'public')[] = ['personal', 'confidential', 'public'];
   
-  if (fs.existsSync(configPath)) {
+  if (rawExistsSync(configPath)) {
     try {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const config = JSON.parse(rawReadTextFile(configPath));
       for (const tier of tiers) {
         const subPath = config.directories?.[tier];
         if (subPath) {
           const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-          if (fs.existsSync(fullPath)) return fullPath;
+          if (rawExistsSync(fullPath)) return fullPath;
         }
       }
     } catch (_) { /* Fallback to legacy search */ }
@@ -110,7 +110,7 @@ export function findMissionPath(missionId: string): string | null {
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (fs.existsSync(legacyPath)) return legacyPath;
+  if (rawExistsSync(legacyPath)) return legacyPath;
 
   return null;
 }

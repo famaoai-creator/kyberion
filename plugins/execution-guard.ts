@@ -1,5 +1,4 @@
-import { safeAppendFileSync, safeMkdir } from '@agent/core/secure-io';
-import * as fs from 'node:fs';
+import { safeAppendFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 /**
@@ -35,7 +34,7 @@ export const afterSkill = (skillName: string, output: any) => {
       pid: process.pid,
     };
     const dir = path.dirname(auditLog);
-    if (!fs.existsSync(dir)) {
+    if (!safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
     safeAppendFileSync(auditLog, JSON.stringify(entry) + '\n');

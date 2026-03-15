@@ -1,9 +1,8 @@
 import chalk from 'chalk';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 // chalk imported dynamically
 import { execSync } from 'node:child_process';
-import { safeWriteFile, safeReadFile } from '@agent/core';
+import { safeExistsSync, safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
 const inboxPath = path.join(rootDir, 'active/shared/portal/inbox.json');
@@ -16,7 +15,7 @@ interface PortalRequest {
 }
 
 async function processInbox(): Promise<void> {
-  if (!fs.existsSync(inboxPath)) return;
+  if (!safeExistsSync(inboxPath)) return;
 
   const raw = safeReadFile(inboxPath, { encoding: 'utf8' }) as string;
   const request: PortalRequest = JSON.parse(raw);

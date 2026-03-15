@@ -16,7 +16,7 @@ export const DEFAULT_TIMEOUT_MS = 30000;
 
 export interface SafeReadOptions {
   maxSizeMB?: number;
-  encoding?: BufferEncoding;
+  encoding?: BufferEncoding | null;
   label?: string;
   cache?: boolean;
   timeoutMs?: number;
@@ -71,6 +71,9 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
     throw new Error(`File not found: ${resolved}`);
   }
   validateFileSize(resolved, maxSizeMB);
+  if (encoding === null) {
+    return fs.readFileSync(resolved);
+  }
   return fs.readFileSync(resolved, { encoding });
 }
 
@@ -120,6 +123,77 @@ export function safeAppendFileSync(filePath: string, data: string | Buffer, opti
 }
 
 /**
+ * Copy a file safely with permission validation.
+ */
+export function safeCopyFileSync(srcPath: string, destPath: string): void {
+  const resolvedSrc = pathResolver.resolve(srcPath);
+  const resolvedDest = pathResolver.resolve(destPath);
+  const readGuard = validateReadPermission(resolvedSrc);
+  if (!readGuard.allowed) {
+    throw new Error(`[SECURITY] Read access denied to ${srcPath}: ${readGuard.reason}`);
+  }
+  const writeGuard = validateWritePermission(resolvedDest);
+  if (!writeGuard.allowed) {
+    throw new Error(writeGuard.reason);
+  }
+  fs.copyFileSync(resolvedSrc, resolvedDest);
+}
+
+/**
+ * Move a file or directory safely with permission validation.
+ */
+export function safeMoveSync(srcPath: string, destPath: string): void {
+  const resolvedSrc = pathResolver.resolve(srcPath);
+  const resolvedDest = pathResolver.resolve(destPath);
+  const readGuard = validateReadPermission(resolvedSrc);
+  if (!readGuard.allowed) {
+    throw new Error(`[SECURITY] Read access denied to ${srcPath}: ${readGuard.reason}`);
+  }
+  const sourceWriteGuard = validateWritePermission(resolvedSrc);
+  if (!sourceWriteGuard.allowed) {
+    throw new Error(sourceWriteGuard.reason);
+  }
+  const writeGuard = validateWritePermission(resolvedDest);
+  if (!writeGuard.allowed) {
+    throw new Error(writeGuard.reason);
+  }
+  fs.renameSync(resolvedSrc, resolvedDest);
+}
+
+/**
+ * Create a symlink safely with permission validation.
+ */
+export function safeSymlinkSync(targetPath: string, linkPath: string, type?: fs.symlink.Type): void {
+  const resolvedTarget = pathResolver.resolve(targetPath);
+  const resolvedLink = pathResolver.resolve(linkPath);
+  const targetGuard = validateReadPermission(resolvedTarget);
+  if (!targetGuard.allowed) {
+    throw new Error(`[SECURITY] Read access denied to ${targetPath}: ${targetGuard.reason}`);
+  }
+  const linkGuard = validateWritePermission(resolvedLink);
+  if (!linkGuard.allowed) {
+    throw new Error(linkGuard.reason);
+  }
+  const dir = path.dirname(resolvedLink);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.symlinkSync(path.relative(dir, resolvedTarget), resolvedLink, type);
+}
+
+/**
+ * Remove a file or directory safely with permission validation.
+ */
+export function safeRmSync(targetPath: string, options: fs.RmOptions = { recursive: true, force: true }): void {
+  const resolved = pathResolver.resolve(targetPath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  if (fs.existsSync(resolved)) {
+    fs.rmSync(resolved, options);
+  }
+}
+
+/**
  * Unlink a file safely.
  */
 export function safeUnlinkSync(filePath: string): void {
@@ -138,6 +212,35 @@ export function safeMkdir(dirPath: string, options: fs.MakeDirectoryOptions = { 
   if (!guard.allowed) throw new Error(guard.reason);
   if (!fs.existsSync(resolved)) {
     fs.mkdirSync(resolved, options);
+  }
+}
+
+/**
+ * Open a file for append safely and return the file descriptor.
+ */
+export function safeOpenAppendFile(filePath: string): number {
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  const dir = path.dirname(resolved);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return fs.openSync(resolved, 'a');
+}
+
+/**
+ * Safely fsync an existing file for durability.
+ */
+export function safeFsyncFile(filePath: string): void {
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  const fd = fs.openSync(resolved, 'r+');
+  try {
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
   }
 }
 
@@ -263,4 +366,28 @@ export function safeStat(filePath: string): fs.Stats {
     throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''}`);
   }
   return fs.statSync(resolved);
+}
+
+/**
+ * Safely get symbolic-link-aware file status with permission validation.
+ */
+export function safeLstat(filePath: string): fs.Stats {
+  const resolved = pathResolver.resolve(filePath);
+  const check = validateReadPermission(resolved);
+  if (!check.allowed) {
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''}`);
+  }
+  return fs.lstatSync(resolved);
+}
+
+/**
+ * Safely read a symbolic link target with permission validation.
+ */
+export function safeReadlink(filePath: string): string {
+  const resolved = pathResolver.resolve(filePath);
+  const check = validateReadPermission(resolved);
+  if (!check.allowed) {
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''}`);
+  }
+  return fs.readlinkSync(resolved);
 }

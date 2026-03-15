@@ -14,16 +14,17 @@
  * Weights are loaded from governance/analysis-config.json.
  *
  * Usage:
- *   npx tsx scripts/context_ranker.ts --intent "mission governance" --role "ceo" --limit 7
+ *   pnpm exec tsx scripts/context_ranker.ts --intent "mission governance" --role "ceo" --limit 7
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   logger,
   pathResolver,
+  safeReaddir,
   safeReadFile,
   safeExistsSync,
+  safeStat,
 } from '@agent/core';
 
 // ---------------------------------------------------------------------------
@@ -93,20 +94,20 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
   const entries: KnowledgeEntry[] = [];
 
   function walk(dir: string) {
-    if (!fs.existsSync(dir)) return;
+    if (!safeExistsSync(dir)) return;
     let items: string[];
-    try { items = fs.readdirSync(dir); } catch (_) { return; }
+    try { items = safeReaddir(dir); } catch (_) { return; }
     for (const item of items) {
       const fullPath = path.join(dir, item);
-      let stat: fs.Stats;
-      try { stat = fs.lstatSync(fullPath); } catch (_) { continue; }
+      let stat: ReturnType<typeof safeStat>;
+      try { stat = safeStat(fullPath); } catch (_) { continue; }
       if (stat.isDirectory()) {
         // Skip hidden dirs, node_modules, external-wisdom
         if (item.startsWith('.') || item === 'node_modules' || item === 'external-wisdom') continue;
         walk(fullPath);
       } else if (stat.isFile() && item.endsWith('.md') && !item.startsWith('_')) {
         try {
-          const content = fs.readFileSync(fullPath, 'utf8');
+          const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
           const fm = parseFrontmatter(content);
           const relativePath = path.relative(knowledgeRoot, fullPath);
           const tier = relativePath.startsWith('personal/')
@@ -221,7 +222,7 @@ async function main() {
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
-    console.log('Usage: npx tsx scripts/context_ranker.ts --intent "query" [--role "role"] [--limit N] [--json]');
+    console.log('Usage: pnpm exec tsx scripts/context_ranker.ts --intent "query" [--role "role"] [--limit N] [--json]');
     process.exit(1);
   }
 

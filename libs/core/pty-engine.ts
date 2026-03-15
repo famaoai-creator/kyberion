@@ -3,6 +3,7 @@ import { spawn as spawnChild, ChildProcess } from 'node:child_process';
 import { logger } from './core';
 import * as crypto from 'node:crypto';
 import * as os from 'node:os';
+import { runtimeSupervisor } from './runtime-supervisor';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1
@@ -68,6 +69,15 @@ class PtyRegistry {
   private messageBus: Map<string, InSessionMessage[]> = new Map(); // Key: threadId
   private readonly DSR_REQ = /\x1b\[\??6n/g;
   private readonly DSR_RES = '\x1b[1;1R';
+  private readonly idleTimeoutMs = Number(process.env.KYBERION_PTY_IDLE_TIMEOUT_MS || 15 * 60 * 1000);
+
+  private detachThread(sessionId: string): void {
+    for (const [threadId, mappedSessionId] of this.threadToSession.entries()) {
+      if (mappedSessionId === sessionId) {
+        this.threadToSession.delete(threadId);
+      }
+    }
+  }
 
   /**
    * Cleans ANSI escape sequences. Conservative approach to avoid text loss.
@@ -231,6 +241,7 @@ class PtyRegistry {
 
       session.buffer += processed;
       session.lastUpdated = Date.now();
+      runtimeSupervisor.touch(id);
       if (session.buffer.length > 1024 * 1024) {
         session.buffer = session.buffer.slice(-1024 * 1024);
       }
@@ -239,10 +250,39 @@ class PtyRegistry {
     adapter.onExit((code) => {
       session.status = 'exited';
       session.exitCode = code || 0;
+      session.lastUpdated = Date.now();
+      this.detachThread(id);
+      runtimeSupervisor.update(id, { state: 'exited', lastActiveAt: Date.now() });
       logger.info(`[PTY_ENGINE] Session ${id} exited with code ${code}`);
+      const gcTimer = setTimeout(() => {
+        const existing = this.sessions.get(id);
+        if (existing && existing.status === 'exited') {
+          this.sessions.delete(id);
+          runtimeSupervisor.unregister(id);
+        }
+      }, 60_000);
+      gcTimer.unref?.();
     });
 
     this.sessions.set(id, session);
+    runtimeSupervisor.register({
+      resourceId: id,
+      kind: 'pty',
+      ownerId: threadId || id,
+      ownerType: threadId ? 'thread' : 'terminal-session',
+      pid: adapter.pid,
+      idleTimeoutMs: this.idleTimeoutMs,
+      shutdownPolicy: 'idle',
+      metadata: { cwd: targetCwd, shell: targetShell },
+      cleanup: () => {
+        const existing = this.sessions.get(id);
+        if (existing) {
+          existing.adapter.kill();
+          this.sessions.delete(id);
+        }
+        this.detachThread(id);
+      },
+    });
     return id;
   }
 
@@ -255,6 +295,7 @@ class PtyRegistry {
     if (!session) return { output: '', nextOffset: 0, total: 0 };
 
     const total = session.buffer.length;
+    runtimeSupervisor.touch(id);
     let start = offset !== undefined ? offset : 0;
     
     // If no offset provided, return all and clear (backward compatibility or full drain)
@@ -278,6 +319,8 @@ class PtyRegistry {
     const session = this.sessions.get(id);
     if (session && session.status === 'running') {
       session.adapter.write(data);
+      session.lastUpdated = Date.now();
+      runtimeSupervisor.touch(id);
       return true;
     }
     return false;
@@ -287,6 +330,8 @@ class PtyRegistry {
     const session = this.sessions.get(id);
     if (session && session.status === 'running') {
       session.adapter.resize(cols, rows);
+      session.lastUpdated = Date.now();
+      runtimeSupervisor.touch(id);
       return true;
     }
     return false;
@@ -297,6 +342,8 @@ class PtyRegistry {
     if (session) {
       session.adapter.kill();
       this.sessions.delete(id);
+      this.detachThread(id);
+      runtimeSupervisor.unregister(id);
       return true;
     }
     return false;
@@ -311,6 +358,7 @@ class PtyRegistry {
 const GLOBAL_PTY_KEY = Symbol.for('@kyberion/pty-engine');
 if (!(globalThis as any)[GLOBAL_PTY_KEY]) {
   (globalThis as any)[GLOBAL_PTY_KEY] = new PtyRegistry();
+  runtimeSupervisor.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
 }
 
 export const ptyEngine: PtyRegistry = (globalThis as any)[GLOBAL_PTY_KEY];

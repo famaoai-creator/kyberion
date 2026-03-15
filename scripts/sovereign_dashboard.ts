@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '../libs/core/index.js';
 import chalk from 'chalk';
@@ -35,7 +34,7 @@ function drawMissions() {
     for (const item of items) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
-        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
         if (state.status === 'active') {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
           console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}]`);
@@ -65,7 +64,7 @@ function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
   if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
+    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
     Object.keys(ledger.agents).forEach(a => {
       const score = ledger.agents[a].current_score;
       const bar = '█'.repeat(Math.floor(score)) + '░'.repeat(10 - Math.floor(score));

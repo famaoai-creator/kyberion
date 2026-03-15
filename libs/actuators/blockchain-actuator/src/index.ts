@@ -1,6 +1,5 @@
 import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 
 /**

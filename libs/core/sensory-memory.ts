@@ -1,15 +1,12 @@
 /**
  * libs/core/sensory-memory.ts
  * Kyberion Autonomous Nerve System (KANS) - Shared Sensory Memory v1.0
- * [CORE COMPONENT - DIRECT FS AUTHORIZED]
+ * [CORE COMPONENT]
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as pathResolver from './path-resolver.js';
 import { NerveMessage } from './nerve-bridge.js';
+import { appendStimulus, loadRecentStimuli } from './stimuli-journal.js';
 
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const MAX_MEMORY_SIZE = 5000;
 
 export class SensoryMemory {
@@ -29,25 +26,14 @@ export class SensoryMemory {
 
   private hydrate() {
     try {
-      if (!fs.existsSync(STIMULI_PATH)) return;
-      const content = fs.readFileSync(STIMULI_PATH, 'utf8');
-      const lines = content.trim().split('\n');
-      
-      // Get the last N lines to ensure we have the most recent context
-      const latestLines = lines.slice(-MAX_MEMORY_SIZE);
-      for (const line of latestLines) {
-        if (!line) continue;
-        try {
-          this.buffer.push(JSON.parse(line));
-        } catch (_) {}
-      }
+      this.buffer.push(...loadRecentStimuli(MAX_MEMORY_SIZE));
     } catch (_) {}
   }
 
   public remember(stimulus: NerveMessage) {
     this.buffer.push(stimulus);
     if (this.buffer.length > MAX_MEMORY_SIZE) this.buffer.shift();
-    fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+    appendStimulus(stimulus);
   }
 
   public getLatestByIntent(intent: string): NerveMessage | undefined {

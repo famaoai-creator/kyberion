@@ -1,11 +1,12 @@
 import { logger } from './core';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator';
-import { CodexAdapter, ClaudeAdapter } from './agent-adapter';
+import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter';
 import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry';
 import { getAgentManifest, validateRequirements } from './agent-manifest';
 import * as crypto from 'node:crypto';
 import { safeExistsSync } from './secure-io';
 import * as path from 'node:path';
+import { runtimeSupervisor } from './runtime-supervisor';
 
 /** Walk up from cwd to find the project root (contains AGENTS.md) */
 function resolveProjectRoot(): string {
@@ -19,6 +20,7 @@ function resolveProjectRoot(): string {
   return process.cwd();
 }
 const PROJECT_ROOT = resolveProjectRoot();
+const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
 
 /**
  * Agent Lifecycle Manager v1.0
@@ -51,7 +53,7 @@ const PROVIDER_CONFIG: Record<string, { bootCommand: string; bootArgs: string[];
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
-  private execAdapters: Map<string, CodexAdapter | ClaudeAdapter> = new Map();
+  private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -96,7 +98,7 @@ class AgentLifecycleManagerImpl {
 
     // Codex and Claude use exec mode, not ACP
     if (options.provider === 'codex' || options.provider === 'claude') {
-      let adapter: CodexAdapter | ClaudeAdapter;
+      let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter;
 
       if (options.provider === 'claude') {
         // Resolve tool restrictions from manifest
@@ -113,11 +115,32 @@ class AgentLifecycleManagerImpl {
           permissionMode: 'auto',
         });
       } else {
-        adapter = new CodexAdapter();
+        const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+        if (mode === 'exec' || mode === 'legacy') {
+          adapter = new CodexAdapter();
+        } else {
+          adapter = new CodexAppServerAdapter({
+            model: options.modelId,
+            modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+            cwd: options.cwd || PROJECT_ROOT,
+            systemPrompt: options.systemPrompt,
+            approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+          });
+        }
       }
 
       await adapter.boot();
       this.execAdapters.set(agentId, adapter);
+      runtimeSupervisor.register({
+        resourceId: agentId,
+        kind: 'agent',
+        ownerId: options.missionId || agentId,
+        ownerType: options.missionId ? 'mission' : 'agent',
+        idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
+        shutdownPolicy: 'idle',
+        metadata: { provider: options.provider, modelId: options.modelId || config?.defaultModel || options.provider },
+        cleanup: async () => this.shutdown(agentId),
+      });
       agentRegistry.updateStatus(agentId, 'ready');
       logger.info(`[LIFECYCLE] Agent ${agentId} (${options.provider}) ready.`);
 
@@ -126,6 +149,7 @@ class AgentLifecycleManagerImpl {
         ask: async (prompt: string) => {
           agentRegistry.updateStatus(agentId, 'busy');
           agentRegistry.touch(agentId);
+          runtimeSupervisor.touch(agentId);
           try {
             const res = await adapter.ask(prompt);
             agentRegistry.updateStatus(agentId, 'ready');
@@ -139,6 +163,7 @@ class AgentLifecycleManagerImpl {
           await adapter.shutdown();
           this.execAdapters.delete(agentId);
           this.handles.delete(agentId);
+          runtimeSupervisor.unregister(agentId);
           agentRegistry.updateStatus(agentId, 'shutdown');
           agentRegistry.unregister(agentId);
         },
@@ -168,6 +193,16 @@ class AgentLifecycleManagerImpl {
 
     try {
       await mediator.boot();
+      runtimeSupervisor.register({
+        resourceId: agentId,
+        kind: 'agent',
+        ownerId: options.missionId || agentId,
+        ownerType: options.missionId ? 'mission' : 'agent',
+        idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
+        shutdownPolicy: 'idle',
+        metadata: { provider: options.provider, modelId: mediatorOpts.modelId },
+        cleanup: async () => this.shutdown(agentId),
+      });
       agentRegistry.updateStatus(agentId, 'ready');
       logger.info(`[LIFECYCLE] Agent ${agentId} (${options.provider}/${mediatorOpts.modelId}) ready.`);
     } catch (e: any) {
@@ -181,6 +216,7 @@ class AgentLifecycleManagerImpl {
       ask: async (prompt: string) => {
         agentRegistry.updateStatus(agentId, 'busy');
         agentRegistry.touch(agentId);
+        runtimeSupervisor.touch(agentId);
         try {
           const result = await mediator.ask(prompt);
           agentRegistry.updateStatus(agentId, 'ready');
@@ -209,6 +245,7 @@ class AgentLifecycleManagerImpl {
       this.execAdapters.delete(agentId);
     }
     this.handles.delete(agentId);
+    runtimeSupervisor.unregister(agentId);
     agentRegistry.updateStatus(agentId, 'shutdown');
     agentRegistry.unregister(agentId);
     logger.info(`[LIFECYCLE] Agent ${agentId} shutdown.`);
@@ -277,6 +314,7 @@ class AgentLifecycleManagerImpl {
 const GLOBAL_KEY = Symbol.for('@kyberion/agent-lifecycle');
 if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new AgentLifecycleManagerImpl();
+  runtimeSupervisor.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
 
   // Cleanup on process exit to prevent orphaned child processes
   const cleanup = () => {

@@ -2,8 +2,8 @@
   "name": "@actuator/browser",
   "version": "1.0.0",
   "description": "Browser-Actuator for Web Automation and Playwright operations",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../../dist/libs/actuators/browser-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/browser-actuator/src/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

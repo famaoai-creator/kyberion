@@ -1,9 +1,17 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
+import {
+  rawExistsSync,
+  rawMkdirp,
+  rawReadBuffer,
+  rawReadTextFile,
+  rawStatSync,
+  rawUnlinkSync,
+  rawWriteFile,
+} from './fs-primitives.js';
 
 /**
  * Shared Utility Core for Kyberion (TypeScript Edition)
@@ -122,9 +130,9 @@ export const sre = {
     const sigPath = path.resolve(process.cwd(), 'knowledge/orchestration/error-signatures.json');
     const results = [];
     
-    if (fs.existsSync(sigPath)) {
+    if (rawExistsSync(sigPath)) {
       try {
-        const signatures = JSON.parse(fs.readFileSync(sigPath, 'utf8'));
+        const signatures = JSON.parse(rawReadTextFile(sigPath));
         for (const sig of signatures) {
           const regex = new RegExp(sig.pattern, 'i');
           if (regex.test(errorMessage)) {
@@ -202,9 +210,9 @@ export class Cache {
       const diskPath = this._getDiskPath(key);
       const v8Path = diskPath.replace('.json', '.v8');
 
-      if (fs.existsSync(v8Path)) {
+      if (rawExistsSync(v8Path)) {
         try {
-          const v8Entry = v8.deserialize(fs.readFileSync(v8Path));
+          const v8Entry = v8.deserialize(rawReadBuffer(v8Path));
           if (Date.now() - v8Entry.timestamp < v8Entry.ttl) {
             const actualHash = this._generateHash(v8Entry.value);
             if (actualHash === v8Entry.h) {
@@ -213,18 +221,18 @@ export class Cache {
               return v8Entry.value;
             }
           }
-          fs.unlinkSync(v8Path);
+          rawUnlinkSync(v8Path);
         } catch (_) {}
       }
 
-      if (fs.existsSync(diskPath)) {
+      if (rawExistsSync(diskPath)) {
         try {
-          const diskEntry = JSON.parse(fs.readFileSync(diskPath, 'utf8'));
+          const diskEntry = JSON.parse(rawReadTextFile(diskPath));
           if (diskEntry.h) {
             const actualHash = this._generateHash(diskEntry.value);
             if (actualHash !== diskEntry.h) {
               this._stats.integrityFailures++;
-              fs.unlinkSync(diskPath);
+              rawUnlinkSync(diskPath);
               return undefined;
             }
           }
@@ -233,7 +241,7 @@ export class Cache {
             this.set(key, diskEntry.value, diskEntry.ttl, false);
             return diskEntry.value;
           } else {
-            fs.unlinkSync(diskPath);
+            rawUnlinkSync(diskPath);
           }
         } catch (_) {}
       }
@@ -277,12 +285,12 @@ export class Cache {
       const diskPath = this._getDiskPath(key);
       const v8Path = diskPath.replace('.json', '.v8');
       try {
-        if (!fs.existsSync(this._persistenceDir))
-          fs.mkdirSync(this._persistenceDir, { recursive: true });
+        if (!rawExistsSync(this._persistenceDir))
+          rawMkdirp(this._persistenceDir);
         const hash = this._generateHash(value);
         const entry = { value, timestamp, ttl, h: hash };
-        fs.writeFileSync(v8Path, v8.serialize(entry));
-        fs.writeFileSync(diskPath, JSON.stringify(entry), 'utf8');
+        rawWriteFile(v8Path, v8.serialize(entry));
+        rawWriteFile(diskPath, JSON.stringify(entry));
       } catch (_) {}
     }
   }
@@ -345,7 +353,7 @@ export const fileUtils = {
     priorityPaths.push(path.resolve(process.cwd(), 'knowledge/personal/role-config.json'));
 
     for (const p of priorityPaths) {
-      if (fs.existsSync(p)) {
+      if (rawExistsSync(p)) {
         const config = fileUtils.readJson(p);
         if (config && (config.active_role || config.role)) return config;
       }
@@ -353,17 +361,17 @@ export const fileUtils = {
     return null;
   },
   ensureDir: (dirPath: string) => {
-    if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+    if (!rawExistsSync(dirPath)) rawMkdirp(dirPath);
   },
   readJson: (filePath: string) => {
     try {
       const resolved = path.resolve(filePath);
-      const stat = fs.statSync(resolved);
+      const stat = rawStatSync(resolved);
       const mtimeMs = stat.mtimeMs;
       const cached = _fileCache.get(resolved);
       if (cached && cached.mtimeMs === mtimeMs) return cached.data;
 
-      const content = fs.readFileSync(resolved, 'utf8');
+      const content = rawReadTextFile(resolved);
       const data = JSON.parse(content);
       if (stat.size < 5 * 1024 * 1024) {
         const isIndex = resolved.includes('global_skill_index.json');
@@ -374,15 +382,15 @@ export const fileUtils = {
   },
   writeJson: (filePath: string, data: any) => {
     try {
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+      rawWriteFile(filePath, JSON.stringify(data, null, 2));
     } catch (err) {
       errorHandler(err, 'fileUtils.writeJson');
     }
   },
   getGoldenRule: () => {
     const rulePath = path.resolve(process.cwd(), 'vision/_default.md');
-    if (fs.existsSync(rulePath)) {
-      return fs.readFileSync(rulePath, 'utf8');
+    if (rawExistsSync(rulePath)) {
+      return rawReadTextFile(rulePath);
     }
     return 'Logic is a Hygiene Factor. Vision is the Compass.';
   },

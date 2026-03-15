@@ -4,10 +4,9 @@
  * Periodic environment awareness for the AI agent.
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { logger, pathResolver } from '@agent/core';
+import { logger, pathResolver, safeAppendFileSync, safeExistsSync, safeReadFile } from '@agent/core';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const PID_FILE = pathResolver.shared('services-pids.json');
@@ -20,9 +19,9 @@ async function whisper() {
   
   // 1. Service Health Check
   let serviceStatus = "All services operational.";
-  if (fs.existsSync(PID_FILE)) {
+  if (safeExistsSync(PID_FILE)) {
     try {
-      const pids = JSON.parse(fs.readFileSync(PID_FILE, 'utf8'));
+      const pids = JSON.parse(safeReadFile(PID_FILE, { encoding: 'utf8' }) as string);
       const activeCount = Object.keys(pids).length;
       serviceStatus = `${activeCount} services registered in PID registry.`;
     } catch (e) {}
@@ -30,9 +29,9 @@ async function whisper() {
 
   // 2. Pending Tasks
   let pendingCount = 0;
-  if (fs.existsSync(STIMULI_PATH)) {
+  if (safeExistsSync(STIMULI_PATH)) {
     try {
-      const raw = fs.readFileSync(STIMULI_PATH, 'utf8').trim().split('\n');
+      const raw = (safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string).trim().split('\n');
       pendingCount = raw.filter(l => l.includes('"status":"pending"')).length;
     } catch (e) {}
   }
@@ -60,7 +59,7 @@ Agent resonance is stable.`;
     }
   };
 
-  fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+  safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
   logger.info(`🌬️ System Whisper emitted: ${stimulus.id}`);
 }
 

@@ -1,4 +1,4 @@
-import * as fs from 'node:fs';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 /**
  * Persona Loader Utility
@@ -6,8 +6,8 @@ import * as fs from 'node:fs';
  */
 export const personaLoader = {
   loadPersonas: (matrixPath: string) => {
-    if (!fs.existsSync(matrixPath)) return {};
-    const content = fs.readFileSync(matrixPath, 'utf8');
+    if (!safeExistsSync(matrixPath)) return {};
+    const content = safeReadFile(matrixPath, { encoding: 'utf8' }) as string;
     const personas: Record<string, any> = {};
 
     const sections = content.split(/^## /m);

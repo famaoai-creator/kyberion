@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeExistsSync, safeLstat, safeReadFile, safeReadlink } from './secure-io.js';
 
 /**
  * Doctor Core Utility
@@ -20,7 +20,7 @@ export const doctor = {
 
   /** ファイルの存在チェック */
   checkFile: (filePath: string, name?: string) => {
-    if (fs.existsSync(filePath)) {
+    if (safeExistsSync(filePath)) {
       console.log(`✅ ${name || filePath}: Found`);
       return true;
     } else {
@@ -52,10 +52,10 @@ export const doctor = {
 
     const confidentialPath = path.join(rootDir, 'knowledge', 'confidential');
     try {
-      const stats = fs.lstatSync(confidentialPath);
+      const stats = safeLstat(confidentialPath);
       if (stats.isSymbolicLink()) {
-        const target = fs.readlinkSync(confidentialPath);
-        if (fs.existsSync(confidentialPath)) {
+        const target = safeReadlink(confidentialPath);
+        if (safeExistsSync(confidentialPath)) {
           console.log(`✅ Confidential Tier: Linked to ${target}`);
         } else {
           console.log(`❌ Confidential Tier: Broken link (Target missing: ${target})`);
@@ -68,14 +68,14 @@ export const doctor = {
     }
 
     const personalPath = path.join(rootDir, 'knowledge', 'personal');
-    if (fs.existsSync(personalPath)) {
+    if (safeExistsSync(personalPath)) {
       console.log(`✅ Personal Tier: Found`);
     } else {
       console.log(`⚠️  Personal Tier: Missing (Run init_wizard.js)`);
     }
 
     try {
-      const gitignore = fs.readFileSync(path.join(rootDir, '.gitignore'), 'utf8');
+      const gitignore = safeReadFile(path.join(rootDir, '.gitignore'), { encoding: 'utf8' }) as string;
       const criticalIgnores = ['knowledge/personal/', 'knowledge/confidential/', 'active/shared/'];
       criticalIgnores.forEach((item) => {
         if (gitignore.includes(item)) {
@@ -101,9 +101,9 @@ export const doctor = {
       'connections',
       'inventory.json'
     );
-    if (fs.existsSync(inventoryPath)) {
+    if (safeExistsSync(inventoryPath)) {
       try {
-        const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+        const inventory = JSON.parse(safeReadFile(inventoryPath, { encoding: 'utf8' }) as string);
         const systems = Object.keys(inventory.systems || {});
         if (systems.length > 0) {
           console.log(`✅ Known Systems: ${systems.join(', ')}`);

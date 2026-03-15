@@ -23,7 +23,9 @@ describe('core library bundle', () => {
     });
 
     it('should scan for confidential markers', () => {
-      const result = scanForConfidentialMarkers('The API_KEY is abc123 and PASSWORD is secret');
+      const result = scanForConfidentialMarkers(
+        'API_KEY: "1234567890abcdef1234567890abcdef" and secret: "1234567890abcdef1234"'
+      );
       expect(result.hasMarkers).toBe(true);
       expect(result.markers.length).toBeGreaterThanOrEqual(2);
 

@@ -3,8 +3,8 @@
  * Extracts a DocxDesignProtocol ADF from a .docx file using JSZip.
  * Follows the same architecture pattern as xlsx-utils.ts and pptx-utils.ts.
  */
-import * as fs from 'node:fs';
 import JSZip from 'jszip';
+import { safeReadFile } from '../secure-io.js';
 import type {
   DocxDesignProtocol,
   DocxTheme,
@@ -879,7 +879,7 @@ async function embedImageData(
 // ─── Main Extraction ────────────────────────────────────────
 
 export async function distillDocxDesign(filePath: string): Promise<DocxDesignProtocol> {
-  const buffer = fs.readFileSync(filePath);
+  const buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
   const zip = await JSZip.loadAsync(buffer);
 
   async function readEntry(path: string): Promise<string | null> {

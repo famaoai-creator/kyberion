@@ -2,8 +2,8 @@
   "name": "@agent/shared-business",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../dist/libs/shared-business/src/index.js",
+  "types": "../../dist/libs/shared-business/src/index.d.ts",
   "scripts": { "build": "tsc" },
   "dependencies": { "@agent/core": "workspace:*" }
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 const API_TOKEN = process.env.KYBERION_API_TOKEN;
+const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === "true";
 
 // In-memory rate limit store
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
@@ -18,6 +19,10 @@ function getClientIP(req: NextRequest): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || req.headers.get("x-real-ip")
     || "unknown";
+}
+
+function isLoopback(ip: string): boolean {
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
 }
 
 function checkRateLimit(ip: string): boolean {
@@ -45,22 +50,28 @@ export function guardRequest(req: NextRequest): NextResponse | null {
     );
   }
 
+  const isLocal = isLoopback(ip);
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const cookieToken = req.cookies.get("kyberion_token")?.value;
+
   // Authentication: if KYBERION_API_TOKEN is set, require it
   if (API_TOKEN) {
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-    // Also accept token from cookie for browser sessions
-    const cookieToken = req.cookies.get("kyberion_token")?.value;
-
     if (token !== API_TOKEN && cookieToken !== API_TOKEN) {
-      // Allow localhost without token in development
-      if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "unknown") {
+      if (!isLocal) {
         return NextResponse.json(
           { error: "Unauthorized. Set Authorization: Bearer <token>" },
           { status: 401 }
         );
       }
+    }
+  } else {
+    // No token set: allow local only unless explicitly enabled
+    if (!isLocal && !ALLOW_UNAUTH_REMOTE) {
+      return NextResponse.json(
+        { error: "Unauthorized. Set KYBERION_API_TOKEN or enable KYBERION_ALLOW_UNAUTH_REMOTE=true" },
+        { status: 401 }
+      );
     }
   }
 

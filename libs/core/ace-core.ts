@@ -1,5 +1,5 @@
-import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { safeAppendFileSync, safeExistsSync, safeReadFile } from './secure-io.js';
 
 /**
  * ACE (Autonomous Consensus Engine) Core Utility
@@ -11,8 +11,8 @@ export const aceCore = {
 
   appendThought: (minutesPath: string, role: string, thought: string, _metadata = {}) => {
     let content = '';
-    if (fs.existsSync(minutesPath)) {
-      content = fs.readFileSync(minutesPath, 'utf8');
+    if (safeExistsSync(minutesPath)) {
+      content = safeReadFile(minutesPath, { encoding: 'utf8' }) as string;
     }
 
     const prevHash = aceCore.calculateHash(content);
@@ -24,23 +24,32 @@ export const aceCore = {
     const entryHash = aceCore.calculateHash(entryHeader + entryBody);
     const finalEntry = entryHeader + entryHash.substring(0, 8) + entryBody;
 
-    fs.appendFileSync(minutesPath, finalEntry);
+    safeAppendFileSync(minutesPath, finalEntry);
     return entryHash;
   },
 
   validateIntegrity: (minutesPath: string) => {
-    if (!fs.existsSync(minutesPath)) return true;
-    const content = fs.readFileSync(minutesPath, 'utf8');
-    const lines = content.split('\n');
-    let lastHash = '';
+    if (!safeExistsSync(minutesPath)) return true;
+    const content = safeReadFile(minutesPath, { encoding: 'utf8' }) as string;
+    const entries = content.split(/\n(?=### \[)/).filter(Boolean);
+    let prefixContent = '';
 
-    for (const line of lines) {
-      const match = line.match(/HASH: ([a-f0-9]{8})/);
-      if (match) {
-        lastHash = match[1];
-      }
+    for (const entry of entries) {
+      const headerMatch = entry.match(/^### \[(.+?)\] @(.+?) \| PREV_HASH: ([a-f0-9]{8}) \| HASH: ([a-f0-9]{8})\n/s);
+      if (!headerMatch) return false;
+
+      const [, role, timestamp, prevHash, storedHash] = headerMatch;
+      const body = entry.slice(headerMatch[0].length);
+      const expectedPrevHash = aceCore.calculateHash(prefixContent).substring(0, 8);
+      if (prevHash !== expectedPrevHash) return false;
+
+      const headerPrefix = `\n### [${role}] @${timestamp} | PREV_HASH: ${prevHash} | HASH: `;
+      const computedHash = aceCore.calculateHash(headerPrefix + body).substring(0, 8);
+      if (storedHash !== computedHash) return false;
+
+      prefixContent += headerPrefix + storedHash + body;
     }
-    console.log(`[Integrity] Last chain hash: ${lastHash}`);
+
     return true;
   },
 

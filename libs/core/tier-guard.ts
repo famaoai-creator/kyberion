@@ -4,8 +4,8 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { pathResolver } from './path-resolver.js';
+import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
 
 export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
@@ -40,6 +40,12 @@ function pathStartsWith(targetPath: string, patternPath: string): boolean {
   return t === p || t.startsWith(p + '/');
 }
 
+function isOutsideProjectRoot(relativePath: string): boolean {
+  if (!relativePath) return false;
+  const firstSegment = relativePath.split(path.sep)[0];
+  return firstSegment === '..';
+}
+
 /**
  * Validates write permission based on security-policy.json ADF.
  *
@@ -55,14 +61,18 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
   const currentMission = process.env.MISSION_ID;
 
+  if (isOutsideProjectRoot(relativePath)) {
+    return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
+  }
+
   // 1. Identify Role
   const currentRole = resolveCurrentRole();
 
   // 2. Load Policy
   let policy: any = null;
   try {
-    if (fs.existsSync(POLICY_PATH)) {
-      policy = JSON.parse(fs.readFileSync(POLICY_PATH, 'utf8'));
+    if (rawExistsSync(POLICY_PATH)) {
+      policy = JSON.parse(rawReadTextFile(POLICY_PATH));
     }
   } catch (_) {}
 
@@ -130,8 +140,8 @@ function resolveCurrentRole(): string {
   if ((!currentRole || currentRole === 'unknown') && process.env.MISSION_ID) {
     const statePath = pathResolver.active(`missions/${process.env.MISSION_ID}/mission-state.json`);
     try {
-      if (fs.existsSync(statePath)) {
-        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      if (rawExistsSync(statePath)) {
+        const state = JSON.parse(rawReadTextFile(statePath));
         currentRole = (state.assigned_persona || 'unknown').toLowerCase().replace(/\s+/g, '_');
       }
     } catch (_) {}
@@ -159,6 +169,10 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const resolvedPath = path.resolve(filePath);
   const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
 
+  if (isOutsideProjectRoot(relativePath)) {
+    return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
+  }
+
   // Fast path: non-knowledge files are always readable
   if (!pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
 
@@ -174,8 +188,8 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   // Load policy
   let policy: any = null;
   try {
-    if (fs.existsSync(POLICY_PATH)) {
-      policy = JSON.parse(fs.readFileSync(POLICY_PATH, 'utf8'));
+    if (rawExistsSync(POLICY_PATH)) {
+      policy = JSON.parse(rawReadTextFile(POLICY_PATH));
     }
   } catch (_) {}
 
@@ -206,9 +220,70 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
 }
 
 export function validateSovereignBoundary(content: string, activeSecrets: string[] = []): { safe: boolean; detected: string[] } {
-  return { safe: true, detected: [] };
+  if (!content || activeSecrets.length === 0) return { safe: true, detected: [] };
+  const detected: string[] = [];
+  for (const secret of activeSecrets) {
+    if (secret && content.includes(secret)) {
+      const masked = secret.length <= 8 ? '********' : `${secret.slice(0, 4)}...${secret.slice(-4)}`;
+      detected.push(`SECRET_LEAK:${masked}`);
+    }
+  }
+  return { safe: detected.length === 0, detected };
 }
 
 export function scanForConfidentialMarkers(content: string): MarkerScanResult {
-  return { hasMarkers: false, markers: [] };
+  if (!content) return { hasMarkers: false, markers: [] };
+
+  const markers: string[] = [];
+  const patterns = loadMarkerPatterns();
+
+  for (const pattern of patterns) {
+    try {
+      const re = new RegExp(pattern.regex, 'm');
+      if (re.test(content)) {
+        markers.push(pattern.name);
+      }
+    } catch (_) {
+      // Ignore invalid regex
+    }
+  }
+
+  return { hasMarkers: markers.length > 0, markers };
+}
+
+type MarkerPattern = { name: string; regex: string };
+let cachedMarkerPatterns: MarkerPattern[] | null = null;
+
+function loadMarkerPatterns(): MarkerPattern[] {
+  if (cachedMarkerPatterns) return cachedMarkerPatterns;
+
+  const patterns: MarkerPattern[] = [];
+
+  // Knowledge sync rules (PII/secret patterns)
+  try {
+    const policyPath = pathResolver.knowledge('public/governance/knowledge-sync-rules.json');
+    if (rawExistsSync(policyPath)) {
+      const rules = JSON.parse(rawReadTextFile(policyPath));
+      const pii = rules?.security?.pii_patterns || [];
+      for (const p of pii) {
+        if (p?.name && p?.regex) patterns.push({ name: p.name, regex: p.regex });
+      }
+    }
+  } catch (_) {}
+
+  // Security scanner patterns (augment with critical items)
+  try {
+    const vulnPath = pathResolver.knowledge('public/skills/security-scanner/vulnerability-patterns.json');
+    if (rawExistsSync(vulnPath)) {
+      const vulns = JSON.parse(rawReadTextFile(vulnPath));
+      if (Array.isArray(vulns)) {
+        for (const v of vulns) {
+          if (v?.name && v?.regex) patterns.push({ name: v.name, regex: v.regex });
+        }
+      }
+    }
+  } catch (_) {}
+
+  cachedMarkerPatterns = patterns;
+  return patterns;
 }

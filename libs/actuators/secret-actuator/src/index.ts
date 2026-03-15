@@ -1,6 +1,5 @@
 import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 /**
  * Secret-Actuator v1.0.0 [SOVEREIGN NATIVE BRIDGE]

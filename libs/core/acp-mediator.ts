@@ -2,7 +2,8 @@ import { logger } from './core';
 import { ptyEngine } from './pty-engine';
 import { dispatchA2UI } from './a2ui';
 import { getAgentManifest, isActuatorAllowed } from './agent-manifest';
-import { spawn, ChildProcess } from 'node:child_process';
+import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './managed-process';
+import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 
 /** Whitelist environment variables passed to child agent processes */
@@ -60,8 +61,11 @@ export class ACPMediator {
   private systemPromptSent: boolean = false;
   private logBuffer: { ts: number; type: string; content: string }[] = [];
   private static readonly MAX_LOG_ENTRIES = 200;
+  private runtimeResourceId: string;
 
-  constructor(private options: ACPMediatorOptions) {}
+  constructor(private options: ACPMediatorOptions) {
+    this.runtimeResourceId = `acp:${options.threadId}`;
+  }
 
   private log(type: string, content: string): void {
     this.logBuffer.push({ ts: Date.now(), type, content });
@@ -79,11 +83,25 @@ export class ACPMediator {
     if (this.booted) return;
     logger.info(`[ACP_MEDIATOR] Spawning ACP Agent: ${this.options.bootCommand}`);
 
-    this.child = spawn(this.options.bootCommand, this.options.bootArgs, {
-      cwd: this.options.cwd || process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: sanitizeEnvForChild(process.env),
+    const managed = spawnManagedProcess({
+      resourceId: this.runtimeResourceId,
+      kind: 'agent',
+      ownerId: this.options.threadId,
+      ownerType: 'acp-mediator',
+      command: this.options.bootCommand,
+      args: this.options.bootArgs,
+      shutdownPolicy: 'manual',
+      spawnOptions: {
+        cwd: this.options.cwd || process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: sanitizeEnvForChild(process.env),
+      },
+      metadata: {
+        providerCommand: this.options.bootCommand,
+        providerArgs: this.options.bootArgs,
+      },
     });
+    this.child = managed.child;
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -99,9 +117,11 @@ export class ACPMediator {
           sdkInput.write(trimmed + '\n');
           logger.info(`[ACP_JSON_IN] ${trimmed}`);
           this.log('in', trimmed);
+          touchManagedProcess(this.runtimeResourceId);
         } else if (trimmed) {
           logger.info(`[ACP_TEXT_IN] ${trimmed}`);
           this.log('text', trimmed);
+          touchManagedProcess(this.runtimeResourceId);
         }
       }
     });
@@ -110,6 +130,7 @@ export class ACPMediator {
       const msg = data.toString().trim();
       logger.info(`[ACP_STDERR] ${msg}`);
       this.log('stderr', msg);
+      touchManagedProcess(this.runtimeResourceId);
     });
 
     sdkOutput.on('data', (chunk) => {
@@ -275,7 +296,7 @@ export class ACPMediator {
 
   public async shutdown(): Promise<void> {
     if (this.child) {
-      this.child.kill();
+      stopManagedProcess(this.runtimeResourceId, this.child);
       this.child = null;
     }
     this.booted = false;

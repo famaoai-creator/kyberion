@@ -11,7 +11,7 @@
 pnpm install
 
 # 2. システムの具現化 (ビルドとオーケストレーション)
-npx tsx scripts/run_orchestration_job.ts
+pnpm exec tsx scripts/run_orchestration_job.ts
 
 # 3. 魂の注入 (アイデンティティ設定 - 対話形式)
 pnpm onboard
@@ -29,7 +29,7 @@ pnpm onboard
     - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
 
 ### Stage 2: システムの具現化 (System Manifestation)
-- **実行コマンド**: `npx tsx scripts/run_orchestration_job.ts`
+- **実行コマンド**: `pnpm exec tsx scripts/run_orchestration_job.ts`
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
 - **物理的変化**:
     - `dist/` ディレクトリが生成され、全ソースコードがビルドされます。
@@ -37,7 +37,7 @@ pnpm onboard
     - 各種バックグラウンド・サービスが起動します。
 
 ### Stage 3: 魂の注入 (Soul Infusion)
-- **実行コマンド**: `pnpm onboard` (または `npx tsx scripts/onboarding_wizard.ts`)
+- **実行コマンド**: `pnpm onboard` (または `pnpm exec tsx scripts/onboarding_wizard.ts`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野をシステムに記憶させます。
 - **物理的変化**:
     - `knowledge/personal/my-identity.json` が生成されます。

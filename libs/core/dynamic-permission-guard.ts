@@ -4,9 +4,9 @@
  * [CORE COMPONENT - DIRECT FS AUTHORIZED]
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { sensoryMemory } from './sensory-memory.js';
 
 export interface DynamicPolicy {
@@ -39,9 +39,9 @@ class DynamicPermissionGuard {
   }
 
   public loadPolicies() {
-    if (!fs.existsSync(this.POLICY_PATH)) return;
+    if (!safeExistsSync(this.POLICY_PATH)) return;
     try {
-      const content = fs.readFileSync(this.POLICY_PATH, 'utf8');
+      const content = safeReadFile(this.POLICY_PATH, { encoding: 'utf8' }) as string;
       this.policies = JSON.parse(content).policies;
     } catch (_) {}
   }

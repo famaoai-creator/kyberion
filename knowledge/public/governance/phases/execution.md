@@ -18,7 +18,7 @@ Accomplish physical changes with absolute validation and micro-tasking.
 ## Physical Enforcement
 At each significant milestone or task completion, the agent MUST record progress through the mission controller.
 
-- **Command**: `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "<NOTE>"`
+- **Command**: `node dist/scripts/mission_controller.js checkpoint <TASK_ID> "<NOTE>"`
 - **Validation**:
   - Transactional integrity through git commit checkpoints.
   - Recording of commit hashes in `mission-state.json`.

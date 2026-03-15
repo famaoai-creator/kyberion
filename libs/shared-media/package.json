@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Domain-specific utilities for Media and Office formats.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../dist/libs/shared-media/src/index.js",
+  "types": "../../dist/libs/shared-media/src/index.d.ts",
   "scripts": {
     "build": "tsc"
   },

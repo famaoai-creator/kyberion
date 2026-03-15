@@ -1,8 +1,7 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, resolveVars, evaluateCondition, withRetry } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import yaml from 'js-yaml';
 
@@ -49,7 +48,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
   
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -84,7 +83,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -165,7 +164,7 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'write_file':
       const out = path.resolve(rootDir, resolveVars(params.path, ctx));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       await withRetry(async () => {
         safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       }, params.retry || { maxRetries: 3 });
@@ -174,9 +173,9 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'symlink':
       const target = path.resolve(rootDir, resolveVars(params.target, ctx));
       const source = path.resolve(rootDir, resolveVars(params.source, ctx));
-      if (fs.existsSync(target)) fs.unlinkSync(target);
-      if (!fs.existsSync(path.dirname(target))) safeMkdir(path.dirname(target), { recursive: true });
-      fs.symlinkSync(path.relative(path.dirname(target), source), target, params.type || 'dir');
+      if (safeExistsSync(target)) safeUnlinkSync(target);
+      if (!safeExistsSync(path.dirname(target))) safeMkdir(path.dirname(target), { recursive: true });
+      safeSymlinkSync(source, target, params.type || 'dir');
       break;
     case 'git_checkpoint':
       await withRetry(async () => {
@@ -193,7 +192,7 @@ async function opApply(op: string, params: any, ctx: any) {
  */
 async function performReconcile(input: OrchestratorAction) {
   const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/orchestration-strategy.json');
-  if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

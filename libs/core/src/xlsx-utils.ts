@@ -1,6 +1,6 @@
 import * as path from 'path';
 import JSZip from 'jszip';
-import * as fs from 'fs';
+import { safeReadFile } from '../secure-io.js';
 import {
   XlsxDesignProtocol, XlsxWorksheet, XlsxRow, XlsxCell, XlsxColumn,
   XlsxMergeCell, XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge,
@@ -891,7 +891,7 @@ async function resolveSheetPaths(zip: JSZip): Promise<Map<string, string>> {
 // ─── Main Entry Point ────────────────────────────────────────
 
 export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignProtocol> {
-  const buffer = fs.readFileSync(filePath);
+  const buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
   const zip = await JSZip.loadAsync(buffer);
 
   // 1. Theme

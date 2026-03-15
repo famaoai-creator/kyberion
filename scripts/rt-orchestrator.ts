@@ -5,10 +5,8 @@
  */
 
 import { ReflexTerminal } from '../libs/core/reflex-terminal.js';
-import { logger } from '../libs/core/core.js';
+import { logger, safeExistsSync, safeReadFile, safeStat, safeWriteFile } from '../libs/core/index.js';
 import * as pathResolver from '../libs/core/path-resolver.js';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 const INBOX_PATH = pathResolver.resolve('active/shared/rt_inbox.jsonl');
 
@@ -43,15 +41,15 @@ async function main() {
   }, 1000);
 
   // 2. Stimuli Inbox Monitor (Input Bridge)
-  if (fs.existsSync(INBOX_PATH)) fs.truncateSync(INBOX_PATH); // Clear old stimuli on start
+  if (safeExistsSync(INBOX_PATH)) safeWriteFile(INBOX_PATH, ''); // Clear old stimuli on start
 
   setInterval(() => {
-    if (fs.existsSync(INBOX_PATH)) {
-      const stats = fs.statSync(INBOX_PATH);
+    if (safeExistsSync(INBOX_PATH)) {
+      const stats = safeStat(INBOX_PATH);
       if (stats.size > 0) {
         try {
-          const content = fs.readFileSync(INBOX_PATH, 'utf8');
-          fs.truncateSync(INBOX_PATH); // Mark as read
+          const content = safeReadFile(INBOX_PATH, { encoding: 'utf8' }) as string;
+          safeWriteFile(INBOX_PATH, ''); // Mark as read
 
           const lines = content.trim().split('\n');
           for (const line of lines) {

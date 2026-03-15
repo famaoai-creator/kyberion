@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import * as fs from 'node:fs';
+import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -12,12 +12,26 @@ import * as fs from 'node:fs';
 function loadAllowedDomains(): string[] {
   try {
     const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
-    if (fs.existsSync(policyPath)) {
-      const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+    if (safeExistsSync(policyPath)) {
+      const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
       return policy.network_guardrails.allowed_domains || [];
     }
   } catch (_) {}
   return ['github.com', 'google.com']; // Hard fallback for connectivity
+}
+
+function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
+  try {
+    const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+    if (safeExistsSync(policyPath)) {
+      const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
+      const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);
+      if (!Number.isNaN(maxRequestSizeKb) && maxRequestSizeKb > 0) {
+        return { maxRequestSizeKb };
+      }
+    }
+  } catch (_) {}
+  return { maxRequestSizeKb: 2048 };
 }
 
 function scrubData(data: any, url: string): any {
@@ -41,8 +55,19 @@ function scrubData(data: any, url: string): any {
   return typeof data === 'string' ? str : JSON.parse(str);
 }
 
+function enforcePayloadSize(options: AxiosRequestConfig) {
+  const { maxRequestSizeKb } = loadNetworkGuardrails();
+  const payload = options.data ?? options.params ?? '';
+  if (payload === '' || payload === undefined || payload === null) return;
+  const sizeBytes = Buffer.byteLength(typeof payload === 'string' ? payload : JSON.stringify(payload));
+  if (sizeBytes > maxRequestSizeKb * 1024) {
+    throw new Error(`[NETWORK_POLICY_VIOLATION] Payload too large (${Math.ceil(sizeBytes / 1024)}KB > ${maxRequestSizeKb}KB)`);
+  }
+}
+
 export async function secureFetch<T = any>(options: AxiosRequestConfig): Promise<T> {
   const url = options.url || '';
+  validateUrl(url);
   const hostname = new URL(url).hostname;
 
   // 1. Verify Endpoint Integrity
@@ -60,6 +85,7 @@ export async function secureFetch<T = any>(options: AxiosRequestConfig): Promise
   // 2. Automatically scrub outbound payload
   if (options.data) options.data = scrubData(options.data, url);
   if (options.params) options.params = scrubData(options.params, url);
+  enforcePayloadSize(options);
 
   try {
     const response = await axios({

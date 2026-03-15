@@ -1,6 +1,5 @@
-import { logger, safeReadFile, safeWriteFile, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, derivePipelineStatus } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 /**
  * Super-Nerve Engine v2.2.1 [FLOW REPAIRED]
@@ -76,7 +75,7 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
     }
   }
 
-  return { status: 'finished', results, context: ctx };
+  return { status: derivePipelineStatus(results), results, context: ctx };
 }
 
 async function handleCoreAction(action: string, params: any, ctx: any, options: any, state: any): Promise<any> {
@@ -132,19 +131,23 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
   const domainMap: Record<string, string> = {
-    'file': 'libs/actuators/file-actuator/src/index.ts',
-    'system': 'libs/actuators/system-actuator/src/index.ts',
-    'wisdom': 'libs/actuators/wisdom-actuator/src/index.ts',
-    'network': 'libs/actuators/network-actuator/src/index.ts',
-    'browser': 'libs/actuators/browser-actuator/src/index.ts',
-    'code': 'libs/actuators/code-actuator/src/index.ts',
-    'orchestrator': 'libs/actuators/orchestrator-actuator/src/index.ts',
-    'media': 'libs/actuators/media-actuator/src/index.ts',
-    'service': 'libs/actuators/service-actuator/src/index.ts'
+    'file': 'dist/libs/actuators/file-actuator/src/index.js',
+    'system': 'dist/libs/actuators/system-actuator/src/index.js',
+    'wisdom': 'dist/libs/actuators/wisdom-actuator/src/index.js',
+    'network': 'dist/libs/actuators/network-actuator/src/index.js',
+    'browser': 'dist/libs/actuators/browser-actuator/src/index.js',
+    'code': 'dist/libs/actuators/code-actuator/src/index.js',
+    'orchestrator': 'dist/libs/actuators/orchestrator-actuator/src/index.js',
+    'media': 'dist/libs/actuators/media-actuator/src/index.js',
+    'service': 'dist/libs/actuators/service-actuator/src/index.js'
   };
 
   const actuatorPath = domainMap[domain];
   if (!actuatorPath) throw new Error(`Unknown actuator domain: ${domain}`);
+  const builtActuatorPath = path.resolve(process.cwd(), actuatorPath);
+  if (!safeExistsSync(builtActuatorPath)) {
+    throw new Error(`Built actuator not found for ${domain}. Expected ${actuatorPath}. Run pnpm build first.`);
+  }
 
   const tempAdfPath = path.resolve(process.cwd(), `scratch/nerve-dispatch-${Date.now()}-${Math.random().toString(36).substring(7)}.json`);
   const outCtxPath = tempAdfPath.replace('.json', '-out.json');
@@ -158,9 +161,9 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
   safeWriteFile(tempAdfPath, JSON.stringify(adf));
 
   try {
-    const out = safeExec('npx', ['tsx', actuatorPath, '--input', tempAdfPath]);
+    safeExec('node', [builtActuatorPath, '--input', tempAdfPath]);
     
-    if (fs.existsSync(outCtxPath)) {
+    if (safeExistsSync(outCtxPath)) {
       const resultData = JSON.parse(safeReadFile(outCtxPath, { encoding: 'utf8' }) as string);
       
       // Merge results from child into parent results if necessary?
@@ -176,8 +179,8 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     }
     return ctx;
   } finally {
-    if (fs.existsSync(tempAdfPath)) fs.unlinkSync(tempAdfPath);
-    if (fs.existsSync(outCtxPath)) fs.unlinkSync(outCtxPath);
+    if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
+    if (safeExistsSync(outCtxPath)) safeUnlinkSync(outCtxPath);
   }
 }
 

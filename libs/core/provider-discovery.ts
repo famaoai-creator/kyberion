@@ -12,7 +12,7 @@ export interface ProviderInfo {
   provider: string;
   installed: boolean;
   version: string | null;
-  protocol: 'acp' | 'print-json' | 'exec';
+  protocol: 'acp' | 'print-json' | 'exec' | 'json-rpc';
   models: string[];
   healthy: boolean;
 }
@@ -98,12 +98,14 @@ function checkCodex(): ProviderInfo {
   const which = run('which', ['codex']);
   const npx = !which.ok ? run('npx', ['codex', '--version'], 15000) : { ok: true, stdout: '' };
   const installed = which.ok || npx.ok;
+  const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+  const protocol: ProviderInfo['protocol'] = (mode === 'exec' || mode === 'legacy') ? 'exec' : 'json-rpc';
 
   return {
     provider: 'codex',
     installed,
     version: which.ok ? null : (npx.stdout || null),
-    protocol: 'exec',
+    protocol,
     models: ['codex'],
     healthy: installed,
   };

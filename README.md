@@ -74,7 +74,7 @@ start → checkpoint (repeat) → verify → distill → finish
 ```
 
 ```bash
-MC="npx tsx scripts/mission_controller.ts"
+MC="node dist/scripts/mission_controller.js"
 $MC help                                        # all commands
 $MC start MY-FEATURE confidential               # create mission
 $MC checkpoint task-1 "Implemented auth module"  # record progress
@@ -120,14 +120,14 @@ LLM profiles are configurable per purpose (`heavy`/`standard`/`light`) in `wisdo
 Each `op` maps to an actuator capability (`system:shell`, `service:cli`, `file:read`, etc.). Steps export results via `export_as` and reference them with `{{variable}}` interpolation.
 
 ```bash
-npx tsx scripts/run_intent.ts <intent_id>                        # resolve intent → ADF → execute
-npx tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json  # execute ADF directly
+pnpm exec tsx scripts/run_intent.ts <intent_id>                        # resolve intent → ADF → execute
+pnpm exec tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json  # execute ADF directly
 ```
 
 **A2A (Agent-to-Agent)** wraps ADF payloads in a messaging envelope with routing (`sender`, `receiver`, `performative`) and conversation tracking (`conversation_id`, `parent_id`). This enables external agents to request work from Kyberion and receive structured results.
 
 ```bash
-npx tsx scripts/run_a2a.ts --input message.json
+pnpm exec tsx scripts/run_a2a.ts --input message.json
 ```
 
 Schemas: `schemas/a2a-envelope.schema.json`, `schemas/super-nerve-pipeline.schema.json`, etc.

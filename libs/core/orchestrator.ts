@@ -1,9 +1,9 @@
 import { execSync, exec, spawnSync } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { logger } from './core.js';
 import { metrics } from './metrics.js';
+import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 
 /**
  * Skill Pipeline Orchestrator - chains skills together with data passing.
@@ -13,7 +13,7 @@ const rootDir = process.cwd();
 const skillIndex = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
 
 export function resolveSkillScript(skillName: string): string {
-  const index = JSON.parse(fs.readFileSync(skillIndex, 'utf8'));
+  const index = JSON.parse(safeReadFile(skillIndex, { encoding: 'utf8' }) as string);
   const skills = index.s || index.skills;
 
   let skill;
@@ -31,13 +31,13 @@ export function resolveSkillScript(skillName: string): string {
   const mainPath = skill.m || skill.main;
   if (mainPath) {
     const fullPath = path.join(skillDir, mainPath);
-    if (fs.existsSync(fullPath)) return fullPath;
+    if (safeExistsSync(fullPath)) return fullPath;
   }
 
   const scriptsDir = path.join(skillDir, 'scripts');
-  if (!fs.existsSync(scriptsDir))
+  if (!safeExistsSync(scriptsDir))
     throw new Error(`No scripts/ directory for "${skillName}" at ${skillDir}`);
-  const scripts = fs.readdirSync(scriptsDir).filter((f) => /\.(cjs|js)$/.test(f));
+  const scripts = safeReaddir(scriptsDir).filter((f) => /\.(cjs|js)$/.test(f));
   if (scripts.length === 0) throw new Error(`No .cjs or .js scripts found for "${skillName}"`);
   return path.join(scriptsDir, scripts[0]);
 }
@@ -203,7 +203,7 @@ export function runParallel(steps: any[]): Promise<any> {
 }
 
 export function loadPipeline(yamlPath: string) {
-  const content = fs.readFileSync(path.resolve(yamlPath), 'utf8');
+  const content = safeReadFile(path.resolve(yamlPath), { encoding: 'utf8' }) as string;
   const def: any = yaml.load(content);
 
   if (!def.pipeline || !Array.isArray(def.pipeline)) {

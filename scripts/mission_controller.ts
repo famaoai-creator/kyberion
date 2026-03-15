@@ -11,10 +11,9 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import { logger } from '../libs/core/core.js';
+import * as pathResolver from '../libs/core/path-resolver.js';
 import {
-  logger,
-  pathResolver,
   safeWriteFile,
   safeReadFile,
   safeExec,
@@ -23,21 +22,24 @@ import {
   safeReaddir,
   safeUnlinkSync,
   safeAppendFileSync,
-  detectTier,
-  ledger,
-  withLock,
-  findMissionPath,
-  missionDir as resolveMissionDir,
-  transitionStatus,
-  trustEngine,
-  auditChain,
-} from '@agent/core';
+  safeStat,
+  safeLstat,
+  safeRmSync,
+} from '../libs/core/secure-io.js';
+import { detectTier } from '../libs/core/tier-guard.js';
+import { ledger } from '../libs/core/ledger.js';
+import { withLock } from '../libs/core/src/lock-utils.js';
+import { findMissionPath, missionDir as resolveMissionDir } from '../libs/core/path-resolver.js';
+import { transitionStatus } from '../libs/core/mission-status.js';
+import { trustEngine } from '../libs/core/trust-engine.js';
+import { auditChain } from '../libs/core/audit-chain.js';
 import { validateFileFreshness } from '../libs/core/validators.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = pathResolver.active('missions/registry.json');
 const ARCHIVE_DIR = pathResolver.active('archive/missions');
 const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
+const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
 
 interface MissionState {
   mission_id: string;
@@ -67,6 +69,24 @@ interface MissionState {
     checkpoints: Array<{ task_id: string; commit_hash: string; ts: string }>;
   };
   history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
+}
+
+function readFocusedMissionId(): string | null {
+  if (!safeExistsSync(MISSION_FOCUS_PATH)) return null;
+  try {
+    const raw = safeReadFile(MISSION_FOCUS_PATH, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.mission_id === 'string' ? parsed.mission_id.toUpperCase() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeFocusedMissionId(missionId: string): void {
+  safeWriteFile(MISSION_FOCUS_PATH, JSON.stringify({
+    mission_id: missionId.toUpperCase(),
+    ts: new Date().toISOString(),
+  }, null, 2));
 }
 
 /**
@@ -1040,7 +1060,7 @@ async function sealMission(id: string) {
     
     // 5. [Blockchain Anchor] Anchor the hash of the encrypted archive
     const { createHash } = await import('node:crypto');
-    const fileBuffer = fs.readFileSync(encryptedPath);
+    const fileBuffer = safeReadFile(encryptedPath, { encoding: null }) as Buffer;
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
 
     const anchorInput = pathResolver.rootResolve(`scratch/anchor-${upperId}-${Date.now()}.json`);
@@ -1052,11 +1072,11 @@ async function sealMission(id: string) {
     try {
       safeExec('npx', ['tsx', 'libs/actuators/blockchain-actuator/src/index.ts', '--input', anchorInput]);
     } catch (_) {}
-    if (fs.existsSync(anchorInput)) fs.unlinkSync(anchorInput);
+    safeUnlinkSync(anchorInput);
 
     // Clean up temporary unencrypted files
-    if (safeExistsSync(archivePath)) fs.unlinkSync(archivePath);
-    if (safeExistsSync(symKeyPath)) fs.unlinkSync(symKeyPath);
+    safeUnlinkSync(archivePath);
+    safeUnlinkSync(symKeyPath);
 
     return encryptedPath;
   } catch (err: any) {
@@ -1144,8 +1164,10 @@ async function finishMission(id: string, seal: boolean = false) {
   } catch (_) { logger.info('No changes to commit in mission repo.'); }
 
   // 2. Update state
-  state.status = transitionStatus(state.status, 'completed');
-  state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
+  if (state.status !== 'completed') {
+    state.status = transitionStatus(state.status, 'completed');
+    state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
+  }
   await saveState(upperId, state);
 
   // 3. Optional Sealing
@@ -1176,22 +1198,47 @@ async function finishMission(id: string, seal: boolean = false) {
   // Use shell cp and rm to handle potential cross-device move if tier is in knowledge/
   safeExec('cp', ['-r', missionDir, archivePath]);
   safeExec('rm', ['-rf', missionDir]);
+
+  state.status = transitionStatus(state.status, 'archived');
+  state.history.push({ ts: new Date().toISOString(), event: 'ARCHIVE', note: `Mission archived to ${archivePath}.` });
+  await saveState(upperId, state);
   
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 
-async function createCheckpoint(taskId: string, note: string) {
-  // Find current active mission by scanning tier directories
+async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
+  if (explicitMissionId) {
+    const targetMissionId = explicitMissionId.toUpperCase();
+    const explicitState = loadState(targetMissionId);
+    const explicitPath = findMissionPath(targetMissionId);
+    if (explicitState?.status === 'active' && explicitPath) {
+      return await recordCheckpointForMission(targetMissionId, explicitPath, taskId, note);
+    }
+    logger.error(`Mission ${targetMissionId} is not active or could not be found. Checkpoint aborted.`);
+    return;
+  }
+
+  const focusedMissionId = readFocusedMissionId();
+
+  if (focusedMissionId) {
+    const focusedState = loadState(focusedMissionId);
+    const focusedPath = findMissionPath(focusedMissionId);
+    if (focusedState?.status === 'active' && focusedPath) {
+      return await recordCheckpointForMission(focusedMissionId, focusedPath, taskId, note);
+    }
+  }
+
+  // Fallback: find current active mission by scanning tier directories
   const searchDirs = getActiveMissionSearchDirs();
 
   let activeMissionId: string | null = null;
   let missionPath: string | null = null;
 
   for (const dir of searchDirs) {
-    if (!safeExistsSync(dir) || !fs.lstatSync(dir).isDirectory()) continue;
+    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
     const missions = safeReaddir(dir).filter(m => {
       try {
-        return fs.lstatSync(path.join(dir, m)).isDirectory();
+        return safeLstat(path.join(dir, m)).isDirectory();
       } catch (_) { return false; }
     });
     for (const m of missions) {
@@ -1211,6 +1258,12 @@ async function createCheckpoint(taskId: string, note: string) {
     logger.info('  To see all missions:    mission_controller list');
     return;
   }
+
+  return await recordCheckpointForMission(activeMissionId, missionPath, taskId, note);
+}
+
+async function recordCheckpointForMission(activeMissionId: string, missionPath: string, taskId: string, note: string) {
+  writeFocusedMissionId(activeMissionId);
 
   const state = loadState(activeMissionId);
   if (!state) return;
@@ -1258,10 +1311,10 @@ async function resumeMission(id?: string) {
     const searchDirs = getActiveMissionSearchDirs();
 
     for (const dir of searchDirs) {
-      if (!safeExistsSync(dir) || !fs.lstatSync(dir).isDirectory()) continue;
+      if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
       const missions = safeReaddir(dir).filter(m => {
         try {
-          return fs.lstatSync(path.join(dir, m)).isDirectory();
+          return safeLstat(path.join(dir, m)).isDirectory();
         } catch (_) { return false; }
       });
       const active = missions.find(m => {
@@ -1303,6 +1356,7 @@ async function resumeMission(id?: string) {
 
   state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Session re-established.' });
   await saveState(targetId, state);
+  writeFocusedMissionId(targetId);
   logger.success(`✅ Mission ${targetId} is back in focus.`);
 }
 
@@ -1339,7 +1393,7 @@ async function purgeMissions(dryRun: boolean = false) {
     if (!safeExistsSync(dir)) continue;
     const missions = safeReaddir(dir).filter(m => {
       try {
-        return fs.lstatSync(path.join(dir, m)).isDirectory();
+        return safeLstat(path.join(dir, m)).isDirectory();
       } catch (_) { return false; }
     });
 
@@ -1354,7 +1408,7 @@ async function purgeMissions(dryRun: boolean = false) {
             match = true;
           }
         } else if (condition.max_age_days) {
-          const stat = fs.statSync(missionDir);
+          const stat = safeStat(missionDir);
           const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
           if (ageDays > condition.max_age_days) {
             match = true;
@@ -1398,8 +1452,8 @@ async function purgeMissions(dryRun: boolean = false) {
     if (!safeExistsSync(path.dirname(c.targetPath))) {
       safeMkdir(path.dirname(c.targetPath), { recursive: true });
     }
-    fs.cpSync(c.missionDir, c.targetPath, { recursive: true });
-    fs.rmSync(c.missionDir, { recursive: true, force: true });
+    safeExec('cp', ['-r', c.missionDir, c.targetPath]);
+    safeRmSync(c.missionDir, { recursive: true, force: true });
   }
   logger.success(`✅ ${candidates.length} mission(s) purged.`);
 }
@@ -1412,9 +1466,9 @@ function listMissions(filterStatus?: string) {
   const missions: Array<{ id: string; status: string; tier: string; persona: string; checkpoints: number; lastEvent: string }> = [];
 
   for (const dir of searchDirs) {
-    if (!safeExistsSync(dir) || !fs.lstatSync(dir).isDirectory()) continue;
+    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
     const entries = safeReaddir(dir).filter(m => {
-      try { return fs.lstatSync(path.join(dir, m)).isDirectory(); } catch (_) { return false; }
+      try { return safeLstat(path.join(dir, m)).isDirectory(); } catch (_) { return false; }
     });
     for (const m of entries) {
       const state = loadState(m);
@@ -1514,7 +1568,7 @@ function showHelp() {
   console.log(`
 Kyberion Sovereign Mission Controller (KSMC)
 
-Usage: npx tsx scripts/mission_controller.ts <command> [args]
+Usage: node dist/scripts/mission_controller.js <command> [args]
 
 Lifecycle Commands:
   create   <ID> [tier] [tenant] [type] [vision] [persona] [relationships]
@@ -1573,7 +1627,13 @@ async function main() {
   switch (action) {
     case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
     case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
-    case 'checkpoint': await createCheckpoint(arg1 || 'manual', arg2 || 'progress update'); break;
+    case 'checkpoint':
+      if (arg3) {
+        await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
+      } else {
+        await createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
+      }
+      break;
     case 'delegate': await delegateMission(arg1, arg2, arg3); break;
     case 'import': await importMission(arg1, arg2); break;
     case 'verify': await verifyMission(arg1, arg2 as any, arg3); break;

@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "Ecosystem Vital Check",
   "description": "Checks for critical ecosystem paths and active missions.",
   "steps": [

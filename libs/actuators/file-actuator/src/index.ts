@@ -1,8 +1,20 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeStat, safeUnlink, safeReaddir } from '@agent/core';
+import { 
+  logger, 
+  safeReadFile, 
+  safeWriteFile, 
+  safeMkdir, 
+  safeExistsSync,
+  safeExec, 
+  safeStat, 
+  safeReaddir,
+  safeAppendFileSync,
+  safeCopyFileSync,
+  safeMoveSync,
+  safeRmSync,
+  derivePipelineStatus
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
-import { execSync } from 'node:child_process';
 
 /**
  * File-Actuator v2.1.1 [RESILIENT PIPELINE]
@@ -47,7 +59,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, root: rootDir };
   
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -103,7 +115,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -166,10 +178,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const s = safeStat(path.resolve(rootDir, resolve(params.path)));
       return { ...ctx, [params.export_as || 'last_stat']: { size: s.size, mtime: s.mtime, isFile: s.isFile(), isDirectory: s.isDirectory() } };
     case 'exists':
-      return { ...ctx, [params.export_as || 'exists']: fs.existsSync(path.resolve(rootDir, resolve(params.path))) };
-    case 'search':
-      const rgOutput = execSync(`rg --json "${resolve(params.pattern)}" "${path.resolve(rootDir, resolve(params.path))}"`, { encoding: 'utf8' });
+      return { ...ctx, [params.export_as || 'exists']: safeExistsSync(path.resolve(rootDir, resolve(params.path))) };
+    case 'search': {
+      const pattern = resolve(params.pattern);
+      const targetPath = path.resolve(rootDir, resolve(params.path));
+      const rgOutput = safeExec('rg', ['--json', String(pattern), targetPath], { encoding: 'utf8' });
       return { ...ctx, [params.export_as || 'search_results']: JSON.parse(rgOutput) };
+    }
     case 'tail': {
       const tailPath = path.resolve(rootDir, resolve(params.path));
       const stats = safeStat(tailPath);
@@ -213,31 +228,28 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'append': {
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || resolve(params.content);
-      fs.appendFileSync(out, content + (params.newline !== false ? '\n' : ''));
+      const payload = content + (params.newline !== false ? '\n' : '');
+      safeAppendFileSync(out, payload);
       break;
     }
     case 'delete': {
       const target = path.resolve(rootDir, resolve(params.path));
-      if (fs.existsSync(target)) {
-        if (fs.statSync(target).isDirectory()) {
-          execSync(`rm -rf "${target}"`);
-        } else {
-          safeUnlink(target);
-        }
-      }
+      safeRmSync(target, { recursive: true, force: true });
       break;
     }
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
     case 'copy': {
       const src = path.resolve(rootDir, resolve(params.from));
       const dest = path.resolve(rootDir, resolve(params.to));
-      fs.copyFileSync(src, dest);
+      if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
+      safeCopyFileSync(src, dest);
       break;
     }
     case 'move': {
       const src = path.resolve(rootDir, resolve(params.from));
       const dest = path.resolve(rootDir, resolve(params.to));
-      fs.renameSync(src, dest);
+      if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
+      safeMoveSync(src, dest);
       break;
     }
   }

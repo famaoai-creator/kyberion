@@ -1,10 +1,9 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { execSync } from 'node:child_process';
 import * as pathResolver from '@agent/core/path-resolver';
 import { safeJsonParse } from '@agent/core/validators';
-import { safeWriteFile, safeReadFile, safeAppendFile } from '@agent/core';
+import { safeAppendFile, safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeReaddir, safeUnlinkSync, safeWriteFile } from '@agent/core';
 
 const rootDir = process.cwd();
 const queueDir = path.join(rootDir, 'active/shared/queue');
@@ -32,10 +31,9 @@ interface QueueRequest {
 }
 
 async function processQueue(): Promise<void> {
-  if (!fs.existsSync(inboxDir)) return;
+  if (!safeExistsSync(inboxDir)) return;
 
-  const files = fs
-    .readdirSync(inboxDir)
+  const files = safeReaddir(inboxDir)
     .filter((f) => f.endsWith('.json') && !f.startsWith('LOCK-'));
   if (files.length === 0) return;
 
@@ -43,8 +41,8 @@ async function processQueue(): Promise<void> {
   const chainsPath = path.join(rootDir, 'knowledge/orchestration/role-chains.json');
   let chainsConfig: RoleChains = { chains: { default: [{ role: 'Agent', objective: 'Process' }] } };
   
-  if (fs.existsSync(chainsPath)) {
-    chainsConfig = JSON.parse(fs.readFileSync(chainsPath, 'utf8'));
+  if (safeExistsSync(chainsPath)) {
+    chainsConfig = JSON.parse(safeReadFile(chainsPath, { encoding: 'utf8' }) as string);
   }
 
   for (const file of files) {
@@ -52,14 +50,13 @@ async function processQueue(): Promise<void> {
     const lockPath = path.join(inboxDir, `LOCK-${file}`);
 
     try {
-      if (!fs.existsSync(filePath)) continue;
-      const renameOpName = 'rename' + 'Sync';
-      (fs as any)[renameOpName](filePath, lockPath);
+      if (!safeExistsSync(filePath)) continue;
+      safeMoveSync(filePath, lockPath);
     } catch (e) {
       continue;
     }
 
-    const rawRequest = fs.readFileSync(lockPath, 'utf8');
+    const rawRequest = safeReadFile(lockPath, { encoding: 'utf8' }) as string;
     const request = safeJsonParse(rawRequest, 'Queue Request') as QueueRequest;
     const msgId = request.id;
 
@@ -90,7 +87,7 @@ async function processQueue(): Promise<void> {
     const missionDir = path.join(rootDir, 'active/missions', missionId);
     const handoffPath = path.join(missionDir, 'handoff.md');
 
-    let handoffContext = fs.existsSync(handoffPath)
+    let handoffContext = safeExistsSync(handoffPath)
       ? safeReadFile(handoffPath, { encoding: 'utf8' }) as string
       : 'None (New mission)';
 
@@ -143,8 +140,8 @@ ${handoffContext}
 
     // Update handoff for next possible step
     const handoffUpdate = `\n### Step ${chainStep + 1}: ${currentRole}\n> ${new Date().toISOString()}\n\n${agentOutput.substring(0, 500)}...\n`;
-    if (!fs.existsSync(missionDir)) {
-      fs.mkdirSync(missionDir, { recursive: true });
+    if (!safeExistsSync(missionDir)) {
+      safeMkdir(missionDir, { recursive: true });
     }
     safeAppendFile(handoffPath, handoffUpdate);
 
@@ -163,16 +160,13 @@ ${handoffContext}
       console.log(chalk.cyan(`  ↳ Auto-queued next step: ${chain[chainStep + 1].role}`));
     }
 
-    if (fs.existsSync(lockPath)) {
-      const unlinkOpName = 'unlink' + 'Sync';
-      (fs as any)[unlinkOpName](lockPath);
-    }
+    if (safeExistsSync(lockPath)) safeUnlinkSync(lockPath);
     console.log(chalk.green(`  [${msgId}] Task complete.`));
   }
 }
 
-if (!fs.existsSync(outboxDir)) {
-  fs.mkdirSync(outboxDir, { recursive: true });
+if (!safeExistsSync(outboxDir)) {
+  safeMkdir(outboxDir, { recursive: true });
 }
 
 processQueue().catch(err => {

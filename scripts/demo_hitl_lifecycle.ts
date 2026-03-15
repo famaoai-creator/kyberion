@@ -1,7 +1,6 @@
 import { handleAction as terminal } from '../libs/actuators/terminal-actuator/src/index.js';
 import { handleAction as presence } from '../libs/actuators/presence-actuator/src/index.js';
-import { logger } from '../libs/core/index.js';
-import * as fs from 'node:fs';
+import { logger, safeExistsSync, safeMkdir, safeReadFile, safeStat, safeWriteFile } from '../libs/core/index.js';
 import * as path from 'node:path';
 
 /**
@@ -17,15 +16,15 @@ async function waitForUserReply(timeoutMs = 60000): Promise<string | null> {
   
   // Ensure the directory exists
   const dir = path.dirname(STIMULI_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(STIMULI_PATH)) fs.writeFileSync(STIMULI_PATH, '');
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  if (!safeExistsSync(STIMULI_PATH)) safeWriteFile(STIMULI_PATH, '');
 
-  let lastSize = fs.statSync(STIMULI_PATH).size;
+  let lastSize = safeStat(STIMULI_PATH).size;
 
   while (Date.now() - startTime < timeoutMs) {
-    const currentSize = fs.statSync(STIMULI_PATH).size;
+    const currentSize = safeStat(STIMULI_PATH).size;
     if (currentSize > lastSize) {
-      const content = fs.readFileSync(STIMULI_PATH, 'utf8');
+      const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
       const lines = content.trim().split('\n');
       const lastLine = JSON.parse(lines[lines.length - 1]);
       logger.info(`📥 [HITL] Received reply: "${lastLine.signal.payload}" from ${lastLine.origin.source_id}`);

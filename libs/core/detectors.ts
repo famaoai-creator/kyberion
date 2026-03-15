@@ -1,4 +1,4 @@
-import * as fs from 'node:fs';
+import { safeReadFile } from './secure-io.js';
 import * as jschardet from 'jschardet';
 import LanguageDetect from 'languagedetect';
 
@@ -8,7 +8,9 @@ const lngDetector = new LanguageDetect();
  * Detects file encoding and line endings.
  */
 export function detectEncoding(bufferOrPath: string | Buffer) {
-  const buffer = Buffer.isBuffer(bufferOrPath) ? bufferOrPath : fs.readFileSync(bufferOrPath);
+  const buffer = Buffer.isBuffer(bufferOrPath)
+    ? bufferOrPath
+    : safeReadFile(bufferOrPath, { encoding: null }) as Buffer;
   const result = jschardet.detect(buffer);
   const content = buffer.toString();
 

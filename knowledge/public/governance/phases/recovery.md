@@ -19,7 +19,7 @@ This phase is automatically triggered by the **Phase Detection Protocol** when t
 ## Physical Enforcement
 The agent MUST use the mission controller to resume, which handles auto-stashing uncommitted debris, clearing stale locks, and checking out the correct branch safely.
 
-- **Command**: `npx tsx scripts/mission_controller.ts resume` (It will automatically detect the target ID from the lock file or registry)
+- **Command**: `node dist/scripts/mission_controller.js resume` (It will automatically detect the target ID from the lock file or registry)
 - **Validation**:
   - Verification of `mission-state.json` freshness via `validateFileFreshness`.
   - Automatic git branch verification to match the mission context.

@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { validateWritePermission, validateReadPermission, safeWriteFile, safeUnlinkSync, safeExistsSync, pathResolver } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 describe('Governance Policy-as-Code Enforcement', () => {
   const TEST_FILE = pathResolver.knowledge('public/test-policy-effect.md');
@@ -57,6 +56,18 @@ describe('Governance Policy-as-Code Enforcement', () => {
     safeWriteFile(SCRATCH_FILE, 'test');
     expect(safeExistsSync(SCRATCH_FILE)).toBe(true);
     safeUnlinkSync(SCRATCH_FILE);
+  });
+
+  it('Scenario: mission_controller can write distilled wisdom output', async () => {
+    const WISDOM_FILE = pathResolver.rootResolve('knowledge/evolution/test-mission-controller-distill.md');
+    process.env.MISSION_ROLE = 'mission_controller';
+
+    const check = validateWritePermission(WISDOM_FILE);
+    expect(check.allowed).toBe(true);
+
+    safeWriteFile(WISDOM_FILE, '# Distilled Wisdom');
+    expect(safeExistsSync(WISDOM_FILE)).toBe(true);
+    safeUnlinkSync(WISDOM_FILE);
   });
 });
 

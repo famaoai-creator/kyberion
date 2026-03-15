@@ -18,12 +18,20 @@ export {
   safeReadFile, 
   safeWriteFile, 
   safeAppendFileSync, 
+  safeCopyFileSync,
+  safeMoveSync,
+  safeSymlinkSync,
+  safeRmSync,
   safeUnlinkSync, 
   safeMkdir, 
   safeExistsSync, 
   safeExec,
   safeReaddir,
-  safeStat
+  safeStat,
+  safeLstat,
+  safeReadlink,
+  safeOpenAppendFile,
+  safeFsyncFile
 } from './secure-io.js';
 
 // Backward compatibility aliases
@@ -100,6 +108,7 @@ export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
+export * from './stimuli-journal.js';
 
 // Mission Status Guard
 export { MissionStatus, isValidTransition, transitionStatus } from './mission-status';
@@ -120,6 +129,9 @@ export * from './agent-lifecycle';
 export * from './a2a-bridge';
 export * from './agent-manifest';
 export * from './provider-discovery';
+export * from './runtime-supervisor';
+export * from './managed-process';
+export * from './pipeline-contract';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine';
@@ -135,4 +147,3 @@ export { handleAction as presenceAction } from '../actuators/presence-actuator/s
 // Shared Business Types
 export * from './shared-business-types.js';
 // export * as visionJudge from './vision-judge.js';
-

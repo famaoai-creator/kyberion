@@ -24,6 +24,6 @@
       "@agent/shared-business": ["libs/shared-business/src/index.ts"]
     }
   },
-  "include": ["skills/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts"],
+  "include": ["skills/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "presence/**/*.ts", "satellites/**/*.ts"],
   "exclude": ["node_modules", "dist", "coverage", "test-results", "presence/displays/kyberion-dashboard/", "presence/displays/chronos-mirror-v2/"]
 }

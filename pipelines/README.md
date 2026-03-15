@@ -1,9 +1,9 @@
 # Pipelines
 
-Pre-built YAML pipelines that chain multiple skills into automated workflows. Execute via `mission-control`:
+Pre-built JSON ADF pipelines for runtime execution. Execute via the built pipeline runner:
 
 ```bash
-node mission-control/scripts/orchestrate.js --pipeline pipelines/<name>.yml
+node dist/scripts/run_pipeline.js --input pipelines/<name>.json
 ```
 
 ## Available Pipelines
@@ -32,13 +32,16 @@ node mission-control/scripts/orchestrate.js --pipeline pipelines/<name>.yml
 
 ## Creating Custom Pipelines
 
-See any `.yml` file in this directory for the format. Each pipeline defines:
+Canonical runtime pipelines use the JSON ADF shape:
 
-```yaml
-name: Pipeline Name
-steps:
-  - skill: skill-name
-    args: --flag value
-  - skill: another-skill
-    depends_on: [skill-name]
+```json
+{
+  "action": "pipeline",
+  "name": "Pipeline Name",
+  "steps": [
+    { "op": "system:log", "params": { "message": "hello" } }
+  ]
+}
 ```
+
+Legacy `.yml` skill-chaining files may still exist as historical artifacts, but they are not the primary runtime contract.

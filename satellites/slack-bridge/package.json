@@ -2,10 +2,11 @@
   "name": "@kyberion/slack-bridge",
   "version": "1.0.0",
   "description": "Sensory Satellite for Slack (Socket Mode)",
-  "main": "dist/index.js",
+  "main": "../../dist/satellites/slack-bridge/src/index.js",
+  "types": "../../dist/satellites/slack-bridge/src/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node ../../dist/satellites/slack-bridge/src/index.js"
   },
   "dependencies": {
     "@agent/core": "workspace:*",

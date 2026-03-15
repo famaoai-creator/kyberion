@@ -4,21 +4,29 @@ import {
   safeReadFile, 
   safeWriteFile, 
   safeMkdir,
+  safeExistsSync,
   safeExec,
   pathResolver,
   resolveVars,
   evaluateCondition,
-  withRetry
+  withRetry,
+  derivePipelineStatus
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 
 /**
  * Network-Actuator v2.2.0 [A2A TRANSPORT ENABLED]
  * Pure ADF-driven engine for all network and A2A interactions.
  */
+const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
+
+function assertUnsafeShellAllowed() {
+  if (!ALLOW_UNSAFE_SHELL) {
+    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+  }
+}
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -56,7 +64,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
-  if (initialCtx.context_path && fs.existsSync(pathResolver.rootResolve(initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -91,7 +99,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -140,6 +148,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as || 'last_capture']: response };
 
     case 'shell':
+      assertUnsafeShellAllowed();
       const cmd = resolveVars(params.cmd, ctx);
       return { ...ctx, [params.export_as || 'last_capture']: safeExec(cmd).trim() };
 
@@ -178,7 +187,7 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'write_file':
       const outPath = pathResolver.rootResolve(resolveVars(params.path, ctx));
       const content = typeof ctx.last_capture === 'object' ? JSON.stringify(ctx.last_capture, null, 2) : ctx.last_capture;
-      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       safeWriteFile(outPath, content);
       break;
 

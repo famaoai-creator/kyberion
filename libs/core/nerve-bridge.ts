@@ -8,9 +8,8 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { logger, pathResolver, safeWriteFile, safeReadFile, safeAppendFileSync } from './index.js';
+import { logger, pathResolver, safeReadFile, safeAppendFileSync, safeExistsSync, safeStat } from './index.js';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;
@@ -73,17 +72,18 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
   logger.info(`👂 [BRIDGE:${NODE_ID}] Nerve '${nerveId}' started listening...`);
   
   let lastSize = 0;
-  if (fs.existsSync(STIMULI_PATH)) {
-    lastSize = fs.statSync(STIMULI_PATH).size;
+  if (safeExistsSync(STIMULI_PATH)) {
+    lastSize = safeStat(STIMULI_PATH).size;
   }
 
   setInterval(() => {
-    if (!fs.existsSync(STIMULI_PATH)) return;
+    if (!safeExistsSync(STIMULI_PATH)) return;
     
-    const stats = fs.statSync(STIMULI_PATH);
+    const stats = safeStat(STIMULI_PATH);
     if (stats.size > lastSize) {
-      const content = fs.readFileSync(STIMULI_PATH, 'utf8');
-      const newLines = content.substring(lastSize).trim().split('\n');
+      const content = safeReadFile(STIMULI_PATH, { encoding: null }) as Buffer;
+      const appended = content.subarray(lastSize).toString('utf8');
+      const newLines = appended.trim().split('\n');
       
       newLines.forEach(line => {
         if (!line) return;

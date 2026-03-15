@@ -3,96 +3,96 @@
   "version": "1.0.0",
   "private": true,
   "description": "Core utilities and wrappers for Kyberion.",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "../../dist/libs/core/index.js",
+  "types": "../../dist/libs/core/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "default": "./index.js"
+      "types": "../../dist/libs/core/index.d.ts",
+      "default": "../../dist/libs/core/index.js"
     },
     "./validators": {
-      "types": "./validators.d.ts",
-      "default": "./validators.js"
+      "types": "../../dist/libs/core/validators.d.ts",
+      "default": "../../dist/libs/core/validators.js"
     },
     "./fs-utils": {
-      "types": "./fs-utils.d.ts",
-      "default": "./fs-utils.js"
+      "types": "../../dist/libs/core/fs-utils.d.ts",
+      "default": "../../dist/libs/core/fs-utils.js"
     },
     "./cli-utils": {
-      "types": "./cli-utils.d.ts",
-      "default": "./cli-utils.js"
+      "types": "../../dist/libs/core/cli-utils.d.ts",
+      "default": "../../dist/libs/core/cli-utils.js"
     },
     "./secure-io": {
-      "types": "./secure-io.d.ts",
-      "default": "./secure-io.js"
+      "types": "../../dist/libs/core/secure-io.d.ts",
+      "default": "../../dist/libs/core/secure-io.js"
     },
     "./classifier": {
-      "types": "./classifier.d.ts",
-      "default": "./classifier.js"
+      "types": "../../dist/libs/core/classifier.d.ts",
+      "default": "../../dist/libs/core/classifier.js"
     },
     "./path-resolver": {
-      "types": "./path-resolver.d.ts",
-      "default": "./path-resolver.js"
+      "types": "../../dist/libs/core/path-resolver.d.ts",
+      "default": "../../dist/libs/core/path-resolver.js"
     },
     "./tier-guard": {
-      "types": "./tier-guard.d.ts",
-      "default": "./tier-guard.js"
+      "types": "../../dist/libs/core/tier-guard.d.ts",
+      "default": "../../dist/libs/core/tier-guard.js"
     },
     "./network": {
-      "types": "./network.d.ts",
-      "default": "./network.js"
+      "types": "../../dist/libs/core/network.d.ts",
+      "default": "../../dist/libs/core/network.js"
     },
     "./core": {
-      "types": "./core.d.ts",
-      "default": "./core.js"
+      "types": "../../dist/libs/core/core.d.ts",
+      "default": "../../dist/libs/core/core.js"
     },
     "./logger": {
-      "types": "./logger.d.ts",
-      "default": "./logger.js"
+      "types": "../../dist/libs/core/logger.d.ts",
+      "default": "../../dist/libs/core/logger.js"
     },
     "./metrics": {
-      "types": "./metrics.d.ts",
-      "default": "./metrics.js"
+      "types": "../../dist/libs/core/metrics.d.ts",
+      "default": "../../dist/libs/core/metrics.js"
     },
     "./error-codes": {
-      "types": "./error-codes.d.ts",
-      "default": "./error-codes.js"
+      "types": "../../dist/libs/core/error-codes.d.ts",
+      "default": "../../dist/libs/core/error-codes.js"
     },
     "./validate": {
-      "types": "./validate.d.ts",
-      "default": "./validate.js"
+      "types": "../../dist/libs/core/validate.d.ts",
+      "default": "../../dist/libs/core/validate.js"
     },
     "./orchestrator": {
-      "types": "./orchestrator.d.ts",
-      "default": "./orchestrator.js"
+      "types": "../../dist/libs/core/orchestrator.d.ts",
+      "default": "../../dist/libs/core/orchestrator.js"
     },
     "./ledger": {
-      "types": "./ledger.d.ts",
-      "default": "./ledger.js"
+      "types": "../../dist/libs/core/ledger.d.ts",
+      "default": "../../dist/libs/core/ledger.js"
     },
     "./secret-guard": {
-      "types": "./secret-guard.d.ts",
-      "default": "./secret-guard.js"
+      "types": "../../dist/libs/core/secret-guard.d.ts",
+      "default": "../../dist/libs/core/secret-guard.js"
     },
     "./test-utils": {
-      "types": "./test-utils.d.ts",
-      "default": "./test-utils.js"
+      "types": "../../dist/libs/core/test-utils.d.ts",
+      "default": "../../dist/libs/core/test-utils.js"
     },
     "./pulse-guard": {
-      "types": "./pulse-guard.d.ts",
-      "default": "./pulse-guard.js"
+      "types": "../../dist/libs/core/pulse-guard.d.ts",
+      "default": "../../dist/libs/core/pulse-guard.js"
     },
     "./acp-mediator": {
-      "types": "./acp-mediator.d.ts",
-      "default": "./acp-mediator.js"
+      "types": "../../dist/libs/core/acp-mediator.d.ts",
+      "default": "../../dist/libs/core/acp-mediator.js"
     },
     "./shared-business-types": {
-      "types": "./shared-business-types.ts",
-      "default": "./shared-business-types.ts"
+      "types": "../../dist/libs/core/shared-business-types.d.ts",
+      "default": "../../dist/libs/core/shared-business-types.js"
     },
     "./nerve-bridge": {
-      "types": "./nerve-bridge.d.ts",
-      "default": "./nerve-bridge.js"
+      "types": "../../dist/libs/core/nerve-bridge.d.ts",
+      "default": "../../dist/libs/core/nerve-bridge.js"
     }
   },
   "dependencies": {

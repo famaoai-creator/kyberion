@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "System Tool Diagnostics",
   "description": "Checks for external binary dependencies required by various skills.",
   "steps": [

@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 10,
-  "u": "2026-03-07T09:15:30.000Z",
+  "t": 15,
+  "u": "2026-03-15T00:00:00.000Z",
   "s": [
     { "n": "file-actuator", "path": "libs/actuators/file-actuator", "d": "Unified File I/O and Search", "s": "implemented" },
     { "n": "code-actuator", "path": "libs/actuators/code-actuator", "d": "Logic Analysis and Refactoring", "s": "implemented" },
@@ -12,6 +12,11 @@
     { "n": "system-actuator", "path": "libs/actuators/system-actuator", "d": "OS Peripheral Injection", "s": "implemented" },
     { "n": "modeling-actuator", "path": "libs/actuators/modeling-actuator", "d": "Strategic and Mathematical Modeling", "s": "implemented" },
     { "n": "service-actuator", "path": "libs/actuators/service-actuator", "d": "External SaaS and API Connectors", "s": "implemented" },
-    { "n": "orchestrator-actuator", "path": "libs/actuators/orchestrator-actuator", "d": "Central Mission Orchestration", "s": "implemented" }
+    { "n": "orchestrator-actuator", "path": "libs/actuators/orchestrator-actuator", "d": "Central Mission Orchestration", "s": "implemented" },
+    { "n": "quality-scorer", "path": "skills/audit/quality-scorer", "d": "Quality scoring for documents", "s": "implemented" },
+    { "n": "html-reporter", "path": "skills/media/html-reporter", "d": "Generate HTML reports from Markdown", "s": "implemented" },
+    { "n": "code-lang-detector", "path": "skills/engineering/code-lang-detector", "d": "Detect source code language", "s": "implemented" },
+    { "n": "encoding-detector", "path": "skills/utilities/encoding-detector", "d": "Detect file encoding and newline style", "s": "implemented" },
+    { "n": "sensitivity-detector", "path": "skills/utilities/sensitivity-detector", "d": "Detect sensitive information markers", "s": "implemented" }
   ]
 }
