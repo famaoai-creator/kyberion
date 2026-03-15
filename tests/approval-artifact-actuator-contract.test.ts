@@ -14,22 +14,38 @@ import {
 } from '@agent/core';
 
 describe('Approval and artifact actuator contracts', () => {
+  const contractChannel = 'contract-test';
+  const contractCoordination = pathResolver.rootResolve(`active/shared/coordination/channels/${contractChannel}`);
+  const contractObservability = pathResolver.rootResolve(`active/shared/observability/channels/${contractChannel}`);
   const slackCoordination = pathResolver.rootResolve('active/shared/coordination/channels/slack');
   const slackObservability = pathResolver.rootResolve('active/shared/observability/channels/slack');
 
   afterEach(() => {
+    process.env.MISSION_ROLE = 'infrastructure_sentinel';
+    if (safeExistsSync(contractCoordination)) safeRmSync(contractCoordination);
+    if (safeExistsSync(contractObservability)) safeRmSync(contractObservability);
     process.env.MISSION_ROLE = 'slack_bridge';
     if (safeExistsSync(slackCoordination)) safeRmSync(slackCoordination);
     if (safeExistsSync(slackObservability)) safeRmSync(slackObservability);
   });
 
   it('writes governed artifacts only inside coordination/observability paths', () => {
-    const written = writeGovernedArtifactJson('slack_bridge', 'active/shared/coordination/channels/slack/inbox/test.json', { ok: true });
-    appendGovernedArtifactJsonl('slack_bridge', 'active/shared/observability/channels/slack/events.jsonl', { event: 'x' });
+    const written = writeGovernedArtifactJson(
+      'infrastructure_sentinel',
+      `active/shared/coordination/channels/${contractChannel}/inbox/test.json`,
+      { ok: true },
+    );
+    appendGovernedArtifactJsonl(
+      'infrastructure_sentinel',
+      `active/shared/observability/channels/${contractChannel}/events.jsonl`,
+      { event: 'x' },
+    );
 
     expect(safeExistsSync(written)).toBe(true);
-    expect(readGovernedArtifactJson<{ ok: boolean }>('active/shared/coordination/channels/slack/inbox/test.json')?.ok).toBe(true);
-    expect(listGovernedArtifacts('active/shared/coordination/channels/slack/inbox')).toContain('test.json');
+    expect(
+      readGovernedArtifactJson<{ ok: boolean }>(`active/shared/coordination/channels/${contractChannel}/inbox/test.json`)?.ok,
+    ).toBe(true);
+    expect(listGovernedArtifacts(`active/shared/coordination/channels/${contractChannel}/inbox`)).toContain('test.json');
   });
 
   it('creates and decides approval requests through the generic store', () => {
