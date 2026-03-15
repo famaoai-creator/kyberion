@@ -6,9 +6,19 @@
     "public": "active/missions/public",
     "archive": "active/archive/missions",
     "exports": "hub/exports/missions",
-    "global_ledger": "active/audit/system-ledger.jsonl"
+    "global_ledger": "active/audit/system-ledger.jsonl",
+    "global_coordination": "active/shared/coordination",
+    "global_runtime_locks": "active/shared/runtime/locks",
+    "global_observability": "active/shared/observability",
+    "mission_coordination": "coordination",
+    "mission_events": "coordination/events",
+    "mission_tasks": "coordination/tasks",
+    "mission_claims": "coordination/claims",
+    "mission_handoffs": "coordination/handoffs",
+    "mission_reviews": "coordination/reviews"
   },
   "mep_version": "0.1.0",
+  "mission_control_model": "single-owner-multi-worker",
   "rehydrate_map": {
     "{{HOME}}": "/Users",
     "{{PROJECT_ROOT}}": "."
