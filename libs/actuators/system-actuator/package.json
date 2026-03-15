@@ -2,8 +2,8 @@
   "name": "@actuator/system",
   "version": "1.0.0",
   "description": "System-Actuator for Kyberion OS/Peripheral Controls",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../../dist/libs/actuators/system-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/system-actuator/src/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

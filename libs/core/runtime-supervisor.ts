@@ -1,0 +1,142 @@
+import { logger } from './core';
+
+export type RuntimeResourceKind = 'pty' | 'agent' | 'service';
+export type RuntimeShutdownPolicy = 'manual' | 'idle' | 'detached';
+export type RuntimeResourceState = 'running' | 'stopped' | 'exited';
+
+export interface RuntimeRegistration {
+  resourceId: string;
+  kind: RuntimeResourceKind;
+  ownerId: string;
+  ownerType: string;
+  pid?: number;
+  idleTimeoutMs?: number;
+  shutdownPolicy?: RuntimeShutdownPolicy;
+  metadata?: Record<string, unknown>;
+  cleanup?: () => void | Promise<void>;
+}
+
+export interface RuntimeResourceRecord extends RuntimeRegistration {
+  createdAt: number;
+  lastActiveAt: number;
+  shutdownPolicy: RuntimeShutdownPolicy;
+  state: RuntimeResourceState;
+}
+
+export interface RuntimeResourceSnapshot extends RuntimeResourceRecord {
+  idleForMs: number;
+}
+
+class RuntimeSupervisorImpl {
+  private resources = new Map<string, RuntimeResourceRecord>();
+  private sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+  register(input: RuntimeRegistration): RuntimeResourceRecord {
+    const now = Date.now();
+    const record: RuntimeResourceRecord = {
+      ...input,
+      createdAt: now,
+      lastActiveAt: now,
+      shutdownPolicy: input.shutdownPolicy || 'manual',
+      state: 'running',
+    };
+
+    this.resources.set(input.resourceId, record);
+    return record;
+  }
+
+  get(resourceId: string): RuntimeResourceRecord | undefined {
+    return this.resources.get(resourceId);
+  }
+
+  list(): RuntimeResourceRecord[] {
+    return Array.from(this.resources.values()).sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  snapshot(now = Date.now()): RuntimeResourceSnapshot[] {
+    return this.list().map((record) => ({
+      ...record,
+      idleForMs: Math.max(0, now - record.lastActiveAt),
+    }));
+  }
+
+  touch(resourceId: string): void {
+    const record = this.resources.get(resourceId);
+    if (record) {
+      record.lastActiveAt = Date.now();
+    }
+  }
+
+  update(
+    resourceId: string,
+    patch: Partial<Omit<RuntimeResourceRecord, 'resourceId' | 'createdAt'>>,
+  ): RuntimeResourceRecord | undefined {
+    const record = this.resources.get(resourceId);
+    if (!record) return undefined;
+    Object.assign(record, patch);
+    return record;
+  }
+
+  unregister(resourceId: string): boolean {
+    return this.resources.delete(resourceId);
+  }
+
+  async cleanup(resourceId: string, reason = 'manual'): Promise<boolean> {
+    const record = this.resources.get(resourceId);
+    if (!record) return false;
+
+    try {
+      await record.cleanup?.();
+    } catch (error: any) {
+      logger.warn(`[RUNTIME_SUPERVISOR] Cleanup failed for ${resourceId} (${reason}): ${error?.message || error}`);
+    } finally {
+      this.resources.delete(resourceId);
+    }
+
+    return true;
+  }
+
+  async reapIdle(now = Date.now()): Promise<string[]> {
+    const expired = this.list().filter((record) => {
+      if (record.shutdownPolicy !== 'idle' || !record.idleTimeoutMs) return false;
+      if (record.state !== 'running') return false;
+      return now - record.lastActiveAt >= record.idleTimeoutMs;
+    });
+
+    const reaped: string[] = [];
+    for (const record of expired) {
+      await this.cleanup(record.resourceId, 'idle_timeout');
+      reaped.push(record.resourceId);
+    }
+
+    return reaped;
+  }
+
+  startSweep(intervalMs = 30000): void {
+    if (this.sweepTimer) return;
+    this.sweepTimer = setInterval(() => {
+      this.reapIdle().catch((error: any) => {
+        logger.warn(`[RUNTIME_SUPERVISOR] Idle sweep failed: ${error?.message || error}`);
+      });
+    }, intervalMs);
+    this.sweepTimer.unref?.();
+  }
+
+  stopSweep(): void {
+    if (!this.sweepTimer) return;
+    clearInterval(this.sweepTimer);
+    this.sweepTimer = null;
+  }
+
+  resetForTests(): void {
+    this.stopSweep();
+    this.resources.clear();
+  }
+}
+
+const GLOBAL_KEY = Symbol.for('@kyberion/runtime-supervisor');
+if (!(globalThis as any)[GLOBAL_KEY]) {
+  (globalThis as any)[GLOBAL_KEY] = new RuntimeSupervisorImpl();
+}
+
+export const runtimeSupervisor: RuntimeSupervisorImpl = (globalThis as any)[GLOBAL_KEY];

@@ -2,11 +2,11 @@ import {
   safeReadFile, 
   safeWriteFile, 
   safeReaddir, 
-  safeStat
+  safeStat,
+  safeFsyncFile
 } from './secure-io.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
@@ -145,9 +145,7 @@ function _saveGrants(grants: AuthGrant[]) {
   
   // For physical sync assurance in multi-process (legacy necessity)
   try {
-    const fd = fs.openSync(GRANTS_FILE, 'r+');
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
+    safeFsyncFile(GRANTS_FILE);
   } catch (_) {}
 }
 

@@ -1,8 +1,7 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -53,7 +52,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -109,7 +108,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -206,7 +205,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'write_file':
       const outPath = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       safeWriteFile(outPath, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       break;
     case 'log':
@@ -220,7 +219,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
  */
 async function performReconcile(input: ModelingAction) {
   const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/modeling-strategy.json');
-  if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

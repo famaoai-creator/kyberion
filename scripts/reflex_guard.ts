@@ -7,9 +7,14 @@
  * when a prompt is detected, enabling automated agent response.
  */
 
-const fs = require('node:fs');
-const path = require('node:path');
-const { pathResolver } = require('../libs/core/index.js');
+const {
+  pathResolver,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeReadFile,
+  safeStat,
+  safeWriteFile,
+} = require('../libs/core/index.js');
 
 // Constants
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
@@ -36,43 +41,40 @@ function injectStimulus(intent, payload, originalId) {
     signal: { intent: intent, priority: 5, payload: payload },
     control: { status: 'processed', feedback: 'silent', evidence: [] }
   };
-  fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+  safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
   console.log(`⚡ [ReflexGuard] Injected reflex stimulus: ${intent}`);
 }
 
 // Ensure the file exists
-if (!fs.existsSync(STIMULI_PATH)) {
-  fs.writeFileSync(STIMULI_PATH, '');
+if (!safeExistsSync(STIMULI_PATH)) {
+  safeWriteFile(STIMULI_PATH, '');
 }
 
 // Watch the file for changes
-let lastSize = fs.statSync(STIMULI_PATH).size;
+let lastSize = safeStat(STIMULI_PATH).size;
 
 setInterval(() => {
-  const stats = fs.statSync(STIMULI_PATH);
+  const stats = safeStat(STIMULI_PATH);
   if (stats.size > lastSize) {
-    const stream = fs.createReadStream(STIMULI_PATH, { start: lastSize });
-    let data = '';
-    stream.on('data', (chunk) => data += chunk);
-    stream.on('end', () => {
-      const lines = data.trim().split('\n');
-      lines.forEach(line => {
-        if (!line) return;
-        try {
-          const stimulus = JSON.parse(line);
-          // Only react to terminal log streams from agents
-          if (stimulus.origin?.channel === 'terminal' && stimulus.signal?.intent !== 'EXECUTION_FINISHED') {
-            const cleanText = cleanOutput(stimulus.signal.payload || '');
-            if (PROMPT_PATTERN.test(cleanText)) {
-              injectStimulus('EXECUTION_FINISHED', 'System is ready for next instruction.', stimulus.id);
-            }
+    const fullContent = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
+    const data = String(fullContent).slice(lastSize);
+    const lines = data.trim().split('\n');
+    lines.forEach(line => {
+      if (!line) return;
+      try {
+        const stimulus = JSON.parse(line);
+        // Only react to terminal log streams from agents
+        if (stimulus.origin?.channel === 'terminal' && stimulus.signal?.intent !== 'EXECUTION_FINISHED') {
+          const cleanText = cleanOutput(stimulus.signal.payload || '');
+          if (PROMPT_PATTERN.test(cleanText)) {
+            injectStimulus('EXECUTION_FINISHED', 'System is ready for next instruction.', stimulus.id);
           }
-        } catch (e) {
-          // Ignore parse errors for partial lines
         }
-      });
-      lastSize = stats.size;
+      } catch (e) {
+        // Ignore parse errors for partial lines
+      }
     });
+    lastSize = stats.size;
   } else if (stats.size < lastSize) {
     // Handle file rotation/truncation
     lastSize = stats.size;

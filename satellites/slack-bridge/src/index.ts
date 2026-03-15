@@ -1,8 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
 import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, secretGuard } from '@agent/core';
+import { logger, secretGuard, safeAppendFileSync } from '@agent/core';
 
 /**
  * Slack Sensory Satellite (Socket Mode) v1.0
@@ -28,13 +27,16 @@ async function start() {
   });
 
   // 1. Listen for messages
-  app.message(async ({ message, say }) => {
+  app.message(async ({ message }) => {
     // Only process text messages (ignore edits, deletes, etc. for now)
     if (!('text' in message) || !message.text) return;
     if (message.subtype) return; // Ignore bot messages or other subtypes
 
     const stimulusId = uuidv4();
     const ts = new Date().toISOString();
+    const threadTs = 'thread_ts' in message && typeof message.thread_ts === 'string' ? message.thread_ts : message.ts;
+    const team = 'team' in message && typeof message.team === 'string' ? message.team : undefined;
+    const channelType = 'channel_type' in message && typeof message.channel_type === 'string' ? message.channel_type : undefined;
 
     // 2. Convert to GUSP v2.0
     const stimulus = {
@@ -44,10 +46,10 @@ async function start() {
       origin: {
         channel: 'slack',
         source_id: message.user,
-        context: `${message.channel}:${message.thread_ts || message.ts}`,
+        context: `${message.channel}:${threadTs}`,
         metadata: {
-          team: message.team,
-          channel_type: message.channel_type
+          team,
+          channel_type: channelType
         }
       },
       signal: {
@@ -69,7 +71,7 @@ async function start() {
     // 3. Physical Ingestion (Evidence-as-State)
     try {
       logger.info(`📥 [SlackBridge] Ingesting stimulus ${stimulusId} from ${message.user}`);
-      fs.appendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n', 'utf8');
+      safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n', 'utf8');
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);
     }

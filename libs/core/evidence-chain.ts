@@ -1,8 +1,7 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
-import { safeWriteFile, safeReadFile } from './secure-io.js';
+import { safeWriteFile, safeReadFile, safeExistsSync } from './secure-io.js';
 
 /**
  * Chain of Evidence: The Blockchain of Artifacts
@@ -12,10 +11,10 @@ export const evidenceChain = {
   registryPath: pathResolver.shared('registry/evidence_chain.json'),
 
   register: (filePath: string, agentId: string, parentId: string | null = null, context = '') => {
-    if (!fs.existsSync(filePath)) return null;
+    if (!safeExistsSync(filePath)) return null;
 
     try {
-      const content = safeReadFile(filePath) as Buffer;
+      const content = safeReadFile(filePath, { encoding: null }) as Buffer;
       const hash = createHash('sha256').update(content).digest('hex');
       const id = `EVD-${hash.substring(0, 8).toUpperCase()}`;
 
@@ -56,13 +55,11 @@ export const evidenceChain = {
   },
 
   _loadRegistry: () => {
-    if (!fs.existsSync(evidenceChain.registryPath)) {
+    if (!safeExistsSync(evidenceChain.registryPath)) {
       return { chain: [] };
     }
     try {
-      // Use standard fs for internal loading within library if necessary, 
-      // but safeReadFile is preferred if accessible.
-      const content = fs.readFileSync(evidenceChain.registryPath, 'utf8');
+      const content = safeReadFile(evidenceChain.registryPath, { encoding: 'utf8' }) as string;
       return JSON.parse(content);
     } catch (_) {
       return { chain: [] };

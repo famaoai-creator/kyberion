@@ -4,8 +4,7 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
-import { logger, ui, ptyEngine } from './index.js';
+import { logger, ui, ptyEngine, safeExistsSync, safeMkdir, safeWriteFile } from './index.js';
 
 export interface ReflexTerminalOptions {
   shell?: string;
@@ -60,6 +59,10 @@ export class ReflexTerminal {
     return ptyEngine.get(this.sessionId)?.adapter.pid;
   }
 
+  public getSessionId(): string {
+    return this.sessionId;
+  }
+
   public kill() {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
@@ -80,8 +83,8 @@ export class ReflexTerminal {
         metadata: { timestamp: new Date().toISOString(), duration_ms: 0 }
       };
       const dir = path.dirname(this.feedbackPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this.feedbackPath, JSON.stringify(envelope, null, 2), 'utf8');
+      if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+      safeWriteFile(this.feedbackPath, JSON.stringify(envelope, null, 2));
       logger.success(`[RT] Response persisted to ${this.feedbackPath}`);
     } catch (err: any) {
       logger.error(`[RT] Failed to persist response: ${err.message}`);

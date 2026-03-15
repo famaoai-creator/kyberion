@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "steps": [
     {
       "op": "system:shell",

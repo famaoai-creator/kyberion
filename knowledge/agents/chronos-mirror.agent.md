@@ -30,8 +30,8 @@ denied_actuators: [blockchain-actuator]
 - `git branch -a` — ブランチ一覧
 
 ### Mission Management
-- `npx tsx scripts/mission_controller.ts list` — ミッション一覧
-- `npx tsx scripts/mission_controller.ts status <id>` — ミッション詳細
+- `node dist/scripts/mission_controller.js list` — ミッション一覧
+- `node dist/scripts/mission_controller.js status <id>` — ミッション詳細
 - `cat active/missions/registry.json` — ミッションレジストリ
 
 ### System Health
@@ -54,7 +54,7 @@ denied_actuators: [blockchain-actuator]
 
 ### Pipelines (ADF パイプライン実行)
 
-実行コマンド: `npx tsx scripts/run_pipeline.ts -i <path>`
+実行コマンド: `node dist/scripts/run_pipeline.js --input <path>`
 
 **システム運用:**
 - `pipelines/vital-check.json` — エコシステム生存確認（パス存在チェック、ミッション数）

@@ -2,8 +2,8 @@
   "name": "@agent/blockchain-actuator",
   "version": "1.0.0",
   "description": "Blockchain Anchoring Actuator for Kyberion Ecosystem",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../../dist/libs/actuators/blockchain-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/blockchain-actuator/src/index.d.ts",
   "private": true,
   "dependencies": {
     "@agent/core": "workspace:*"

@@ -1,6 +1,5 @@
-import { pathResolver, logger, safeMkdir } from '@agent/core';
+import { pathResolver, logger, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
 
 /**
@@ -9,10 +8,10 @@ import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
  * Generates documents from design patterns using the Media-Actuator pipeline.
  *
  * Usage:
- *   npx tsx scripts/generate_marketing_deck.ts                                  # default marketing deck
- *   npx tsx scripts/generate_marketing_deck.ts --pattern <pattern_path>         # custom pattern
- *   npx tsx scripts/generate_marketing_deck.ts --pattern <path> --theme <name>  # with theme
- *   npx tsx scripts/generate_marketing_deck.ts --pattern <path> --output <path> # custom output
+ *   pnpm exec tsx scripts/generate_marketing_deck.ts                                  # default marketing deck
+ *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <pattern_path>         # custom pattern
+ *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <path> --theme <name>  # with theme
+ *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <path> --output <path> # custom output
  */
 
 async function main() {
@@ -32,12 +31,12 @@ async function main() {
     ? patternRelPath
     : path.join(process.cwd(), patternRelPath);
 
-  if (!fs.existsSync(patternPath)) {
+  if (!safeExistsSync(patternPath)) {
     logger.error(`Pattern file not found: ${patternPath}`);
     process.exit(1);
   }
 
-  const pattern = JSON.parse(fs.readFileSync(patternPath, 'utf8'));
+  const pattern = JSON.parse(safeReadFile(patternPath, { encoding: 'utf8' }) as string);
   const engine = pattern.media_actuator_config?.engine || 'pptx';
 
   // Determine output path
@@ -46,7 +45,7 @@ async function main() {
   const outputPath = outputArg || `scratch/${defaultName}${ext}`;
 
   const outputDir = path.dirname(path.resolve(process.cwd(), outputPath));
-  if (!fs.existsSync(outputDir)) {
+  if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });
   }
 

@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
-import * as fs from 'fs';
 import * as path from 'path';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { PptxDesignProtocol, PptxElement, PptxPos, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
 import { generateNativePptx } from './native-pptx-engine/engine.js';
 
@@ -601,9 +601,9 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
   }
 
   if (extractAssetsDir) {
-    if (!fs.existsSync(extractAssetsDir)) fs.mkdirSync(extractAssetsDir, { recursive: true });
+    if (!safeExistsSync(extractAssetsDir)) safeMkdir(extractAssetsDir, { recursive: true });
     zip.getEntries().filter(e => e.entryName.startsWith('ppt/media/')).forEach(m => {
-      fs.writeFileSync(path.join(extractAssetsDir, path.basename(m.entryName)), m.getData());
+      safeWriteFile(path.join(extractAssetsDir, path.basename(m.entryName)), m.getData());
     });
   }
 

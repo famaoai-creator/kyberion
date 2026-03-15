@@ -1,10 +1,9 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 import * as util from 'node:util';
-import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 
 /**
@@ -12,6 +11,20 @@ import { execSync } from 'node:child_process';
  * Strictly compliant with Layer 2 (Shield).
  * Generic data pipeline engine for source code analysis with Control Flow and Safety Guards.
  */
+const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
+const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+
+function assertUnsafeShellAllowed() {
+  if (!ALLOW_UNSAFE_SHELL) {
+    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+  }
+}
+
+function assertUnsafeJsAllowed() {
+  if (!ALLOW_UNSAFE_JS) {
+    throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
+  }
+}
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -50,7 +63,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, root: rootDir };
   
-  if (initialCtx.context_path && fs.existsSync(path.resolve(rootDir, initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -106,7 +119,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -166,15 +179,16 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     case 'glob_files':
       return { ...ctx, [params.export_as || 'file_list']: getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)) };
     case 'shell':
+      assertUnsafeShellAllowed();
       return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
     case 'discover_skills':
       const skillsRootDir = path.join(rootDir, 'skills');
       const skills: any[] = [];
-      if (fs.existsSync(skillsRootDir)) {
-        const categories = fs.readdirSync(skillsRootDir).filter(f => fs.lstatSync(path.join(skillsRootDir, f)).isDirectory());
+      if (safeExistsSync(skillsRootDir)) {
+        const categories = safeReaddir(skillsRootDir).filter(f => safeLstat(path.join(skillsRootDir, f)).isDirectory());
         for (const cat of categories) {
           const catPath = path.join(skillsRootDir, cat);
-          const skillDirs = fs.readdirSync(catPath).filter(f => fs.lstatSync(path.join(catPath, f)).isDirectory());
+          const skillDirs = safeReaddir(catPath).filter(f => safeLstat(path.join(catPath, f)).isDirectory());
           for (const dir of skillDirs) {
             skills.push({ name: dir, path: path.join('skills', cat, dir), category: cat });
           }
@@ -197,6 +211,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       params.updates.forEach((u: any) => { json[u.key] = resolve(u.value); });
       return { ...ctx, [params.export_as || 'last_transform']: JSON.stringify(json, null, 2) + '\n' };
     case 'run_js':
+      assertUnsafeJsAllowed();
       const sandbox = { Buffer, process: { env: { ...process.env } }, console, ctx: { ...ctx } };
       vm.createContext(sandbox);
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
@@ -214,7 +229,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'write_file':
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       safeWriteFile(out, content);
       break;
     case 'log': logger.info(`[CODE_LOG] ${resolve(params.message || 'Action completed')}`); break;
@@ -226,7 +241,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
  */
 async function performReconcile(input: CodeAction) {
   const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/code-strategy.json');
-  if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

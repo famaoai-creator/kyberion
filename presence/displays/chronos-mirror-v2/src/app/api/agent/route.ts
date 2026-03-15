@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { agentLifecycle } from "@agent/core/agent-lifecycle";
 import { a2aBridge } from "@agent/core/a2a-bridge";
+import { safeExistsSync } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 import { getAgentManifest } from "@agent/core/agent-manifest";
 
@@ -9,8 +10,7 @@ function findProjectRoot(): string {
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     try {
-      const fs = require("node:fs");
-      if (fs.existsSync(path.join(dir, "AGENTS.md"))) return dir;
+      if (safeExistsSync(path.join(dir, "AGENTS.md"))) return dir;
     } catch (_) {}
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -21,10 +21,44 @@ function findProjectRoot(): string {
 const PROJECT_ROOT = findProjectRoot();
 
 const CHRONOS_AGENT_ID = "chronos-mirror";
+const CHRONOS_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000);
 
 const g = globalThis as any;
 
+function clearChronosCache() {
+  if (g.__kyberionChronosIdleTimer) {
+    clearTimeout(g.__kyberionChronosIdleTimer);
+    g.__kyberionChronosIdleTimer = null;
+  }
+  g.__kyberionChronosReady = null;
+  g.__kyberionChronosHandle = null;
+}
+
+function scheduleChronosShutdown() {
+  if (g.__kyberionChronosIdleTimer) {
+    clearTimeout(g.__kyberionChronosIdleTimer);
+  }
+  g.__kyberionChronosIdleTimer = setTimeout(async () => {
+    try {
+      await agentLifecycle.shutdown(CHRONOS_AGENT_ID);
+    } catch (_) {}
+    clearChronosCache();
+  }, CHRONOS_IDLE_TIMEOUT_MS);
+  g.__kyberionChronosIdleTimer.unref?.();
+}
+
 async function ensureChronosAgent() {
+  const cachedHandle = g.__kyberionChronosHandle;
+  const runtimeHandle = agentLifecycle.getHandle(CHRONOS_AGENT_ID);
+  const cachedStatus = cachedHandle?.getRecord?.()?.status;
+  if (cachedHandle && runtimeHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
+    scheduleChronosShutdown();
+    return cachedHandle;
+  }
+  if (!runtimeHandle || cachedStatus === "shutdown" || cachedStatus === "error") {
+    clearChronosCache();
+  }
+
   // Use a separate promise key to avoid storing a rejected promise forever
   if (!g.__kyberionChronosReady) {
     g.__kyberionChronosReady = (async () => {
@@ -38,15 +72,16 @@ async function ensureChronosAgent() {
         cwd: PROJECT_ROOT,
       });
       g.__kyberionChronosHandle = handle;
+      scheduleChronosShutdown();
       return handle;
     })().catch((err: any) => {
       console.error("[API_AGENT] Boot failed:", err.message);
-      g.__kyberionChronosReady = null;
-      g.__kyberionChronosHandle = null;
+      clearChronosCache();
       throw err;
     });
   }
   await g.__kyberionChronosReady;
+  scheduleChronosShutdown();
   return g.__kyberionChronosHandle;
 }
 
@@ -143,6 +178,7 @@ export async function POST(req: NextRequest) {
 
     const handle = await ensureChronosAgent();
     const rawResponse = await handle.ask(query);
+    scheduleChronosShutdown();
     const { text, a2uiMessages, a2aMessages } = extractBlocks(rawResponse);
 
     // Process any A2A delegations the agent requested
@@ -161,6 +197,7 @@ export async function POST(req: NextRequest) {
         const followUp = await handle.ask(
           `以下は委任先エージェントからの回答です。ユーザーに分かりやすくまとめて表示してください。A2UIも使ってください。\n\n${summaryContext}`
         );
+        scheduleChronosShutdown();
         const followUpBlocks = extractBlocks(followUp);
         return NextResponse.json({
           status: "ok",
