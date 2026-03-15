@@ -70,6 +70,15 @@ node dist/scripts/surface_runtime.js --action start --surface slack-bridge
 node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
 ```
 
+## Diagnostics Discipline
+
+- Local editor warnings such as `Waited for background terminal` are not canonical proof of a Kyberion runtime leak.
+- The canonical runtime view is:
+  - `knowledge/public/governance/active-surfaces.json`
+  - `active/shared/runtime/surfaces/state.json`
+  - `node dist/scripts/surface_runtime.js --action status`
+- Residual local `tsx` or CLI processes may come from the terminal host itself and must be distinguished from managed surfaces before taking remediation action.
+
 ## Boundaries
 
 - Slack ingress belongs to `slack-bridge`, not `service-actuator`.

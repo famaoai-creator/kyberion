@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { safeReadFile } from '../libs/core/index.js';
+
+const rootDir = process.cwd();
+
+function read(relPath: string): string {
+  return safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
+}
+
+describe('Workflow operations contract', () => {
+  it('keeps CI aligned with built capability and runtime-surface commands', () => {
+    const ci = read('.github/workflows/ci.yml');
+    expect(ci).toContain('pnpm install --frozen-lockfile');
+    expect(ci).toContain('node dist/scripts/capability_discovery.js');
+    expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
+    expect(ci).toContain('node dist/scripts/measure-build-size.js --json --no-save');
+  });
+
+  it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
+    const ci = read('.github/workflows/ci.yml');
+    expect(ci).not.toContain('dist/scripts/bootstrap.js');
+    expect(ci).not.toContain('dist/scripts/validate_skills.js');
+    expect(ci).not.toContain('dist/scripts/audit_skills.js');
+    expect(ci).not.toContain('dist/scripts/validate_schemas.js');
+    expect(ci).not.toContain('npx tsc -p libs/core/tsconfig.json');
+  });
+
+  it('keeps PR validation on built build-size measurement', () => {
+    const prValidation = read('.github/workflows/pr-validation.yml');
+    expect(prValidation).toContain('node dist/scripts/measure-build-size.js');
+    expect(prValidation).not.toContain('npx tsx scripts/measure-build-size.ts');
+  });
+
+  it('documents the distinction between local terminal residue and managed surfaces', () => {
+    const workflowReadme = read('.github/workflows/README.md');
+    expect(workflowReadme).toContain('Waited for background terminal');
+    expect(workflowReadme).toContain('pnpm surfaces:status');
+    expect(workflowReadme).toContain('Codex unified exec sessions');
+  });
+});
