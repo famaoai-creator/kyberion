@@ -25,6 +25,12 @@ cd kyberion
 # Install dependencies
 pnpm install
 
+# Build runtime artifacts
+pnpm build
+
+# Start background surfaces from the canonical manifest
+pnpm surfaces:reconcile
+
 # The interactive wizard configures your identity and environment
 pnpm onboard
 ```

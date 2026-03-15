@@ -21,4 +21,26 @@ describe('runtime supervisor observability', () => {
     expect(snapshot[0].resourceId).toBe('resource-1');
     expect(snapshot[0].idleForMs).toBe(2500);
   });
+
+  it('supports gateway and ui runtime kinds for background surfaces', () => {
+    runtimeSupervisor.register({
+      resourceId: 'surface:slack-bridge',
+      kind: 'gateway',
+      ownerId: 'slack-bridge',
+      ownerType: 'surface-runtime-manifest',
+      shutdownPolicy: 'detached',
+      pid: 23456,
+    });
+    runtimeSupervisor.register({
+      resourceId: 'surface:chronos-mirror-v2',
+      kind: 'ui',
+      ownerId: 'chronos-mirror-v2',
+      ownerType: 'surface-runtime-manifest',
+      shutdownPolicy: 'detached',
+      pid: 23457,
+    });
+
+    const snapshot = runtimeSupervisor.snapshot();
+    expect(snapshot.map((entry) => entry.kind)).toEqual(['gateway', 'ui']);
+  });
 });

@@ -119,6 +119,7 @@ Actuators are the execution layer. Current major groups include:
 - `orchestrator-actuator`: mission/control-plane execution
 - `process-actuator`: managed long-lived process ownership
 - `presence-actuator`: channel delivery and in-session message dispatch
+- `scripts/surface_runtime.ts`: operational lifecycle controller for long-running gateways and control surfaces
 
 ### Channel and service boundary
 
@@ -139,6 +140,8 @@ Kyberion uses four separate concepts here:
 
 This means Slack and Chronos are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
+
+Background surfaces and bridges are not started ad hoc. Their canonical startup manifest is `knowledge/public/governance/active-surfaces.json`, and their lifecycle is coordinated through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
 
 ## Mission control model
 

@@ -135,6 +135,7 @@ export * from './a2a-bridge';
 export * from './agent-manifest';
 export * from './provider-discovery';
 export * from './runtime-supervisor';
+export * from './surface-runtime';
 export * from './managed-process';
 export * from './pipeline-contract';
 export * from './channel-surface';

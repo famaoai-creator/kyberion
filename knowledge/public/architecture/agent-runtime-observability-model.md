@@ -27,6 +27,9 @@ Examples:
 4. `surface / control API`
 Exposes snapshots and recovery controls to Chronos Mirror v2 and other operator surfaces.
 
+5. `surface runtime controller`
+Owns durable startup, PID tracking, and reconcile semantics for long-running gateways and control surfaces such as Slack Bridge, Chronos Mirror, Nexus Daemon, and Terminal Bridge.
+
 ## Snapshot Contract
 
 Each agent snapshot should answer:

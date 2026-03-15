@@ -1,6 +1,6 @@
 import { logger } from './core';
 
-export type RuntimeResourceKind = 'pty' | 'agent' | 'service';
+export type RuntimeResourceKind = 'pty' | 'agent' | 'service' | 'gateway' | 'ui';
 export type RuntimeShutdownPolicy = 'manual' | 'idle' | 'detached';
 export type RuntimeResourceState = 'running' | 'stopped' | 'exited';
 

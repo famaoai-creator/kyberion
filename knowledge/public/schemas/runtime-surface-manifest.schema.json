@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "surfaces"],
+  "properties": {
+    "version": { "const": 1 },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "description", "command"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["gateway", "ui", "service"] },
+          "description": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "cwd": { "type": "string" },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "shutdownPolicy": { "type": "string", "enum": ["manual", "idle", "detached"] },
+          "startupMode": { "type": "string", "enum": ["background", "workspace-app"] },
+          "ownerType": { "type": "string" },
+          "port": { "type": "integer", "minimum": 1 },
+          "healthPath": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
