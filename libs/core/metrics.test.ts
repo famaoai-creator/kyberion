@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { MetricsCollector } from './metrics.js';
 
 describe('metrics core', () => {
@@ -67,5 +69,65 @@ describe('metrics core', () => {
     mc.reset();
     expect(mc.summarize()).toHaveLength(0);
     expect(mc.getCapabilityMetrics('reset-test')).toBeNull();
+  });
+
+  it('should persist metrics history and load it back', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-persist');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+
+    const mc = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: true,
+    });
+
+    mc.record('persist-capability', 120, 'success', {
+      usage: { prompt_tokens: 100, completion_tokens: 50 },
+      model: 'gpt-4o-mini',
+      cacheStats: { hits: 1, misses: 2 },
+      outputSize: 2048,
+      recovered: true,
+      intervention: true,
+    });
+    mc.recordIntervention('approval', 'decision-1');
+
+    const history = mc.loadHistory();
+    expect(history).toHaveLength(2);
+    expect(history[0].component).toBe('persist-capability');
+    expect(history[0].cost_usd).toBeGreaterThan(0);
+    expect(history[1].type).toBe('intervention');
+  });
+
+  it('should build reports and regressions from persisted history', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-report');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const entries = [
+      { skill: 'audit-capability', duration_ms: 100, status: 'success', timestamp: '2026-03-15T00:00:00.000Z', cacheStats: { hits: 1, misses: 0 } },
+      { skill: 'audit-capability', duration_ms: 110, status: 'success', timestamp: '2026-03-15T00:01:00.000Z', cacheStats: { hits: 1, misses: 0 } },
+      { skill: 'audit-capability', duration_ms: 105, status: 'success', timestamp: '2026-03-15T00:02:00.000Z', cacheStats: { hits: 1, misses: 0 } },
+      { skill: 'audit-capability', duration_ms: 115, status: 'success', timestamp: '2026-03-15T00:03:00.000Z', cacheStats: { hits: 1, misses: 0 } },
+      { skill: 'audit-capability', duration_ms: 500, status: 'success', timestamp: '2026-03-15T00:04:00.000Z', cacheStats: { hits: 0, misses: 1 } },
+    ];
+    fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: false,
+    });
+
+    const report = mc.reportFromHistory();
+    expect(report.totalEntries).toBe(5);
+    expect(report.uniqueSkills).toBe(1);
+    expect(report.skills[0].skill).toBe('audit-capability');
+    expect(report.skills[0].cacheHitRatio).toBeGreaterThan(0);
+
+    const regressions = mc.detectRegressions(1.5);
+    expect(regressions).toHaveLength(1);
+    expect(regressions[0].skill).toBe('audit-capability');
+    expect(regressions[0].lastDuration).toBe(500);
   });
 });

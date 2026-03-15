@@ -6,6 +6,7 @@ import { getAllFiles } from '../libs/core/fs-utils.js';
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
   'libs/actuators/process-actuator/src/index.ts',
+  'libs/actuators/service-actuator/src/index.test.ts',
   'libs/actuators/service-actuator/src/index.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
