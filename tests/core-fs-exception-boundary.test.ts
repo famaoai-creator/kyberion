@@ -20,7 +20,6 @@ const allowedCoreFsImports = [
   'libs/core/src/native-pptx-engine/engine.ts',
   'libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts',
   'libs/core/src/native-xlsx-engine/engine.ts',
-  'libs/core/validate.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

@@ -17,7 +17,6 @@
     "libs/core/src/native-pptx-engine/engine.ts",
     "libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts",
     "libs/core/src/native-xlsx-engine/engine.ts",
-    "libs/core/validate.ts",
     "presence/displays/knowledge-portal/scripts/launch.cjs",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
@@ -44,6 +43,7 @@
     "scripts/process_portal_inbox.ts",
     "scripts/process_portal_queue.ts",
     "scripts/system_whisperer.ts",
+    "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"

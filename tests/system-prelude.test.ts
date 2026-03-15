@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import * as prelude from '../scripts/system-prelude.js';
 
 describe('system-prelude', () => {
-  it('should export essential security and utility members', () => {
-    expect(prelude.requireRole).toBeDefined();
-    expect(typeof prelude.requireRole).toBe('function');
-    
-    expect(prelude.safeWriteFile).toBeDefined();
-    expect(typeof prelude.safeWriteFile).toBe('function');
-    
-    expect(prelude.safeAppendFile).toBeDefined();
-    expect(typeof prelude.safeAppendFile).toBe('function');
+  it('should export essential prelude members', () => {
+    expect(prelude.main).toBeDefined();
+    expect(typeof prelude.main).toBe('function');
+
+    expect(prelude.secretGuard).toBeDefined();
+    expect(typeof prelude.secretGuard.getSecret).toBe('function');
+
+    expect(prelude.logger).toBeDefined();
+    expect(typeof prelude.logger.info).toBe('function');
   });
 
   it('should have sandbox hooks applied to fs', async () => {

@@ -1,12 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
 import { secureFetch } from '@agent/core';
 
-// Manual spy approach
-const axiosSpy = vi.spyOn(axios, 'default').mockResolvedValue({ data: { success: true } });
+vi.mock('axios', () => ({
+  default: vi.fn(),
+}));
 
 describe('Network Governance Policy Enforcement', () => {
-  
+  beforeEach(() => {
+    vi.mocked(axios).mockReset();
+    vi.mocked(axios).mockResolvedValue({ data: { success: true } } as any);
+  });
+
   it('Scenario: Authenticated request to whitelisted domain (Allowed)', async () => {
     const result = await secureFetch({
       url: 'https://api.github.com/user',

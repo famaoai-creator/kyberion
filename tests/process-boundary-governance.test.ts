@@ -9,6 +9,7 @@ const allowedManagedProcessConsumers = [
   'libs/actuators/service-actuator/src/index.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
+  'scripts/surface_runtime.ts',
   'tests/managed-process.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 

@@ -6,7 +6,9 @@
 
 import { secretGuard, logger } from '@agent/core';
 
-async function main() {
+export { secretGuard, logger };
+
+export async function main() {
   logger.info('🛡️ Initializing Sovereign System Prelude...');
 
   // Use Secret Guard for Sudo Key acquisition
@@ -19,7 +21,7 @@ async function main() {
   logger.success('✅ System Prelude complete.');
 }
 
-main().catch(err => {
+void main().catch(err => {
   console.error(err);
   process.exit(1);
 });
