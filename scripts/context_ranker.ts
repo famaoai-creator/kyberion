@@ -14,7 +14,7 @@
  * Weights are loaded from governance/analysis-config.json.
  *
  * Usage:
- *   pnpm exec tsx scripts/context_ranker.ts --intent "mission governance" --role "ceo" --limit 7
+ *   node dist/scripts/context_ranker.js --intent "mission governance" --role "ceo" --limit 7
  */
 
 import * as path from 'node:path';
@@ -359,7 +359,7 @@ async function main() {
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
-    console.log('Usage: pnpm exec tsx scripts/context_ranker.ts --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]');
+    console.log('Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]');
     process.exit(1);
   }
 

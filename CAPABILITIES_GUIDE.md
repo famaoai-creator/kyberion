@@ -71,7 +71,7 @@ This guide provides a domain-driven catalog of the ecosystem's capabilities.
 | Capability | Description | Score | Avg Time | Usage |
 | :--- | :--- | :--- | :--- | :--- |
 | **intent-classifier** | Classify intent of text (request, question, report). | N/A | - | `npm run cli -- run intent-classifier` |
-| **mission-control** | Orchestrates 3-tier mission lifecycles with independent Micro-Git isolation. | N/A | - | `npx tsx scripts/mission_controller.ts start <ID> <TIER>` |
+| **mission-control** | Orchestrates 3-tier mission lifecycles with independent Micro-Git isolation. | N/A | - | `node dist/scripts/mission_controller.js start <ID> <TIER>` |
 | **prompt-optimizer** | >- | N/A | - | `npm run cli -- run prompt-optimizer` |
 | **self-evolution** | >- | N/A | - | `npm run cli -- run self-evolution` |
 | **self-healing-orchestrator** | >- | N/A | - | `npm run cli -- run self-healing-orchestrator` |

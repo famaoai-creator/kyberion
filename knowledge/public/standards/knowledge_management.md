@@ -61,12 +61,12 @@ npm run generate-index
 
 ### エクスポート
 ```bash
-npx tsx scripts/export_knowledge.ts <category>
+node dist/scripts/export_knowledge.js <category>
 ```
 `hub/exports/` に KEP (Knowledge Exchange Package) ファイルが生成される。
 
 ### インポート
 ```bash
-npx tsx scripts/import_knowledge.ts <path-to-kep-file>
+node dist/scripts/import_knowledge.js <path-to-kep-file>
 ```
 ファイルが配置され、自動的に `npm run generate-index` が実行される。

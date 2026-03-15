@@ -11,7 +11,7 @@ async function main() {
 
   const intent = argv.intent || argv._[0] as string;
   if (!intent) {
-    logger.error('Usage: pnpm exec tsx scripts/run_intent.ts <intent_id> [--input context.json]');
+    logger.error('Usage: node dist/scripts/run_intent.js <intent_id> [--input context.json]');
     process.exit(1);
   }
 
