@@ -132,6 +132,7 @@ export * from './provider-discovery';
 export * from './runtime-supervisor';
 export * from './managed-process';
 export * from './pipeline-contract';
+export * from './channel-surface';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine';

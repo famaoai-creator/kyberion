@@ -29,7 +29,7 @@ Sovereign intent
 | `pipelines/` | Declarative workflows | Review system diagnostics and repeatable flows |
 | `plugins/` | Runtime guardrails and telemetry | Inspect policy enforcement and instrumentation |
 | `satellites/` | External bridges | Connect Kyberion to platforms like Slack |
-| `presence/` | Background sensing and dashboards | Inspect pulse, display, and sensory integrations |
+| `presence/` | Background sensing, dashboards, and control surfaces | Inspect pulse, display, sensory integrations, and Chronos Mirror v2 |
 | `active/` | Mission/runtime workspace | Review live mission state and generated operational files |
 | `schemas/` | Structured data contracts | Validate JSON-based ADF and ecosystem data |
 | `tests/` | Cross-cutting tests | Run smoke and integration coverage |
@@ -63,6 +63,16 @@ This path manages mission lifecycle, mission ownership, task delegation, evidenc
 
 This path tells users what is available and lets them run an actuator or skill.
 
+### 4. Channel ingress and interactive control
+
+- `satellites/slack-bridge/`
+- `presence/bridge/nexus-daemon.ts`
+- `presence/displays/chronos-mirror-v2/`
+- `knowledge/public/architecture/slack-chronos-control-model.md`
+
+This path covers how external channels are normalized, routed, observed, and answered.
+It also defines channel ports and Surface Agents that sit between human-facing surfaces and the durable mission/execution layer.
+
 ## Key library groups
 
 ### `libs/core/`
@@ -74,6 +84,7 @@ The kernel of the ecosystem. Important responsibilities:
 - resource locks, leases, and concurrency guards
 - CLI utilities and common runtime helpers
 - runtime supervision for agent, PTY, and service ownership
+- control-plane helpers for channel routing, feedback, and session-scoped artifacts
 
 If you are changing shared behavior or trying to follow AGENTS.md's secure-I/O rule, start here.
 
@@ -102,6 +113,7 @@ Kyberion uses a `single-owner, multi-worker` mission model.
 - Worker agents collaborate through task contracts and scoped leases.
 - Mission-local collaboration artifacts live under `active/missions/<tier>/<mission_id>/coordination/`.
 - Global discovery, mailboxes, runtime locks, and observability summaries live under `active/shared/`.
+- Channel-specific coordination and observability artifacts live under `active/shared/coordination/channels/` and `active/shared/observability/channels/`.
 
 The authoritative architecture reference is:
 
@@ -122,6 +134,8 @@ The charter assumes strict isolation between these tiers.
 - `docs/architecture/AUTONOMY_SYSTEM_GUIDE.md`: shared memory, reflexes, dynamic permission, cluster concepts
 - `docs/architecture/NERVE_SYSTEM_GUIDE.md`: background daemons, messaging bus, observability, and policies
 - `knowledge/public/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
+- `knowledge/public/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
+- `knowledge/public/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
 - `dependency-graph.mmd`: repo-level dependency visualization
 
 ## Recommended reading order for new contributors

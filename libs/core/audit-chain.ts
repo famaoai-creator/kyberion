@@ -33,7 +33,7 @@ class AuditChainImpl {
   private auditDir: string;
 
   constructor() {
-    this.auditDir = path.join(findProjectRoot(), 'evidence', 'audit');
+    this.auditDir = path.join(findProjectRoot(), 'active', 'audit');
   }
 
   /**

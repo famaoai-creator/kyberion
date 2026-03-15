@@ -15,10 +15,39 @@
       "allow": ["active/audit/security/", "knowledge/security/"]
     },
     "mission_controller": {
-      "allow": ["active/missions/", "registry.json", "active/audit/", "knowledge/evolution/"]
+      "allow": [
+        "active/missions/",
+        "registry.json",
+        "active/audit/",
+        "knowledge/evolution/",
+        "active/shared/coordination/",
+        "active/shared/observability/mission-control/"
+      ]
     },
     "infrastructure_sentinel": {
-      "allow": ["active/shared/logs/", "active/shared/runtime/", "presence/bridge/runtime/", "../../../Library/LaunchAgents/"]
+      "allow": [
+        "active/shared/coordination/channels/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "presence/bridge/runtime/",
+        "../../../Library/LaunchAgents/"
+      ]
+    },
+    "slack_bridge": {
+      "allow": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/slack/",
+        "active/shared/observability/channels/slack/",
+        "active/audit/"
+      ]
+    },
+    "chronos_gateway": {
+      "allow": [
+        "active/shared/coordination/chronos/",
+        "active/shared/observability/chronos/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
+      ]
     },
     "strategic_sales": {
       "allow": ["active/projects/proposals/"]

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from "lucide-react";
 
 interface AgentRecord {
   agentId: string;
@@ -10,8 +10,34 @@ interface AgentRecord {
   status: string;
   capabilities: string[];
   trustScore: number;
-  spawnedAt: number;
-  lastActivity: number;
+  uptimeMs: number;
+  idleMs: number;
+  runtime: {
+    kind: string;
+    state: string;
+    pid?: number;
+    idleForMs: number;
+    shutdownPolicy: string;
+  } | null;
+  metrics: {
+    turnCount: number;
+    errorCount: number;
+    restartCount: number;
+    refreshCount: number;
+    totalPromptChars: number;
+    totalResponseChars: number;
+    usage?: {
+      totalTokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+    };
+  };
+  process: {
+    rssKb?: number;
+    cpuPercent?: number;
+  } | null;
+  supportsSoftRefresh: boolean;
+  providerRuntime?: Record<string, unknown>;
 }
 
 interface HealthSnapshot {
@@ -69,6 +95,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const [spawnPrompt, setSpawnPrompt] = useState("");
   const [viewingLogs, setViewingLogs] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ ts: number; type: string; content: string }[]>([]);
+  const [mutatingAgent, setMutatingAgent] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -182,6 +209,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   const handleShutdown = async (agentId: string) => {
     try {
+      setMutatingAgent(agentId);
       await fetch("/api/agents", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -189,6 +217,23 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       });
       await fetchAgents();
     } catch (_) {}
+    setMutatingAgent(null);
+  };
+
+  const handleAgentAction = async (agentId: string, action: "refresh" | "restart") => {
+    try {
+      setMutatingAgent(agentId);
+      await fetch("/api/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, agentId }),
+      });
+      await fetchAgents();
+      if (viewingLogs === agentId) {
+        await fetchLogs(agentId);
+      }
+    } catch (_) {}
+    setMutatingAgent(null);
   };
 
   if (!isOpen) return null;
@@ -240,8 +285,33 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <span>Trust: {agent.trustScore}</span>
                   {agent.capabilities.length > 0 && <span>[{agent.capabilities.join(", ")}]</span>}
                 </div>
+                <div className="text-[8px] opacity-35 flex flex-wrap gap-3 mt-1 font-mono">
+                  <span>turns {agent.metrics.turnCount}</span>
+                  <span>errors {agent.metrics.errorCount}</span>
+                  <span>refresh {agent.metrics.refreshCount}</span>
+                  <span>restart {agent.metrics.restartCount}</span>
+                  <span>idle {Math.round((agent.runtime?.idleForMs ?? agent.idleMs) / 1000)}s</span>
+                  {typeof agent.process?.rssKb === "number" && <span>rss {(agent.process.rssKb / 1024).toFixed(1)}MB</span>}
+                  {typeof agent.metrics.usage?.totalTokens === "number" && <span>tokens {agent.metrics.usage.totalTokens}</span>}
+                </div>
               </div>
               <div className="text-[8px] uppercase tracking-widest opacity-40">{agent.status}</div>
+              <button
+                onClick={() => handleAgentAction(agent.agentId, "refresh")}
+                disabled={mutatingAgent === agent.agentId || !agent.supportsSoftRefresh}
+                className="p-1.5 rounded-lg hover:bg-emerald-900/30 text-emerald-400/40 hover:text-emerald-400 transition disabled:opacity-20"
+                title={agent.supportsSoftRefresh ? "Soft refresh context" : "Soft refresh unsupported"}
+              >
+                <RefreshCw size={12} />
+              </button>
+              <button
+                onClick={() => handleAgentAction(agent.agentId, "restart")}
+                disabled={mutatingAgent === agent.agentId}
+                className="p-1.5 rounded-lg hover:bg-amber-900/30 text-amber-400/40 hover:text-amber-400 transition disabled:opacity-20"
+                title="Restart agent runtime"
+              >
+                <RotateCcw size={12} />
+              </button>
               <button
                 onClick={() => handleViewLogs(agent.agentId)}
                 className="p-1.5 rounded-lg hover:bg-blue-900/30 text-blue-400/40 hover:text-blue-400 transition"
@@ -251,7 +321,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </button>
               <button
                 onClick={() => handleShutdown(agent.agentId)}
-                className="p-1.5 rounded-lg hover:bg-red-900/30 text-red-400/40 hover:text-red-400 transition"
+                disabled={mutatingAgent === agent.agentId}
+                className="p-1.5 rounded-lg hover:bg-red-900/30 text-red-400/40 hover:text-red-400 transition disabled:opacity-20"
               >
                 <Trash2 size={12} />
               </button>

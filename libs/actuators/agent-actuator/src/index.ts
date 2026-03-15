@@ -28,7 +28,7 @@ import { safeReadFile } from '@agent/core';
  */
 
 interface AgentAction {
-  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a';
+  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart';
   params: {
     agentId?: string;
     provider?: AgentProvider;
@@ -113,17 +113,40 @@ export async function handleAction(input: AgentAction) {
 
     case 'health': {
       const snapshot = agentRegistry.getHealthSnapshot();
-      const agents = agentRegistry.list().map(a => ({
-        agentId: a.agentId,
-        provider: a.provider,
-        modelId: a.modelId,
-        status: a.status,
-        capabilities: a.capabilities,
-        trustScore: a.trustScore,
-        uptimeMs: Date.now() - a.spawnedAt,
-        idleMs: Date.now() - a.lastActivity,
+      const agents = agentLifecycle.listSnapshots().map(entry => ({
+        agentId: entry.agent.agentId,
+        provider: entry.agent.provider,
+        modelId: entry.agent.modelId,
+        status: entry.agent.status,
+        capabilities: entry.agent.capabilities,
+        trustScore: entry.agent.trustScore,
+        uptimeMs: Date.now() - entry.agent.spawnedAt,
+        idleMs: Date.now() - entry.agent.lastActivity,
+        runtime: entry.runtime,
+        metrics: entry.metrics,
+        process: entry.process,
+        supportsSoftRefresh: entry.supportsSoftRefresh,
       }));
       return { status: 'ok', ...snapshot, agents };
+    }
+
+    case 'snapshot': {
+      if (!params.agentId) throw new Error('agentId is required for snapshot');
+      const snapshot = agentLifecycle.getSnapshot(params.agentId);
+      if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
+      return { status: 'ok', snapshot };
+    }
+
+    case 'refresh': {
+      if (!params.agentId) throw new Error('agentId is required for refresh');
+      const result = await agentLifecycle.refreshContext(params.agentId);
+      return { status: 'ok', agentId: params.agentId, ...result };
+    }
+
+    case 'restart': {
+      if (!params.agentId) throw new Error('agentId is required for restart');
+      const handle = await agentLifecycle.restart(params.agentId);
+      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: agentLifecycle.getSnapshot(params.agentId) };
     }
 
     case 'a2a': {

@@ -11,7 +11,7 @@ import {
   rawStatSync,
   rawUnlinkSync,
   rawWriteFile,
-} from './fs-primitives.js';
+} from './fs-primitives';
 
 /**
  * Shared Utility Core for Kyberion (TypeScript Edition)

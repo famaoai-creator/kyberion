@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Channel Port Contract",
+  "type": "object",
+  "required": [
+    "port_id",
+    "channel",
+    "role",
+    "directionality",
+    "transport",
+    "binding",
+    "durability",
+    "approval_mode"
+  ],
+  "properties": {
+    "port_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "enum": ["sensor", "emitter", "gateway", "control-surface", "display"]
+    },
+    "directionality": {
+      "type": "string",
+      "enum": ["receive-only", "send-only", "request-response", "streaming-duplex"]
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["poll", "webhook", "socket", "push-api", "file-drop", "interactive-session"]
+    },
+    "binding": {
+      "type": "string",
+      "enum": ["mission", "task", "runtime-session", "queue", "approval"]
+    },
+    "durability": {
+      "type": "string",
+      "enum": ["ephemeral", "journaled", "append-only"]
+    },
+    "approval_mode": {
+      "type": "string",
+      "enum": ["auto", "owner-gated", "human-gated"]
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

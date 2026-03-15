@@ -96,6 +96,30 @@ A shared runtime health/state signal, commonly surfaced through files like `acti
 
 The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams.
 
+### Control Plane
+
+The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
+
+### Channel Outbox
+
+A channel-scoped delivery queue under `active/shared/coordination/channels/<channel>/outbox/` used to return approved responses to external systems such as Slack.
+
+### Chronos Gateway
+
+The authenticated interactive control surface behind Chronos Mirror v2. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
+
+### Channel
+
+An external interaction context such as Slack or Chronos. A channel may have multiple concrete ports for ingress, egress, and streaming.
+
+### Port
+
+A concrete ingress or egress interface of a channel, described by role, directionality, transport, binding, durability, and approval mode.
+
+### Surface Agent
+
+A lightweight channel-local agent that improves interaction quality, context shaping, and handoff preparation without becoming the durable mission owner.
+
 ## Governance and storage terms
 
 ### Tier Isolation

@@ -61,6 +61,8 @@
         "active/archive/missions/",
         "knowledge/personal/missions/",
         "knowledge/evolution/",
+        "active/shared/coordination/",
+        "active/shared/observability/mission-control/",
         "active/shared/runtime/mission_queue.jsonl",
         "active/audit/",
         "registry.json"
@@ -68,10 +70,27 @@
     },
     "infrastructure_sentinel": {
       "allow_write": [
-        "active/shared/logs/",
+        "active/shared/coordination/channels/",
+        "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
         "Library/LaunchAgents/"
+      ]
+    },
+    "slack_bridge": {
+      "allow_write": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/slack/",
+        "active/shared/observability/channels/slack/",
+        "active/audit/"
+      ]
+    },
+    "chronos_gateway": {
+      "allow_write": [
+        "active/shared/coordination/chronos/",
+        "active/shared/observability/chronos/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
       ]
     },
     "strategic_sales": {
