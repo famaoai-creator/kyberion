@@ -112,7 +112,9 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
     params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' }
   }));
   
-  const passResult = JSON.parse(safeExec('npx', ['tsx', 'libs/actuators/secret-actuator/src/index.ts', '--input', getPassInput]));
+  const passResult = JSON.parse(
+    safeExec('node', [pathResolver.capabilityEntry('secret-actuator'), '--input', getPassInput]),
+  );
   const pass = passResult.v;
   safeUnlinkSync(getPassInput);
 

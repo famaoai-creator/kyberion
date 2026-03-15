@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -106,6 +106,7 @@ function unregisterServiceRuntime(serviceId: string) {
 async function startService(id: string, service: any, pids: any) {
   const rootDir = process.cwd();
   const scriptPath = path.join(rootDir, service.path);
+  const builtEntry = capabilityEntry(id);
   const logFile = path.join(rootDir, `active/shared/logs/${id}.log`);
   if (!safeExistsSync(path.dirname(logFile))) safeMkdir(path.dirname(logFile), { recursive: true });
   const out = safeOpenAppendFile(logFile);
@@ -116,8 +117,8 @@ async function startService(id: string, service: any, pids: any) {
     kind: 'service',
     ownerId: service.path || id,
     ownerType: 'service-actuator',
-    command: 'npx',
-    args: ['tsx', scriptPath],
+    command: 'node',
+    args: [builtEntry],
     shutdownPolicy: 'detached',
     spawnOptions: {
       detached: true,
@@ -127,6 +128,7 @@ async function startService(id: string, service: any, pids: any) {
     },
     metadata: {
       scriptPath,
+      builtEntry,
     },
   });
   const child = managed.child;

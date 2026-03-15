@@ -1,5 +1,4 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp } from '@agent/core';
-import * as path from 'node:path';
+import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp, capabilityEntry } from '@agent/core';
 
 async function main() {
   const configPath = rootResolve('knowledge/governance/knowledge-sync-rules.json');
@@ -15,7 +14,7 @@ async function main() {
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
-      const output = safeExec('npx', ['tsx', 'libs/actuators/wisdom-actuator/src/index.ts', '--input', tempAdfPath]);
+      const output = safeExec('node', [capabilityEntry('wisdom-actuator'), '--input', tempAdfPath]);
       console.log(output);
     } catch (err: any) {
       logger.error(`Knowledge sync ${job.action} failed: ${err.message}`);

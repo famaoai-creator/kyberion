@@ -3,7 +3,7 @@
  * ADF-driven runner for Strategic Analysis & Modeling.
  */
 
-import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, capabilityEntry } from '@agent/core';
 import * as path from 'node:path';
 
 async function main() {
@@ -41,7 +41,7 @@ async function runModelingActuator(input: any) {
   safeWriteFile(tempAdfPath, JSON.stringify(input, null, 2));
 
   try {
-    const output = safeExec('npx', ['tsx', 'libs/actuators/modeling-actuator/src/index.ts', '--input', tempAdfPath]);
+    const output = safeExec('node', [capabilityEntry('modeling-actuator'), '--input', tempAdfPath]);
     console.log(output);
   } catch (err: any) {
     logger.error(`Action ${input.analysisType || input.action} failed: ${err.message}`);

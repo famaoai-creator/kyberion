@@ -77,6 +77,10 @@ export function capabilityDir(capabilityName: string) {
 
 export const skillDir = capabilityDir;
 
+export function capabilityEntry(capabilityName: string) {
+  return path.join(PROJECT_ROOT_DIR, 'dist', 'libs', 'actuators', capabilityName, 'src', 'index.js');
+}
+
 export function missionDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
   const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
   let subPath = 'active/missions';
@@ -170,6 +174,7 @@ export const pathResolver = {
   sharedTmp,
   sharedExports,
   isProtected,
+  capabilityEntry,
   capabilityDir,
   skillDir,
   missionDir,

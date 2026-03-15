@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import { 
   rootDir, 
+  capabilityEntry,
   capabilityDir,
   skillDir, 
   resolve 
@@ -19,6 +20,12 @@ describe('path-resolver core', () => {
     const dir = capabilityDir('security-scanner');
     expect(dir).toContain('security-scanner');
     expect(path.isAbsolute(dir)).toBe(true);
+  });
+
+  it('should resolve built capability entry path', () => {
+    const entry = capabilityEntry('system-actuator');
+    expect(entry).toContain(path.join('dist', 'libs', 'actuators', 'system-actuator', 'src', 'index.js'));
+    expect(path.isAbsolute(entry)).toBe(true);
   });
 
   it('should resolve skill directory via index or default path', () => {

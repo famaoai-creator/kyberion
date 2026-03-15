@@ -48,6 +48,7 @@ export const ui = {
     const interval = setInterval(() => {
       process.stdout.write('\r' + chalk.cyan(chars[i++ % chars.length]) + ' ' + msg + '...');
     }, 100);
+    interval.unref?.();
     return {
       stop: (success = true) => {
         clearInterval(interval);

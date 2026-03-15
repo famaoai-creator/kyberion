@@ -1,5 +1,4 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp } from '@agent/core';
-import * as path from 'node:path';
+import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp, capabilityEntry } from '@agent/core';
 
 async function main() {
   let configPath = rootResolve('knowledge/governance/orchestration-config.json');
@@ -19,7 +18,7 @@ async function main() {
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
-      const output = safeExec('npx', ['tsx', 'libs/actuators/orchestrator-actuator/src/index.ts', '--input', tempAdfPath]);
+      const output = safeExec('node', [capabilityEntry('orchestrator-actuator'), '--input', tempAdfPath]);
       console.log(output);
     } catch (err: any) {
       logger.error(`Orchestration job ${job.name} failed: ${err.message}`);
