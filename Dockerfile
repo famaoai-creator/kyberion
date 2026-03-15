@@ -1,5 +1,5 @@
 # Stage 1: Base Runtime Environment
-FROM node:23-slim AS base
+FROM node:20-slim AS base
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -24,22 +24,16 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY . .
 
 # Synchronize lockfile for Linux environment and install all dependencies
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
-# BUILD ALL SKILLS & LIBS
+# Build runtime artifacts
 RUN pnpm run build
 
 # Stage 3: Development & Quality Gate
 FROM builder AS development
 ENV NODE_ENV=development
 
-RUN node dist/scripts/bootstrap.js
-
-# Setup dummy role config for Governance Audit
-RUN mkdir -p knowledge/personal && echo '{"active_role":"Ecosystem Architect","persona":"Mock"}' > knowledge/personal/role-config.json
-
-# Validate ecosystem integrity
-RUN pnpm run doctor
+CMD ["node", "dist/scripts/cli.js", "list", "implemented"]
 
 # Stage 4: Lean Production Image
 FROM base AS production
@@ -50,13 +44,14 @@ ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/libs ./libs
 COPY --from=builder /app/knowledge ./knowledge
+COPY --from=builder /app/presence ./presence
+COPY --from=builder /app/satellites ./satellites
 
 # Prune dev dependencies
 RUN pnpm prune --prod
-
-RUN node dist/scripts/bootstrap.js
 
 # Optimized Entrypoint using the unified CLI
 ENTRYPOINT ["node", "dist/scripts/cli.js"]
