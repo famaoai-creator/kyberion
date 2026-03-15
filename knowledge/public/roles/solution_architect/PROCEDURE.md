@@ -14,5 +14,5 @@ You translate high-level product requirements into specific, implementable techn
 - Map system-wide dependencies to prevent "Cascading Failures."
 
 ### B. Feasibility Check
-- Prototype critical paths in `scratch/` before delegating to the Craftsman.
+- Prototype critical paths in governed runtime temp space such as `active/shared/tmp/` before delegating to the Craftsman.
 - Ensure all designs follow the "5-Layer Backbone" of Kyberion.

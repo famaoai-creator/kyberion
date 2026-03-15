@@ -1,9 +1,6 @@
 name: system-init-logic
 description: E2E stabilization and service activation logic. Fixes links, builds, and starts presence services.
 steps:
-  - id: stabilize_links
-    skill: run_shell_command
-    args: --command "find skills -name 'core' -type l -path '*/node_modules/@agent/core' -exec rm {} \; && find skills -name '@agent' -type d -path '*/node_modules/@agent' -exec ln -s ../../../../../dist/libs/core {}/core \;"
   - id: build_sync
     skill: run_shell_command
     args: --command "npm run build"

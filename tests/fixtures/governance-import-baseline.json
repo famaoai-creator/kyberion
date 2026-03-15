@@ -19,7 +19,6 @@
     "libs/core/src/native-xlsx-engine/engine.ts",
     "libs/core/validate.ts",
     "presence/displays/knowledge-portal/scripts/launch.cjs",
-    "tests/plugins.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ],
@@ -32,6 +31,7 @@
     "libs/actuators/system-actuator/src/index.ts",
     "libs/core/acp-mediator.ts",
     "libs/core/agent-adapter.ts",
+    "libs/core/agent-lifecycle.ts",
     "libs/core/managed-process.ts",
     "libs/core/doctor_core.ts",
     "libs/core/orchestrator.ts",
@@ -44,12 +44,7 @@
     "scripts/process_portal_inbox.ts",
     "scripts/process_portal_queue.ts",
     "scripts/system_whisperer.ts",
-    "scripts/test_claude_json.ts",
-    "scripts/test_codex_acp.ts",
-    "tests/integration.test.ts",
     "tests/managed-process.test.ts",
-    "tests/plugins.test.ts",
-    "tests/smoke.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ]

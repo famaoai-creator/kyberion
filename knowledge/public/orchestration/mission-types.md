@@ -18,7 +18,7 @@ last_updated: 2026-03-06
 ### 1.1 実行原則 (The Zero-Write Rule)
 - **改変禁止**: `write_file`, `replace`, `run_shell_command` による破壊的操作、Gitのステージング/コミットは厳禁とする。
 - **観察優先**: 既存のログ、ソースコード、ドキュメントの読み取り (`read_file`, `grep_search`, `glob`) を中心に実行する。
-- **検証環境**: 動作確認が必要な場合は、`scratch/` ディレクトリ内でのみ一時的なスクリプト実行を許可する。
+- **検証環境**: 動作確認が必要な場合は、`active/shared/tmp/` または mission-local な一時領域でのみ一時的な実行を許可する。
 
 ### 1.2 主な目的
 - 新機能導入前の現状分析 (Capability Gap Analysis)。

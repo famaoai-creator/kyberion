@@ -26,7 +26,7 @@ _Before writing code, the AI must understand the intent and the existing system.
 
 _AI generates code based on the Task Board and context._
 
-1.  **Drafting**: AI writes code (using standard Kyberion output or ad-hoc `scratch/` scripts).
+1.  **Drafting**: AI writes code (using standard Kyberion output or governed runtime temp artifacts under `active/shared/tmp/` when transient files are required).
 2.  **Unit Tests**: Ask AI to generate tests for the new code immediately.
 
 ### Phase 2: Verification (検証)

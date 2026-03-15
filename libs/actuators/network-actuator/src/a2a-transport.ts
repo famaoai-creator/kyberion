@@ -106,7 +106,7 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
   const encryptedPayload = lines[3];
 
   // Retrieve our private key passphrase from Keychain
-  const getPassInput = pathResolver.rootResolve('scratch/get-pass-a2a.json');
+  const getPassInput = pathResolver.sharedTmp('actuators/network-actuator/get-pass-a2a.json');
   safeWriteFile(getPassInput, JSON.stringify({
     action: 'get',
     params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' }

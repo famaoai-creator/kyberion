@@ -54,14 +54,18 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 
 This path manages mission lifecycle, mission ownership, task delegation, evidence, and journal/history views.
 
+Operational entrypoints should stay at the top level of `scripts/`.
+Ad hoc demos and one-off verification utilities should not live in the tracked operational script tree.
+If temporary artifacts are needed, prefer governed runtime storage under `active/shared/` rather than adding disposable scripts to the repo.
+
 ### 3. Capability discovery and execution
 
 - `scripts/capability_discovery.ts`
 - `scripts/cli.ts`
-- `knowledge/public/orchestration/global_skill_index.json`
+- `knowledge/public/orchestration/global_actuator_index.json`
 - `libs/actuators/*`
 
-This path tells users what is available and lets them run an actuator or skill.
+This path tells users what is available and lets them run an actuator.
 
 ### 4. Channel ingress and interactive control
 
@@ -72,6 +76,16 @@ This path tells users what is available and lets them run an actuator or skill.
 
 This path covers how external channels are normalized, routed, observed, and answered.
 It also defines channel ports and Surface Agents that sit between human-facing surfaces and the durable mission/execution layer.
+
+### 5. Service binding and channel delivery
+
+- `libs/core/service-binding.ts`
+- `libs/actuators/service-actuator/`
+- `libs/actuators/presence-actuator/`
+- `libs/actuators/system-actuator/`
+
+This path defines how authenticated external service access is separated from channel delivery and from local OS execution.
+It is the practical boundary between "how we authenticate to a service", "how we deliver to a channel", and "how we run local commands".
 
 ## Key library groups
 
@@ -99,10 +113,32 @@ Actuators are the execution layer. Current major groups include:
 - `media-actuator`: document and diagram generation
 - `browser-actuator`: browser automation
 - `system-actuator`: OS-level operations
+  - local ephemeral shell/OS control only
 - `modeling-actuator`: modeling and strategic reasoning support
-- `service-actuator`: SaaS/API integration
+- `service-actuator`: authenticated service binding and service-aware access
 - `orchestrator-actuator`: mission/control-plane execution
 - `process-actuator`: managed long-lived process ownership
+- `presence-actuator`: channel delivery and in-session message dispatch
+
+### Channel and service boundary
+
+Kyberion uses four separate concepts here:
+
+- `gateway`
+  - receives external events
+  - examples: `satellites/slack-bridge`, `chronos-mirror-v2` API routes
+- `service binding`
+  - resolves authenticated service access from governed secrets
+  - examples: `libs/core/service-binding.ts`, `service-actuator`
+- `delivery actuator`
+  - sends approved responses or UI events back to a channel
+  - example: `presence-actuator`
+- `system actuator`
+  - performs local short-lived shell/OS/file control
+  - example: `system-actuator`
+
+This means Slack and Chronos are not part of `system-actuator`.
+They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
 ## Mission control model
 
@@ -136,6 +172,7 @@ The charter assumes strict isolation between these tiers.
 - `knowledge/public/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
 - `knowledge/public/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
 - `knowledge/public/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
+- `knowledge/public/architecture/slack-chronos-control-model.md`: also defines gateway, service binding, delivery actuator, and system actuator boundaries
 - `dependency-graph.mmd`: repo-level dependency visualization
 
 ## Recommended reading order for new contributors

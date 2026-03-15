@@ -47,8 +47,8 @@ describe('Governance Policy-as-Code Enforcement', () => {
     }
   });
 
-  it('Scenario: Default allow paths (Scratch) work for everyone', async () => {
-    const SCRATCH_FILE = pathResolver.rootResolve('scratch/test-default-allow.txt');
+  it('Scenario: Default allow runtime temp paths work for everyone', async () => {
+    const SCRATCH_FILE = pathResolver.sharedTmp('tests/test-default-allow.txt');
     process.env.MISSION_ROLE = 'any_role';
     const check = validateWritePermission(SCRATCH_FILE);
     expect(check.allowed).toBe(true);

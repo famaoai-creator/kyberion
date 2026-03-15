@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, derivePipelineStatus } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, derivePipelineStatus, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
 /**
@@ -149,7 +149,9 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     throw new Error(`Built actuator not found for ${domain}. Expected ${actuatorPath}. Run pnpm build first.`);
   }
 
-  const tempAdfPath = path.resolve(process.cwd(), `scratch/nerve-dispatch-${Date.now()}-${Math.random().toString(36).substring(7)}.json`);
+  const tempAdfPath = pathResolver.sharedTmp(
+    `actuators/orchestrator-actuator/nerve-dispatch-${Date.now()}-${Math.random().toString(36).substring(7)}.json`
+  );
   const outCtxPath = tempAdfPath.replace('.json', '-out.json');
 
   const adf = {

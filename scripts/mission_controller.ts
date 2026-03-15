@@ -1048,10 +1048,10 @@ async function sealMission(id: string) {
 
   logger.info(`🔒 [SovereignSeal] Encrypting mission ${upperId} for archival (Hybrid AES+RSA)...`);
 
-  const archivePath = pathResolver.rootResolve(`scratch/${upperId}.tar.gz`);
-  const symKeyPath = pathResolver.rootResolve(`scratch/${upperId}.key`);
-  const encKeyPath = pathResolver.rootResolve(`scratch/${upperId}.key.enc`);
-  const encryptedPath = pathResolver.rootResolve(`scratch/${upperId}.enc`);
+  const archivePath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.tar.gz`);
+  const symKeyPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.key`);
+  const encKeyPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.key.enc`);
+  const encryptedPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.enc`);
 
   try {
     // 1. Package mission directory
@@ -1073,7 +1073,7 @@ async function sealMission(id: string) {
     const fileBuffer = safeReadFile(encryptedPath, { encoding: null }) as Buffer;
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
 
-    const anchorInput = pathResolver.rootResolve(`scratch/anchor-${upperId}-${Date.now()}.json`);
+    const anchorInput = pathResolver.sharedTmp(`missions/${upperId}/anchor-${upperId}-${Date.now()}.json`);
     safeWriteFile(anchorInput, JSON.stringify({
       action: 'anchor_mission',
       params: { mission_id: upperId, hash }
@@ -1200,10 +1200,11 @@ async function finishMission(id: string, seal: boolean = false) {
     note: 'Mission finished. Control surfaces may refresh or restart mission-bound agents to reduce stale context.',
   });
 
-  // 4. Purge Scratch
-  const scratchDir = pathResolver.rootResolve('scratch');
-  if (safeExistsSync(scratchDir)) {
-    logger.info('🧹 Purging scratch files...');
+  // 4. Purge governed runtime temp for this mission if present
+  const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
+  if (safeExistsSync(missionTmpDir)) {
+    logger.info('🧹 Purging mission runtime temp...');
+    safeRmSync(missionTmpDir, { recursive: true, force: true });
   }
 
   // 4. Archive

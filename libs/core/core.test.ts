@@ -18,7 +18,7 @@ import {
 describe('core library bundle', () => {
   describe('tier-guard', () => {
     it('should detect public tier', () => {
-      const tier = detectTier(path.join(rootDir(), 'knowledge/orchestration/global_skill_index.json'));
+      const tier = detectTier(path.join(rootDir(), 'knowledge/public/orchestration/global_actuator_index.json'));
       expect(tier).toBe('public');
     });
 

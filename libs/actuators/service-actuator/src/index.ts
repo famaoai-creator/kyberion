@@ -1,4 +1,4 @@
-import { logger, secretGuard, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -68,7 +68,7 @@ function emitRecoveryStimulus(serviceId: string) {
 function registerServiceRuntime(serviceId: string, pid: number | undefined, manifestPath?: string) {
   if (!pid) return;
 
-  runtimeSupervisor.update(serviceResourceId(serviceId), {
+  const updated = runtimeSupervisor.update(serviceResourceId(serviceId), {
     pid,
     state: 'running',
     metadata: {
@@ -76,23 +76,27 @@ function registerServiceRuntime(serviceId: string, pid: number | undefined, mani
       manifestPath,
     },
     lastActiveAt: Date.now(),
-  }) || runtimeSupervisor.register({
-    resourceId: serviceResourceId(serviceId),
-    kind: 'service',
-    ownerId: manifestPath || serviceId,
-    ownerType: manifestPath ? 'service-manifest' : 'service',
-    pid,
-    shutdownPolicy: 'detached',
-    metadata: {
-      serviceId,
-      manifestPath,
-    },
-    cleanup: () => {
-      try {
-        process.kill(pid, 'SIGTERM');
-      } catch (_) {}
-    },
   });
+
+  if (!updated) {
+    runtimeSupervisor.register({
+      resourceId: serviceResourceId(serviceId),
+      kind: 'service',
+      ownerId: manifestPath || serviceId,
+      ownerType: manifestPath ? 'service-manifest' : 'service',
+      pid,
+      shutdownPolicy: 'detached',
+      metadata: {
+        serviceId,
+        manifestPath,
+      },
+      cleanup: () => {
+        try {
+          process.kill(pid, 'SIGTERM');
+        } catch (_) {}
+      },
+    });
+  }
 }
 
 function unregisterServiceRuntime(serviceId: string) {
@@ -165,16 +169,13 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
   logger.info(`🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`);
 
   // 1. Service-Aware Guard: Only allow access to requested service's secrets
-  let token: string | null = null;
+  let binding = input.auth ? resolveServiceBinding(input.service_id, input.auth) : resolveServiceBinding(input.service_id, 'none');
+  let token: string | null = binding.accessToken || null;
   if (input.auth === 'secret-guard') {
-    const service = input.service_id.toUpperCase();
-    token = secretGuard.getSecret(`${service}_BOT_TOKEN`, input.service_id) 
-         || secretGuard.getSecret(`${service}_TOKEN`, input.service_id);
-    
-    if (!token) {
-      throw new Error(`Access Denied: No secret found for service "${input.service_id}"`);
+    if (!token && input.mode !== 'STREAM') {
+      throw new Error(`Access Denied: No access token found for service "${input.service_id}"`);
     }
-    logger.info(`🔐 [AUTH] Securely injected credentials for ${input.service_id}`);
+    logger.info(`🔐 [AUTH] Bound authenticated service access for ${input.service_id}`);
   }
 
   // 2. Multi-Mode Execution
@@ -228,27 +229,7 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
     case 'STREAM':
       if (input.service_id === 'slack') {
-        const { App } = await import('@slack/bolt');
-        const botToken = token || secretGuard.getSecret('SLACK_BOT_TOKEN', 'slack');
-        const appToken = secretGuard.getSecret('SLACK_APP_TOKEN', 'slack');
-        
-        if (!botToken || !appToken) throw new Error('Slack tokens missing for streaming.');
-
-        const app = new App({ token: botToken, appToken, socketMode: true, logLevel: 'error' as any });
-        
-        app.event('app_mention', async ({ event }) => {
-          if (onEvent) onEvent({ type: 'mention', event });
-        });
-        
-        app.message(async ({ event }) => {
-          const e = event as any;
-          if (e.channel_type === 'im' || e.channel?.startsWith('D')) {
-            if (onEvent) onEvent({ type: 'dm', event: e });
-          }
-        });
-
-        await app.start();
-        return { status: 'streaming_active' };
+        throw new Error('Slack streaming ingress belongs to the Slack gateway (satellites/slack-bridge), not service-actuator.');
       }
       throw new Error(`Streaming not implemented for ${input.service_id}`);
 
