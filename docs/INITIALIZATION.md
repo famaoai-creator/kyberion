@@ -47,7 +47,7 @@ pnpm onboard
     - `runtime-supervisor` に surface runtime が登録されます。
 
 ### Stage 4: 魂の注入 (Soul Infusion)
-- **実行コマンド**: `pnpm onboard` (または `pnpm exec tsx scripts/onboarding_wizard.ts`)
+- **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野をシステムに記憶させます。
 - **物理的変化**:
     - `knowledge/personal/my-identity.json` が生成されます。

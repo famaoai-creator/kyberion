@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import AdmZip from 'adm-zip';
 import { generateNativeXlsx } from '../engine';
 import { distillXlsxDesign } from '../../xlsx-utils.js';
@@ -158,7 +157,9 @@ describe('Native XLSX Engine', () => {
   let files: Map<string, string>;
 
   beforeAll(async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xlsx-test-'));
+    const tmpRoot = path.join(process.cwd(), 'active/shared/tmp');
+    fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpDir = fs.mkdtempSync(path.join(tmpRoot, 'xlsx-test-'));
     outputPath = path.join(tmpDir, 'test.xlsx');
     await generateNativeXlsx(createTestProtocol(), outputPath);
     files = extractXlsx(outputPath);

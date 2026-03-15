@@ -23,10 +23,10 @@
 
 ```bash
 # デフォルト（Marketing Deck）
-npx tsx scripts/generate_marketing_deck.ts
+node dist/scripts/generate_marketing_deck.js
 
 # カスタムパターン + テーマ指定
-npx tsx scripts/generate_marketing_deck.ts \
+node dist/scripts/generate_marketing_deck.js \
   --pattern knowledge/public/design-patterns/presentation/executive-summary.json \
   --theme kyberion-standard \
   --output active/shared/exports/exec-summary.pptx

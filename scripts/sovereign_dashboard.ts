@@ -92,9 +92,10 @@ function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
   if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
-    Object.keys(ledger.agents).forEach(a => {
-      const score = ledger.agents[a].current_score;
+    const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const ledger = raw?.agents ?? raw ?? {};
+    Object.keys(ledger).forEach(a => {
+      const score = ledger[a].current_score / 100;
       const bar = '█'.repeat(Math.floor(score)) + '░'.repeat(10 - Math.floor(score));
       console.log(`  ${a.padEnd(15)} [${chalk.cyan(bar)}] ${score.toFixed(1)}`);
     });
