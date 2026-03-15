@@ -1,0 +1,15 @@
+{
+  "name": "@actuator/approval",
+  "version": "1.0.0",
+  "description": "Approval-Actuator for human approval request state transitions",
+  "main": "../../../dist/libs/actuators/approval-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/approval-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "yargs": "^17.7.2"
+  }
+}

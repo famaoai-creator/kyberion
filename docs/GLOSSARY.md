@@ -116,6 +116,14 @@ A governed authenticated access contract for an external service. Service bindin
 
 An actuator that sends approved responses or UI events back to external channels. In the current model, `presence-actuator` is the primary delivery actuator for Slack-style channel feedback.
 
+### Artifact Actuator
+
+A governed actuator for reading, writing, listing, and appending coordination and observability artifacts under approved runtime paths such as `active/shared/coordination/` and `active/shared/observability/`.
+
+### Approval Actuator
+
+A narrow actuator for creating, loading, deciding, and listing human approval requests without mixing that state machine into gateways or generic file operations.
+
 ### Chronos Gateway
 
 The authenticated interactive control surface behind Chronos Mirror v2. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.

@@ -2,11 +2,13 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest, type ApprovalRequestRecord, type ApprovalRequestDraft } from './approval-store.js';
+import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
 import { agentLifecycle } from './agent-lifecycle.js';
 import { a2aBridge } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
 
-type SurfaceRole = 'slack_bridge' | 'chronos_gateway' | 'sovereign_concierge';
+type SurfaceRole = GovernedArtifactRole;
 
 export interface SurfaceConversationResult {
   text: string;
@@ -110,25 +112,8 @@ export interface OnboardingTurnResult {
   completed: boolean;
 }
 
-export interface SlackApprovalRequestDraft {
-  title: string;
-  summary: string;
-  details?: string;
-  severity?: 'low' | 'medium' | 'high';
-}
-
-export interface SlackApprovalRequestRecord extends SlackApprovalRequestDraft {
-  id: string;
-  channel: string;
-  threadTs: string;
-  correlationId: string;
-  requestedBy: string;
-  status: 'pending' | 'approved' | 'rejected';
-  requestedAt: string;
-  decidedAt?: string;
-  decidedBy?: string;
-  sourceText?: string;
-}
+export type SlackApprovalRequestDraft = ApprovalRequestDraft;
+export type SlackApprovalRequestRecord = ApprovalRequestRecord;
 
 export interface SlackApprovalActionPayload {
   requestId: string;
@@ -162,41 +147,15 @@ function withSurfaceRole<T>(role: SurfaceRole, fn: () => T): T {
 }
 
 function ensureDirAs(role: SurfaceRole, logicalPath: string): string {
-  return withSurfaceRole(role, () => {
-    const resolved = pathResolver.resolve(logicalPath);
-    if (!safeExistsSync(resolved)) {
-      safeMkdir(resolved, { recursive: true });
-    }
-    return resolved;
-  });
+  return ensureGovernedArtifactDir(role, logicalPath);
 }
 
 function appendJsonlAs(role: SurfaceRole, logicalPath: string, record: unknown): string {
-  return withSurfaceRole(role, () => {
-    const resolved = pathResolver.resolve(logicalPath);
-    const dir = path.dirname(resolved);
-    if (!safeExistsSync(dir)) {
-      safeMkdir(dir, { recursive: true });
-    }
-    safeAppendFileSync(resolved, JSON.stringify(record) + '\n', 'utf8');
-    return resolved;
-  });
+  return appendGovernedArtifactJsonl(role, logicalPath, record);
 }
 
 function writeJsonAs(role: SurfaceRole, logicalPath: string, record: unknown): string {
-  return withSurfaceRole(role, () => {
-    const resolved = pathResolver.resolve(logicalPath);
-    const dir = path.dirname(resolved);
-    if (!safeExistsSync(dir)) {
-      safeMkdir(dir, { recursive: true });
-    }
-    safeWriteFile(resolved, JSON.stringify(record, null, 2));
-    return resolved;
-  });
-}
-
-function approvalRequestLogicalPath(id: string): string {
-  return `active/shared/coordination/channels/slack/approvals/requests/${id}.json`;
+  return writeGovernedArtifactJson(role, logicalPath, record);
 }
 
 export function emitChannelSurfaceEvent(
@@ -557,24 +516,15 @@ export function createSlackApprovalRequest(params: {
   draft: SlackApprovalRequestDraft;
   sourceText?: string;
 }): SlackApprovalRequestRecord {
-  ensureDirAs('slack_bridge', 'active/shared/coordination/channels/slack/approvals/requests');
-
-  const record: SlackApprovalRequestRecord = {
-    id: randomUUID(),
+  const record = createApprovalRequest('slack_bridge', {
     channel: params.channel,
+    storageChannel: 'slack',
     threadTs: params.threadTs,
     correlationId: params.correlationId,
     requestedBy: params.requestedBy,
-    requestedAt: new Date().toISOString(),
-    status: 'pending',
-    title: params.draft.title,
-    summary: params.draft.summary,
-    details: params.draft.details,
-    severity: params.draft.severity || 'medium',
+    draft: params.draft,
     sourceText: params.sourceText,
-  };
-
-  writeJsonAs('slack_bridge', approvalRequestLogicalPath(record.id), record);
+  });
   emitChannelSurfaceEvent('slack_bridge', 'slack', 'approvals', {
     correlation_id: params.correlationId,
     decision: 'approval_requested',
@@ -589,9 +539,7 @@ export function createSlackApprovalRequest(params: {
 }
 
 export function loadSlackApprovalRequest(id: string): SlackApprovalRequestRecord | null {
-  const resolved = pathResolver.resolve(approvalRequestLogicalPath(id));
-  if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as SlackApprovalRequestRecord;
+  return loadApprovalRequest('slack', id);
 }
 
 export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): any[] {
@@ -655,19 +603,13 @@ export function applySlackApprovalDecision(params: {
   decision: 'approved' | 'rejected';
   decidedBy: string;
 }): SlackApprovalRequestRecord {
-  const record = loadSlackApprovalRequest(params.requestId);
-  if (!record) {
-    throw new Error(`Approval request not found: ${params.requestId}`);
-  }
-
-  const updated: SlackApprovalRequestRecord = {
-    ...record,
-    status: params.decision,
-    decidedAt: new Date().toISOString(),
+  const updated = decideApprovalRequest('slack_bridge', {
+    channel: 'slack',
+    storageChannel: 'slack',
+    requestId: params.requestId,
+    decision: params.decision,
     decidedBy: params.decidedBy,
-  };
-
-  writeJsonAs('slack_bridge', approvalRequestLogicalPath(updated.id), updated);
+  });
   emitChannelSurfaceEvent('slack_bridge', 'slack', 'approvals', {
     correlation_id: updated.correlationId,
     decision: params.decision,

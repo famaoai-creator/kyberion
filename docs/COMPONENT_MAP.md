@@ -116,6 +116,8 @@ Actuators are the execution layer. Current major groups include:
   - local ephemeral shell/OS control only
 - `modeling-actuator`: modeling and strategic reasoning support
 - `service-actuator`: authenticated service binding and service-aware access
+- `artifact-actuator`: governed coordination and observability artifact management
+- `approval-actuator`: human approval request state transitions and decision handling
 - `orchestrator-actuator`: mission/control-plane execution
 - `process-actuator`: managed long-lived process ownership
 - `presence-actuator`: channel delivery and in-session message dispatch
