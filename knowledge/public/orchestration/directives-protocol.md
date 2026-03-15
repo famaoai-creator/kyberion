@@ -31,7 +31,8 @@ last_updated: 2026-03-06
 実行にあたって参照すべき既存のナレッジやデータ。
 
 - `knowledge/...` : 関連する規約やマニュアル
-- `active/shared/...` : 過去の実行結果や中間成果物
+- `active/missions/<tier>/<mission_id>/coordination/...` : ミッション固有のタスク、ハンドオフ、レビュー、イベント
+- `active/shared/...` : グローバル発見、メールボックス、可観測性サマリ
 
 ## 3. 勝利条件 (Victory Conditions)
 
@@ -57,27 +58,28 @@ last_updated: 2026-03-06
   - **Public Tier (`knowledge/`)**: **書き込み・修正は厳禁。**
   - **Confidential Tier (`knowledge/confidential/`)**: クライアント資産の主要な保存先。
   - **Personal Tier (`knowledge/personal/`)**: ユーザー固有の嗜好、設定、プライベートなメモの保存先。
-  - **Temporary (`active/shared/`)**: 実行時の中間成果物。
+  - **Mission Coordination (`active/missions/.../coordination/`)**: 実行時のタスク成果物、ハンドオフ、レビュー。
+  - **Temporary Shared (`active/shared/`)**: グローバル discovery や observability のみ。
 
 ### 資産配置の原則
 
 1. **クライアント・プロジェクトに関連するもの**: 無条件で `knowledge/confidential/` 以下の適切なサブディレクトリへ保存。
-2. **個人の設定や特定の環境に依存するもの**: `knowledge/personal/` または `active/shared/` へ保存。
+2. **個人の設定や特定の環境に依存するもの**: `knowledge/personal/` または mission-local coordination へ保存。
 3. **汎用的な「標準」を更新したい場合**: 必ず `Ecosystem Architect` へ「共通化の提案」を行い、承認後にロールをスイッチして実施する。
 
 ## 6. アウトプット形式 (Handover Spec)
 
 成果物の保存先とフォーマット。
 
-- 保存先: `active/shared/outputs/[filename]`
+- 保存先: `active/missions/<tier>/<mission_id>/coordination/handoffs/[filename]`
 - 形式: [Markdown | JSON | PPTX | etc.]
 ```
 
 ## 2. 依頼のフロー
 
-1.  **Directive Creation**: 依頼元ロールが上記テンプレートに従い指示書（Markdown）を作成し、`active/shared/directives/` 配下に保存する。
+1.  **Directive Creation**: 依頼元ロールが上記テンプレートに従い指示書（Markdown）を作成し、mission-local `coordination/tasks/` または `coordination/handoffs/` 配下に保存する。
 2.  **Role Switching**: ユーザー（または自動化された `mission-control`）が実行先ロールにスイッチする。
-3.  **Context Loading**: 実行先ロールは `active/shared/directives/` の最新ファイルを読み込み、自身のミッション定義と照らし合わせて実行を開始する。
+3.  **Context Loading**: 実行先ロールは mission-local coordination artifact を読み込み、自身のタスク契約と照らし合わせて実行を開始する。
 4.  **Reporting**: 完了後、指示書のチェックリストを埋め、成果物を指定場所に保存して報告する。
 
 ## 4. 特殊な指示書
