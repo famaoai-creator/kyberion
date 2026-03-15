@@ -60,6 +60,34 @@ function drawA2ATraffic() {
   console.log(`  Outbox: ${outCount > 0 ? chalk.bold.yellow(outCount) : chalk.dim(0)} sending\n`);
 }
 
+function drawRuntimeSurfaces() {
+  const statePath = pathResolver.shared('runtime/surfaces/state.json');
+  const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+
+  console.log(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
+
+  if (!safeExistsSync(manifestPath)) {
+    console.log(chalk.dim('  (Surface manifest not found)'));
+    console.log('');
+    return;
+  }
+
+  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
+    surfaces: Array<{ id: string; kind: string; startupMode?: string }>;
+  };
+  const state = safeExistsSync(statePath)
+    ? JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as { surfaces: Record<string, { pid: number }> }
+    : { surfaces: {} };
+
+  for (const surface of manifest.surfaces) {
+    const record = state.surfaces?.[surface.id];
+    const status = record?.pid ? chalk.green('RUNNING') : chalk.dim('STOPPED');
+    const pid = record?.pid ? chalk.gray(` pid=${record.pid}`) : '';
+    console.log(`  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`);
+  }
+  console.log('');
+}
+
 function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
@@ -80,6 +108,7 @@ function render() {
   clearScreen();
   drawHeader();
   drawMissions();
+  drawRuntimeSurfaces();
   drawA2ATraffic();
   drawTrustBoard();
   console.log(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));

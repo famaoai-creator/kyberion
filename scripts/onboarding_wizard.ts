@@ -116,8 +116,10 @@ async function runOnboarding() {
   // ------------------------------------
 
   console.log('Next steps:');
-  console.log('1. Run missions with: pnpm mission:create');
-  console.log('2. Check health with: pnpm vital');
+  console.log('1. Build the workspace with: pnpm build');
+  console.log('2. Start background surfaces with: pnpm surfaces:reconcile');
+  console.log('3. Run missions with: pnpm mission:create');
+  console.log('4. Check health with: pnpm vital');
   console.log('\nWelcome aboard, ' + name + '.\n');
 
   rl.close();

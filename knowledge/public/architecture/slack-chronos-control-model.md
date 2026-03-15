@@ -260,6 +260,10 @@ The intended mapping is:
 Slack streaming ingress should not live in `service-actuator`.
 It belongs to the Slack gateway.
 
+Long-running gateways and control surfaces should be declared in
+`knowledge/public/governance/active-surfaces.json` and managed through
+`scripts/surface_runtime.ts`, not started ad hoc from unrelated CLIs.
+
 ## 6. Observability contract
 
 Every important operation should emit an explainable event.

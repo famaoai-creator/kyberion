@@ -1,0 +1,139 @@
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io';
+import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor';
+
+export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
+
+export interface SurfaceRuntimeDefinition {
+  id: string;
+  kind: SurfaceRuntimeKind;
+  description: string;
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  shutdownPolicy?: RuntimeShutdownPolicy;
+  startupMode?: 'background' | 'workspace-app';
+  ownerType?: string;
+  port?: number;
+  healthPath?: string;
+  enabled?: boolean;
+}
+
+export interface SurfaceRuntimeManifest {
+  version: 1;
+  surfaces: SurfaceRuntimeDefinition[];
+}
+
+export interface SurfaceRuntimeStateRecord {
+  id: string;
+  pid: number;
+  resourceId: string;
+  kind: SurfaceRuntimeKind;
+  command: string;
+  args: string[];
+  cwd: string;
+  logPath: string;
+  startedAt: string;
+  shutdownPolicy: RuntimeShutdownPolicy;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SurfaceRuntimeState {
+  version: 1;
+  surfaces: Record<string, SurfaceRuntimeStateRecord>;
+}
+
+export interface SurfaceHealthStatus {
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  detail: string;
+}
+
+export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
+  if (!safeExistsSync(logPath)) return [];
+  const content = safeReadFile(logPath, { encoding: 'utf8' }) as string;
+  return content
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .slice(-maxLines);
+}
+
+const DEFAULT_MANIFEST_PATH = 'knowledge/public/governance/active-surfaces.json';
+const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
+const LOG_DIR = pathResolver.shared('logs/surfaces');
+
+function ensureParentDir(filePath: string): void {
+  const dir = path.dirname(filePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+}
+
+export function surfaceManifestPath(): string {
+  return pathResolver.resolve(DEFAULT_MANIFEST_PATH);
+}
+
+export function surfaceStatePath(): string {
+  return STATE_PATH;
+}
+
+export function surfaceLogPath(surfaceId: string): string {
+  if (!safeExistsSync(LOG_DIR)) safeMkdir(LOG_DIR, { recursive: true });
+  return path.join(LOG_DIR, `${surfaceId}.log`);
+}
+
+export function surfaceResourceId(surfaceId: string): string {
+  return `surface:${surfaceId}`;
+}
+
+export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
+  return JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
+}
+
+export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
+  if (!safeExistsSync(statePath)) {
+    return { version: 1, surfaces: {} };
+  }
+  return JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as SurfaceRuntimeState;
+}
+
+export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {
+  ensureParentDir(statePath);
+  safeWriteFile(statePath, JSON.stringify(state, null, 2));
+}
+
+export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {
+  return definition.cwd ? pathResolver.resolve(definition.cwd) : pathResolver.rootDir();
+}
+
+export function normalizeSurfaceDefinition(definition: SurfaceRuntimeDefinition): SurfaceRuntimeDefinition {
+  return {
+    ...definition,
+    args: definition.args || [],
+    cwd: resolveSurfaceCwd(definition),
+    shutdownPolicy: definition.shutdownPolicy || 'detached',
+    startupMode: definition.startupMode || 'background',
+    ownerType: definition.ownerType || 'surface-runtime-manifest',
+    enabled: definition.enabled !== false,
+  };
+}
+
+export async function probeSurfaceHealth(definition: SurfaceRuntimeDefinition): Promise<SurfaceHealthStatus> {
+  const normalized = normalizeSurfaceDefinition(definition);
+  if (!normalized.port || !normalized.healthPath) {
+    return { status: 'unknown', detail: 'no_port_or_health_path' };
+  }
+
+  const url = `http://127.0.0.1:${normalized.port}${normalized.healthPath}`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return response.ok
+      ? { status: 'healthy', detail: `http_${response.status}` }
+      : { status: 'unhealthy', detail: `http_${response.status}` };
+  } catch (error: any) {
+    return { status: 'unhealthy', detail: error?.name === 'AbortError' ? 'timeout' : 'connect_failed' };
+  }
+}
