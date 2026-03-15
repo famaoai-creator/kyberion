@@ -76,7 +76,7 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
     lastSize = safeStat(STIMULI_PATH).size;
   }
 
-  setInterval(() => {
+  const timer = setInterval(() => {
     if (!safeExistsSync(STIMULI_PATH)) return;
     
     const stats = safeStat(STIMULI_PATH);
@@ -98,4 +98,5 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
       lastSize = stats.size;
     }
   }, 1000);
+  timer.unref?.();
 }

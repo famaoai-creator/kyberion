@@ -186,6 +186,7 @@ class TrustEngineImpl {
   startDecayTimer(intervalMs = 3600000): void {
     if (this.decayTimer) return;
     this.decayTimer = setInterval(() => this.applyDecay(), intervalMs);
+    this.decayTimer.unref?.();
   }
 
   stopDecayTimer(): void {

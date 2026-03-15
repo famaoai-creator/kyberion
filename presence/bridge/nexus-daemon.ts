@@ -15,7 +15,8 @@ import {
   safeExistsSync,
   safeUnlinkSync,
   safeReaddir,
-  sensoryMemory
+  sensoryMemory,
+  capabilityEntry,
 } from '../../libs/core/index.js';
 import { reflexEngine } from '../../libs/shared-nerve/src/index.js';
 import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
@@ -133,10 +134,10 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
       const serviceId = channelCfg.service_id || stimulus.origin.channel || 'slack';
       secretGuard.grantAccess(NEXUS_MISSION_ID, serviceId, 5);
 
-      const actuatorPath = path.join(ROOT_DIR, `libs/actuators/${channelCfg.connector_skill}/src/index.ts`);
-      logger.info(`🚀 [Nexus] Dispatching via npx tsx ${channelCfg.connector_skill}...`);
+      const actuatorPath = capabilityEntry(channelCfg.connector_skill);
+      logger.info(`🚀 [Nexus] Dispatching via node ${actuatorPath}...`);
       
-      const rawOutput = await safeExec('npx', ['tsx', actuatorPath, '--input', tempPath], {
+      const rawOutput = await safeExec('node', [actuatorPath, '--input', tempPath], {
         env: { ...process.env, MISSION_ID: NEXUS_MISSION_ID }
       });
       

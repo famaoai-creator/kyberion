@@ -1080,7 +1080,7 @@ async function sealMission(id: string) {
     }));
     
     try {
-      safeExec('npx', ['tsx', 'libs/actuators/blockchain-actuator/src/index.ts', '--input', anchorInput]);
+      safeExec('node', [pathResolver.capabilityEntry('blockchain-actuator'), '--input', anchorInput]);
     } catch (_) {}
     safeUnlinkSync(anchorInput);
 

@@ -39,6 +39,7 @@ export class ReflexTerminal {
           options.onOutput(result.output);
         }
       }, 100);
+      this.pollTimer.unref?.();
     }
   }
 
