@@ -32,6 +32,14 @@ A human-readable structured contract between reasoning and execution layers. In 
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
 
+### Mission Lease
+
+A durable authority grant over a mission, task, bridge, or resource. Leases define who currently holds control and when that control expires.
+
+### Task Contract
+
+A structured unit of delegated work inside a mission. Task contracts define objective, write scope, expected outputs, and acceptance criteria.
+
 ### KSMC (Kyberion Sovereign Mission Controller)
 
 The mission lifecycle controller referenced in the charter. It handles mission start, checkpoints, finish, and transactional safeguards.
@@ -72,6 +80,10 @@ The actuator layer that performs the physical work chosen by the reasoning layer
 
 Kyberion's background messaging, daemon, and observability model. See `docs/architecture/NERVE_SYSTEM_GUIDE.md`.
 
+### Runtime Supervisor
+
+The runtime ownership registry for PTY sessions, agent runtimes, and services. It tracks liveness, idle reaping, and resource snapshots.
+
 ### Reflex
 
 A predefined automatic response, often expressed declaratively in ADF instead of TypeScript.
@@ -79,6 +91,10 @@ A predefined automatic response, often expressed declaratively in ADF instead of
 ### Pulse
 
 A shared runtime health/state signal, commonly surfaced through files like `active/shared/runtime/pulse.json`.
+
+### Coordination Store
+
+The mission-local and global storage model for task claims, handoffs, reviews, mailboxes, leases, and event streams.
 
 ## Governance and storage terms
 
@@ -101,6 +117,10 @@ Reusable shared knowledge, governance, and procedures intended for broad reuse w
 ### Micro-Repo
 
 An independently managed Git-backed mission workspace used to reduce leakage and improve rollback safety.
+
+### Single-Owner, Multi-Worker
+
+Kyberion's mission execution model: one owner agent controls mission state, while worker agents collaborate through delegated task leases.
 
 ### Sovereign Shield
 

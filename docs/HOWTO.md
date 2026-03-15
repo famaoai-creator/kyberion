@@ -11,13 +11,13 @@ In Kyberion v2.1+, you do not run individual scripts. Instead, you issue **Inten
 ### Standard Intent Execution
 ```bash
 # Recommended way to run any high-level task
-pnpm exec tsx scripts/run_intent.ts <intent_id>
+node dist/scripts/run_intent.js <intent_id>
 ```
 
 ### Manual Pipeline Execution
 If you need to run a specific ADF pipeline file:
 ```bash
-pnpm exec tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json
+node dist/scripts/run_super_pipeline.js --input path/to/pipeline.json
 ```
 
 ---
@@ -36,7 +36,7 @@ start → checkpoint (repeat) → verify → distill → finish
    Creates and activates a mission. Status: `planned → active`.
 
 2. **Work & Checkpoint**: Perform tasks, then record progress:
-   `node dist/scripts/mission_controller.js checkpoint <TASK_ID> "description"`
+   `node dist/scripts/mission_controller.js checkpoint <ID> <TASK_ID> "description"`
 
 3. **Verify**: Mark the mission as verified (or reject for rework):
    `node dist/scripts/mission_controller.js verify <ID> verified "Verification note"`
@@ -70,8 +70,15 @@ node dist/scripts/mission_controller.js help
 To communicate with Kyberion via the **Agent-to-Agent (A2A)** protocol:
 
 ```bash
-pnpm exec tsx scripts/run_a2a.ts --input my-a2a-message.json
+node dist/scripts/run_a2a.js --input my-a2a-message.json
 ```
+
+### Mission Collaboration
+Kyberion uses a `single-owner, multi-worker` mission model.
+
+- The owner agent controls mission state and lifecycle.
+- Worker agents operate through task contracts and leases.
+- Shared execution artifacts should go to mission-local `coordination/` first, and only use `active/shared/` for global discovery or observability.
 
 The response will be a standardized A2A `result` message containing the pipeline context.
 
