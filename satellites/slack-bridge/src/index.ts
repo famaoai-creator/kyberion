@@ -11,6 +11,11 @@ import {
   recordSlackDelivery,
   shouldForceSlackDelegation,
   isEnvironmentInitialized,
+  getSlackMissionProposalState,
+  saveSlackMissionProposalState,
+  clearSlackMissionProposalState,
+  isSlackMissionConfirmation,
+  issueSlackMissionFromProposal,
   handleSlackOnboardingTurn,
   buildSlackOnboardingBlocks,
   buildSlackOnboardingModal,
@@ -127,7 +132,33 @@ async function start() {
           onboarding.replyText,
           onboarding.completed
         );
-        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts);
+        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, 'system');
+        return;
+      }
+
+      const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
+      if (pendingMissionProposal && isSlackMissionConfirmation(message.text)) {
+        const issued = await issueSlackMissionFromProposal({
+          channel: message.channel,
+          threadTs,
+          proposal: pendingMissionProposal.proposal,
+          sourceText: pendingMissionProposal.sourceText,
+        });
+        clearSlackMissionProposalState(message.channel, threadTs);
+        const response = await client.chat.postMessage({
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: [
+            `Mission ${issued.missionId} started.`,
+            `Type: ${issued.missionType}`,
+            `Tier: ${issued.tier}`,
+            `Persona: ${issued.persona}`,
+            issued.orchestrationStatus === 'queued'
+              ? 'Background orchestration has been queued.'
+              : 'Background orchestration could not be queued.',
+          ].join('\n'),
+        });
+        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, 'system');
         return;
       }
 
@@ -162,13 +193,46 @@ async function start() {
         return;
       }
 
+      if (conversation.missionProposals && conversation.missionProposals.length > 0) {
+        const proposal = conversation.missionProposals[0];
+        saveSlackMissionProposalState({
+          channel: message.channel,
+          threadTs,
+          proposal,
+          sourceText: message.text,
+        });
+        const response = await client.chat.postMessage({
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: [
+            conversation.text || 'I can turn this into a mission.',
+            '',
+            'If you want me to proceed, reply with `はい` or `お願いします` in this thread.',
+          ].join('\n').trim(),
+        });
+        recordSlackDelivery(
+          artifact.correlationId,
+          message.channel,
+          threadTs,
+          response.ts,
+          shouldForceSlackDelegation(message.text) ? 'nerve' : 'surface',
+        );
+        return;
+      }
+
       if (conversation.text) {
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
           text: conversation.text,
         });
-        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts);
+        recordSlackDelivery(
+          artifact.correlationId,
+          message.channel,
+          threadTs,
+          response.ts,
+          shouldForceSlackDelegation(message.text) ? 'nerve' : 'surface',
+        );
       }
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);

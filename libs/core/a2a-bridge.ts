@@ -4,6 +4,8 @@ import { agentLifecycle, AgentHandle } from './agent-lifecycle';
 import { getAgentManifest, loadAgentManifests } from './agent-manifest';
 import { auditChain } from './audit-chain';
 import * as crypto from 'node:crypto';
+import { pathResolver } from './path-resolver.js';
+import { ensureAgentRuntimeRoot } from './agent-runtime-root.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]
@@ -52,6 +54,7 @@ class A2ABridgeImpl {
   private handles: Map<string, AgentHandle> = new Map();
   private responseHandlers: Map<string, ((envelope: A2AMessage) => void)[]> = new Map();
   private knownManifestIds: Set<string> | null = null;
+  private runtimeContexts: Map<string, string> = new Map();
 
   /**
    * Route an A2A envelope to the target agent and return a result envelope.
@@ -89,12 +92,11 @@ class A2ABridgeImpl {
     const { agentId, provider } = this.parseReceiver(receiver);
 
     // Security: Only spawn agents that have a manifest (whitelist)
-    const handle = await this.ensureAgent(agentId, provider);
+    const runtimeContextKey = this.getRuntimeContextKey(envelope.payload);
+    const handle = await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
 
     // Extract prompt from payload
-    const prompt = typeof envelope.payload === 'string'
-      ? envelope.payload
-      : envelope.payload?.intent || envelope.payload?.text || JSON.stringify(envelope.payload);
+    const prompt = this.buildPromptFromPayload(envelope.payload);
 
     logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${prompt.slice(0, 80)}..."`);
 
@@ -144,12 +146,19 @@ class A2ABridgeImpl {
   /**
    * Auto-spawn an agent ONLY if it has a manifest (whitelist enforcement).
    */
-  async ensureAgent(agentId: string, provider?: AgentProvider): Promise<AgentHandle> {
+  async ensureAgent(agentId: string, provider?: AgentProvider, payload?: unknown, runtimeContextKey = 'default'): Promise<AgentHandle> {
     // Check existing
     const existing = this.handles.get(agentId);
-    if (existing) {
+    if (existing && this.runtimeContexts.get(agentId) === runtimeContextKey) {
       const record = agentRegistry.get(agentId);
       if (record && record.status === 'ready') return existing;
+    }
+
+    if (existing && this.runtimeContexts.get(agentId) !== runtimeContextKey) {
+      logger.info(`[A2A_BRIDGE] Recreating ${agentId} for runtime context ${runtimeContextKey}`);
+      await agentLifecycle.shutdown(agentId);
+      this.handles.delete(agentId);
+      this.runtimeContexts.delete(agentId);
     }
 
     // Security: Only spawn agents with a known manifest
@@ -158,14 +167,18 @@ class A2ABridgeImpl {
       throw new Error(`Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/agents/${agentId}.agent.md to allow.`);
     }
 
+    const cwd = this.resolveSpawnCwd(agentId, manifest.provider || provider || 'gemini', manifest.systemPrompt, payload, runtimeContextKey);
+
     const handle = await agentLifecycle.spawn({
       agentId,
       provider: manifest.provider || provider || 'gemini',
       modelId: manifest.modelId,
       systemPrompt: manifest.systemPrompt,
       capabilities: manifest.capabilities,
+      cwd,
     });
     this.handles.set(agentId, handle);
+    this.runtimeContexts.set(agentId, runtimeContextKey);
     logger.info(`[A2A_BRIDGE] Auto-spawned agent: ${agentId} (manifest-verified)`);
     return handle;
   }
@@ -190,6 +203,67 @@ class A2ABridgeImpl {
       return { agentId, provider };
     }
     return { agentId: receiver };
+  }
+
+  private getRuntimeContextKey(payload: unknown): string {
+    const executionMode = this.extractExecutionMode(payload);
+    return executionMode === 'conversation' ? 'conversation' : 'default';
+  }
+
+  private extractExecutionMode(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return undefined;
+    const executionMode = (context as Record<string, unknown>).execution_mode;
+    return typeof executionMode === 'string' ? executionMode : undefined;
+  }
+
+  private resolveSpawnCwd(
+    agentId: string,
+    provider: string,
+    systemPrompt: string | undefined,
+    payload: unknown,
+    runtimeContextKey: string,
+  ): string {
+    if (runtimeContextKey !== 'conversation') {
+      return pathResolver.rootDir();
+    }
+
+    const context = payload && typeof payload === 'object'
+      ? ((payload as Record<string, unknown>).context as Record<string, unknown> | undefined)
+      : undefined;
+    const channel = typeof context?.channel === 'string' ? context.channel : 'surface';
+    const thread = typeof context?.thread === 'string' ? context.thread.replace(/[^\w.-]+/g, '_') : 'default';
+    return ensureAgentRuntimeRoot({
+      agentId,
+      provider,
+      mode: 'conversation',
+      channel,
+      thread,
+      systemPrompt,
+    });
+  }
+
+  private buildPromptFromPayload(payload: unknown): string {
+    if (typeof payload === 'string') return payload;
+    if (!payload || typeof payload !== 'object') return JSON.stringify(payload);
+
+    const record = payload as Record<string, unknown>;
+    const text = typeof record.text === 'string' ? record.text.trim() : '';
+    const intent = typeof record.intent === 'string' ? record.intent.trim() : '';
+    const context = record.context && typeof record.context === 'object' ? record.context : undefined;
+
+    if (!intent && !context) {
+      return text || JSON.stringify(payload);
+    }
+
+    const sections = [
+      intent ? `Intent: ${intent}` : '',
+      context ? `Context:\n${JSON.stringify(context, null, 2)}` : '',
+      text ? `Request:\n${text}` : '',
+    ].filter(Boolean);
+
+    return sections.join('\n\n');
   }
 }
 

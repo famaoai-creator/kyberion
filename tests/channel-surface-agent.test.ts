@@ -5,7 +5,12 @@ import {
   buildSlackApprovalBlocks,
   buildSlackOnboardingBlocks,
   buildSlackOnboardingModal,
+  deriveSlackExecutionMode,
   createSlackApprovalRequest,
+  saveSlackMissionProposalState,
+  getSlackMissionProposalState,
+  clearSlackMissionProposalState,
+  isSlackMissionConfirmation,
   extractSurfaceBlocks,
   handleSlackOnboardingTurn,
   isEnvironmentInitialized,
@@ -101,8 +106,32 @@ describe('Channel surface agents', () => {
       ts: '1710000000.000100',
       channelType: 'im',
     })).toContain('Slack Surface Agent');
+    expect(buildSlackSurfacePrompt({
+      user: 'U123',
+      text: 'Kyberionの資料を作ってください',
+      channel: 'C123',
+      ts: '1710000000.000100',
+      channelType: 'im',
+    })).toContain('Execution mode: conversation');
+    expect(buildSlackSurfacePrompt({
+      user: 'U123',
+      text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
+      channel: 'C123',
+      ts: '1710000000.000100',
+      channelType: 'im',
+    })).toContain('Execution mode: conversation');
+    expect(buildSlackSurfacePrompt({
+      user: 'U123',
+      text: 'こんにちは',
+      channel: 'C123',
+      ts: '1710000000.000100',
+      channelType: 'im',
+    })).toContain('Execution mode: conversation');
     expect(shouldForceSlackDelegation('deploy status please')).toBe(true);
     expect(shouldForceSlackDelegation('ping')).toBe(false);
+    expect(deriveSlackExecutionMode('Kyberionの資料を作って欲しいんだけど可能かな？')).toBe('conversation');
+    expect(deriveSlackExecutionMode('Kyberionの資料を作成して保存してください')).toBe('task');
+    expect(deriveSlackExecutionMode('Kyberionの資料を作ってください')).toBe('conversation');
   });
 
   it('records Chronos control-plane requests and delegation summaries', () => {
@@ -150,6 +179,19 @@ describe('Channel surface agents', () => {
     expect(parsed.text).toBe('Need approval.');
     expect(parsed.approvalRequests).toHaveLength(1);
     expect(parsed.approvalRequests[0].title).toBe('Deploy production change');
+  });
+
+  it('extracts mission proposal blocks from a surface-agent response', () => {
+    const parsed = extractSurfaceBlocks([
+      'I can escalate this into durable work.',
+      '```mission_proposal',
+      '{"intent":"create_mission","mission_type":"product_development","summary":"Create a Kyberion marketing deck","assigned_persona":"Ecosystem Architect","tier":"public","why":"Needs multi-step execution"}',
+      '```',
+    ].join('\n'));
+
+    expect(parsed.text).toBe('I can escalate this into durable work.');
+    expect(parsed.missionProposals).toHaveLength(1);
+    expect(parsed.missionProposals?.[0].mission_type).toBe('product_development');
   });
 
   it('routes uninitialized Slack threads into onboarding and persists identity artifacts', () => {
@@ -276,6 +318,35 @@ describe('Channel surface agents', () => {
     expect(loadSlackApprovalRequest(record.id)?.decidedBy).toBe('U123');
   });
 
+  it('persists and clears Slack mission proposal state per thread', () => {
+    saveSlackMissionProposalState({
+      channel: 'C123',
+      threadTs: '1710000000.000500',
+      proposal: {
+        intent: 'create_mission',
+        mission_type: 'product_development',
+        summary: 'Create a Kyberion marketing deck',
+        assigned_persona: 'Ecosystem Architect',
+        tier: 'public',
+      },
+      sourceText: 'もっとチーム組んで連携して作って',
+    });
+
+    const state = getSlackMissionProposalState('C123', '1710000000.000500');
+    expect(state?.proposal.mission_type).toBe('product_development');
+    expect(state?.sourceText).toBe('もっとチーム組んで連携して作って');
+
+    clearSlackMissionProposalState('C123', '1710000000.000500');
+    expect(getSlackMissionProposalState('C123', '1710000000.000500')).toBeNull();
+  });
+
+  it('detects explicit Slack mission confirmation replies', () => {
+    expect(isSlackMissionConfirmation('はい')).toBe(true);
+    expect(isSlackMissionConfirmation('ではよろしく')).toBe(true);
+    expect(isSlackMissionConfirmation('お願いします')).toBe(true);
+    expect(isSlackMissionConfirmation('もう少し考えたい')).toBe(false);
+  });
+
   it('includes delegated response context when building the summary prompt', async () => {
     const ask = vi.fn()
       .mockResolvedValueOnce('```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}\n```')
@@ -307,6 +378,99 @@ describe('Channel surface agents', () => {
       2,
       expect.stringContaining('[Response from nerve-agent]: delegated answer')
     );
+
+    spawnSpy.mockRestore();
+    routeSpy.mockRestore();
+  });
+
+  it('fills missing slack a2a payload text from the original surface prompt', async () => {
+    const ask = vi.fn()
+      .mockResolvedValueOnce(
+        '```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"intent":"slack_request","text":"original request and relevant Slack context"}}\n```'
+      )
+      .mockResolvedValueOnce('final slack reply');
+
+    const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
+      agentId: 'slack-surface-agent',
+      ask,
+      shutdown: async () => {},
+      getRecord: () => ({ status: 'ready' } as any),
+    } as any);
+
+    const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
+      a2a_version: '1.0',
+      header: { msg_id: '1', sender: 'nerve-agent', performative: 'result' },
+      payload: { text: 'delegated answer' },
+    } as any);
+
+    await runSurfaceConversation({
+      agentId: 'slack-surface-agent',
+      query: buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'Kyberionのマーケティング資料を作ってほしい',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        threadTs: '1710000000.000100',
+        channelType: 'im',
+      }),
+      senderAgentId: 'kyberion:slack-bridge',
+      delegationSummaryInstruction: 'Summarize for Slack.',
+    });
+
+    expect(routeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          text: 'Kyberionのマーケティング資料を作ってほしい',
+        }),
+      }),
+    );
+
+    spawnSpy.mockRestore();
+    routeSpy.mockRestore();
+  });
+
+  it('bypasses the slack surface agent for conversation-mode forced delegation', async () => {
+    const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
+      agentId: 'slack-surface-agent',
+      ask: vi.fn(),
+      shutdown: async () => {},
+      getRecord: () => ({ status: 'ready' } as any),
+    } as any);
+
+    const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
+      a2a_version: '1.0',
+      header: { msg_id: '1', sender: 'nerve-agent', performative: 'result' },
+      payload: { text: '短く説明できます。まず対象読者を決めましょう。' },
+    } as any);
+
+    const result = await runSurfaceConversation({
+      agentId: 'slack-surface-agent',
+      query: buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'Kyberionのコンセプトを説明する資料を作ってくれないかな？',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        threadTs: '1710000000.000100',
+        channelType: 'im',
+      }),
+      senderAgentId: 'kyberion:slack-bridge',
+      forcedReceiver: 'nerve-agent',
+      delegationSummaryInstruction: 'Summarize for Slack.',
+    });
+
+    expect(spawnSpy).not.toHaveBeenCalled();
+    expect(routeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({
+        intent: 'request_marketing_material',
+        text: 'Kyberionのコンセプトを説明する資料を作ってくれないかな？',
+        context: expect.objectContaining({
+          execution_mode: 'conversation',
+          channel: 'slack',
+          slack_channel: 'C123',
+        }),
+      }),
+    }));
+    expect(result.text).toBe('短く説明できます。まず対象読者を決めましょう。');
 
     spawnSpy.mockRestore();
     routeSpy.mockRestore();

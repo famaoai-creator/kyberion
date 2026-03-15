@@ -148,6 +148,90 @@ describe('a2a-bridge', () => {
     expect(responses).toHaveLength(1);
   });
 
+  it('includes intent and context when routing structured payloads', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    const ask = vi.fn(async () => 'ok');
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.spawn.mockResolvedValue({ ask });
+    mocks.get.mockImplementation((agentId: string) => {
+      if (agentId === 'sender-x' || agentId === 'nerve-agent') return { status: 'ready' };
+      return undefined;
+    });
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-CTX-1',
+        sender: 'sender-x',
+        receiver: 'nerve-agent',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'request_marketing_material',
+        text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
+        context: {
+          channel: 'slack',
+          execution_mode: 'conversation',
+          user_language: 'ja',
+        },
+      },
+    });
+
+    expect(ask).toHaveBeenCalledWith([
+      'Intent: request_marketing_material',
+      '',
+      'Context:',
+      '{',
+      '  "channel": "slack",',
+      '  "execution_mode": "conversation",',
+      '  "user_language": "ja"',
+      '}',
+      '',
+      'Request:',
+      'Kyberionの資料を作って欲しいんだけど可能かな？',
+    ].join('\n'));
+  });
+
+  it('spawns conversation-mode agents inside a conversation sandbox cwd', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.spawn.mockResolvedValue({ ask: vi.fn(async () => 'ok') });
+    mocks.get.mockReturnValue(undefined);
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-CWD-1',
+        sender: 'sender-x',
+        receiver: 'nerve-agent',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'request_marketing_material',
+        text: 'Kyberionのコンセプトを説明して',
+        context: {
+          channel: 'slack',
+          thread: '1773596301.435519',
+          execution_mode: 'conversation',
+        },
+      },
+    });
+
+    expect(mocks.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: expect.stringContaining('active/shared/tmp/agent-runtime-roots/conversation/slack/1773596301.435519/nerve-agent'),
+    }));
+  });
+
   it('denies invalid signatures and accepts unsigned internal senders', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
     mocks.getAgentManifest.mockReturnValue({

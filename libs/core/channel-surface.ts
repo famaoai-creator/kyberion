@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeAppendFileSync, safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { spawnManagedProcess } from './managed-process.js';
 import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest, type ApprovalRequestRecord, type ApprovalRequestDraft } from './approval-store.js';
 import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
 import { agentLifecycle } from './agent-lifecycle.js';
@@ -18,6 +19,7 @@ export interface SurfaceConversationResult {
   delegationResults: any[];
   approvalRequests: SlackApprovalRequestDraft[];
   routingProposals?: NerveRoutingProposal[];
+  missionProposals?: MissionProposal[];
 }
 
 interface SurfaceEvent {
@@ -43,6 +45,17 @@ export interface SlackSurfaceInput {
   threadTs?: string;
   team?: string;
   channelType?: string;
+}
+
+export type SlackExecutionMode = 'conversation' | 'task';
+
+interface ParsedSlackSurfacePrompt {
+  channel?: string;
+  thread?: string;
+  user?: string;
+  derivedLanguage?: string;
+  executionMode?: SlackExecutionMode;
+  userMessage: string;
 }
 
 type OnboardingField =
@@ -125,6 +138,44 @@ export interface NerveRoutingProposal {
   team_role: string;
   task_summary?: string;
   why?: string;
+}
+
+export interface MissionProposal {
+  intent: 'create_mission';
+  mission_type?: string;
+  summary?: string;
+  assigned_persona?: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  vision_ref?: string;
+  why?: string;
+}
+
+interface SlackMissionProposalState {
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  createdAt: string;
+}
+
+interface SlackMissionOrchestrationJob {
+  missionId: string;
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  createdAt: string;
+}
+
+export interface SlackMissionIssuanceResult {
+  missionId: string;
+  tier: 'personal' | 'confidential' | 'public';
+  missionType: string;
+  persona: string;
+  startOutput: string;
+  orchestrationStatus: 'queued' | 'failed';
+  orchestrationJobPath?: string;
+  orchestrationError?: string;
 }
 
 export interface SlackApprovalActionPayload {
@@ -309,6 +360,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
   const a2aMessages: any[] = [];
   const approvalRequests: SlackApprovalRequestDraft[] = [];
   const routingProposals: NerveRoutingProposal[] = [];
+  const missionProposals: MissionProposal[] = [];
 
   let text = raw;
 
@@ -337,6 +389,11 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
+  text = text.replace(/```mission_proposal\s*\n([\s\S]*?)```/g, (_match, json) => {
+    try { missionProposals.push(JSON.parse(json.trim()) as MissionProposal); } catch (_) {}
+    return '';
+  });
+
   text = text.replace(/>>A2A(\{[\s\S]*?\})<</g, (_match, json) => {
     try { a2aMessages.push(JSON.parse(json.trim())); } catch (_) {}
     return '';
@@ -349,6 +406,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     delegationResults: [],
     approvalRequests,
     routingProposals,
+    missionProposals,
   };
 }
 
@@ -389,7 +447,64 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
   });
 }
 
-async function processDelegations(a2aMessages: any[], senderAgentId: string): Promise<any[]> {
+function buildDelegationFallbackText(query: string): string {
+  const marker = 'User message:\n';
+  const idx = query.lastIndexOf(marker);
+  if (idx >= 0) {
+    const extracted = query.slice(idx + marker.length).trim();
+    if (extracted) return extracted;
+  }
+  return query.trim();
+}
+
+function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt | null {
+  if (!query.includes('You are handling a Slack conversation as the Slack Surface Agent.')) {
+    return null;
+  }
+
+  const readLine = (label: string): string | undefined => {
+    const match = query.match(new RegExp(`^${label}:\\s*(.+)$`, 'm'));
+    return match?.[1]?.trim();
+  };
+
+  const userMessage = buildDelegationFallbackText(query);
+  return {
+    channel: readLine('Channel'),
+    thread: readLine('Thread'),
+    user: readLine('User'),
+    derivedLanguage: readLine('Derived language'),
+    executionMode: readLine('Execution mode') as SlackExecutionMode | undefined,
+    userMessage,
+  };
+}
+
+function deriveSlackIntentLabel(text: string): string {
+  const normalized = text.trim();
+  if (!normalized) return 'general_request';
+  if (/マーケティング|資料|pitch|marketing/i.test(normalized)) return 'request_marketing_material';
+  if (/レビュー|review/i.test(normalized)) return 'request_review';
+  if (/設計|architecture|design/i.test(normalized)) return 'request_design_analysis';
+  if (/デバッグ|bug|error|調査/i.test(normalized)) return 'request_debug_investigation';
+  if (/ミッション|mission/i.test(normalized)) return 'request_mission_work';
+  return 'request_deeper_reasoning';
+}
+
+function normalizeDelegationPayload(payload: any, fallbackText: string): any {
+  if (!payload || typeof payload !== 'object') return payload;
+  const currentText = typeof payload.text === 'string' ? payload.text.trim() : '';
+  const looksPlaceholder =
+    currentText === '' ||
+    currentText === 'original request and relevant Slack context' ||
+    currentText === 'original request';
+
+  if (!looksPlaceholder) return payload;
+  return {
+    ...payload,
+    text: fallbackText,
+  };
+}
+
+async function processDelegations(a2aMessages: any[], senderAgentId: string, fallbackText: string): Promise<any[]> {
   const delegationResults: any[] = [];
 
   for (const msg of a2aMessages) {
@@ -404,7 +519,7 @@ async function processDelegations(a2aMessages: any[], senderAgentId: string): Pr
           conversation_id: msg.header?.conversation_id,
           timestamp: new Date().toISOString(),
         },
-        payload: msg.payload,
+        payload: normalizeDelegationPayload(msg.payload, fallbackText),
       };
 
       const response = await a2aBridge.route(envelope);
@@ -460,6 +575,55 @@ async function routeForcedDelegation(
   }
 }
 
+async function routeSlackForcedDelegation(
+  receiver: string,
+  query: string,
+  senderAgentId: string,
+  missionId?: string,
+): Promise<any[]> {
+  const parsed = parseSlackSurfacePrompt(query);
+  if (!parsed) {
+    return routeForcedDelegation(receiver, query, senderAgentId, missionId);
+  }
+
+  try {
+    const response = await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`,
+        sender: senderAgentId,
+        receiver,
+        performative: 'request',
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        intent: deriveSlackIntentLabel(parsed.userMessage),
+        text: parsed.userMessage,
+        context: {
+          channel: 'slack',
+          slack_channel: parsed.channel,
+          thread: parsed.thread,
+          user: parsed.user,
+          user_language: parsed.derivedLanguage,
+          execution_mode: parsed.executionMode || 'conversation',
+        },
+      },
+    });
+
+    return [{
+      receiver,
+      response: response.payload?.text || JSON.stringify(response.payload),
+      bypassedSurfaceAgent: true,
+    }];
+  } catch (err: any) {
+    return [{
+      receiver,
+      error: err.message,
+      bypassedSurfaceAgent: true,
+    }];
+  }
+}
+
 async function routeMissionTeamDelegation(
   missionId: string,
   teamRole: string,
@@ -504,13 +668,38 @@ async function routeNerveRoutingProposals(
 }
 
 export async function runSurfaceConversation(input: SurfaceConversationInput): Promise<SurfaceConversationResult> {
+  const parsedSlackPrompt =
+    input.agentId === 'slack-surface-agent' && input.forcedReceiver
+      ? parseSlackSurfacePrompt(input.query)
+      : null;
+
+  if (parsedSlackPrompt && parsedSlackPrompt.executionMode === 'conversation') {
+    const delegationResults = await routeSlackForcedDelegation(
+      input.forcedReceiver!,
+      input.query,
+      input.senderAgentId,
+      input.missionId,
+    );
+    const successful = delegationResults.filter((result) => !result.error);
+    return {
+      text: successful[0]?.response || '',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults,
+      approvalRequests: [],
+      routingProposals: [],
+      missionProposals: extractSurfaceBlocks(successful[0]?.response || '').missionProposals || [],
+    };
+  }
+
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
   const firstResponse = await handle.ask(input.query);
   const firstBlocks = extractSurfaceBlocks(firstResponse);
   let delegationResults: any[] = [];
+  const delegationFallbackText = buildDelegationFallbackText(input.query);
 
   if (firstBlocks.a2aMessages.length > 0) {
-    delegationResults = await processDelegations(firstBlocks.a2aMessages, input.senderAgentId);
+    delegationResults = await processDelegations(firstBlocks.a2aMessages, input.senderAgentId, delegationFallbackText);
   } else if (input.missionId && input.teamRole) {
     delegationResults = await routeMissionTeamDelegation(
       input.missionId,
@@ -547,6 +736,7 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
       delegationResults: finalDelegationResults,
       approvalRequests: firstBlocks.approvalRequests,
       routingProposals,
+      missionProposals: firstBlocks.missionProposals,
     };
   }
 
@@ -571,21 +761,56 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     delegationResults: finalDelegationResults,
     approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
     routingProposals,
+    missionProposals: [...(firstBlocks.missionProposals || []), ...(followUpBlocks.missionProposals || [])],
   };
+}
+
+export function deriveSlackExecutionMode(text: string): SlackExecutionMode {
+  const normalized = text.trim();
+  if (!normalized) return 'conversation';
+
+  const feasibilityPatterns = [
+    /可能[?？。]?$|可能かな|可能ですか|できますか|できる[?？。]?$/i,
+    /お願いしても良い|お願いできますか|どうですか|いけますか/i,
+    /can you|is it possible|would it be possible|could you/i,
+  ];
+
+  if (feasibilityPatterns.some((pattern) => pattern.test(normalized))) {
+    return 'conversation';
+  }
+
+  const durableTaskPatterns = [
+    /ミッション.*(開始|作成)/i,
+    /mission.*(start|create)/i,
+    /保存して|save (it|this|that)?|write (it|this|that)?/i,
+    /実装して|implement\b/i,
+    /作成して|作って\b|draft it|create it/i,
+    /ファイル.*(作成|保存)/i,
+  ];
+
+  return durableTaskPatterns.some((pattern) => pattern.test(normalized))
+    ? 'task'
+    : 'conversation';
 }
 
 export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   const threadTs = input.threadTs || input.ts || 'unknown';
   const channelType = input.channelType || 'unknown';
+  const normalizedText = input.text.trim();
+  const language = /[ぁ-んァ-ン一-龯]/.test(normalizedText) ? 'ja' : 'en';
+  const executionMode = deriveSlackExecutionMode(normalizedText);
   return [
     'You are handling a Slack conversation as the Slack Surface Agent.',
     `Channel: ${input.channel}`,
     `Thread: ${threadTs}`,
     `Channel type: ${channelType}`,
     `User: ${input.user || 'unknown'}`,
+    `Derived intent: ${shouldForceSlackDelegation(normalizedText) ? 'request_deeper_reasoning' : 'request_lightweight_reply'}`,
+    `Derived language: ${language}`,
+    `Execution mode: ${executionMode}`,
     '',
     'User message:',
-    input.text.trim(),
+    normalizedText,
   ].join('\n');
 }
 
@@ -607,7 +832,13 @@ export function shouldForceSlackDelegation(text: string): boolean {
   return !lightweightPatterns.some((pattern) => pattern.test(normalized));
 }
 
-export function recordSlackDelivery(correlationId: string, channel: string, threadTs: string, deliveryTs?: string): string {
+export function recordSlackDelivery(
+  correlationId: string,
+  channel: string,
+  threadTs: string,
+  deliveryTs?: string,
+  source: 'surface' | 'nerve' | 'system' = 'surface',
+): string {
   return emitChannelSurfaceEvent('slack_bridge', 'slack', 'deliveries', {
     correlation_id: correlationId,
     decision: 'delivery_sent',
@@ -617,7 +848,161 @@ export function recordSlackDelivery(correlationId: string, channel: string, thre
     resource_id: deliveryTs || threadTs,
     slack_channel: channel,
     thread_ts: threadTs,
+    response_source: source,
   });
+}
+
+function missionProposalStateLogicalPath(channel: string, threadTs: string): string {
+  const safeThread = threadTs.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `active/shared/coordination/channels/slack/mission-proposals/${channel}-${safeThread}.json`;
+}
+
+export function getSlackMissionProposalState(channel: string, threadTs: string): SlackMissionProposalState | null {
+  const logicalPath = missionProposalStateLogicalPath(channel, threadTs);
+  const resolved = pathResolver.resolve(logicalPath);
+  if (!safeExistsSync(resolved)) return null;
+  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as SlackMissionProposalState;
+}
+
+export function saveSlackMissionProposalState(params: {
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+}): string {
+  return writeJsonAs('slack_bridge', missionProposalStateLogicalPath(params.channel, params.threadTs), {
+    channel: params.channel,
+    threadTs: params.threadTs,
+    proposal: params.proposal,
+    sourceText: params.sourceText,
+    createdAt: new Date().toISOString(),
+  } satisfies SlackMissionProposalState);
+}
+
+export function clearSlackMissionProposalState(channel: string, threadTs: string): void {
+  const logicalPath = missionProposalStateLogicalPath(channel, threadTs);
+  const resolved = pathResolver.resolve(logicalPath);
+  if (!safeExistsSync(resolved)) return;
+  withSurfaceRole('slack_bridge', () => {
+    safeRmSync(resolved, { force: true });
+  });
+}
+
+export function isSlackMissionConfirmation(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return false;
+  return [
+    /^はい[。！!]?$/,
+    /^お願いします?[。！!]?$/,
+    /^ではよろしく[。！!]?$/,
+    /^よろしくお願いします?[。！!]?$/,
+    /^進めて$/,
+    /^go ahead$/,
+    /^yes$/,
+    /^approved?$/,
+    /^please proceed$/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function sanitizeMissionSlug(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24) || 'REQUEST';
+}
+
+function buildSlackMissionId(threadTs: string, proposal: MissionProposal, sourceText?: string): string {
+  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || 'request';
+  const slug = sanitizeMissionSlug(base);
+  const numericThread = threadTs.replace(/\D+/g, '').slice(-8) || Date.now().toString().slice(-8);
+  return `MSN-SLACK-${slug}-${numericThread}`;
+}
+
+export async function issueSlackMissionFromProposal(params: {
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+}): Promise<SlackMissionIssuanceResult> {
+  const missionId = buildSlackMissionId(params.threadTs, params.proposal, params.sourceText);
+  const tier = params.proposal.tier || 'public';
+  const missionType = params.proposal.mission_type || 'development';
+  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
+  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+
+  const startOutput = safeExec(
+    'node',
+    ['dist/scripts/mission_controller.js', 'start', missionId, tier, persona, 'default', missionType],
+    { env, cwd: pathResolver.rootDir() },
+  );
+  let orchestrationStatus: SlackMissionIssuanceResult['orchestrationStatus'] = 'queued';
+  let orchestrationJobPath: string | undefined;
+  let orchestrationError: string | undefined;
+  try {
+    const jobRecord: SlackMissionOrchestrationJob = {
+      missionId,
+      channel: params.channel,
+      threadTs: params.threadTs,
+      proposal: params.proposal,
+      sourceText: params.sourceText,
+      createdAt: new Date().toISOString(),
+    };
+    orchestrationJobPath = writeJsonAs(
+      'slack_bridge',
+      `active/shared/coordination/channels/slack/mission-jobs/${missionId}.json`,
+      jobRecord,
+    );
+    spawnManagedProcess({
+      resourceId: `slack-orchestration:${missionId}`,
+      kind: 'service',
+      ownerId: missionId,
+      ownerType: 'slack-bridge',
+      command: 'node',
+      args: ['dist/scripts/run_slack_mission_kickoff.js', orchestrationJobPath],
+      shutdownPolicy: 'manual',
+      spawnOptions: {
+        cwd: pathResolver.rootDir(),
+        detached: true,
+        stdio: 'ignore',
+        env,
+      },
+      metadata: {
+        missionId,
+        source: 'slack',
+        stage: 'orchestration',
+      },
+    });
+  } catch (error) {
+    orchestrationStatus = 'failed';
+    orchestrationError = error instanceof Error ? error.message : String(error);
+  }
+
+  emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
+    correlation_id: randomUUID(),
+    decision: 'mission_issued',
+    why: 'A confirmed Slack mission proposal was deterministically issued through mission_controller.',
+    policy_used: 'slack_mission_issue_v1',
+    agent_id: 'mission_controller',
+    resource_id: missionId,
+    thread_ts: params.threadTs,
+    slack_channel: params.channel,
+    mission_type: missionType,
+    tier,
+    orchestration_status: orchestrationStatus,
+    orchestration_job_path: orchestrationJobPath,
+  });
+
+  return {
+    missionId,
+    tier,
+    missionType,
+    persona,
+    startOutput,
+    orchestrationStatus,
+    orchestrationJobPath,
+    orchestrationError,
+  };
 }
 
 export function createSlackApprovalRequest(params: {
