@@ -56,11 +56,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-and-validate
     strategy:
+      fail-fast: false
       matrix:
         test-suite: [smoke, unit, integration]
         include:
           - test-suite: smoke
-            command: node tests/smoke.test.cjs
+            command: pnpm run test
           - test-suite: unit
             command: pnpm run test:coverage
           - test-suite: integration
