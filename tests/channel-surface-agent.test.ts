@@ -67,12 +67,12 @@ describe('Channel surface agents', () => {
     if (safeExistsSync(chronosDir)) safeRmSync(chronosDir);
     if (safeExistsSync(chronosObsDir)) safeRmSync(chronosObsDir);
     process.env.MISSION_ROLE = 'ecosystem_architect';
-    if (safeExistsSync(identityPath)) safeRmSync(identityPath);
-    if (safeExistsSync(visionPath)) safeRmSync(visionPath);
-    if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);
     if (baselineIdentity !== null) core.safeWriteFile(identityPath, baselineIdentity);
+    else if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (baselineVision !== null) core.safeWriteFile(visionPath, baselineVision);
+    else if (safeExistsSync(visionPath)) safeRmSync(visionPath);
     if (baselineAgentIdentity !== null) core.safeWriteFile(agentIdentityPath, baselineAgentIdentity);
+    else if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);
   });
 
   it('creates Slack handoff artifacts and events through the Slack surface agent role', () => {
