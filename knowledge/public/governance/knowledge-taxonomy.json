@@ -1,0 +1,103 @@
+{
+  "$schema": "../schemas/knowledge-taxonomy.schema.json",
+  "version": "1.0.0",
+  "default_tier_inference": {
+    "knowledge/public": "public",
+    "knowledge/confidential": "confidential",
+    "knowledge/personal": "personal"
+  },
+  "kinds": {
+    "governance": {
+      "description": "Hard rules, gates, policy contracts, and compliance constraints.",
+      "default_authority": "policy",
+      "default_scope": "global"
+    },
+    "standard": {
+      "description": "Reference standards, checklists, and expected engineering quality bars.",
+      "default_authority": "standard",
+      "default_scope": "repository"
+    },
+    "architecture": {
+      "description": "Structural models, system boundaries, and design rationale.",
+      "default_authority": "reference",
+      "default_scope": "repository"
+    },
+    "capability": {
+      "description": "Executable know-how for actuators, agents, and channels.",
+      "default_authority": "recipe",
+      "default_scope": "global"
+    },
+    "role": {
+      "description": "Responsibility-specific guidance and decision posture.",
+      "default_authority": "advisory",
+      "default_scope": "global"
+    },
+    "playbook": {
+      "description": "Mission or scenario composition guidance across multiple capabilities.",
+      "default_authority": "recipe",
+      "default_scope": "mission"
+    },
+    "incident": {
+      "description": "Postmortems, failure records, and recovery references.",
+      "default_authority": "reference",
+      "default_scope": "repository"
+    },
+    "reference": {
+      "description": "Supplemental reference material that informs but does not directly govern execution.",
+      "default_authority": "reference",
+      "default_scope": "global"
+    }
+  },
+  "directory_defaults": [
+    {
+      "path_prefix": "knowledge/public/governance/",
+      "kind": "governance",
+      "authority": "policy",
+      "scope": "global"
+    },
+    {
+      "path_prefix": "knowledge/public/standards/",
+      "kind": "standard",
+      "authority": "standard",
+      "scope": "repository"
+    },
+    {
+      "path_prefix": "knowledge/public/architecture/",
+      "kind": "architecture",
+      "authority": "reference",
+      "scope": "repository"
+    },
+    {
+      "path_prefix": "knowledge/public/procedures/",
+      "kind": "capability",
+      "authority": "recipe",
+      "scope": "global"
+    },
+    {
+      "path_prefix": "knowledge/public/roles/",
+      "kind": "role",
+      "authority": "advisory",
+      "scope": "global"
+    },
+    {
+      "path_prefix": "knowledge/public/capability-assets/",
+      "kind": "reference",
+      "authority": "advisory",
+      "scope": "repository"
+    },
+    {
+      "path_prefix": "knowledge/public/incidents/",
+      "kind": "incident",
+      "authority": "reference",
+      "scope": "repository"
+    }
+  ],
+  "overlay_precedence": ["global", "repository", "mission", "environment"],
+  "retrieval_priority": {
+    "alignment": ["architecture", "standard", "governance", "role"],
+    "execution": ["capability", "playbook", "governance", "standard"],
+    "review": ["governance", "standard", "architecture", "incident"],
+    "onboarding": ["role", "playbook", "capability", "governance"],
+    "recovery": ["governance", "playbook", "capability"]
+  }
+}

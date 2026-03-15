@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Capability Validation Contract",
+  "type": "object",
+  "required": ["rules"],
+  "properties": {
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "check"],
+        "properties": {
+          "name": { "type": "string" },
+          "check": {
+            "type": "object",
+            "required": ["required_fields", "valid_statuses", "required_files"],
+            "properties": {
+              "required_fields": { "type": "array", "items": { "type": "string" } },
+              "valid_statuses": { "type": "array", "items": { "type": "string" } },
+              "required_files": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

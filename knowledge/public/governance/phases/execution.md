@@ -16,9 +16,9 @@ Accomplish physical changes with absolute validation and micro-tasking.
 - **Legacy Preservation**: Inventory all existing methods and critical logic before performing an overwrite to prevent feature loss.
 
 ## Physical Enforcement
-At each significant milestone or task completion, the agent MUST record progress through the mission controller.
+At each significant milestone or task completion, the owner agent MUST record progress through the mission controller. Worker agents should report through mission-local coordination artifacts for owner acceptance.
 
-- **Command**: `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "<NOTE>"`
+- **Command**: `node dist/scripts/mission_controller.js checkpoint <MISSION_ID> <TASK_ID> "<NOTE>"`
 - **Validation**:
   - Transactional integrity through git commit checkpoints.
   - Recording of commit hashes in `mission-state.json`.

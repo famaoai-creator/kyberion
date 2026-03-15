@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { 
   validateFileSize, 
   safeReadFile, 
@@ -14,7 +13,9 @@ describe('secure-io core', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-test-'));
+    const tmpRoot = path.join(process.cwd(), 'active', 'shared', 'tmp', 'tests');
+    if (!fs.existsSync(tmpRoot)) fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpDir = fs.mkdtempSync(path.join(tmpRoot, 'secure-io-test-'));
   });
 
   afterEach(() => {

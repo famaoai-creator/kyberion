@@ -18,14 +18,14 @@ Model Context Protocol (MCP) is an open standard that enables AI models to inter
 To align Kyberion with MCP, we must map our current architecture to MCP primitives:
 
 - **Resources**: Map to our `knowledge/` tier data.
-- **Tools**: Map to our `scripts/` and `SKILL.md` definitions.
+- **Tools**: Map to our `scripts/`, actuator manifests, and procedure definitions.
 - **Prompts**: Map to our `templates/` or `intent_mapping.yaml`.
 
 ## 3. Implementation Patterns
 
 ### Pattern A: Skill-to-Tool Wrapper
 
-Every Kyberion Skill that follows the `runSkill()` pattern can be automatically wrapped as an MCP Tool.
+Every Kyberion capability that follows the `runCapability()` pattern can be automatically wrapped as an MCP Tool.
 
 ```javascript
 // Example: Converting a Kyberion Skill to an MCP Tool definition
@@ -52,9 +52,9 @@ MCP allows for dynamic context injection. Kyberion's **3-Tier Model** should be 
 
 ### Pattern C: MCP Connector Wrapper (Approach B)
 
-For high-demand public MCP servers, we create individual "Connector" skills that wrap the MCP server execution. This ensures strict schema validation and better discoverability via `SKILL.md`.
+For high-demand public MCP servers, we create individual connector capabilities that wrap the MCP server execution. This ensures strict schema validation and better discoverability via manifests and procedure cards.
 
-- **Shared Engine**: `skills/Connector/scripts/mcp-client-engine.js` provides the common MCP client logic.
+- **Shared Engine**: a shared MCP client engine provides the common MCP client logic behind connector capabilities.
 - **Individual Skills**:
     - `mcp-aws-knowledge-connector`: Wraps `@modelcontextprotocol/server-aws-kb-retrieval` (npx).
     - `mcp-terraform-connector`: Wraps `terraform-mcp-server` (npx).
@@ -74,7 +74,7 @@ By adopting MCP, the Kyberion Ecosystem gains:
 
 ## 5. Action Plan for Evolution
 
-1. **MCP Exporter**: Create a new skill `mcp-gateway` that reads `SKILL.md` files and serves them via an MCP server.
+1. **MCP Exporter**: Create a new capability `mcp-gateway` that reads actuator manifests and procedure cards and serves them via an MCP server.
 2. **Dynamic Tool Loading**: Allow `mission-control` to consume external MCP tools, effectively making our agent capable of using tools it wasn't originally programmed with.
 
 ---

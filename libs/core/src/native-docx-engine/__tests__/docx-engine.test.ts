@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import AdmZip from 'adm-zip';
+import { pathResolver } from '../../../index.js';
 import { generateNativeDocx } from '../engine';
 import { distillDocxDesign } from '../../docx-utils.js';
 import type { DocxDesignProtocol } from '../../types/docx-protocol.js';
@@ -339,7 +339,7 @@ describe('Native DOCX Engine', () => {
   let files: Map<string, string>;
 
   beforeAll(async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docx-test-'));
+    tmpDir = fs.mkdtempSync(path.join(pathResolver.sharedTmp('docx-test-')));
     outputPath = path.join(tmpDir, 'test.docx');
     const protocol = createTestProtocol();
     await generateNativeDocx(protocol, outputPath);

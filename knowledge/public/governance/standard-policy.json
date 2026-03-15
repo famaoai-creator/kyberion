@@ -4,7 +4,7 @@
   "rules": [
     {
       "id": "restricted-api-check",
-      "description": "Ensure skills do not use restricted synchronous FS APIs.",
+      "description": "Ensure actuators and operational scripts do not use restricted synchronous FS APIs.",
       "severity": "error",
       "check_type": "restricted_api",
       "params": {
@@ -15,7 +15,7 @@
           "scripts/fix_shebangs.ts",
           "scripts/mass_refactor_governance.ts"
         ],
-        "target_dirs": ["skills", "scripts"],
+        "target_dirs": ["libs/actuators", "scripts"],
         "file_extensions": [".ts", ".js", ".cjs"]
       }
     },

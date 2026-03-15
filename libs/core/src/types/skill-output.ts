@@ -9,17 +9,18 @@
 /**
  * Standard output contract for Kyberion
  */
-export interface SkillOutput {
+export interface CapabilityOutput {
   /**
    * Name of the skill that produced this output
    */
-  skill: string;
+  capability?: string;
+  skill?: string;
   /**
    * Execution result status
    */
   status: 'success' | 'error' | 'partial';
   /**
-   * The skill's output data (type varies by skill)
+   * The capability output data
    */
   data?: {
     [k: string]: unknown;
@@ -39,3 +40,5 @@ export interface SkillOutput {
   };
   [k: string]: unknown;
 }
+
+export type SkillOutput = CapabilityOutput;

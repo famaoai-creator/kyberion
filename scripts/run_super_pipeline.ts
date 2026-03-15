@@ -1,7 +1,6 @@
-import { logger, safeReadFile, safeWriteFile } from '@agent/core';
+import { logger, safeReadFile, validatePipelineAdf } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { executeSuperPipeline, SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 
 async function main() {
@@ -10,13 +9,21 @@ async function main() {
     .parseSync();
 
   const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
-  const inputData = JSON.parse(inputContent) as { steps: SuperPipelineStep[], context?: any };
+  const inputData = validatePipelineAdf(JSON.parse(inputContent)) as { steps: SuperPipelineStep[], context?: any, options?: any };
 
   logger.info(`🧠 [SUPER_NERVE] Initiating cross-actuator pipeline from: ${argv.input}`);
   
   try {
-    const result = await executeSuperPipeline(inputData.steps, inputData.context || {});
+    const result = await executeSuperPipeline(
+      inputData.steps.map((step) => ({ ...step, params: step.params || {} })),
+      inputData.context || {},
+      inputData.options || {}
+    );
     console.log(JSON.stringify(result, null, 2));
+    if (result.status !== 'succeeded') {
+      logger.error('❌ [SUPER_NERVE] Pipeline failed.');
+      process.exit(1);
+    }
     logger.success('✅ [SUPER_NERVE] Pipeline completed successfully.');
   } catch (err: any) {
     logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${err.message}`);

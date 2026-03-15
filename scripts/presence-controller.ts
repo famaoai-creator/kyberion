@@ -1,6 +1,5 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { logger, safeReadFile, safeWriteFile, safeAppendFile } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
@@ -32,7 +31,7 @@ export function perceive(): Stimulus[] {
   const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
   const REGISTRY_PATH = pathResolver.resolve('presence/bridge/channel-registry.json');
 
-  if (!fs.existsSync(STIMULI_PATH)) return [];
+  if (!safeExistsSync(STIMULI_PATH)) return [];
 
   try {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
@@ -74,7 +73,7 @@ export function getSensoryContext(): string | null {
 
 export async function resolveStimulus(timestamp: string, responseText: string = ''): Promise<void> {
   const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
-  if (!fs.existsSync(STIMULI_PATH)) return;
+  if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
@@ -121,7 +120,7 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
 
 export async function pruneStimuli(): Promise<void> {
   const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
-  if (!fs.existsSync(STIMULI_PATH)) return;
+  if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
@@ -147,7 +146,7 @@ export async function pruneStimuli(): Promise<void> {
       const archiveDir = pathResolver.resolve('active/archive/presence');
       const archiveFile = path.join(archiveDir, `stimuli_archive_${now.toISOString().split('T')[0]}.jsonl`);
       
-      if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
+      if (!safeExistsSync(archiveDir)) safeWriteFile(path.join(archiveDir, '.gitkeep'), '');
       safeAppendFile(archiveFile, archived.join('\n') + '\n');
       safeWriteFile(STIMULI_PATH, remaining.join('\n') + '\n');
       logger.info(`🧹 Pruned ${archived.length} old stimuli to archive.`);

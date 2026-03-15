@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/capability-input.json",
+  "title": "Capability Input",
+  "description": "Standard input contract for Kyberion",
+  "type": "object",
+  "properties": {
+    "capability": {
+      "type": "string",
+      "description": "Name of the capability being invoked"
+    },
+    "skill": {
+      "type": "string",
+      "description": "Legacy alias for capability"
+    },
+    "action": {
+      "type": "string",
+      "description": "The action to perform"
+    },
+    "params": {
+      "type": "object",
+      "description": "Capability-specific parameters",
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "description": "Execution context (knowledge tier, caller info)",
+      "properties": {
+        "knowledge_tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "caller": {
+          "type": "string",
+          "description": "Name of the calling capability or user"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "required": ["action"],
+  "anyOf": [
+    { "required": ["capability"] },
+    { "required": ["skill"] }
+  ]
+}

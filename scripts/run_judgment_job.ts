@@ -3,15 +3,14 @@
  * ADF-driven runner for AI Judging & Analysis.
  */
 
-import { logger, safeReadFile, safeWriteFile, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, capabilityEntry } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 async function main() {
   const adfPath = process.argv[2] || 'work/judgment-job.json';
   const fullAdfPath = path.isAbsolute(adfPath) ? adfPath : path.resolve(process.cwd(), adfPath);
 
-  if (!fs.existsSync(fullAdfPath)) {
+  if (!safeExistsSync(fullAdfPath)) {
     logger.error(`ADF job file not found: ${fullAdfPath}`);
     process.exit(1);
   }
@@ -41,12 +40,12 @@ async function runSystemActuator(input: any) {
   safeWriteFile(tempAdfPath, JSON.stringify(input, null, 2));
 
   try {
-    const output = safeExec('npx', ['tsx', 'libs/actuators/system-actuator/src/index.ts', '--input', tempAdfPath]);
+    const output = safeExec('node', [capabilityEntry('system-actuator'), '--input', tempAdfPath]);
     console.log(output);
   } catch (err: any) {
     logger.error(`Action ${input.action} failed: ${err.message}`);
   } finally {
-    if (fs.existsSync(tempAdfPath)) fs.unlinkSync(tempAdfPath);
+    if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
   }
 }
 

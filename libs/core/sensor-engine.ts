@@ -102,6 +102,7 @@ export abstract class PollingSensor extends KyberionSensor {
         logger.error(`⚠️ [SENSOR:${this.config.id}] Poll cycle failed: ${err}`);
       }
     }, this.config.interval_ms || 60000);
+    this.timer.unref?.();
     
     // Initial poll
     await this.poll();

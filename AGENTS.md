@@ -15,13 +15,15 @@ In any phase, we must never violate the following "Sacred Sanctuaries":
 1.  **Physical Integrity**:
     All file operations MUST be performed via `@agent/core/secure-io`. Direct use of `node:fs` is an act of betrayal against our foundational stability. **All mission lifecycles (Start, Checkpoint, Finish) MUST be managed via `scripts/mission_controller.ts` (KSMC v2.0) to ensure transactional and prerequisite integrity through independent Micro-Git repositories.**
 2.  **Actuator-First (Anti-Reinvention Ban)**:
-    Before writing any temporary or disposable scripts in `scratch/` (e.g., for taking screenshots, making API calls, or parsing data), we MUST first search for and utilize existing tools in `libs/actuators/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort.
+    Before writing any temporary or disposable operational artifacts (for example screenshots, API payloads, parsed outputs, or transient ADF files), we MUST first search for and utilize existing tools in `libs/actuators/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort. Temporary runtime artifacts must live under governed runtime paths such as `active/shared/tmp/` or mission-local storage, not ad hoc top-level directories.
 3.  **Sovereign Primacy**:
     Every action originates from the Sovereign's intent. Any decision involving risk or architectural change requires explicit approval (**Sudo Gate**).
 4.  **Structured Contracts (ADF First)**:
     The junction between reasoning (Brain) and execution (Actuators) MUST always be human-readable Agentic Data Format (**ADF**). We act based on transparent contracts, not script fragments.
 5.  **Tier Isolation (The Sovereign Shield)**:
     Information and mission history are strictly segregated according to the 3-Tier model (Personal, Confidential, Public). **Each mission operates within its own independent Git repository to prevent sovereign data leakage into the system core and to ensure atomic rollbacks.** Leaks from higher to lower tiers must be physically blocked.
+6.  **Mission Authority (Single-Owner, Multi-Worker)**:
+    Every mission MUST have exactly one active owner agent at a time. Worker agents may collaborate only through explicit task contracts, mission-local coordination artifacts, and scoped leases. Short-lived exclusion is a lock concern; durable mission control is a lease concern.
 
 ## 3. The 5-Phase Lifecycle
 Our activities are autonomously recognized through the following **Phase Detection Protocol**, applying their respective dedicated protocols.
@@ -50,6 +52,7 @@ Immediately upon session initialization, the agent MUST determine its active pha
 ### ④ Mission Execution
 *   **Goal**: Accomplishment of physical changes and absolute validation.
 *   **Directive**: **The Absolute Rule of One**. Fix exactly one location at a time and test immediately. Micro-tasking is the only defense against large-scale system collapse.
+*   **Authority Model**: The owner agent controls mission state, checkpoints, verification, and archival transitions. Worker agents contribute through delegated task contracts and coordination artifacts, not by directly mutating mission-wide state.
 *   **Dynamic Re-Alignment**: If significant obstacles arise, or if a superior strategic path is discovered during execution, the agent MUST pause execution and return to **③ Alignment** to synchronize intent and update the Victory Conditions with the Sovereign.
 *   **Ref**: `knowledge/public/governance/phases/execution.md`
 
@@ -63,6 +66,7 @@ Immediately upon session initialization, the agent MUST determine its active pha
 - **[docs/GLOSSARY.md](./docs/GLOSSARY.md)** — Key terms (Actuator, Skill, Plugin, ADF, etc.)
 - **[docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)** — Directory structure and component relationships
 - **[docs/QUICKSTART.md](./docs/QUICKSTART.md)** — Getting started guide
+- **[knowledge/public/architecture/agent-mission-control-model.md](./knowledge/public/architecture/agent-mission-control-model.md)** — Mission ownership, leases, coordination, and observability model
 - **[CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)** — Full capability catalog
 
 ---

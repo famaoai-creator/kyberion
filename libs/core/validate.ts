@@ -3,51 +3,27 @@
  *
  * Validates data against schemas in the schemas/ directory without external dependencies.
  * Supports required fields, type constraints, and enum values.
- *
- * Usage:
- *   import { validateInput, validateOutput } from '../../scripts/lib/validate.js';
- *   const result = validateInput({ skill: 'my-skill', action: 'run' });
- *   if (!result.valid) console.error(result.errors);
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
+import { safeReadFile } from './secure-io.js';
 
 const schemasDir: string = path.resolve(__dirname, '../../schemas');
-
-/** Schema cache to avoid re-reading files from disk. */
 const schemaCache: Record<string, JsonSchema> = {};
 
-/**
- * Load a JSON Schema by name from the schemas/ directory.
- *
- * @param schemaName - Schema name without the `.schema.json` extension
- * @returns Parsed JSON Schema object
- * @throws {Error} If the schema file cannot be read or parsed
- */
 export function loadSchema(schemaName: string): JsonSchema {
   if (schemaCache[schemaName]) return schemaCache[schemaName];
   const filePath = path.join(schemasDir, `${schemaName}.schema.json`);
-  const schema: JsonSchema = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const schema: JsonSchema = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
   schemaCache[schemaName] = schema;
   return schema;
 }
 
-/**
- * Validate data against a named schema.
- *
- * Checks required fields, type constraints, and enum values.
- *
- * @param data       - Data object to validate
- * @param schemaName - Schema name (e.g. 'skill-input', 'skill-output')
- * @returns Validation result with a `valid` flag and an array of errors
- */
 export function validate(data: Record<string, unknown>, schemaName: string): ValidationResult {
   const schema = loadSchema(schemaName);
   const errors: ValidationError[] = [];
 
-  // Check required fields
   if (schema.required) {
     for (const field of schema.required) {
       if (data[field] === undefined || data[field] === null) {
@@ -56,11 +32,18 @@ export function validate(data: Record<string, unknown>, schemaName: string): Val
     }
   }
 
-  // Check property-level constraints
+  if (schema.anyOf) {
+    const anyOfSatisfied = schema.anyOf.some((candidate) =>
+      (candidate.required || []).every((field) => data[field] !== undefined && data[field] !== null),
+    );
+    if (!anyOfSatisfied) {
+      errors.push({ field: 'anyOf', message: 'At least one alternative required field set must be provided' });
+    }
+  }
+
   if (schema.properties) {
     for (const [key, prop] of Object.entries(schema.properties)) {
       if (data[key] !== undefined && data[key] !== null) {
-        // Type check (primitive types only; object/array skipped)
         if (
           prop.type &&
           typeof data[key] !== prop.type &&
@@ -72,7 +55,6 @@ export function validate(data: Record<string, unknown>, schemaName: string): Val
             message: `Expected type "${prop.type}", got "${typeof data[key]}"`,
           });
         }
-        // Enum check
         if (prop.enum && !prop.enum.includes(data[key] as string)) {
           errors.push({
             field: key,
@@ -86,22 +68,18 @@ export function validate(data: Record<string, unknown>, schemaName: string): Val
   return { valid: errors.length === 0, errors };
 }
 
-/**
- * Validate data against the `skill-input` schema.
- *
- * @param data - Input data to validate
- * @returns Validation result
- */
-export function validateInput(data: Record<string, unknown>): ValidationResult {
-  return validate(data, 'skill-input');
+export function validateCapabilityInput(data: Record<string, unknown>): ValidationResult {
+  return validate(data, 'capability-input');
 }
 
-/**
- * Validate data against the `skill-output` schema.
- *
- * @param data - Output data to validate
- * @returns Validation result
- */
+export function validateCapabilityOutput(data: Record<string, unknown>): ValidationResult {
+  return validate(data, 'capability-output');
+}
+
+export function validateInput(data: Record<string, unknown>): ValidationResult {
+  return validateCapabilityInput(data);
+}
+
 export function validateOutput(data: Record<string, unknown>): ValidationResult {
-  return validate(data, 'skill-output');
+  return validateCapabilityOutput(data);
 }

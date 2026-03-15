@@ -9,11 +9,11 @@ last_updated: 2026-03-06
 
 # Sensory Bridge Protocol (GUSP v1.0)
 
-本ドキュメントは、Kyberion エコシステムにおける外部刺激（Sensory Stimulus）の受容から、AI による自律実行、およびフィードバックまでの通信規約を定義する。
+This document defines the transport contract from external stimuli ingestion to agent notification and channel feedback delivery.
 
 ## 1. アーキテクチャ概観
 
-エコシステムの神経系は、以下の3層構造で構成される。
+The sensory system is organized into three layers.
 
 ```mermaid
 graph LR
@@ -24,29 +24,35 @@ graph LR
     end
 
     subgraph Nerve [Bridge Layer]
-        B1[(stimuli.jsonl)]
+        B1[(presence/bridge/runtime/stimuli.jsonl)]
         B2[Nexus Daemon]
+        B3[(channel outbox / receipts)]
     end
 
     subgraph Hub [Incarnation Layer]
         H1[Terminal Hub API]
         H2[Kyberion CLI / Ink]
+        H3[Chronos Mirror v2]
     end
 
     S1 & S2 & S3 -->|GUSP v1.0| B1
     B1 -.->|Watch| B2
     B2 -->|POST /inject| H1
+    B2 -->|control summary| H3
     H1 -->|PTY Write| H2
     H2 -->|Capture & Strip| H1
-    H1 -->|last_response.json| B2
-    B2 -->|Mirror Feedback| S1
+    H1 -->|session outbox| B2
+    B2 -->|approved feedback| B3
+    B3 -->|deliver| S1
 ```
 
 ## 2. Kyberion Unified Sensory Protocol (GUSP) v1.0
 
-すべてのセンサーは、以下のスキーマに従って `presence/bridge/stimuli.jsonl` に「刺激」を書き込まなければならない。
+All sensors must normalize incoming events into the canonical runtime journal:
 
-### 2.1 データ構造 (JSON)
+- `presence/bridge/runtime/stimuli.jsonl`
+
+### 2.1 Data Structure (JSON)
 ```json
 {
   "id": "req-20260305-abcd",      // ユニークID
@@ -70,24 +76,39 @@ graph LR
 }
 ```
 
-## 3. 構成コンポーネントの責務
+## 3. Component responsibilities
 
-### 3.1 センサー (Sensors)
-- 外部イベントを検知し、GUSP 形式に変換。
-- ユーザーへの「受付確認（ACK）」を即座に返し、`stimuli.jsonl` へ追記する。
+### 3.1 Sensors
+- detect external events and normalize them into GUSP
+- return a fast channel-local acknowledgement when appropriate
+- append stimuli to `presence/bridge/runtime/stimuli.jsonl`
+- emit channel observability events into `active/shared/observability/channels/<channel>/`
 
-### 3.2 Nexus Daemon (デーモン)
-- `stimuli.jsonl` を監視し、`pending` 状態の刺激を処理。
-- TTL をチェックし、期限切れの刺激を排除。
-- アイドル状態のターミナル・ハブを特定し、API 経由で指示を注入。
-- `last_response.json` を監視し、完了した成果を元の `origin.channel` へ送り返す。
+### 3.2 Nexus Daemon
+- watch `stimuli.jsonl` and process `pending` stimuli
+- check TTL and expire dead stimuli
+- find an eligible terminal or agent runtime and inject work
+- read session-scoped response artifacts such as `active/shared/runtime/terminal/<session_id>/out/latest_response.json`
+- write approved feedback envelopes into channel outboxes instead of depending on a single global response file
 
-### 3.3 Terminal Hub (ハブ)
-- ブラウザへの WebSocket 配信と、外部からの `/inject` API を提供。
-- **Ink/TUI 最適化**: 1文字ずつのタイピング・エミュレーションを行い、TUI アプリの入力取りこぼしを防止。
-- **ANSI 剥離**: PTY 出力からエスケープシーケンスを除去し、プレーンテキストとしてフィードバックを永続化。
+### 3.3 Terminal Hub
+- provide WebSocket distribution and `/inject` APIs
+- perform TUI-safe input delivery
+- strip ANSI output and persist session-scoped response envelopes
 
-## 4. セキュリティとガバナンス
-- **アクセス制御**: `/inject` API は原則として `localhost` からのみ受け付ける。
-- **不揮発性**: セッション永続化により、物理的な接続が切れても AI の思考状態を保護する。
-- **透明性**: `evidence` 配列により、一つの刺激がどのように処理されたかを物理的に追跡可能にする。
+### 3.4 Chronos Mirror v2
+- provide the authenticated interactive control surface
+- expose structured agent output and delegation summaries
+- keep cached runtime handles only as an optimization, not as the durable system of record
+- store durable coordination and observability artifacts outside the API route process
+
+## 4. Security and governance
+- **Access control**: `/inject` APIs should remain protected by loopback or authenticated gateway rules.
+- **Durability**: session persistence protects in-flight terminal work from transient disconnects.
+- **Transparency**: each stimulus should accumulate evidence and channel delivery receipts.
+- **Mission authority**: channel bridges do not own missions. Mission ownership remains `single-owner, multi-worker`.
+- **Compatibility boundary**: `active/shared/last_response.json` is now a legacy path and must not be treated as the canonical response source for new integrations.
+
+For the full Slack and Chronos operating model, see:
+
+- `knowledge/public/architecture/slack-chronos-control-model.md`

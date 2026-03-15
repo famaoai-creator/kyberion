@@ -1,6 +1,5 @@
-import * as fs from 'node:fs';
 import * as pathResolver from './path-resolver';
-import { safeReadFile } from './secure-io';
+import { safeExistsSync, safeReadFile } from './secure-io';
 
 /**
  * KnowledgeProvider abstracts the access to the `knowledge/` directory.
@@ -43,7 +42,7 @@ export class KnowledgeProvider {
     }
 
     const fullPath = pathResolver.knowledge(relativePath);
-    if (!fs.existsSync(fullPath)) {
+    if (!safeExistsSync(fullPath)) {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Knowledge file not found: ${fullPath}`);
     }
@@ -70,7 +69,7 @@ export class KnowledgeProvider {
     }
 
     const fullPath = pathResolver.knowledge(relativePath);
-    if (!fs.existsSync(fullPath)) {
+    if (!safeExistsSync(fullPath)) {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Knowledge file not found: ${fullPath}`);
     }

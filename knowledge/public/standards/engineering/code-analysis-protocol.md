@@ -43,7 +43,7 @@ last_updated: 2026-03-06
 
 ### Phase 1: Context Discovery (背景把握)
 
-- `README.md`, `SKILL.md` を読み、解析対象の「意図（Purpose）」を特定する。
+- `README.md`, actuator manifest, procedure card を読み、解析対象の「意図（Purpose）」を特定する。
 - `package.json` で依存関係を確認し、エコシステム内の位置付けを把握する。
 
 ### Phase 2: Static Structural Audit (静的解析)

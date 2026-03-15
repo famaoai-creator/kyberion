@@ -25,7 +25,7 @@ last_updated: 2026-03-06
 
 ```json
 {
-  "origin_skill": "skill-name",
+  "origin_capability": "capability-name",
   "confidence_score": 0.95,
   "timestamp": "ISO-String",
   "payload": { ... }

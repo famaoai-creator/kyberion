@@ -5,6 +5,14 @@ tags: [onboarding, setup, concierge, identity]
 importance: 8
 related_roles: [Sovereign Concierge, Ecosystem Architect]
 last_updated: 2026-03-06
+kind: playbook
+scope: global
+authority: recipe
+phase: [onboarding]
+role_affinity: [sovereign_concierge, ecosystem_architect]
+applies_to: [onboarding, identity, setup]
+owner: sovereign_concierge
+status: active
 ---
 
 # 主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)
@@ -26,10 +34,10 @@ last_updated: 2026-03-06
 - **アクション**: `knowledge/personal/my-identity.json` の設定（名前、言語、対話スタイル、優先ドメイン）を確認または更新する。
 - **成果物**: `my-identity.json` の永続化。
 
-### Stage 3: Provision (環境とスキルの配備)
+### Stage 3: Provision (環境と capability の配備)
 - **役割**: 主権者のロールに応じたツールを準備する。
-- **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、専用のスキルバンドルを `skill-bundle-packager` で作成する。
-- **成果物**: `session.json`, スキルバンドル。
+- **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、必要な capabilities と playbooks を提示する。
+- **成果物**: `session.json`, capability guidance.
 
 ### Stage 4: Navigate & Execute (ナビゲーションと最初の任務)
 - **役割**: ナビゲーションを継続しながらの実務理解。

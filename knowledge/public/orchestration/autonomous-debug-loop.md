@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # 自律型デバッグ・ループ (Autonomous Debug Loop)
 
-スキル実行中に予期せぬエラーが発生した際の、自動復旧と再試行の標準プロトコル。
+capability execution 中に予期せぬエラーが発生した際の、自動復旧と再試行の標準プロトコル。
 
 ## 1. エラー検知 (Detection)
 
@@ -22,7 +22,7 @@ last_updated: 2026-03-06
 
 ## 3. 自己修復フェーズ (Self-Healing)
 
-- **パッチ生成**: `skill-evolution-engine` を使い、特定された原因を解消するための修正コード（またはプロンプト）を生成する。
+- **パッチ生成**: `actuator-evolution-engine` を使い、特定された原因を解消するための修正コード（またはプロンプト）を生成する。
 - **適用**: 修正を一時的（または永続的）に反映する。
 
 ## 4. 再試行フェーズ (Retry)
@@ -32,4 +32,4 @@ last_updated: 2026-03-06
 
 ## 5. 永続化 (Learning)
 
-- 成功した修正内容は、将来の再発防止のためスキルの `SKILL.md` または `scripts/` に正式に反映する。
+- 成功した修正内容は、将来の再発防止のため actuator procedure、knowledge card、または `scripts/` に正式に反映する。

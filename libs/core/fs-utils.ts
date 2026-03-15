@@ -1,6 +1,6 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadProjectStandards } from './config-loader.js';
+import { safeLstat, safeReaddir } from './secure-io.js';
 
 const standards = loadProjectStandards();
 
@@ -16,24 +16,26 @@ export function* walk(dir: string, options: WalkOptions = {}): Generator<string>
   const { maxDepth = Infinity, currentDepth = 0 } = options;
   if (currentDepth > maxDepth) return;
 
-  let entries;
+  let entries: string[];
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = safeReaddir(dir);
   } catch (_e) {
     return;
   }
 
   for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
+    const fullPath = path.join(dir, entry);
+    const ext = path.extname(entry).toLowerCase();
 
-    if (entry.isDirectory()) {
-      if (standards.ignore_dirs.includes(entry.name)) continue;
-      yield* walk(fullPath, { ...options, currentDepth: currentDepth + 1 });
-    } else {
-      const ext = path.extname(entry.name).toLowerCase();
-      if (standards.ignore_extensions.includes(ext)) continue;
-      yield fullPath;
-    }
+    try {
+      if (safeLstat(fullPath).isDirectory()) {
+        if (standards.ignore_dirs.includes(entry)) continue;
+        yield* walk(fullPath, { ...options, currentDepth: currentDepth + 1 });
+      } else {
+        if (standards.ignore_extensions.includes(ext)) continue;
+        yield fullPath;
+      }
+    } catch (_e) {}
   }
 }
 
@@ -51,23 +53,26 @@ export async function* walkAsync(dir: string, options: WalkOptions = {}): AsyncG
   const { maxDepth = Infinity, currentDepth = 0 } = options;
   if (currentDepth > maxDepth) return;
 
-  let entries;
+  let entries: string[];
   try {
-    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    entries = safeReaddir(dir);
   } catch (_e) {
     return;
   }
 
   for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (standards.ignore_dirs.includes(entry.name)) continue;
-      yield* walkAsync(fullPath, { ...options, currentDepth: currentDepth + 1 });
-    } else {
-      const ext = path.extname(entry.name).toLowerCase();
-      if (standards.ignore_extensions.includes(ext)) continue;
-      yield fullPath;
-    }
+    const fullPath = path.join(dir, entry);
+    const ext = path.extname(entry).toLowerCase();
+
+    try {
+      if (safeLstat(fullPath).isDirectory()) {
+        if (standards.ignore_dirs.includes(entry)) continue;
+        yield* walkAsync(fullPath, { ...options, currentDepth: currentDepth + 1 });
+      } else {
+        if (standards.ignore_extensions.includes(ext)) continue;
+        yield fullPath;
+      }
+    } catch (_e) {}
   }
 }
 

@@ -144,6 +144,7 @@ class KillSwitchImpl {
         await this.respond(agentId, issues);
       }
     }, intervalMs);
+    this.monitorInterval.unref?.();
     logger.info(`[KILL_SWITCH] Monitor started (${intervalMs}ms interval)`);
   }
 

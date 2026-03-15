@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '../libs/core/index.js';
 import chalk from 'chalk';
@@ -35,7 +34,7 @@ function drawMissions() {
     for (const item of items) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
-        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
         if (state.status === 'active') {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
           console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}]`);
@@ -61,13 +60,42 @@ function drawA2ATraffic() {
   console.log(`  Outbox: ${outCount > 0 ? chalk.bold.yellow(outCount) : chalk.dim(0)} sending\n`);
 }
 
+function drawRuntimeSurfaces() {
+  const statePath = pathResolver.shared('runtime/surfaces/state.json');
+  const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+
+  console.log(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
+
+  if (!safeExistsSync(manifestPath)) {
+    console.log(chalk.dim('  (Surface manifest not found)'));
+    console.log('');
+    return;
+  }
+
+  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
+    surfaces: Array<{ id: string; kind: string; startupMode?: string }>;
+  };
+  const state = safeExistsSync(statePath)
+    ? JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as { surfaces: Record<string, { pid: number }> }
+    : { surfaces: {} };
+
+  for (const surface of manifest.surfaces) {
+    const record = state.surfaces?.[surface.id];
+    const status = record?.pid ? chalk.green('RUNNING') : chalk.dim('STOPPED');
+    const pid = record?.pid ? chalk.gray(` pid=${record.pid}`) : '';
+    console.log(`  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`);
+  }
+  console.log('');
+}
+
 function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
   if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
-    Object.keys(ledger.agents).forEach(a => {
-      const score = ledger.agents[a].current_score;
+    const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const ledger = raw?.agents ?? raw ?? {};
+    Object.keys(ledger).forEach(a => {
+      const score = ledger[a].current_score / 100;
       const bar = '█'.repeat(Math.floor(score)) + '░'.repeat(10 - Math.floor(score));
       console.log(`  ${a.padEnd(15)} [${chalk.cyan(bar)}] ${score.toFixed(1)}`);
     });
@@ -81,6 +109,7 @@ function render() {
   clearScreen();
   drawHeader();
   drawMissions();
+  drawRuntimeSurfaces();
   drawA2ATraffic();
   drawTrustBoard();
   console.log(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));

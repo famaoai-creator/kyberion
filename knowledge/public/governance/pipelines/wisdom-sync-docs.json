@@ -5,7 +5,7 @@
       "id": "load-index",
       "type": "capture",
       "op": "read_json",
-      "params": { "path": "knowledge/orchestration/global_skill_index.json", "export_as": "index_data" }
+      "params": { "path": "knowledge/public/orchestration/global_actuator_index.json", "export_as": "index_data" }
     },
     {
       "id": "count-impl",
@@ -23,7 +23,7 @@
       "id": "update-readme",
       "type": "transform",
       "op": "regex_replace",
-      "params": { "from": "readme_orig", "pattern": "Implemented Skills \\(\\d+\\)", "template": "Implemented Skills ({{impl_count}})", "export_as": "readme_new" }
+      "params": { "from": "readme_orig", "pattern": "Implemented Actuators \\(\\d+\\)", "template": "Implemented Actuators ({{impl_count}})", "export_as": "readme_new" }
     },
     {
       "id": "write-readme",

@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "Sovereign System Upgrade",
   "description": "Checks for updates on GitHub and self-manages the upgrade mission through validation and merge.",
   "steps": [
@@ -34,11 +35,11 @@
           {
             "op": "system:shell",
             "params": {
-              "cmd": "npx tsx scripts/mission_controller.ts create MSN-SYS-UPGRADE-{{remote_hash}} confidential 'default' 'development' '/knowledge/personal/my-vision.md' 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'",
+              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development /knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'",
               "export_as": "create_result"
             }
           },
-          { "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: npx tsx scripts/mission_controller.ts start MSN-SYS-UPGRADE-{{remote_hash}}" } },
+          { "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}" } },
           { "op": "system:log", "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" } }
         ],
         "else": [

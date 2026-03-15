@@ -5,6 +5,6 @@
   "SECURITY_VULNERABILITY": "knowledge/security/security-best-practices.md",
   "GOVERNANCE_VIOLATION": "knowledge/orchestration/directives-protocol.md",
   "MISSING_DEPENDENCY": "knowledge/orchestration/corporate-env-guide.md",
-  "INVALID_INPUT": "schemas/skill-input.schema.json",
+  "INVALID_INPUT": "schemas/capability-input.schema.json",
   "SLO_BREACH": "knowledge/quality-management/metrics_standards.md"
 }

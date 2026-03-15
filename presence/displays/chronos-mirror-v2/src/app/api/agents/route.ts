@@ -9,8 +9,8 @@ import { guardRequest } from "../../../lib/api-guard";
 /**
  * /api/agents - Thin wrapper over Agent-Actuator
  *
- * GET    → health (list all agents with status)
- * POST   → spawn / ask / a2a (via action field)
+ * GET    → health (list all agents with runtime snapshots)
+ * POST   → spawn / ask / a2a / logs / refresh / restart (via action field)
  * DELETE → shutdown
  */
 
@@ -38,15 +38,26 @@ export async function GET(req: NextRequest) {
     }
 
     const snapshot = agentRegistry.getHealthSnapshot();
-    const agents = agentRegistry.list().map(a => ({
-      agentId: a.agentId,
-      provider: a.provider,
-      modelId: a.modelId,
-      status: a.status,
-      capabilities: a.capabilities,
-      trustScore: a.trustScore,
-      uptimeMs: Date.now() - a.spawnedAt,
-      idleMs: Date.now() - a.lastActivity,
+    const agents = agentLifecycle.listSnapshots().map((entry) => ({
+      agentId: entry.agent.agentId,
+      provider: entry.agent.provider,
+      modelId: entry.agent.modelId,
+      status: entry.agent.status,
+      capabilities: entry.agent.capabilities,
+      trustScore: entry.agent.trustScore,
+      uptimeMs: Date.now() - entry.agent.spawnedAt,
+      idleMs: Date.now() - entry.agent.lastActivity,
+      runtime: entry.runtime ? {
+        kind: entry.runtime.kind,
+        state: entry.runtime.state,
+        pid: entry.runtime.pid,
+        idleForMs: entry.runtime.idleForMs,
+        shutdownPolicy: entry.runtime.shutdownPolicy,
+      } : null,
+      metrics: entry.metrics,
+      process: entry.process || null,
+      supportsSoftRefresh: entry.supportsSoftRefresh,
+      providerRuntime: entry.providerRuntime || {},
     }));
     return NextResponse.json({ status: "ok", ...snapshot, agents });
   } catch (err: any) {
@@ -78,12 +89,28 @@ export async function POST(req: NextRequest) {
         const logs = agentLifecycle.getLog(body.agentId, body.limit || 50);
         return NextResponse.json({ status: "ok", agentId: body.agentId, logs });
       }
+      case "snapshot": {
+        if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
+        const snapshot = agentLifecycle.getSnapshot(body.agentId, body.logLimit || 50);
+        if (!snapshot) return NextResponse.json({ error: `Agent ${body.agentId} not found` }, { status: 404 });
+        return NextResponse.json({ status: "ok", snapshot });
+      }
       case "ask": {
         if (!body.agentId || !body.query) return NextResponse.json({ error: "Missing agentId or query" }, { status: 400 });
         const handle = agentLifecycle.getHandle(body.agentId);
         if (!handle) return NextResponse.json({ error: `Agent ${body.agentId} not found or not ready` }, { status: 404 });
         const response = await handle.ask(body.query);
         return NextResponse.json({ status: "ok", agentId: body.agentId, response });
+      }
+      case "refresh": {
+        if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
+        const result = await agentLifecycle.refreshContext(body.agentId);
+        return NextResponse.json({ status: "ok", agentId: body.agentId, ...result });
+      }
+      case "restart": {
+        if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
+        const handle = await agentLifecycle.restart(body.agentId);
+        return NextResponse.json({ status: "ok", agentId: body.agentId, agent: handle.getRecord(), snapshot: agentLifecycle.getSnapshot(body.agentId) });
       }
       case "a2a": {
         if (!body.envelope?.header) return NextResponse.json({ error: "Invalid A2A envelope" }, { status: 400 });

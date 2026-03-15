@@ -4,12 +4,13 @@ import {
   safeWriteFile, 
   safeMkdir, 
   safeExistsSync, 
+  safeReaddir,
+  safeUnlinkSync,
   pathResolver, 
   safeExec,
   withRetry 
 } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import * as crypto from 'node:crypto';
 
 /**
@@ -55,7 +56,7 @@ export async function sendA2AMessage(message: any, options: TransportOptions) {
 export async function pollA2AInbox(): Promise<any[]> {
   if (!safeExistsSync(A2A_INBOX)) return [];
   
-  const files = fs.readdirSync(A2A_INBOX).filter(f => f.endsWith('.a2a'));
+  const files = safeReaddir(A2A_INBOX).filter(f => f.endsWith('.a2a'));
   const messages: any[] = [];
 
   for (const file of files) {
@@ -70,7 +71,7 @@ export async function pollA2AInbox(): Promise<any[]> {
     try {
       messages.push(JSON.parse(content));
       // Move to processed or delete
-      fs.unlinkSync(filePath);
+      safeUnlinkSync(filePath);
     } catch (err) {
       logger.error(`Failed to parse A2A message ${file}: ${err}`);
     }
@@ -92,7 +93,7 @@ async function _encryptPayload(plainText: string, publicKeyPath: string): Promis
   encrypted += cipher.final('hex');
 
   // Encrypt symKey with target's RSA public key
-  const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
+  const publicKey = safeReadFile(publicKeyPath, { encoding: 'utf8' }) as string;
   const encryptedKey = crypto.publicEncrypt(publicKey, symKey).toString('hex');
 
   return `---ENCRYPTED---\n${encryptedKey}\n${iv.toString('hex')}\n${encrypted}`;
@@ -105,20 +106,22 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
   const encryptedPayload = lines[3];
 
   // Retrieve our private key passphrase from Keychain
-  const getPassInput = pathResolver.rootResolve('scratch/get-pass-a2a.json');
+  const getPassInput = pathResolver.sharedTmp('actuators/network-actuator/get-pass-a2a.json');
   safeWriteFile(getPassInput, JSON.stringify({
     action: 'get',
     params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' }
   }));
   
-  const passResult = JSON.parse(safeExec('npx', ['tsx', 'libs/actuators/secret-actuator/src/index.ts', '--input', getPassInput]));
+  const passResult = JSON.parse(
+    safeExec('node', [pathResolver.capabilityEntry('secret-actuator'), '--input', getPassInput]),
+  );
   const pass = passResult.v;
-  fs.unlinkSync(getPassInput);
+  safeUnlinkSync(getPassInput);
 
   // Decrypt our private key using the passphrase
   const privKeyPath = pathResolver.vault('keys/sovereign-private.pem');
   const privateKey = crypto.createPrivateKey({
-    key: fs.readFileSync(privKeyPath),
+    key: safeReadFile(privKeyPath, { encoding: null }) as Buffer,
     passphrase: pass
   });
 

@@ -1,5 +1,5 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 
 /**
  * User Preference Adapter v1.0
@@ -10,8 +10,8 @@ const PREF_PATH = path.join(process.cwd(), 'knowledge/personal/user-preferences.
 export const preferenceAdapter = {
   get: (key: string, defaultValue: any = null) => {
     try {
-      if (!fs.existsSync(PREF_PATH)) return defaultValue;
-      const prefs = JSON.parse(fs.readFileSync(PREF_PATH, 'utf8'));
+      if (!safeExistsSync(PREF_PATH)) return defaultValue;
+      const prefs = JSON.parse(safeReadFile(PREF_PATH, { encoding: 'utf8' }) as string);
 
       const parts = key.split('.');
       let current = prefs;
@@ -27,7 +27,9 @@ export const preferenceAdapter = {
 
   set: (key: string, value: any) => {
     try {
-      const prefs = fs.existsSync(PREF_PATH) ? JSON.parse(fs.readFileSync(PREF_PATH, 'utf8')) : {};
+      const prefs = safeExistsSync(PREF_PATH)
+        ? JSON.parse(safeReadFile(PREF_PATH, { encoding: 'utf8' }) as string)
+        : {};
 
       const parts = key.split('.');
       let current = prefs;
@@ -38,7 +40,7 @@ export const preferenceAdapter = {
       }
       current[parts[parts.length - 1]] = value;
 
-      fs.writeFileSync(PREF_PATH, JSON.stringify(prefs, null, 2) + '\n');
+      safeWriteFile(PREF_PATH, JSON.stringify(prefs, null, 2) + '\n');
       return true;
     } catch (_e) {
       return false;

@@ -11,13 +11,13 @@ In Kyberion v2.1+, you do not run individual scripts. Instead, you issue **Inten
 ### Standard Intent Execution
 ```bash
 # Recommended way to run any high-level task
-npx tsx scripts/run_intent.ts <intent_id>
+node dist/scripts/run_intent.js <intent_id>
 ```
 
 ### Manual Pipeline Execution
 If you need to run a specific ADF pipeline file:
 ```bash
-npx tsx scripts/run_super_pipeline.ts --input path/to/pipeline.json
+node dist/scripts/run_super_pipeline.js --input path/to/pipeline.json
 ```
 
 ---
@@ -32,35 +32,35 @@ All physical changes to the codebase MUST be performed within a mission context.
 start → checkpoint (repeat) → verify → distill → finish
 ```
 
-1. **Start**: `npx tsx scripts/mission_controller.ts start <ID> [tier]`
+1. **Start**: `node dist/scripts/mission_controller.js start <ID> [tier]`
    Creates and activates a mission. Status: `planned → active`.
 
 2. **Work & Checkpoint**: Perform tasks, then record progress:
-   `npx tsx scripts/mission_controller.ts checkpoint <TASK_ID> "description"`
+   `node dist/scripts/mission_controller.js checkpoint <ID> <TASK_ID> "description"`
 
 3. **Verify**: Mark the mission as verified (or reject for rework):
-   `npx tsx scripts/mission_controller.ts verify <ID> verified "Verification note"`
+   `node dist/scripts/mission_controller.js verify <ID> verified "Verification note"`
    Status: `active → distilling` (or back to `active` if rejected).
 
 4. **Distill**: Extract knowledge from the mission via LLM:
-   `npx tsx scripts/mission_controller.ts distill <ID>`
+   `node dist/scripts/mission_controller.js distill <ID>`
    Status: `distilling → completed`. Produces a wisdom file in `knowledge/`.
 
 5. **Finish**: Archive the completed mission:
-   `npx tsx scripts/mission_controller.ts finish <ID> [--seal]`
+   `node dist/scripts/mission_controller.js finish <ID> [--seal]`
    Optionally encrypts with `--seal` (AES+RSA).
 
 ### Visibility
 
 ```bash
 # List all missions (optionally filter by status)
-npx tsx scripts/mission_controller.ts list [active|completed|...]
+node dist/scripts/mission_controller.js list [active|completed|...]
 
 # Show detailed status of a specific mission
-npx tsx scripts/mission_controller.ts status <ID>
+node dist/scripts/mission_controller.js status <ID>
 
 # Show all commands
-npx tsx scripts/mission_controller.ts help
+node dist/scripts/mission_controller.js help
 ```
 
 ---
@@ -70,8 +70,15 @@ npx tsx scripts/mission_controller.ts help
 To communicate with Kyberion via the **Agent-to-Agent (A2A)** protocol:
 
 ```bash
-npx tsx scripts/run_a2a.ts --input my-a2a-message.json
+node dist/scripts/run_a2a.js --input my-a2a-message.json
 ```
+
+### Mission Collaboration
+Kyberion uses a `single-owner, multi-worker` mission model.
+
+- The owner agent controls mission state and lifecycle.
+- Worker agents operate through task contracts and leases.
+- Shared execution artifacts should go to mission-local `coordination/` first, and only use `active/shared/` for global discovery or observability.
 
 The response will be a standardized A2A `result` message containing the pipeline context.
 

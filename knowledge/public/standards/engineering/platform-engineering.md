@@ -31,11 +31,11 @@ await platform.open('https://google.com');
 
 ## 2. スキルの互換性宣言 (Skill Compatibility)
 
-特定の OS でしか動作しないスキルは、`SKILL.md` の Frontmatter で明示的に制限しなければならない。
+特定の OS でしか動作しない capability は、actuator manifest または procedure metadata で明示的に制限しなければならない。
 
 ```yaml
 ---
-name: macOS-only-skill
+name: macOS-only-capability
 platforms: [darwin]
 ---
 ```
@@ -44,7 +44,7 @@ platforms: [darwin]
 
 1.  **自動検知**: `npm run generate-index` は各スキルの `platforms` メタデータを抽出し、グローバルインデックスに記録する。
 2.  **実行時ガード**: CLI はスキル実行前に現在のホスト OS とスキルの互換性をチェックし、不一致の場合は実行を拒否する。
-3.  **ヘルスチェック**: `scripts/check_skills_health.ts` は、現在の環境で動作しないスキルを `🚫 UNSUPPORTED` としてフラグを立てる。
+3.  **ヘルスチェック**: capability health check は、現在の環境で動作しない capability を `🚫 UNSUPPORTED` としてフラグを立てる。
 
 ## 4. 各プラットフォームのサポート状況
 

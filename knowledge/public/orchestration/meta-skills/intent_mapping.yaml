@@ -1,6 +1,6 @@
-# Meta-Skill Intent Mapping
-# Maps abstract user intents to concrete skill chains.
-# Each intent defines trigger phrases and the skill chain to execute.
+# Intent Routing Map
+# Maps abstract user intents to concrete capability chains.
+# Each intent defines trigger phrases and the capability chain to execute.
 
 intents:
   # === Security & Compliance ===

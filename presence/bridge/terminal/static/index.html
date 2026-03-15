@@ -107,9 +107,18 @@
             fetchSessions();
         }, 50);
 
+        function getTerminalToken() {
+            return localStorage.getItem('kyberion_terminal_token');
+        }
+
+        function authHeaders() {
+            const token = getTerminalToken();
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
         async function fetchSessions() {
             try {
-                const res = await fetch('/sessions');
+                const res = await fetch('/sessions', { headers: authHeaders() });
                 const list = await res.json();
                 sessionList.innerHTML = '';
                 list.forEach(s => {
@@ -131,7 +140,11 @@
 
         function connect() {
             const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-            socket = new WebSocket(`${protocol}://${location.host}`);
+            const token = getTerminalToken();
+            const wsUrl = token
+                ? `${protocol}://${location.host}?token=${encodeURIComponent(token)}`
+                : `${protocol}://${location.host}`;
+            socket = new WebSocket(wsUrl);
             socket.onopen = () => {
                 connIndicator.classList.add('on');
                 // Fit BEFORE sending init to get correct initial size
@@ -188,7 +201,7 @@
                 try {
                     const res = await fetch('/sessions', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
                         body: JSON.stringify({ name })
                     });
                     const created = await res.json();

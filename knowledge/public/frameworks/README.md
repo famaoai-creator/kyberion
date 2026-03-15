@@ -4,7 +4,7 @@ This directory contains conceptual frameworks and guidelines that were previousl
 
 ## Why the Consolidation?
 
-Each of these 26 entries previously occupied its own top-level directory containing only a `SKILL.md` file with no implementation code. They describe thinking models, governance principles, and analytical perspectives rather than actionable tooling.
+Each of these 26 entries previously occupied its own top-level directory containing only a thin instruction file and no implementation code. They describe thinking models, governance principles, and analytical perspectives rather than actionable tooling.
 
 By moving them into `knowledge/frameworks/`:
 
