@@ -13,9 +13,9 @@ describe('secure-io core', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    const scratchRoot = path.join(process.cwd(), 'scratch');
-    if (!fs.existsSync(scratchRoot)) fs.mkdirSync(scratchRoot, { recursive: true });
-    tmpDir = fs.mkdtempSync(path.join(scratchRoot, 'secure-io-test-'));
+    const tmpRoot = path.join(process.cwd(), 'active', 'shared', 'tmp', 'tests');
+    if (!fs.existsSync(tmpRoot)) fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpDir = fs.mkdtempSync(path.join(tmpRoot, 'secure-io-test-'));
   });
 
   afterEach(() => {

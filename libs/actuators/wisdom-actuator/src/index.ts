@@ -249,7 +249,9 @@ async function opApply(op: string, params: any, ctx: any) {
         }
       };
 
-      const outPath = pathResolver.rootResolve(resolveVars(params.output_path || `scratch/${kkp.metadata.package_id}.kkp`, ctx));
+      const outPath = pathResolver.rootResolve(
+        resolveVars(params.output_path || pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`), ctx)
+      );
       safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
       logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
       break;

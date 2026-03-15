@@ -18,6 +18,10 @@ The goal is to separate four concerns that had started to blur together:
 3. interactive control surfaces
 4. channel feedback delivery
 
+After the service-binding cleanup, a fifth concern is explicit:
+
+5. authenticated service binding
+
 ## 1. Core rule
 
 Slack is a channel, not a mission owner.
@@ -56,6 +60,7 @@ Ingress responsibilities:
 - never write directly into mission state without a claim or lease
 
 Slack bridge belongs here first. Its current behavior as a sensor is correct.
+Its authentication should come from service binding, not route-local secret lookup patterns spread across gateways.
 
 ### 2.2 Control plane
 
@@ -101,6 +106,21 @@ Feedback responsibilities:
 - preserve channel reply context such as Slack thread information
 - emit delivery receipts and failures into observability
 
+### 2.4 Service-binding plane
+
+Service binding resolves authenticated access to external services without turning gateways into ad hoc credential loaders.
+
+Current implementation anchor:
+
+- `libs/core/service-binding.ts`
+
+Service-binding responsibilities:
+
+- resolve service-scoped credentials through governed secret access
+- express whether access is token-based or session-based
+- keep ingress gateways thin
+- support delivery actuators and service-aware access paths with a shared binding contract
+
 ## 3. Slack model
 
 Slack should be modeled as:
@@ -142,6 +162,8 @@ If a Slack exchange is mission-bound, the outbox artifact should reference:
 
 This is what makes the response explainable later.
 
+Slack egress should be treated as channel delivery, not as local system execution.
+
 ## 4. Chronos Mirror v2 model
 
 Chronos Mirror v2 should be modeled as an interactive control plane and display surface.
@@ -169,6 +191,8 @@ Authoritative artifacts belong in:
 - `active/shared/coordination/chronos/sessions/`
 - `active/shared/observability/chronos/requests.jsonl`
 - `active/shared/observability/chronos/delegations.jsonl`
+
+Chronos gateway authentication is route-local, but any downstream external service access should still flow through service binding.
 
 ### 4.2 Chronos and A2A
 
@@ -217,6 +241,24 @@ Recommended roles:
 - shared observability
 - shared channel coordination
 - presence runtime bridges
+
+### 5.3 Gateway, binding, and actuator split
+
+The intended mapping is:
+
+- `slack-bridge`
+  - Slack ingress gateway
+- `chronos-mirror-v2`
+  - Chronos control gateway
+- `presence-actuator`
+  - channel delivery actuator
+- `service-actuator`
+  - authenticated service binding and service-aware access
+- `system-actuator`
+  - local ephemeral OS execution
+
+Slack streaming ingress should not live in `service-actuator`.
+It belongs to the Slack gateway.
 
 ## 6. Observability contract
 

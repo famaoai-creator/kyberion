@@ -1,4 +1,4 @@
-import { pathResolver, logger, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { pathResolver, logger, safeExistsSync, safeMkdir, safeReadFile, sharedExports } from '@agent/core';
 import * as path from 'node:path';
 import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
 
@@ -42,7 +42,7 @@ async function main() {
   // Determine output path
   const ext = engine === 'pptx' ? '.pptx' : engine === 'd2' ? '.svg' : '.pdf';
   const defaultName = pattern.pattern_id?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'output';
-  const outputPath = outputArg || `scratch/${defaultName}${ext}`;
+  const outputPath = outputArg || sharedExports(`marketing/${defaultName}${ext}`);
 
   const outputDir = path.dirname(path.resolve(process.cwd(), outputPath));
   if (!safeExistsSync(outputDir)) {

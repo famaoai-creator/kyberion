@@ -26,6 +26,10 @@ Kyberion should reason about external interaction as three layers:
 2. `Nerve`
 3. `Execution`
 
+For service-backed channels, there is an additional cross-cutting concern:
+
+- `Service Binding`
+
 ### 1.1 Surface
 
 The human-facing or external-system-facing layer.
@@ -50,6 +54,21 @@ The durable authority layer.
 This is where missions, task contracts, worker agents, runtime sessions, and actuators perform work.
 
 Execution owns outcomes. Surface does not.
+
+### 1.4 Service Binding
+
+Service Binding is the governed authenticated access contract for an external service.
+
+It is not the same thing as:
+
+- ingress gateway
+- delivery actuator
+- local system execution
+
+Examples:
+
+- Slack token/app-token resolution
+- future Jira or Box service client resolution
 
 ## 2. Channel
 
@@ -234,6 +253,12 @@ Surface Agent:
 
 - `slack-surface-agent`
 
+Supporting runtime components:
+
+- ingress gateway: `satellites/slack-bridge`
+- delivery actuator: `libs/actuators/presence-actuator`
+- service binding: `libs/core/service-binding.ts`
+
 ### 6.2 Chronos Mirror v2
 
 Channel:
@@ -258,6 +283,12 @@ Ports:
 Surface Agent:
 
 - `chronos-surface-agent`
+
+Supporting runtime components:
+
+- control gateway: `presence/displays/chronos-mirror-v2`
+- delivery path: `presence-actuator` or UI-local response rendering
+- service binding: only when Chronos needs downstream authenticated service access
 
 ## 7. Artifact placement
 

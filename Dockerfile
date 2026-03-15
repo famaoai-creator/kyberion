@@ -33,10 +33,7 @@ RUN pnpm run build
 FROM builder AS development
 ENV NODE_ENV=development
 
-# Establish internal links pointing to dist
-RUN node dist/scripts/bootstrap.js && \
-    find skills -name "core" -type l -path "*/node_modules/@agent/core" -exec rm {} \; && \
-    find skills -name "@agent" -type d -path "*/node_modules/@agent" -exec ln -s ../../../../../dist/libs/core {}/core \;
+RUN node dist/scripts/bootstrap.js
 
 # Setup dummy role config for Governance Audit
 RUN mkdir -p knowledge/personal && echo '{"active_role":"Ecosystem Architect","persona":"Mock"}' > knowledge/personal/role-config.json
@@ -54,16 +51,12 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/libs ./libs
-COPY --from=builder /app/skills ./skills
 COPY --from=builder /app/knowledge ./knowledge
 
 # Prune dev dependencies
 RUN pnpm prune --prod
 
-# Establish internal links for runtime (pointing to dist)
-RUN node dist/scripts/bootstrap.js && \
-    find skills -name "core" -type l -path "*/node_modules/@agent/core" -exec rm {} \; && \
-    find skills -name "@agent" -type d -path "*/node_modules/@agent" -exec ln -s ../../../../../dist/libs/core {}/core \;
+RUN node dist/scripts/bootstrap.js
 
 # Optimized Entrypoint using the unified CLI
 ENTRYPOINT ["node", "dist/scripts/cli.js"]

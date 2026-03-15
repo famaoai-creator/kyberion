@@ -374,7 +374,9 @@ export const fileUtils = {
       const content = rawReadTextFile(resolved);
       const data = JSON.parse(content);
       if (stat.size < 5 * 1024 * 1024) {
-        const isIndex = resolved.includes('global_skill_index.json');
+        const isIndex =
+          resolved.includes('global_actuator_index.json') ||
+          resolved.includes('global_skill_index.json');
         _fileCache.set(resolved, { mtimeMs, data }, undefined, isIndex);
       }
       return data;

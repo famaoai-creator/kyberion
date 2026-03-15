@@ -3,7 +3,7 @@ import { withLock, safeWriteFile, safeReadFile, safeExistsSync, pathResolver, sa
 import * as path from 'node:path';
 
 const TEST_RESOURCE = 'test-resource-arbitration';
-const TEST_FILE = pathResolver.rootResolve('scratch/lock-test.txt');
+const TEST_FILE = pathResolver.sharedTmp('tests/lock-test.txt');
 
 describe('Autonomous Resource Arbitration (Locking)', () => {
   

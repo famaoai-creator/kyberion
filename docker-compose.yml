@@ -12,11 +12,8 @@ services:
       - node_modules_data:/app/node_modules
     environment:
       - NODE_ENV=development
-    # Ensure links are correct inside the container on startup
     entrypoint: >
       bash -c "node dist/scripts/bootstrap.js && 
-      find skills -name 'core' -type l -path '*/node_modules/@agent/core' -exec rm {} \; && 
-      find skills -name '@agent' -type d -path '*/node_modules/@agent' -exec ln -s ../../../../../dist/libs/core {}/core \; &&
       node dist/scripts/cli.js list implemented"
 
 volumes:

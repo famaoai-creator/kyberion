@@ -46,7 +46,7 @@ pnpm capabilities
 
 ## Step 3: Discover What You Can Run
 
-Before starting a mission, use the CLI to discover available actuators from the global skill index.
+Before starting a mission, use the CLI to discover available actuators from the global actuator index.
 
 ```bash
 # Show all indexed actuators
@@ -73,35 +73,31 @@ Your personal settings always take priority. See [3-Tier Model](./README.md#3-ti
 
 ## Step 5: Your First Mission
 
-Every mission begins in **Phase 0: Alignment**. You must discuss your intent with the agent and establish a `TASK_BOARD.md` before executing skills.
+Every mission begins in **Phase 0: Alignment**. You must discuss your intent with the agent and establish a `TASK_BOARD.md` before executing actuators and mission flows.
 
 ### For CEOs / Executives
 
 > "I want to evaluate our new market entry using the ceo-strategy playbook. Let's do the Alignment phase first."
 
-*Agent will create a Task Board using:* `scenario-multiverse-orchestrator`, `financial-modeling-maestro`, `competitive-intel-strategist`
+*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
 
 ### For Engineers
 
 > "I need to modernize this legacy component. Let's align on a strategy and create a Task Board."
 
-*Agent will create a Task Board using:* `codebase-mapper` → `refactoring-engine`
+*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
 
 ### For PM / Auditors
 
 > "Run a full product audit. Draft the plan in a Task Board first."
 
-*Agent will create a Task Board using:* `project-health-check`, `security-scanner`, `ux-auditor`
+*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
 
 ---
 
 ## Next Steps
 
 - Browse available playbooks: [`knowledge/orchestration/mission-playbooks/`](./knowledge/orchestration/mission-playbooks/)
-- Create a custom skill bundle:
-  ```bash
-  npm run cli -- run skill-bundle-packager -- my-mission skill-a skill-b
-  ```
 - Install an external plugin:
   ```bash
   npm run plugin -- install <package>
@@ -114,4 +110,4 @@ Every mission begins in **Phase 0: Alignment**. You must discuss your intent wit
 ---
 
 **Need Help?**
-See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the full list of capabilities, or ask Kyberion: "Help me find the right skill for [your task]."
+See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the full list of capabilities, or ask Kyberion: "Help me find the right actuator for [your task]."

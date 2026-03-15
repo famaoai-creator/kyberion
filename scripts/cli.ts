@@ -2,7 +2,7 @@ import { logger, pathResolver, safeExistsSync, safeExec, safeReadFile, safeReadd
 import * as path from 'node:path';
 import chalk from 'chalk';
 
-interface RawSkillEntry {
+interface RawActuatorEntry {
   n?: string;
   name?: string;
   path: string;
@@ -12,12 +12,13 @@ interface RawSkillEntry {
   status?: string;
 }
 
-interface RawSkillIndex {
-  s?: RawSkillEntry[];
-  skills?: RawSkillEntry[];
+interface RawActuatorIndex {
+  s?: RawActuatorEntry[];
+  actuators?: RawActuatorEntry[];
+  skills?: RawActuatorEntry[];
 }
 
-export interface SkillRecord {
+export interface ActuatorRecord {
   name: string;
   path: string;
   description: string;
@@ -26,6 +27,8 @@ export interface SkillRecord {
 
 const rootDir = pathResolver.rootDir();
 const indexCandidates = [
+  pathResolver.knowledge('public/orchestration/global_actuator_index.json'),
+  pathResolver.knowledge('orchestration/global_actuator_index.json'),
   pathResolver.knowledge('public/orchestration/global_skill_index.json'),
   pathResolver.knowledge('orchestration/global_skill_index.json'),
 ];
@@ -33,41 +36,41 @@ const indexCandidates = [
 export function resolveIndexPath(): string {
   const resolved = indexCandidates.find(candidate => safeExistsSync(candidate));
   if (!resolved) {
-    throw new Error(`Skill index not found. Checked: ${indexCandidates.join(', ')}`);
+    throw new Error(`Actuator index not found. Checked: ${indexCandidates.join(', ')}`);
   }
 
   return resolved;
 }
 
-export function normalizeSkills(index: RawSkillIndex): SkillRecord[] {
-  const rawSkills = index.s || index.skills || [];
+export function normalizeActuators(index: RawActuatorIndex): ActuatorRecord[] {
+  const rawActuators = index.actuators || index.s || index.skills || [];
 
-  return rawSkills
-    .map(skill => ({
-      name: skill.n || skill.name || path.basename(skill.path),
-      path: skill.path,
-      description: skill.d || skill.description || 'No description available.',
-      status: skill.s || skill.status || 'unknown',
+  return rawActuators
+    .map(actuator => ({
+      name: actuator.n || actuator.name || path.basename(actuator.path),
+      path: actuator.path,
+      description: actuator.d || actuator.description || 'No description available.',
+      status: actuator.s || actuator.status || 'unknown',
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function loadSkills(): SkillRecord[] {
+export function loadActuators(): ActuatorRecord[] {
   const indexContent = safeReadFile(resolveIndexPath(), { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(indexContent) as RawSkillIndex;
-  return normalizeSkills(parsed);
+  const parsed = JSON.parse(indexContent) as RawActuatorIndex;
+  return normalizeActuators(parsed);
 }
 
-export function searchSkills(skills: SkillRecord[], query: string): SkillRecord[] {
+export function searchActuators(actuators: ActuatorRecord[], query: string): ActuatorRecord[] {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
-    return skills;
+    return actuators;
   }
 
-  return skills.filter(skill =>
-    skill.name.toLowerCase().includes(normalizedQuery) ||
-    skill.description.toLowerCase().includes(normalizedQuery) ||
-    skill.path.toLowerCase().includes(normalizedQuery),
+  return actuators.filter(actuator =>
+    actuator.name.toLowerCase().includes(normalizedQuery) ||
+    actuator.description.toLowerCase().includes(normalizedQuery) ||
+    actuator.path.toLowerCase().includes(normalizedQuery),
   );
 }
 
@@ -123,13 +126,13 @@ function printHeader() {
   console.log(chalk.gray('Discover, inspect, and run actuators from the sovereign console.\n'));
 }
 
-function printHelp(skills: SkillRecord[]) {
+function printHelp(actuators: ActuatorRecord[]) {
   printHeader();
   console.log('Usage: npm run cli -- <command> [arguments]');
   console.log('');
   console.log('Commands:');
   console.log('  help                 Show this help');
-  console.log('  list                 List available actuators in the global skill index');
+  console.log('  list                 List available actuators in the global actuator index');
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
@@ -145,39 +148,38 @@ function printHelp(skills: SkillRecord[]) {
   console.log('  pnpm capabilities    Check which actuator capabilities fit this environment');
   console.log('  pnpm mission:journal Inspect mission history');
   console.log('');
-  console.log(`Indexed actuators: ${skills.length}`);
+  console.log(`Indexed actuators: ${actuators.length}`);
 }
 
-function printSkillList(skills: SkillRecord[]) {
+function printActuatorList(actuators: ActuatorRecord[]) {
   printHeader();
 
-  if (skills.length === 0) {
-    console.log('No actuators were found in the skill index.');
+  if (actuators.length === 0) {
+    console.log('No actuators were found in the actuator index.');
     return;
   }
 
-  console.log(`Indexed actuators: ${skills.length}\n`);
-  skills.forEach(skill => {
-    console.log(`- ${chalk.bold(skill.name)} (${skill.status})`);
-    console.log(`  ${skill.description}`);
-    console.log(`  ${chalk.gray(skill.path)}`);
+  console.log(`Indexed actuators: ${actuators.length}\n`);
+  actuators.forEach(actuator => {
+    console.log(`- ${chalk.bold(actuator.name)} (${actuator.status})`);
+    console.log(`  ${actuator.description}`);
+    console.log(`  ${chalk.gray(actuator.path)}`);
   });
 }
 
-function printSkillInfo(skill: SkillRecord) {
+function printActuatorInfo(actuator: ActuatorRecord) {
   printHeader();
-  console.log(`${chalk.bold(skill.name)} (${skill.status})`);
-  console.log(skill.description);
-  console.log(`Path: ${skill.path}`);
+  console.log(`${chalk.bold(actuator.name)} (${actuator.status})`);
+  console.log(actuator.description);
+  console.log(`Path: ${actuator.path}`);
 
-  const runnableScript = resolveSkillPath(skill.path);
+  const runnableScript = resolveActuatorPath(actuator.path);
   console.log(`Runnable: ${runnableScript ? runnableScript : 'Not built yet (run pnpm build)'}`);
 }
 
-export function resolveSkillPath(skillPath: string): string | null {
+export function resolveActuatorPath(actuatorPath: string): string | null {
   const candidates = [
-    path.join(rootDir, 'dist', skillPath, 'src'),
-    path.join(rootDir, 'dist', 'skills', skillPath, 'src'),
+    path.join(rootDir, 'dist', actuatorPath, 'src'),
   ];
 
   for (const candidate of candidates) {
@@ -195,33 +197,33 @@ export function resolveSkillPath(skillPath: string): string | null {
   return null;
 }
 
-function findSkill(skills: SkillRecord[], name: string): SkillRecord | undefined {
+function findActuator(actuators: ActuatorRecord[], name: string): ActuatorRecord | undefined {
   const normalizedName = name.trim().toLowerCase();
-  return skills.find(skill => skill.name.toLowerCase() === normalizedName);
+  return actuators.find(actuator => actuator.name.toLowerCase() === normalizedName);
 }
 
-function runSkill(skills: SkillRecord[], skillName: string | undefined, rawArgs: string[], missionId?: string) {
-  if (!skillName) {
+function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefined, rawArgs: string[], missionId?: string) {
+  if (!actuatorName) {
     throw new Error('Missing actuator name. Try `npm run cli -- list`.');
   }
 
-  const skill = findSkill(skills, skillName);
-  if (!skill) {
-    const suggestions = searchSkills(skills, skillName).slice(0, 5).map(match => match.name);
+  const actuator = findActuator(actuators, actuatorName);
+  if (!actuator) {
+    const suggestions = searchActuators(actuators, actuatorName).slice(0, 5).map(match => match.name);
     const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
-    throw new Error(`Actuator "${skillName}" not found.${suffix}`);
+    throw new Error(`Actuator "${actuatorName}" not found.${suffix}`);
   }
 
   const { branchId, args } = extractBranchArg(rawArgs);
   printBranchBanner(branchId);
 
-  const script = resolveSkillPath(skill.path);
+  const script = resolveActuatorPath(actuator.path);
   if (!script) {
-    throw new Error(`Actuator "${skill.name}" is indexed but has no runnable build output. Run \`pnpm build\` first.`);
+    throw new Error(`Actuator "${actuator.name}" is indexed but has no runnable build output. Run \`pnpm build\` first.`);
   }
 
   const forwardedArgs = args.filter(arg => arg !== '--');
-  process.stderr.write(chalk.blue(`🚀 ACTUATING: ${skill.name}...\n`));
+  process.stderr.write(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
 
   try {
     const output = safeExec('node', [script, ...forwardedArgs], {
@@ -244,22 +246,22 @@ export async function main(args = process.argv.slice(2)) {
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
 
-  const skills = loadSkills();
+  const actuators = loadActuators();
   const [command = 'help', firstArg, ...restArgs] = args;
 
   if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp(skills);
+    printHelp(actuators);
     return;
   }
 
   if (command === 'list') {
-    printSkillList(skills);
+    printActuatorList(actuators);
     return;
   }
 
   if (command === 'search') {
-    const matches = searchSkills(skills, firstArg || '');
-    printSkillList(matches);
+    const matches = searchActuators(actuators, firstArg || '');
+    printActuatorList(matches);
     return;
   }
 
@@ -268,17 +270,17 @@ export async function main(args = process.argv.slice(2)) {
       throw new Error('Missing actuator name. Try `npm run cli -- list`.');
     }
 
-    const skill = findSkill(skills, firstArg);
-    if (!skill) {
+    const actuator = findActuator(actuators, firstArg);
+    if (!actuator) {
       throw new Error(`Actuator "${firstArg}" not found.`);
     }
 
-    printSkillInfo(skill);
+    printActuatorInfo(actuator);
     return;
   }
 
   if (command === 'run') {
-    runSkill(skills, firstArg, restArgs, missionId);
+    runActuator(actuators, firstArg, restArgs, missionId);
     return;
   }
 

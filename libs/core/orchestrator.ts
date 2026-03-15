@@ -6,15 +6,26 @@ import { metrics } from './metrics.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 
 /**
- * Skill Pipeline Orchestrator - chains skills together with data passing.
+ * Actuator Pipeline Orchestrator - chains actuator steps together with data passing.
  */
 
 const rootDir = process.cwd();
-const skillIndex = path.join(rootDir, 'knowledge/orchestration/global_skill_index.json');
+const actuatorIndexCandidates = [
+  path.join(rootDir, 'knowledge/public/orchestration/global_actuator_index.json'),
+  path.join(rootDir, 'knowledge/orchestration/global_actuator_index.json'),
+  path.join(rootDir, 'knowledge/public/orchestration/global_skill_index.json'),
+  path.join(rootDir, 'knowledge/orchestration/global_skill_index.json'),
+];
+
+function resolveActuatorIndexPath() {
+  const resolved = actuatorIndexCandidates.find(candidate => safeExistsSync(candidate));
+  if (!resolved) throw new Error(`Actuator index not found. Checked: ${actuatorIndexCandidates.join(', ')}`);
+  return resolved;
+}
 
 export function resolveSkillScript(skillName: string): string {
-  const index = JSON.parse(safeReadFile(skillIndex, { encoding: 'utf8' }) as string);
-  const skills = index.s || index.skills;
+  const index = JSON.parse(safeReadFile(resolveActuatorIndexPath(), { encoding: 'utf8' }) as string);
+  const skills = index.actuators || index.s || index.skills;
 
   let skill;
   if (skillName.includes('/')) {

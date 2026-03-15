@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync } from '@agent/core';
+import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp } from '@agent/core';
 import * as path from 'node:path';
 
 async function main() {
@@ -15,7 +15,7 @@ async function main() {
   
   for (const job of config.jobs || []) {
     logger.info(`🚀 [ORCHESTRATION] Running job: ${job.name}`);
-    const tempAdfPath = rootResolve(`scratch/orchestration-job-${Date.now()}.json`);
+    const tempAdfPath = sharedTmp(`scripts/orchestration-job-${Date.now()}.json`);
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {

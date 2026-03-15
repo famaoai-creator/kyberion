@@ -6,7 +6,7 @@
 | :-- | :-------------------- | :-------------------- | :--------------------------------------------- | :------- |
 | 01  | Software Engineer     | Infrastructure Docs   | Wiki, CI/CD YAMLs, Terraform scripts           | High     |
 | 02  | CEO                   | Strategic Vision      | Board Minutes, Vision Slides                   | Critical |
-| 03  | Ecosystem Architect   | Skill Usage Metrics   | global_skill_index.json, work logs             | Medium   |
+| 03  | Ecosystem Architect   | Actuator Usage Metrics | global_actuator_index.json, work logs          | Medium   |
 | 04  | Knowledge Steward     | External Auth Config  | Box/Google Credentials, API Specs              | High     |
 | 05  | Solution Architect    | Case Studies & ROI    | Past proposals, Sales CRM, Competitor sites    | High     |
 | 06  | Reliability Engineer  | Incident & Monitoring | PagerDuty, Prometheus configs, Billing data    | High     |

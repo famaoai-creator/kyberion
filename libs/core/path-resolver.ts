@@ -22,11 +22,15 @@ function findProjectRoot(startDir: string): string {
 
 const PROJECT_ROOT_DIR = findProjectRoot(process.cwd());
 const ACTIVE_ROOT = path.join(PROJECT_ROOT_DIR, 'active');
+const ACTIVE_SHARED_ROOT = path.join(ACTIVE_ROOT, 'shared');
 const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
 const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
-const INDEX_PATH = path.join(KNOWLEDGE_ROOT, 'public/orchestration/global_skill_index.json');
+const INDEX_PATHS = [
+  path.join(KNOWLEDGE_ROOT, 'public/orchestration/global_actuator_index.json'),
+  path.join(KNOWLEDGE_ROOT, 'public/orchestration/global_skill_index.json'),
+];
 
 export function rootDir() { return PROJECT_ROOT_DIR; }
 export function knowledge(subPath = '') { return path.join(KNOWLEDGE_ROOT, subPath); }
@@ -34,7 +38,17 @@ export function active(subPath = '') { return path.join(ACTIVE_ROOT, subPath); }
 export function scripts(subPath = '') { return path.join(SCRIPTS_ROOT, subPath); }
 export function vault(subPath = '') { return path.join(VAULT_ROOT, subPath); }
 export function vision(subPath = '') { return path.join(VISION_ROOT, subPath); }
-export function shared(subPath = '') { return path.join(ACTIVE_ROOT, 'shared', subPath); }
+export function shared(subPath = '') { return path.join(ACTIVE_SHARED_ROOT, subPath); }
+export function sharedTmp(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
+export function sharedExports(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'exports');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
 
 export function isProtected(filePath: string) {
   const resolved = path.resolve(filePath);
@@ -46,9 +60,10 @@ export function isProtected(filePath: string) {
 }
 
 export function skillDir(skillName: string) {
-  if (!rawExistsSync(INDEX_PATH)) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
-  const index = JSON.parse(rawReadTextFile(INDEX_PATH));
-  const skillList = index.s || index.skills || [];
+  const indexPath = INDEX_PATHS.find(candidate => rawExistsSync(candidate));
+  if (!indexPath) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', skillName);
+  const index = JSON.parse(rawReadTextFile(indexPath));
+  const skillList = index.actuators || index.s || index.skills || [];
   const skill = skillList.find((s: any) => (s.n || s.name) === skillName);
   
   if (skill && skill.path) return path.join(PROJECT_ROOT_DIR, skill.path);
@@ -145,6 +160,8 @@ export const pathResolver = {
   vault,
   vision,
   shared,
+  sharedTmp,
+  sharedExports,
   isProtected,
   skillDir,
   missionDir,

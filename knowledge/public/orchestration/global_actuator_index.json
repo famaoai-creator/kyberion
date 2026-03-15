@@ -1,8 +1,8 @@
 {
-  "v": "2.0.0",
+  "v": "1.0.0",
   "t": 10,
   "u": "2026-03-15T00:00:00.000Z",
-  "s": [
+  "actuators": [
     { "n": "file-actuator", "path": "libs/actuators/file-actuator", "d": "Unified File I/O and Search", "s": "implemented" },
     { "n": "code-actuator", "path": "libs/actuators/code-actuator", "d": "Logic Analysis and Refactoring", "s": "implemented" },
     { "n": "network-actuator", "path": "libs/actuators/network-actuator", "d": "Secure API Communications", "s": "implemented" },

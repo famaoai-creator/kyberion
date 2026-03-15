@@ -33,4 +33,4 @@ Direct shell commands like `curl` or `wget` should be avoided for downloading bi
 - **Discovery**: Use `browser-navigator` (Omni-Browser) to output a clean `snapshot.json`.
 - **Harvesting**: Use jq or script (`scripts/url_resolver.ts`) to extract and construct the absolute URLs.
 - **Ingestion**: Download the target file.
-- **Analysis**: Use `doc-to-text` on the downloaded artifact and stream the output to a safe location (`scratch/` or `knowledge/`)—never overwriting the original artifact in `vault/`.
+- **Analysis**: Use `doc-to-text` on the downloaded artifact and stream the output to a safe governed location such as `active/shared/tmp/` or `knowledge/`—never overwriting the original artifact in `vault/`.

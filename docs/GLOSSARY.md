@@ -100,9 +100,21 @@ The mission-local and global storage model for task claims, handoffs, reviews, m
 
 The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
 
+### Gateway
+
+A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the Chronos API surface.
+
 ### Channel Outbox
 
 A channel-scoped delivery queue under `active/shared/coordination/channels/<channel>/outbox/` used to return approved responses to external systems such as Slack.
+
+### Service Binding
+
+A governed authenticated access contract for an external service. Service binding resolves service-scoped credentials or session material without turning the channel gateway into the credential source of truth.
+
+### Delivery Actuator
+
+An actuator that sends approved responses or UI events back to external channels. In the current model, `presence-actuator` is the primary delivery actuator for Slack-style channel feedback.
 
 ### Chronos Gateway
 
@@ -119,6 +131,10 @@ A concrete ingress or egress interface of a channel, described by role, directio
 ### Surface Agent
 
 A lightweight channel-local agent that improves interaction quality, context shaping, and handoff preparation without becoming the durable mission owner.
+
+### System Actuator
+
+The actuator class for local short-lived shell, OS, and file-control operations. It is distinct from channel gateways and from authenticated service binding.
 
 ## Governance and storage terms
 
@@ -168,6 +184,6 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 `scripts/mission_journal.ts`, the human-readable view over recorded mission history.
 
-### Global Skill Index
+### Global Actuator Index
 
-`knowledge/public/orchestration/global_skill_index.json`, the compact registry of runnable actuators/skills used by the CLI.
+`knowledge/public/orchestration/global_actuator_index.json`, the compact registry of runnable actuators used by the CLI. `global_skill_index.json` remains only as a compatibility alias during migration.

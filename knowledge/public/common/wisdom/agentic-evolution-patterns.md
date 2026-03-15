@@ -15,7 +15,7 @@ last_updated: 2026-03-06
 - **Problem**: 想像上のユースケースに基づいたスキルの事前実装は、負債の温床となる。
 - **Wisdom**: スキル（恒久的なプログラム）の実装は「最後の手段」である。
 - **Practice**: 
-  1. まず `scratch/` でのアドホックな試行錯誤（Mission Execution）を通じて、現実の課題を泥臭く解決する。
+  1. まず `active/shared/tmp/` のような governed runtime temp space でのアドホックな試行錯誤（Mission Execution）を通じて、現実の課題を泥臭く解決する。
   2. その解決手順が「再現可能」で「堅牢」であることを実証（Validation）する。
   3. 成功体験の中から不変のロジックのみを抽出し、初めて「スキル」へと昇華（Distillation）させる。
 

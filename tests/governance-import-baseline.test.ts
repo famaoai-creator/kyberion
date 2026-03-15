@@ -17,7 +17,6 @@ const IGNORED_DIRS = new Set([
   'dist',
   'coverage',
   'active',
-  'scratch',
   'work',
   'vault',
 ]);

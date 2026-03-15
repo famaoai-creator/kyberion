@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync } from '@agent/core';
+import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp } from '@agent/core';
 import * as path from 'node:path';
 
 async function main() {
@@ -11,7 +11,7 @@ async function main() {
   
   for (const job of config.jobs || []) {
     logger.info(`🔄 [KNOWLEDGE] Running sync action: ${job.action}`);
-    const tempAdfPath = rootResolve(`scratch/knowledge-sync-${Date.now()}.json`);
+    const tempAdfPath = sharedTmp(`scripts/knowledge-sync-${Date.now()}.json`);
     safeWriteFile(tempAdfPath, JSON.stringify(job));
     
     try {
