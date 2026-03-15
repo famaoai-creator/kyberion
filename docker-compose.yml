@@ -1,19 +1,17 @@
-version: '3.8'
-
 services:
-  gemini-agent:
+  kyberion:
     build:
       context: .
       target: development
+    working_dir: /app
     volumes:
-      # Mount source code for live development
       - .:/app
-      # Use a named volume for container-specific node_modules to avoid host conflicts
       - node_modules_data:/app/node_modules
     environment:
-      - NODE_ENV=development
-    entrypoint: >
-      bash -c "node dist/scripts/bootstrap.js && 
+      NODE_ENV: development
+    command: >
+      bash -lc "pnpm install --frozen-lockfile &&
+      pnpm build &&
       node dist/scripts/cli.js list implemented"
 
 volumes:
