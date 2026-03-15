@@ -24,7 +24,7 @@ import {
   buildSlackApprovalBlocks,
   parseSlackApprovalAction,
   applySlackApprovalDecision,
-} from '@agent/core';
+} from '../../../libs/core/index.js';
 
 /**
  * Slack Sensory Satellite (Socket Mode) v1.0
