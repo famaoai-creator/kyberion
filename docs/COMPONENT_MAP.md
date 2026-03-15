@@ -8,6 +8,7 @@ Kyberion is a sovereign-agent ecosystem organized around a small number of high-
 Sovereign intent
   -> AGENTS.md governance and 5-phase lifecycle
   -> scripts/ and pipelines/ orchestration
+  -> mission controller and coordination contracts
   -> libs/core shared runtime and secure I/O
   -> libs/actuators/* execution capabilities
   -> knowledge/* tiered memory and procedures
@@ -49,8 +50,9 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `scripts/mission_journal.ts`
 - `pipelines/vital-check.json`
 - `active/missions/`
+- `knowledge/public/architecture/agent-mission-control-model.md`
 
-This path manages mission lifecycle, status, evidence, and journal/history views.
+This path manages mission lifecycle, mission ownership, task delegation, evidence, and journal/history views.
 
 ### 3. Capability discovery and execution
 
@@ -69,8 +71,9 @@ The kernel of the ecosystem. Important responsibilities:
 
 - secure file/process helpers
 - path resolution for tiered directories
-- locking and concurrency guards
+- resource locks, leases, and concurrency guards
 - CLI utilities and common runtime helpers
+- runtime supervision for agent, PTY, and service ownership
 
 If you are changing shared behavior or trying to follow AGENTS.md's secure-I/O rule, start here.
 
@@ -88,6 +91,21 @@ Actuators are the execution layer. Current major groups include:
 - `modeling-actuator`: modeling and strategic reasoning support
 - `service-actuator`: SaaS/API integration
 - `orchestrator-actuator`: mission/control-plane execution
+- `process-actuator`: managed long-lived process ownership
+
+## Mission control model
+
+Kyberion uses a `single-owner, multi-worker` mission model.
+
+- The mission is the durable control contract.
+- One owner agent holds mission write authority.
+- Worker agents collaborate through task contracts and scoped leases.
+- Mission-local collaboration artifacts live under `active/missions/<tier>/<mission_id>/coordination/`.
+- Global discovery, mailboxes, runtime locks, and observability summaries live under `active/shared/`.
+
+The authoritative architecture reference is:
+
+- `knowledge/public/architecture/agent-mission-control-model.md`
 
 ## Knowledge tiers
 
@@ -103,6 +121,7 @@ The charter assumes strict isolation between these tiers.
 
 - `docs/architecture/AUTONOMY_SYSTEM_GUIDE.md`: shared memory, reflexes, dynamic permission, cluster concepts
 - `docs/architecture/NERVE_SYSTEM_GUIDE.md`: background daemons, messaging bus, observability, and policies
+- `knowledge/public/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
 - `dependency-graph.mmd`: repo-level dependency visualization
 
 ## Recommended reading order for new contributors
