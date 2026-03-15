@@ -7,6 +7,7 @@ import * as crypto from 'node:crypto';
 import { safeExistsSync } from './secure-io';
 import * as path from 'node:path';
 import { runtimeSupervisor } from './runtime-supervisor';
+import { spawnSync } from 'node:child_process';
 
 /** Walk up from cwd to find the project root (contains AGENTS.md) */
 function resolveProjectRoot(): string {
@@ -46,6 +47,46 @@ export interface AgentHandle {
   getRecord(): AgentRecord | undefined;
 }
 
+export interface AgentUsageMetrics {
+  promptChars: number;
+  responseChars: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  raw?: Record<string, unknown>;
+}
+
+export interface AgentRuntimeMetrics {
+  turnCount: number;
+  errorCount: number;
+  restartCount: number;
+  refreshCount: number;
+  lastPromptChars: number;
+  totalPromptChars: number;
+  lastResponseChars: number;
+  totalResponseChars: number;
+  lastStopReason?: string;
+  lastError?: string;
+  lastRefreshedAt?: number;
+  lastRestartedAt?: number;
+  usage?: AgentUsageMetrics;
+}
+
+export interface AgentProcessStats {
+  rssKb?: number;
+  cpuPercent?: number;
+}
+
+export interface AgentRuntimeSnapshot {
+  agent: AgentRecord;
+  runtime?: ReturnType<typeof runtimeSupervisor.snapshot>[number];
+  metrics: AgentRuntimeMetrics;
+  logs: { ts: number; type: string; content: string }[];
+  process?: AgentProcessStats;
+  providerRuntime?: Record<string, unknown>;
+  supportsSoftRefresh: boolean;
+}
+
 const PROVIDER_CONFIG: Record<string, { bootCommand: string; bootArgs: string[]; defaultModel: string }> = {
   gemini: { bootCommand: 'gemini', bootArgs: ['--acp', '-y'], defaultModel: 'gemini-2.5-flash' },
   copilot: { bootCommand: 'gh', bootArgs: ['copilot', '--', '--acp', '--allow-all'], defaultModel: 'claude-sonnet-4' },
@@ -56,9 +97,75 @@ class AgentLifecycleManagerImpl {
   private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
+  private spawnOptions: Map<string, SpawnOptions> = new Map();
+  private runtimeMetrics: Map<string, AgentRuntimeMetrics> = new Map();
+
+  private ensureMetrics(agentId: string): AgentRuntimeMetrics {
+    let metrics = this.runtimeMetrics.get(agentId);
+    if (!metrics) {
+      metrics = {
+        turnCount: 0,
+        errorCount: 0,
+        restartCount: 0,
+        refreshCount: 0,
+        lastPromptChars: 0,
+        totalPromptChars: 0,
+        lastResponseChars: 0,
+        totalResponseChars: 0,
+      };
+      this.runtimeMetrics.set(agentId, metrics);
+    }
+    return metrics;
+  }
+
+  private getProviderRuntime(agentId: string): Record<string, unknown> | undefined {
+    const mediator = this.mediators.get(agentId) as any;
+    if (mediator?.getRuntimeInfo) return mediator.getRuntimeInfo();
+    const adapter = this.execAdapters.get(agentId) as any;
+    if (adapter?.getRuntimeInfo) return adapter.getRuntimeInfo();
+    return undefined;
+  }
+
+  private recordUsage(metrics: AgentRuntimeMetrics, providerRuntime?: Record<string, unknown>): void {
+    const usage = providerRuntime?.usage as Record<string, unknown> | undefined;
+    if (!usage) return;
+    metrics.usage = {
+      promptChars: metrics.lastPromptChars,
+      responseChars: metrics.lastResponseChars,
+      inputTokens: coerceUsageNumber(usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens),
+      outputTokens: coerceUsageNumber(usage.outputTokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.completion_tokens),
+      totalTokens: coerceUsageNumber(usage.totalTokens ?? usage.total_tokens),
+      raw: usage,
+    };
+  }
+
+  private observeSuccess(agentId: string, prompt: string, responseText: string, stopReason: string): void {
+    const metrics = this.ensureMetrics(agentId);
+    metrics.turnCount += 1;
+    metrics.lastPromptChars = prompt.length;
+    metrics.totalPromptChars += prompt.length;
+    metrics.lastResponseChars = responseText.length;
+    metrics.totalResponseChars += responseText.length;
+    metrics.lastStopReason = stopReason;
+    metrics.lastError = undefined;
+    this.recordUsage(metrics, this.getProviderRuntime(agentId));
+  }
+
+  private observeFailure(agentId: string, prompt: string, error: Error): void {
+    const metrics = this.ensureMetrics(agentId);
+    metrics.turnCount += 1;
+    metrics.errorCount += 1;
+    metrics.lastPromptChars = prompt.length;
+    metrics.totalPromptChars += prompt.length;
+    metrics.lastResponseChars = 0;
+    metrics.lastStopReason = 'error';
+    metrics.lastError = error.message;
+  }
 
   async spawn(options: SpawnOptions): Promise<AgentHandle> {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
+    this.spawnOptions.set(agentId, { ...options, agentId });
+    this.ensureMetrics(agentId);
 
     // Requirements gate: check manifest prerequisites
     const manifest = getAgentManifest(agentId);
@@ -153,9 +260,11 @@ class AgentLifecycleManagerImpl {
           try {
             const res = await adapter.ask(prompt);
             agentRegistry.updateStatus(agentId, 'ready');
+            this.observeSuccess(agentId, prompt, res.text, res.stopReason);
             return res.text;
           } catch (e: any) {
             agentRegistry.updateStatus(agentId, 'error');
+            this.observeFailure(agentId, prompt, e);
             throw e;
           }
         },
@@ -166,6 +275,8 @@ class AgentLifecycleManagerImpl {
           runtimeSupervisor.unregister(agentId);
           agentRegistry.updateStatus(agentId, 'shutdown');
           agentRegistry.unregister(agentId);
+          this.spawnOptions.delete(agentId);
+          this.runtimeMetrics.delete(agentId);
         },
         getRecord: () => agentRegistry.get(agentId),
       };
@@ -220,9 +331,11 @@ class AgentLifecycleManagerImpl {
         try {
           const result = await mediator.ask(prompt);
           agentRegistry.updateStatus(agentId, 'ready');
+          this.observeSuccess(agentId, prompt, result, 'completed');
           return result;
         } catch (e: any) {
           agentRegistry.updateStatus(agentId, 'error');
+          this.observeFailure(agentId, prompt, e);
           throw e;
         }
       },
@@ -248,6 +361,8 @@ class AgentLifecycleManagerImpl {
     runtimeSupervisor.unregister(agentId);
     agentRegistry.updateStatus(agentId, 'shutdown');
     agentRegistry.unregister(agentId);
+    this.spawnOptions.delete(agentId);
+    this.runtimeMetrics.delete(agentId);
     logger.info(`[LIFECYCLE] Agent ${agentId} shutdown.`);
   }
 
@@ -309,6 +424,69 @@ class AgentLifecycleManagerImpl {
 
     return [];
   }
+
+  getSnapshot(agentId: string, logLimit = 50): AgentRuntimeSnapshot | undefined {
+    const agent = agentRegistry.get(agentId);
+    if (!agent) return undefined;
+    const runtime = runtimeSupervisor.get(agentId);
+    const providerRuntime = this.getProviderRuntime(agentId);
+    const pid = typeof providerRuntime?.pid === 'number' ? providerRuntime.pid : runtime?.pid;
+    return {
+      agent,
+      runtime: runtime ? {
+        ...runtime,
+        idleForMs: Math.max(0, Date.now() - runtime.lastActiveAt),
+      } : undefined,
+      metrics: { ...this.ensureMetrics(agentId) },
+      logs: this.getLog(agentId, logLimit),
+      process: probeProcessStats(pid),
+      providerRuntime,
+      supportsSoftRefresh: Boolean(providerRuntime?.supportsSoftRefresh),
+    };
+  }
+
+  listSnapshots(logLimit = 20): AgentRuntimeSnapshot[] {
+    return agentRegistry.list().map((agent) => this.getSnapshot(agent.agentId, logLimit)).filter(Boolean) as AgentRuntimeSnapshot[];
+  }
+
+  async refreshContext(agentId: string): Promise<{ mode: 'soft' | 'restart' | 'stateless'; snapshot: AgentRuntimeSnapshot | undefined }> {
+    const mediator: any = this.mediators.get(agentId);
+    const adapter: any = this.execAdapters.get(agentId);
+    const metrics = this.ensureMetrics(agentId);
+
+    if (mediator?.refreshContext) {
+      await mediator.refreshContext();
+      metrics.refreshCount += 1;
+      metrics.lastRefreshedAt = Date.now();
+      return { mode: 'soft', snapshot: this.getSnapshot(agentId) };
+    }
+
+    if (adapter?.refreshContext) {
+      const result = await adapter.refreshContext();
+      metrics.refreshCount += 1;
+      metrics.lastRefreshedAt = Date.now();
+      const mode = result?.mode === 'stateless' ? 'stateless' : 'soft';
+      return { mode, snapshot: this.getSnapshot(agentId) };
+    }
+
+    await this.restart(agentId);
+    return { mode: 'restart', snapshot: this.getSnapshot(agentId) };
+  }
+
+  async restart(agentId: string): Promise<AgentHandle> {
+    const options = this.spawnOptions.get(agentId);
+    if (!options) throw new Error(`No spawn options available for ${agentId}`);
+    const previousMetrics = { ...this.ensureMetrics(agentId) };
+    await this.shutdown(agentId);
+    const handle = await this.spawn(options);
+    const metrics: AgentRuntimeMetrics = {
+      ...previousMetrics,
+      restartCount: previousMetrics.restartCount + 1,
+      lastRestartedAt: Date.now(),
+    };
+    this.runtimeMetrics.set(agentId, metrics);
+    return handle;
+  }
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/agent-lifecycle');
@@ -329,3 +507,27 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
   process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 }
 export const agentLifecycle: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];
+
+function probeProcessStats(pid?: number): AgentProcessStats | undefined {
+  if (!pid) return undefined;
+  try {
+    const result = spawnSync('ps', ['-o', 'rss=,%cpu=', '-p', String(pid)], { encoding: 'utf8' });
+    if (result.status !== 0) return undefined;
+    const [rss, cpu] = (result.stdout || '').trim().split(/\s+/, 2);
+    return {
+      rssKb: rss ? Number(rss) : undefined,
+      cpuPercent: cpu ? Number(cpu) : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function coerceUsageNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}

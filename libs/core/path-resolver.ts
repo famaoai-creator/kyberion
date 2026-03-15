@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { rawExistsSync, rawMkdirp, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawMkdirp, rawReadTextFile } from './fs-primitives';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)

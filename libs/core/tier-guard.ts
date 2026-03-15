@@ -4,9 +4,9 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
-import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
+import { pathResolver } from './path-resolver';
+import { rawExistsSync, rawReadTextFile } from './fs-primitives';
+import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types';
 
 export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
 

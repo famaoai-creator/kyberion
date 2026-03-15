@@ -53,6 +53,8 @@ export interface AgentAdapter {
   boot(): Promise<void>;
   ask(prompt: string): Promise<AgentResponse>;
   shutdown(): Promise<void>;
+  getRuntimeInfo?(): Record<string, unknown>;
+  refreshContext?(): Promise<{ mode: 'soft' | 'stateless'; sessionId?: string | null; threadId?: string | null }>;
 }
 
 interface ACPDialect {
@@ -68,6 +70,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   protected accumulatedResponse: string = '';
   protected accumulatedThought: string = '';
   protected runtimeResourceId: string | null = null;
+  protected usageSummary: Record<string, unknown> | null = null;
 
   constructor(
     protected bootCommand: string,
@@ -219,6 +222,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       content: [{ type: 'text', text }],
       input: [{ type: 'text', text }]
     });
+    this.usageSummary = extractUsageSummary(response);
 
     logger.info(`[UAA_RESULT] ${JSON.stringify(response)}`); // DEBUG: Watch response structure
 
@@ -244,6 +248,26 @@ abstract class BaseACPAdapter implements AgentAdapter {
       this.child = null;
     }
     this.runtimeResourceId = null;
+  }
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      pid: this.child?.pid,
+      sessionId: this.acpSessionId,
+      usage: this.usageSummary,
+      supportsSoftRefresh: true,
+    };
+  }
+
+  public async refreshContext(): Promise<{ mode: 'soft'; sessionId?: string | null }> {
+    if (!this.connection) throw new Error('Agent not booted.');
+    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+      cwd: process.cwd(),
+      workingDirectory: process.cwd(),
+      mcpServers: []
+    });
+    this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
+    return { mode: 'soft', sessionId: this.acpSessionId };
   }
 }
 
@@ -297,6 +321,17 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public async shutdown(): Promise<void> {}
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      supportsSoftRefresh: false,
+      stateless: true,
+    };
+  }
+
+  public async refreshContext(): Promise<{ mode: 'stateless' }> {
+    return { mode: 'stateless' };
+  }
 }
 
 export interface CodexAppServerAdapterOptions {
@@ -330,6 +365,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private logBuffer: { ts: number; type: string; content: string }[] = [];
   private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
   private projectRoot: string = PROJECT_ROOT;
+  private usageSummary: Record<string, unknown> | null = null;
 
   constructor(options?: CodexAppServerAdapterOptions) {
     this.options = options || {};
@@ -488,6 +524,34 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.runtimeResourceId = null;
   }
 
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      pid: this.child?.pid,
+      threadId: this.threadId,
+      usage: this.usageSummary,
+      supportsSoftRefresh: true,
+    };
+  }
+
+  public async refreshContext(): Promise<{ mode: 'soft'; threadId?: string | null }> {
+    if (!this.child) throw new Error('Codex app-server not booted.');
+    const cwd = this.options.cwd || process.cwd();
+    const approvalMode = this.options.approvalMode || 'strict';
+    const sandboxMode = this.getSandboxMode();
+    const threadRes: any = await this.sendRequest('thread/start', {
+      model: this.options.model ?? undefined,
+      modelProvider: this.options.modelProvider ?? undefined,
+      cwd,
+      approvalPolicy: this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
+      sandbox: sandboxMode,
+      developerInstructions: this.options.systemPrompt ?? undefined,
+      experimentalRawEvents: false,
+      persistExtendedHistory: false,
+    }, this.options.timeoutMs ?? 20000);
+    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    return { mode: 'soft', threadId: this.threadId };
+  }
+
   private handleStdout(chunk: Buffer): void {
     if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
     this.buffer += chunk.toString();
@@ -565,6 +629,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
           .join('');
         if (text) this.accumulatedText += text;
       }
+      const usage = extractUsageSummary(params);
+      if (usage) this.usageSummary = usage;
       return;
     }
 
@@ -584,6 +650,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: finalText.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       const result = { text: finalText, stopReason };
+      const usage = extractUsageSummary(params);
+      if (usage) this.usageSummary = usage;
 
       if (this.pendingTurn && this.pendingTurn.turnId === turnId) {
         clearTimeout(this.pendingTurn.timeout);
@@ -764,6 +832,7 @@ const ACTUATOR_TO_CLAUDE_TOOLS: Record<string, string[]> = {
 export class ClaudeAdapter implements AgentAdapter {
   private options: ClaudeAdapterOptions;
   private logBuffer: { ts: number; type: string; content: string }[] = [];
+  private usageSummary: Record<string, unknown> | null = null;
 
   constructor(options?: ClaudeAdapterOptions) {
     this.options = options || {};
@@ -825,6 +894,7 @@ export class ClaudeAdapter implements AgentAdapter {
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       try {
         const parsed = JSON.parse(output);
+        this.usageSummary = extractUsageSummary(parsed);
         return {
           text: parsed.result || parsed.content || parsed.message || output,
           thought: parsed.thought,
@@ -841,6 +911,15 @@ export class ClaudeAdapter implements AgentAdapter {
   }
 
   public async shutdown(): Promise<void> {}
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      sessionId: this.options.sessionId || null,
+      usage: this.usageSummary,
+      supportsSoftRefresh: false,
+      stateless: !this.options.sessionId,
+    };
+  }
 
   /**
    * Convert Kyberion actuator restrictions to Claude Code tool names.
@@ -888,4 +967,20 @@ export class AgentFactory {
       default: throw new Error(`Unsupported provider: ${provider}`);
     }
   }
+}
+
+function extractUsageSummary(payload: unknown): Record<string, unknown> | null {
+  const queue: unknown[] = [payload];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object') continue;
+    const usage = (current as any).usage;
+    if (usage && typeof usage === 'object') {
+      return usage as Record<string, unknown>;
+    }
+    for (const value of Object.values(current as Record<string, unknown>)) {
+      if (value && typeof value === 'object') queue.push(value);
+    }
+  }
+  return null;
 }

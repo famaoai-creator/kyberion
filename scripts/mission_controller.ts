@@ -40,6 +40,7 @@ const REGISTRY_PATH = pathResolver.active('missions/registry.json');
 const ARCHIVE_DIR = pathResolver.active('archive/missions');
 const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
+const AGENT_RUNTIME_EVENT_PATH = pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl');
 
 interface MissionState {
   mission_id: string;
@@ -254,6 +255,15 @@ async function dispatchNextMission() {
     }
     logger.info('No missions ready for dispatch (dependencies not met).');
   });
+}
+
+function recordAgentRuntimeEvent(event: Record<string, unknown>): void {
+  const dir = path.dirname(AGENT_RUNTIME_EVENT_PATH);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeAppendFileSync(AGENT_RUNTIME_EVENT_PATH, JSON.stringify({
+    ts: new Date().toISOString(),
+    ...event,
+  }) + '\n');
 }
 
 async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
@@ -1181,6 +1191,13 @@ async function finishMission(id: string, seal: boolean = false) {
     status: 'completed',
     sealed: seal,
     archive_path: ARCHIVE_DIR
+  });
+
+  recordAgentRuntimeEvent({
+    event: 'MISSION_FINISH_REFRESH_RECOMMENDED',
+    mission_id: upperId,
+    tier: state.tier,
+    note: 'Mission finished. Control surfaces may refresh or restart mission-bound agents to reduce stale context.',
   });
 
   // 4. Purge Scratch
