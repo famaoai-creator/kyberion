@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { safeExec, safeExistsSync, pathResolver } from '../libs/core/index.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -11,12 +11,8 @@ const RUN_ID = Date.now();
 function ensurePersonalFixtures() {
   fs.mkdirSync(path.dirname(IDENTITY_PATH), { recursive: true });
   fs.mkdirSync(path.dirname(LEDGER_PATH), { recursive: true });
-  if (!safeExistsSync(IDENTITY_PATH)) {
-    fs.writeFileSync(IDENTITY_PATH, JSON.stringify({ sovereign: 'test', initialized_at: new Date().toISOString() }, null, 2));
-  }
-  if (!safeExistsSync(LEDGER_PATH)) {
-    fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
-  }
+  fs.writeFileSync(IDENTITY_PATH, JSON.stringify({ sovereign: 'test', initialized_at: new Date().toISOString() }, null, 2));
+  if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
 }
 
 function runMissionController(...args: string[]) {
@@ -35,9 +31,13 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', () => {
   beforeAll(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     ensurePersonalFixtures();
-    // Ensure we start with a clean slate for the test agent
+  });
+
+  beforeEach(() => {
+    ensurePersonalFixtures();
     const ledger = readLedger();
     delete ledger[AGENT_ID];
+    delete ledger['Agent-Bad'];
     fs.writeFileSync(LEDGER_PATH, JSON.stringify(ledger, null, 2));
   });
 
@@ -70,9 +70,9 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', () => {
     // 2. Verify with Rejection
     runMissionController('verify', FAIL_MISSION_ID, 'rejected', 'Poor work');
     
-    // 3. Check Score after one success then one rejection
+    // 3. Check Score after one rejection from the default baseline
     const ledger = readLedger();
-    expect(ledger[AGENT_ID].current_score).toBe(495);
+    expect(ledger[AGENT_ID].current_score).toBe(480);
     
     runMissionController('finish', FAIL_MISSION_ID);
   });
