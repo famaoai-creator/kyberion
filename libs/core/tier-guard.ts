@@ -273,7 +273,7 @@ function loadMarkerPatterns(): MarkerPattern[] {
 
   // Security scanner patterns (augment with critical items)
   try {
-    const vulnPath = pathResolver.knowledge('public/skills/security-scanner/vulnerability-patterns.json');
+    const vulnPath = pathResolver.capabilityAssets('security-scanner/vulnerability-patterns.json');
     if (rawExistsSync(vulnPath)) {
       const vulns = JSON.parse(rawReadTextFile(vulnPath));
       if (Array.isArray(vulns)) {

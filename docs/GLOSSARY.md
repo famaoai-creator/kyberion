@@ -186,4 +186,4 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 ### Global Actuator Index
 
-`knowledge/public/orchestration/global_actuator_index.json`, the compact registry of runnable actuators used by the CLI. `global_skill_index.json` remains only as a compatibility alias during migration.
+`knowledge/public/orchestration/global_actuator_index.json`, the compact registry of runnable actuators used by the CLI.

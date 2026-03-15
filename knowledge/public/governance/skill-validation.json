@@ -1,12 +1,12 @@
 {
-  "$schema": "../../schemas/skill-validation-contract.schema.json",
+  "$schema": "../../schemas/capability-validation-contract.schema.json",
   "rules": [
     {
-      "name": "metadata-completeness",
+      "name": "actuator-metadata-completeness",
       "check": {
         "required_fields": ["name", "description", "status"],
         "valid_statuses": ["implemented", "planned", "conceptual", "unstable"],
-        "required_files": ["package.json", "SKILL.md"]
+        "required_files": ["package.json", "src/index.ts"]
       }
     }
   ]

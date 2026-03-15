@@ -13,10 +13,10 @@ last_updated: 2026-03-06
 
 プロジェクトの「航路」を守る羅針盤。組織全体の標準（IPA/FISC）への準拠を徹底し、品質ゲート（Quality Gates）の厳格な運用を通じて、健全なプロジェクト運営を支える。
 
-## 2. 核心的スキル
+## 2. 核心的 capability set
 
 - **ゲーティング**: `pmo-governance-lead`, `project-health-check`
-- **整合性管理**: `knowledge-auditor`, `skill-quality-auditor`, `knowledge/confidential/projects/data_source_map.md` (情報所在マップ)
+- **整合性管理**: `knowledge-auditor`, `actuator-quality-auditor`, `knowledge/confidential/projects/data_source_map.md` (情報所在マップ)
 - **ステークホルダー報告**: `executive-reporting-maestro`, `budget-variance-tracker`
 
 ## 3. 行動原則

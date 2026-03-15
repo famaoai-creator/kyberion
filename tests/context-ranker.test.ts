@@ -8,12 +8,19 @@ describe('Context Ranker — parseFrontmatter', () => {
 title: My Document
 importance: 5
 tags: [governance, mission]
+kind: governance
+scope: repository
+authority: policy
+phase: [alignment, execution]
 ---
 Body text here.`;
     const result = parseFrontmatter(content);
     expect(result.title).toBe('My Document');
     expect(result.importance).toBe(5);
     expect(result.tags).toEqual(['governance', 'mission']);
+    expect(result.kind).toBe('governance');
+    expect(result.scope).toBe('repository');
+    expect(result.phase).toEqual(['alignment', 'execution']);
   });
 
   it('returns empty object when no frontmatter present', () => {
@@ -56,7 +63,7 @@ describe('Context Ranker — tokenize', () => {
 });
 
 describe('Context Ranker — scoreEntry', () => {
-  const weights: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25 };
+  const weights: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
   const now = new Date('2025-06-01').getTime();
 
   const baseEntry: KnowledgeEntry = {
@@ -65,30 +72,44 @@ describe('Context Ranker — scoreEntry', () => {
     tags: ['governance', 'mission'],
     importance: 5,
     related_roles: ['ecosystem_architect'],
+    role_affinity: ['mission_controller'],
     last_updated: '2025-05-01',
     tier: 'public',
+    kind: 'governance',
+    scope: 'repository',
+    authority: 'policy',
+    phase: ['alignment', 'execution'],
+    applies_to: ['missions'],
   };
 
   it('scores higher when intent matches title', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], '', weights, now);
+    const scored = scoreEntry(baseEntry, ['mission'], '', '', 'repository', weights, now);
     expect(scored.breakdown.intent).toBeGreaterThan(0);
     expect(scored.score).toBeGreaterThan(0);
   });
 
   it('scores higher when role matches', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], 'ecosystem_architect', weights, now);
+    const scored = scoreEntry(baseEntry, ['mission'], 'ecosystem_architect', '', 'repository', weights, now);
     expect(scored.breakdown.role).toBe(25);
   });
 
   it('role score is 0 when role does not match', () => {
-    const scored = scoreEntry(baseEntry, ['mission'], 'unknown_role', weights, now);
+    const scored = scoreEntry(baseEntry, ['mission'], 'unknown_role', '', 'repository', weights, now);
     expect(scored.breakdown.role).toBe(0);
   });
 
+  it('adds phase, scope, kind, and authority score for aligned execution context', () => {
+    const scored = scoreEntry(baseEntry, ['mission'], 'ecosystem_architect', 'alignment', 'repository', weights, now);
+    expect(scored.breakdown.phase).toBeGreaterThan(0);
+    expect(scored.breakdown.scope).toBeGreaterThan(0);
+    expect(scored.breakdown.kind).toBeGreaterThan(0);
+    expect(scored.breakdown.authority).toBeGreaterThan(0);
+  });
+
   it('recency score decreases with age', () => {
-    const recent = scoreEntry(baseEntry, ['mission'], '', weights, now);
+    const recent = scoreEntry(baseEntry, ['mission'], '', '', 'repository', weights, now);
     const oldEntry = { ...baseEntry, last_updated: '2020-01-01' };
-    const old = scoreEntry(oldEntry, ['mission'], '', weights, now);
+    const old = scoreEntry(oldEntry, ['mission'], '', '', 'repository', weights, now);
     expect(recent.breakdown.recency).toBeGreaterThan(old.breakdown.recency);
   });
 });

@@ -10,6 +10,8 @@ export {
   createMockActuator,
   createMockFileSystem,
   createMockNetwork,
+  createMockCapabilityInput,
+  createMockCapabilityOutput,
   createMockSkillInput,
   createMockSkillOutput,
   type MockActuator,

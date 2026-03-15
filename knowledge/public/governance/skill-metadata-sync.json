@@ -2,17 +2,17 @@
   "$schema": "../../schemas/metadata-sync-contract.schema.json",
   "sync_rules": [
     {
-      "source": "skills/**/src/index.ts",
-      "targets": ["skills/**/SKILL.md"],
+      "source": "libs/actuators/*/src/index.ts",
+      "targets": ["knowledge/public/procedures/**"],
       "mapping": {
-        "yargs_options": "frontmatter.arguments"
+        "manifest": "knowledge_card.arguments"
       }
     },
     {
-      "source": "skills/**/SKILL.md",
-      "targets": ["skills/**/package.json"],
+      "source": "knowledge/public/procedures/**",
+      "targets": ["knowledge/public/orchestration/global_actuator_index.json"],
       "mapping": {
-        "frontmatter.description": "json.description"
+        "knowledge_card.summary": "index.description"
       }
     }
   ]

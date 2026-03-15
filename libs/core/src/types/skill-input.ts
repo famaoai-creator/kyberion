@@ -9,17 +9,18 @@
 /**
  * Standard input contract for Kyberion
  */
-export interface SkillInput {
+export interface CapabilityInput {
   /**
    * Name of the skill being invoked
    */
-  skill: string;
+  capability?: string;
+  skill?: string;
   /**
    * The action to perform
    */
   action: string;
   /**
-   * Skill-specific parameters
+   * Capability-specific parameters
    */
   params?: {
     [k: string]: unknown;
@@ -30,7 +31,7 @@ export interface SkillInput {
   context?: {
     knowledge_tier?: 'personal' | 'confidential' | 'public';
     /**
-     * Name of the calling skill or user
+     * Name of the calling capability or user
      */
     caller?: string;
     session_id?: string;
@@ -38,3 +39,5 @@ export interface SkillInput {
   };
   [k: string]: unknown;
 }
+
+export type SkillInput = CapabilityInput;

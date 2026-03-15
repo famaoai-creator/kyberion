@@ -41,7 +41,7 @@ Both TS skills and legacy CJS scripts consume core utilities through the `@agent
 
 ### B. File Extension Policy
 
-- **`.ts`**: Mandatory for all source code in `scripts/`, `libs/core/`, and `skills/`.
+- **`.ts`**: Mandatory for all source code in `scripts/`, `libs/core/`, and `libs/actuators/`.
 - **`.js`**: Found in `dist/`, these are the compiled artifacts.
 - **`.js`**: Used exclusively for **Bridges** in `libs/core/` to maintain backward compatibility.
 

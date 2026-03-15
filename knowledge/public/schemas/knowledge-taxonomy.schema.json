@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Knowledge Taxonomy",
+  "type": "object",
+  "required": ["version", "kinds", "directory_defaults", "overlay_precedence", "retrieval_priority"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "default_tier_inference": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["public", "confidential", "personal"]
+      }
+    },
+    "kinds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description", "default_authority", "default_scope"],
+        "properties": {
+          "description": { "type": "string" },
+          "default_authority": {
+            "type": "string",
+            "enum": ["policy", "standard", "recipe", "reference", "advisory"]
+          },
+          "default_scope": {
+            "type": "string",
+            "enum": ["global", "repository", "mission", "environment"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "directory_defaults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path_prefix", "kind", "authority", "scope"],
+        "properties": {
+          "path_prefix": { "type": "string" },
+          "kind": { "type": "string" },
+          "authority": { "type": "string" },
+          "scope": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "overlay_precedence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["global", "repository", "mission", "environment"]
+      }
+    },
+    "retrieval_priority": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

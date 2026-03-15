@@ -36,8 +36,15 @@ export interface KnowledgeEntry {
   tags: string[];
   importance: number;
   related_roles: string[];
+  role_affinity: string[];
   last_updated: string;
   tier: string;
+  kind: string;
+  scope: string;
+  authority: string;
+  phase: string[];
+  applies_to: string[];
+  owner?: string;
   knowledge_type?: string;
   intelligence_layer?: string;
 }
@@ -48,6 +55,10 @@ export interface RankingWeights {
   tag: number;
   category: number;
   role: number;
+  phase: number;
+  scope: number;
+  kind: number;
+  authority: number;
 }
 
 interface ScoredEntry extends KnowledgeEntry {
@@ -55,9 +66,81 @@ interface ScoredEntry extends KnowledgeEntry {
   breakdown: {
     intent: number;
     role: number;
+    phase: number;
+    scope: number;
+    kind: number;
+    authority: number;
     importance: number;
     recency: number;
   };
+}
+
+interface TaxonomyManifest {
+  kinds?: Record<string, {
+    default_authority?: string;
+    default_scope?: string;
+  }>;
+  directory_defaults?: Array<{
+    path_prefix: string;
+    kind: string;
+    authority: string;
+    scope: string;
+  }>;
+  retrieval_priority?: Record<string, string[]>;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map(item => String(item).trim()).filter(Boolean)
+    : typeof value === 'string' && value.trim()
+      ? [value.trim()]
+      : [];
+}
+
+let cachedTaxonomy: TaxonomyManifest | null = null;
+
+function loadTaxonomy(): TaxonomyManifest {
+  if (cachedTaxonomy) return cachedTaxonomy;
+  const taxonomyPath = pathResolver.knowledge('public/governance/knowledge-taxonomy.json');
+  if (!safeExistsSync(taxonomyPath)) {
+    cachedTaxonomy = {};
+    return cachedTaxonomy;
+  }
+
+  try {
+    cachedTaxonomy = JSON.parse(safeReadFile(taxonomyPath, { encoding: 'utf8' }) as string) as TaxonomyManifest;
+  } catch (_) {
+    cachedTaxonomy = {};
+  }
+
+  return cachedTaxonomy;
+}
+
+function resolveDirectoryDefault(relativePath: string) {
+  const normalized = path.join('knowledge', relativePath).replace(/\\/g, '/');
+  const defaults = loadTaxonomy().directory_defaults || [];
+  return defaults.find(entry => normalized.startsWith(entry.path_prefix));
+}
+
+function inferKind(relativePath: string, frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.kind === 'string' && frontmatter.kind.trim()) return frontmatter.kind.trim();
+  return resolveDirectoryDefault(relativePath)?.kind || 'reference';
+}
+
+function inferScope(frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.scope === 'string' && frontmatter.scope.trim()) return frontmatter.scope.trim();
+  const kind = typeof frontmatter.kind === 'string' && frontmatter.kind.trim()
+    ? frontmatter.kind
+    : undefined;
+  return (kind && loadTaxonomy().kinds?.[kind]?.default_scope) || 'global';
+}
+
+function inferAuthority(relativePath: string, frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.authority === 'string' && frontmatter.authority.trim()) return frontmatter.authority.trim();
+  const directoryDefault = resolveDirectoryDefault(relativePath);
+  if (directoryDefault?.authority) return directoryDefault.authority;
+  const kind = typeof frontmatter.kind === 'string' ? frontmatter.kind : inferKind(relativePath, frontmatter);
+  return loadTaxonomy().kinds?.[kind]?.default_authority || 'reference';
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +205,15 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
             tags: Array.isArray(fm.tags) ? fm.tags : [],
             importance: typeof fm.importance === 'number' ? fm.importance : 3,
             related_roles: Array.isArray(fm.related_roles) ? fm.related_roles : [],
+            role_affinity: normalizeStringArray(fm.role_affinity),
             last_updated: fm.last_updated || '2020-01-01',
             tier,
+            kind: inferKind(relativePath, fm),
+            scope: inferScope(fm),
+            authority: inferAuthority(relativePath, fm),
+            phase: normalizeStringArray(fm.phase),
+            applies_to: normalizeStringArray(fm.applies_to),
+            owner: typeof fm.owner === 'string' ? fm.owner : undefined,
             knowledge_type: fm.knowledge_type,
             intelligence_layer: fm.intelligence_layer,
           });
@@ -149,6 +239,8 @@ export function scoreEntry(
   entry: KnowledgeEntry,
   intentTokens: string[],
   roleSlug: string,
+  phaseSlug: string,
+  currentScope: string,
   weights: RankingWeights,
   now: number,
 ): ScoredEntry {
@@ -166,12 +258,49 @@ export function scoreEntry(
 
   // 2. Role Match
   let roleScore = 0;
-  if (roleSlug && entry.related_roles.length > 0) {
-    const normalizedRoles = entry.related_roles.map(r => r.toLowerCase().replace(/\s+/g, '_'));
+  const roleCandidates = [...entry.related_roles, ...entry.role_affinity];
+  if (roleSlug && roleCandidates.length > 0) {
+    const normalizedRoles = roleCandidates.map(r => r.toLowerCase().replace(/\s+/g, '_'));
     if (normalizedRoles.some(r => r.includes(roleSlug))) {
       roleScore = weights.role;
     }
   }
+
+  const taxonomy = loadTaxonomy();
+  let phaseScore = 0;
+  if (phaseSlug) {
+    const normalizedPhases = entry.phase.map(p => p.toLowerCase());
+    if (normalizedPhases.includes(phaseSlug)) {
+      phaseScore = weights.phase;
+    }
+  }
+
+  let scopeScore = 0;
+  const scopeMatrix: Record<string, Record<string, number>> = {
+    global: { global: 1, repository: 0.6, mission: 0.4, environment: 0.2 },
+    repository: { global: 0.7, repository: 1, mission: 0.8, environment: 0.3 },
+    mission: { global: 0.5, repository: 0.8, mission: 1, environment: 0.4 },
+    environment: { global: 0.3, repository: 0.4, mission: 0.5, environment: 1 },
+  };
+  scopeScore = Math.round(weights.scope * (scopeMatrix[currentScope]?.[entry.scope] ?? 0.4));
+
+  let kindScore = 0;
+  if (phaseSlug) {
+    const preferredKinds = taxonomy.retrieval_priority?.[phaseSlug] || [];
+    const kindIndex = preferredKinds.indexOf(entry.kind);
+    if (kindIndex >= 0) {
+      kindScore = Math.max(1, weights.kind - kindIndex * 2);
+    }
+  }
+
+  const authorityWeights: Record<string, number> = {
+    policy: weights.authority,
+    standard: Math.max(1, weights.authority - 1),
+    recipe: Math.max(1, weights.authority - 2),
+    reference: Math.max(1, weights.authority - 4),
+    advisory: Math.max(1, weights.authority - 5),
+  };
+  const authorityScore = authorityWeights[entry.authority] || 0;
 
   // 3. Importance (normalize to 0-10 scale)
   const importanceScore = entry.importance;
@@ -181,7 +310,7 @@ export function scoreEntry(
   const daysSince = Math.max(0, (now - lastUpdated) / (1000 * 60 * 60 * 24));
   const recencyScore = Math.max(0, 10 - daysSince / 30); // Lose ~1 point per month
 
-  const total = intentScore + roleScore + importanceScore + recencyScore;
+  const total = intentScore + roleScore + phaseScore + scopeScore + kindScore + authorityScore + importanceScore + recencyScore;
 
   return {
     ...entry,
@@ -189,6 +318,10 @@ export function scoreEntry(
     breakdown: {
       intent: intentScore,
       role: roleScore,
+      phase: phaseScore,
+      scope: scopeScore,
+      kind: kindScore,
+      authority: authorityScore,
       importance: importanceScore,
       recency: Math.round(recencyScore * 100) / 100,
     },
@@ -200,7 +333,7 @@ export function scoreEntry(
 // ---------------------------------------------------------------------------
 function loadWeights(): RankingWeights {
   const configPath = pathResolver.knowledge('public/governance/analysis-config.json');
-  const defaults: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25 };
+  const defaults: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
   if (!safeExistsSync(configPath)) return defaults;
   try {
     const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
@@ -214,39 +347,44 @@ async function main() {
   const args = process.argv.slice(2);
   const intentIdx = args.indexOf('--intent');
   const roleIdx = args.indexOf('--role');
+  const phaseIdx = args.indexOf('--phase');
+  const scopeIdx = args.indexOf('--scope');
   const limitIdx = args.indexOf('--limit');
   const jsonFlag = args.includes('--json');
 
   const intent = intentIdx >= 0 ? args[intentIdx + 1] : '';
   const role = roleIdx >= 0 ? args[roleIdx + 1] : '';
+  const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : '';
+  const scope = scopeIdx >= 0 ? args[scopeIdx + 1] : 'repository';
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
-    console.log('Usage: pnpm exec tsx scripts/context_ranker.ts --intent "query" [--role "role"] [--limit N] [--json]');
+    console.log('Usage: pnpm exec tsx scripts/context_ranker.ts --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]');
     process.exit(1);
   }
 
-  logger.info(`🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", limit=${limit}`);
+  logger.info(`🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`);
 
   const weights = loadWeights();
   const entries = scanKnowledgeFiles();
   const intentTokens = tokenize(intent);
   const roleSlug = role.toLowerCase().replace(/\s+/g, '_');
+  const phaseSlug = phase.toLowerCase().trim();
   const now = Date.now();
 
   const scored = entries
-    .map(e => scoreEntry(e, intentTokens, roleSlug, weights, now))
+    .map(e => scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now))
     .filter(e => e.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
   if (jsonFlag) {
-    console.log(JSON.stringify({ intent, role, limit, results: scored }, null, 2));
+    console.log(JSON.stringify({ intent, role, phase, scope, limit, results: scored }, null, 2));
   } else {
     logger.info(`📊 TOP-${limit} Results (${scored.length} matches from ${entries.length} files):`);
     for (let i = 0; i < scored.length; i++) {
       const e = scored[i];
-      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
+      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} kind=${e.breakdown.kind} auth=${e.breakdown.authority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
       logger.info(`  ${i + 1}. [${e.score.toFixed(1)}] ${e.path} (${breakdown})`);
     }
   }

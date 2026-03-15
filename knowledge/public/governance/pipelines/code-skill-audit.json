@@ -4,14 +4,14 @@
     {
       "id": "discover",
       "type": "capture",
-      "op": "discover_skills",
-      "params": { "export_as": "all_skills" }
+      "op": "discover_capabilities",
+      "params": { "export_as": "all_capabilities" }
     },
     {
       "id": "log-discovery",
       "type": "apply",
       "op": "log",
-      "params": { "message": "Discovered {{all_skills.length}} capabilities." }
+      "params": { "message": "Discovered {{all_capabilities.length}} capabilities." }
     }
   ]
 }

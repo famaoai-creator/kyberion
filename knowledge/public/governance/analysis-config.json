@@ -5,12 +5,12 @@
   "algorithms": {
     "cooccurrence": {
       "pipeline_dir": "pipelines",
-      "skill_dir": "skills",
+      "capability_dir": "libs/actuators",
       "threshold": 1
     },
     "ranking": {
       "index_path": "knowledge/orchestration/knowledge_index.json",
-      "weights": { "title": 10, "id": 5, "tag": 15, "category": 3, "role": 25 }
+      "weights": { "title": 10, "id": 5, "tag": 15, "category": 3, "role": 25, "phase": 18, "scope": 12, "kind": 10, "authority": 8 }
     },
     "graph": {
       "knowledge_dir": "knowledge",
@@ -18,5 +18,5 @@
       "mermaid_theme": "base"
     }
   },
-  "auto_update": { "related_skills": true, "related_knowledge": true }
+  "auto_update": { "related_capabilities": true, "related_knowledge": true }
 }

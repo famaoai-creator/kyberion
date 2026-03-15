@@ -20,15 +20,13 @@ COMPANY 勤怠管理システムにおける部下の申請（勤怠、休暇等
 
 1.  **認証情報**: `knowledge/personal/connections/company_attendance.json`
 2.  **シナリオ**: `knowledge/personal/automation/scenarios/company_manager_complete.yaml`
-3.  **スキル**: `skills/utilities/browser-navigator` (ビルド済みであること)
+3.  **Capability**: `browser-actuator` (ビルド済みであること)
 
 ## 3. 即時実行コマンド (Quick Start)
 リポジトリルートから以下のコマンドを実行する。
 
 ```bash
-node skills/utilities/browser-navigator/dist/index.js 
-  --scenario=knowledge/personal/automation/scenarios/company_manager_complete.yaml 
-  --headless=false
+pnpm run cli -- run browser-actuator -- --scenario=knowledge/personal/automation/scenarios/company_manager_complete.yaml --headless=false
 ```
 ※ `headless=false` を推奨（操作の可視化とオーバーレイ回避のため）。
 

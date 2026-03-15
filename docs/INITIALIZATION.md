@@ -33,7 +33,7 @@ pnpm onboard
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
 - **物理的変化**:
     - `dist/` ディレクトリが生成され、全ソースコードがビルドされます。
-    - 各 `skills/` ディレクトリ内に `@agent/core` へのリンクが再構築されます。
+    - workspace 間の runtime contract が再構築されます。
     - 各種バックグラウンド・サービスが起動します。
 
 ### Stage 3: 魂の注入 (Soul Infusion)

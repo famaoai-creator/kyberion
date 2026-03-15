@@ -6,13 +6,13 @@
  */
 
 import type { MissionContract } from '@agent/core/src/types/mission-contract';
-import type { SkillInput, TierLevel } from '@agent/core/types';
+import type { CapabilityInput, TierLevel } from '@agent/core/types';
 
 /**
  * Options for generating ADF (Agentic Data Format) test data
  */
 export interface ADFOptions {
-  skill?: string;
+  capability?: string;
   action?: string;
   params?: Record<string, unknown>;
   tier?: TierLevel;
@@ -34,11 +34,11 @@ export interface MissionOptions {
  * Generates a test ADF (Agentic Data Format) object
  *
  * @param options - Configuration options for the ADF
- * @returns SkillInput object representing an ADF contract
+ * @returns CapabilityInput object representing an ADF contract
  */
-export function generateADF(options?: ADFOptions): SkillInput {
-  const defaults: SkillInput = {
-    skill: 'test-skill',
+export function generateADF(options?: ADFOptions): CapabilityInput {
+  const defaults: CapabilityInput = {
+    capability: 'test-capability',
     action: 'execute',
     params: {
       target: 'test-target',
@@ -52,7 +52,7 @@ export function generateADF(options?: ADFOptions): SkillInput {
   };
 
   if (options) {
-    if (options.skill) defaults.skill = options.skill;
+    if (options.capability) defaults.capability = options.capability;
     if (options.action) defaults.action = options.action;
     if (options.params) defaults.params = { ...defaults.params, ...options.params };
     if (options.tier && defaults.context) defaults.context.knowledge_tier = options.tier;

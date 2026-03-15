@@ -52,7 +52,7 @@
   },
   "roles": {
     "Sovereign Concierge": {
-      "skills": [
+      "capabilities": [
         "onboarding-wizard",
         "knowledge-fetcher",
         "requirements-wizard",
@@ -67,20 +67,20 @@
       }
     },
     "CEO": {
-      "skills": [
+      "capabilities": [
         "release-note-crafter",
         "project-health-check",
         "license-auditor",
         "pr-architect",
         "onboarding-wizard",
         "asset-token-economist",
-        "skill-evolution-engine"
+        "capability-evolution-engine"
       ],
       "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
       "description": "Strategy, Finance, Org, and Ecosystem Stewardship"
     },
     "Business Owner": {
-      "skills": [
+      "capabilities": [
         "business-impact-analyzer",
         "strategic-roadmap-planner",
         "financial-modeling-maestro",
@@ -93,7 +93,7 @@
       "description": "P&L Responsibility, Strategic Alignment, and Market Success"
     },
     "Product Manager": {
-      "skills": [
+      "capabilities": [
         "requirements-wizard",
         "strategic-roadmap-planner",
         "ux-auditor",
@@ -106,7 +106,7 @@
       "description": "Product Vision, Roadmap, and Requirement Definition"
     },
     "Software Engineer": {
-      "skills": [
+      "capabilities": [
         "codebase-mapper",
         "local-reviewer",
         "security-scanner",
@@ -119,7 +119,7 @@
       "description": "DevOps & Tooling"
     },
     "Software Developer": {
-      "skills": [
+      "capabilities": [
         "boilerplate-genie",
         "refactoring-engine",
         "test-suite-architect",
@@ -135,10 +135,10 @@
       "description": "Product Implementation"
     },
     "Ecosystem Architect": {
-      "skills": [
-        "autonomous-skill-designer",
-        "skill-evolution-engine",
-        "skill-quality-auditor",
+      "capabilities": [
+        "autonomous-capability-designer",
+        "capability-evolution-engine",
+        "capability-quality-auditor",
         "knowledge-auditor",
         "codebase-mapper",
         "boilerplate-genie",
@@ -148,7 +148,7 @@
       "description": "Monorepo Maintenance"
     },
     "Reliability Engineer": {
-      "skills": [
+      "capabilities": [
         "crisis-manager",
         "self-healing-orchestrator",
         "log-analyst",
@@ -160,7 +160,7 @@
       "description": "SRE & Cost"
     },
     "Incident Commander": {
-      "skills": [
+      "capabilities": [
         "crisis-manager",
         "stakeholder-communicator",
         "executive-reporting-maestro",
@@ -172,7 +172,7 @@
       "description": "Crisis Coordination, Remediation Strategy, and Incident Reporting"
     },
     "Performance Engineer": {
-      "skills": [
+      "capabilities": [
         "performance-monitor-analyst",
         "cloud-waste-hunter",
         "cognitive-load-auditor",
@@ -184,7 +184,7 @@
       "description": "Performance Evaluation, Resource Optimization, and Scalability"
     },
     "Integration Steward": {
-      "skills": [
+      "capabilities": [
         "api-evolution-manager",
         "doc-sync-sentinel",
         "dependency-grapher",
@@ -195,7 +195,7 @@
       "description": "API & Dependency Stewardship"
     },
     "Strategic Sales": {
-      "skills": [
+      "capabilities": [
         "competitive-intel-strategist",
         "business-growth-planner",
         "stakeholder-communicator",
@@ -206,7 +206,7 @@
       "description": "Business Development"
     },
     "Marketing & Growth": {
-      "skills": [
+      "capabilities": [
         "competitive-intel-strategist",
         "business-growth-planner",
         "stakeholder-communicator",
@@ -216,7 +216,7 @@
       "description": "Market Fit & Branding"
     },
     "Customer Success": {
-      "skills": [
+      "capabilities": [
         "telemetry-insight-engine",
         "slack-communicator-pro",
         "doc-sync-sentinel",
@@ -226,11 +226,11 @@
       "description": "Support & Adoption"
     },
     "PMO Governance": {
-      "skills": [
+      "capabilities": [
         "pmo-governance-lead",
         "project-health-check",
         "knowledge-auditor",
-        "skill-quality-auditor",
+        "capability-quality-auditor",
         "budget-variance-tracker",
         "executive-reporting-maestro",
         "onboarding-wizard"
@@ -238,7 +238,7 @@
       "description": "Quality Gates & Risk"
     },
     "Quality Assurance": {
-      "skills": [
+      "capabilities": [
         "test-genie",
         "test-suite-architect",
         "ux-auditor",
@@ -251,7 +251,7 @@
       "description": "QA/QC & Evidence"
     },
     "Legal & IP Strategist": {
-      "skills": [
+      "capabilities": [
         "license-auditor",
         "compliance-officer",
         "ai-ethics-auditor",
@@ -261,7 +261,7 @@
       "description": "Compliance & IP"
     },
     "Cyber Security Lead": {
-      "skills": [
+      "capabilities": [
         "security-scanner",
         "red-team-adversary",
         "post-quantum-shield",
@@ -274,7 +274,7 @@
       "description": "Defense & Vulnerability"
     },
     "Executive Assistant": {
-      "skills": [
+      "capabilities": [
         "google-workspace-integrator",
         "slack-communicator-pro",
         "doc-sync-sentinel",
@@ -288,7 +288,7 @@
       "description": "Support & Coordination"
     },
     "Knowledge Steward": {
-      "skills": [
+      "capabilities": [
         "knowledge-harvester",
         "knowledge-fetcher",
         "knowledge-refiner",
@@ -304,19 +304,19 @@
       "description": "Data Collection"
     },
     "Line Manager": {
-      "skills": [
+      "capabilities": [
         "onboarding-wizard",
         "slack-communicator-pro",
         "pr-architect",
         "project-health-check",
-        "skill-bundle-packager",
+        "auto-context-mapper",
         "stakeholder-communicator",
         "budget-variance-tracker"
       ],
       "description": "Approvals & Team Health"
     },
     "Experience Designer": {
-      "skills": [
+      "capabilities": [
         "ux-auditor",
         "layout-architect",
         "synthetic-user-persona",
@@ -329,7 +329,7 @@
       "description": "UX, UI, & Design Systems"
     },
     "Finance Controller": {
-      "skills": [
+      "capabilities": [
         "financial-modeling-maestro",
         "budget-variance-tracker",
         "unit-economics-optimizer",
@@ -341,9 +341,9 @@
       "description": "P&L & Unit Economics"
     },
     "Talent & Culture": {
-      "skills": [
+      "capabilities": [
         "onboarding-wizard",
-        "skill-bundle-packager",
+        "auto-context-mapper",
         "ai-ethics-auditor"
       ],
       "description": "Hiring & Culture"
