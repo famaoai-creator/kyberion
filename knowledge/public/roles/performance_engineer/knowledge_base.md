@@ -22,13 +22,13 @@ last_updated: 2026-03-06
 
 ## 2. 性能監視・計測ツール
 
-- **Skill Metrics**: `scripts/lib/metrics.js` により自動収集。`work/metrics/skill-metrics.jsonl` に記録。
+- **Capability Metrics**: `libs/core/metrics.ts` により自動収集。`work/metrics/execution-metrics.jsonl` に記録。
 - **System Benchmark**: `npm run benchmark` で全スキルのロード性能を一括評価。
 - **Resource Profiler**: `performance-monitor-analyst` スキルを使用して、詳細なボトルネック分析を実施。
 
 ## 3. 最適化の定石 (Optimization Patterns)
 
-- **Lazy Loading**: `scripts/lib/skill-wrapper.js` で行われているような、ライブラリ（Ajv等）の遅延読み込み。
+- **Lazy Loading**: `libs/core/capability-wrapper.ts` で扱うような、ライブラリ（Ajv等）の遅延読み込み。
 - **Cache Strategy**: `scripts/lib/core.js` の `Cache` クラスを用いたファイル/データのキャッシュ。
 - **Parallel Execution**: `scripts/lib/orchestrator.js` の `runParallel()` を利用したIO待ちの解消。
 
@@ -40,7 +40,7 @@ last_updated: 2026-03-06
 
 ## 5. 調査・改善フロー
 
-1. `work/metrics/skill-metrics.jsonl` から `status: "success"` かつ `duration_ms` が高いものを抽出。
+1. `work/metrics/execution-metrics.jsonl` から `status: "success"` かつ `duration_ms` が高いものを抽出。
 2. `performance-monitor-analyst` で詳細なプロファイリングを実施。
 3. `refactoring-engine` を適用し、計算量の多いロジック（重い正規表現や深いネスト）を特定・修正。
 4. 修正後に `npm run benchmark` を実行し、デグレがないか確認。

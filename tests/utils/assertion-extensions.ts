@@ -6,7 +6,7 @@
  */
 
 import { expect } from 'vitest';
-import type { SkillInput } from '@agent/core/types';
+import type { CapabilityInput } from '@agent/core/types';
 import type { MissionContract } from '@agent/core/src/types/mission-contract';
 
 /**
@@ -38,13 +38,15 @@ expect.extend({
       };
     }
 
-    const adf = received as Partial<SkillInput>;
+    const adf = received as Partial<CapabilityInput>;
 
     // Required fields for ADF
-    const hasSkill = typeof adf.skill === 'string' && adf.skill.length > 0;
+    const hasCapability =
+      (typeof adf.capability === 'string' && adf.capability.length > 0) ||
+      (typeof adf.skill === 'string' && adf.skill.length > 0);
     const hasAction = typeof adf.action === 'string' && adf.action.length > 0;
 
-    const pass = hasSkill && hasAction;
+    const pass = hasCapability && hasAction;
 
     return {
       pass,
@@ -53,7 +55,7 @@ expect.extend({
           return `Expected object not to match ADF schema`;
         }
         const missing: string[] = [];
-        if (!hasSkill) missing.push('skill');
+        if (!hasCapability) missing.push('capability');
         if (!hasAction) missing.push('action');
         return `Expected object to match ADF schema. Missing required fields: ${missing.join(', ')}`;
       },
@@ -158,10 +160,10 @@ expect.extend({
 
     // Check for mission contract structure if applicable
     const contract = received as Partial<MissionContract>;
-    if (contract.mission_id && contract.skill && contract.action) {
+    if (contract.mission_id && (contract.skill || (contract as any).capability) && contract.action) {
       // This looks like a mission contract - validate ADF structure
-      if (!contract.skill || !contract.action) {
-        violations.push('Mission contract missing required ADF fields (skill, action)');
+      if ((!contract.skill && !(contract as any).capability) || !contract.action) {
+        violations.push('Mission contract missing required ADF fields (capability, action)');
       }
     }
 

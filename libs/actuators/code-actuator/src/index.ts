@@ -181,20 +181,21 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     case 'shell':
       assertUnsafeShellAllowed();
       return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+    case 'discover_capabilities':
     case 'discover_skills':
-      const skillsRootDir = path.join(rootDir, 'skills');
-      const skills: any[] = [];
-      if (safeExistsSync(skillsRootDir)) {
-        const categories = safeReaddir(skillsRootDir).filter(f => safeLstat(path.join(skillsRootDir, f)).isDirectory());
-        for (const cat of categories) {
-          const catPath = path.join(skillsRootDir, cat);
-          const skillDirs = safeReaddir(catPath).filter(f => safeLstat(path.join(catPath, f)).isDirectory());
-          for (const dir of skillDirs) {
-            skills.push({ name: dir, path: path.join('skills', cat, dir), category: cat });
-          }
+      const actuatorsRootDir = path.join(rootDir, 'libs/actuators');
+      const capabilities: any[] = [];
+      if (safeExistsSync(actuatorsRootDir)) {
+        const actuatorDirs = safeReaddir(actuatorsRootDir).filter(f => safeLstat(path.join(actuatorsRootDir, f)).isDirectory());
+        for (const dir of actuatorDirs) {
+          capabilities.push({
+            name: dir,
+            path: path.join('libs/actuators', dir),
+            category: 'actuator',
+          });
         }
       }
-      return { ...ctx, [params.export_as || 'skills_list']: skills };
+      return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
     default: return ctx;
   }
 }

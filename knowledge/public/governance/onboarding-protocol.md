@@ -26,10 +26,10 @@ last_updated: 2026-03-06
 - **アクション**: `pnpm onboard` を実行し、`knowledge/personal/my-identity.json` の設定（名前、言語、対話スタイル、優先ドメイン）を対話形式で行う。
 - **成果物**: `my-identity.json` の永続化と、3-Tier ディレクトリ構造の確立。
 
-### Stage 3: Provision (環境とスキルの配備)
+### Stage 3: Provision (環境と capability overlay の配備)
 - **役割**: 主権者のロールに応じたツールを準備する。
-- **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、専用のスキルバンドルを `skill-bundle-packager` で作成する。
-- **成果物**: `session.json`, スキルバンドル。
+- **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、mission / role / phase に応じた capability overlay を確立する。
+- **成果物**: `session.json`, capability overlay。
 
 ### Stage 4: Navigate & Execute (ナビゲーションと最初の任務)
 - **役割**: ナビゲーションを継続しながらの実務理解。

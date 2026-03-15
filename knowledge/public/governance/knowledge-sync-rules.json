@@ -3,7 +3,7 @@
   "name": "Knowledge & Documentation Sync Rules",
   "indexing": {
     "knowledge_dir": "knowledge",
-    "skills_dir": "skills",
+    "capabilities_dir": "libs/actuators",
     "output_json": "knowledge/orchestration/knowledge_index.json",
     "output_md": "knowledge/_index.md",
     "exclude": [".*", "node_modules", "incidents"]
@@ -23,7 +23,7 @@
   },
   "sync": {
     "readme": true,
-    "skills_guide": true,
+    "capabilities_guide": true,
     "last_updated_field": "last_updated"
   }
 }

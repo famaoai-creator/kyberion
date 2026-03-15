@@ -4,36 +4,36 @@ import { MetricsCollector } from './metrics.js';
 describe('metrics core', () => {
   it('should record and summarize aggregates correctly', () => {
     const mc = new MetricsCollector({ persist: false });
-    mc.record('test-skill-a', 100, 'success');
-    mc.record('test-skill-a', 200, 'success');
-    mc.record('test-skill-a', 50, 'error');
-    mc.record('test-skill-b', 300, 'success');
+    mc.record('test-capability-a', 100, 'success');
+    mc.record('test-capability-a', 200, 'success');
+    mc.record('test-capability-a', 50, 'error');
+    mc.record('test-capability-b', 300, 'success');
 
     const summaries = mc.summarize();
     expect(Array.isArray(summaries)).toBe(true);
     expect(summaries).toHaveLength(2);
 
-    const skillA = summaries.find((s) => s.component === 'test-skill-a');
-    expect(skillA).toBeDefined();
-    expect(skillA!.executions).toBe(3);
-    expect(skillA!.errors).toBe(1);
-    expect(skillA!.errorRate).toBe(33.3);
-    expect(skillA!.avgMs).toBe(117);
-    expect(skillA!.minMs).toBe(50);
-    expect(skillA!.maxMs).toBe(200);
+    const capabilityA = summaries.find((s) => s.component === 'test-capability-a');
+    expect(capabilityA).toBeDefined();
+    expect(capabilityA!.executions).toBe(3);
+    expect(capabilityA!.errors).toBe(1);
+    expect(capabilityA!.errorRate).toBe(33.3);
+    expect(capabilityA!.avgMs).toBe(117);
+    expect(capabilityA!.minMs).toBe(50);
+    expect(capabilityA!.maxMs).toBe(200);
 
-    const skillB = summaries.find((s) => s.component === 'test-skill-b');
-    expect(skillB).toBeDefined();
-    expect(skillB!.executions).toBe(1);
-    expect(skillB!.errors).toBe(0);
+    const capabilityB = summaries.find((s) => s.component === 'test-capability-b');
+    expect(capabilityB).toBeDefined();
+    expect(capabilityB!.executions).toBe(1);
+    expect(capabilityB!.errors).toBe(0);
   });
 
-  it('should return detailed metrics for a recorded skill', () => {
+  it('should return detailed metrics for a recorded capability', () => {
     const mc = new MetricsCollector({ persist: false });
-    mc.record('my-skill', 150, 'success');
-    mc.record('my-skill', 250, 'error');
+    mc.record('my-capability', 150, 'success');
+    mc.record('my-capability', 250, 'error');
 
-    const result = mc.getSkillMetrics('my-skill');
+    const result = mc.getCapabilityMetrics('my-capability');
     expect(result).not.toBeNull();
     expect(result.count).toBe(2);
     expect(result.errors).toBe(1);
@@ -48,15 +48,15 @@ describe('metrics core', () => {
     mc.record('mem-test', 100, 'success');
     mc.record('mem-test', 200, 'success');
 
-    const result = mc.getSkillMetrics('mem-test');
+    const result = mc.getCapabilityMetrics('mem-test');
     expect(result.peakHeapMB).toBeGreaterThan(0);
     expect(result.peakRssMB).toBeGreaterThan(0);
     expect(result.peakRssMB).toBeGreaterThanOrEqual(result.peakHeapMB);
   });
 
-  it('should return null for an unknown skill', () => {
+  it('should return null for an unknown capability', () => {
     const mc = new MetricsCollector({ persist: false });
-    const result = mc.getSkillMetrics('nonexistent-skill');
+    const result = mc.getCapabilityMetrics('nonexistent-capability');
     expect(result).toBeNull();
   });
 
@@ -66,6 +66,6 @@ describe('metrics core', () => {
     expect(mc.summarize()).toHaveLength(1);
     mc.reset();
     expect(mc.summarize()).toHaveLength(0);
-    expect(mc.getSkillMetrics('reset-test')).toBeNull();
+    expect(mc.getCapabilityMetrics('reset-test')).toBeNull();
   });
 });

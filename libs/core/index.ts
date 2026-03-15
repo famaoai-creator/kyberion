@@ -9,6 +9,7 @@ export * from './core.js';
 
 // Specific Wrappers & Metrics
 export * from './skill-wrapper.js';
+export * from './capability-wrapper.js';
 export * from './metrics.js';
 export * from './error-codes.js';
 
@@ -48,10 +49,12 @@ export {
   scripts, 
   active, 
   vault, 
+  capabilityAssets,
   shared, 
   sharedTmp,
   sharedExports,
   isProtected, 
+  capabilityDir,
   skillDir, 
   missionDir,
   missionEvidenceDir,

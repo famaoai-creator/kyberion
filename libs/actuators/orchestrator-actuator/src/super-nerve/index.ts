@@ -187,7 +187,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
 }
 
 function determineType(domain: string, action: string): string {
-  const captureOps = ['read', 'read_file', 'read_json', 'fetch', 'shell', 'list', 'glob_files', 'search', 'goto', 'content', 'evaluate', 'vision_consult', 'pulse_status', 'discover_skills', 'screenshot', 'pptx_extract'];
+  const captureOps = ['read', 'read_file', 'read_json', 'fetch', 'shell', 'list', 'glob_files', 'search', 'goto', 'content', 'evaluate', 'vision_consult', 'pulse_status', 'discover_capabilities', 'discover_skills', 'screenshot', 'pptx_extract'];
   const transformOps = ['regex_extract', 'regex_replace', 'json_query', 'run_js', 'yaml_update', 'json_parse', 'path_join', 'array_count', 'array_filter', 'variable_hydrate', 'json_update', 'markdown_to_pdf'];
   const applyOps = ['write', 'write_file', 'log', 'click', 'fill', 'press', 'wait', 'delete', 'mkdir', 'symlink', 'git_checkpoint', 'voice', 'notify', 'keyboard', 'mouse_click', 'deploy', 'append', 'copy', 'move', 'pptx_render'];
   

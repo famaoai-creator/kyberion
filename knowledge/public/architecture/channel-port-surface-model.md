@@ -5,6 +5,14 @@ tags: [architecture, channels, ports, surface-agents, slack, chronos]
 importance: 9
 author: Ecosystem Architect
 last_updated: 2026-03-15
+kind: architecture
+scope: repository
+authority: reference
+phase: [alignment, execution]
+role_affinity: [ecosystem_architect, solution_architect, sovereign_concierge]
+applies_to: [channels, surface_agents, slack, chronos]
+owner: ecosystem_architect
+status: active
 ---
 
 # Channel, Port, and Surface Agent Model

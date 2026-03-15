@@ -5,19 +5,19 @@
       "id": "load-index",
       "type": "capture",
       "op": "read_json",
-      "params": { "path": "knowledge/orchestration/global_skill_index.json", "export_as": "index_data" }
+      "params": { "path": "knowledge/public/orchestration/global_actuator_index.json", "export_as": "index_data" }
     },
     {
-      "id": "query-skills",
+      "id": "query-actuators",
       "type": "transform",
       "op": "json_query",
-      "params": { "from": "index_data", "path": "s", "export_as": "skills_list" }
+      "params": { "from": "index_data", "path": "actuators", "export_as": "actuator_list" }
     },
     {
       "id": "gen-mermaid",
       "type": "transform",
       "op": "mermaid_gen",
-      "params": { "from": "skills_list", "export_as": "mermaid_code" }
+      "params": { "from": "actuator_list", "export_as": "mermaid_code" }
     },
     {
       "id": "write-graph",

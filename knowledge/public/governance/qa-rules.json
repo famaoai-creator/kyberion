@@ -3,7 +3,7 @@
   "rules": [
     {
       "id": "CAPABILITY_VALIDATION",
-      "description": "Ensure all skills have valid metadata.",
+      "description": "Ensure all actuators and capability descriptors have valid metadata.",
       "severity": "error"
     },
     {
@@ -13,7 +13,7 @@
     },
     {
       "id": "HEALTH_CHECK",
-      "description": "Ensure all skill entry points resolve.",
+      "description": "Ensure all actuator entry points resolve.",
       "severity": "warning"
     }
   ],

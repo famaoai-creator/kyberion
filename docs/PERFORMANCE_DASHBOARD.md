@@ -38,7 +38,7 @@ _Last Updated: 2026/2/14 13:49:11_
 | **boilerplate-genie**        | 26ms    | 2ms            | 15.4x  |
 | **glossary-resolver**        | 1ms     | 0ms            | 4.4x   |
 | **knowledge-harvester**      | 1116ms  | 102ms          | 11x    |
-| **skill-bundle-packager**    | 7ms     | 2ms            | 2.8x   |
+| **capability-overlay-curator** | 7ms   | 2ms            | 2.8x   |
 | **license-auditor**          | 507ms   | 0ms            | 1352x  |
 | **issue-to-solution-bridge** | 1ms     | 0ms            | 3.3x   |
 | **environment-provisioner**  | 1ms     | 0ms            | 3x     |
@@ -87,9 +87,9 @@ _Last Updated: 2026/2/14 13:49:11_
 | **knowledge-harvester**         | 180ms / 5000ms    | 84.6% / 99%       | 🔴 BREACH |
 | **google-workspace-integrator** | 2ms / 5000ms      | 63.6% / 99%       | 🔴 BREACH |
 | **mission-control**             | 189ms / 5000ms    | 66.7% / 99%       | 🔴 BREACH |
-| **mock-skill**                  | 0ms / 5000ms      | 50.0% / 99%       | 🔴 BREACH |
+| **mock-capability**             | 0ms / 5000ms      | 50.0% / 99%       | 🔴 BREACH |
 | **terraform-arch-mapper**       | 10ms / 5000ms     | 75.0% / 99%       | 🔴 BREACH |
-| **autonomous-skill-designer**   | 32ms / 5000ms     | 50.0% / 99%       | 🔴 BREACH |
+| **autonomous-capability-designer** | 32ms / 5000ms   | 50.0% / 99%       | 🔴 BREACH |
 | **browser-navigator**           | 1045ms / 5000ms   | 0.0% / 99%        | 🔴 BREACH |
 
 ## 2. Stability Watchlist (High Error Rates)

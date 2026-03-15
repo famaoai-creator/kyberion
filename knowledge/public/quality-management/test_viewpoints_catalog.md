@@ -17,7 +17,7 @@ last_updated: 2026-03-06
 
 ## 2. Performance (Engineer Focus)
 
-- [ ] **Index Load**: `global_skill_index` の読み込みを最小限に抑えているか。
+- [ ] **Index Load**: `global_actuator_index` の読み込みを最小限に抑えているか。
 - [ ] **Memory Limit**: 200MB 以内に収まっているか（大規模データ処理時）。
 - [ ] **Concurrency**: 大量ファイル処理時に `mapAsync` を使用しているか。
 

@@ -1,3 +1,19 @@
+---
+title: Procedure: Web Automation & Navigation
+tags: [capability, browser, procedure, web-automation, playwright]
+importance: 8
+author: Ecosystem Architect
+last_updated: 2026-03-15
+kind: capability
+scope: global
+authority: recipe
+phase: [execution]
+role_affinity: [software_developer, solution_architect, sovereign_concierge]
+applies_to: [browser-actuator, web-automation]
+owner: software_developer
+status: active
+---
+
 # Procedure: Web Automation & Navigation
 
 ## 1. Goal

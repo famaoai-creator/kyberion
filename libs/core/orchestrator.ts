@@ -13,8 +13,6 @@ const rootDir = process.cwd();
 const actuatorIndexCandidates = [
   path.join(rootDir, 'knowledge/public/orchestration/global_actuator_index.json'),
   path.join(rootDir, 'knowledge/orchestration/global_actuator_index.json'),
-  path.join(rootDir, 'knowledge/public/orchestration/global_skill_index.json'),
-  path.join(rootDir, 'knowledge/orchestration/global_skill_index.json'),
 ];
 
 function resolveActuatorIndexPath() {
@@ -23,35 +21,37 @@ function resolveActuatorIndexPath() {
   return resolved;
 }
 
-export function resolveSkillScript(skillName: string): string {
+export function resolveCapabilityScript(capabilityName: string): string {
   const index = JSON.parse(safeReadFile(resolveActuatorIndexPath(), { encoding: 'utf8' }) as string);
-  const skills = index.actuators || index.s || index.skills;
+  const capabilities = index.actuators || index.s || index.skills;
 
-  let skill;
-  if (skillName.includes('/')) {
-    skill = skills.find((s: any) => (s.path || '').includes(skillName) || (s.n || s.name) === skillName);
+  let capability;
+  if (capabilityName.includes('/')) {
+    capability = capabilities.find((s: any) => (s.path || '').includes(capabilityName) || (s.n || s.name) === capabilityName);
   } else {
-    skill = skills.find((s: any) => (s.n || s.name) === skillName);
+    capability = capabilities.find((s: any) => (s.n || s.name) === capabilityName);
   }
 
-  if (!skill) throw new Error(`Skill "${skillName}" not found in index`);
+  if (!capability) throw new Error(`Capability "${capabilityName}" not found in index`);
 
-  const skillRelPath = skill.path || skillName;
-  const skillDir = path.join(rootDir, skillRelPath);
+  const capabilityRelPath = capability.path || capabilityName;
+  const capabilityDir = path.join(rootDir, capabilityRelPath);
 
-  const mainPath = skill.m || skill.main;
+  const mainPath = capability.m || capability.main;
   if (mainPath) {
-    const fullPath = path.join(skillDir, mainPath);
+    const fullPath = path.join(capabilityDir, mainPath);
     if (safeExistsSync(fullPath)) return fullPath;
   }
 
-  const scriptsDir = path.join(skillDir, 'scripts');
+  const scriptsDir = path.join(capabilityDir, 'scripts');
   if (!safeExistsSync(scriptsDir))
-    throw new Error(`No scripts/ directory for "${skillName}" at ${skillDir}`);
+    throw new Error(`No scripts/ directory for "${capabilityName}" at ${capabilityDir}`);
   const scripts = safeReaddir(scriptsDir).filter((f) => /\.(cjs|js)$/.test(f));
-  if (scripts.length === 0) throw new Error(`No .cjs or .js scripts found for "${skillName}"`);
+  if (scripts.length === 0) throw new Error(`No .cjs or .js scripts found for "${capabilityName}"`);
   return path.join(scriptsDir, scripts[0]);
 }
+
+export const resolveSkillScript = resolveCapabilityScript;
 
 function resolveParams(params: any, prevOutput: any) {
   const resolved: any = {};
@@ -84,13 +84,13 @@ export function runStep(script: string, args: string, step: any = {}) {
   const maxAttempts = (step.retries || 0) + 1;
   const initialDelay = step.retryDelay || 1000;
   const timeout = step.timeout || 60000;
-  const skillDir = path.dirname(path.dirname(script));
+  const capabilityDir = path.dirname(path.dirname(script));
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const output = execSync(`node "${script}" ${args}`, {
         encoding: 'utf8',
-        cwd: skillDir,
+        cwd: capabilityDir,
         timeout,
         stdio: 'pipe',
       });
@@ -142,7 +142,7 @@ export function runPipeline(steps: any[], initialData = {}) {
   const startTime = Date.now();
 
   for (const step of steps) {
-    const script = resolveSkillScript(step.skill);
+    const script = resolveCapabilityScript(step.skill);
     const params = resolveParams(step.params, prevOutput);
     const args = buildArgs(params);
 
@@ -172,17 +172,17 @@ export function runParallel(steps: any[]): Promise<any> {
   const startTime = Date.now();
 
   const promises = steps.map((step) => {
-    const script = resolveSkillScript(step.skill);
+    const script = resolveCapabilityScript(step.skill);
     const args = buildArgs(step.params);
     const timeout = step.timeout || 60000;
-    const skillDir = path.dirname(path.dirname(script));
+    const capabilityDir = path.dirname(path.dirname(script));
 
     return new Promise((resolve) => {
       exec(
         `node "${script}" ${args}`,
         {
           encoding: 'utf8',
-          cwd: skillDir,
+          cwd: capabilityDir,
           timeout,
           maxBuffer: 5 * 1024 * 1024,
         },

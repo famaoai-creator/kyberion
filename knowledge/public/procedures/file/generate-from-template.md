@@ -7,7 +7,7 @@ Create new files based on predefined templates and dynamic variable injection.
 - **Actuator**: `File-Actuator`
 
 ## 3. Step-by-Step Instructions
-1.  Identify the template path (e.g., `templates/skill-template-ts/index.ts`).
+1.  Identify the template path (e.g., `templates/capability-template-ts/index.ts`).
 2.  Use `File-Actuator` with the `read` action to load the template content.
 3.  Inject variables (e.g., `{{name}}`, `{{description}}`) using the agent's internal string replacement logic.
 4.  Define the target output path.
@@ -15,7 +15,7 @@ Create new files based on predefined templates and dynamic variable injection.
     ```json
     {
       "action": "write",
-      "path": "skills/new-skill/index.ts",
+      "path": "libs/actuators/new-capability/src/index.ts",
       "content": "FINAL_CONTENT_HERE"
     }
     ```

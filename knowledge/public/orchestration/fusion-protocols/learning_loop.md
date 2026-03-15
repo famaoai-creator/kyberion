@@ -26,4 +26,4 @@ When `knowledge-harvester` adds new files to `knowledge/external-wisdom/`:
 
 ## 3. Autonomous Execution
 
-The `skill-evolution-engine` is responsible for applying these updates via Pull Request, ensuring the agent's behavior permanently improves based on external data.
+The `actuator-evolution-engine` is responsible for applying these updates via Pull Request, ensuring the agent's behavior permanently improves based on external data.

@@ -29,11 +29,11 @@ When evaluating a merger or acquisition (M&A):
 - **Kyberion Approach**: Deploy `knowledge-harvester` and `codebase-mapper` against the target repo. Use `quality-scorer` to detect technical debt within minutes.
 - **Strategic Value**: Drastically reduces M&A risk and shortens the integration timeline.
 
-### 2.3. Dynamic Skill Synthesis
+### 2.3. Dynamic Capability Synthesis
 
 When a new market opportunity arises (e.g., a new regulation like PQC):
 
-- **Kyberion Approach**: Use `autonomous-skill-designer` to generate a niche scraper/auditor for that specific domain.
+- **Kyberion Approach**: Use `autonomous-capability-designer` to generate a niche scraper/auditor for that specific domain.
 - **Strategic Value**: Hyper-agility in vertical SaaS markets.
 
 ## 3. Victory Conditions for the Agent-Led Org

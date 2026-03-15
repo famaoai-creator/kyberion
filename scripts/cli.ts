@@ -29,8 +29,6 @@ const rootDir = pathResolver.rootDir();
 const indexCandidates = [
   pathResolver.knowledge('public/orchestration/global_actuator_index.json'),
   pathResolver.knowledge('orchestration/global_actuator_index.json'),
-  pathResolver.knowledge('public/orchestration/global_skill_index.json'),
-  pathResolver.knowledge('orchestration/global_skill_index.json'),
 ];
 
 export function resolveIndexPath(): string {
