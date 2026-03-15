@@ -98,4 +98,45 @@ describe('mission-team-orchestrator', () => {
     expect(mocks.spawn).not.toHaveBeenCalled();
     expect(result.assignments[0].runtime_status).toBe('already_ready');
   });
+
+  it('spawns each assigned agent only once even when multiple roles share the same agent', async () => {
+    mocks.loadMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-TEAM',
+      assignments: [
+        {
+          team_role: 'owner',
+          required: true,
+          status: 'assigned',
+          agent_id: 'nerve-agent',
+        },
+        {
+          team_role: 'planner',
+          required: true,
+          status: 'assigned',
+          agent_id: 'nerve-agent',
+        },
+        {
+          team_role: 'tester',
+          required: true,
+          status: 'assigned',
+          agent_id: 'nerve-agent',
+        },
+      ],
+    });
+    mocks.loadAgentProfileIndex.mockReturnValue({
+      'nerve-agent': {
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        capabilities: ['reasoning'],
+      },
+    });
+    mocks.get.mockReturnValue(undefined);
+    mocks.spawn.mockResolvedValue({});
+
+    const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
+    const result = await ensureMissionTeamRuntime('MSN-TEAM');
+
+    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+    expect(result.assignments.map((entry: any) => entry.runtime_status)).toEqual(['spawned', 'spawned', 'spawned']);
+  });
 });

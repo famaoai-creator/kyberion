@@ -25,6 +25,7 @@ export async function ensureMissionTeamRuntime(missionId: string): Promise<Missi
 
   const profiles = loadAgentProfileIndex();
   const assignments: MissionTeamRuntimeAssignment[] = [];
+  const resolvedRuntimeStatus = new Map<string, MissionTeamRuntimeAssignment>();
 
   for (const assignment of plan.assignments) {
     if (assignment.status !== 'assigned' || !assignment.agent_id) {
@@ -35,21 +36,35 @@ export async function ensureMissionTeamRuntime(missionId: string): Promise<Missi
       continue;
     }
 
-    if (isReady(assignment.agent_id)) {
+    const cached = resolvedRuntimeStatus.get(assignment.agent_id);
+    if (cached) {
       assignments.push({
         ...assignment,
-        runtime_status: 'already_ready',
+        runtime_status: cached.runtime_status,
+        error: cached.error,
       });
+      continue;
+    }
+
+    if (isReady(assignment.agent_id)) {
+      const resolved = {
+        ...assignment,
+        runtime_status: 'already_ready',
+      } satisfies MissionTeamRuntimeAssignment;
+      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      assignments.push(resolved);
       continue;
     }
 
     const profile = profiles[assignment.agent_id];
     if (!profile) {
-      assignments.push({
+      const resolved = {
         ...assignment,
         runtime_status: 'failed',
         error: `Agent profile not found: ${assignment.agent_id}`,
-      });
+      } satisfies MissionTeamRuntimeAssignment;
+      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      assignments.push(resolved);
       continue;
     }
 
@@ -61,16 +76,20 @@ export async function ensureMissionTeamRuntime(missionId: string): Promise<Missi
         capabilities: profile.capabilities,
         missionId: missionId.toUpperCase(),
       });
-      assignments.push({
+      const resolved = {
         ...assignment,
         runtime_status: 'spawned',
-      });
+      } satisfies MissionTeamRuntimeAssignment;
+      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      assignments.push(resolved);
     } catch (error) {
-      assignments.push({
+      const resolved = {
         ...assignment,
         runtime_status: 'failed',
         error: error instanceof Error ? error.message : String(error),
-      });
+      } satisfies MissionTeamRuntimeAssignment;
+      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
+      assignments.push(resolved);
     }
   }
 

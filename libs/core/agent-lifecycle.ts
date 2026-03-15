@@ -96,6 +96,7 @@ class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
   private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
+  private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private spawnOptions: Map<string, SpawnOptions> = new Map();
   private runtimeMetrics: Map<string, AgentRuntimeMetrics> = new Map();
@@ -164,6 +165,26 @@ class AgentLifecycleManagerImpl {
 
   async spawn(options: SpawnOptions): Promise<AgentHandle> {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
+    const existingHandle = this.handles.get(agentId);
+    const existingRecord = agentRegistry.get(agentId);
+    if (existingHandle && (existingRecord?.status === 'ready' || existingRecord?.status === 'busy' || existingRecord?.status === 'booting')) {
+      return existingHandle;
+    }
+    const pending = this.pendingSpawns.get(agentId);
+    if (pending) {
+      return pending;
+    }
+
+    const pendingSpawn = this.spawnInternal(agentId, options);
+    this.pendingSpawns.set(agentId, pendingSpawn);
+    try {
+      return await pendingSpawn;
+    } finally {
+      this.pendingSpawns.delete(agentId);
+    }
+  }
+
+  private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
     this.spawnOptions.set(agentId, { ...options, agentId });
     this.ensureMetrics(agentId);
 
@@ -358,6 +379,7 @@ class AgentLifecycleManagerImpl {
       this.execAdapters.delete(agentId);
     }
     this.handles.delete(agentId);
+    this.pendingSpawns.delete(agentId);
     runtimeSupervisor.unregister(agentId);
     agentRegistry.updateStatus(agentId, 'shutdown');
     agentRegistry.unregister(agentId);

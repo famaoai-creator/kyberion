@@ -1,9 +1,10 @@
 import {
   a2aBridge,
   buildMissionTeamView,
+  ensureMissionTeamRuntime,
   emitChannelSurfaceEvent,
-  loadMissionTeamPlan,
   logger,
+  resolveMissionTeamPlan,
   resolveMissionTeamReceiver,
   safeExec,
   safeReadFile,
@@ -15,6 +16,19 @@ interface SlackKickoffInput {
   threadTs: string;
   sourceText?: string;
   proposal?: Record<string, unknown>;
+}
+
+const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
+
+function runMissionController(env: NodeJS.ProcessEnv, args: string[]) {
+  return safeExec(
+    'node',
+    ['dist/scripts/mission_controller.js', ...args],
+    {
+      env,
+      timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
+    },
+  );
 }
 
 async function main() {
@@ -39,38 +53,37 @@ async function main() {
     thread_ts: input.threadTs,
   });
 
-  safeExec(
-    'node',
-    ['dist/scripts/mission_controller.js', 'team', missionId, '--refresh'],
-    { env },
-  );
-  safeExec(
-    'node',
-    ['dist/scripts/mission_controller.js', 'staff', missionId],
-    { env },
-  );
+  const plan = resolveMissionTeamPlan({ missionId });
+  const runtimePlan = await ensureMissionTeamRuntime(missionId);
+  emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
+    correlation_id: missionId,
+    decision: 'mission_team_staffed',
+    why: 'Mission team runtime was ensured in-process by the orchestration worker.',
+    policy_used: 'slack_mission_orchestration_v1',
+    agent_id: 'mission_controller',
+    resource_id: missionId,
+    slack_channel: input.channel,
+    thread_ts: input.threadTs,
+    assignments: runtimePlan.assignments.map((assignment) => ({
+      team_role: assignment.team_role,
+      agent_id: assignment.agent_id,
+      runtime_status: assignment.runtime_status,
+    })),
+  });
 
-  safeExec(
-    'node',
-    [
-      'dist/scripts/mission_controller.js',
-      'record-task',
-      missionId,
-      'Initial planning kickoff from Slack mission issuance',
-      JSON.stringify({
-        source: 'slack',
-        channel: input.channel,
-        threadTs: input.threadTs,
-        sourceText: input.sourceText,
-        proposal: input.proposal,
-      }),
-    ],
-    {
-      env,
-    },
-  );
+  runMissionController(env, [
+    'record-task',
+    missionId,
+    'Initial planning kickoff from Slack mission issuance',
+    JSON.stringify({
+      source: 'slack',
+      channel: input.channel,
+      threadTs: input.threadTs,
+      sourceText: input.sourceText,
+      proposal: input.proposal,
+    }),
+  ]);
 
-  const plan = loadMissionTeamPlan(missionId);
   const plannerAssignment = resolveMissionTeamReceiver({ missionId, teamRole: 'planner' });
   if (!plan || !plannerAssignment?.agent_id) {
     logger.warn(`[SLACK_KICKOFF] Planner assignment not found for ${missionId}.`);
