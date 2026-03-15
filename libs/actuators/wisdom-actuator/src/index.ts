@@ -8,12 +8,12 @@ import {
   pathResolver,
   resolveVars,
   evaluateCondition,
-  withRetry
+  withRetry,
+  derivePipelineStatus
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import * as yaml from 'js-yaml';
 
 /**
@@ -58,7 +58,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   let ctx = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
   
-  if (initialCtx.context_path && fs.existsSync(pathResolver.rootResolve(initialCtx.context_path))) {
+  if (initialCtx.context_path && safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))) {
     const saved = JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string);
     ctx = { ...ctx, ...saved };
   }
@@ -93,7 +93,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -203,7 +203,7 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'write_file':
       const out = pathResolver.rootResolve(resolveVars(params.path, ctx));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
-      if (!fs.existsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
+      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
       break;
     case 'knowledge_inject':
@@ -283,7 +283,7 @@ async function opApply(op: string, params: any, ctx: any) {
  */
 async function performReconcile(input: WisdomAction) {
   const strategyPath = pathResolver.knowledge(input.strategy_path || 'governance/wisdom-reconcile-strategy.json');
-  if (!fs.existsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
     if (strategy.for_each) {

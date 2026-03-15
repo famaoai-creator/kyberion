@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 
 /**
  * Terminal Bridge v4.0 (Isolated Session Protocol)
@@ -12,14 +12,14 @@ const RUNTIME_BASE = path.join(process.cwd(), 'active/shared/runtime/terminal');
 const STRATEGIES: Record<string, any> = {
   ReflexTerminal: {
     findIdle: () => {
-      if (!fs.existsSync(RUNTIME_BASE)) return null;
+      if (!safeExistsSync(RUNTIME_BASE)) return null;
       
-      const sessions = fs.readdirSync(RUNTIME_BASE);
+      const sessions = safeReaddir(RUNTIME_BASE);
       for (const id of sessions) {
         const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
-        if (fs.existsSync(stateFile)) {
+        if (safeExistsSync(stateFile)) {
           try {
-            const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+            const state = JSON.parse(safeReadFile(stateFile, { encoding: 'utf8' }) as string);
             // Simple check if the process is still alive
             process.kill(state.pid, 0);
             return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
@@ -35,18 +35,18 @@ const STRATEGIES: Record<string, any> = {
       const sessionInDir = path.join(RUNTIME_BASE, sid, 'in');
       
       try {
-        if (!fs.existsSync(sessionInDir)) {
-          fs.mkdirSync(sessionInDir, { recursive: true });
+        if (!safeExistsSync(sessionInDir)) {
+          safeMkdir(sessionInDir, { recursive: true });
         }
         
         const requestId = `req-${Date.now()}`;
         const requestPath = path.join(sessionInDir, `${requestId}.json`);
         
-        fs.writeFileSync(requestPath, JSON.stringify({
+        safeWriteFile(requestPath, JSON.stringify({
           id: requestId,
           ts: new Date().toISOString(),
           text
-        }, null, 2), 'utf8');
+        }, null, 2));
         
         return true;
       } catch (err: any) {
@@ -144,9 +144,9 @@ export const terminalBridge = {
   readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
     if (terminalType === 'ReflexTerminal') {
       const latestPath = path.join(RUNTIME_BASE, sessionId, 'out', 'latest_response.json');
-      if (fs.existsSync(latestPath)) {
+      if (safeExistsSync(latestPath)) {
         try {
-          const content = JSON.parse(fs.readFileSync(latestPath, 'utf8'));
+          const content = JSON.parse(safeReadFile(latestPath, { encoding: 'utf8' }) as string);
           return content.data.message || '';
         } catch (_) { return ''; }
       }

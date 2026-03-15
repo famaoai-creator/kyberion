@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "Agent Provider Availability Check",
   "description": "Checks availability and version of all LLM agent providers (Gemini, Claude, Copilot, Codex). Verifies CLI installation, authentication, and basic prompt execution.",
   "steps": [

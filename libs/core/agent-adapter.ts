@@ -1,11 +1,15 @@
 import { logger } from './core';
-import { spawn, ChildProcess } from 'node:child_process';
+import { safeExistsSync } from './secure-io';
+import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process';
+import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
+import * as path from 'node:path';
 
 const ENV_WHITELIST = [
   'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'TERM', 'NODE_ENV',
   'NVM_DIR', 'NVM_BIN', 'GOOGLE_API_KEY', 'GEMINI_API_KEY',
-  'ANTHROPIC_API_KEY', 'MISSION_ID', 'MISSION_ROLE',
+  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'MISSION_ID', 'MISSION_ROLE',
+  'CODEX_HOME',
   // SSL/Proxy
   'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
   'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
@@ -16,6 +20,19 @@ function safeEnv(): Record<string, string> {
   for (const k of ENV_WHITELIST) { if (process.env[k]) env[k] = process.env[k] as string; }
   return env;
 }
+
+/** Walk up from cwd to find the project root (contains AGENTS.md) */
+function resolveProjectRoot(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i++) {
+    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+const PROJECT_ROOT = resolveProjectRoot();
 
 async function getACPSdk() {
   return await import('@agentclientprotocol/sdk');
@@ -50,6 +67,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   protected acpSessionId: string | null = null;
   protected accumulatedResponse: string = '';
   protected accumulatedThought: string = '';
+  protected runtimeResourceId: string | null = null;
 
   constructor(
     protected bootCommand: string,
@@ -60,11 +78,26 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
-    this.child = spawn(this.bootCommand, this.bootArgs, {
-      cwd: process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: safeEnv()
+    this.runtimeResourceId = `adapter:${this.bootCommand}`;
+    const managed = spawnManagedProcess({
+      resourceId: this.runtimeResourceId,
+      kind: 'agent',
+      ownerId: this.bootCommand,
+      ownerType: 'agent-adapter',
+      command: this.bootCommand,
+      args: this.bootArgs,
+      shutdownPolicy: 'manual',
+      spawnOptions: {
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: safeEnv(),
+      },
+      metadata: {
+        bootCommand: this.bootCommand,
+        bootArgs: this.bootArgs,
+      },
     });
+    this.child = managed.child;
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -78,6 +111,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
         const trimmed = line.trim();
         if (trimmed.startsWith('{')) {
           sdkInput.write(trimmed + '\n');
+          touchManagedProcess(this.runtimeResourceId);
         }
       }
     });
@@ -85,6 +119,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     sdkOutput.on('data', (data) => {
       const msg = data.toString();
       if (this.child?.stdin?.writable) this.child.stdin.write(msg);
+      touchManagedProcess(this.runtimeResourceId);
     });
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
@@ -205,9 +240,10 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
   public async shutdown(): Promise<void> {
     if (this.child) {
-      this.child.kill();
+      stopManagedProcess(this.runtimeResourceId, this.child);
       this.child = null;
     }
+    this.runtimeResourceId = null;
   }
 }
 
@@ -261,6 +297,437 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public async shutdown(): Promise<void> {}
+}
+
+export interface CodexAppServerAdapterOptions {
+  model?: string;
+  modelProvider?: string;
+  cwd?: string;
+  systemPrompt?: string;
+  approvalPolicy?: any;
+  timeoutMs?: number;
+  approvalMode?: 'strict' | 'relaxed';
+  sandboxMode?: 'workspace-write' | 'read-only' | 'danger-full-access';
+  networkAccess?: boolean;
+  writableRoots?: string[];
+}
+
+/**
+ * Codex App Server Adapter (JSON-RPC over stdio).
+ */
+export class CodexAppServerAdapter implements AgentAdapter {
+  private options: CodexAppServerAdapterOptions;
+  private child: ChildProcess | null = null;
+  private runtimeResourceId: string | null = null;
+  private buffer = '';
+  private nextId = 1;
+  private pendingRequests: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void; timeout?: ReturnType<typeof setTimeout> }> = new Map();
+  private threadId: string | null = null;
+  private currentTurnId: string | null = null;
+  private pendingTurn: { turnId: string; resolve: (res: AgentResponse) => void; reject: (err: Error) => void; timeout: ReturnType<typeof setTimeout> } | null = null;
+  private accumulatedText = '';
+  private sawAgentDelta = false;
+  private logBuffer: { ts: number; type: string; content: string }[] = [];
+  private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
+  private projectRoot: string = PROJECT_ROOT;
+
+  constructor(options?: CodexAppServerAdapterOptions) {
+    this.options = options || {};
+  }
+
+  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    return this.logBuffer.slice(-limit);
+  }
+
+  private getSandboxMode(): 'workspace-write' | 'read-only' | 'danger-full-access' {
+    return this.options.sandboxMode || 'workspace-write';
+  }
+
+  private buildSandboxPolicy():
+    | { type: 'dangerFullAccess' }
+    | { type: 'readOnly'; networkAccess: boolean }
+    | {
+        type: 'workspaceWrite';
+        writableRoots?: string[];
+        networkAccess: boolean;
+        excludeTmpdirEnvVar: boolean;
+        excludeSlashTmp: boolean;
+      } {
+    const sandboxMode = this.getSandboxMode();
+    if (sandboxMode === 'danger-full-access') {
+      return { type: 'dangerFullAccess' };
+    }
+    if (sandboxMode === 'read-only') {
+      return {
+        type: 'readOnly',
+        networkAccess: this.options.networkAccess ?? true,
+      };
+    }
+    return {
+      type: 'workspaceWrite',
+      writableRoots: this.options.writableRoots,
+      networkAccess: this.options.networkAccess ?? true,
+      excludeTmpdirEnvVar: false,
+      excludeSlashTmp: false,
+    };
+  }
+
+  public async boot(): Promise<void> {
+    const cwd = this.options.cwd || process.cwd();
+    logger.info(`[UAA] Codex App Server booting (cwd: ${cwd})`);
+
+    this.runtimeResourceId = `codex-app-server:${cwd}`;
+    const managed = spawnManagedProcess({
+      resourceId: this.runtimeResourceId,
+      kind: 'agent',
+      ownerId: cwd,
+      ownerType: 'agent-adapter',
+      command: 'npx',
+      args: ['codex', 'app-server', '--listen', 'stdio://'],
+      shutdownPolicy: 'manual',
+      spawnOptions: {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: safeEnv(),
+      },
+      metadata: { cwd },
+    });
+    this.child = managed.child;
+
+    this.child.stdout?.on('data', (chunk) => this.handleStdout(chunk));
+    this.child.stderr?.on('data', (chunk) => {
+      const msg = chunk.toString().trim();
+      if (msg) logger.warn(`[UAA_CODEX_ERR] ${msg}`);
+      if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
+    });
+    this.child.on('exit', (code, signal) => {
+      const err = new Error(`Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`);
+      for (const pending of this.pendingRequests.values()) {
+        if (pending.timeout) clearTimeout(pending.timeout);
+        pending.reject(err);
+      }
+      this.pendingRequests.clear();
+      if (this.pendingTurn) {
+        clearTimeout(this.pendingTurn.timeout);
+        this.pendingTurn.reject(err);
+        this.pendingTurn = null;
+      }
+    });
+
+    const bootTimeoutMs = this.options.timeoutMs ?? 20000;
+    await this.sendRequest('initialize', {
+      clientInfo: { name: 'Kyberion', version: '1.0.0' },
+      capabilities: { experimentalApi: false, optOutNotificationMethods: [] },
+    }, bootTimeoutMs);
+
+    const approvalMode = this.options.approvalMode || 'strict';
+    const sandboxMode = this.getSandboxMode();
+
+    const threadRes: any = await this.sendRequest('thread/start', {
+      model: this.options.model ?? undefined,
+      modelProvider: this.options.modelProvider ?? undefined,
+      cwd,
+      approvalPolicy: this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
+      sandbox: sandboxMode,
+      developerInstructions: this.options.systemPrompt ?? undefined,
+      experimentalRawEvents: false,
+      persistExtendedHistory: false,
+    }, bootTimeoutMs);
+
+    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
+    if (!this.threadId) {
+      throw new Error(`Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`);
+    }
+    logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
+  }
+
+  public async ask(text: string): Promise<AgentResponse> {
+    if (!this.threadId) throw new Error('Codex app-server not booted.');
+    if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
+
+    this.accumulatedText = '';
+    this.sawAgentDelta = false;
+    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+
+    const turnRes: any = await this.sendRequest('turn/start', {
+      threadId: this.threadId,
+      input: [{ type: 'text', text, text_elements: [] }],
+      model: this.options.model ?? undefined,
+      cwd: this.options.cwd ?? undefined,
+      sandboxPolicy: this.buildSandboxPolicy(),
+    }, this.options.timeoutMs ?? 20000);
+
+    const turnId = turnRes?.turn?.id || turnRes?.turnId;
+    if (turnId) this.currentTurnId = turnId;
+
+    if (!turnId) {
+      throw new Error(`Codex app-server turn/start missing turn id: ${JSON.stringify(turnRes)}`);
+    }
+
+    const early = this.earlyTurnResults.get(turnId);
+    if (early) {
+      this.earlyTurnResults.delete(turnId);
+      return { text: early.text, stopReason: early.stopReason };
+    }
+
+    const timeoutMs = this.options.timeoutMs ?? 300000;
+    return await new Promise<AgentResponse>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingTurn = null;
+        reject(new Error('Codex app-server turn timed out.'));
+      }, timeoutMs);
+      this.pendingTurn = { turnId, resolve, reject, timeout };
+    });
+  }
+
+  public async shutdown(): Promise<void> {
+    if (this.child) {
+      if (this.runtimeResourceId) stopManagedProcess(this.runtimeResourceId, this.child);
+      this.child = null;
+    }
+    this.runtimeResourceId = null;
+  }
+
+  private handleStdout(chunk: Buffer): void {
+    if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
+    this.buffer += chunk.toString();
+    let newlineIdx = this.buffer.indexOf('\n');
+    while (newlineIdx >= 0) {
+      const line = this.buffer.slice(0, newlineIdx).trim();
+      this.buffer = this.buffer.slice(newlineIdx + 1);
+      if (line.length > 0) {
+        try {
+          const msg = JSON.parse(line);
+          this.handleMessage(msg);
+        } catch (e: any) {
+          logger.warn(`[UAA_CODEX_PARSE] Failed to parse JSON: ${e.message}`);
+        }
+      }
+      newlineIdx = this.buffer.indexOf('\n');
+    }
+  }
+
+  private handleMessage(msg: any): void {
+    if (!msg || typeof msg !== 'object') return;
+
+    const hasId = Object.prototype.hasOwnProperty.call(msg, 'id');
+    const hasMethod = Object.prototype.hasOwnProperty.call(msg, 'method');
+    const hasResult = Object.prototype.hasOwnProperty.call(msg, 'result');
+    const hasError = Object.prototype.hasOwnProperty.call(msg, 'error');
+
+    if (hasId && (hasResult || hasError)) {
+      const pending = this.pendingRequests.get(msg.id);
+      if (pending) {
+        this.pendingRequests.delete(msg.id);
+        if (pending.timeout) clearTimeout(pending.timeout);
+        if (hasError) {
+          const errMsg = msg.error?.message || 'Codex app-server error';
+          pending.reject(new Error(errMsg));
+        } else {
+          pending.resolve(msg.result);
+        }
+      }
+      return;
+    }
+
+    if (hasMethod && hasId) {
+      void this.handleServerRequest(msg);
+      return;
+    }
+
+    if (hasMethod) {
+      this.handleNotification(msg);
+    }
+  }
+
+  private handleNotification(msg: any): void {
+    const method = msg.method;
+    const params = msg.params || {};
+
+    if (method === 'item/agentMessage/delta') {
+      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
+      if (typeof params.delta === 'string') {
+        this.sawAgentDelta = true;
+        this.accumulatedText += params.delta;
+      }
+      return;
+    }
+
+    if (method === 'rawResponseItem/completed') {
+      if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
+      if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
+      if (!this.sawAgentDelta && params.item?.type === 'message' && params.item?.role === 'assistant') {
+        const content = Array.isArray(params.item?.content) ? params.item.content : [];
+        const text = content
+          .filter((c: any) => c?.type === 'output_text' && typeof c.text === 'string')
+          .map((c: any) => c.text)
+          .join('');
+        if (text) this.accumulatedText += text;
+      }
+      return;
+    }
+
+    if (method === 'turn/started') {
+      const turnId = params.turn?.id;
+      if (turnId) this.currentTurnId = turnId;
+      return;
+    }
+
+    if (method === 'turn/completed') {
+      const turnId = params.turn?.id;
+      if (!turnId) return;
+
+      const status = params.turn?.status || 'completed';
+      const stopReason = status === 'failed' ? 'error' : (status === 'interrupted' ? 'interrupted' : 'completed');
+      const finalText = this.accumulatedText;
+      this.logBuffer.push({ ts: Date.now(), type: 'agent', content: finalText.slice(0, 500) });
+      if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
+      const result = { text: finalText, stopReason };
+
+      if (this.pendingTurn && this.pendingTurn.turnId === turnId) {
+        clearTimeout(this.pendingTurn.timeout);
+        const resolve = this.pendingTurn.resolve;
+        this.pendingTurn = null;
+        resolve(result);
+      } else {
+        this.earlyTurnResults.set(turnId, result);
+      }
+      return;
+    }
+
+    if (method === 'error') {
+      logger.error(`[UAA_CODEX_ERR] ${JSON.stringify(params)}`);
+    }
+  }
+
+  private async handleServerRequest(msg: any): Promise<void> {
+    const { id, method, params } = msg;
+    const relaxed = this.options.approvalMode === 'relaxed';
+
+    switch (method) {
+      case 'item/commandExecution/requestApproval': {
+        const allow = relaxed || this.isReadOnlyCommand(params);
+        this.sendResponse(id, { decision: allow ? 'accept' : 'decline' });
+        return;
+      }
+      case 'item/fileChange/requestApproval': {
+        this.sendResponse(id, { decision: relaxed ? 'accept' : 'decline' });
+        return;
+      }
+      case 'item/permissions/requestApproval': {
+        this.sendResponse(id, {
+          permissions: relaxed ? (params?.permissions || {}) : {},
+          scope: relaxed ? 'session' : 'turn',
+        });
+        return;
+      }
+      case 'item/tool/requestUserInput': {
+        this.sendResponse(id, { answers: {} });
+        return;
+      }
+      case 'item/tool/call': {
+        this.sendResponse(id, {
+          success: false,
+          contentItems: [{ type: 'inputText', text: 'Dynamic tool calls are not supported by Kyberion.' }],
+        });
+        return;
+      }
+      case 'mcpServer/elicitation/request': {
+        this.sendResponse(id, { action: 'decline' });
+        return;
+      }
+      case 'applyPatchApproval': {
+        this.sendResponse(id, { decision: relaxed ? 'approved' : 'denied' });
+        return;
+      }
+      case 'execCommandApproval': {
+        const allow = relaxed || this.isReadOnlyParsedCommand(params);
+        this.sendResponse(id, { decision: allow ? 'approved' : 'denied' });
+        return;
+      }
+      case 'account/chatgptAuthTokens/refresh': {
+        this.sendError(id, -32000, 'ChatGPT auth token refresh not supported');
+        return;
+      }
+      default: {
+        this.sendError(id, -32601, `Unsupported request: ${method}`);
+      }
+    }
+  }
+
+  private sendRequest<T>(method: string, params: any, timeoutMs?: number): Promise<T> {
+    if (!this.child?.stdin?.writable) throw new Error('Codex app-server stdin not writable.');
+    const id = this.nextId++;
+    const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
+    this.child.stdin.write(`${payload}\n`);
+    return new Promise<T>((resolve, reject) => {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      if (timeoutMs && timeoutMs > 0) {
+        timeout = setTimeout(() => {
+          this.pendingRequests.delete(id);
+          reject(new Error(`Codex app-server request timed out (${method}).`));
+        }, timeoutMs);
+      }
+      this.pendingRequests.set(id, { resolve, reject, timeout });
+    });
+  }
+
+  private sendResponse(id: number | string, result: any): void {
+    if (!this.child?.stdin?.writable) return;
+    const payload = JSON.stringify({ jsonrpc: '2.0', id, result });
+    this.child.stdin.write(`${payload}\n`);
+  }
+
+  private sendError(id: number | string, code: number, message: string, data?: any): void {
+    if (!this.child?.stdin?.writable) return;
+    const payload = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message, data } });
+    this.child.stdin.write(`${payload}\n`);
+  }
+
+  private isReadOnlyCommand(params: any): boolean {
+    const actions = Array.isArray(params?.commandActions) ? params.commandActions : [];
+    if (actions.length === 0) return false;
+    if (!this.isCwdAllowed(params?.cwd)) return false;
+    return actions.every((action: any) => {
+      const type = action?.type;
+      if (type === 'read' || type === 'listFiles' || type === 'search') {
+        return this.isPathAllowed(action?.path, params?.cwd);
+      }
+      return false;
+    });
+  }
+
+  private isReadOnlyParsedCommand(params: any): boolean {
+    const parsed = Array.isArray(params?.parsedCmd) ? params.parsedCmd : [];
+    if (parsed.length === 0) return false;
+    if (!this.isCwdAllowed(params?.cwd)) return false;
+    return parsed.every((cmd: any) => {
+      const type = cmd?.type;
+      if (type === 'read') return this.isPathAllowed(cmd?.path, params?.cwd);
+      if (type === 'list_files' || type === 'search') return this.isPathAllowed(cmd?.path, params?.cwd);
+      return false;
+    });
+  }
+
+  private isCwdAllowed(cwd?: string | null): boolean {
+    if (!cwd) return true;
+    return this.isWithinRoot(cwd);
+  }
+
+  private isPathAllowed(targetPath?: string | null, cwd?: string | null): boolean {
+    if (!targetPath) return true;
+    const base = cwd || this.options.cwd || this.projectRoot;
+    const resolved = path.isAbsolute(targetPath) ? targetPath : path.resolve(base, targetPath);
+    return this.isWithinRoot(resolved);
+  }
+
+  private isWithinRoot(targetPath: string): boolean {
+    const root = path.resolve(this.projectRoot);
+    const resolved = path.resolve(targetPath);
+    if (resolved === root) return true;
+    return resolved.startsWith(root + path.sep);
+  }
 }
 
 /**
@@ -408,7 +875,15 @@ export class AgentFactory {
   public static create(provider: 'gemini' | 'codex' | 'claude'): AgentAdapter {
     switch (provider) {
       case 'gemini': return new GeminiAdapter();
-      case 'codex': return new CodexAdapter();
+      case 'codex': {
+        const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+        if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
+        return new CodexAppServerAdapter({
+          model: process.env.KYBERION_CODEX_MODEL,
+          modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+          approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+        });
+      }
       case 'claude': return new ClaudeAdapter();
       default: throw new Error(`Unsupported provider: ${provider}`);
     }

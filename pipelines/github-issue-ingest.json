@@ -1,4 +1,5 @@
 {
+  "action": "pipeline",
   "name": "GitHub Issue to Mission Ingest",
   "description": "Automatically converts GitHub Issues with 'mission' label into active Kyberion missions.",
   "steps": [
@@ -23,7 +24,7 @@
     {
       "op": "system:shell",
       "params": {
-        "cmd": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; npx tsx scripts/mission_controller.ts start \"${title}\" personal; done",
+        "cmd": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; node dist/scripts/mission_controller.js start \"${title}\" personal; done",
         "export_as": "ingest_summary"
       }
     },

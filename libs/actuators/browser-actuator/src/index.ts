@@ -1,7 +1,6 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import { chromium, BrowserContext, Page } from 'playwright';
 
@@ -56,11 +55,11 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   const TIMEOUT = options.timeout_ms || 300000;
 
   const userDataDir = path.join(BROWSER_RUNTIME_DIR, sessionId);
-  if (!fs.existsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
+  if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
 
   const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
-  if (options.record_video && !fs.existsSync(videoDir)) safeMkdir(videoDir, { recursive: true });
+  if (options.record_video && !safeExistsSync(videoDir)) safeMkdir(videoDir, { recursive: true });
 
   logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
   
@@ -144,7 +143,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     }
   } finally {
     if (options.record_trace) {
-      if (!fs.existsSync(EVIDENCE_DIR)) safeMkdir(EVIDENCE_DIR, { recursive: true });
+      if (!safeExistsSync(EVIDENCE_DIR)) safeMkdir(EVIDENCE_DIR, { recursive: true });
       await browserContext.tracing.stop({ path: tracePath });
       logger.info(`🎞️ [BROWSER] Trace recorded at: ${tracePath}`);
       ctx.last_trace_path = tracePath;
@@ -152,7 +151,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     await browserContext.close();
   }
 
-  return { status: 'finished', results, context: ctx, total_steps: state.stepCount };
+  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
 /**
@@ -239,7 +238,7 @@ async function opCapture(op: string, params: any, page: Page, ctx: any, resolve:
     case 'screenshot':
       const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
-      if (!fs.existsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
       return { ...ctx, [params.export_as || 'last_screenshot']: outPath };
     case 'content': return { ...ctx, [params.export_as || 'last_capture']: params.selector ? await page.innerText(params.selector) : await page.content() };

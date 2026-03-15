@@ -1,7 +1,6 @@
 import { logger, safeReadFile, safeWriteFile, pathResolver, safeExec } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 /**
  * Physical-Bridge Actuator v1.0 [KUCA COMPLIANT]

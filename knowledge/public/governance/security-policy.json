@@ -60,6 +60,7 @@
         "active/missions/",
         "active/archive/missions/",
         "knowledge/personal/missions/",
+        "knowledge/evolution/",
         "active/shared/runtime/mission_queue.jsonl",
         "active/audit/",
         "registry.json"

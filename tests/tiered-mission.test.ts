@@ -1,18 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { 
   rootDir, 
   missionDir, 
   missionEvidenceDir, 
   findMissionPath,
   detectTier,
-  ledger
+  ledger,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync
 } from '../libs/core/index.js';
 
 describe('Tiered Mission Architecture', () => {
   const TEST_MISSION_ID = 'TEST-MSN-TIER-999';
   const PROJECT_ROOT = rootDir();
+
+  beforeEach(() => {
+    process.env.MISSION_ROLE = 'mission_controller';
+  });
 
   it('should detect tiers correctly based on paths', () => {
     expect(detectTier('knowledge/personal/identity.json')).toBe('personal');
@@ -35,13 +42,13 @@ describe('Tiered Mission Architecture', () => {
   it('should find mission path across all tiers', () => {
     // Manually create a mission dir in personal tier for testing findMissionPath
     const personalMissionPath = path.join(PROJECT_ROOT, 'knowledge/personal/missions', TEST_MISSION_ID);
-    if (!fs.existsSync(personalMissionPath)) fs.mkdirSync(personalMissionPath, { recursive: true });
+    if (!safeExistsSync(personalMissionPath)) safeMkdir(personalMissionPath, { recursive: true });
     
     const foundPath = findMissionPath(TEST_MISSION_ID);
     expect(foundPath).toBe(personalMissionPath);
     
     // Cleanup
-    fs.rmSync(personalMissionPath, { recursive: true, force: true });
+    safeRmSync(personalMissionPath, { recursive: true, force: true });
   });
 
   it('should record hybrid ledger entries correctly', () => {
@@ -58,19 +65,19 @@ describe('Tiered Mission Architecture', () => {
     });
 
     // 1. Check Mission Ledger (Should have details)
-    expect(fs.existsSync(missionLedgerPath)).toBe(true);
-    const missionContent = fs.readFileSync(missionLedgerPath, 'utf8');
+    expect(safeExistsSync(missionLedgerPath)).toBe(true);
+    const missionContent = safeReadFile(missionLedgerPath, { encoding: 'utf8' }) as string;
     expect(missionContent).toContain('DO_NOT_SHOW_IN_GLOBAL');
     expect(missionContent).toContain('TEST_EVENT');
 
     // 2. Check Global Ledger (Should have metadata only)
-    expect(fs.existsSync(globalLedgerPath)).toBe(true);
-    const globalContent = fs.readFileSync(globalLedgerPath, 'utf8');
+    expect(safeExistsSync(globalLedgerPath)).toBe(true);
+    const globalContent = safeReadFile(globalLedgerPath, { encoding: 'utf8' }) as string;
     expect(globalContent).toContain('MISSION_EVENT:TEST_EVENT');
     expect(globalContent).not.toContain('DO_NOT_SHOW_IN_GLOBAL');
     expect(globalContent).toContain('Metadata only');
 
     // Cleanup
-    fs.rmSync(missionPath, { recursive: true, force: true });
+    safeRmSync(missionPath, { recursive: true, force: true });
   });
 });

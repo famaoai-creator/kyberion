@@ -1,10 +1,9 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve } from '@agent/core';
+import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 async function main() {
   const configPath = rootResolve('knowledge/governance/knowledge-sync-rules.json');
-  if (!fs.existsSync(configPath)) {
+  if (!safeExistsSync(configPath)) {
     logger.warn('Knowledge sync rules not found.');
     return;
   }
@@ -21,7 +20,7 @@ async function main() {
     } catch (err: any) {
       logger.error(`Knowledge sync ${job.action} failed: ${err.message}`);
     } finally {
-      if (fs.existsSync(tempAdfPath)) fs.unlinkSync(tempAdfPath);
+      if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
     }
   }
 }

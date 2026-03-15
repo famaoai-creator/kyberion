@@ -2,8 +2,8 @@
   "name": "@actuator/media",
   "version": "1.0.0",
   "description": "Visual and Document Generation Engine for Kyberion",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "../../../dist/libs/actuators/media-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/media-actuator/src/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

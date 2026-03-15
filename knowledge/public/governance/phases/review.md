@@ -17,7 +17,7 @@ Capitalize on experience and perform environmental cleansing.
 ## Physical Enforcement
 At mission completion, the agent MUST execute the finalization protocol.
 
-- **Command**: `npx tsx scripts/mission_controller.ts finish <MISSION_ID>`
+- **Command**: `node dist/scripts/mission_controller.js finish <MISSION_ID>`
 - **Validation**:
   - Automatic purging of `scratch/` files.
   - Archiving the mission directory to `active/archive/missions/`.

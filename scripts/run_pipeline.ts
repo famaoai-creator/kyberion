@@ -1,4 +1,4 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
+import { logger, safeReadFile, pathResolver, validatePipelineAdf } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { executeSuperPipeline } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
@@ -10,16 +10,21 @@ async function main() {
 
   const inputPath = pathResolver.rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const pipeline = JSON.parse(inputContent);
+  const pipeline = validatePipelineAdf(JSON.parse(inputContent));
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
   
   try {
-    const result = await executeSuperPipeline(pipeline.steps || [], pipeline.context || {});
-    if (result.status === 'finished') {
+    const result = await executeSuperPipeline(
+      (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
+      pipeline.context || {},
+      pipeline.options || {}
+    );
+    if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
     } else {
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
+      process.exit(1);
     }
   } catch (err: any) {
     logger.error(`❌ [PIPELINE] Error: ${err.message}`);

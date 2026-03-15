@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs'; // Only for fs.statSync in render operations
@@ -79,7 +79,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: 'finished', results, context: ctx };
+  return { status: derivePipelineStatus(results), results, context: ctx };
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {

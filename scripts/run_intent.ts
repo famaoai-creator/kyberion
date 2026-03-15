@@ -1,7 +1,6 @@
-import { logger, safeReadFile } from '@agent/core';
+import { logger, safeExistsSync, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 
 async function main() {
@@ -12,12 +11,12 @@ async function main() {
 
   const intent = argv.intent || argv._[0] as string;
   if (!intent) {
-    logger.error('Usage: npx tsx scripts/run_intent.ts <intent_id> [--input context.json]');
+    logger.error('Usage: pnpm exec tsx scripts/run_intent.ts <intent_id> [--input context.json]');
     process.exit(1);
   }
 
   let context = {};
-  if (argv.input && fs.existsSync(path.resolve(process.cwd(), argv.input))) {
+  if (argv.input && safeExistsSync(path.resolve(process.cwd(), argv.input))) {
     context = JSON.parse(safeReadFile(path.resolve(process.cwd(), argv.input), { encoding: 'utf8' }) as string);
   }
 
