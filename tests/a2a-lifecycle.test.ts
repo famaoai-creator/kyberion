@@ -26,7 +26,7 @@ function readLedger(): Record<string, any> {
   return JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8'));
 }
 
-describe('A2A Mission Lifecycle & Trust Engine Integration', () => {
+describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
   
   beforeAll(() => {
     process.env.MISSION_ROLE = 'mission_controller';
