@@ -17,6 +17,12 @@ The "Nexus" is the active dialogue session between the User and the Agent in the
 - **Ears & Eyes (Sensors)**: Ability to receive asynchronous or real-time stimuli from external sources.
 - **Presence (Displays)**: Ability to manifest its thought process and knowledge in a visual or public medium.
 
+After the mission/runtime refactor, the Presence Layer also acts as a boundary between:
+
+- channel ingress
+- interactive control surfaces
+- explainable feedback delivery
+
 ## 2. Communication Channels
 
 All external interactions are categorized by **Channels**, each defined in `presence/bridge/channel-registry.json`.
@@ -31,7 +37,13 @@ All external interactions are categorized by **Channels**, each defined in `pres
 
 ## 3. The Intervention Protocol (How I Perceive)
 
-Stimuli from sensors are written to `presence/bridge/stimuli.jsonl`. 
+Stimuli from sensors are written to the canonical runtime journal:
+
+- `presence/bridge/runtime/stimuli.jsonl`
+
+Channel events should also be mirrored into explainable observability streams under:
+
+- `active/shared/observability/channels/<channel>/`
 
 1.  **Dynamic Context Injection**: During script execution, the `system-prelude.js` automatically reads pending stimuli and injects them into the Agent's consciousness as a "System Whisper."
 2.  **Priority Resolution**: The Agent MUST address stimuli in order of priority (Voice > Slack).
@@ -54,38 +66,56 @@ The **Nexus Daemon** (`presence/bridge/nexus-daemon.js`) can physically inject s
   [SENSORY_INPUT_END]
   ```
 - **Stability**: Automatically marks stimuli as `INJECTED` in physical storage to prevent duplicates on restart.
+- **Response plane**: Session results should be read from session-scoped runtime outboxes such as `active/shared/runtime/terminal/<session_id>/out/latest_response.json`, not from a global singleton response file.
 
-## 4. 👁️ Visual Perception (SIGHT)
+## 4. Slack and Chronos responsibilities
+
+The Presence Layer now distinguishes clearly between Slack and Chronos Mirror v2:
+
+- **Slack** is primarily a channel sensor and channel endpoint.
+- **Chronos Mirror v2** is an authenticated interactive control surface.
+- Both should be described through explicit channel ports and optional Surface Agents.
+
+Slack should normalize ingress and deliver egress. It should not own mission authority.
+
+Chronos Mirror v2 may hold a cached runtime handle for UX efficiency, but it should not become the durable source of truth for mission state. Durable coordination belongs in:
+
+- `active/shared/coordination/chronos/`
+- `active/shared/observability/chronos/`
+- mission-local `coordination/`
+
+## 5. 👁️ Visual Perception (SIGHT)
 
 Provides the Agent with the ability to capture and interpret the physical state of the workspace.
 
-### 4.1. Modular Driver Architecture
+### 5.1. Modular Driver Architecture
 Visual sensing uses a **Driver Strategy Pattern** for cross-platform support:
 - **Orchestrator (`presence/sensors/visual-sensor.js`)**: Detects OS and delegates to drivers.
 - **Drivers**:
     - `macos-driver.js`: Uses native `screencapture`.
     - *Linux/Windows drivers planned.*
 
-### 4.2. CLI Usage
+### 5.2. CLI Usage
 Manual capture trigger:
 ```bash
 npm run cli -- system visual-capture [screen|window]
 ```
 
-## 5. 🛡️ Service Management & Watchdog
+## 6. 🛡️ Service Management & Watchdog
 
 Background presence services are managed by `scripts/service_manager.js`.
 
 - **Watchdog Mode**: A dedicated background process that monitors other services every 30 seconds.
 - **Auto-Healing**: Automatically restarts crashed sensors or daemons.
 - **Maintenance**: Periodically prunes `stimuli.jsonl` by archiving processed items older than 24 hours.
+- **Observability**: Services should emit explainable events into `active/shared/observability/` so operators can reconstruct why a channel event was routed or delayed.
 
-## 6. Developer Guide: Creating a New Sensor
+## 7. Developer Guide: Creating a New Sensor
 
 To add a new sensory input:
 
 1.  **Register Channel**: Update `presence/bridge/channel-registry.json`.
-2.  **Write Stimulus**: Append a JSON line to `presence/bridge/stimuli.jsonl`:
+2.  **Write Stimulus**: Append a JSON line to `presence/bridge/runtime/stimuli.jsonl`:
     ```json
     { 
       "timestamp": "ISO-8601-TS", 
@@ -95,4 +125,10 @@ To add a new sensory input:
       "status": "PENDING" 
     }
     ```
-3.  **Integrate**: Ensure your sensor is listed in `service_manager.js` for lifecycle management.
+3.  **Mirror Observability**: Append an explainable event under `active/shared/observability/channels/<channel>/`.
+4.  **Integrate**: Ensure your sensor is listed in `service_manager.js` for lifecycle management.
+
+For the authoritative Slack and Chronos control contract, see:
+
+- `knowledge/public/architecture/slack-chronos-control-model.md`
+- `knowledge/public/architecture/channel-port-surface-model.md`

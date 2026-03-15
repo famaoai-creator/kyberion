@@ -51,6 +51,14 @@ export interface ACPMediatorOptions {
   cwd?: string;
 }
 
+export interface ProviderUsageSummary {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  raw?: Record<string, unknown>;
+  lastUpdatedAt?: number;
+}
+
 export class ACPMediator {
   private child: ChildProcess | null = null;
   private connection: any = null;
@@ -62,6 +70,7 @@ export class ACPMediator {
   private logBuffer: { ts: number; type: string; content: string }[] = [];
   private static readonly MAX_LOG_ENTRIES = 200;
   private runtimeResourceId: string;
+  private usage: ProviderUsageSummary = {};
 
   constructor(private options: ACPMediatorOptions) {
     this.runtimeResourceId = `acp:${options.threadId}`;
@@ -77,6 +86,50 @@ export class ACPMediator {
   /** Get recent terminal log entries */
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
     return this.logBuffer.slice(-limit);
+  }
+
+  public getRuntimeInfo(): { pid?: number; sessionId: string | null; usage: ProviderUsageSummary; supportsSoftRefresh: boolean } {
+    return {
+      pid: this.child?.pid,
+      sessionId: this.acpSessionId,
+      usage: { ...this.usage },
+      supportsSoftRefresh: true,
+    };
+  }
+
+  private updateUsageFromPayload(payload: unknown): void {
+    const usage = extractUsageSummary(payload);
+    if (!usage) return;
+    this.usage = {
+      inputTokens: usage.inputTokens ?? this.usage.inputTokens,
+      outputTokens: usage.outputTokens ?? this.usage.outputTokens,
+      totalTokens: usage.totalTokens ?? this.usage.totalTokens,
+      raw: usage.raw ?? this.usage.raw,
+      lastUpdatedAt: Date.now(),
+    };
+  }
+
+  private async establishSession(): Promise<void> {
+    logger.info('[ACP_MEDIATOR] Establishing Session...');
+    const sessionRes = await this.connection.newSession({
+      cwd: this.options.cwd || process.cwd(),
+      mcpServers: []
+    });
+    this.acpSessionId = sessionRes.sessionId;
+    logger.info(`[ACP_MEDIATOR] Ready. Session: ${this.acpSessionId}`);
+
+    const targetModel = this.options.modelId || 'gemini-2.5-flash';
+    try {
+      logger.info(`[ACP_MEDIATOR] Setting model to: ${targetModel}`);
+      // @ts-ignore
+      await this.connection.unstable_setSessionModel({
+        sessionId: this.acpSessionId,
+        modelId: targetModel
+      });
+    } catch (e) {
+      logger.warn(`[ACP_MEDIATOR] Model selection failed: ${e}`);
+    }
+    this.systemPromptSent = false;
   }
 
   public async boot(): Promise<void> {
@@ -145,6 +198,7 @@ export class ACPMediator {
       (agent: any) => ({
         sessionUpdate: async (params: any) => {
           logger.info(`[ACP_NOTIF] ${JSON.stringify(params)}`);
+          this.updateUsageFromPayload(params);
           if (params.update?.sessionUpdate === 'agent_message_chunk') {
             const text = params.update.content?.text || '';
             this.accumulatedResponse += text;
@@ -228,27 +282,7 @@ export class ACPMediator {
       methodId: 'oauth-personal'
     });
 
-    logger.info('[ACP_MEDIATOR] Establishing Session...');
-    const sessionRes = await this.connection.newSession({
-      cwd: this.options.cwd || process.cwd(),
-      mcpServers: []
-    });
-    this.acpSessionId = sessionRes.sessionId;
-    
-    logger.info(`[ACP_MEDIATOR] Ready. Session: ${this.acpSessionId}`);
-
-    // Dynamic Model Selection
-    const targetModel = this.options.modelId || 'gemini-2.5-flash';
-    try {
-      logger.info(`[ACP_MEDIATOR] Setting model to: ${targetModel}`);
-      // @ts-ignore
-      await this.connection.unstable_setSessionModel({
-        sessionId: this.acpSessionId,
-        modelId: targetModel
-      });
-    } catch (e) {
-      logger.warn(`[ACP_MEDIATOR] Model selection failed: ${e}`);
-    }
+    await this.establishSession();
 
     // System prompt will be prepended to the first ask() call
     // instead of sent as a separate prompt during boot.
@@ -291,7 +325,16 @@ export class ACPMediator {
       sessionId: this.acpSessionId,
       prompt: [{ type: 'text', text: enrichedPrompt }]
     });
+    this.updateUsageFromPayload(response);
     return this.accumulatedResponse || `(No text, stopReason: ${response.stopReason})`;
+  }
+
+  public async refreshContext(): Promise<{ mode: 'soft'; sessionId: string | null }> {
+    if (!this.connection) throw new Error('Not booted.');
+    this.accumulatedResponse = '';
+    this.processedA2UIOffsets.clear();
+    await this.establishSession();
+    return { mode: 'soft', sessionId: this.acpSessionId };
   }
 
   public async shutdown(): Promise<void> {
@@ -303,4 +346,37 @@ export class ACPMediator {
     this.connection = null;
     this.acpSessionId = null;
   }
+}
+
+function extractUsageSummary(payload: unknown): ProviderUsageSummary | null {
+  const queue: unknown[] = [payload];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object') continue;
+    const usage = (current as any).usage;
+    if (usage && typeof usage === 'object') {
+      const inputTokens = coerceNumber(usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens);
+      const outputTokens = coerceNumber(usage.outputTokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.completion_tokens);
+      const totalTokens = coerceNumber(usage.totalTokens ?? usage.total_tokens) ?? ((inputTokens ?? 0) + (outputTokens ?? 0));
+      return {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        raw: usage as Record<string, unknown>,
+      };
+    }
+    for (const value of Object.values(current as Record<string, unknown>)) {
+      if (value && typeof value === 'object') queue.push(value);
+    }
+  }
+  return null;
+}
+
+function coerceNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
 }
