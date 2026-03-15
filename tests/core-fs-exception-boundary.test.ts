@@ -7,6 +7,7 @@ const rootDir = process.cwd();
 const allowedCoreFsImports = [
   'libs/core/fs-primitives.ts',
   'libs/core/ledger.test.ts',
+  'libs/core/metrics.test.ts',
   'libs/core/secure-io.test.ts',
   'libs/core/secure-io.ts',
   'libs/core/src/lock-utils.ts',
@@ -20,6 +21,7 @@ const allowedCoreFsImports = [
   'libs/core/src/native-pptx-engine/engine.ts',
   'libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts',
   'libs/core/src/native-xlsx-engine/engine.ts',
+  'libs/core/trust-engine.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

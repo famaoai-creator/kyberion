@@ -4,6 +4,7 @@
     "libs/actuators/media-actuator/src/index.ts",
     "libs/core/fs-primitives.ts",
     "libs/core/ledger.test.ts",
+    "libs/core/metrics.test.ts",
     "libs/core/secure-io.test.ts",
     "libs/core/secure-io.ts",
     "libs/core/src/lock-utils.ts",
@@ -17,8 +18,10 @@
     "libs/core/src/native-pptx-engine/engine.ts",
     "libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts",
     "libs/core/src/native-xlsx-engine/engine.ts",
+    "libs/core/trust-engine.test.ts",
     "presence/displays/knowledge-portal/scripts/launch.cjs",
     "tests/a2a-lifecycle.test.ts",
+    "tests/runtime-surface-state.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ],
