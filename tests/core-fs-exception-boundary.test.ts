@@ -10,6 +10,7 @@ const allowedCoreFsImports = [
   'libs/core/metrics.test.ts',
   'libs/core/secure-io.test.ts',
   'libs/core/secure-io.ts',
+  'libs/core/validators.test.ts',
   'libs/core/src/lock-utils.ts',
   'libs/core/src/native-docx-engine/__tests__/docx-engine.test.ts',
   'libs/core/src/native-docx-engine/engine.ts',
