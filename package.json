@@ -52,7 +52,7 @@
     "system:upgrade:execute": "node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-execute.json",
     "init": "npm run init-wizard",
     "init-wizard": "node dist/scripts/init_wizard.js",
-    "vision:start": "tsx presence/sensors/visual-buffer-daemon.ts &",
+    "vision:start": "node dist/presence/sensors/visual-buffer-daemon.js &",
     "vision:stop": "pkill -f visual-buffer-daemon",
     "bootstrap": "pnpm build && node dist/scripts/surface_runtime.js --action reconcile",
     "benchmark": "node dist/scripts/benchmark.js",

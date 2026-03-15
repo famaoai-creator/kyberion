@@ -8,10 +8,10 @@ import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
  * Generates documents from design patterns using the Media-Actuator pipeline.
  *
  * Usage:
- *   pnpm exec tsx scripts/generate_marketing_deck.ts                                  # default marketing deck
- *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <pattern_path>         # custom pattern
- *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <path> --theme <name>  # with theme
- *   pnpm exec tsx scripts/generate_marketing_deck.ts --pattern <path> --output <path> # custom output
+ *   node dist/scripts/generate_marketing_deck.js                                      # default marketing deck
+ *   node dist/scripts/generate_marketing_deck.js --pattern <pattern_path>             # custom pattern
+ *   node dist/scripts/generate_marketing_deck.js --pattern <path> --theme <name>      # with theme
+ *   node dist/scripts/generate_marketing_deck.js --pattern <path> --output <path>     # custom output
  */
 
 async function main() {

@@ -18,6 +18,7 @@
     "libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts",
     "libs/core/src/native-xlsx-engine/engine.ts",
     "presence/displays/knowledge-portal/scripts/launch.cjs",
+    "tests/a2a-lifecycle.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ],

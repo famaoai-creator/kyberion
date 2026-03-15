@@ -103,12 +103,14 @@ function renderJournal() {
   // Trust Scores Summary
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const ledger = raw?.agents ?? raw ?? {};
     console.log(chalk.bold('🤝 Agent Trust Scores:'));
-    Object.keys(ledger.agents).forEach(a => {
-      const score = ledger.agents[a].current_score;
-      const color = score >= 7.0 ? chalk.green : score >= 5.0 ? chalk.yellow : chalk.red;
-      console.log(`  - ${a}: ${color(score.toFixed(1))}/10.0`);
+    Object.keys(ledger).forEach(a => {
+      const score = ledger[a].current_score;
+      const normalized = score / 100;
+      const color = normalized >= 7.0 ? chalk.green : normalized >= 5.0 ? chalk.yellow : chalk.red;
+      console.log(`  - ${a}: ${color(normalized.toFixed(1))}/10.0`);
     });
     console.log('');
   }

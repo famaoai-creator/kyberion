@@ -507,6 +507,13 @@ function updateTrustScore(agentId: string, result: 'verified' | 'rejected') {
   auditChain.recordTrustChange(agentId, oldScore, newRecord?.score ?? 0, `mission ${result}`);
 }
 
+function readTrustLedger(): Record<string, any> {
+  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
+  if (!safeExistsSync(ledgerPath)) return {};
+  const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+  return raw?.agents ?? raw ?? {};
+}
+
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
   if (!id || !agentId || !a2aMessageId) {
     logger.error('Usage: mission_controller delegate <MISSION_ID> <AGENT_ID> <A2A_MESSAGE_ID>');
@@ -520,18 +527,17 @@ async function delegateMission(id: string, agentId: string, a2aMessageId: string
   }
 
   // Trust Guardrail
-  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-  if (safeExistsSync(ledgerPath)) {
-    const ledger = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
-    const agent = ledger.agents[agentId];
-    if (agent && agent.current_score < 3.0 && (state.tier === 'personal' || state.tier === 'confidential')) {
-      throw new Error(`CRITICAL: Agent ${agentId} has insufficient trust score (${agent.current_score}) for ${state.tier} tier mission.`);
-    }
+  const ledger = readTrustLedger();
+  const agent = ledger[agentId];
+  if (agent && agent.current_score < 300 && (state.tier === 'personal' || state.tier === 'confidential')) {
+    throw new Error(`CRITICAL: Agent ${agentId} has insufficient trust score (${agent.current_score}) for ${state.tier} tier mission.`);
   }
 
   logger.info(`📤 Delegating Mission ${upperId} to agent ${agentId}...`);
 
-  state.status = transitionStatus(state.status, 'active');
+  if (state.status !== 'active') {
+    state.status = transitionStatus(state.status, 'active');
+  }
   state.execution_mode = 'delegated';
   state.delegation = {
     agent_id: agentId,
@@ -622,7 +628,9 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
   if (result === 'verified') {
     state.status = transitionStatus(state.status, 'distilling');
   } else {
-    state.status = transitionStatus(state.status, 'active'); // Send back to active for rework
+    if (state.status !== 'active') {
+      state.status = transitionStatus(state.status, 'active'); // Send back to active for rework
+    }
   }
 
   if (state.delegation) {

@@ -20,6 +20,7 @@
         "registry.json",
         "active/audit/",
         "knowledge/evolution/",
+        "knowledge/personal/governance/",
         "active/shared/coordination/",
         "active/shared/observability/mission-control/"
       ]
