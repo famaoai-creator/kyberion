@@ -2,7 +2,7 @@ import { App, LogLevel } from '@slack/bolt';
 import * as path from 'node:path';
 import {
   logger,
-  secretGuard,
+  resolveServiceBinding,
   safeAppendFileSync,
   prepareSlackSurfaceArtifact,
   recordSlackSurfaceArtifact,
@@ -63,11 +63,12 @@ async function postApprovalRequest(client: any, params: {
 
 async function start() {
   process.env.MISSION_ROLE ||= 'slack_bridge';
-  const appToken = secretGuard.getSecret('SLACK_APP_TOKEN');
-  const botToken = secretGuard.getSecret('SLACK_BOT_TOKEN');
+  const binding = resolveServiceBinding('slack', 'secret-guard');
+  const appToken = binding.appToken;
+  const botToken = binding.accessToken;
 
   if (!appToken || !botToken) {
-    logger.error('❌ Missing SLACK_APP_TOKEN or SLACK_BOT_TOKEN in SecretGuard.');
+    logger.error('❌ Missing Slack service binding (access token or app token).');
     process.exit(1);
   }
 

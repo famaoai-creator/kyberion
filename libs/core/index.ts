@@ -49,6 +49,8 @@ export {
   active, 
   vault, 
   shared, 
+  sharedTmp,
+  sharedExports,
   isProtected, 
   skillDir, 
   missionDir,
@@ -133,6 +135,7 @@ export * from './runtime-supervisor';
 export * from './managed-process';
 export * from './pipeline-contract';
 export * from './channel-surface';
+export * from './service-binding';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine';

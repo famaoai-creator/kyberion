@@ -20,7 +20,7 @@ last_updated: 2026-03-06
 ## 2. コンテキスト & リソース
 
 - `active/shared/logs/` (過去の実行ログ)
-- `knowledge/orchestration/global_skill_index.json`
+- `knowledge/public/orchestration/global_actuator_index.json`
 
 ## 3. 勝利条件
 

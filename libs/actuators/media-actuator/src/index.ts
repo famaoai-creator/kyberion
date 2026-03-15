@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs'; // Only for fs.statSync in render operations
@@ -87,7 +87,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'pptx_extract': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const assetsDir = path.resolve(rootDir, `scratch/assets_${Date.now()}`);
+      const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
       return { ...ctx, [params.export_as || 'last_pptx_design']: design, last_assets_dir: assetsDir };
     }

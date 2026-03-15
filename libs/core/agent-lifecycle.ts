@@ -395,6 +395,7 @@ class AgentLifecycleManagerImpl {
   startHealthMonitor(intervalMs = 30000): void {
     if (this.healthInterval) return;
     this.healthInterval = setInterval(() => this.healthCheck(), intervalMs);
+    this.healthInterval.unref?.();
     logger.info(`[LIFECYCLE] Health monitor started (${intervalMs}ms).`);
   }
 
@@ -493,18 +494,6 @@ const GLOBAL_KEY = Symbol.for('@kyberion/agent-lifecycle');
 if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new AgentLifecycleManagerImpl();
   runtimeSupervisor.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
-
-  // Cleanup on process exit to prevent orphaned child processes
-  const cleanup = () => {
-    const instance: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];
-    if (instance) {
-      logger.info('[LIFECYCLE] Process exit — shutting down all agents...');
-      instance.shutdownAll().catch(() => {});
-    }
-  };
-  process.on('exit', cleanup);
-  process.on('SIGINT', () => { cleanup(); process.exit(0); });
-  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 }
 export const agentLifecycle: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];
 

@@ -12,7 +12,7 @@ Interact with web applications, extract content, and execute complex browser sce
     {
       "action": "extract",
       "url": "https://example.com",
-      "output_path": "scratch/example_content.html"
+      "output_path": "active/shared/tmp/browser/example_content.html"
     }
     ```
 2.  **Screenshot**: Use `screenshot` to capture visual evidence of a page's state.

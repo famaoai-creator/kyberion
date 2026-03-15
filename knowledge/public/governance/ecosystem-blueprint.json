@@ -6,7 +6,8 @@
       "knowledge/personal",
       "knowledge/confidential",
       "active/shared/logs",
-      "scratch"
+      "active/shared/tmp",
+      "active/shared/exports"
     ],
     "links": [
       {

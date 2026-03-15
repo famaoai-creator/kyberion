@@ -10,7 +10,7 @@ Capitalize on experience and perform environmental cleansing.
 4. **Audit Reporting**: Include results from security scanners, test runners, and performance metrics in the final summary.
 
 ## Constraints
-- **Scratch Purge**: MUST physically delete all data in the `scratch/` directory.
+- **Runtime Temp Purge**: MUST physically delete transient data from governed runtime temp paths such as `active/shared/tmp/` when the mission or review flow requires cleanup.
 - **Evidence Preservation**: Retain structured execution logs and `mission-state.json` in the mission evidence folder.
 - **Intel First**: Do not skip the distillation step; learnings are more valuable than code.
 
@@ -19,7 +19,7 @@ At mission completion, the agent MUST execute the finalization protocol.
 
 - **Command**: `node dist/scripts/mission_controller.js finish <MISSION_ID>`
 - **Validation**:
-  - Automatic purging of `scratch/` files.
+  - Automatic purging of governed runtime temp files.
   - Archiving the mission directory to `active/archive/missions/`.
   - Setting status to `completed` in the mission state.
 

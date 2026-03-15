@@ -25,6 +25,8 @@ describe('Process boundary governance', () => {
     const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
+      .filter((relPath) => !relPath.startsWith('dist/'))
+      .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => relPath !== 'libs/core/managed-process.ts')
       .filter((relPath) => /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/.test(read(relPath)))
       .sort((a, b) => a.localeCompare(b));

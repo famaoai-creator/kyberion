@@ -30,8 +30,34 @@ export interface RuntimeResourceSnapshot extends RuntimeResourceRecord {
 class RuntimeSupervisorImpl {
   private resources = new Map<string, RuntimeResourceRecord>();
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
+  private exitHooksInstalled = false;
+  private cleanupStarted = false;
+
+  private installExitHooks(): void {
+    if (this.exitHooksInstalled) return;
+    this.exitHooksInstalled = true;
+
+    const cleanupAndExit = (exitCode: number) => {
+      if (this.cleanupStarted) return;
+      this.cleanupStarted = true;
+
+      const forceExitTimer = setTimeout(() => process.exit(exitCode), 1500);
+      forceExitTimer.unref?.();
+
+      this.cleanupAll(`signal:${exitCode}`)
+        .catch(() => {})
+        .finally(() => {
+          clearTimeout(forceExitTimer);
+          process.exit(exitCode);
+        });
+    };
+
+    process.once('SIGINT', () => cleanupAndExit(130));
+    process.once('SIGTERM', () => cleanupAndExit(143));
+  }
 
   register(input: RuntimeRegistration): RuntimeResourceRecord {
+    this.installExitHooks();
     const now = Date.now();
     const record: RuntimeResourceRecord = {
       ...input,
@@ -96,6 +122,18 @@ class RuntimeSupervisorImpl {
     return true;
   }
 
+  async cleanupAll(reason = 'manual'): Promise<string[]> {
+    const resourceIds = this.list().map((record) => record.resourceId);
+    const cleaned: string[] = [];
+
+    for (const resourceId of resourceIds) {
+      const didCleanup = await this.cleanup(resourceId, reason);
+      if (didCleanup) cleaned.push(resourceId);
+    }
+
+    return cleaned;
+  }
+
   async reapIdle(now = Date.now()): Promise<string[]> {
     const expired = this.list().filter((record) => {
       if (record.shutdownPolicy !== 'idle' || !record.idleTimeoutMs) return false;
@@ -131,6 +169,8 @@ class RuntimeSupervisorImpl {
   resetForTests(): void {
     this.stopSweep();
     this.resources.clear();
+    this.cleanupStarted = false;
+    this.exitHooksInstalled = false;
   }
 }
 

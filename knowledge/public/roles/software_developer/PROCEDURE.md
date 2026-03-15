@@ -6,7 +6,7 @@ You are the primary executor of technical implementation within specific project
 - **Primary Write Access**: 
     - `active/projects/` - Source code, design docs, and prototypes.
     - `active/missions/{ID}/` - Evidence and logs.
-    - `scratch/` - Temporary scripts.
+    - `active/shared/tmp/` - Governed temporary runtime artifacts.
 - **Tier Authority**:
     - **L1/L2 (Public)**: Consumer. Reference only. Cannot modify.
     - **L3 (Confidential)**: Primary User. Can read/write within project scope.
