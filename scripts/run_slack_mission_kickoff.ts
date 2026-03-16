@@ -2,7 +2,7 @@ import {
   a2aBridge,
   agentLifecycle,
   buildMissionTeamView,
-  ensureMissionTeamRuntime,
+  ensureMissionTeamRuntimeViaSupervisor,
   emitChannelSurfaceEvent,
   ledger,
   logger,
@@ -88,9 +88,12 @@ async function main() {
   });
 
   const plan = resolveMissionTeamPlan({ missionId });
-  const runtimePlan = await ensureMissionTeamRuntime({
+  const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
     missionId,
     teamRoles: ['planner'],
+    requestedBy: 'slack_mission_kickoff',
+    reason: 'Prewarm planner runtime before Slack mission kickoff routing.',
+    timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
   });
   emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
     correlation_id: missionId,
@@ -101,7 +104,7 @@ async function main() {
     resource_id: missionId,
     slack_channel: input.channel,
     thread_ts: input.threadTs,
-    assignments: runtimePlan.assignments.map((assignment) => ({
+    assignments: runtimePlan.runtime_plan.assignments.map((assignment) => ({
       team_role: assignment.team_role,
       agent_id: assignment.agent_id,
       runtime_status: assignment.runtime_status,

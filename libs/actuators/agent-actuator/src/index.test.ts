@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const resolveMissionTeamPlan = vi.fn();
   const getMissionTeamAssignment = vi.fn();
-  const ensureMissionTeamRuntime = vi.fn();
+  const ensureMissionTeamRuntimeViaSupervisor = vi.fn();
+  const enqueueMissionTeamPrewarmRequest = vi.fn();
+  const startAgentRuntimeSupervisorForRequest = vi.fn();
 
   return {
     resolveMissionTeamPlan,
     getMissionTeamAssignment,
-    ensureMissionTeamRuntime,
+    ensureMissionTeamRuntimeViaSupervisor,
+    enqueueMissionTeamPrewarmRequest,
+    startAgentRuntimeSupervisorForRequest,
   };
 });
 
@@ -44,7 +48,9 @@ vi.mock('@agent/core', () => ({
   },
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   getMissionTeamAssignment: mocks.getMissionTeamAssignment,
-  ensureMissionTeamRuntime: mocks.ensureMissionTeamRuntime,
+  ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
+  enqueueMissionTeamPrewarmRequest: mocks.enqueueMissionTeamPrewarmRequest,
+  startAgentRuntimeSupervisorForRequest: mocks.startAgentRuntimeSupervisorForRequest,
   safeReadFile: vi.fn(),
 }));
 
@@ -115,12 +121,19 @@ describe('agent-actuator team composition actions', () => {
 
   it('stuffs a mission team into runtime instances for staff_mission', async () => {
     const runtimePlan = {
+      request_id: 'AR-1',
       mission_id: 'MSN-TEAM',
-      assignments: [
-        { team_role: 'owner', runtime_status: 'spawned' },
-      ],
+      requested_by: 'agent_actuator',
+      created_at: '2026-03-16T00:00:00.000Z',
+      completed_at: '2026-03-16T00:00:10.000Z',
+      runtime_plan: {
+        mission_id: 'MSN-TEAM',
+        assignments: [
+          { team_role: 'owner', runtime_status: 'spawned' },
+        ],
+      },
     };
-    mocks.ensureMissionTeamRuntime.mockResolvedValue(runtimePlan);
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue(runtimePlan);
 
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -130,7 +143,40 @@ describe('agent-actuator team composition actions', () => {
       },
     } as any);
 
-    expect(mocks.ensureMissionTeamRuntime).toHaveBeenCalledWith('MSN-TEAM');
-    expect(result).toEqual({ status: 'ok', missionId: 'MSN-TEAM', runtimePlan });
+    expect(mocks.ensureMissionTeamRuntimeViaSupervisor).toHaveBeenCalledWith(expect.objectContaining({
+      missionId: 'MSN-TEAM',
+      requestedBy: 'agent_actuator',
+    }));
+    expect(result).toEqual({ status: 'ok', missionId: 'MSN-TEAM', runtimePlan: runtimePlan.runtime_plan });
+  });
+
+  it('queues mission prewarm through the supervisor', async () => {
+    mocks.enqueueMissionTeamPrewarmRequest.mockReturnValue({
+      request_id: 'AR-1',
+      mission_id: 'MSN-TEAM',
+      team_roles: ['planner'],
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'prewarm_mission',
+      params: {
+        missionId: 'MSN-TEAM',
+      },
+    } as any);
+
+    expect(mocks.enqueueMissionTeamPrewarmRequest).toHaveBeenCalledWith(expect.objectContaining({
+      missionId: 'MSN-TEAM',
+      requestedBy: 'agent_actuator',
+    }));
+    expect(mocks.startAgentRuntimeSupervisorForRequest).toHaveBeenCalledWith(expect.objectContaining({
+      request_id: 'AR-1',
+    }));
+    expect(result).toEqual({
+      status: 'queued',
+      missionId: 'MSN-TEAM',
+      requestId: 'AR-1',
+      teamRoles: ['planner'],
+    });
   });
 });

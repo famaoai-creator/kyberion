@@ -12,12 +12,21 @@ export interface MissionTeamRuntimePlan {
   assignments: MissionTeamRuntimeAssignment[];
 }
 
+export interface EnsureMissionTeamRuntimeOptions {
+  missionId: string;
+  teamRoles?: string[];
+}
+
 function isReady(agentId: string): boolean {
   const record = agentRegistry.get(agentId);
   return record?.status === 'ready' || record?.status === 'busy';
 }
 
-export async function ensureMissionTeamRuntime(missionId: string): Promise<MissionTeamRuntimePlan> {
+export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeamRuntimeOptions): Promise<MissionTeamRuntimePlan> {
+  const missionId = typeof input === 'string' ? input : input.missionId;
+  const teamRoles = typeof input === 'string' ? undefined : input.teamRoles;
+  const requestedRoles = teamRoles ? new Set(teamRoles) : null;
+
   const plan = loadMissionTeamPlan(missionId);
   if (!plan) {
     throw new Error(`Mission team plan not found for ${missionId}`);
@@ -28,6 +37,10 @@ export async function ensureMissionTeamRuntime(missionId: string): Promise<Missi
   const resolvedRuntimeStatus = new Map<string, MissionTeamRuntimeAssignment>();
 
   for (const assignment of plan.assignments) {
+    if (requestedRoles && !requestedRoles.has(assignment.team_role)) {
+      continue;
+    }
+
     if (assignment.status !== 'assigned' || !assignment.agent_id) {
       assignments.push({
         ...assignment,

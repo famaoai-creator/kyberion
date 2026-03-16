@@ -142,6 +142,7 @@ export * from './approval-store';
 export * from './managed-process';
 export * from './mission-team-composer';
 export * from './mission-team-orchestrator';
+export * from './agent-runtime-supervisor';
 export * from './pipeline-contract';
 export * from './channel-surface';
 export * from './service-binding';

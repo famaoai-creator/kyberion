@@ -36,7 +36,11 @@ import { auditChain } from '../libs/core/audit-chain.js';
 import { validateFileFreshness } from '../libs/core/validators.js';
 import { composeMissionTeamPlan, writeMissionTeamPlan } from '../libs/core/mission-team-composer.js';
 import { loadMissionTeamPlan, resolveMissionTeamPlan } from '../libs/core/mission-team-composer.js';
-import { ensureMissionTeamRuntime } from '../libs/core/mission-team-orchestrator.js';
+import {
+  enqueueMissionTeamPrewarmRequest,
+  ensureMissionTeamRuntimeViaSupervisor,
+  startAgentRuntimeSupervisorForRequest,
+} from '../libs/core/agent-runtime-supervisor.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 const REGISTRY_PATH = pathResolver.active('missions/registry.json');
@@ -1693,8 +1697,38 @@ async function staffMissionTeam(id: string) {
     return;
   }
 
-  const runtimePlan = await ensureMissionTeamRuntime(upperId);
-  console.log(JSON.stringify(runtimePlan, null, 2));
+  const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
+    missionId: upperId,
+    requestedBy: 'mission_controller',
+    reason: 'Explicit mission team staffing request.',
+    timeoutMs: 600_000,
+  });
+  console.log(JSON.stringify(runtimePlan.runtime_plan, null, 2));
+}
+
+async function prewarmMissionTeam(id: string, teamRolesArg?: string) {
+  if (!id) {
+    logger.error('Usage: mission_controller prewarm <MISSION_ID> [team_role_csv]');
+    return;
+  }
+
+  const upperId = id.toUpperCase();
+  const teamRoles = teamRolesArg
+    ? teamRolesArg.split(',').map((entry) => entry.trim()).filter(Boolean)
+    : undefined;
+  const request = enqueueMissionTeamPrewarmRequest({
+    missionId: upperId,
+    teamRoles,
+    requestedBy: 'mission_controller',
+    reason: 'Explicit mission team prewarm request.',
+  });
+  startAgentRuntimeSupervisorForRequest(request);
+  console.log(JSON.stringify({
+    status: 'queued',
+    request_id: request.request_id,
+    mission_id: request.mission_id,
+    team_roles: request.team_roles || [],
+  }, null, 2));
 }
 
 /**
@@ -1741,6 +1775,7 @@ async function main() {
     case 'status': showMissionStatus(arg1); break;
     case 'team': showMissionTeam(arg1, hasRefresh); break;
     case 'staff': await staffMissionTeam(arg1); break;
+    case 'prewarm': await prewarmMissionTeam(arg1, arg2); break;
     case 'sync':
         logger.info('Syncing mission registry...');
         break;

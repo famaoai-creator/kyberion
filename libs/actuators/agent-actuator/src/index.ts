@@ -6,7 +6,9 @@ import {
   a2aBridge,
   resolveMissionTeamPlan,
   getMissionTeamAssignment,
-  ensureMissionTeamRuntime,
+  ensureMissionTeamRuntimeViaSupervisor,
+  enqueueMissionTeamPrewarmRequest,
+  startAgentRuntimeSupervisorForRequest,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -31,7 +33,7 @@ import { safeReadFile } from '@agent/core';
  */
 
 interface AgentAction {
-  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission';
+  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission' | 'prewarm_mission';
   params: {
     agentId?: string;
     provider?: AgentProvider;
@@ -182,8 +184,29 @@ export async function handleAction(input: AgentAction) {
 
     case 'staff_mission': {
       if (!params.missionId) throw new Error('missionId is required for staff_mission');
-      const runtimePlan = await ensureMissionTeamRuntime(params.missionId);
-      return { status: 'ok', missionId: params.missionId, runtimePlan };
+      const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
+        missionId: params.missionId,
+        requestedBy: 'agent_actuator',
+        reason: 'Agent actuator mission staffing request.',
+        timeoutMs: 600_000,
+      });
+      return { status: 'ok', missionId: params.missionId, runtimePlan: runtimePlan.runtime_plan };
+    }
+
+    case 'prewarm_mission': {
+      if (!params.missionId) throw new Error('missionId is required for prewarm_mission');
+      const request = enqueueMissionTeamPrewarmRequest({
+        missionId: params.missionId,
+        requestedBy: 'agent_actuator',
+        reason: 'Agent actuator mission prewarm request.',
+      });
+      startAgentRuntimeSupervisorForRequest(request);
+      return {
+        status: 'queued',
+        missionId: params.missionId,
+        requestId: request.request_id,
+        teamRoles: request.team_roles || [],
+      };
     }
 
     default:

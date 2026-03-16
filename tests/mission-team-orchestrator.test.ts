@@ -139,4 +139,57 @@ describe('mission-team-orchestrator', () => {
     expect(mocks.spawn).toHaveBeenCalledTimes(1);
     expect(result.assignments.map((entry: any) => entry.runtime_status)).toEqual(['spawned', 'spawned', 'spawned']);
   });
+
+  it('can ensure only selected team roles', async () => {
+    mocks.loadMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-TEAM',
+      assignments: [
+        {
+          team_role: 'owner',
+          required: true,
+          status: 'assigned',
+          agent_id: 'nerve-agent',
+        },
+        {
+          team_role: 'planner',
+          required: true,
+          status: 'assigned',
+          agent_id: 'nerve-agent',
+        },
+        {
+          team_role: 'implementer',
+          required: true,
+          status: 'assigned',
+          agent_id: 'implementation-architect',
+        },
+      ],
+    });
+    mocks.loadAgentProfileIndex.mockReturnValue({
+      'nerve-agent': {
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        capabilities: ['reasoning'],
+      },
+      'implementation-architect': {
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        capabilities: ['implementation'],
+      },
+    });
+    mocks.get.mockReturnValue(undefined);
+    mocks.spawn.mockResolvedValue({});
+
+    const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
+    const result = await ensureMissionTeamRuntime({
+      missionId: 'MSN-TEAM',
+      teamRoles: ['planner'],
+    });
+
+    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+    expect(mocks.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'nerve-agent',
+    }));
+    expect(result.assignments).toHaveLength(1);
+    expect(result.assignments[0].team_role).toBe('planner');
+  });
 });
