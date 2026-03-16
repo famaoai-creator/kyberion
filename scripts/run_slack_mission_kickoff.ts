@@ -1,13 +1,18 @@
 import {
   a2aBridge,
+  agentLifecycle,
   buildMissionTeamView,
   ensureMissionTeamRuntime,
   emitChannelSurfaceEvent,
+  ledger,
   logger,
+  missionDir,
   resolveMissionTeamPlan,
   resolveMissionTeamReceiver,
+  safeExistsSync,
   safeExec,
   safeReadFile,
+  safeWriteFile,
 } from '../libs/core/index.js';
 
 interface SlackKickoffInput {
@@ -29,6 +34,35 @@ function runMissionController(env: NodeJS.ProcessEnv, args: string[]) {
       timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
     },
   );
+}
+
+function syncPlanningArtifacts(missionId: string): void {
+  const missionPath = missionDir(missionId, 'public');
+  const planPath = `${missionPath}/PLAN.md`;
+  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
+
+  if (!safeExistsSync(planPath) || !safeExistsSync(nextTasksPath) || !safeExistsSync(taskBoardPath)) {
+    return;
+  }
+
+  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+  const updatedTaskBoard = currentTaskBoard
+    .replace('## Status: Planned', '## Status: Planning Ready')
+    .replace('- [ ] Step 1: Research and Strategy', '- [x] Step 1: Research and Strategy');
+
+  if (updatedTaskBoard !== currentTaskBoard) {
+    safeWriteFile(taskBoardPath, updatedTaskBoard);
+  }
+
+  const nextTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+  ledger.record('MISSION_PLAN_READY', {
+    mission_id: missionId,
+    role: 'planner',
+    summary_path: 'PLAN.md',
+    next_tasks_path: 'NEXT_TASKS.json',
+    planned_task_count: Array.isArray(nextTasks) ? nextTasks.length : 0,
+  });
 }
 
 async function main() {
@@ -54,7 +88,10 @@ async function main() {
   });
 
   const plan = resolveMissionTeamPlan({ missionId });
-  const runtimePlan = await ensureMissionTeamRuntime(missionId);
+  const runtimePlan = await ensureMissionTeamRuntime({
+    missionId,
+    teamRoles: ['planner'],
+  });
   emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
     correlation_id: missionId,
     decision: 'mission_team_staffed',
@@ -137,6 +174,7 @@ async function main() {
   });
 
   logger.info(`[SLACK_KICKOFF] Planner kickoff complete for ${missionId}: ${String(kickoff.payload?.text || '').slice(0, 240)}`);
+  syncPlanningArtifacts(missionId);
   emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
     correlation_id: missionId,
     decision: 'mission_kickoff_completed',
@@ -147,6 +185,8 @@ async function main() {
     slack_channel: input.channel,
     thread_ts: input.threadTs,
   });
+
+  await agentLifecycle.shutdownAll();
 }
 
 main().catch((error) => {
