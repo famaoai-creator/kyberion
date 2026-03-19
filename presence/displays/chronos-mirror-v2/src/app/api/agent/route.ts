@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { guardRequest } from "../../../lib/api-guard";
 
 async function loadChronosCore() {
@@ -321,29 +320,37 @@ async function tryHandleDeterministicPipelineQuery(query: string) {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
-  const { pathResolver, safeReadFile, validatePipelineAdf, logger } = await loadChronosCore();
+  const { pathResolver, safeExec, logger } = await loadChronosCore();
   const inputPath = pathResolver.rootResolve(match[1]);
-  const pipeline = validatePipelineAdf(JSON.parse(safeReadFile(inputPath, { encoding: "utf8" }) as string));
-  const superNervePath = path.join(PROJECT_ROOT, "dist/libs/actuators/orchestrator-actuator/src/super-nerve/index.js");
-  const { executeSuperPipeline } = await import(pathToFileURL(superNervePath).href);
-  const result = await executeSuperPipeline(
-    (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
-    pipeline.context || {},
-    pipeline.options || {},
-  );
+  const output = safeExec("node", ["dist/scripts/run_pipeline.js", "--input", inputPath], { cwd: PROJECT_ROOT });
 
-  logger.info(`[CHRONOS] Deterministic pipeline query executed: ${match[1]}`);
+  logger.info(`[CHRONOS] Deterministic pipeline query executed via built script: ${match[1]}`);
 
   return {
     status: "ok",
-    response: `Pipeline ${match[1]} finished with status: ${result.status}`,
+    response: `Pipeline ${match[1]} completed.`,
+    a2ui: [
+      {
+        type: "display:section",
+        props: {
+          title: "Pipeline Execution",
+          description: `Deterministic execution of ${match[1]} through the built pipeline runner.`,
+          items: [
+            {
+              type: "display:log",
+              props: {
+                title: "Execution Output",
+                lines: output.split("\n").filter(Boolean).slice(-40),
+              },
+            },
+          ],
+        },
+      },
+    ],
     pipeline: {
       input: match[1],
-      status: result.status,
-      results: result.results,
-      context: result.context,
+      status: "completed",
     },
-    a2ui: [],
     delegations: undefined,
     timestamp: new Date().toISOString(),
   };

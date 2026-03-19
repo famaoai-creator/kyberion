@@ -49,6 +49,6 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('cleanup_runtime_lease');
     expect(route).toContain('restart_runtime_lease');
     expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
-    expect(agentRoute).toContain('executeSuperPipeline');
+    expect(agentRoute).toContain('dist/scripts/run_pipeline.js');
   });
 });
