@@ -162,12 +162,15 @@ function collectControlActions(): ControlActionSummary[] {
         (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
         eventId
       ) {
+        const queuedTarget = event.event_type === "surface_control_requested"
+          ? event.payload?.surfaceId || "surface-runtime"
+          : event.mission_id || "system";
         lifecycle.set(eventId, {
           event_id: eventId,
           ts: event.ts || new Date().toISOString(),
           kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
-          target: event.mission_id || event.resource_id || "system",
-          operation: event.event_type,
+          target: queuedTarget,
+          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
           status: "queued",
           requested_by: event.requested_by || "unknown",
         });
@@ -196,12 +199,15 @@ function collectControlActions(): ControlActionSummary[] {
         (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
         eventId
       ) {
+        const failedTarget = event.event_type === "surface_control_requested"
+          ? event.payload?.surfaceId || "surface-runtime"
+          : event.mission_id || "system";
         lifecycle.set(eventId, {
           event_id: eventId,
           ts: event.ts || new Date().toISOString(),
           kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
-          target: event.mission_id || event.resource_id || "system",
-          operation: event.event_type,
+          target: failedTarget,
+          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
           status: "failed",
           requested_by: event.requested_by || "unknown",
           error: typeof event.error === "string" ? event.error : undefined,

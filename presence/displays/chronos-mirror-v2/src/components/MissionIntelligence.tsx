@@ -73,6 +73,26 @@ interface ControlActionSummary {
   error?: string;
 }
 
+function getLatestMissionControlAction(
+  actions: ControlActionSummary[],
+  missionId: string,
+): ControlActionSummary | null {
+  return actions.find((action) => action.kind === "mission" && action.target === missionId) || null;
+}
+
+function getLatestSurfaceControlAction(
+  actions: ControlActionSummary[],
+  surfaceId: string,
+): ControlActionSummary | null {
+  return actions.find((action) => action.kind === "surface" && action.target === surfaceId) || null;
+}
+
+function getGlobalSurfaceControlAction(
+  actions: ControlActionSummary[],
+): ControlActionSummary | null {
+  return actions.find((action) => action.kind === "surface" && action.target === "surface-runtime") || null;
+}
+
 interface IntelligencePayload {
   accessRole: "readonly" | "localadmin";
   activeMissions: MissionSummary[];
@@ -370,6 +390,25 @@ export function MissionIntelligence() {
               <div className="text-[11px] italic text-kyberion-gold/30">No active missions.</div>
             ) : data.activeMissions.map((mission) => (
               <div key={mission.missionId} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const latestAction = getLatestMissionControlAction(data.controlActions, mission.missionId);
+                  return latestAction ? (
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        last control action
+                      </div>
+                      <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
+                        latestAction.status === "completed"
+                          ? "bg-green-500/15 text-green-300"
+                          : latestAction.status === "failed"
+                            ? "bg-red-500/15 text-red-300"
+                            : "bg-yellow-500/10 text-yellow-200"
+                      }`}>
+                        {latestAction.operation} · {latestAction.status}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{mission.missionId}</div>
@@ -528,6 +567,23 @@ export function MissionIntelligence() {
       <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
         <Panel title="Surface Control">
           <div className="mb-3 flex flex-wrap gap-2">
+            {(() => {
+              const latestAction = getGlobalSurfaceControlAction(data.controlActions);
+              return latestAction ? (
+                <div className="mr-2 flex items-center rounded-lg border border-white/6 bg-white/[0.03] px-3 py-1.5 text-[10px] text-white/55">
+                  surfaces · {latestAction.operation}
+                  <span className={`ml-2 rounded-full px-2 py-0.5 uppercase tracking-[0.18em] ${
+                    latestAction.status === "completed"
+                      ? "bg-green-500/15 text-green-300"
+                      : latestAction.status === "failed"
+                        ? "bg-red-500/15 text-red-300"
+                        : "bg-yellow-500/10 text-yellow-200"
+                  }`}>
+                    {latestAction.status}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             {[
               { label: "reconcile surfaces", op: "reconcile" },
               { label: "status refresh", op: "status" },
@@ -548,6 +604,25 @@ export function MissionIntelligence() {
               <div className="text-[11px] italic text-kyberion-gold/30">No managed surfaces.</div>
             ) : data.surfaces.map((surface) => (
               <div key={surface.id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const latestAction = getLatestSurfaceControlAction(data.controlActions, surface.id);
+                  return latestAction ? (
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        last control action
+                      </div>
+                      <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
+                        latestAction.status === "completed"
+                          ? "bg-green-500/15 text-green-300"
+                          : latestAction.status === "failed"
+                            ? "bg-red-500/15 text-red-300"
+                            : "bg-yellow-500/10 text-yellow-200"
+                      }`}>
+                        {latestAction.operation} · {latestAction.status}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{surface.id}</div>
