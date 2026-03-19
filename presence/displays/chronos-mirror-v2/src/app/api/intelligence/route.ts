@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
+import { emitMissionOrchestrationObservation, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
 
 interface MissionSummary {
   missionId: string;
@@ -220,6 +220,14 @@ export async function POST(req: NextRequest) {
     } else {
       await restartAgentRuntime(agentId, "chronos_operator");
     }
+    emitMissionOrchestrationObservation({
+      decision: "runtime_lease_remediation_applied",
+      event_type: "runtime_lease_remediation_applied",
+      requested_by: "chronos_operator",
+      resource_id: agentId,
+      action,
+      why: "Chronos operator applied runtime lease remediation from the doctor view.",
+    });
     return NextResponse.json({
       status: "ok",
       action,
