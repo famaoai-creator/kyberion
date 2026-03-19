@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { ensureMissionTeamRuntime, type EnsureMissionTeamRuntimeOptions, type MissionTeamRuntimePlan } from './mission-team-orchestrator.js';
-import { agentLifecycle, type SpawnOptions, type AgentHandle } from './agent-lifecycle.js';
+import { agentLifecycle, type SpawnOptions, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 
@@ -228,4 +228,63 @@ export async function stopAgentRuntime(agentId: string, requestedBy: string): Pr
     agent_id: agentId,
     requested_by: requestedBy,
   });
+}
+
+export async function shutdownAllAgentRuntimes(requestedBy: string): Promise<void> {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_shutdown_all_requested',
+    requested_by: requestedBy,
+  });
+  await agentLifecycle.shutdownAll();
+  appendSupervisorEvent({
+    decision: 'agent_runtime_shutdown_all_completed',
+    requested_by: requestedBy,
+  });
+}
+
+export function listAgentRuntimeSnapshots(): AgentRuntimeSnapshot[] {
+  return agentLifecycle.listSnapshots();
+}
+
+export function getAgentRuntimeSnapshot(agentId: string, logLimit?: number): AgentRuntimeSnapshot | null {
+  return agentLifecycle.getSnapshot(agentId, logLimit) || null;
+}
+
+export function getAgentRuntimeHandle(agentId: string): AgentHandle | null {
+  return agentLifecycle.getHandle(agentId) || null;
+}
+
+export function getAgentRuntimeLog(agentId: string, limit = 50) {
+  return agentLifecycle.getLog(agentId, limit);
+}
+
+export async function refreshAgentRuntime(agentId: string, requestedBy: string) {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_refresh_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+  });
+  const result = await agentLifecycle.refreshContext(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_refreshed',
+    agent_id: agentId,
+    requested_by: requestedBy,
+    mode: result.mode,
+  });
+  return result;
+}
+
+export async function restartAgentRuntime(agentId: string, requestedBy: string): Promise<AgentHandle> {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_restart_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+  });
+  const handle = await agentLifecycle.restart(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_restarted',
+    agent_id: agentId,
+    requested_by: requestedBy,
+  });
+  return handle;
 }

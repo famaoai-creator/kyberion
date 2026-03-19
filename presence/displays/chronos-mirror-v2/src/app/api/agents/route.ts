@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { agentRegistry } from "@agent/core/agent-registry";
-import { agentLifecycle } from "@agent/core/agent-lifecycle";
 import { a2aBridge } from "@agent/core/a2a-bridge";
 import { loadAgentManifests } from "@agent/core/agent-manifest";
 import { discoverProviders } from "@agent/core/provider-discovery";
-import { ensureAgentRuntime, stopAgentRuntime } from "@agent/core";
+import { ensureAgentRuntime, stopAgentRuntime, listAgentRuntimeSnapshots, getAgentRuntimeLog, getAgentRuntimeSnapshot, getAgentRuntimeHandle, refreshAgentRuntime, restartAgentRuntime } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 
 /**
@@ -39,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     const snapshot = agentRegistry.getHealthSnapshot();
-    const agents = agentLifecycle.listSnapshots().map((entry) => ({
+    const agents = listAgentRuntimeSnapshots().map((entry) => ({
       agentId: entry.agent.agentId,
       provider: entry.agent.provider,
       modelId: entry.agent.modelId,
@@ -88,31 +87,31 @@ export async function POST(req: NextRequest) {
       }
       case "logs": {
         if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
-        const logs = agentLifecycle.getLog(body.agentId, body.limit || 50);
+        const logs = getAgentRuntimeLog(body.agentId, body.limit || 50);
         return NextResponse.json({ status: "ok", agentId: body.agentId, logs });
       }
       case "snapshot": {
         if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
-        const snapshot = agentLifecycle.getSnapshot(body.agentId, body.logLimit || 50);
+        const snapshot = getAgentRuntimeSnapshot(body.agentId, body.logLimit || 50);
         if (!snapshot) return NextResponse.json({ error: `Agent ${body.agentId} not found` }, { status: 404 });
         return NextResponse.json({ status: "ok", snapshot });
       }
       case "ask": {
         if (!body.agentId || !body.query) return NextResponse.json({ error: "Missing agentId or query" }, { status: 400 });
-        const handle = agentLifecycle.getHandle(body.agentId);
+        const handle = getAgentRuntimeHandle(body.agentId);
         if (!handle) return NextResponse.json({ error: `Agent ${body.agentId} not found or not ready` }, { status: 404 });
         const response = await handle.ask(body.query);
         return NextResponse.json({ status: "ok", agentId: body.agentId, response });
       }
       case "refresh": {
         if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
-        const result = await agentLifecycle.refreshContext(body.agentId);
+        const result = await refreshAgentRuntime(body.agentId, "chronos_agents_api");
         return NextResponse.json({ status: "ok", agentId: body.agentId, ...result });
       }
       case "restart": {
         if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
-        const handle = await agentLifecycle.restart(body.agentId);
-        return NextResponse.json({ status: "ok", agentId: body.agentId, agent: handle.getRecord(), snapshot: agentLifecycle.getSnapshot(body.agentId) });
+        const handle = await restartAgentRuntime(body.agentId, "chronos_agents_api");
+        return NextResponse.json({ status: "ok", agentId: body.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(body.agentId) });
       }
       case "a2a": {
         if (!body.envelope?.header) return NextResponse.json({ error: "Invalid A2A envelope" }, { status: 400 });

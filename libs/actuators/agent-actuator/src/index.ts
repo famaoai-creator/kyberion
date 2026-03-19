@@ -9,6 +9,13 @@ import {
   ensureMissionTeamRuntimeViaSupervisor,
   enqueueMissionTeamPrewarmRequest,
   startAgentRuntimeSupervisorForRequest,
+  ensureAgentRuntime,
+  stopAgentRuntime,
+  shutdownAllAgentRuntimes,
+  listAgentRuntimeSnapshots,
+  getAgentRuntimeSnapshot,
+  refreshAgentRuntime,
+  restartAgentRuntime,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -58,7 +65,7 @@ export async function handleAction(input: AgentAction) {
     case 'spawn': {
       if (!params.provider) throw new Error('provider is required for spawn');
 
-      const handle = await agentLifecycle.spawn({
+      const handle = await ensureAgentRuntime({
         agentId: params.agentId,
         provider: params.provider,
         modelId: params.modelId,
@@ -68,6 +75,7 @@ export async function handleAction(input: AgentAction) {
         parentAgentId: params.parentAgentId,
         missionId: params.missionId,
         trustRequired: params.trustRequired,
+        requestedBy: 'agent_actuator',
       });
 
       const record = handle.getRecord();
@@ -103,12 +111,12 @@ export async function handleAction(input: AgentAction) {
 
     case 'shutdown': {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
-      await agentLifecycle.shutdown(params.agentId);
+      await stopAgentRuntime(params.agentId, 'agent_actuator');
       return { status: 'shutdown', agentId: params.agentId };
     }
 
     case 'shutdown_all': {
-      await agentLifecycle.shutdownAll();
+      await shutdownAllAgentRuntimes('agent_actuator');
       return { status: 'all_shutdown' };
     }
 
@@ -119,7 +127,7 @@ export async function handleAction(input: AgentAction) {
 
     case 'health': {
       const snapshot = agentRegistry.getHealthSnapshot();
-      const agents = agentLifecycle.listSnapshots().map(entry => ({
+      const agents = listAgentRuntimeSnapshots().map(entry => ({
         agentId: entry.agent.agentId,
         provider: entry.agent.provider,
         modelId: entry.agent.modelId,
@@ -138,21 +146,21 @@ export async function handleAction(input: AgentAction) {
 
     case 'snapshot': {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
-      const snapshot = agentLifecycle.getSnapshot(params.agentId);
+      const snapshot = getAgentRuntimeSnapshot(params.agentId);
       if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
       return { status: 'ok', snapshot };
     }
 
     case 'refresh': {
       if (!params.agentId) throw new Error('agentId is required for refresh');
-      const result = await agentLifecycle.refreshContext(params.agentId);
+      const result = await refreshAgentRuntime(params.agentId, 'agent_actuator');
       return { status: 'ok', agentId: params.agentId, ...result };
     }
 
     case 'restart': {
       if (!params.agentId) throw new Error('agentId is required for restart');
-      const handle = await agentLifecycle.restart(params.agentId);
-      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: agentLifecycle.getSnapshot(params.agentId) };
+      const handle = await restartAgentRuntime(params.agentId, 'agent_actuator');
+      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
     }
 
     case 'a2a': {

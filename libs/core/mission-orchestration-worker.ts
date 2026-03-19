@@ -100,6 +100,20 @@ function syncPlanningArtifacts(missionId: string): void {
       next_tasks_path: 'NEXT_TASKS.json',
     },
   });
+  emitMissionTaskEvent({
+    event_type: 'task_completed',
+    mission_id: missionId,
+    task_id: 'planner-initial-plan',
+    agent_id: 'nerve-agent',
+    team_role: 'planner',
+    decision: 'task_completed',
+    why: 'Planner initial planning task completed with mission plan and next tasks.',
+    policy_used: 'mission_orchestration_control_plane_v1',
+    evidence: ['PLAN.md', 'NEXT_TASKS.json'],
+    payload: {
+      completion: 'planning_artifacts_ready',
+    },
+  });
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {

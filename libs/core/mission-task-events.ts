@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { missionDir, pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir } from './secure-io.js';
 
-export type MissionTaskEventType = 'task_issued' | 'task_submitted' | 'task_reviewed';
+export type MissionTaskEventType = 'task_issued' | 'task_submitted' | 'task_reviewed' | 'task_completed';
 
 export interface MissionTaskEventInput {
   event_type: MissionTaskEventType;
