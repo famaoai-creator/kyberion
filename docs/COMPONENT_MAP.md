@@ -48,11 +48,24 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 
 - `scripts/mission_controller.ts`
 - `scripts/mission_journal.ts`
+- `scripts/run_mission_orchestration_event_worker.ts`
+- `scripts/run_agent_runtime_supervisor.ts`
 - `pipelines/vital-check.json`
 - `active/missions/`
 - `knowledge/public/architecture/agent-mission-control-model.md`
+- `knowledge/public/architecture/mission-orchestration-control-plane.md`
 
 This path manages mission lifecycle, mission ownership, task delegation, evidence, and journal/history views.
+The current shape is:
+
+- `mission_controller`
+  - durable mission authority
+- `mission-orchestration-worker`
+  - event-driven deterministic orchestration
+- `agent-runtime-supervisor`
+  - runtime spawn/reuse/stop authority
+- `a2a-bridge`
+  - work delegation to agent runtimes
 
 Operational entrypoints should stay at the top level of `scripts/`.
 Ad hoc demos and one-off verification utilities should not live in the tracked operational script tree.
@@ -77,6 +90,12 @@ This path tells users what is available and lets them run an actuator.
 This path covers how external channels are normalized, routed, observed, and answered.
 It also defines channel ports and Surface Agents that sit between human-facing surfaces and the durable mission/execution layer.
 
+Current delivery model:
+
+- mission/control-plane workers write deterministic updates to `active/shared/coordination/channels/<surface>/outbox/`
+- channel bridges or control surfaces deliver/render those updates
+- delivery observability lives under `active/shared/observability/channels/`
+
 ### 5. Service binding and channel delivery
 
 - `libs/core/service-binding.ts`
@@ -99,6 +118,8 @@ The kernel of the ecosystem. Important responsibilities:
 - CLI utilities and common runtime helpers
 - runtime supervision for agent, PTY, and service ownership
 - control-plane helpers for channel routing, feedback, and session-scoped artifacts
+- mission orchestration worker and event contracts
+- generic surface outbox and delivery helpers
 
 If you are changing shared behavior or trying to follow AGENTS.md's secure-I/O rule, start here.
 
@@ -155,10 +176,12 @@ Kyberion uses a `single-owner, multi-worker` mission model.
 - Mission-local collaboration artifacts live under `active/missions/<tier>/<mission_id>/coordination/`.
 - Global discovery, mailboxes, runtime locks, and observability summaries live under `active/shared/`.
 - Channel-specific coordination and observability artifacts live under `active/shared/coordination/channels/` and `active/shared/observability/channels/`.
+- Generic surface outbox artifacts live under `active/shared/coordination/channels/<surface>/outbox/`.
 
 The authoritative architecture reference is:
 
 - `knowledge/public/architecture/agent-mission-control-model.md`
+- `knowledge/public/architecture/mission-orchestration-control-plane.md`
 
 ## Knowledge tiers
 

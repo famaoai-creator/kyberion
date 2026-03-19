@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, mission, agent, leases, observability, coordination]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-15
+last_updated: 2026-03-20
 ---
 
 # Agent Mission Control Model
@@ -60,22 +60,34 @@ They never mutate mission state directly.
 1. `mission-controller`
    - mission state machine
    - mission lease authority
-   - task issuance and acceptance
+   - mission lifecycle authority
 
-2. `agent-lifecycle`
-   - logical agent registry
-   - agent readiness and shutdown
+2. `mission-orchestration-worker`
+   - reacts to control-plane events
+   - prewarms runtimes
+   - emits A2A task delegation
+   - reconciles artifacts back into mission state
 
-3. `runtime-supervisor`
+3. `agent-runtime-supervisor`
+   - runtime front door
+   - spawn/reuse/ask/refresh/restart/stop
+   - prewarm request processing
+   - lease metadata projection to runtime resources
+
+4. `agent-lifecycle`
+   - logical agent runtime implementation
+   - provider mediation and readiness
+
+5. `runtime-supervisor`
    - physical execution resources
    - PTY / agent / service ownership
    - idle reaping and snapshots
 
-4. `resource-lock`
+6. `resource-lock`
    - file and registry mutex
    - short-lived exclusion only
 
-5. `coordination-store`
+7. `coordination-store`
    - task contracts
    - handoffs
    - reviews
@@ -198,6 +210,8 @@ Maintain append-only JSONL streams for:
 - lease events
 - runtime events
 - handoff events
+- surface delivery events
+- surface outbox remediation events
 
 ### 8.2 Required Event Fields
 
@@ -216,6 +230,21 @@ Each event should include:
 - `why`
 - `policy_used`
 - `evidence`
+
+### 8.3 Surface Outbox
+
+Mission progress summaries and deterministic operator notices should not be emitted directly from workers to surfaces.
+
+They should be written to:
+
+- `active/shared/coordination/channels/slack/outbox/`
+- `active/shared/coordination/channels/chronos/outbox/`
+
+This keeps:
+
+- orchestration asynchronous
+- delivery retriable
+- surface logic thin
 
 ## 9. Explainability Standard
 
@@ -254,6 +283,7 @@ Every authority change should explain:
 
 - render `mission -> agents -> tasks -> resources` in dashboards
 - use event streams as the source of truth for operational reasoning
+- close the loop from reconciliation summary to surface delivery through the generic outbox
 
 ## 11. Non-Goals
 

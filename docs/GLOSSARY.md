@@ -84,6 +84,10 @@ Kyberion's background messaging, daemon, and observability model. See `docs/arch
 
 The runtime ownership registry for PTY sessions, agent runtimes, and services. It tracks liveness, idle reaping, and resource snapshots.
 
+### Agent Runtime Supervisor
+
+The operational front door for agent runtimes. It owns runtime ensure, ask, refresh, restart, stop, and prewarm flows so callers do not spawn providers independently.
+
 ### Reflex
 
 A predefined automatic response, often expressed declaratively in ADF instead of TypeScript.
@@ -100,13 +104,17 @@ The mission-local and global storage model for task claims, handoffs, reviews, m
 
 The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
 
+### Orchestration Worker
+
+The deterministic event worker that reacts to mission control-plane events, prewarms agent runtimes, emits A2A task requests, and reconciles mission artifacts back into durable state.
+
 ### Gateway
 
 A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the Chronos API surface.
 
 ### Channel Outbox
 
-A channel-scoped delivery queue under `active/shared/coordination/channels/<channel>/outbox/` used to return approved responses to external systems such as Slack.
+A surface-scoped delivery queue under `active/shared/coordination/channels/<surface>/outbox/` used to return deterministic approved updates to external systems such as Slack and Chronos.
 
 ### Service Binding
 
@@ -139,6 +147,14 @@ A concrete ingress or egress interface of a channel, described by role, directio
 ### Surface Agent
 
 A lightweight channel-local agent that improves interaction quality, context shaping, and handoff preparation without becoming the durable mission owner.
+
+### Surface Outbox
+
+The generic delivery contract shared by surfaces. Workers enqueue system updates there; bridges and control surfaces consume and render them asynchronously.
+
+### Runtime Lease Doctor
+
+The diagnostic view that inspects runtime lease metadata, finds stale/orphaned/error runtimes, and recommends or triggers remediation actions such as stop or restart.
 
 ### System Actuator
 

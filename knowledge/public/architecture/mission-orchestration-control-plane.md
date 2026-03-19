@@ -63,6 +63,9 @@ Examples:
 - `mission_issue_requested`
 - `mission_team_prewarm_requested`
 - `mission_kickoff_requested`
+- `mission_followup_requested`
+- `mission_reconciliation_requested`
+- `runtime_lease_remediation_applied`
 
 Events are:
 
@@ -104,6 +107,17 @@ Disallowed target behavior:
 - direct ad hoc provider spawn in surface code
 - multiple workers racing to spawn the same agent instance
 
+`agent-runtime-supervisor` is the runtime front door for:
+
+- `ensure`
+- `ask`
+- `refresh`
+- `restart`
+- `stop`
+- `shutdownAll`
+
+`runtime-supervisor` remains the lower-level resource registry. The supervisor layer is the operational authority; the runtime registry is the physical snapshot.
+
 ## Recommended Flow
 
 1. Surface receives sovereign intent.
@@ -122,6 +136,7 @@ Disallowed target behavior:
 11. Follow-up worker prewarms the required worker roles.
 12. `NEXT_TASKS.json` tasks are delegated through A2A.
 13. Mission state and task board reconcile from artifacts/events.
+14. Owner summary is emitted to surface outboxes and control-plane observability.
 
 ## Why This Shape
 
@@ -142,11 +157,37 @@ while preserving flexibility:
   - `active/shared/coordination/orchestration/events/`
 - orchestration observability:
   - `active/shared/observability/mission-control/orchestration-events.jsonl`
+- task event observability:
+  - `active/shared/observability/mission-control/task-events.jsonl`
 - agent runtime prewarm:
   - `active/shared/coordination/agent-runtime/requests/`
   - `active/shared/coordination/agent-runtime/results/`
+- runtime supervisor observability:
+  - `active/shared/observability/mission-control/agent-runtime-supervisor-events.jsonl`
 - A2A runtime delegation:
   - `libs/core/a2a-bridge.ts`
+- generic surface outbox:
+  - `active/shared/coordination/channels/<surface>/outbox/`
+
+## Surface Closing Contract
+
+Surfaces stay lightweight by using a shared outbox model.
+
+- workers write deterministic surface updates into the generic outbox
+- channel bridges or control surfaces render those updates
+- delivery is decoupled from mission orchestration latency
+
+Current surfaces:
+
+- `slack`
+- `chronos`
+
+This keeps the concept simple:
+
+- one mission state machine
+- one event-driven orchestration model
+- one runtime supervisor
+- one surface delivery contract
 
 ## Migration Direction
 
