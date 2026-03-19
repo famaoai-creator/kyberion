@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } from './mission-orchestration-events.js';
+import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
 import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest, type ApprovalRequestRecord, type ApprovalRequestDraft } from './approval-store.js';
 import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
 import { agentLifecycle } from './agent-lifecycle.js';
@@ -428,13 +429,14 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
     throw new Error(`Surface agent manifest not found: ${agentId}`);
   }
 
-  return agentLifecycle.spawn({
+  return ensureAgentRuntime({
     agentId,
     provider: manifest.provider,
     modelId: manifest.modelId,
     systemPrompt: manifest.systemPrompt,
     capabilities: manifest.capabilities,
     cwd: cwd || pathResolver.rootDir(),
+    requestedBy: 'surface_agent',
   });
 }
 

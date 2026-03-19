@@ -4,6 +4,7 @@ import { agentLifecycle } from "@agent/core/agent-lifecycle";
 import { a2aBridge } from "@agent/core/a2a-bridge";
 import { loadAgentManifests } from "@agent/core/agent-manifest";
 import { discoverProviders } from "@agent/core/provider-discovery";
+import { ensureAgentRuntime, stopAgentRuntime } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 
 /**
@@ -75,12 +76,13 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case "spawn": {
         if (!body.provider) return NextResponse.json({ error: "Missing provider" }, { status: 400 });
-        const handle = await agentLifecycle.spawn({
+        const handle = await ensureAgentRuntime({
           agentId: body.agentId,
           provider: body.provider,
           modelId: body.modelId,
           systemPrompt: body.systemPrompt,
           capabilities: body.capabilities,
+          requestedBy: "chronos_agents_api",
         });
         return NextResponse.json({ status: "spawned", agent: handle.getRecord() });
       }
@@ -131,7 +133,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
     if (!body.agentId) return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
-    await agentLifecycle.shutdown(body.agentId);
+    await stopAgentRuntime(body.agentId, "chronos_agents_api");
     return NextResponse.json({ status: "shutdown", agentId: body.agentId });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

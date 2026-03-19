@@ -1,4 +1,4 @@
-import { agentLifecycle } from './agent-lifecycle.js';
+import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
 import { agentRegistry } from './agent-registry.js';
 import { loadAgentProfileIndex, loadMissionTeamPlan, type MissionTeamAssignment } from './mission-team-composer.js';
 
@@ -82,12 +82,13 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
     }
 
     try {
-      await agentLifecycle.spawn({
+      await ensureAgentRuntime({
         agentId: assignment.agent_id,
         provider: profile.provider,
         modelId: profile.modelId,
         capabilities: profile.capabilities,
         missionId: missionId.toUpperCase(),
+        requestedBy: 'mission_team_orchestrator',
       });
       const resolved = {
         ...assignment,

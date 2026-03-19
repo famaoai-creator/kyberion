@@ -7,6 +7,7 @@ import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { missionDir } from './path-resolver.js';
 import { safeExec, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
   enqueueMissionOrchestrationEvent,
   emitMissionOrchestrationObservation,
@@ -83,6 +84,21 @@ function syncPlanningArtifacts(missionId: string): void {
     summary_path: 'PLAN.md',
     next_tasks_path: 'NEXT_TASKS.json',
     planned_task_count: Array.isArray(nextTasks) ? nextTasks.length : 0,
+  });
+  emitMissionTaskEvent({
+    event_type: 'task_submitted',
+    mission_id: missionId,
+    task_id: 'planner-initial-plan',
+    agent_id: 'nerve-agent',
+    team_role: 'planner',
+    decision: 'task_submitted',
+    why: 'Planner produced PLAN.md and NEXT_TASKS.json for the mission kickoff.',
+    policy_used: 'mission_orchestration_control_plane_v1',
+    evidence: ['PLAN.md', 'NEXT_TASKS.json'],
+    payload: {
+      summary_path: 'PLAN.md',
+      next_tasks_path: 'NEXT_TASKS.json',
+    },
   });
 }
 
@@ -174,6 +190,21 @@ export async function dispatchMissionNextTasks(missionId: string): Promise<Array
     });
 
     task.status = 'requested';
+    emitMissionTaskEvent({
+      event_type: 'task_issued',
+      mission_id: missionId,
+      task_id: task.task_id,
+      agent_id: assignment.agent_id,
+      team_role: teamRole,
+      decision: 'task_issued',
+      why: 'Planner-produced follow-up task was delegated to the assigned mission team role.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: task.deliverable ? [String(task.deliverable)] : [],
+      payload: {
+        description: task.description,
+        deliverable: task.deliverable,
+      },
+    });
     dispatched.push({
       task_id: task.task_id,
       team_role: teamRole,

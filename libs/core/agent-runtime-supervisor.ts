@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { ensureMissionTeamRuntime, type EnsureMissionTeamRuntimeOptions, type MissionTeamRuntimePlan } from './mission-team-orchestrator.js';
+import { agentLifecycle, type SpawnOptions, type AgentHandle } from './agent-lifecycle.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 
@@ -23,6 +24,10 @@ export interface AgentRuntimeEnsureResult {
   runtime_plan: MissionTeamRuntimePlan;
 }
 
+export interface EnsureAgentRuntimeOptions extends SpawnOptions {
+  requestedBy: string;
+}
+
 interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeamRuntimeOptions {
   requestedBy: string;
   reason?: string;
@@ -35,27 +40,35 @@ const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
 const EVENTS_PATH = pathResolver.shared('observability/mission-control/agent-runtime-supervisor-events.jsonl');
 const EVENTS_DIR = pathResolver.shared('observability/mission-control');
 
-function ensureRuntimeDirs(): void {
+function ensureQueueDirs(): void {
   safeMkdir(REQUESTS_DIR);
   safeMkdir(RESULTS_DIR);
+}
+
+function ensureEventDir(): void {
   safeMkdir(EVENTS_DIR);
 }
 
 function appendSupervisorEvent(event: Record<string, unknown>): void {
-  ensureRuntimeDirs();
-  safeAppendFileSync(EVENTS_PATH, `${JSON.stringify({
-    ts: new Date().toISOString(),
-    ...event,
-  })}\n`);
+  try {
+    ensureEventDir();
+    safeAppendFileSync(EVENTS_PATH, `${JSON.stringify({
+      ts: new Date().toISOString(),
+      ...event,
+    })}\n`);
+  } catch {
+    // Some narrow authority roles can ensure/stop runtimes without observability write scope.
+    // Runtime control should still succeed even if supervisor event logging is unavailable.
+  }
 }
 
 export function getAgentRuntimeEnsureRequestPath(requestId: string): string {
-  ensureRuntimeDirs();
+  ensureQueueDirs();
   return `${REQUESTS_DIR}/${requestId}.json`;
 }
 
 export function getAgentRuntimeEnsureResultPath(requestId: string): string {
-  ensureRuntimeDirs();
+  ensureQueueDirs();
   return `${RESULTS_DIR}/${requestId}.json`;
 }
 
@@ -65,7 +78,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
   requestedBy: string;
   reason?: string;
 }): AgentRuntimeEnsureRequest {
-  ensureRuntimeDirs();
+  ensureQueueDirs();
   const request: AgentRuntimeEnsureRequest = {
     request_id: `AR-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId.toUpperCase(),
@@ -182,4 +195,37 @@ export async function ensureMissionTeamRuntimeViaSupervisor(
     options.timeoutMs,
     options.pollIntervalMs,
   );
+}
+
+export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Promise<AgentHandle> {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_ensure_requested',
+    agent_id: options.agentId,
+    mission_id: options.missionId,
+    requested_by: options.requestedBy,
+    provider: options.provider,
+  });
+  const handle = await agentLifecycle.spawn(options);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_ensure_completed',
+    agent_id: options.agentId || handle.agentId,
+    mission_id: options.missionId,
+    requested_by: options.requestedBy,
+    provider: options.provider,
+  });
+  return handle;
+}
+
+export async function stopAgentRuntime(agentId: string, requestedBy: string): Promise<void> {
+  appendSupervisorEvent({
+    decision: 'agent_runtime_stop_requested',
+    agent_id: agentId,
+    requested_by: requestedBy,
+  });
+  await agentLifecycle.shutdown(agentId);
+  appendSupervisorEvent({
+    decision: 'agent_runtime_stopped',
+    agent_id: agentId,
+    requested_by: requestedBy,
+  });
 }

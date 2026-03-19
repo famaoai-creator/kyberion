@@ -1,11 +1,12 @@
 import { logger } from './core';
 import { agentRegistry, AgentProvider } from './agent-registry';
-import { agentLifecycle, AgentHandle } from './agent-lifecycle';
+import { type AgentHandle } from './agent-lifecycle';
 import { getAgentManifest, loadAgentManifests } from './agent-manifest';
 import { auditChain } from './audit-chain';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { ensureAgentRuntimeRoot } from './agent-runtime-root.js';
+import { ensureAgentRuntime, stopAgentRuntime } from './agent-runtime-supervisor.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]
@@ -156,7 +157,7 @@ class A2ABridgeImpl {
 
     if (existing && this.runtimeContexts.get(agentId) !== runtimeContextKey) {
       logger.info(`[A2A_BRIDGE] Recreating ${agentId} for runtime context ${runtimeContextKey}`);
-      await agentLifecycle.shutdown(agentId);
+      await stopAgentRuntime(agentId, 'a2a_bridge');
       this.handles.delete(agentId);
       this.runtimeContexts.delete(agentId);
     }
@@ -169,13 +170,14 @@ class A2ABridgeImpl {
 
     const cwd = this.resolveSpawnCwd(agentId, manifest.provider || provider || 'gemini', manifest.systemPrompt, payload, runtimeContextKey);
 
-    const handle = await agentLifecycle.spawn({
+    const handle = await ensureAgentRuntime({
       agentId,
       provider: manifest.provider || provider || 'gemini',
       modelId: manifest.modelId,
       systemPrompt: manifest.systemPrompt,
       capabilities: manifest.capabilities,
       cwd,
+      requestedBy: 'a2a_bridge',
     });
     this.handles.set(agentId, handle);
     this.runtimeContexts.set(agentId, runtimeContextKey);

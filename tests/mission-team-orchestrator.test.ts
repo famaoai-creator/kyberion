@@ -4,13 +4,13 @@ const mocks = vi.hoisted(() => {
   const loadMissionTeamPlan = vi.fn();
   const loadAgentProfileIndex = vi.fn();
   const get = vi.fn();
-  const spawn = vi.fn();
+  const ensureAgentRuntime = vi.fn();
 
   return {
     loadMissionTeamPlan,
     loadAgentProfileIndex,
     get,
-    spawn,
+    ensureAgentRuntime,
   };
 });
 
@@ -25,10 +25,8 @@ vi.mock('../libs/core/agent-registry.js', () => ({
   },
 }));
 
-vi.mock('../libs/core/agent-lifecycle.js', () => ({
-  agentLifecycle: {
-    spawn: mocks.spawn,
-  },
+vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
+  ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
 describe('mission-team-orchestrator', () => {
@@ -63,12 +61,12 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.spawn.mockResolvedValue({});
+    mocks.ensureAgentRuntime.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
-    expect(mocks.spawn).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
       agentId: 'nerve-agent',
       provider: 'gemini',
       missionId: 'MSN-TEAM',
@@ -95,7 +93,7 @@ describe('mission-team-orchestrator', () => {
     const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
-    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments[0].runtime_status).toBe('already_ready');
   });
 
@@ -131,12 +129,12 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.spawn.mockResolvedValue({});
+    mocks.ensureAgentRuntime.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
-    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
     expect(result.assignments.map((entry: any) => entry.runtime_status)).toEqual(['spawned', 'spawned', 'spawned']);
   });
 
@@ -177,7 +175,7 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.spawn.mockResolvedValue({});
+    mocks.ensureAgentRuntime.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('../libs/core/mission-team-orchestrator.js');
     const result = await ensureMissionTeamRuntime({
@@ -185,8 +183,8 @@ describe('mission-team-orchestrator', () => {
       teamRoles: ['planner'],
     });
 
-    expect(mocks.spawn).toHaveBeenCalledTimes(1);
-    expect(mocks.spawn).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
       agentId: 'nerve-agent',
     }));
     expect(result.assignments).toHaveLength(1);

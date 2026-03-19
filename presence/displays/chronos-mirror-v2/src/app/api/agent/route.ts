@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { agentLifecycle } from "@agent/core/agent-lifecycle";
-import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest } from "@agent/core";
+import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime } from "@agent/core";
 import { runSurfaceConversation } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 import { getAgentManifest } from "@agent/core/agent-manifest";
@@ -40,7 +40,7 @@ function scheduleChronosShutdown() {
   }
   g.__kyberionChronosIdleTimer = setTimeout(async () => {
     try {
-      await agentLifecycle.shutdown(CHRONOS_AGENT_ID);
+      await stopAgentRuntime(CHRONOS_AGENT_ID, "chronos_api");
     } catch (_) {}
     clearChronosCache();
   }, CHRONOS_IDLE_TIMEOUT_MS);
@@ -63,13 +63,14 @@ async function ensureChronosAgent() {
   if (!g.__kyberionChronosReady) {
     g.__kyberionChronosReady = (async () => {
       const manifest = getAgentManifest(CHRONOS_AGENT_ID, PROJECT_ROOT);
-      const handle = await agentLifecycle.spawn({
+      const handle = await ensureAgentRuntime({
         agentId: CHRONOS_AGENT_ID,
         provider: manifest?.provider || "gemini",
         modelId: manifest?.modelId || "gemini-2.5-flash",
         systemPrompt: manifest?.systemPrompt,
         capabilities: manifest?.capabilities || ["a2ui", "dashboard", "commands", "gateway"],
         cwd: PROJECT_ROOT,
+        requestedBy: "chronos_api",
       });
       g.__kyberionChronosHandle = handle;
       scheduleChronosShutdown();

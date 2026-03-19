@@ -145,6 +145,7 @@ export * from './mission-team-orchestrator';
 export * from './agent-runtime-supervisor';
 export * from './mission-orchestration-events';
 export * from './mission-orchestration-worker';
+export * from './mission-task-events';
 export * from './pipeline-contract';
 export * from './channel-surface';
 export * from './service-binding';
