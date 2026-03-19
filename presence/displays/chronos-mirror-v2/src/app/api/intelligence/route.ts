@@ -11,6 +11,20 @@ interface MissionSummary {
   nextTaskCount: number;
 }
 
+interface RuntimeLeaseSummary {
+  agent_id: string;
+  owner_id: string;
+  owner_type: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface RuntimeDoctorFinding {
+  severity: "warning" | "critical";
+  agentId: string;
+  ownerId: string;
+  reason: string;
+}
+
 function readJson<T = any>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   return JSON.parse(safeReadFile(filePath, { encoding: "utf8" }) as string) as T;
@@ -75,12 +89,62 @@ function collectRecentEvents() {
     .slice(0, 8);
 }
 
+function buildRuntimeDoctor(
+  runtimeLeases: RuntimeLeaseSummary[],
+  activeMissions: MissionSummary[],
+  runtimeSnapshots: ReturnType<typeof listAgentRuntimeSnapshots>,
+): RuntimeDoctorFinding[] {
+  const activeMissionIds = new Set(activeMissions.map((mission) => mission.missionId));
+  const runtimeByAgent = new Map(runtimeSnapshots.map((snapshot) => [snapshot.agent.agentId, snapshot]));
+  const findings: RuntimeDoctorFinding[] = [];
+
+  for (const lease of runtimeLeases) {
+    const runtime = runtimeByAgent.get(lease.agent_id);
+    if (!runtime) continue;
+
+    if (lease.owner_type === "mission" && !activeMissionIds.has(lease.owner_id)) {
+      findings.push({
+        severity: "critical",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Mission-scoped runtime lease without an active mission owner.",
+      });
+      continue;
+    }
+
+    if (runtime.agent.status === "error") {
+      findings.push({
+        severity: "warning",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Runtime lease is attached to an agent in error state.",
+      });
+      continue;
+    }
+
+    const executionMode = typeof lease.metadata?.execution_mode === "string" ? lease.metadata.execution_mode : undefined;
+    const channel = typeof lease.metadata?.channel === "string" ? lease.metadata.channel : undefined;
+    if (executionMode === "conversation" && channel === "slack" && runtime.runtime?.idleForMs && runtime.runtime.idleForMs > 5 * 60 * 1000) {
+      findings.push({
+        severity: "warning",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Conversation-scoped lease appears stale (>5m idle).",
+      });
+    }
+  }
+
+  return findings.slice(0, 12);
+}
+
 export async function GET() {
   try {
     process.env.MISSION_ROLE ||= "chronos_operator";
     const runtime = listAgentRuntimeSnapshots();
+    const activeMissions = collectActiveMissions();
+    const runtimeLeases = listAgentRuntimeLeaseSummaries().slice(0, 12);
     return NextResponse.json({
-      activeMissions: collectActiveMissions(),
+      activeMissions,
       recentEvents: collectRecentEvents(),
       runtime: {
         total: runtime.length,
@@ -88,7 +152,8 @@ export async function GET() {
         busy: runtime.filter((entry) => entry.agent.status === "busy").length,
         error: runtime.filter((entry) => entry.agent.status === "error").length,
       },
-      runtimeLeases: listAgentRuntimeLeaseSummaries().slice(0, 12),
+      runtimeLeases,
+      runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, runtime),
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {

@@ -30,7 +30,8 @@
         "mission_plan_ready",
         "mission_followup_requested",
         "mission_followup_dispatched",
-        "mission_reconciliation_completed"
+        "mission_reconciliation_completed",
+        "mission_owner_notified"
       ]
     },
     "mission_id": { "type": "string" },

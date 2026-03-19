@@ -365,6 +365,21 @@ function emitSlackMissionEvent(
   });
 }
 
+function summarizeMissionTaskOutcomes(missionId: string): {
+  acceptedCount: number;
+  reviewedCount: number;
+  completedCount: number;
+  requestedCount: number;
+} {
+  const tasks = loadAllNextTasks(missionId);
+  return {
+    acceptedCount: tasks.filter((task) => task.status === 'accepted').length,
+    reviewedCount: tasks.filter((task) => task.status === 'reviewed').length,
+    completedCount: tasks.filter((task) => task.status === 'completed').length,
+    requestedCount: tasks.filter((task) => task.status === 'requested').length,
+  };
+}
+
 async function handleMissionIssueRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
@@ -529,6 +544,19 @@ async function handleMissionReconciliationRequested(event: MissionOrchestrationE
   const missionId = event.mission_id;
   reconcileMissionProgress(missionId);
   emitSlackMissionEvent(payload, missionId, 'mission_reconciliation_completed', 'Mission task outcomes were reconciled into mission state.');
+  const summary = summarizeMissionTaskOutcomes(missionId);
+  emitSlackMissionEvent(
+    payload,
+    missionId,
+    'mission_owner_notified',
+    'Owner summary emitted after reconciliation.',
+    {
+      accepted_count: summary.acceptedCount,
+      reviewed_count: summary.reviewedCount,
+      completed_count: summary.completedCount,
+      requested_count: summary.requestedCount,
+    },
+  );
   await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 

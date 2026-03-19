@@ -27,10 +27,26 @@ interface RuntimeSummary {
   error: number;
 }
 
+interface RuntimeLease {
+  agent_id: string;
+  owner_id: string;
+  owner_type: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface RuntimeDoctorFinding {
+  severity: "warning" | "critical";
+  agentId: string;
+  ownerId: string;
+  reason: string;
+}
+
 interface IntelligencePayload {
   activeMissions: MissionSummary[];
   recentEvents: OrchestrationEvent[];
   runtime: RuntimeSummary;
+  runtimeLeases: RuntimeLease[];
+  runtimeDoctor: RuntimeDoctorFinding[];
 }
 
 export function MissionIntelligence() {
@@ -104,7 +120,7 @@ export function MissionIntelligence() {
         />
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-[1.3fr,1fr]">
+      <section className="grid gap-4 lg:grid-cols-[1.2fr,1fr,1fr]">
         <Panel title="Mission Control Plane">
           <div className="space-y-3">
             {data.activeMissions.length === 0 ? (
@@ -147,6 +163,46 @@ export function MissionIntelligence() {
                 <div className="mt-1 text-[9px] font-mono text-white/25">{new Date(event.ts).toLocaleString()}</div>
               </div>
             ))}
+          </div>
+        </Panel>
+
+        <Panel title="Runtime Lease Doctor">
+          <div className="space-y-3">
+            {data.runtimeDoctor.length === 0 ? (
+              <div className="text-[11px] italic text-emerald-300/40">No stale or orphaned runtime leases detected.</div>
+            ) : data.runtimeDoctor.map((finding, index) => (
+              <div key={`${finding.agentId}-${index}`} className={`rounded-xl border px-3 py-3 ${
+                finding.severity === "critical"
+                  ? "border-red-500/20 bg-red-950/10"
+                  : "border-yellow-500/20 bg-yellow-950/10"
+              }`}>
+                <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em]">
+                  <span className={finding.severity === "critical" ? "text-red-300/80" : "text-yellow-200/80"}>
+                    {finding.severity}
+                  </span>
+                  <span className="font-mono text-white/45">{finding.agentId}</span>
+                </div>
+                <div className="mt-2 text-[10px] text-white/65">owner: {finding.ownerId}</div>
+                <div className="mt-1 text-[10px] text-white/55">{finding.reason}</div>
+              </div>
+            ))}
+
+            <div className="border-t border-white/5 pt-3">
+              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/35">Active Runtime Leases</div>
+              <div className="space-y-2">
+                {data.runtimeLeases.slice(0, 6).map((lease) => (
+                  <div key={`${lease.agent_id}-${lease.owner_id}`} className="rounded-xl border border-white/5 bg-black/20 px-3 py-2">
+                    <div className="text-[10px] font-mono text-white/75">{lease.agent_id}</div>
+                    <div className="mt-1 text-[10px] text-white/45">
+                      {lease.owner_type}: {lease.owner_id}
+                    </div>
+                    {typeof lease.metadata?.team_role === "string" && (
+                      <div className="mt-1 text-[10px] text-white/35">team_role: {lease.metadata.team_role}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Panel>
       </section>
