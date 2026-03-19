@@ -924,6 +924,23 @@ export function enqueueSlackOutboxMessage(params: {
   });
 }
 
+export function enqueueChronosOutboxMessage(params: {
+  correlationId: string;
+  channel?: string;
+  threadTs: string;
+  text: string;
+  source?: 'surface' | 'nerve' | 'system';
+}): string {
+  return enqueueSurfaceOutboxMessage({
+    surface: 'chronos',
+    correlationId: params.correlationId,
+    channel: params.channel || 'chronos',
+    threadTs: params.threadTs,
+    text: params.text,
+    source: params.source,
+  });
+}
+
 export function listSlackOutboxMessages(): SlackOutboxMessage[] {
   return listSurfaceOutboxMessages('slack');
 }

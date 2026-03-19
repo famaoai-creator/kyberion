@@ -35,6 +35,17 @@ interface OwnerSummary {
   requested_count: number;
 }
 
+interface SurfaceOutboxMessage {
+  message_id: string;
+  surface: "slack" | "chronos";
+  correlation_id: string;
+  channel: string;
+  thread_ts: string;
+  text: string;
+  source: "surface" | "nerve" | "system";
+  created_at: string;
+}
+
 function readJson<T = any>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   return JSON.parse(safeReadFile(filePath, { encoding: "utf8" }) as string) as T;
@@ -122,6 +133,15 @@ function collectOwnerSummaries(): OwnerSummary[] {
     }
   }
   return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
+}
+
+function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
+  return [
+    ...listSurfaceOutboxMessages("slack"),
+    ...listSurfaceOutboxMessages("chronos"),
+  ]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 8);
 }
 
 function buildRuntimeDoctor(
@@ -226,6 +246,7 @@ export async function GET() {
         slack: listSurfaceOutboxMessages("slack").length,
         chronos: listSurfaceOutboxMessages("chronos").length,
       },
+      recentSurfaceOutbox: collectRecentSurfaceOutbox(),
       runtime: {
         total: runtime.length,
         ready: runtime.filter((entry) => entry.agent.status === "ready").length,

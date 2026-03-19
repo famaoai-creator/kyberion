@@ -51,6 +51,17 @@ interface OwnerSummary {
   requested_count: number;
 }
 
+interface SurfaceOutboxMessage {
+  message_id: string;
+  surface: "slack" | "chronos";
+  correlation_id: string;
+  channel: string;
+  thread_ts: string;
+  text: string;
+  source: "surface" | "nerve" | "system";
+  created_at: string;
+}
+
 interface IntelligencePayload {
   activeMissions: MissionSummary[];
   recentEvents: OrchestrationEvent[];
@@ -59,6 +70,7 @@ interface IntelligencePayload {
     slack: number;
     chronos: number;
   };
+  recentSurfaceOutbox: SurfaceOutboxMessage[];
   runtime: RuntimeSummary;
   runtimeLeases: RuntimeLease[];
   runtimeDoctor: RuntimeDoctorFinding[];
@@ -299,6 +311,26 @@ export function MissionIntelligence() {
             <RuntimeCell label="leases" value={data.runtimeLeases.length} />
             <RuntimeCell label="slack outbox" value={data.surfaceOutbox.slack} />
             <RuntimeCell label="chronos outbox" value={data.surfaceOutbox.chronos} />
+          </div>
+        </Panel>
+      </section>
+
+      <section className="grid gap-4">
+        <Panel title="Recent Surface Outbox">
+          <div className="space-y-3">
+            {data.recentSurfaceOutbox.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No pending or recent surface outbox messages.</div>
+            ) : data.recentSurfaceOutbox.map((message) => (
+              <div key={message.message_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    {message.surface} · {message.source} · {message.channel}
+                  </div>
+                  <div className="text-[9px] font-mono text-white/30">{new Date(message.created_at).toLocaleString()}</div>
+                </div>
+                <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
+              </div>
+            ))}
           </div>
         </Panel>
       </section>
