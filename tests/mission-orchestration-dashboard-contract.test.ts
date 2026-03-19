@@ -52,7 +52,9 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('activeMissions');
     expect(route).toContain('controlSummary');
     expect(route).toContain('controlTone');
-    expect(route).toContain('action pending');
+    expect(route).toContain('pendingMissionTargets');
+    expect(route).toContain('pendingSurfaceTargets');
+    expect(route).toContain(' pending');
     expect(route).toContain('execution ready');
     expect(route).toContain('planning pending');
     expect(route).toContain('surfaces');

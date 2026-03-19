@@ -280,26 +280,34 @@ function applyPendingActionSummaries(
   activeMissions: MissionSummary[];
   surfaces: SurfaceSummary[];
 } {
-  const pendingMissionTargets = new Set(
+  const pendingMissionTargets = new Map(
     controlActions
       .filter((action) => action.kind === "mission" && action.status === "queued")
-      .map((action) => action.target),
+      .map((action) => [action.target, action.operation]),
   );
-  const pendingSurfaceTargets = new Set(
+  const pendingSurfaceTargets = new Map(
     controlActions
       .filter((action) => action.kind === "surface" && action.status === "queued")
-      .map((action) => action.target),
+      .map((action) => [action.target, action.operation]),
   );
 
   return {
     activeMissions: activeMissions.map((mission) => (
       pendingMissionTargets.has(mission.missionId)
-        ? { ...mission, controlSummary: "action pending", controlTone: "pending" }
+        ? {
+            ...mission,
+            controlSummary: `${pendingMissionTargets.get(mission.missionId)} pending`,
+            controlTone: "pending",
+          }
         : mission
     )),
     surfaces: surfaces.map((surface) => (
       pendingSurfaceTargets.has(surface.id) || pendingSurfaceTargets.has("surface-runtime")
-        ? { ...surface, controlSummary: "action pending", controlTone: "pending" }
+        ? {
+            ...surface,
+            controlSummary: `${pendingSurfaceTargets.get(surface.id) || pendingSurfaceTargets.get("surface-runtime")} pending`,
+            controlTone: "pending",
+          }
         : surface
     )),
   };
