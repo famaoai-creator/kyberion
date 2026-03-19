@@ -509,15 +509,28 @@ export function MissionIntelligence() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(() => {
                     const latestAction = getLatestMissionControlAction(data.controlActions, mission.missionId);
-                    return latestAction?.event_id ? (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedMissionCardActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
-                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
-                      >
-                        {expandedMissionCardActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
-                      </button>
-                    ) : null;
+                    if (!latestAction?.event_id) return null;
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedMissionCardActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
+                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        >
+                          {expandedMissionCardActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
+                        </button>
+                        {latestAction.status === "failed" && (
+                          <button
+                            type="button"
+                            onClick={() => runMissionControl(mission.missionId, latestAction.operation)}
+                            disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${latestAction.operation}`}
+                            className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {missionActionTarget === `${mission.missionId}:${latestAction.operation}` ? "retrying" : "retry latest action"}
+                          </button>
+                        )}
+                      </>
+                    );
                   })()}
                   {[
                     { label: "refresh team", op: "refresh_team" },
@@ -733,15 +746,28 @@ export function MissionIntelligence() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(() => {
                     const latestAction = getLatestSurfaceControlAction(data.controlActions, surface.id);
-                    return latestAction?.event_id ? (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedSurfaceCardActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
-                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
-                      >
-                        {expandedSurfaceCardActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
-                      </button>
-                    ) : null;
+                    if (!latestAction?.event_id) return null;
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSurfaceCardActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
+                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        >
+                          {expandedSurfaceCardActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
+                        </button>
+                        {latestAction.status === "failed" && (
+                          <button
+                            type="button"
+                            onClick={() => runSurfaceControl(surface.id, latestAction.operation)}
+                            disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:${latestAction.operation}`}
+                            className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {surfaceActionTarget === `${surface.id}:${latestAction.operation}` ? "retrying" : "retry latest action"}
+                          </button>
+                        )}
+                      </>
+                    );
                   })()}
                   <button
                     type="button"
