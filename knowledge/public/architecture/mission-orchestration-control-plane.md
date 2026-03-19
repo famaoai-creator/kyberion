@@ -118,7 +118,10 @@ Disallowed target behavior:
 7. Worker emits `mission_kickoff_requested`.
 8. Planner receives A2A kickoff request.
 9. Planner writes initial artifacts.
-10. Mission state and task board reconcile from artifacts/events.
+10. Worker emits `mission_followup_requested`.
+11. Follow-up worker prewarms the required worker roles.
+12. `NEXT_TASKS.json` tasks are delegated through A2A.
+13. Mission state and task board reconcile from artifacts/events.
 
 ## Why This Shape
 

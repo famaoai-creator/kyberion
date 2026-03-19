@@ -28,6 +28,17 @@ interface SlackPayload {
   teamRoles?: string[];
 }
 
+interface PlannedNextTask {
+  task_id: string;
+  status?: string;
+  assigned_to?: {
+    role?: string;
+    agent_id?: string;
+  };
+  description?: string;
+  deliverable?: string;
+}
+
 function resolveMissionType(payload: SlackPayload): string {
   if (typeof payload.missionType === 'string' && payload.missionType.trim()) {
     return payload.missionType;
@@ -73,6 +84,111 @@ function syncPlanningArtifacts(missionId: string): void {
     next_tasks_path: 'NEXT_TASKS.json',
     planned_task_count: Array.isArray(nextTasks) ? nextTasks.length : 0,
   });
+}
+
+function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
+  const missionPath = missionDir(missionId, 'public');
+  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+  if (!safeExistsSync(nextTasksPath)) return [];
+  const tasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as PlannedNextTask[];
+  return Array.isArray(tasks) ? tasks.filter((task) => (task.status || 'planned') === 'planned') : [];
+}
+
+function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
+  const missionPath = missionDir(missionId, 'public');
+  safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(tasks, null, 2));
+}
+
+function markTaskBoardInProgress(missionId: string): void {
+  const missionPath = missionDir(missionId, 'public');
+  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
+  if (!safeExistsSync(taskBoardPath)) return;
+  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+  const updatedTaskBoard = currentTaskBoard
+    .replace('## Status: Planning Ready', '## Status: Execution Ready')
+    .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
+  if (updatedTaskBoard !== currentTaskBoard) {
+    safeWriteFile(taskBoardPath, updatedTaskBoard);
+  }
+}
+
+export async function dispatchMissionNextTasks(missionId: string): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
+  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+  if (!safeExistsSync(nextTasksPath)) return [];
+  const allTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as PlannedNextTask[];
+  const plannedTasks = Array.isArray(allTasks) ? allTasks.filter((task) => (task.status || 'planned') === 'planned') : [];
+  if (plannedTasks.length === 0) return [];
+
+  const uniqueRoles = Array.from(new Set(plannedTasks.map((task) => task.assigned_to?.role).filter((role): role is string => Boolean(role))));
+  if (uniqueRoles.length > 0) {
+    await ensureMissionTeamRuntimeViaSupervisor({
+      missionId,
+      teamRoles: uniqueRoles,
+      requestedBy: 'mission_orchestration_worker',
+      reason: 'Prewarm roles required by planner-produced NEXT_TASKS.',
+      timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
+    });
+  }
+
+  const dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
+  const plan = resolveMissionTeamPlan({ missionId });
+  const teamView = buildMissionTeamView(plan);
+
+  for (const task of plannedTasks) {
+    const teamRole = task.assigned_to?.role;
+    if (!teamRole) continue;
+    const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
+    if (!assignment?.agent_id) continue;
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${task.task_id}`,
+        sender: 'kyberion:mission-orchestrator',
+        receiver: assignment.agent_id,
+        performative: 'request',
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        intent: 'mission_task_execution',
+        text: [
+          `Execute task ${task.task_id} for mission ${missionId}.`,
+          `Assigned team role: ${teamRole}.`,
+          `Description: ${task.description || ''}`,
+          `Deliverable: ${task.deliverable || ''}`,
+          '',
+          'Mission team context:',
+          JSON.stringify({
+            mission_id: missionId,
+            team: teamView,
+          }, null, 2),
+        ].join('\n'),
+        context: {
+          mission_id: missionId,
+          team_role: teamRole,
+          task_id: task.task_id,
+          execution_mode: 'task',
+          deliverable: task.deliverable,
+        },
+      },
+    });
+
+    task.status = 'requested';
+    dispatched.push({
+      task_id: task.task_id,
+      team_role: teamRole,
+      agent_id: assignment.agent_id,
+    });
+  }
+
+  writeNextTasks(missionId, allTasks);
+  markTaskBoardInProgress(missionId);
+  ledger.record('MISSION_FOLLOWUP_DISPATCHED', {
+    mission_id: missionId,
+    dispatched_task_count: dispatched.length,
+    task_ids: dispatched.map((task) => task.task_id),
+  });
+  return dispatched;
 }
 
 function emitSlackMissionEvent(
@@ -221,6 +337,26 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
   emitSlackMissionEvent(payload, missionId, 'mission_kickoff_completed', 'Planner kickoff request was delivered.', {
     planner_agent_id: plannerAssignment.agent_id,
   });
+  const nextEvent = enqueueMissionOrchestrationEvent({
+    eventType: 'mission_followup_requested',
+    missionId,
+    requestedBy: 'mission_orchestration_worker',
+    correlationId: event.correlation_id || event.event_id,
+    causationId: event.event_id,
+    payload,
+  });
+  startMissionOrchestrationWorker(nextEvent);
+  await agentLifecycle.shutdownAll();
+}
+
+async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<SlackPayload>) {
+  const payload = event.payload;
+  const missionId = event.mission_id;
+  emitSlackMissionEvent(payload, missionId, 'mission_followup_requested', 'Planner artifacts were reconciled and follow-up delegation started.');
+  const dispatched = await dispatchMissionNextTasks(missionId);
+  emitSlackMissionEvent(payload, missionId, 'mission_followup_dispatched', 'Planner-produced follow-up tasks were delegated.', {
+    dispatched_tasks: dispatched,
+  });
   await agentLifecycle.shutdownAll();
 }
 
@@ -243,6 +379,9 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
         break;
       case 'mission_kickoff_requested':
         await handleMissionKickoffRequested(event);
+        break;
+      case 'mission_followup_requested':
+        await handleMissionFollowupRequested(event);
         break;
       default:
         throw new Error(`Unsupported orchestration event type: ${event.event_type}`);

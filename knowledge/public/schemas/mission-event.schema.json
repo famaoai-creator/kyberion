@@ -25,7 +25,9 @@
         "mission_orchestration_started",
         "mission_team_staffed",
         "mission_kickoff_completed",
-        "mission_plan_ready"
+        "mission_plan_ready",
+        "mission_followup_requested",
+        "mission_followup_dispatched"
       ]
     },
     "mission_id": { "type": "string" },
