@@ -32,6 +32,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('jump to target');
     expect(component).toContain('show latest action');
     expect(component).toContain('retry latest action');
+    expect(component).toContain('operator guidance');
+    expect(component).toContain('next valid actions');
     expect(component).toContain('safe actions');
     expect(component).toContain('risky actions');
     expect(component).toContain('approval required');

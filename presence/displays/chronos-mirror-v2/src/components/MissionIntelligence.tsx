@@ -170,6 +170,46 @@ function ActionDetailList({
   );
 }
 
+function ActionGuidance({
+  latestAction,
+  availableActions,
+}: {
+  latestAction: ControlActionSummary | null;
+  availableActions: ControlActionDefinition[];
+}) {
+  if (!latestAction) return null;
+  const currentAction = getActionDefinition(availableActions, latestAction.operation);
+  const nextValidActions = availableActions.filter((action) => action.enabled && action.operation !== latestAction.operation);
+  const shouldShow =
+    latestAction.status === "failed" ||
+    Boolean(currentAction?.disabledReason) ||
+    nextValidActions.length > 0;
+
+  if (!shouldShow) return null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/6 bg-black/25 px-3 py-3">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">operator guidance</div>
+      {currentAction?.disabledReason && (
+        <div className="mt-2 text-[10px] text-white/55">
+          disabled reason: <span className="text-white/75">{currentAction.disabledReason}</span>
+        </div>
+      )}
+      {nextValidActions.length > 0 && (
+        <div className="mt-2 text-[10px] text-white/55">
+          next valid actions:{" "}
+          <span className="text-white/75">{nextValidActions.map((action) => action.label).join(", ")}</span>
+        </div>
+      )}
+      {latestAction.status === "failed" && nextValidActions.length === 0 && !currentAction?.enabled && (
+        <div className="mt-2 text-[10px] text-amber-200/75">
+          No immediate retry path is available from the current target state.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function actionButtonClass(kind: "safe" | "risky"): string {
   if (kind === "risky") {
     return "rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40";
@@ -644,7 +684,10 @@ export function MissionIntelligence() {
                 {(() => {
                   const latestAction = getLatestMissionControlAction(data.controlActions, mission.missionId);
                   return latestAction?.event_id && expandedMissionCardActionId === latestAction.event_id ? (
-                    <ActionDetailList actionId={latestAction.event_id} details={data.controlActionDetails} />
+                    <>
+                      <ActionDetailList actionId={latestAction.event_id} details={data.controlActionDetails} />
+                      <ActionGuidance latestAction={latestAction} availableActions={missionActions} />
+                    </>
                   ) : null;
                 })()}
               </div>
@@ -823,6 +866,7 @@ export function MissionIntelligence() {
             return latestAction?.event_id && expandedGlobalSurfaceActionId === latestAction.event_id ? (
               <div className="mb-3">
                 <ActionDetailList actionId={latestAction.event_id} details={data.controlActionDetails} />
+                <ActionGuidance latestAction={latestAction} availableActions={data.controlActionAvailability.globalSurface} />
               </div>
             ) : null;
           })()}
@@ -941,7 +985,10 @@ export function MissionIntelligence() {
                 {(() => {
                   const latestAction = getLatestSurfaceControlAction(data.controlActions, surface.id);
                   return latestAction?.event_id && expandedSurfaceCardActionId === latestAction.event_id ? (
-                    <ActionDetailList actionId={latestAction.event_id} details={data.controlActionDetails} />
+                    <>
+                      <ActionDetailList actionId={latestAction.event_id} details={data.controlActionDetails} />
+                      <ActionGuidance latestAction={latestAction} availableActions={surfaceActions} />
+                    </>
                   ) : null;
                 })()}
               </div>
