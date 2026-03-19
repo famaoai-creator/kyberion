@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-  listSlackOutboxMessages,
+  listSurfaceOutboxMessages,
   logger,
   pathResolver,
   safeExistsSync,
@@ -210,11 +210,16 @@ function drawRuntimeLeaseDoctor() {
 }
 
 function drawSlackOutbox() {
-  console.log(chalk.bold.green(' 📬 SLACK OUTBOX'));
-  const messages = listSlackOutboxMessages();
-  console.log(`  Pending messages: ${messages.length > 0 ? chalk.bold.yellow(messages.length) : chalk.dim(0)}`);
-  for (const message of messages.slice(0, 4)) {
-    console.log(`  ${chalk.gray('•')} ${chalk.cyan(message.source.padEnd(7))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 72))}`);
+  console.log(chalk.bold.green(' 📬 SURFACE OUTBOX'));
+  const slackMessages = listSurfaceOutboxMessages('slack');
+  const chronosMessages = listSurfaceOutboxMessages('chronos');
+  console.log(`  Slack pending:   ${slackMessages.length > 0 ? chalk.bold.yellow(slackMessages.length) : chalk.dim(0)}`);
+  console.log(`  Chronos pending: ${chronosMessages.length > 0 ? chalk.bold.yellow(chronosMessages.length) : chalk.dim(0)}`);
+  for (const message of slackMessages.slice(0, 4)) {
+    console.log(`  ${chalk.gray('•')} ${chalk.cyan(`slack/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`);
+  }
+  for (const message of chronosMessages.slice(0, 2)) {
+    console.log(`  ${chalk.gray('•')} ${chalk.cyan(`chronos/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`);
   }
   console.log('');
 }

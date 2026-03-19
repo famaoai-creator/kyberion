@@ -55,6 +55,10 @@ interface IntelligencePayload {
   activeMissions: MissionSummary[];
   recentEvents: OrchestrationEvent[];
   ownerSummaries: OwnerSummary[];
+  surfaceOutbox: {
+    slack: number;
+    chronos: number;
+  };
   runtime: RuntimeSummary;
   runtimeLeases: RuntimeLease[];
   runtimeDoctor: RuntimeDoctorFinding[];
@@ -293,6 +297,8 @@ export function MissionIntelligence() {
             <RuntimeCell label="busy" value={data.runtime.busy} />
             <RuntimeCell label="error" value={data.runtime.error} />
             <RuntimeCell label="leases" value={data.runtimeLeases.length} />
+            <RuntimeCell label="slack outbox" value={data.surfaceOutbox.slack} />
+            <RuntimeCell label="chronos outbox" value={data.surfaceOutbox.chronos} />
           </div>
         </Panel>
       </section>

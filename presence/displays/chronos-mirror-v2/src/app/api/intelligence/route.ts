@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { emitChannelSurfaceEvent, emitMissionOrchestrationObservation, ledger, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
+import { emitChannelSurfaceEvent, emitMissionOrchestrationObservation, ledger, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, listSurfaceOutboxMessages, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
 
 interface MissionSummary {
   missionId: string;
@@ -222,6 +222,10 @@ export async function GET() {
       activeMissions,
       recentEvents: collectRecentEvents(),
       ownerSummaries: collectOwnerSummaries(),
+      surfaceOutbox: {
+        slack: listSurfaceOutboxMessages("slack").length,
+        chronos: listSurfaceOutboxMessages("chronos").length,
+      },
       runtime: {
         total: runtime.length,
         ready: runtime.filter((entry) => entry.agent.status === "ready").length,

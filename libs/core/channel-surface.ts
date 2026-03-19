@@ -158,8 +158,9 @@ interface SlackMissionProposalState {
   createdAt: string;
 }
 
-export interface SlackOutboxMessage {
+export interface SurfaceOutboxMessage {
   message_id: string;
+  surface: 'slack' | 'chronos';
   correlation_id: string;
   channel: string;
   thread_ts: string;
@@ -167,6 +168,8 @@ export interface SlackOutboxMessage {
   source: 'surface' | 'nerve' | 'system';
   created_at: string;
 }
+
+export type SlackOutboxMessage = SurfaceOutboxMessage;
 
 export interface SlackMissionIssuanceResult {
   missionId: string;
@@ -865,8 +868,47 @@ function missionProposalStateLogicalPath(channel: string, threadTs: string): str
   return `active/shared/coordination/channels/slack/mission-proposals/${channel}-${safeThread}.json`;
 }
 
-function slackOutboxLogicalPath(messageId: string): string {
-  return `active/shared/coordination/channels/slack/outbox/${messageId}.json`;
+function surfaceOutboxLogicalPath(surface: 'slack' | 'chronos', messageId: string): string {
+  return `active/shared/coordination/channels/${surface}/outbox/${messageId}.json`;
+}
+
+export function enqueueSurfaceOutboxMessage(params: {
+  surface: 'slack' | 'chronos';
+  correlationId: string;
+  channel: string;
+  threadTs: string;
+  text: string;
+  source?: 'surface' | 'nerve' | 'system';
+}): string {
+  const surfacePrefix = params.surface.toUpperCase();
+  const record: SurfaceOutboxMessage = {
+    message_id: `${surfacePrefix}-OUTBOX-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    surface: params.surface,
+    correlation_id: params.correlationId,
+    channel: params.channel,
+    thread_ts: params.threadTs,
+    text: params.text,
+    source: params.source || 'system',
+    created_at: new Date().toISOString(),
+  };
+  return writeJsonAs('slack_bridge', surfaceOutboxLogicalPath(params.surface, record.message_id), record);
+}
+
+export function listSurfaceOutboxMessages(surface: 'slack' | 'chronos'): SurfaceOutboxMessage[] {
+  const dir = pathResolver.resolve(`active/shared/coordination/channels/${surface}/outbox`);
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string) as SurfaceOutboxMessage);
+}
+
+export function clearSurfaceOutboxMessage(surface: 'slack' | 'chronos', messageId: string): void {
+  const resolved = pathResolver.resolve(surfaceOutboxLogicalPath(surface, messageId));
+  if (!safeExistsSync(resolved)) return;
+  withSurfaceRole('slack_bridge', () => {
+    safeRmSync(resolved, { force: true });
+  });
 }
 
 export function enqueueSlackOutboxMessage(params: {
@@ -876,33 +918,18 @@ export function enqueueSlackOutboxMessage(params: {
   text: string;
   source?: 'surface' | 'nerve' | 'system';
 }): string {
-  const record: SlackOutboxMessage = {
-    message_id: `SLACK-OUTBOX-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
-    correlation_id: params.correlationId,
-    channel: params.channel,
-    thread_ts: params.threadTs,
-    text: params.text,
-    source: params.source || 'system',
-    created_at: new Date().toISOString(),
-  };
-  return writeJsonAs('slack_bridge', slackOutboxLogicalPath(record.message_id), record);
+  return enqueueSurfaceOutboxMessage({
+    surface: 'slack',
+    ...params,
+  });
 }
 
 export function listSlackOutboxMessages(): SlackOutboxMessage[] {
-  const dir = pathResolver.resolve('active/shared/coordination/channels/slack/outbox');
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((name) => name.endsWith('.json'))
-    .sort()
-    .map((name) => JSON.parse(safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string) as SlackOutboxMessage);
+  return listSurfaceOutboxMessages('slack');
 }
 
 export function clearSlackOutboxMessage(messageId: string): void {
-  const resolved = pathResolver.resolve(slackOutboxLogicalPath(messageId));
-  if (!safeExistsSync(resolved)) return;
-  withSurfaceRole('slack_bridge', () => {
-    safeRmSync(resolved, { force: true });
-  });
+  clearSurfaceOutboxMessage('slack', messageId);
 }
 
 export function getSlackMissionProposalState(channel: string, threadTs: string): SlackMissionProposalState | null {

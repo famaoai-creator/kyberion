@@ -14,7 +14,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(dashboard).toContain('MISSION ORCHESTRATION');
     expect(dashboard).toContain('OWNER SUMMARIES');
     expect(dashboard).toContain('RUNTIME LEASE DOCTOR');
-    expect(dashboard).toContain('SLACK OUTBOX');
+    expect(dashboard).toContain('SURFACE OUTBOX');
     expect(dashboard).toContain('PLAN READY');
     expect(dashboard).toContain('NEXT_TASKS.json');
   });
@@ -34,6 +34,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('activeMissions');
     expect(route).toContain('recentEvents');
     expect(route).toContain('ownerSummaries');
+    expect(route).toContain('surfaceOutbox');
     expect(route).toContain('runtimeLeases');
     expect(route).toContain('runtimeDoctor');
     expect(route).toContain('MISSION_RUNTIME_REMEDIATION');
