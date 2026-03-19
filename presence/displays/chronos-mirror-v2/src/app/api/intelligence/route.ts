@@ -91,6 +91,9 @@ interface ControlActionDefinition {
   operation: string;
   label: string;
   risk: "safe" | "risky";
+  approvalRequired: boolean;
+  enabled: boolean;
+  disabledReason?: string;
 }
 
 interface ControlActionCatalog {
@@ -246,22 +249,26 @@ function collectControlActions(): ControlActionSummary[] {
     .slice(0, 10);
 }
 
-function collectControlActionCatalog(): ControlActionCatalog {
+function collectControlActionCatalog(accessRole: "readonly" | "localadmin"): ControlActionCatalog {
+  const controlEnabled = accessRole === "localadmin";
+  const disabledReason = controlEnabled
+    ? undefined
+    : "Requires localadmin access. Readonly mode can observe but cannot execute control actions.";
   return {
     mission: [
-      { operation: "refresh_team", label: "refresh team", risk: "safe" },
-      { operation: "prewarm_team", label: "prewarm", risk: "safe" },
-      { operation: "staff_team", label: "staff", risk: "safe" },
-      { operation: "resume", label: "resume", risk: "safe" },
-      { operation: "finish", label: "finish", risk: "risky" },
+      { operation: "refresh_team", label: "refresh team", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "prewarm_team", label: "prewarm", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "staff_team", label: "staff", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "resume", label: "resume", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "finish", label: "finish", risk: "risky", approvalRequired: true, enabled: controlEnabled, disabledReason },
     ],
     surface: [
-      { operation: "start", label: "start", risk: "safe" },
-      { operation: "stop", label: "stop", risk: "risky" },
+      { operation: "start", label: "start", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "stop", label: "stop", risk: "risky", approvalRequired: true, enabled: controlEnabled, disabledReason },
     ],
     globalSurface: [
-      { operation: "reconcile", label: "reconcile surfaces", risk: "safe" },
-      { operation: "status", label: "status refresh", risk: "safe" },
+      { operation: "reconcile", label: "reconcile surfaces", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
+      { operation: "status", label: "status refresh", risk: "safe", approvalRequired: false, enabled: controlEnabled, disabledReason },
     ],
   };
 }
@@ -484,7 +491,7 @@ export async function GET(req: NextRequest) {
       surfaces,
       accessRole,
       recentEvents: collectRecentEvents(),
-      controlActionCatalog: collectControlActionCatalog(),
+      controlActionCatalog: collectControlActionCatalog(accessRole),
       controlActions: collectControlActions(),
       controlActionDetails: collectControlActionDetails(),
       ownerSummaries: collectOwnerSummaries(),

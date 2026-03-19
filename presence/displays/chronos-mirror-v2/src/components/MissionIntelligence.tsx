@@ -88,6 +88,9 @@ interface ControlActionDefinition {
   operation: string;
   label: string;
   risk: "safe" | "risky";
+  approvalRequired: boolean;
+  enabled: boolean;
+  disabledReason?: string;
 }
 
 interface ControlActionCatalog {
@@ -192,6 +195,13 @@ function getActionsByRisk(
   risk: "safe" | "risky",
 ): ControlActionDefinition[] {
   return actions.filter((action) => action.risk === risk);
+}
+
+function getSharedDisabledReason(actions: ControlActionDefinition[]): string | null {
+  const reasons = actions
+    .map((action) => action.disabledReason)
+    .filter((reason): reason is string => Boolean(reason));
+  return reasons[0] || null;
 }
 
 interface SurfaceSummary {
@@ -567,26 +577,38 @@ export function MissionIntelligence() {
                         key={action.operation}
                         type="button"
                         onClick={() => runMissionControl(mission.missionId, action.operation)}
-                        disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${action.operation}`}
+                        disabled={!action.enabled || missionActionTarget === `${mission.missionId}:${action.operation}`}
+                        title={action.disabledReason}
                         className={actionButtonClass("safe")}
                       >
                         {missionActionTarget === `${mission.missionId}:${action.operation}` ? "working" : action.label}
                       </button>
                     ))}
+                    {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.mission, "safe")) && (
+                      <div className="w-full text-[10px] text-white/40">
+                        {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.mission, "safe"))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
-                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions</div>
+                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions · approval required</div>
                     {getActionsByRisk(data.controlActionCatalog.mission, "risky").map((action) => (
                       <button
                         key={action.operation}
                         type="button"
                         onClick={() => runMissionControl(mission.missionId, action.operation)}
-                        disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${action.operation}`}
+                        disabled={!action.enabled || missionActionTarget === `${mission.missionId}:${action.operation}`}
+                        title={action.disabledReason}
                         className={actionButtonClass("risky")}
                       >
                         {missionActionTarget === `${mission.missionId}:${action.operation}` ? "working" : action.label}
                       </button>
                     ))}
+                    {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.mission, "risky")) && (
+                      <div className="w-full text-[10px] text-white/40">
+                        {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.mission, "risky"))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {(() => {
@@ -750,12 +772,18 @@ export function MissionIntelligence() {
                 key={action.operation}
                 type="button"
                 onClick={() => runSurfaceControl(null, action.operation)}
-                disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `all:${action.operation}`}
+                disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
+                title={action.disabledReason}
                 className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {surfaceActionTarget === `all:${action.operation}` ? "working" : action.label}
               </button>
             ))}
+            {getSharedDisabledReason(data.controlActionCatalog.globalSurface) && (
+              <div className="w-full text-[10px] text-white/40">
+                {getSharedDisabledReason(data.controlActionCatalog.globalSurface)}
+              </div>
+            )}
           </div>
           {(() => {
             const latestAction = getGlobalSurfaceControlAction(data.controlActions);
@@ -835,26 +863,38 @@ export function MissionIntelligence() {
                         key={action.operation}
                         type="button"
                         onClick={() => runSurfaceControl(surface.id, action.operation)}
-                        disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        disabled={!action.enabled || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        title={action.disabledReason}
                         className={actionButtonClass("safe")}
                       >
                         {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
                       </button>
                     ))}
+                    {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.surface, "safe")) && (
+                      <div className="w-full text-[10px] text-white/40">
+                        {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.surface, "safe"))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
-                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions</div>
+                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions · approval required</div>
                     {getActionsByRisk(data.controlActionCatalog.surface, "risky").map((action) => (
                       <button
                         key={action.operation}
                         type="button"
                         onClick={() => runSurfaceControl(surface.id, action.operation)}
-                        disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        disabled={!action.enabled || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        title={action.disabledReason}
                         className={actionButtonClass("risky")}
                       >
                         {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
                       </button>
                     ))}
+                    {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.surface, "risky")) && (
+                      <div className="w-full text-[10px] text-white/40">
+                        {getSharedDisabledReason(getActionsByRisk(data.controlActionCatalog.surface, "risky"))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {(() => {

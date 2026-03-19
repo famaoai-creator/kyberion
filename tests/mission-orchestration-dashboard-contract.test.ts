@@ -34,6 +34,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('retry latest action');
     expect(component).toContain('safe actions');
     expect(component).toContain('risky actions');
+    expect(component).toContain('approval required');
     expect(component).toContain('Recent Orchestration Events');
     expect(component).toContain('Owner Summaries');
     expect(component).toContain('Recent Surface Outbox');
@@ -49,6 +50,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('surfaces');
     expect(route).toContain('recentEvents');
     expect(route).toContain('controlActionCatalog');
+    expect(route).toContain('approvalRequired');
+    expect(route).toContain('disabledReason');
     expect(route).toContain('finish');
     expect(route).toContain('refresh team');
     expect(route).toContain('reconcile surfaces');
