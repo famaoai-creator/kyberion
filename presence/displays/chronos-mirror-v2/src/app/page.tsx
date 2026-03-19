@@ -18,6 +18,8 @@ type QuickActionGroup = {
   title: string;
   hint: string;
   icon: typeof Radar;
+  accent: string;
+  accentText: string;
   actions: QuickAction[];
 };
 
@@ -26,6 +28,8 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     title: "Observe",
     hint: "Read current system state without mutating runtime.",
     icon: Radar,
+    accent: "from-cyan-400/16 via-cyan-300/8 to-transparent",
+    accentText: "text-cyan-200/85",
     actions: [
       { label: "Dashboard", query: "git status と git log --oneline -10 を実行して、ブランチ状態・最近のコミット・未コミット変更のサマリをダッシュボード表示して", icon: "📊", tone: "observe" },
       { label: "Missions", query: "active/missions/registry.json を読んでミッション一覧をテーブル表示して。なければ「ミッションなし」と表示", icon: "🎯", tone: "observe" },
@@ -37,6 +41,8 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     title: "Verify",
     hint: "Run deterministic health and capability checks.",
     icon: ActivitySquare,
+    accent: "from-amber-300/18 via-amber-200/8 to-transparent",
+    accentText: "text-amber-200/85",
     actions: [
       { label: "Vital Check", query: "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json を実行して結果を表示して", icon: "💓", tone: "verify" },
       { label: "Diagnostics", query: "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json を実行して結果を表示して", icon: "🔍", tone: "verify" },
@@ -48,6 +54,8 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     title: "Operate",
     hint: "Use heavier actions when you need intervention or delivery work.",
     icon: Wrench,
+    accent: "from-rose-400/16 via-orange-300/8 to-transparent",
+    accentText: "text-orange-200/85",
     actions: [
       { label: "Build & Test", query: "pnpm run build と pnpm test を実行して、ビルド結果とテスト結果をステータス表示して", icon: "🔨", tone: "operate" },
       { label: "Policies", query: "knowledge/governance/agent-policies.yaml を読んで、ポリシー一覧をテーブル表示して", icon: "🛡", tone: "operate" },
@@ -63,18 +71,21 @@ const STATUS_CARDS = [
     value: "Mission-first",
     detail: "Event-driven orchestration and deterministic reconciliation.",
     icon: Shield,
+    accent: "border-amber-200/16 bg-amber-300/8 text-amber-100",
   },
   {
     label: "Runtime",
     value: "Supervisor",
     detail: "Agent reuse, lease metadata, runtime doctor remediation.",
     icon: Bot,
+    accent: "border-cyan-200/16 bg-cyan-300/8 text-cyan-100",
   },
   {
     label: "Surface",
     value: "Outbox",
     detail: "Slack and Chronos share a single delivery contract.",
     icon: Radar,
+    accent: "border-rose-200/16 bg-rose-300/8 text-rose-100",
   },
 ];
 
@@ -82,6 +93,7 @@ export default function ChronosMirrorV2() {
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
+
   const handleReady = useCallback((fn: (q: string) => void) => {
     sendQueryRef.current = fn;
   }, []);
@@ -114,40 +126,38 @@ export default function ChronosMirrorV2() {
     sendQueryRef.current?.(query);
   }, []);
 
-  const activeSurfaceTitle = useMemo(
-    () => surface?.title || "Mission Intelligence",
-    [surface?.title],
-  );
+  const activeSurfaceTitle = useMemo(() => surface?.title || "Mission Intelligence", [surface?.title]);
 
   return (
-    <main className="min-h-screen w-screen overflow-hidden bg-black text-kyberion-gold">
-      <div className="absolute inset-0 pointer-events-none opacity-30">
-        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-kyberion-gold/15 blur-[140px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] h-[28rem] w-[28rem] rounded-full bg-cyan-900/30 blur-[160px]" />
+    <main className="min-h-screen w-screen overflow-hidden bg-[#081019] text-kyberion-gold">
+      <div className="absolute inset-0 pointer-events-none opacity-60">
+        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-amber-300/12 blur-[140px]" />
+        <div className="absolute top-[28%] right-[18%] h-[18rem] w-[18rem] rounded-full bg-cyan-400/10 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] h-[28rem] w-[28rem] rounded-full bg-rose-500/10 blur-[170px]" />
       </div>
+      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-[0.08]" />
 
-      <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6">
-        <header className="kyberion-glass rounded-[28px] border border-kyberion-gold/20 px-5 py-4 md:px-6">
+      <div className="chronos-scroll relative z-10 flex min-h-screen flex-col gap-6 overflow-y-auto p-4 md:p-6">
+        <header className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-4 md:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-kyberion-gold/30 bg-black/30">
-                <Shield className="h-5 w-5 text-kyberion-gold" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-200/30 bg-black/25 shadow-[0_0_40px_rgba(251,191,36,0.12)]">
+                <Shield className="h-5 w-5 text-amber-200" />
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.35em] text-kyberion-gold/55">Chronos Mirror</div>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white/90 md:text-3xl">
-                  Operator surface for mission control, runtime health, and delivery flow.
+                <div className="text-[10px] uppercase tracking-[0.35em] text-cyan-100/55">Chronos Mirror</div>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+                  Clear operator view for mission state, runtime health, and delivery flow.
                 </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
-                  Keep the core simple: one durable mission authority, one event-driven orchestration layer, one runtime supervisor,
-                  and thin surfaces for ingress and observability.
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200/70">
+                  Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.
                 </p>
               </div>
             </div>
 
             <button
               onClick={() => setAgentPanelOpen(true)}
-              className="flex items-center gap-2 self-start rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75 transition hover:border-kyberion-gold/30 hover:bg-kyberion-gold/10 hover:text-white"
+              className="flex items-center gap-2 self-start rounded-xl border border-cyan-200/15 bg-cyan-300/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-50 transition hover:border-cyan-200/35 hover:bg-cyan-300/16"
             >
               <Cpu size={14} />
               <span>Agent Runtimes</span>
@@ -155,88 +165,92 @@ export default function ChronosMirrorV2() {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-6 xl:grid-cols-[340px,minmax(0,1fr)]">
-          <aside className="flex flex-col gap-6">
-            <section className="kyberion-glass rounded-[28px] border border-kyberion-gold/20 p-4 md:p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-kyberion-gold/45">Quick Actions</div>
-                  <div className="mt-1 text-sm text-white/55">Grouped by operator intent.</div>
+        <div className="grid flex-1 gap-6 xl:grid-cols-[360px,minmax(0,1fr)]">
+          <aside className="xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:pr-2">
+            <div className="flex flex-col gap-6">
+              <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Quick Actions</div>
+                    <div className="mt-1 text-sm text-slate-200/65">Grouped by operator intent.</div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-5">
-                {QUICK_ACTION_GROUPS.map((group) => {
-                  const Icon = group.icon;
+                <div className="space-y-5">
+                  {QUICK_ACTION_GROUPS.map((group) => {
+                    const Icon = group.icon;
+                    return (
+                      <div key={group.title} className="overflow-hidden rounded-2xl border border-white/8 bg-black/20">
+                        <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/6">
+                              <Icon size={14} className={group.accentText} />
+                            </div>
+                            <div>
+                              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${group.accentText}`}>{group.title}</div>
+                              <div className="mt-1 text-[11px] leading-5 text-slate-200/58">{group.hint}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 p-3">
+                          {group.actions.map((action) => (
+                            <button
+                              key={action.label}
+                              onClick={() => handleQuickAction(action.query)}
+                              className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/55 px-3 py-2 text-left transition hover:border-white/18 hover:bg-slate-900/80"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="text-sm">{action.icon}</div>
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/88">{action.label}</div>
+                                  <div className="text-[10px] uppercase tracking-[0.14em] text-slate-400/70">{action.tone}</div>
+                                </div>
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">Run</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
+                {STATUS_CARDS.map((card) => {
+                  const Icon = card.icon;
                   return (
-                    <div key={group.title} className="rounded-2xl border border-white/6 bg-black/25 p-3">
-                      <div className="mb-3 flex items-start gap-3">
-                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                          <Icon size={14} className="text-kyberion-gold/80" />
+                    <div key={card.label} className="kyberion-glass rounded-2xl border border-white/8 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${card.accent}`}>
+                          <Icon size={15} />
                         </div>
                         <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/85">{group.title}</div>
-                          <div className="mt-1 text-[11px] leading-5 text-white/45">{group.hint}</div>
+                          <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400/80">{card.label}</div>
+                          <div className="mt-1 text-base font-semibold text-white/90">{card.value}</div>
                         </div>
                       </div>
-
-                      <div className="grid gap-2">
-                        {group.actions.map((action) => (
-                          <button
-                            key={action.label}
-                            onClick={() => handleQuickAction(action.query)}
-                            className="flex items-center justify-between rounded-xl border border-white/6 bg-white/5 px-3 py-2 text-left transition hover:border-kyberion-gold/25 hover:bg-kyberion-gold/10"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="text-sm">{action.icon}</div>
-                              <div>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/82">{action.label}</div>
-                                <div className="text-[10px] uppercase tracking-[0.14em] text-white/32">{action.tone}</div>
-                              </div>
-                            </div>
-                            <div className="text-[10px] uppercase tracking-[0.2em] text-kyberion-gold/45">Run</div>
-                          </button>
-                        ))}
-                      </div>
+                      <p className="mt-3 text-[11px] leading-5 text-slate-200/58">{card.detail}</p>
                     </div>
                   );
                 })}
-              </div>
-            </section>
-
-            <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-              {STATUS_CARDS.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div key={card.label} className="kyberion-glass rounded-2xl border border-white/8 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/25">
-                        <Icon size={15} className="text-kyberion-gold/80" />
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.22em] text-white/35">{card.label}</div>
-                        <div className="mt-1 text-base font-semibold text-white/85">{card.value}</div>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-[11px] leading-5 text-white/48">{card.detail}</p>
-                  </div>
-                );
-              })}
-            </section>
+              </section>
+            </div>
           </aside>
 
-          <section className="kyberion-glass flex min-h-[60vh] flex-col overflow-hidden rounded-[30px] border border-kyberion-gold/20">
-            <div className="flex items-center justify-between border-b border-white/6 px-5 py-4 md:px-6">
+          <section className="kyberion-glass flex min-h-[60vh] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]">
+            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.34em] text-kyberion-gold/42">Active Surface</div>
-                <div className="mt-1 text-lg font-semibold tracking-tight text-white/88">{activeSurfaceTitle}</div>
+                <div className="text-[10px] uppercase tracking-[0.34em] text-cyan-100/40">Active Surface</div>
+                <div className="mt-1 text-lg font-semibold tracking-tight text-white/92">{activeSurfaceTitle}</div>
               </div>
-              <div className="rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/45">
+              <div className="rounded-full border border-white/8 bg-slate-950/50 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
                 {surface ? "interactive display" : "default intelligence"}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="chronos-scroll flex-1 overflow-y-auto p-4 md:p-6">
               {!surface ? (
                 <MissionIntelligence />
               ) : (
