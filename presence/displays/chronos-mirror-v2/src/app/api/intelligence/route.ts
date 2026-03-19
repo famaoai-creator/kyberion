@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { clearSurfaceOutboxMessage, emitChannelSurfaceEvent, emitMissionOrchestrationObservation, ledger, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, listSurfaceOutboxMessages, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
+import { clearSurfaceOutboxMessage, emitChannelSurfaceEvent, listSurfaceOutboxMessages } from "@agent/core/dist/channel-surface.js";
+import { emitMissionOrchestrationObservation } from "@agent/core/dist/mission-orchestration-events.js";
+import { ledger } from "@agent/core/dist/ledger.js";
+import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, restartAgentRuntime, stopAgentRuntime } from "@agent/core/dist/agent-runtime-supervisor.js";
+import { pathResolver } from "@agent/core/dist/path-resolver.js";
+import { safeExistsSync, safeReadFile, safeReaddir } from "@agent/core/dist/secure-io.js";
 
 interface MissionSummary {
   missionId: string;

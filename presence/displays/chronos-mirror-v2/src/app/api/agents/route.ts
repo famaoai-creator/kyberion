@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { agentRegistry } from "@agent/core/agent-registry";
-import { a2aBridge } from "@agent/core/a2a-bridge";
-import { loadAgentManifests } from "@agent/core/agent-manifest";
-import { discoverProviders } from "@agent/core/provider-discovery";
-import { ensureAgentRuntime, stopAgentRuntime, listAgentRuntimeSnapshots, getAgentRuntimeLog, getAgentRuntimeSnapshot, getAgentRuntimeHandle, refreshAgentRuntime, restartAgentRuntime } from "@agent/core";
+import { agentRegistry } from "@agent/core/dist/agent-registry.js";
+import { a2aBridge } from "@agent/core/dist/a2a-bridge.js";
+import { loadAgentManifests } from "@agent/core/dist/agent-manifest.js";
+import { discoverProviders } from "@agent/core/dist/provider-discovery.js";
+import {
+  ensureAgentRuntime,
+  getAgentRuntimeHandle,
+  getAgentRuntimeLog,
+  getAgentRuntimeSnapshot,
+  listAgentRuntimeSnapshots,
+  refreshAgentRuntime,
+  restartAgentRuntime,
+  stopAgentRuntime,
+} from "@agent/core/dist/agent-runtime-supervisor.js";
 import { guardRequest } from "../../../lib/api-guard";
 
 /**

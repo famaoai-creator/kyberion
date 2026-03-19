@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { logger, pathResolver, safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime, getAgentRuntimeHandle, validatePipelineAdf } from "@agent/core";
-import { runSurfaceConversation } from "@agent/core";
+import { pathToFileURL } from "node:url";
+import { logger } from "@agent/core/dist/core.js";
+import { pathResolver } from "@agent/core/dist/path-resolver.js";
+import { safeExistsSync, safeReadFile } from "@agent/core/dist/secure-io.js";
+import { recordChronosDelegationSummary, recordChronosSurfaceRequest, runSurfaceConversation } from "@agent/core/dist/channel-surface.js";
+import { ensureAgentRuntime, getAgentRuntimeHandle, stopAgentRuntime } from "@agent/core/dist/agent-runtime-supervisor.js";
+import { validatePipelineAdf } from "@agent/core/dist/pipeline-contract.js";
 import { guardRequest } from "../../../lib/api-guard";
-import { getAgentManifest } from "@agent/core/agent-manifest";
-import { executeSuperPipeline } from "../../../../../../libs/actuators/orchestrator-actuator/src/super-nerve/index.js";
+import { getAgentManifest } from "@agent/core/dist/agent-manifest.js";
 
 function findProjectRoot(): string {
   let dir = process.cwd();
@@ -101,6 +105,8 @@ async function tryHandleDeterministicPipelineQuery(query: string) {
 
   const inputPath = pathResolver.rootResolve(match[1]);
   const pipeline = validatePipelineAdf(JSON.parse(safeReadFile(inputPath, { encoding: "utf8" }) as string));
+  const superNervePath = path.join(PROJECT_ROOT, "dist/libs/actuators/orchestrator-actuator/src/super-nerve/index.js");
+  const { executeSuperPipeline } = await import(pathToFileURL(superNervePath).href);
   const result = await executeSuperPipeline(
     (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
     pipeline.context || {},
