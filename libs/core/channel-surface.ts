@@ -3,10 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } from './mission-orchestration-events.js';
-import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
+import { ensureAgentRuntime, getAgentRuntimeHandle } from './agent-runtime-supervisor.js';
 import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest, type ApprovalRequestRecord, type ApprovalRequestDraft } from './approval-store.js';
 import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
-import { agentLifecycle } from './agent-lifecycle.js';
 import { a2aBridge } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
 import { buildMissionTeamView, loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
@@ -420,7 +419,7 @@ function buildMissionTeamPromptContext(missionId: string): string {
 }
 
 async function ensureSurfaceAgent(agentId: string, cwd?: string) {
-  const existing = agentLifecycle.getHandle(agentId);
+  const existing = getAgentRuntimeHandle(agentId);
   const status = existing?.getRecord?.()?.status;
   if (existing && status !== 'shutdown' && status !== 'error') return existing;
 

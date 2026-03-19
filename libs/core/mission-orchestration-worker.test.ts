@@ -129,4 +129,43 @@ describe('mission-orchestration-worker', () => {
       dispatched_task_count: 2,
     }));
   });
+
+  it('reconciles accepted task outcomes into the task board and ledger', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
+    const { reconcileMissionProgress } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([
+      {
+        task_id: 'task-1',
+        status: 'accepted',
+        assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+        description: 'Implement the deck',
+        deliverable: 'deliverables/presentation.html',
+      },
+    ], null, 2));
+    safeWriteFile(`${missionPath}/TASK_BOARD.md`, [
+      '# TASK_BOARD: MSN-FOLLOWUP',
+      '',
+      '## Status: Execution Ready',
+      '',
+      '### 🛠️ Execution Phase',
+      '- [x] Step 1: Research and Strategy',
+      '- [~] Step 2: Implementation',
+      '- [ ] Step 3: Validation',
+      '',
+    ].join('\n'));
+
+    reconcileMissionProgress('MSN-FOLLOWUP');
+
+    const taskBoard = safeReadFile(`${missionPath}/TASK_BOARD.md`, { encoding: 'utf8' }) as string;
+    expect(taskBoard).toContain('## Status: Review Accepted');
+    expect(taskBoard).toContain('- [x] Step 2: Implementation');
+    expect(taskBoard).toContain('- [x] Step 3: Validation');
+    expect(mocks.record).toHaveBeenCalledWith('MISSION_TASK_OUTCOMES_RECONCILED', expect.objectContaining({
+      mission_id: 'MSN-FOLLOWUP',
+      accepted_count: 1,
+    }));
+  });
 });

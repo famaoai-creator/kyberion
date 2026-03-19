@@ -29,7 +29,8 @@
         "mission_kickoff_completed",
         "mission_plan_ready",
         "mission_followup_requested",
-        "mission_followup_dispatched"
+        "mission_followup_dispatched",
+        "mission_reconciliation_completed"
       ]
     },
     "mission_id": { "type": "string" },

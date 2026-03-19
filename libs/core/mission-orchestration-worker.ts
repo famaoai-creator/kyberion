@@ -122,11 +122,15 @@ function syncPlanningArtifacts(missionId: string): void {
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
+  return loadAllNextTasks(missionId).filter((task) => (task.status || 'planned') === 'planned');
+}
+
+function loadAllNextTasks(missionId: string): PlannedNextTask[] {
   const missionPath = missionDir(missionId, 'public');
   const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const tasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as PlannedNextTask[];
-  return Array.isArray(tasks) ? tasks.filter((task) => (task.status || 'planned') === 'planned') : [];
+  return Array.isArray(tasks) ? tasks : [];
 }
 
 function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
@@ -155,14 +159,7 @@ function readExistingTaskEventKeys(missionId: string): Set<string> {
 }
 
 function reconcileTaskOutcomeEvents(missionId: string): void {
-  const tasks = loadPlannedNextTasks(missionId).concat(
-    (() => {
-      const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
-      if (!safeExistsSync(nextTasksPath)) return [];
-      const allTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as PlannedNextTask[];
-      return Array.isArray(allTasks) ? allTasks.filter((task) => task.status && task.status !== 'planned' && task.status !== 'requested') : [];
-    })(),
-  );
+  const tasks = loadAllNextTasks(missionId).filter((task) => task.status && task.status !== 'planned' && task.status !== 'requested');
   const seen = readExistingTaskEventKeys(missionId);
 
   for (const task of tasks) {
@@ -188,6 +185,55 @@ function reconcileTaskOutcomeEvents(missionId: string): void {
       },
     });
     seen.add(dedupeKey);
+  }
+}
+
+export function reconcileMissionProgress(missionId: string): void {
+  const missionPath = missionDir(missionId, 'public');
+  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
+  if (!safeExistsSync(taskBoardPath)) return;
+
+  const tasks = loadAllNextTasks(missionId);
+  const acceptedCount = tasks.filter((task) => task.status === 'accepted').length;
+  const reviewedCount = tasks.filter((task) => task.status === 'reviewed').length;
+  const completedCount = tasks.filter((task) => task.status === 'completed').length;
+  const requestedCount = tasks.filter((task) => task.status === 'requested').length;
+
+  reconcileTaskOutcomeEvents(missionId);
+
+  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+  let updatedTaskBoard = currentTaskBoard;
+
+  if (acceptedCount > 0) {
+    updatedTaskBoard = updatedTaskBoard
+      .replace(/## Status: .+/u, '## Status: Review Accepted')
+      .replace('- [~] Step 2: Implementation', '- [x] Step 2: Implementation')
+      .replace('- [ ] Step 2: Implementation', '- [x] Step 2: Implementation')
+      .replace('- [ ] Step 3: Validation', '- [x] Step 3: Validation');
+  } else if (reviewedCount > 0 || completedCount > 0) {
+    updatedTaskBoard = updatedTaskBoard
+      .replace(/## Status: .+/u, '## Status: Validation Ready')
+      .replace('- [~] Step 2: Implementation', '- [x] Step 2: Implementation')
+      .replace('- [ ] Step 2: Implementation', '- [x] Step 2: Implementation')
+      .replace('- [ ] Step 3: Validation', '- [~] Step 3: Validation');
+  } else if (requestedCount > 0) {
+    updatedTaskBoard = updatedTaskBoard
+      .replace(/## Status: .+/u, '## Status: Execution Ready')
+      .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
+  }
+
+  if (updatedTaskBoard !== currentTaskBoard) {
+    safeWriteFile(taskBoardPath, updatedTaskBoard);
+  }
+
+  if (acceptedCount > 0 || reviewedCount > 0 || completedCount > 0) {
+    ledger.record('MISSION_TASK_OUTCOMES_RECONCILED', {
+      mission_id: missionId,
+      accepted_count: acceptedCount,
+      reviewed_count: reviewedCount,
+      completed_count: completedCount,
+      requested_count: requestedCount,
+    });
   }
 }
 
@@ -290,7 +336,7 @@ export async function dispatchMissionNextTasks(missionId: string): Promise<Array
 
   writeNextTasks(missionId, allTasks);
   markTaskBoardInProgress(missionId);
-  reconcileTaskOutcomeEvents(missionId);
+  reconcileMissionProgress(missionId);
   ledger.record('MISSION_FOLLOWUP_DISPATCHED', {
     mission_id: missionId,
     dispatched_task_count: dispatched.length,
@@ -442,7 +488,7 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
 
   logger.info(`[MISSION_ORCHESTRATION] Planner kickoff complete for ${missionId}: ${String(kickoff.payload?.text || '').slice(0, 240)}`);
   syncPlanningArtifacts(missionId);
-  reconcileTaskOutcomeEvents(missionId);
+  reconcileMissionProgress(missionId);
   emitSlackMissionEvent(payload, missionId, 'mission_kickoff_completed', 'Planner kickoff request was delivered.', {
     planner_agent_id: plannerAssignment.agent_id,
   });
@@ -466,6 +512,23 @@ async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<S
   emitSlackMissionEvent(payload, missionId, 'mission_followup_dispatched', 'Planner-produced follow-up tasks were delegated.', {
     dispatched_tasks: dispatched,
   });
+  const nextEvent = enqueueMissionOrchestrationEvent({
+    eventType: 'mission_reconciliation_requested',
+    missionId,
+    requestedBy: 'mission_orchestration_worker',
+    correlationId: event.correlation_id || event.event_id,
+    causationId: event.event_id,
+    payload,
+  });
+  startMissionOrchestrationWorker(nextEvent);
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
+}
+
+async function handleMissionReconciliationRequested(event: MissionOrchestrationEvent<SlackPayload>) {
+  const payload = event.payload;
+  const missionId = event.mission_id;
+  reconcileMissionProgress(missionId);
+  emitSlackMissionEvent(payload, missionId, 'mission_reconciliation_completed', 'Mission task outcomes were reconciled into mission state.');
   await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 
@@ -491,6 +554,9 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
         break;
       case 'mission_followup_requested':
         await handleMissionFollowupRequested(event);
+        break;
+      case 'mission_reconciliation_requested':
+        await handleMissionReconciliationRequested(event);
         break;
       default:
         throw new Error(`Unsupported orchestration event type: ${event.event_type}`);
