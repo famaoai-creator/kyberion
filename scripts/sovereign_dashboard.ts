@@ -37,13 +37,63 @@ function drawMissions() {
         const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
         if (state.status === 'active') {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
-          console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}]`);
+          const missionPath = path.join(dir, item);
+          const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
+          const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
+          const nextTaskCount = safeExistsSync(nextTasksPath)
+            ? ((JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as any[])?.length || 0)
+            : 0;
+          const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
+          console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`);
           count++;
         }
       }
     }
   }
   if (count === 0) console.log(chalk.dim('  (No active missions)'));
+  console.log('');
+}
+
+function drawMissionOrchestration() {
+  const eventsPath = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+  const slackMissionsPath = pathResolver.shared('observability/channels/slack/missions.jsonl');
+
+  console.log(chalk.bold.cyan(' 🧭 MISSION ORCHESTRATION'));
+
+  const events: Array<{ ts: string; decision: string; mission?: string; why?: string }> = [];
+  for (const file of [eventsPath, slackMissionsPath]) {
+    if (!safeExistsSync(file)) continue;
+    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
+    for (const line of raw.trim().split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        events.push({
+          ts: event.ts || new Date().toISOString(),
+          decision: event.decision || event.event_type || 'event',
+          mission: event.mission_id || event.resource_id,
+          why: event.why,
+        });
+      } catch {
+        // Ignore malformed lines.
+      }
+    }
+  }
+
+  if (events.length === 0) {
+    console.log(chalk.dim('  (No orchestration events yet)'));
+    console.log('');
+    return;
+  }
+
+  const latest = events.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
+  for (const event of latest) {
+    const ts = event.ts.replace('T', ' ').slice(5, 16);
+    console.log(`  ${chalk.gray('•')} ${chalk.dim(ts)} ${chalk.white(event.decision.padEnd(30))} ${chalk.cyan((event.mission || 'system').slice(0, 32))}`);
+    if (event.why) {
+      console.log(`    ${chalk.dim(event.why.slice(0, 96))}`);
+    }
+  }
   console.log('');
 }
 
@@ -109,6 +159,7 @@ function render() {
   clearScreen();
   drawHeader();
   drawMissions();
+  drawMissionOrchestration();
   drawRuntimeSurfaces();
   drawA2ATraffic();
   drawTrustBoard();

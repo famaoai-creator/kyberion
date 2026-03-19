@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { SovereignChat } from "../components/SovereignChat";
 import { AgentPanel } from "../components/AgentPanel";
+import { MissionIntelligence } from "../components/MissionIntelligence";
 
 const QUICK_ACTIONS = [
   { label: "Dashboard", query: "git status と git log --oneline -10 を実行して、ブランチ状態・最近のコミット・未コミット変更のサマリをダッシュボード表示して", icon: "📊" },
@@ -110,13 +111,10 @@ export default function ChronosMirrorV2() {
             <div className="h-px w-8 bg-kyberion-gold/20"/>
           </h2>
 
-          <div className="flex-1 flex flex-col items-center justify-center relative">
+          <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
             {!surface ? (
-              <div className="text-center space-y-4">
-                <div className="text-kyberion-gold/20 text-4xl">⬡</div>
-                <div className="text-kyberion-gold/30 italic text-sm tracking-wide">
-                  Use the quick actions above or chat to query the system.
-                </div>
+              <div className="w-full h-full">
+                <MissionIntelligence />
               </div>
             ) : (
               <div className="w-full flex flex-col gap-6">
