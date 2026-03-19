@@ -84,6 +84,18 @@ interface ControlActionDetail {
   error?: string;
 }
 
+interface ControlActionDefinition {
+  operation: string;
+  label: string;
+  risk: "safe" | "risky";
+}
+
+interface ControlActionCatalog {
+  mission: ControlActionDefinition[];
+  surface: ControlActionDefinition[];
+  globalSurface: ControlActionDefinition[];
+}
+
 function getLatestMissionControlAction(
   actions: ControlActionSummary[],
   missionId: string,
@@ -161,6 +173,7 @@ interface IntelligencePayload {
   activeMissions: MissionSummary[];
   surfaces: SurfaceSummary[];
   recentEvents: OrchestrationEvent[];
+  controlActionCatalog: ControlActionCatalog;
   controlActions: ControlActionSummary[];
   controlActionDetails: Record<string, ControlActionDetail[]>;
   ownerSummaries: OwnerSummary[];
@@ -172,6 +185,13 @@ interface IntelligencePayload {
   runtime: RuntimeSummary;
   runtimeLeases: RuntimeLease[];
   runtimeDoctor: RuntimeDoctorFinding[];
+}
+
+function getActionsByRisk(
+  actions: ControlActionDefinition[],
+  risk: "safe" | "risky",
+): ControlActionDefinition[] {
+  return actions.filter((action) => action.risk === risk);
 }
 
 interface SurfaceSummary {
@@ -542,33 +562,31 @@ export function MissionIntelligence() {
                   })()}
                   <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-300/10 bg-emerald-400/[0.04] px-2 py-2">
                     <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">safe actions</div>
-                    {[
-                      { label: "refresh team", op: "refresh_team" },
-                      { label: "prewarm", op: "prewarm_team" },
-                      { label: "staff", op: "staff_team" },
-                      { label: "resume", op: "resume" },
-                    ].map((action) => (
+                    {getActionsByRisk(data.controlActionCatalog.mission, "safe").map((action) => (
                       <button
-                        key={action.op}
+                        key={action.operation}
                         type="button"
-                        onClick={() => runMissionControl(mission.missionId, action.op)}
-                        disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${action.op}`}
+                        onClick={() => runMissionControl(mission.missionId, action.operation)}
+                        disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${action.operation}`}
                         className={actionButtonClass("safe")}
                       >
-                        {missionActionTarget === `${mission.missionId}:${action.op}` ? "working" : action.label}
+                        {missionActionTarget === `${mission.missionId}:${action.operation}` ? "working" : action.label}
                       </button>
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
                     <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions</div>
-                    <button
-                      type="button"
-                      onClick={() => runMissionControl(mission.missionId, "finish")}
-                      disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:finish`}
-                      className={actionButtonClass("risky")}
-                    >
-                      {missionActionTarget === `${mission.missionId}:finish` ? "working" : "finish"}
-                    </button>
+                    {getActionsByRisk(data.controlActionCatalog.mission, "risky").map((action) => (
+                      <button
+                        key={action.operation}
+                        type="button"
+                        onClick={() => runMissionControl(mission.missionId, action.operation)}
+                        disabled={data.accessRole !== "localadmin" || missionActionTarget === `${mission.missionId}:${action.operation}`}
+                        className={actionButtonClass("risky")}
+                      >
+                        {missionActionTarget === `${mission.missionId}:${action.operation}` ? "working" : action.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 {(() => {
@@ -727,18 +745,15 @@ export function MissionIntelligence() {
                 </>
               ) : null;
             })()}
-            {[
-              { label: "reconcile surfaces", op: "reconcile" },
-              { label: "status refresh", op: "status" },
-            ].map((action) => (
+            {data.controlActionCatalog.globalSurface.map((action) => (
               <button
-                key={action.op}
+                key={action.operation}
                 type="button"
-                onClick={() => runSurfaceControl(null, action.op)}
-                disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `all:${action.op}`}
+                onClick={() => runSurfaceControl(null, action.operation)}
+                disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `all:${action.operation}`}
                 className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {surfaceActionTarget === `all:${action.op}` ? "working" : action.label}
+                {surfaceActionTarget === `all:${action.operation}` ? "working" : action.label}
               </button>
             ))}
           </div>
@@ -815,25 +830,31 @@ export function MissionIntelligence() {
                   })()}
                   <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-300/10 bg-emerald-400/[0.04] px-2 py-2">
                     <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">safe actions</div>
-                    <button
-                      type="button"
-                      onClick={() => runSurfaceControl(surface.id, "start")}
-                      disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:start`}
-                      className={actionButtonClass("safe")}
-                    >
-                      {surfaceActionTarget === `${surface.id}:start` ? "working" : "start"}
-                    </button>
+                    {getActionsByRisk(data.controlActionCatalog.surface, "safe").map((action) => (
+                      <button
+                        key={action.operation}
+                        type="button"
+                        onClick={() => runSurfaceControl(surface.id, action.operation)}
+                        disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        className={actionButtonClass("safe")}
+                      >
+                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
+                      </button>
+                    ))}
                   </div>
                   <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
                     <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions</div>
-                    <button
-                      type="button"
-                      onClick={() => runSurfaceControl(surface.id, "stop")}
-                      disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:stop`}
-                      className={actionButtonClass("risky")}
-                    >
-                      {surfaceActionTarget === `${surface.id}:stop` ? "working" : "stop"}
-                    </button>
+                    {getActionsByRisk(data.controlActionCatalog.surface, "risky").map((action) => (
+                      <button
+                        key={action.operation}
+                        type="button"
+                        onClick={() => runSurfaceControl(surface.id, action.operation)}
+                        disabled={data.accessRole !== "localadmin" || surfaceActionTarget === `${surface.id}:${action.operation}`}
+                        className={actionButtonClass("risky")}
+                      >
+                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 {(() => {

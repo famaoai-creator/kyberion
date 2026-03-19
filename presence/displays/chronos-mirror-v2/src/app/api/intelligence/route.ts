@@ -87,6 +87,18 @@ interface ControlActionDetail {
   error?: string;
 }
 
+interface ControlActionDefinition {
+  operation: string;
+  label: string;
+  risk: "safe" | "risky";
+}
+
+interface ControlActionCatalog {
+  mission: ControlActionDefinition[];
+  surface: ControlActionDefinition[];
+  globalSurface: ControlActionDefinition[];
+}
+
 function readJson<T = any>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   return JSON.parse(safeReadFile(filePath, { encoding: "utf8" }) as string) as T;
@@ -232,6 +244,26 @@ function collectControlActions(): ControlActionSummary[] {
   return Array.from(lifecycle.values())
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 10);
+}
+
+function collectControlActionCatalog(): ControlActionCatalog {
+  return {
+    mission: [
+      { operation: "refresh_team", label: "refresh team", risk: "safe" },
+      { operation: "prewarm_team", label: "prewarm", risk: "safe" },
+      { operation: "staff_team", label: "staff", risk: "safe" },
+      { operation: "resume", label: "resume", risk: "safe" },
+      { operation: "finish", label: "finish", risk: "risky" },
+    ],
+    surface: [
+      { operation: "start", label: "start", risk: "safe" },
+      { operation: "stop", label: "stop", risk: "risky" },
+    ],
+    globalSurface: [
+      { operation: "reconcile", label: "reconcile surfaces", risk: "safe" },
+      { operation: "status", label: "status refresh", risk: "safe" },
+    ],
+  };
 }
 
 function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
@@ -452,6 +484,7 @@ export async function GET(req: NextRequest) {
       surfaces,
       accessRole,
       recentEvents: collectRecentEvents(),
+      controlActionCatalog: collectControlActionCatalog(),
       controlActions: collectControlActions(),
       controlActionDetails: collectControlActionDetails(),
       ownerSummaries: collectOwnerSummaries(),

@@ -34,7 +34,6 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('retry latest action');
     expect(component).toContain('safe actions');
     expect(component).toContain('risky actions');
-    expect(component).toContain('finish');
     expect(component).toContain('Recent Orchestration Events');
     expect(component).toContain('Owner Summaries');
     expect(component).toContain('Recent Surface Outbox');
@@ -43,14 +42,16 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('mission_controller');
     expect(component).toContain('surface_runtime');
     expect(component).toContain('accessRole');
-    expect(component).toContain('refresh team');
-    expect(component).toContain('reconcile surfaces');
     expect(component).toContain('Runtime Lease Doctor');
     expect(component).toContain('cleanup_runtime_lease');
     expect(component).toContain('restart_runtime_lease');
     expect(route).toContain('activeMissions');
     expect(route).toContain('surfaces');
     expect(route).toContain('recentEvents');
+    expect(route).toContain('controlActionCatalog');
+    expect(route).toContain('finish');
+    expect(route).toContain('refresh team');
+    expect(route).toContain('reconcile surfaces');
     expect(route).toContain('controlActions');
     expect(route).toContain('controlActionDetails');
     expect(route).toContain('ownerSummaries');
@@ -72,6 +73,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('runtime_lease_remediation_applied');
     expect(route).toContain('cleanup_runtime_lease');
     expect(route).toContain('restart_runtime_lease');
+    expect(route).toContain('collectControlActionCatalog');
     expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
     expect(agentRoute).toContain('dist/scripts/run_pipeline.js');
   });
