@@ -137,7 +137,7 @@ export default function ChronosMirrorV2() {
       </div>
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-[0.08]" />
 
-      <div className="chronos-scroll relative z-10 flex min-h-screen flex-col gap-6 overflow-y-auto p-4 md:p-6">
+      <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
         <header className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-4 md:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
@@ -165,8 +165,8 @@ export default function ChronosMirrorV2() {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-6 xl:grid-cols-[360px,minmax(0,1fr)]">
-          <aside className="xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:pr-2">
+        <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[360px,minmax(0,1fr)]">
+          <aside className="min-h-0 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
             <div className="flex flex-col gap-6">
               <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between">
@@ -239,7 +239,7 @@ export default function ChronosMirrorV2() {
             </div>
           </aside>
 
-          <section className="kyberion-glass flex min-h-[60vh] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]">
+          <section className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]">
             <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.34em] text-cyan-100/40">Active Surface</div>
@@ -250,7 +250,7 @@ export default function ChronosMirrorV2() {
               </div>
             </div>
 
-            <div className="chronos-scroll flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
               {!surface ? (
                 <MissionIntelligence />
               ) : (

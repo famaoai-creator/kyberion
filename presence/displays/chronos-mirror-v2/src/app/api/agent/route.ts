@@ -1,20 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { logger } from "@agent/core/dist/core.js";
-import { pathResolver } from "@agent/core/dist/path-resolver.js";
-import { safeExistsSync, safeReadFile } from "@agent/core/dist/secure-io.js";
-import { recordChronosDelegationSummary, recordChronosSurfaceRequest, runSurfaceConversation } from "@agent/core/dist/channel-surface.js";
-import { ensureAgentRuntime, getAgentRuntimeHandle, stopAgentRuntime } from "@agent/core/dist/agent-runtime-supervisor.js";
-import { validatePipelineAdf } from "@agent/core/dist/pipeline-contract.js";
 import { guardRequest } from "../../../lib/api-guard";
-import { getAgentManifest } from "@agent/core/dist/agent-manifest.js";
+
+async function loadChronosCore() {
+  const [
+    core,
+    pathResolverModule,
+    secureIo,
+    channelSurface,
+    runtimeSupervisor,
+    pipelineContract,
+    agentManifest,
+  ] = await Promise.all([
+    import("@agent/core/dist/core.js"),
+    import("@agent/core/dist/path-resolver.js"),
+    import("@agent/core/dist/secure-io.js"),
+    import("@agent/core/dist/channel-surface.js"),
+    import("@agent/core/dist/agent-runtime-supervisor.js"),
+    import("@agent/core/dist/pipeline-contract.js"),
+    import("@agent/core/dist/agent-manifest.js"),
+  ]);
+
+  return {
+    logger: core.logger,
+    pathResolver: pathResolverModule.pathResolver,
+    safeExistsSync: secureIo.safeExistsSync,
+    safeReadFile: secureIo.safeReadFile,
+    recordChronosDelegationSummary: channelSurface.recordChronosDelegationSummary,
+    recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
+    runSurfaceConversation: channelSurface.runSurfaceConversation,
+    ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
+    getAgentRuntimeHandle: runtimeSupervisor.getAgentRuntimeHandle,
+    stopAgentRuntime: runtimeSupervisor.stopAgentRuntime,
+    validatePipelineAdf: pipelineContract.validatePipelineAdf,
+    getAgentManifest: agentManifest.getAgentManifest,
+  };
+}
 
 function findProjectRoot(): string {
   let dir = process.cwd();
+  const fs = require("node:fs") as typeof import("node:fs");
   for (let i = 0; i < 10; i++) {
     try {
-      if (safeExistsSync(path.join(dir, "AGENTS.md"))) return dir;
+      if (fs.existsSync(path.join(dir, "AGENTS.md"))) return dir;
     } catch (_) {}
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -45,6 +74,7 @@ function scheduleChronosShutdown() {
   }
   g.__kyberionChronosIdleTimer = setTimeout(async () => {
     try {
+      const { stopAgentRuntime } = await loadChronosCore();
       await stopAgentRuntime(CHRONOS_AGENT_ID, "chronos_api");
     } catch (_) {}
     clearChronosCache();
@@ -53,6 +83,7 @@ function scheduleChronosShutdown() {
 }
 
 async function ensureChronosAgent(context?: { missionId?: string; teamRole?: string; requesterId?: string }) {
+  const { ensureAgentRuntime, getAgentManifest, getAgentRuntimeHandle } = await loadChronosCore();
   const cachedHandle = g.__kyberionChronosHandle;
   const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
@@ -103,6 +134,7 @@ async function tryHandleDeterministicPipelineQuery(query: string) {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
+  const { pathResolver, safeReadFile, validatePipelineAdf, logger } = await loadChronosCore();
   const inputPath = pathResolver.rootResolve(match[1]);
   const pipeline = validatePipelineAdf(JSON.parse(safeReadFile(inputPath, { encoding: "utf8" }) as string));
   const superNervePath = path.join(PROJECT_ROOT, "dist/libs/actuators/orchestrator-actuator/src/super-nerve/index.js");
@@ -135,6 +167,7 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   try {
     process.env.MISSION_ROLE ||= "chronos_operator";
+    const { recordChronosDelegationSummary, recordChronosSurfaceRequest, runSurfaceConversation, safeReadFile } = await loadChronosCore();
     const body = await req.json();
     const query = (body.query || body.intent || "").trim();
     const missionId = typeof body.missionId === "string" ? body.missionId : undefined;
