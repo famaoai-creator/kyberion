@@ -49,8 +49,9 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('clear_surface_outbox');
     expect(route).toContain('mission_control');
     expect(route).toContain('surface_control');
-    expect(route).toContain('surface_control_action_applied');
-    expect(route).toContain('mission_control_action_applied');
+    expect(route).toContain('mission_control_requested');
+    expect(route).toContain('surface_control_requested');
+    expect(route).toContain('startMissionOrchestrationWorker');
     expect(route).toContain('chronos_localadmin');
     expect(route).toContain('roleToMissionRole');
     expect(route).toContain('surface_outbox_cleared');

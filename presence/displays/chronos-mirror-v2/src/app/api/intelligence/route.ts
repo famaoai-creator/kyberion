@@ -3,10 +3,11 @@ import path from "node:path";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { clearSurfaceOutboxMessage, emitChannelSurfaceEvent, listSurfaceOutboxMessages } from "@agent/core/dist/channel-surface.js";
 import { emitMissionOrchestrationObservation } from "@agent/core/dist/mission-orchestration-events.js";
+import { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } from "@agent/core/dist/mission-orchestration-events.js";
 import { ledger } from "@agent/core/dist/ledger.js";
 import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, restartAgentRuntime, stopAgentRuntime } from "@agent/core/dist/agent-runtime-supervisor.js";
 import { pathResolver } from "@agent/core/dist/path-resolver.js";
-import { safeExistsSync, safeExec, safeReadFile, safeReaddir } from "@agent/core/dist/secure-io.js";
+import { safeExistsSync, safeReadFile, safeReaddir } from "@agent/core/dist/secure-io.js";
 import { loadSurfaceManifest, loadSurfaceState, normalizeSurfaceDefinition, probeSurfaceHealth } from "@agent/core/dist/surface-runtime.js";
 
 interface MissionSummary {
@@ -345,44 +346,27 @@ export async function POST(req: NextRequest) {
       if (!missionId || !operation) {
         return NextResponse.json({ error: "Missing missionId or operation" }, { status: 400 });
       }
-
-      const env = { ...process.env, MISSION_ROLE: "mission_controller" };
-      let output = "";
-      switch (operation) {
-        case "resume":
-          output = safeExec("node", ["dist/scripts/mission_controller.js", "start", missionId], { cwd: pathResolver.rootDir(), env });
-          break;
-        case "refresh_team":
-          output = safeExec("node", ["dist/scripts/mission_controller.js", "team", missionId, "--refresh"], { cwd: pathResolver.rootDir(), env });
-          break;
-        case "prewarm_team":
-          output = safeExec("node", ["dist/scripts/mission_controller.js", "prewarm", missionId], { cwd: pathResolver.rootDir(), env });
-          break;
-        case "staff_team":
-          output = safeExec("node", ["dist/scripts/mission_controller.js", "staff", missionId], { cwd: pathResolver.rootDir(), env });
-          break;
-        case "finish":
-          output = safeExec("node", ["dist/scripts/mission_controller.js", "finish", missionId], { cwd: pathResolver.rootDir(), env });
-          break;
-        default:
-          return NextResponse.json({ error: "Unsupported mission operation" }, { status: 400 });
+      if (!["resume", "refresh_team", "prewarm_team", "staff_team", "finish"].includes(operation)) {
+        return NextResponse.json({ error: "Unsupported mission operation" }, { status: 400 });
       }
 
-      emitMissionOrchestrationObservation({
-        decision: "mission_control_action_applied",
-        event_type: "mission_control_action_applied",
-        requested_by: "chronos_localadmin",
-        mission_id: missionId,
-        operation,
-        why: "Chronos operator invoked a deterministic mission control action.",
+      const event = enqueueMissionOrchestrationEvent({
+        eventType: "mission_control_requested",
+        missionId,
+        requestedBy: "chronos_localadmin",
+        payload: {
+          operation,
+          requested_by_surface: "chronos",
+        },
       });
+      startMissionOrchestrationWorker(event);
 
       return NextResponse.json({
-        status: "ok",
+        status: "queued",
         action,
         missionId,
         operation,
-        output,
+        eventId: event.event_id,
         ts: new Date().toISOString(),
       });
     }
@@ -394,32 +378,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing surface operation" }, { status: 400 });
       }
 
-      const env = { ...process.env, MISSION_ROLE: "surface_runtime" };
-      const args = ["dist/scripts/surface_runtime.js", "--action"];
-      if (operation === "reconcile" || operation === "status") {
-        args.push(operation);
-      } else if ((operation === "start" || operation === "stop") && surfaceId) {
-        args.push(operation, "--surface", surfaceId);
-      } else {
+      if (!(operation === "reconcile" || operation === "status" || ((operation === "start" || operation === "stop") && surfaceId))) {
         return NextResponse.json({ error: "Unsupported surface operation" }, { status: 400 });
       }
-
-      const output = safeExec("node", args, { cwd: pathResolver.rootDir(), env });
-      emitMissionOrchestrationObservation({
-        decision: "surface_control_action_applied",
-        event_type: "surface_control_action_applied",
-        requested_by: "chronos_localadmin",
-        resource_id: surfaceId || "surface-runtime",
-        operation,
-        why: "Chronos operator invoked a deterministic surface runtime action.",
+      const event = enqueueMissionOrchestrationEvent({
+        eventType: "surface_control_requested",
+        missionId: "MSN-CHRONOS-SURFACE-CONTROL",
+        requestedBy: "chronos_localadmin",
+        payload: {
+          operation,
+          surfaceId: surfaceId || undefined,
+          requested_by_surface: "chronos",
+        },
       });
+      startMissionOrchestrationWorker(event);
 
       return NextResponse.json({
-        status: "ok",
+        status: "queued",
         action,
         surfaceId,
         operation,
-        output,
+        eventId: event.event_id,
         ts: new Date().toISOString(),
       });
     }

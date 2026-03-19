@@ -28,6 +28,17 @@ interface SlackPayload {
   teamRoles?: string[];
 }
 
+interface MissionControlPayload {
+  operation: 'resume' | 'refresh_team' | 'prewarm_team' | 'staff_team' | 'finish';
+  requested_by_surface?: 'chronos';
+}
+
+interface SurfaceControlPayload {
+  operation: 'reconcile' | 'status' | 'start' | 'stop';
+  surfaceId?: string;
+  requested_by_surface?: 'chronos';
+}
+
 interface PlannedNextTask {
   task_id: string;
   status?: string;
@@ -585,6 +596,67 @@ async function handleMissionReconciliationRequested(event: MissionOrchestrationE
   await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 
+async function handleMissionControlRequested(event: MissionOrchestrationEvent<MissionControlPayload>) {
+  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const missionId = event.mission_id;
+  const operation = event.payload.operation;
+
+  switch (operation) {
+    case 'resume':
+      runMissionController(env, ['start', missionId]);
+      break;
+    case 'refresh_team':
+      runMissionController(env, ['team', missionId, '--refresh']);
+      break;
+    case 'prewarm_team':
+      runMissionController(env, ['prewarm', missionId]);
+      break;
+    case 'staff_team':
+      runMissionController(env, ['staff', missionId]);
+      break;
+    case 'finish':
+      runMissionController(env, ['finish', missionId]);
+      break;
+    default:
+      throw new Error(`Unsupported mission control operation: ${String(operation)}`);
+  }
+
+  emitMissionOrchestrationObservation({
+    decision: 'mission_control_action_applied',
+    event_type: 'mission_control_action_applied',
+    requested_by: event.requested_by,
+    mission_id: missionId,
+    operation,
+    why: 'Event-driven mission control action executed by the orchestration worker.',
+  });
+}
+
+async function handleSurfaceControlRequested(event: MissionOrchestrationEvent<SurfaceControlPayload>) {
+  const operation = event.payload.operation;
+  const surfaceId = event.payload.surfaceId;
+  const env = { ...process.env, MISSION_ROLE: 'surface_runtime' };
+  const args = ['dist/scripts/surface_runtime.js', '--action'];
+
+  if (operation === 'reconcile' || operation === 'status') {
+    args.push(operation);
+  } else if ((operation === 'start' || operation === 'stop') && surfaceId) {
+    args.push(operation, '--surface', surfaceId);
+  } else {
+    throw new Error(`Unsupported surface control operation: ${String(operation)}`);
+  }
+
+  safeExec('node', args, { cwd: process.cwd(), env, timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS });
+  emitMissionOrchestrationObservation({
+    decision: 'surface_control_action_applied',
+    event_type: 'surface_control_action_applied',
+    requested_by: event.requested_by,
+    resource_id: surfaceId || 'surface-runtime',
+    mission_id: event.mission_id,
+    operation,
+    why: 'Event-driven surface control action executed by the orchestration worker.',
+  });
+}
+
 export async function processMissionOrchestrationEventPath(eventPath: string): Promise<void> {
   const event = loadMissionOrchestrationEvent<SlackPayload>(eventPath);
   emitMissionOrchestrationObservation({
@@ -610,6 +682,12 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
         break;
       case 'mission_reconciliation_requested':
         await handleMissionReconciliationRequested(event);
+        break;
+      case 'mission_control_requested':
+        await handleMissionControlRequested(event as unknown as MissionOrchestrationEvent<MissionControlPayload>);
+        break;
+      case 'surface_control_requested':
+        await handleSurfaceControlRequested(event as unknown as MissionOrchestrationEvent<SurfaceControlPayload>);
         break;
       default:
         throw new Error(`Unsupported orchestration event type: ${event.event_type}`);

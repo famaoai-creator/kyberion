@@ -8,7 +8,9 @@ export type MissionOrchestrationEventType =
   | 'mission_team_prewarm_requested'
   | 'mission_kickoff_requested'
   | 'mission_followup_requested'
-  | 'mission_reconciliation_requested';
+  | 'mission_reconciliation_requested'
+  | 'mission_control_requested'
+  | 'surface_control_requested';
 
 export interface MissionOrchestrationEvent<TPayload = Record<string, unknown>> {
   event_id: string;
