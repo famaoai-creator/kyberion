@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
-import { agentLifecycle } from "@agent/core/agent-lifecycle";
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from "@agent/core";
+import { listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir } from "@agent/core";
 
 interface MissionSummary {
   missionId: string;
@@ -79,7 +78,7 @@ function collectRecentEvents() {
 export async function GET() {
   try {
     process.env.MISSION_ROLE ||= "chronos_operator";
-    const runtime = agentLifecycle.listSnapshots();
+    const runtime = listAgentRuntimeSnapshots();
     return NextResponse.json({
       activeMissions: collectActiveMissions(),
       recentEvents: collectRecentEvents(),

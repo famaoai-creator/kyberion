@@ -1,8 +1,7 @@
 import { a2aBridge } from './a2a-bridge.js';
-import { agentLifecycle } from './agent-lifecycle.js';
 import { buildMissionTeamView, resolveMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
 import { emitChannelSurfaceEvent } from './channel-surface.js';
-import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
+import { ensureMissionTeamRuntimeViaSupervisor, shutdownAllAgentRuntimes } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { missionDir } from './path-resolver.js';
@@ -391,7 +390,7 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
     payload,
   });
   startMissionOrchestrationWorker(nextEvent);
-  await agentLifecycle.shutdownAll();
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 
 async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<SlackPayload>) {
@@ -402,7 +401,7 @@ async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<S
   emitSlackMissionEvent(payload, missionId, 'mission_followup_dispatched', 'Planner-produced follow-up tasks were delegated.', {
     dispatched_tasks: dispatched,
   });
-  await agentLifecycle.shutdownAll();
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 
 export async function processMissionOrchestrationEventPath(eventPath: string): Promise<void> {

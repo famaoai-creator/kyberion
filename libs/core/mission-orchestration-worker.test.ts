@@ -3,20 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const route = vi.fn();
   const ensureMissionTeamRuntimeViaSupervisor = vi.fn();
+  const shutdownAllAgentRuntimes = vi.fn();
   const resolveMissionTeamPlan = vi.fn();
   const resolveMissionTeamReceiver = vi.fn();
   const buildMissionTeamView = vi.fn();
   const record = vi.fn();
-  const shutdownAll = vi.fn();
 
   return {
     route,
     ensureMissionTeamRuntimeViaSupervisor,
+    shutdownAllAgentRuntimes,
     resolveMissionTeamPlan,
     resolveMissionTeamReceiver,
     buildMissionTeamView,
     record,
-    shutdownAll,
   };
 });
 
@@ -28,6 +28,7 @@ vi.mock('./a2a-bridge.js', () => ({
 
 vi.mock('./agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
+  shutdownAllAgentRuntimes: mocks.shutdownAllAgentRuntimes,
 }));
 
 vi.mock('./mission-team-composer.js', () => ({
@@ -39,12 +40,6 @@ vi.mock('./mission-team-composer.js', () => ({
 vi.mock('./ledger.js', () => ({
   ledger: {
     record: mocks.record,
-  },
-}));
-
-vi.mock('./agent-lifecycle.js', () => ({
-  agentLifecycle: {
-    shutdownAll: mocks.shutdownAll,
   },
 }));
 

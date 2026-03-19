@@ -1,6 +1,6 @@
 import { logger } from './core';
 import { agentRegistry } from './agent-registry';
-import { agentLifecycle } from './agent-lifecycle';
+import { stopAgentRuntime } from './agent-runtime-supervisor';
 import { trustEngine } from './trust-engine';
 import { auditChain } from './audit-chain';
 
@@ -115,7 +115,7 @@ class KillSwitchImpl {
     if (severity >= 3) {
       // Kill
       logger.error(`[KILL_SWITCH] Terminating ${agentId}: ${anomalies.join(', ')}`);
-      await agentLifecycle.shutdown(agentId);
+      await stopAgentRuntime(agentId, 'kill_switch');
       auditChain.recordLifecycle(agentId, 'shutdown');
       return 'killed';
     }

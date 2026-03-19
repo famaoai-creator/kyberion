@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { agentLifecycle } from "@agent/core/agent-lifecycle";
-import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime } from "@agent/core";
+import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime, getAgentRuntimeHandle } from "@agent/core";
 import { runSurfaceConversation } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 import { getAgentManifest } from "@agent/core/agent-manifest";
@@ -49,7 +48,7 @@ function scheduleChronosShutdown() {
 
 async function ensureChronosAgent() {
   const cachedHandle = g.__kyberionChronosHandle;
-  const runtimeHandle = agentLifecycle.getHandle(CHRONOS_AGENT_ID);
+  const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
   if (cachedHandle && runtimeHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
     scheduleChronosShutdown();
