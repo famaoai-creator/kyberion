@@ -25,12 +25,12 @@ export const KyberionGauge = ({ label, value, unit }: { label: string; value: nu
 // --- display:log ---
 export const KyberionLog = ({ title, lines }: { title: string; lines: string[] }) => (
   <div className="flex flex-col gap-3 w-full">
-    <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2">
+    <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2 text-slate-300/80">
       <Info size={12} /> {title}
     </div>
-    <div className="bg-black/40 rounded-xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[300px] border border-white/5">
+    <div className="bg-slate-950/70 rounded-2xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[320px] border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {lines.map((line, i) => (
-        <div key={i} className="opacity-60 border-l border-kyberion-gold/20 pl-2">{line}</div>
+        <div key={i} className="opacity-70 border-l border-cyan-200/20 pl-3 leading-5 break-words">{line}</div>
       ))}
     </div>
   </div>
@@ -39,21 +39,21 @@ export const KyberionLog = ({ title, lines }: { title: string; lines: string[] }
 // --- display:table ---
 export const KyberionTable = ({ title, headers, rows }: { title?: string; headers: string[]; rows: string[][] }) => (
   <div className="flex flex-col gap-3 w-full">
-    {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
-    <div className="bg-black/40 rounded-xl border border-white/5 overflow-hidden overflow-x-auto">
+    {title && <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">{title}</div>}
+    <div className="bg-slate-950/70 rounded-2xl border border-white/8 overflow-hidden overflow-x-auto shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <table className="w-full text-[10px]">
         <thead>
-          <tr className="border-b border-white/10">
+          <tr className="border-b border-white/10 bg-white/[0.03]">
             {headers.map((h, i) => (
-              <th key={i} className="px-4 py-2 text-left uppercase tracking-widest opacity-40 font-bold whitespace-nowrap">{h}</th>
+              <th key={i} className="px-4 py-3 text-left uppercase tracking-widest text-slate-400/85 font-bold whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.02] transition">
+            <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.03] transition">
               {(Array.isArray(row) ? row : Object.values(row)).map((cell: any, ci: number) => (
-                <td key={ci} className="px-4 py-2 opacity-70">{typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}</td>
+                <td key={ci} className="px-4 py-3 text-slate-100/75 align-top">{typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}</td>
               ))}
             </tr>
           ))}
@@ -73,13 +73,13 @@ export const KyberionStatus = ({ label, status, detail }: { label: string; statu
   };
   const c = config[status] || config.pending;
   return (
-    <div className={`flex items-center gap-3 p-3 bg-black/30 rounded-lg border ${c.border}`}>
+    <div className={`flex items-center gap-3 p-3 bg-slate-950/55 rounded-xl border ${c.border} shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]`}>
       {c.icon}
       <div className="flex-1">
-        <div className="text-[10px] uppercase tracking-widest opacity-70 font-bold">{label}</div>
-        {detail && <div className="text-[9px] opacity-40 mt-0.5">{detail}</div>}
+        <div className="text-[10px] uppercase tracking-widest text-white/78 font-bold">{label}</div>
+        {detail && <div className="text-[9px] text-slate-300/45 mt-0.5">{detail}</div>}
       </div>
-      <div className="text-[9px] uppercase tracking-widest opacity-40">{status}</div>
+      <div className="text-[9px] uppercase tracking-widest text-slate-300/45">{status}</div>
     </div>
   );
 };
@@ -107,14 +107,14 @@ export const KyberionMetric = ({ label, value, unit, trend, description }: {
     : trend === 'down' ? <ArrowDown size={12} className="text-red-400" />
     : <Minus size={12} className="opacity-30" />;
   return (
-    <div className="bg-black/30 rounded-xl p-4 border border-white/5 flex flex-col gap-1">
-      <div className="text-[9px] uppercase tracking-widest opacity-40">{label}</div>
+    <div className="bg-slate-950/60 rounded-2xl p-4 border border-white/8 flex flex-col gap-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="text-[9px] uppercase tracking-widest text-slate-400/85">{label}</div>
       <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold font-mono">{value}</span>
-        {unit && <span className="text-[10px] opacity-40 mb-1">{unit}</span>}
+        <span className="text-2xl font-bold font-mono text-white/90">{value}</span>
+        {unit && <span className="text-[10px] text-slate-400/70 mb-1">{unit}</span>}
         {trend && <span className="mb-1">{trendIcon}</span>}
       </div>
-      {description && <div className="text-[9px] opacity-30 mt-1">{description}</div>}
+      {description && <div className="text-[9px] text-slate-300/35 mt-1">{description}</div>}
     </div>
   );
 };
@@ -201,6 +201,87 @@ export const KyberionAlert = ({ severity, title, message }: {
   );
 };
 
+// --- display:hero ---
+export const KyberionHero = ({
+  title,
+  description,
+  eyebrow,
+  status,
+}: {
+  title: string;
+  description?: string;
+  eyebrow?: string;
+  status?: string;
+}) => (
+  <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+    {eyebrow && <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">{eyebrow}</div>}
+    <div className="mt-2 flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-white/92">{title}</h2>
+        {description && <p className="mt-2 text-[12px] leading-6 text-slate-200/62">{description}</p>}
+      </div>
+      {status && <div className="rounded-full border border-amber-200/15 bg-amber-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-100/80">{status}</div>}
+    </div>
+  </div>
+);
+
+// --- display:badges ---
+export const KyberionBadges = ({
+  title,
+  items,
+}: {
+  title?: string;
+  items: { label: string; tone?: "neutral" | "info" | "success" | "warning" | "danger" }[];
+}) => {
+  const toneClass: Record<string, string> = {
+    neutral: "border-white/10 bg-white/5 text-slate-200/75",
+    info: "border-cyan-200/20 bg-cyan-300/10 text-cyan-100/85",
+    success: "border-emerald-200/20 bg-emerald-300/10 text-emerald-100/85",
+    warning: "border-amber-200/20 bg-amber-300/10 text-amber-100/85",
+    danger: "border-rose-200/20 bg-rose-300/10 text-rose-100/85",
+  };
+
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">{title}</div>}
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, index) => (
+          <div
+            key={`${item.label}-${index}`}
+            className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${toneClass[item.tone || "neutral"]}`}
+          >
+            {item.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- display:section ---
+export const KyberionSection = ({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string;
+  items: { type: string; props: Record<string, any> }[];
+}) => (
+  <div className="flex flex-col gap-4 rounded-[24px] border border-white/8 bg-slate-950/50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">{title}</div>
+      {description && <div className="mt-1 text-[11px] leading-5 text-slate-200/52">{description}</div>}
+    </div>
+    <div className="flex flex-col gap-4">
+      {items.map((item, index) => {
+        const Component = A2UI_COMPONENT_REGISTRY[item.type];
+        return Component ? <Component key={`${item.type}-${index}`} {...item.props} /> : null;
+      })}
+    </div>
+  </div>
+);
+
 // --- display:code ---
 export const KyberionCode = ({ title, language, code }: {
   title?: string; language?: string; code: string;
@@ -270,6 +351,9 @@ export const KyberionGrid = ({ cols, children: items }: {
  * Registry mapping A2UI component types to React components.
  */
 export const A2UI_COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
+  'display:hero':        KyberionHero,
+  'display:badges':      KyberionBadges,
+  'display:section':     KyberionSection,
   'display:gauge':       KyberionGauge,
   'display:log':         KyberionLog,
   'display:table':       KyberionTable,
