@@ -13,6 +13,7 @@ interface MissionSummary {
   nextTaskCount: number;
   controlSummary: string;
   controlTone: "planning" | "ready" | "attention" | "pending";
+  controlRequestedBy?: string;
 }
 
 interface OrchestrationEvent {
@@ -293,6 +294,7 @@ interface SurfaceSummary {
   detail?: string;
   controlSummary: string;
   controlTone: "stable" | "attention" | "offline" | "pending";
+  controlRequestedBy?: string;
 }
 
 export function MissionIntelligence() {
@@ -627,6 +629,11 @@ export function MissionIntelligence() {
                     {mission.controlSummary}
                   </div>
                   <div className="text-[10px] text-white/45">control summary</div>
+                  {mission.controlRequestedBy && (
+                    <div className="text-[10px] text-white/35">
+                      requested by <span className="font-mono text-white/60">{mission.controlRequestedBy}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
                   <div>
@@ -942,6 +949,11 @@ export function MissionIntelligence() {
                     {surface.controlSummary}
                   </div>
                   <div className="text-[10px] text-white/45">control summary</div>
+                  {surface.controlRequestedBy && (
+                    <div className="text-[10px] text-white/35">
+                      requested by <span className="font-mono text-white/60">{surface.controlRequestedBy}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(() => {

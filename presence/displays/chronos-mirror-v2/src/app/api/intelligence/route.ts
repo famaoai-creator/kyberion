@@ -19,6 +19,7 @@ interface MissionSummary {
   nextTaskCount: number;
   controlSummary: string;
   controlTone: "planning" | "ready" | "attention" | "pending";
+  controlRequestedBy?: string;
 }
 
 interface RuntimeLeaseSummary {
@@ -67,6 +68,7 @@ interface SurfaceSummary {
   detail?: string;
   controlSummary: string;
   controlTone: "stable" | "attention" | "offline" | "pending";
+  controlRequestedBy?: string;
 }
 
 interface ControlActionSummary {
@@ -283,12 +285,12 @@ function applyPendingActionSummaries(
   const pendingMissionTargets = new Map(
     controlActions
       .filter((action) => action.kind === "mission" && action.status === "queued")
-      .map((action) => [action.target, action.operation]),
+      .map((action) => [action.target, { operation: action.operation, requestedBy: action.requested_by }]),
   );
   const pendingSurfaceTargets = new Map(
     controlActions
       .filter((action) => action.kind === "surface" && action.status === "queued")
-      .map((action) => [action.target, action.operation]),
+      .map((action) => [action.target, { operation: action.operation, requestedBy: action.requested_by }]),
   );
 
   return {
@@ -296,8 +298,9 @@ function applyPendingActionSummaries(
       pendingMissionTargets.has(mission.missionId)
         ? {
             ...mission,
-            controlSummary: `${pendingMissionTargets.get(mission.missionId)} pending`,
+            controlSummary: `${pendingMissionTargets.get(mission.missionId)?.operation} pending`,
             controlTone: "pending",
+            controlRequestedBy: pendingMissionTargets.get(mission.missionId)?.requestedBy,
           }
         : mission
     )),
@@ -305,8 +308,9 @@ function applyPendingActionSummaries(
       pendingSurfaceTargets.has(surface.id) || pendingSurfaceTargets.has("surface-runtime")
         ? {
             ...surface,
-            controlSummary: `${pendingSurfaceTargets.get(surface.id) || pendingSurfaceTargets.get("surface-runtime")} pending`,
+            controlSummary: `${pendingSurfaceTargets.get(surface.id)?.operation || pendingSurfaceTargets.get("surface-runtime")?.operation} pending`,
             controlTone: "pending",
+            controlRequestedBy: pendingSurfaceTargets.get(surface.id)?.requestedBy || pendingSurfaceTargets.get("surface-runtime")?.requestedBy,
           }
         : surface
     )),
