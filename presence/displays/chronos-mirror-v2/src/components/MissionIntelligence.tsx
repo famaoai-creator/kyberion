@@ -11,6 +11,8 @@ interface MissionSummary {
   missionType?: string;
   planReady: boolean;
   nextTaskCount: number;
+  controlSummary: string;
+  controlTone: "planning" | "ready" | "attention";
 }
 
 interface OrchestrationEvent {
@@ -215,6 +217,12 @@ function actionButtonClass(kind: "safe" | "risky"): string {
     return "rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40";
   }
   return "rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40";
+}
+
+function missionSummaryBadgeClass(tone: MissionSummary["controlTone"]): string {
+  if (tone === "ready") return "bg-cyan-500/15 text-cyan-200";
+  if (tone === "attention") return "bg-yellow-500/10 text-yellow-200";
+  return "bg-green-500/15 text-green-300";
 }
 
 interface IntelligencePayload {
@@ -603,6 +611,12 @@ export function MissionIntelligence() {
                   }`}>
                     {mission.planReady ? "plan ready" : mission.status}
                   </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${missionSummaryBadgeClass(mission.controlTone)}`}>
+                    {mission.controlSummary}
+                  </div>
+                  <div className="text-[10px] text-white/45">control summary</div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
                   <div>

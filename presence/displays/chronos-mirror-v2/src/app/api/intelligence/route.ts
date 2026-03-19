@@ -17,6 +17,8 @@ interface MissionSummary {
   missionType?: string;
   planReady: boolean;
   nextTaskCount: number;
+  controlSummary: string;
+  controlTone: "planning" | "ready" | "attention";
 }
 
 interface RuntimeLeaseSummary {
@@ -129,13 +131,26 @@ function collectActiveMissions(): MissionSummary[] {
         if (!state || state.status !== "active") continue;
         const nextTasks = readJson<any[]>(path.join(missionPath, "NEXT_TASKS.json")) || [];
         const planReady = safeExistsSync(path.join(missionPath, "PLAN.md"));
+        const nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
+        const controlSummary = planReady
+          ? nextTaskCount > 0
+            ? "execution ready"
+            : "plan ready"
+          : "planning pending";
+        const controlTone: MissionSummary["controlTone"] = planReady
+          ? nextTaskCount > 0
+            ? "ready"
+            : "planning"
+          : "attention";
         missions.push({
           missionId: state.mission_id || item,
           status: state.status,
           tier: state.tier || root.tier,
           missionType: state.mission_type,
           planReady,
-          nextTaskCount: Array.isArray(nextTasks) ? nextTasks.length : 0,
+          nextTaskCount,
+          controlSummary,
+          controlTone,
         });
       }
     } catch {

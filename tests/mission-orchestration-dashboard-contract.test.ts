@@ -27,6 +27,7 @@ describe('mission orchestration dashboard contract', () => {
 
     expect(page).toContain('MissionIntelligence');
     expect(component).toContain('Mission Control Plane');
+    expect(component).toContain('control summary');
     expect(component).toContain('Control Action Queue');
     expect(component).toContain('show details');
     expect(component).toContain('jump to target');
@@ -49,6 +50,10 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('cleanup_runtime_lease');
     expect(component).toContain('restart_runtime_lease');
     expect(route).toContain('activeMissions');
+    expect(route).toContain('controlSummary');
+    expect(route).toContain('controlTone');
+    expect(route).toContain('execution ready');
+    expect(route).toContain('planning pending');
     expect(route).toContain('surfaces');
     expect(route).toContain('recentEvents');
     expect(route).toContain('controlActionCatalog');
