@@ -60,26 +60,29 @@ function collectActiveMissions(): MissionSummary[] {
   const missionRoots = [
     { dir: pathResolver.active("missions/public"), tier: "public" },
     { dir: pathResolver.active("missions/confidential"), tier: "confidential" },
-    { dir: pathResolver.knowledge("personal/missions"), tier: "personal" },
   ];
   const missions: MissionSummary[] = [];
 
   for (const root of missionRoots) {
-    if (!safeExistsSync(root.dir)) continue;
-    for (const item of safeReaddir(root.dir)) {
-      const missionPath = path.join(root.dir, item);
-      const state = readJson<any>(path.join(missionPath, "mission-state.json"));
-      if (!state || state.status !== "active") continue;
-      const nextTasks = readJson<any[]>(path.join(missionPath, "NEXT_TASKS.json")) || [];
-      const planReady = safeExistsSync(path.join(missionPath, "PLAN.md"));
-      missions.push({
-        missionId: state.mission_id || item,
-        status: state.status,
-        tier: state.tier || root.tier,
-        missionType: state.mission_type,
-        planReady,
-        nextTaskCount: Array.isArray(nextTasks) ? nextTasks.length : 0,
-      });
+    try {
+      if (!safeExistsSync(root.dir)) continue;
+      for (const item of safeReaddir(root.dir)) {
+        const missionPath = path.join(root.dir, item);
+        const state = readJson<any>(path.join(missionPath, "mission-state.json"));
+        if (!state || state.status !== "active") continue;
+        const nextTasks = readJson<any[]>(path.join(missionPath, "NEXT_TASKS.json")) || [];
+        const planReady = safeExistsSync(path.join(missionPath, "PLAN.md"));
+        missions.push({
+          missionId: state.mission_id || item,
+          status: state.status,
+          tier: state.tier || root.tier,
+          missionType: state.mission_type,
+          planReady,
+          nextTaskCount: Array.isArray(nextTasks) ? nextTasks.length : 0,
+        });
+      }
+    } catch {
+      // Skip roots that are unavailable to the current authority role.
     }
   }
 

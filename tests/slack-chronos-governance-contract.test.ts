@@ -39,7 +39,6 @@ describe('Slack and Chronos governance contract', () => {
       'active/audit/'
     ]);
     expect(securityPolicy.role_permissions.chronos_operator.allow_write).toEqual([]);
-    expect(securityPolicy.role_permissions.chronos_operator.allow_read).toContain('knowledge/personal/missions/');
     expect(securityPolicy.role_permissions.chronos_operator.allow_read).toContain('active/shared/observability/');
 
     expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/channels/slack/');

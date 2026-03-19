@@ -62,7 +62,7 @@
       "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
       "write_scopes": [],
       "allowed_actuators": ["presence-actuator"],
-      "tier_access": ["public", "confidential", "personal"]
+      "tier_access": ["public", "confidential"]
     },
     "sovereign_concierge": {
       "description": "Personal onboarding and identity synchronization authority.",

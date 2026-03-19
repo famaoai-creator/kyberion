@@ -97,8 +97,6 @@
     },
     "chronos_operator": {
       "allow_read": [
-        "knowledge/personal/missions/",
-        "knowledge/personal/governance/",
         "active/missions/",
         "active/shared/observability/",
         "active/shared/runtime/",
