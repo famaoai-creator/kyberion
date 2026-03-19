@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { emitMissionOrchestrationObservation, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
+import { emitChannelSurfaceEvent, emitMissionOrchestrationObservation, ledger, listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, pathResolver, safeExistsSync, safeReadFile, safeReaddir, stopAgentRuntime, restartAgentRuntime } from "@agent/core";
 
 interface MissionSummary {
   missionId: string;
@@ -175,6 +175,43 @@ function buildRuntimeDoctor(
   return findings.slice(0, 12);
 }
 
+function recordRuntimeRemediationArtifacts(input: {
+  action: "cleanup_runtime_lease" | "restart_runtime_lease";
+  agentId: string;
+  lease?: RuntimeLeaseSummary;
+}) {
+  const lease = input.lease;
+  if (!lease) return;
+
+  if (lease.owner_type === "mission") {
+    ledger.record("MISSION_RUNTIME_REMEDIATION", {
+      mission_id: lease.owner_id,
+      role: "chronos_operator",
+      agent_id: input.agentId,
+      remediation_action: input.action,
+      owner_type: lease.owner_type,
+      metadata: lease.metadata || {},
+    });
+  }
+
+  const channel = typeof lease.metadata?.channel === "string" ? lease.metadata.channel : undefined;
+  if (channel) {
+    emitChannelSurfaceEvent("chronos_operator", channel, "runtime-remediation", {
+      correlation_id: typeof lease.metadata?.thread === "string" ? lease.metadata.thread : input.agentId,
+      decision: "runtime_lease_remediation_applied",
+      why: "Chronos operator applied runtime remediation to a leased agent runtime.",
+      policy_used: "mission_orchestration_control_plane_v1",
+      mission_id: lease.owner_type === "mission" ? lease.owner_id : undefined,
+      agent_id: input.agentId,
+      resource_id: input.agentId,
+      action: input.action,
+      owner_type: lease.owner_type,
+      owner_id: lease.owner_id,
+      thread: typeof lease.metadata?.thread === "string" ? lease.metadata.thread : undefined,
+    });
+  }
+}
+
 export async function GET() {
   try {
     process.env.MISSION_ROLE ||= "chronos_operator";
@@ -214,6 +251,7 @@ export async function POST(req: NextRequest) {
     if (!agentId) {
       return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
     }
+    const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === agentId);
 
     if (action === "cleanup_runtime_lease") {
       await stopAgentRuntime(agentId, "chronos_operator");
@@ -228,6 +266,7 @@ export async function POST(req: NextRequest) {
       action,
       why: "Chronos operator applied runtime lease remediation from the doctor view.",
     });
+    recordRuntimeRemediationArtifacts({ action, agentId, lease });
     return NextResponse.json({
       status: "ok",
       action,

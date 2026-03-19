@@ -36,6 +36,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('ownerSummaries');
     expect(route).toContain('runtimeLeases');
     expect(route).toContain('runtimeDoctor');
+    expect(route).toContain('MISSION_RUNTIME_REMEDIATION');
+    expect(route).toContain('runtime-remediation');
     expect(route).toContain('runtime_lease_remediation_applied');
     expect(route).toContain('cleanup_runtime_lease');
     expect(route).toContain('restart_runtime_lease');
