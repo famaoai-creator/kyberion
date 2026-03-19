@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { guardRequest } from "../../../lib/api-guard";
@@ -12,6 +13,7 @@ async function loadChronosCore() {
     runtimeSupervisor,
     pipelineContract,
     agentManifest,
+    orchestrationEvents,
   ] = await Promise.all([
     import("@agent/core/dist/core.js"),
     import("@agent/core/dist/path-resolver.js"),
@@ -20,22 +22,23 @@ async function loadChronosCore() {
     import("@agent/core/dist/agent-runtime-supervisor.js"),
     import("@agent/core/dist/pipeline-contract.js"),
     import("@agent/core/dist/agent-manifest.js"),
+    import("@agent/core/dist/mission-orchestration-events.js"),
   ]);
 
   return {
     logger: core.logger,
     pathResolver: pathResolverModule.pathResolver,
     safeExistsSync: secureIo.safeExistsSync,
+    safeMkdir: secureIo.safeMkdir,
     safeReadFile: secureIo.safeReadFile,
+    safeReaddir: secureIo.safeReaddir,
+    safeRmSync: secureIo.safeRmSync,
+    safeWriteFile: secureIo.safeWriteFile,
     recordChronosDelegationSummary: channelSurface.recordChronosDelegationSummary,
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
     runSurfaceConversation: channelSurface.runSurfaceConversation,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
-    clearChronosMissionProposalState: channelSurface.clearChronosMissionProposalState,
-    getChronosMissionProposalState: channelSurface.getChronosMissionProposalState,
-    issueChronosMissionFromProposal: channelSurface.issueChronosMissionFromProposal,
     isSlackMissionConfirmation: channelSurface.isSlackMissionConfirmation,
-    saveChronosMissionProposalState: channelSurface.saveChronosMissionProposalState,
     ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
     getAgentRuntimeHandle: runtimeSupervisor.getAgentRuntimeHandle,
     listAgentRuntimeSnapshots: runtimeSupervisor.listAgentRuntimeSnapshots,
@@ -44,6 +47,9 @@ async function loadChronosCore() {
     getAgentManifest: agentManifest.getAgentManifest,
     loadAgentManifests: agentManifest.loadAgentManifests,
     safeExec: secureIo.safeExec,
+    emitMissionOrchestrationObservation: orchestrationEvents.emitMissionOrchestrationObservation,
+    enqueueMissionOrchestrationEvent: orchestrationEvents.enqueueMissionOrchestrationEvent,
+    startMissionOrchestrationWorker: orchestrationEvents.startMissionOrchestrationWorker,
   };
 }
 
@@ -138,6 +144,177 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
   await g.__kyberionChronosReady;
   scheduleChronosShutdown();
   return g.__kyberionChronosHandle;
+}
+
+type MissionProposal = {
+  intent: "create_mission";
+  mission_type?: string;
+  summary?: string;
+  assigned_persona?: string;
+  tier?: "personal" | "confidential" | "public";
+  vision_ref?: string;
+  why?: string;
+};
+
+type ChronosMissionProposalState = {
+  surface: "chronos";
+  channel: "chronos";
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  createdAt: string;
+};
+
+function withMissionRole<T>(role: string, fn: () => T): T {
+  const previousRole = process.env.MISSION_ROLE;
+  process.env.MISSION_ROLE = role;
+  try {
+    return fn();
+  } finally {
+    if (previousRole === undefined) {
+      delete process.env.MISSION_ROLE;
+    } else {
+      process.env.MISSION_ROLE = previousRole;
+    }
+  }
+}
+
+function chronosMissionProposalStatePath(sessionId: string, pathResolver: Awaited<ReturnType<typeof loadChronosCore>>["pathResolver"]): string {
+  const safeSession = sessionId.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return pathResolver.resolve(`active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`);
+}
+
+function sanitizeMissionSlug(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "REQUEST";
+}
+
+function buildSurfaceMissionId(prefix: string, threadTs: string, proposal: MissionProposal, sourceText?: string): string {
+  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || "request";
+  const slug = sanitizeMissionSlug(base);
+  const numericThread = threadTs.replace(/\D+/g, "").slice(-8) || Date.now().toString().slice(-8);
+  return `MSN-${prefix}-${slug}-${numericThread}`;
+}
+
+function getChronosMissionProposalState(
+  sessionId: string,
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): ChronosMissionProposalState | null {
+  const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
+  return withMissionRole("chronos_gateway", () => {
+    if (!core.safeExistsSync(statePath)) return null;
+    return JSON.parse(core.safeReadFile(statePath, { encoding: "utf8" }) as string) as ChronosMissionProposalState;
+  });
+}
+
+function saveChronosMissionProposalState(
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): string {
+  const statePath = chronosMissionProposalStatePath(params.sessionId, core.pathResolver);
+  return withMissionRole("chronos_gateway", () => {
+    core.safeMkdir(path.dirname(statePath));
+    core.safeWriteFile(
+      statePath,
+      JSON.stringify(
+        {
+          surface: "chronos",
+          channel: "chronos",
+          threadTs: params.sessionId,
+          proposal: params.proposal,
+          sourceText: params.sourceText,
+          createdAt: new Date().toISOString(),
+        } satisfies ChronosMissionProposalState,
+        null,
+        2,
+      ),
+    );
+    return statePath;
+  });
+}
+
+function clearChronosMissionProposalState(
+  sessionId: string,
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): void {
+  const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
+  withMissionRole("chronos_gateway", () => {
+    if (!core.safeExistsSync(statePath)) return;
+    core.safeRmSync(statePath, { force: true });
+  });
+}
+
+async function issueChronosMissionFromProposal(
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+) {
+  const missionId = buildSurfaceMissionId("CHRONOS", params.sessionId, params.proposal, params.sourceText);
+  const tier = params.proposal.tier || "public";
+  const missionType = params.proposal.mission_type || "development";
+  const persona = params.proposal.assigned_persona || "Ecosystem Architect";
+  const env = { ...process.env, MISSION_ROLE: "mission_controller" };
+
+  const startOutput = core.safeExec(
+    "node",
+    ["dist/scripts/mission_controller.js", "start", missionId, tier, persona, "default", missionType],
+    { env, cwd: PROJECT_ROOT },
+  );
+
+  let orchestrationStatus: "queued" | "failed" = "queued";
+  let orchestrationJobPath: string | undefined;
+  let orchestrationError: string | undefined;
+  try {
+    const event = withMissionRole("chronos_gateway", () =>
+      core.enqueueMissionOrchestrationEvent({
+        eventType: "mission_issue_requested",
+        missionId,
+        requestedBy: "chronos_gateway",
+        correlationId: randomUUID(),
+        payload: {
+          sessionId: params.sessionId,
+          proposal: params.proposal,
+          sourceText: params.sourceText,
+          tier,
+          persona,
+          missionType,
+          channel: "chronos",
+          threadTs: params.sessionId,
+        },
+      }),
+    );
+    orchestrationJobPath = withMissionRole("chronos_gateway", () => core.startMissionOrchestrationWorker(event));
+  } catch (error) {
+    orchestrationStatus = "failed";
+    orchestrationError = error instanceof Error ? error.message : String(error);
+  }
+
+  withMissionRole("chronos_gateway", () => {
+    core.emitMissionOrchestrationObservation({
+      decision: "mission_issued",
+      source: "chronos",
+      mission_id: missionId,
+      session_id: params.sessionId,
+      mission_type: missionType,
+      tier,
+      requested_by: "chronos_gateway",
+      orchestration_status: orchestrationStatus,
+      orchestration_job_path: orchestrationJobPath,
+    });
+  });
+
+  return {
+    missionId,
+    tier,
+    missionType,
+    persona,
+    startOutput,
+    orchestrationStatus,
+    orchestrationJobPath,
+    orchestrationError,
+  };
 }
 
 async function tryHandleDeterministicPipelineQuery(query: string) {
@@ -461,21 +638,18 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   try {
     process.env.MISSION_ROLE ||= "chronos_operator";
+    const core = await loadChronosCore();
     const {
-      clearChronosMissionProposalState,
-      getChronosMissionProposalState,
       isSlackMissionConfirmation,
-      issueChronosMissionFromProposal,
       recordChronosDelegationSummary,
       recordChronosSurfaceRequest,
       runSurfaceConversation,
       safeReadFile,
-      saveChronosMissionProposalState,
-    } = await loadChronosCore();
+    } = core;
     const body = await req.json();
     const query = (body.query || body.intent || "").trim();
     const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId : "chronos-default";
-    const pendingMissionProposal = getChronosMissionProposalState(sessionId);
+    const pendingMissionProposal = getChronosMissionProposalState(sessionId, core);
     const missionId = typeof body.missionId === "string" ? body.missionId : undefined;
     const teamRole = typeof body.teamRole === "string" ? body.teamRole : undefined;
 
@@ -488,8 +662,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         proposal: pendingMissionProposal.proposal,
         sourceText: pendingMissionProposal.sourceText,
-      });
-      clearChronosMissionProposalState(sessionId);
+      }, core);
+      clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: "ok",
         response: [
@@ -577,7 +751,7 @@ export async function POST(req: NextRequest) {
         sessionId,
         proposal,
         sourceText: query,
-      });
+      }, core);
       const confirmationText = [
         conversation.text || "I can turn this into a mission.",
         "",
