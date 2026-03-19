@@ -158,9 +158,6 @@ export * from './agent-slo';
 export * from './kill-switch';
 
 
-// Actuators
-export { handleAction as presenceAction } from '../actuators/presence-actuator/src/index';
-
 // Shared Business Types
 export * from './shared-business-types.js';
 // export * as visionJudge from './vision-judge.js';
