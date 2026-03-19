@@ -1,6 +1,8 @@
-import { logger, safeReadFile, pathResolver, validatePipelineAdf } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
-import * as path from 'node:path';
+import { logger } from '../libs/core/core.js';
+import { rootResolve } from '../libs/core/path-resolver.js';
+import { safeReadFile } from '../libs/core/secure-io.js';
+import { validatePipelineAdf } from '../libs/core/pipeline-contract.js';
+import { createStandardYargs } from '../libs/core/cli-utils.js';
 import { executeSuperPipeline } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 
 async function main() {
@@ -8,7 +10,7 @@ async function main() {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = pathResolver.rootResolve(argv.input as string);
+  const inputPath = rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const pipeline = validatePipelineAdf(JSON.parse(inputContent));
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime, getAgentRuntimeHandle } from "@agent/core";
+import { logger, pathResolver, safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest, ensureAgentRuntime, stopAgentRuntime, getAgentRuntimeHandle, validatePipelineAdf } from "@agent/core";
 import { runSurfaceConversation } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
 import { getAgentManifest } from "@agent/core/agent-manifest";
+import { executeSuperPipeline } from "../../../../../../libs/actuators/orchestrator-actuator/src/super-nerve/index.js";
 
 function findProjectRoot(): string {
   let dir = process.cwd();
@@ -21,6 +22,7 @@ const PROJECT_ROOT = findProjectRoot();
 
 const CHRONOS_AGENT_ID = "chronos-mirror";
 const CHRONOS_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000);
+const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\s+(\S+)/;
 
 const g = globalThis as any;
 
@@ -93,6 +95,35 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
   return g.__kyberionChronosHandle;
 }
 
+async function tryHandleDeterministicPipelineQuery(query: string) {
+  const match = query.match(RUN_PIPELINE_PATTERN);
+  if (!match) return null;
+
+  const inputPath = pathResolver.rootResolve(match[1]);
+  const pipeline = validatePipelineAdf(JSON.parse(safeReadFile(inputPath, { encoding: "utf8" }) as string));
+  const result = await executeSuperPipeline(
+    (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
+    pipeline.context || {},
+    pipeline.options || {},
+  );
+
+  logger.info(`[CHRONOS] Deterministic pipeline query executed: ${match[1]}`);
+
+  return {
+    status: "ok",
+    response: `Pipeline ${match[1]} finished with status: ${result.status}`,
+    pipeline: {
+      input: match[1],
+      status: result.status,
+      results: result.results,
+      context: result.context,
+    },
+    a2ui: [],
+    delegations: undefined,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
@@ -113,6 +144,11 @@ export async function POST(req: NextRequest) {
       requesterId: body.requesterId || "chronos-ui",
     });
     const requestArtifact = JSON.parse(safeReadFile(requestArtifactPath, { encoding: "utf8" }) as string);
+
+    const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query);
+    if (deterministicPipelineResponse) {
+      return NextResponse.json(deterministicPipelineResponse);
+    }
 
     await ensureChronosAgent({
       missionId,

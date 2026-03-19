@@ -23,6 +23,7 @@ describe('mission orchestration dashboard contract', () => {
     const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
     const component = read('presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx');
     const route = read('presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts');
+    const agentRoute = read('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts');
 
     expect(page).toContain('MissionIntelligence');
     expect(component).toContain('Mission Control Plane');
@@ -47,5 +48,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('runtime_lease_remediation_applied');
     expect(route).toContain('cleanup_runtime_lease');
     expect(route).toContain('restart_runtime_lease');
+    expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
+    expect(agentRoute).toContain('executeSuperPipeline');
   });
 });
