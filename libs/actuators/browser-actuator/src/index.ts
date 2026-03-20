@@ -29,6 +29,8 @@ interface BrowserAction {
     record_trace?: boolean;
     record_video?: boolean;
     locale?: string;
+    lease_ms?: number;
+    keep_alive?: boolean;
   };
   context?: Record<string, any>;
 }
@@ -73,6 +75,18 @@ interface BrowserSessionMetadata {
   tabs: BrowserTabSummary[];
   updated_at: string;
   last_trace_path?: string;
+  lease_expires_at?: string;
+  lease_status: 'active' | 'released' | 'expired';
+  retained: boolean;
+  action_trail_count: number;
+  recent_actions: Array<{
+    op: string;
+    kind: BrowserRecordedAction['kind'];
+    tab_id?: string;
+    ref?: string;
+    selector?: string;
+    ts: string;
+  }>;
 }
 
 interface BrowserRuntime {
@@ -100,9 +114,17 @@ interface BrowserRecordedAction {
   ts: string;
 }
 
+interface BrowserRuntimeLease {
+  runtime: BrowserRuntime;
+  userDataDir: string;
+  sessionMetadataPath: string;
+  leaseExpiresAt?: number;
+}
+
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
+const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 
 /**
  * Main Entry Point
@@ -130,21 +152,14 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
   if (options.record_video && !safeExistsSync(videoDir)) safeMkdir(videoDir, { recursive: true });
 
-  logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
-  
-  const browserContext = await chromium.launchPersistentContext(userDataDir, {
-    headless: options.headless !== false,
-    viewport: options.viewport || { width: 1280, height: 720 },
-    locale: options.locale || 'ja-JP',
-    recordVideo: options.record_video ? { dir: videoDir } : undefined
-  });
+  const browserContext = await getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, videoDir);
 
   // Start Tracing if requested
   if (options.record_trace) {
     await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
   }
 
-  const runtime = createBrowserRuntime(browserContext);
+  const runtime = getOrCreateBrowserRuntime(sessionId, browserContext, userDataDir, sessionMetadataPath);
   if (runtime.tabs.size === 0) {
     const page = await browserContext.newPage();
     registerBrowserPage(runtime, page, 'tab-1');
@@ -224,6 +239,9 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     }
     ctx.browser_tabs = await summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;
+    const keepAlive = options.keep_alive === true || Number(options.lease_ms || 0) > 0;
+    const shouldClose = ctx.__close_browser_session === true || !keepAlive;
+    const leaseExpiresAt = shouldClose ? undefined : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
     saveBrowserSessionMetadata(sessionMetadataPath, {
       session_id: sessionId,
       user_data_dir: userDataDir,
@@ -232,8 +250,19 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       tabs: ctx.browser_tabs,
       updated_at: new Date().toISOString(),
       last_trace_path: ctx.last_trace_path,
+      lease_expires_at: leaseExpiresAt ? new Date(leaseExpiresAt).toISOString() : undefined,
+      lease_status: shouldClose ? 'released' : 'active',
+      retained: !shouldClose,
+      action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
+      recent_actions: summarizeRecentActions(ctx.action_trail),
     });
-    await browserContext.close();
+    if (shouldClose) {
+      browserRuntimeLeases.delete(sessionId);
+      await browserContext.close();
+    } else {
+      const lease = browserRuntimeLeases.get(sessionId);
+      if (lease) lease.leaseExpiresAt = leaseExpiresAt;
+    }
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
@@ -277,6 +306,15 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         tab_id: tabId,
       });
     }
+    case 'close_session':
+      return recordBrowserAction({
+        ...ctx,
+        __close_browser_session: true,
+      }, {
+        kind: 'control',
+        op: 'close_session',
+        tab_id: runtime.activeTabId,
+      });
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
         const res = await executePipelineInternal(params.then, runtime, ctx, options, state, resolve);
@@ -463,7 +501,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const trail = readRecordedActions(ctx, params.from);
       const outPath = path.resolve(process.cwd(), resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`));
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      const content = renderPlaywrightSkeleton(trail);
+      const content = renderPlaywrightSkeleton(trail, {
+        assertions: params.assertions === 'hint' ? 'hint' : 'strict',
+      });
       safeWriteFile(outPath, content);
       return { ...ctx, [params.export_as || 'playwright_spec_path']: outPath };
     }
@@ -590,12 +630,20 @@ function readRecordedActions(ctx: any, from?: string): BrowserRecordedAction[] {
   return candidate as BrowserRecordedAction[];
 }
 
-function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
+function renderPlaywrightSkeleton(
+  trail: BrowserRecordedAction[],
+  options: { assertions?: 'hint' | 'strict' } = {},
+): string {
+  const assertionMode = options.assertions || 'strict';
   const lines = [
     "import { test, expect } from '@playwright/test';",
     '',
     "test('browser recorded flow', async ({ page }) => {",
   ];
+
+  const addAssertion = (statement: string) => {
+    lines.push(assertionMode === 'strict' ? `  ${statement}` : `  // assertion hint: ${statement}`);
+  };
 
   for (const action of trail) {
     switch (action.op) {
@@ -603,12 +651,12 @@ function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
       case 'open_tab':
         if (action.url) {
           lines.push(`  await page.goto(${JSON.stringify(action.url)});`);
-          lines.push(`  await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+          addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
         }
         break;
       case 'snapshot':
-        if (action.url) lines.push(`  await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
-        if (action.title) lines.push(`  await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
+        if (action.url) addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+        if (action.title) addAssertion(`await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
         break;
       case 'click':
       case 'click_ref':
@@ -616,7 +664,7 @@ function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
           if (action.element_name || action.element_role) {
             lines.push(`  // assert target is visible before click: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
           }
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
           lines.push(`  await page.click(${JSON.stringify(action.selector)});`);
         }
         break;
@@ -626,15 +674,15 @@ function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
           if (action.element_name || action.element_role) {
             lines.push(`  // assert target is ready for input: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
           }
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
           lines.push(`  await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`);
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`);
         }
         break;
       case 'press':
       case 'press_ref':
         if (action.selector) {
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
           lines.push(`  await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`);
         }
         break;
@@ -642,12 +690,12 @@ function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
       case 'wait_ref':
         if (action.selector) {
           lines.push(`  await page.waitForSelector(${JSON.stringify(action.selector)});`);
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
         }
         break;
       case 'content':
         if (action.selector && action.content_excerpt) {
-          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`);
         }
         break;
       default:
@@ -701,6 +749,94 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
     session_id: sessionId,
     steps,
   };
+}
+
+async function getOrCreateBrowserContext(
+  sessionId: string,
+  userDataDir: string,
+  sessionMetadataPath: string,
+  options: any,
+  videoDir: string,
+): Promise<BrowserContext> {
+  cleanupExpiredBrowserRuntimeLeases();
+  const existing = browserRuntimeLeases.get(sessionId);
+  if (existing) {
+    logger.info(`♻️ [BROWSER] Reusing leased session: ${sessionId}`);
+    return existing.runtime.context;
+  }
+
+  logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: options.headless !== false,
+    viewport: options.viewport || { width: 1280, height: 720 },
+    locale: options.locale || 'ja-JP',
+    recordVideo: options.record_video ? { dir: videoDir } : undefined,
+  });
+
+  browserRuntimeLeases.set(sessionId, {
+    runtime: createBrowserRuntime(context),
+    userDataDir,
+    sessionMetadataPath,
+  });
+  return context;
+}
+
+function getOrCreateBrowserRuntime(
+  sessionId: string,
+  context: BrowserContext,
+  userDataDir: string,
+  sessionMetadataPath: string,
+): BrowserRuntime {
+  const existing = browserRuntimeLeases.get(sessionId);
+  if (existing) return existing.runtime;
+  const runtime = createBrowserRuntime(context);
+  browserRuntimeLeases.set(sessionId, {
+    runtime,
+    userDataDir,
+    sessionMetadataPath,
+  });
+  return runtime;
+}
+
+function cleanupExpiredBrowserRuntimeLeases(): void {
+  const now = Date.now();
+  for (const [sessionId, lease] of browserRuntimeLeases.entries()) {
+    if (!lease.leaseExpiresAt || lease.leaseExpiresAt > now) continue;
+    saveBrowserSessionMetadata(lease.sessionMetadataPath, {
+      session_id: sessionId,
+      user_data_dir: lease.userDataDir,
+      active_tab_id: lease.runtime.activeTabId,
+      tab_count: lease.runtime.tabs.size,
+      tabs: [],
+      updated_at: new Date().toISOString(),
+      lease_status: 'expired',
+      retained: false,
+      lease_expires_at: new Date(lease.leaseExpiresAt).toISOString(),
+      action_trail_count: 0,
+      recent_actions: [],
+    });
+    void lease.runtime.context.close();
+    browserRuntimeLeases.delete(sessionId);
+  }
+}
+
+function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_actions'] {
+  const actions = Array.isArray(trail) ? trail as BrowserRecordedAction[] : [];
+  return actions.slice(-8).map((action) => ({
+    op: action.op,
+    kind: action.kind,
+    tab_id: action.tab_id,
+    ref: action.ref,
+    selector: action.selector,
+    ts: action.ts,
+  }));
+}
+
+async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
+  for (const [sessionId, lease] of browserRuntimeLeases.entries()) {
+    await lease.runtime.context.close();
+    browserRuntimeLeases.delete(sessionId);
+  }
 }
 
 function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
@@ -869,4 +1005,11 @@ if (require.main === module) {
   });
 }
 
-export { handleAction, buildSnapshot, resolveRefSelector, renderPlaywrightSkeleton, renderBrowserAdf };
+export {
+  handleAction,
+  buildSnapshot,
+  resolveRefSelector,
+  renderPlaywrightSkeleton,
+  renderBrowserAdf,
+  resetBrowserRuntimeLeasesForTest,
+};
