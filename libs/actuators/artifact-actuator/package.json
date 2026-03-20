@@ -1,11 +1,12 @@
 {
   "name": "@actuator/artifact",
   "version": "1.0.0",
+  "type": "module",
   "description": "Governed Artifact-Actuator for coordination and observability records",
   "main": "../../../dist/libs/actuators/artifact-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/artifact-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

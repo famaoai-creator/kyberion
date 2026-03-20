@@ -1,7 +1,8 @@
 import { logger, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { executeSuperPipeline, A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 
 async function main() {
   const argv = await createStandardYargs()
@@ -20,7 +21,7 @@ async function main() {
   logger.info(`🚀 [A2A_GATEWAY] Receiving A2A message [ID: ${a2aMsg.header.msg_id}] from ${a2aMsg.header.sender}`);
   
   try {
-    const result = await executeSuperPipeline(a2aMsg);
+    const result = await superNerve.executeSuperPipeline(a2aMsg);
     
     // Create A2A response envelope
     const response: A2AMessage = {

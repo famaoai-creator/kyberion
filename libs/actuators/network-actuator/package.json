@@ -1,11 +1,12 @@
 {
   "name": "@actuator/network",
   "version": "1.0.0",
+  "type": "module",
   "description": "Generic Secure Network-Actuator for Kyberion",
   "main": "../../../dist/libs/actuators/network-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/network-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

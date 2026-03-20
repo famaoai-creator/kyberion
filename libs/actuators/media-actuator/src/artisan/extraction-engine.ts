@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import pdf_parse from 'pdf-parse';
+import * as pdfParseModule from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
@@ -92,7 +92,7 @@ export async function extract(filePath: string, mode: ExtractionMode = 'all'): P
 async function processPDF(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   // Delegate to shared pdf-utils for content/metadata extraction
   if (mode === 'content' || mode === 'metadata' || mode === 'all') {
-    const pdf = pdf_parse as any;
+    const pdf = (pdfParseModule as any).default ?? (pdfParseModule as any);
     const data = await (typeof pdf === 'function' ? pdf(buffer) : pdf.default(buffer));
     if (mode === 'content' || mode === 'all') result.layers.content = data.text;
     if (mode === 'metadata' || mode === 'all') result.layers.metadata = data.info;

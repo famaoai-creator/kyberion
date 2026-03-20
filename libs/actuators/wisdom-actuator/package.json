@@ -1,11 +1,12 @@
 {
   "name": "@actuator/wisdom",
   "version": "1.0.0",
+  "type": "module",
   "description": "Identity and Evolution Manager for Kyberion",
   "main": "../../../dist/libs/actuators/wisdom-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/wisdom-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

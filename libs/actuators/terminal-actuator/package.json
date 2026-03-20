@@ -1,11 +1,12 @@
 {
   "name": "@actuator/terminal",
   "version": "1.0.0",
+  "type": "module",
   "description": "System-Actuator for Kyberion OS/Peripheral Controls",
   "main": "../../../dist/libs/actuators/terminal-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/terminal-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

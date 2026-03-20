@@ -1,11 +1,12 @@
 {
   "name": "@actuator/service",
   "version": "1.0.0",
+  "type": "module",
   "description": "Unified Service-Actuator with Least-Privilege Auth Injection",
   "main": "../../../dist/libs/actuators/service-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/service-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

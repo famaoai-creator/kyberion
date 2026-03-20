@@ -1,11 +1,12 @@
 {
   "name": "@actuator/approval",
   "version": "1.0.0",
+  "type": "module",
   "description": "Approval-Actuator for human approval request state transitions",
   "main": "../../../dist/libs/actuators/approval-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/approval-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p ../../../tsconfig.actuators.json",
     "test": "vitest run"
   },
   "dependencies": {

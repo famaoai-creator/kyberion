@@ -3,7 +3,8 @@ import { rootResolve } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { executeSuperPipeline, SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import type { SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 
 async function main() {
   const argv = await createStandardYargs()
@@ -16,7 +17,7 @@ async function main() {
   logger.info(`🧠 [SUPER_NERVE] Initiating cross-actuator pipeline from: ${argv.input}`);
   
   try {
-    const result = await executeSuperPipeline(
+    const result = await superNerve.executeSuperPipeline(
       inputData.steps.map((step) => ({ ...step, params: step.params || {} })),
       inputData.context || {},
       inputData.options || {}
