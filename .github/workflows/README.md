@@ -10,7 +10,12 @@ The repository currently maintains two GitHub Actions workflows.
 2. `pr-validation.yml`
    Runs on pull requests targeting `main` or `develop`.
 
-Both workflows are expected to use **built artifacts** from `dist/` and the current capability/runtime-surface model. They must not depend on removed `skills` scripts or ad hoc `tsx` execution paths when an equivalent built script already exists.
+Both workflows are expected to separate **package/app build** from **operational validation**.
+
+- `pnpm build` must build package-local workspace artifacts first, then repo-level `dist/`
+- operational validation still runs against built scripts under `dist/`
+
+They must not depend on removed `skills` scripts or on stale package-local build artifacts.
 
 ## CI Workflow
 
@@ -79,7 +84,7 @@ When investigating local residue:
 ### Build size report failed
 
 - Confirm `pnpm build` produced `dist/`
-- Confirm `dist/scripts/measure-build-size.js` exists
+- Confirm `node dist/scripts/measure-build-size.js --json --no-save` succeeds locally
 
 ### Surface validation failed
 
