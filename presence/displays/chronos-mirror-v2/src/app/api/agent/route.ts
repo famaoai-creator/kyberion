@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import path from "node:path";
+import { safeExistsSync } from "@agent/core/secure-io";
 import { guardRequest } from "../../../lib/api-guard";
 
 async function loadChronosCore() {
@@ -57,7 +57,7 @@ function findProjectRoot(): string {
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     try {
-      if (existsSync(path.join(dir, "AGENTS.md"))) return dir;
+      if (safeExistsSync(path.join(dir, "AGENTS.md"))) return dir;
     } catch (_) {}
     const parent = path.dirname(dir);
     if (parent === dir) break;

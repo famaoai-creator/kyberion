@@ -10,6 +10,10 @@ const allowedManagedProcessConsumers = [
   'libs/actuators/service-actuator/src/index.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
+  'libs/core/agent-runtime-supervisor.test.ts',
+  'libs/core/agent-runtime-supervisor.ts',
+  'libs/core/mission-orchestration-events.test.ts',
+  'libs/core/mission-orchestration-events.ts',
   'scripts/surface_runtime.ts',
   'tests/managed-process.test.ts',
 ].sort((a, b) => a.localeCompare(b));
@@ -28,6 +32,7 @@ describe('Process boundary governance', () => {
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.startsWith('dist/'))
+      .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => relPath !== 'libs/core/managed-process.ts')
       .filter((relPath) => /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/.test(read(relPath)))

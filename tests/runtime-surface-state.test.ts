@@ -4,14 +4,15 @@ import * as path from 'node:path';
 import { loadSurfaceState, readSurfaceLogTail, resolveSurfaceCwd, saveSurfaceState, surfaceStatePath } from '@agent/core/surface-runtime';
 import { pathResolver } from '@agent/core';
 
+const testStatePath = path.join(process.cwd(), 'active/shared/tmp/runtime-surface-state.test.json');
+
 describe('Runtime surface state helpers', () => {
   afterEach(() => {
-    const statePath = surfaceStatePath();
-    if (fs.existsSync(statePath)) fs.rmSync(statePath, { force: true });
+    if (fs.existsSync(testStatePath)) fs.rmSync(testStatePath, { force: true });
   });
 
   it('loads an empty state when no state file exists', () => {
-    expect(loadSurfaceState()).toEqual({ version: 1, surfaces: {} });
+    expect(loadSurfaceState(testStatePath)).toEqual({ version: 1, surfaces: {} });
   });
 
   it('saves and reloads surface state', () => {
@@ -33,8 +34,8 @@ describe('Runtime surface state helpers', () => {
       },
     };
 
-    saveSurfaceState(state);
-    expect(loadSurfaceState()).toEqual(state);
+    saveSurfaceState(state, testStatePath);
+    expect(loadSurfaceState(testStatePath)).toEqual(state);
   });
 
   it('reads the tail of an existing log file', () => {

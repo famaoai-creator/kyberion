@@ -34,6 +34,7 @@ describe('Core fs exception boundary', () => {
     const codeFiles = getAllFiles(path.join(rootDir, 'libs/core')).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
     const directFsImports = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
+      .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
         return /from\s+['"](?:node:)?fs['"]|require\(\s*['"](?:node:)?fs['"]\s*\)/.test(content);
