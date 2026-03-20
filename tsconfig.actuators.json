@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["libs/actuators/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "test-results",
+    "libs/actuators/**/*.test.ts",
+    "presence/displays/kyberion-dashboard/",
+    "presence/displays/chronos-mirror-v2/"
+  ]
+}

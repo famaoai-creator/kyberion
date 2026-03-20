@@ -1,10 +1,14 @@
 {
   "name": "@agent/secret-actuator",
   "version": "1.0.0",
+  "type": "module",
   "description": "OS Native Secret Actuator for Kyberion Ecosystem",
   "main": "../../../dist/libs/actuators/secret-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/secret-actuator/src/index.d.ts",
   "private": true,
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json"
+  },
   "dependencies": {
     "@agent/core": "workspace:*"
   }

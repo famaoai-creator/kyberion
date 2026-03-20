@@ -3,8 +3,8 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
+import * as AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 
 /**
  * Modeling-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -29,7 +29,9 @@ interface ModelingAction {
   };
 }
 
-const ajv = new Ajv({ allErrors: true });
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+const ajv = new AjvCtor({ allErrors: true });
 addFormats(ajv);
 
 /**

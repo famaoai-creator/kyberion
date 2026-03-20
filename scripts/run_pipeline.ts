@@ -1,9 +1,46 @@
-import { logger } from '@agent/core/core';
+import { logger, safeExec, resolveVars, evaluateCondition } from '@agent/core';
 import { rootResolve } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { derivePipelineStatus, type PipelineAdfStep, validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { executeSuperPipeline } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+
+async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
+  let ctx: Record<string, unknown> = { ...initialCtx };
+  const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
+
+  for (const step of steps) {
+    try {
+      const [domain, action] = step.op.split(':');
+      const params = (step.params || {}) as Record<string, unknown>;
+
+      if (domain === 'system' && action === 'log') {
+        logger.info(String(resolveVars(params.message || '', ctx)));
+      } else if (domain === 'system' && action === 'shell') {
+        const cmd = String(resolveVars(params.cmd || '', ctx));
+        const output = safeExec('zsh', ['-lc', cmd], { cwd: process.cwd() }).trim();
+        if (params.export_as && typeof params.export_as === 'string') {
+          ctx = { ...ctx, [params.export_as]: output };
+        }
+      } else if (domain === 'core' && action === 'if') {
+        const branch = evaluateCondition(params.condition, ctx) ? params.then : params.else;
+        if (Array.isArray(branch)) {
+          const nested = await runSteps(branch as PipelineAdfStep[], ctx);
+          ctx = nested.context;
+          results.push(...nested.results);
+        }
+      } else {
+        throw new Error(`Unsupported pipeline op: ${step.op}`);
+      }
+
+      results.push({ op: step.op, status: 'success' });
+    } catch (err: any) {
+      results.push({ op: step.op, status: 'failed', error: err.message });
+      return { status: derivePipelineStatus(results), results, context: ctx };
+    }
+  }
+
+  return { status: derivePipelineStatus(results), results, context: ctx };
+}
 
 async function main() {
   const argv = await createStandardYargs()
@@ -17,10 +54,9 @@ async function main() {
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
   
   try {
-    const result = await executeSuperPipeline(
+    const result = await runSteps(
       (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
-      pipeline.context || {},
-      pipeline.options || {}
+      (pipeline.context || {}) as Record<string, unknown>
     );
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
