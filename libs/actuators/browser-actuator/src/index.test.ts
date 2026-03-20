@@ -1,57 +1,57 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
-  const goto = vi.fn(async () => undefined);
-  const click = vi.fn(async () => undefined);
-  const fill = vi.fn(async () => undefined);
-  const press = vi.fn(async () => undefined);
-  const waitForSelector = vi.fn(async () => undefined);
-  const waitForTimeout = vi.fn(async () => undefined);
-  const screenshot = vi.fn(async () => undefined);
-  const innerText = vi.fn(async () => 'content');
-  const content = vi.fn(async () => '<html></html>');
-  const evaluate = vi.fn(async () => [
-    {
-      ref: '@e1',
-      tag: 'button',
-      role: 'button',
-      text: 'Submit',
-      name: 'Submit',
-      type: null,
-      placeholder: null,
-      href: null,
-      value: null,
-      visible: true,
-      editable: false,
-      selector: 'button:nth-of-type(1)',
-    },
-  ]);
-  const title = vi.fn(async () => 'Test Page');
-  const url = vi.fn(() => 'https://example.com');
-  const on = vi.fn();
+  const pageHandlers = new Map<string, Record<string, Function>>();
+  function createPage(label: string, initialUrl = 'https://example.com', initialTitle = 'Test Page') {
+    const handlers: Record<string, Function> = {};
+    pageHandlers.set(label, handlers);
+    let currentUrl = initialUrl;
+    let currentTitle = initialTitle;
+    return {
+      goto: vi.fn(async (url: string) => { currentUrl = url; }),
+      click: vi.fn(async () => undefined),
+      fill: vi.fn(async () => undefined),
+      press: vi.fn(async () => undefined),
+      waitForSelector: vi.fn(async () => undefined),
+      waitForTimeout: vi.fn(async () => undefined),
+      screenshot: vi.fn(async () => undefined),
+      innerText: vi.fn(async () => 'content'),
+      content: vi.fn(async () => '<html></html>'),
+      evaluate: vi.fn(async () => [
+        {
+          ref: '@e1',
+          tag: 'button',
+          role: 'button',
+          text: 'Submit',
+          name: 'Submit',
+          type: null,
+          placeholder: null,
+          href: null,
+          value: null,
+          visible: true,
+          editable: false,
+          selector: 'button:nth-of-type(1)',
+        },
+      ]),
+      title: vi.fn(async () => currentTitle),
+      url: vi.fn(() => currentUrl),
+      on: vi.fn((event: string, handler: Function) => {
+        handlers[event] = handler;
+      }),
+      __setTitle: (next: string) => { currentTitle = next; },
+      __handlers: handlers,
+    };
+  }
+
+  const page = createPage('tab-1');
+  const page2 = createPage('tab-2', 'https://example.org', 'Second Tab');
   const tracingStart = vi.fn(async () => undefined);
   const tracingStop = vi.fn(async () => undefined);
   const close = vi.fn(async () => undefined);
 
-  const page = {
-    goto,
-    click,
-    fill,
-    press,
-    waitForSelector,
-    waitForTimeout,
-    screenshot,
-    innerText,
-    content,
-    evaluate,
-    title,
-    url,
-    on,
-  };
-
   const context = {
     pages: vi.fn(() => [page]),
-    newPage: vi.fn(async () => page),
+    newPage: vi.fn(async () => page2),
     close,
     tracing: {
       start: tracingStart,
@@ -63,20 +63,13 @@ const mocks = vi.hoisted(() => {
 
   return {
     page,
+    page2,
     context,
     launchPersistentContext,
-    goto,
-    click,
-    fill,
-    press,
-    waitForSelector,
-    waitForTimeout,
-    evaluate,
-    title,
-    url,
     close,
     tracingStart,
     tracingStop,
+    pageHandlers,
   };
 });
 
@@ -106,8 +99,8 @@ describe('browser-actuator v3 contract', () => {
     });
 
     expect(mocks.launchPersistentContext).toHaveBeenCalled();
-    expect(mocks.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
-    expect(mocks.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'hello', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'hello', { timeout: 5000 });
     expect(result.context.snapshot).toMatchObject({
       session_id: 'browser-test',
       title: 'Test Page',
@@ -135,5 +128,39 @@ describe('browser-actuator v3 contract', () => {
       status: 'failed',
     });
     expect(String(result.results[0].error)).toContain('Unknown browser ref');
+  });
+
+  it('tracks tabs and exports console/network observations', async () => {
+    const { handleAction } = await import('./index');
+
+    mocks.page2.goto.mockImplementationOnce(async (url: string) => {
+      const handlers = mocks.pageHandlers.get('tab-2') || {};
+      handlers.console?.({ type: () => 'log', text: () => 'hello from tab 2' });
+      handlers.request?.({ method: () => 'GET', url: () => `${url}/api`, resourceType: () => 'fetch' });
+    });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        { type: 'control', op: 'open_tab', params: { url: 'https://example.org', tab_id: 'research' } },
+        { type: 'control', op: 'select_tab', params: { tab_id: 'research' } },
+        { type: 'capture', op: 'tabs', params: { export_as: 'tabs' } },
+        { type: 'capture', op: 'console', params: { export_as: 'console' } },
+        { type: 'capture', op: 'network', params: { export_as: 'network' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.context.tabs).toEqual([
+      expect.objectContaining({ tab_id: 'tab-1', active: false }),
+      expect.objectContaining({ tab_id: 'research', active: true }),
+    ]);
+    expect(result.context.console).toEqual([
+      expect.objectContaining({ tab_id: 'research', text: 'hello from tab 2' }),
+    ]);
+    expect(result.context.network).toEqual([
+      expect.objectContaining({ tab_id: 'research', url: 'https://example.org/api' }),
+    ]);
   });
 });

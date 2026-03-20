@@ -58,7 +58,34 @@ interface BrowserSnapshot {
   elements: BrowserSnapshotElement[];
 }
 
+interface BrowserTabSummary {
+  tab_id: string;
+  url: string;
+  title: string;
+  active: boolean;
+}
+
+interface BrowserSessionMetadata {
+  session_id: string;
+  user_data_dir: string;
+  active_tab_id: string;
+  tab_count: number;
+  tabs: BrowserTabSummary[];
+  updated_at: string;
+  last_trace_path?: string;
+}
+
+interface BrowserRuntime {
+  context: BrowserContext;
+  tabs: Map<string, Page>;
+  pageIds: WeakMap<Page, string>;
+  activeTabId: string;
+  consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
+  networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
+}
+
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
+const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
 
 /**
@@ -75,12 +102,13 @@ async function handleAction(input: BrowserAction) {
  * Universal Browser Pipeline Engine
  */
 async function executePipeline(steps: PipelineStep[], sessionId: string, options: any, initialCtx: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 300000;
 
   const userDataDir = path.join(BROWSER_RUNTIME_DIR, sessionId);
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
+  if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
+  const sessionMetadataPath = path.join(BROWSER_SESSION_DIR, `${sessionId}.json`);
 
   const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
@@ -100,15 +128,19 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
   }
 
-  const page = browserContext.pages().length > 0 ? browserContext.pages()[0] : await browserContext.newPage();
+  const runtime = createBrowserRuntime(browserContext);
+  if (runtime.tabs.size === 0) {
+    const page = await browserContext.newPage();
+    registerBrowserPage(runtime, page, 'tab-1');
+  }
 
-  // Auto-accept all dialogs (confirm, alert, prompt)
-  page.on('dialog', async (dialog) => {
-    logger.info(`[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`);
-    await dialog.accept();
-  });
-
-  let ctx = { ...initialCtx, session_id: sessionId, timestamp: new Date().toISOString() };
+  let ctx = {
+    ...initialCtx,
+    session_id: sessionId,
+    active_tab_id: runtime.activeTabId,
+    browser_tabs: await summarizeTabs(runtime),
+    timestamp: new Date().toISOString(),
+  };
   
   const resolveKey = (key: string): any => {
     // {{env.VAR_NAME}} → process.env.VAR_NAME
@@ -149,13 +181,13 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
         logger.info(`  [BROWSER_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
         
         if (step.type === 'control') {
-          ctx = await opControl(step.op, step.params, page, ctx, options, state, resolve);
+          ctx = await opControl(step.op, step.params, runtime, ctx, options, state, resolve);
         } else if (step.type === 'capture') {
-          ctx = await opCapture(step.op, step.params, page, ctx, resolve);
+          ctx = await opCapture(step.op, step.params, runtime, ctx, resolve);
         } else if (step.type === 'transform') {
           ctx = await opTransform(step.op, step.params, ctx, resolve);
         } else if (step.type === 'apply') {
-          ctx = await opApply(step.op, step.params, page, ctx, resolve);
+          ctx = await opApply(step.op, step.params, runtime, ctx, resolve);
         } else {
           throw new Error(`Unknown step type: ${step.type}`);
         }
@@ -173,6 +205,17 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       logger.info(`🎞️ [BROWSER] Trace recorded at: ${tracePath}`);
       ctx.last_trace_path = tracePath;
     }
+    ctx.browser_tabs = await summarizeTabs(runtime);
+    ctx.active_tab_id = runtime.activeTabId;
+    saveBrowserSessionMetadata(sessionMetadataPath, {
+      session_id: sessionId,
+      user_data_dir: userDataDir,
+      active_tab_id: runtime.activeTabId,
+      tab_count: runtime.tabs.size,
+      tabs: ctx.browser_tabs,
+      updated_at: new Date().toISOString(),
+      last_trace_path: ctx.last_trace_path,
+    });
     await browserContext.close();
   }
 
@@ -182,14 +225,38 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
 /**
  * CONTROL Operators
  */
-async function opControl(op: string, params: any, page: Page, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: any, options: any, state: any, resolve: Function) {
   switch (op) {
+    case 'open_tab': {
+      const page = await runtime.context.newPage();
+      const tabId = params.tab_id || `tab-${runtime.tabs.size + 1}`;
+      registerBrowserPage(runtime, page, tabId);
+      if (params.url) {
+        await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' });
+      }
+      if (params.select !== false) runtime.activeTabId = tabId;
+      return {
+        ...ctx,
+        active_tab_id: runtime.activeTabId,
+        browser_tabs: await summarizeTabs(runtime),
+      };
+    }
+    case 'select_tab': {
+      const tabId = resolve(params.tab_id);
+      if (!runtime.tabs.has(tabId)) throw new Error(`Unknown browser tab: ${tabId}`);
+      runtime.activeTabId = tabId;
+      return {
+        ...ctx,
+        active_tab_id: runtime.activeTabId,
+        browser_tabs: await summarizeTabs(runtime),
+      };
+    }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipelineInternal(params.then, page, ctx, options, state, resolve);
+        const res = await executePipelineInternal(params.then, runtime, ctx, options, state, resolve);
         return res.context;
       } else if (params.else) {
-        const res = await executePipelineInternal(params.else, page, ctx, options, state, resolve);
+        const res = await executePipelineInternal(params.else, runtime, ctx, options, state, resolve);
         return res.context;
       }
       return ctx;
@@ -198,7 +265,7 @@ async function opControl(op: string, params: any, page: Page, ctx: any, options:
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipelineInternal(params.pipeline, page, ctx, options, state, resolve);
+        const res = await executePipelineInternal(params.pipeline, runtime, ctx, options, state, resolve);
         ctx = res.context;
         iterations++;
       }
@@ -212,19 +279,19 @@ async function opControl(op: string, params: any, page: Page, ctx: any, options:
 /**
  * Internal execution within an already open page
  */
-async function executePipelineInternal(steps: PipelineStep[], page: Page, ctx: any, options: any, state: any, resolve: Function) {
+async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRuntime, ctx: any, options: any, state: any, resolve: Function) {
   const results = [];
   for (const step of steps) {
     state.stepCount++;
     try {
       if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, page, ctx, options, state, resolve);
+        ctx = await opControl(step.op, step.params, runtime, ctx, options, state, resolve);
       } else if (step.type === 'capture') {
-        ctx = await opCapture(step.op, step.params, page, ctx, resolve);
+        ctx = await opCapture(step.op, step.params, runtime, ctx, resolve);
       } else if (step.type === 'transform') {
         ctx = await opTransform(step.op, step.params, ctx, resolve);
       } else if (step.type === 'apply') {
-        ctx = await opApply(step.op, step.params, page, ctx, resolve);
+        ctx = await opApply(step.op, step.params, runtime, ctx, resolve);
       } else {
         throw new Error(`Unknown step type: ${step.type}`);
       }
@@ -257,13 +324,20 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 /**
  * CAPTURE Operators
  */
-async function opCapture(op: string, params: any, page: Page, ctx: any, resolve: Function) {
+async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
+  const page = getActivePage(runtime);
   switch (op) {
     case 'goto': await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' }); return { ...ctx, last_url: page.url() };
+    case 'tabs':
+      return {
+        ...ctx,
+        browser_tabs: await summarizeTabs(runtime),
+        [params.export_as || 'browser_tabs']: await summarizeTabs(runtime),
+      };
     case 'snapshot': {
       const snapshot = await buildSnapshot(page, {
         sessionId: ctx.session_id || 'default',
-        tabId: params.tab_id || 'tab-1',
+        tabId: runtime.activeTabId,
         maxElements: Number(params.max_elements || 200),
       });
       return {
@@ -274,6 +348,16 @@ async function opCapture(op: string, params: any, page: Page, ctx: any, resolve:
         [params.export_as || 'last_snapshot']: snapshot,
       };
     }
+    case 'console':
+      return {
+        ...ctx,
+        [params.export_as || 'console_events']: runtime.consoleEvents.slice(-(params.limit || 50)),
+      };
+    case 'network':
+      return {
+        ...ctx,
+        [params.export_as || 'network_events']: runtime.networkEvents.slice(-(params.limit || 50)),
+      };
     case 'screenshot':
       const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
@@ -310,7 +394,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 /**
  * APPLY Operators
  */
-async function opApply(op: string, params: any, page: Page, ctx: any, resolve: Function) {
+async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
+  const page = getActivePage(runtime);
   switch (op) {
     case 'click': await page.click(resolve(params.selector), { timeout: params.timeout || 5000 }); break;
     case 'fill': await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 }); break;
@@ -352,6 +437,83 @@ function resolveRefSelector(ctx: any, ref: string): string {
     throw new Error(`Unknown browser ref: ${ref}. Capture a snapshot before using *_ref actions.`);
   }
   return selector;
+}
+
+function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
+  const tabs = new Map<string, Page>();
+  const pageIds = new WeakMap<Page, string>();
+  const runtime: BrowserRuntime = {
+    context,
+    tabs,
+    pageIds,
+    activeTabId: 'tab-1',
+    consoleEvents: [],
+    networkEvents: [],
+  };
+
+  const pages = context.pages();
+  for (const [index, page] of pages.entries()) {
+    registerBrowserPage(runtime, page, `tab-${index + 1}`);
+  }
+  if (pages.length > 0) runtime.activeTabId = pageIds.get(pages[0]) || 'tab-1';
+  return runtime;
+}
+
+function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: string): void {
+  runtime.tabs.set(tabId, page);
+  runtime.pageIds.set(page, tabId);
+  if (!runtime.activeTabId) runtime.activeTabId = tabId;
+  attachPageObservers(runtime, page);
+}
+
+function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
+  const tabId = runtime.pageIds.get(page) || `tab-${runtime.tabs.size}`;
+  page.on('dialog', async (dialog) => {
+    logger.info(`[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`);
+    await dialog.accept();
+  });
+  page.on('console', (msg) => {
+    runtime.consoleEvents.push({
+      tab_id: tabId,
+      type: msg.type(),
+      text: msg.text(),
+      ts: new Date().toISOString(),
+    });
+    runtime.consoleEvents = runtime.consoleEvents.slice(-200);
+  });
+  page.on('request', (request) => {
+    runtime.networkEvents.push({
+      tab_id: tabId,
+      method: request.method(),
+      url: request.url(),
+      resourceType: request.resourceType(),
+      ts: new Date().toISOString(),
+    });
+    runtime.networkEvents = runtime.networkEvents.slice(-200);
+  });
+}
+
+function getActivePage(runtime: BrowserRuntime): Page {
+  const page = runtime.tabs.get(runtime.activeTabId);
+  if (!page) throw new Error(`Active browser tab not found: ${runtime.activeTabId}`);
+  return page;
+}
+
+async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary[]> {
+  const summaries: BrowserTabSummary[] = [];
+  for (const [tabId, page] of runtime.tabs.entries()) {
+    summaries.push({
+      tab_id: tabId,
+      url: page.url(),
+      title: await page.title(),
+      active: tabId === runtime.activeTabId,
+    });
+  }
+  return summaries;
+}
+
+function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMetadata): void {
+  safeWriteFile(filePath, JSON.stringify(metadata, null, 2));
 }
 
 async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<BrowserSnapshot> {
