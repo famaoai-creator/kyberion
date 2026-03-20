@@ -17,7 +17,7 @@ function ensurePersonalFixtures() {
 
 function runMissionController(...args: string[]) {
   ensurePersonalFixtures();
-  return safeExec('node', ['--import', 'tsx', 'scripts/mission_controller.ts', ...args], {
+  return safeExec('node', ['dist/scripts/mission_controller.js', ...args], {
     env: { ...process.env, MISSION_ROLE: 'mission_controller' },
   });
 }

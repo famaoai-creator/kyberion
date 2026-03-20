@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const rootDir = process.cwd();
 
 function read(relPath: string): string {
-  return fs.readFileSync(path.join(rootDir, relPath), 'utf8');
+  return safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
 }
 
 describe('mission orchestration dashboard contract', () => {

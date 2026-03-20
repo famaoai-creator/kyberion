@@ -39,6 +39,7 @@ describe('Runtime child_process boundary', () => {
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.startsWith('tests/'))
       .filter((relPath) => !relPath.startsWith('dist/'))
+      .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => !relPath.startsWith('scripts/'))
       .filter((relPath) => /\bfrom ['"]node:child_process['"]|require\(['"]node:child_process['"]\)/.test(read(relPath)))

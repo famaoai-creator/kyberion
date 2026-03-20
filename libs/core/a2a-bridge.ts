@@ -105,26 +105,30 @@ class A2ABridgeImpl {
     const missionId = typeof envelope.payload?.context?.mission_id === 'string'
       ? String(envelope.payload.context.mission_id).toUpperCase()
       : undefined;
-    emitMissionOrchestrationObservation({
-      decision: 'a2a_message_routed',
-      mission_id: missionId,
-      requested_by: envelope.header.sender,
-      agent_id: agentId,
-      sender: envelope.header.sender,
-      receiver: agentId,
-      team_role: typeof envelope.payload?.context?.team_role === 'string'
-        ? String(envelope.payload.context.team_role)
-        : undefined,
-      channel: typeof envelope.payload?.context?.channel === 'string'
-        ? String(envelope.payload.context.channel)
-        : undefined,
-      thread: typeof envelope.payload?.context?.thread === 'string'
-        ? String(envelope.payload.context.thread)
-        : undefined,
-      performative: envelope.header.performative,
-      intent: typeof envelope.payload?.intent === 'string' ? String(envelope.payload.intent) : undefined,
-      prompt_excerpt: prompt.slice(0, 240),
-    });
+    try {
+      emitMissionOrchestrationObservation({
+        decision: 'a2a_message_routed',
+        mission_id: missionId,
+        requested_by: envelope.header.sender,
+        agent_id: agentId,
+        sender: envelope.header.sender,
+        receiver: agentId,
+        team_role: typeof envelope.payload?.context?.team_role === 'string'
+          ? String(envelope.payload.context.team_role)
+          : undefined,
+        channel: typeof envelope.payload?.context?.channel === 'string'
+          ? String(envelope.payload.context.channel)
+          : undefined,
+        thread: typeof envelope.payload?.context?.thread === 'string'
+          ? String(envelope.payload.context.thread)
+          : undefined,
+        performative: envelope.header.performative,
+        intent: typeof envelope.payload?.intent === 'string' ? String(envelope.payload.intent) : undefined,
+        prompt_excerpt: prompt.slice(0, 240),
+      });
+    } catch (error: any) {
+      logger.warn(`[A2A_BRIDGE] Failed to record orchestration observation: ${error?.message || error}`);
+    }
 
     // Audit log the routing
     auditChain.record({
