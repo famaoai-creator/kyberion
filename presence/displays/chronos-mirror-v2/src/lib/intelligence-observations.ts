@@ -1,4 +1,4 @@
-import { pathResolver, safeExistsSync, safeReadFile } from "@agent/core";
+import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from "@agent/core";
 
 export interface OrchestrationEventSummary {
   ts: string;
@@ -36,6 +36,26 @@ export interface OwnerSummary {
   reviewed_count: number;
   completed_count: number;
   requested_count: number;
+}
+
+export interface BrowserSessionSummary {
+  session_id: string;
+  active_tab_id: string;
+  tab_count: number;
+  updated_at: string;
+  last_trace_path?: string;
+  lease_expires_at?: string;
+  lease_status: "active" | "released" | "expired";
+  retained: boolean;
+  action_trail_count: number;
+  recent_actions: Array<{
+    op: string;
+    kind: "control" | "capture" | "apply";
+    tab_id?: string;
+    ref?: string;
+    selector?: string;
+    ts: string;
+  }>;
 }
 
 export function collectRecentEvents(): OrchestrationEventSummary[] {
@@ -228,4 +248,24 @@ export function collectOwnerSummaries(): OwnerSummary[] {
     }
   }
   return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
+}
+
+export function collectBrowserSessions(): BrowserSessionSummary[] {
+  const sessionDir = pathResolver.shared("runtime/browser/sessions");
+  if (!safeExistsSync(sessionDir)) return [];
+
+  const sessions: BrowserSessionSummary[] = [];
+  for (const entry of safeReaddir(sessionDir)) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      const raw = safeReadFile(pathResolver.shared(`runtime/browser/sessions/${entry}`), { encoding: "utf8" }) as string;
+      const parsed = JSON.parse(raw) as BrowserSessionSummary;
+      if (!parsed?.session_id) continue;
+      sessions.push(parsed);
+    } catch {
+      // Ignore malformed session files.
+    }
+  }
+
+  return sessions.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 12);
 }

@@ -82,8 +82,10 @@ vi.mock('playwright', () => ({
 }));
 
 describe('browser-actuator v3 contract', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { resetBrowserRuntimeLeasesForTest } = await import('./index');
+    await resetBrowserRuntimeLeasesForTest();
   });
 
   it('captures a snapshot and reuses ref selectors for ref-based actions', async () => {
@@ -183,7 +185,7 @@ describe('browser-actuator v3 contract', () => {
         { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
         { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
         { type: 'capture', op: 'content', params: { selector: 'button:nth-of-type(1)', export_as: 'content' } },
-        { type: 'transform', op: 'export_playwright', params: { path: specPath, export_as: 'spec_path' } },
+        { type: 'transform', op: 'export_playwright', params: { path: specPath, export_as: 'spec_path', assertions: 'strict' } },
         { type: 'transform', op: 'export_adf', params: { path: adfPath, export_as: 'adf_path' } },
       ],
       options: { headless: true },
@@ -213,5 +215,48 @@ describe('browser-actuator v3 contract', () => {
         { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
       ],
     });
+  });
+
+  it('reuses leased browser sessions within the same process and can close them explicitly', async () => {
+    const { handleAction } = await import('./index');
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-lease',
+      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      options: { headless: true, lease_ms: 60_000 },
+    });
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-lease',
+      steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+      options: { headless: true, lease_ms: 60_000 },
+    });
+
+    expect(mocks.launchPersistentContext).toHaveBeenCalledTimes(1);
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-lease',
+      steps: [{ type: 'control', op: 'close_session', params: {} }],
+      options: { headless: true, lease_ms: 60_000 },
+    });
+
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports assertion hints in comment-only mode when requested', async () => {
+    const { renderPlaywrightSkeleton } = await import('./index');
+
+    const spec = renderPlaywrightSkeleton([
+      { kind: 'capture', op: 'snapshot', url: 'https://example.com', title: 'Test Page', ts: new Date().toISOString() },
+      { kind: 'apply', op: 'click_ref', selector: 'button:nth-of-type(1)', ref: '@e1', element_name: 'Submit', element_role: 'button', ts: new Date().toISOString() },
+    ], { assertions: 'hint' });
+
+    expect(spec).toContain('// assertion hint: await expect(page).toHaveURL("https://example.com");');
+    expect(spec).toContain('// assertion hint: await expect(page).toHaveTitle("Test Page");');
+    expect(spec).toContain('// assertion hint: await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
+    expect(spec).toContain('await page.click("button:nth-of-type(1)");');
   });
 });

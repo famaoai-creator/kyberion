@@ -65,6 +65,26 @@ interface SurfaceOutboxMessage {
   created_at: string;
 }
 
+interface BrowserSessionSummary {
+  session_id: string;
+  active_tab_id: string;
+  tab_count: number;
+  updated_at: string;
+  last_trace_path?: string;
+  lease_expires_at?: string;
+  lease_status: "active" | "released" | "expired";
+  retained: boolean;
+  action_trail_count: number;
+  recent_actions: Array<{
+    op: string;
+    kind: "control" | "capture" | "apply";
+    tab_id?: string;
+    ref?: string;
+    selector?: string;
+    ts: string;
+  }>;
+}
+
 interface AgentMessageSummary {
   ts: string;
   missionId?: string;
@@ -339,6 +359,7 @@ interface IntelligencePayload {
   controlActions: ControlActionSummary[];
   controlActionDetails: Record<string, ControlActionDetail[]>;
   ownerSummaries: OwnerSummary[];
+  browserSessions: BrowserSessionSummary[];
   surfaceOutbox: {
     slack: number;
     chronos: number;
@@ -472,6 +493,7 @@ export function MissionIntelligence() {
           controlActions?: ControlActionSummary[];
           controlActionDetails?: Record<string, ControlActionDetail[]>;
           ownerSummaries?: OwnerSummary[];
+          browserSessions?: BrowserSessionSummary[];
         };
         setData((current) => current ? {
           ...current,
@@ -481,6 +503,7 @@ export function MissionIntelligence() {
           controlActions: Array.isArray(payload.controlActions) ? payload.controlActions : current.controlActions,
           controlActionDetails: payload.controlActionDetails || current.controlActionDetails,
           ownerSummaries: Array.isArray(payload.ownerSummaries) ? payload.ownerSummaries : current.ownerSummaries,
+          browserSessions: Array.isArray(payload.browserSessions) ? payload.browserSessions : current.browserSessions,
         } : current);
       } catch {
         // Ignore malformed SSE payloads and keep polling fallback.
@@ -1016,6 +1039,81 @@ export function MissionIntelligence() {
             <RuntimeCell label="leases" value={data.runtimeLeases.length} accent="cyan" />
             <RuntimeCell label="slack outbox" value={data.surfaceOutbox.slack} accent="gold" />
             <RuntimeCell label="chronos outbox" value={data.surfaceOutbox.chronos} accent="cyan" />
+          </div>
+        </Panel>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
+        <Panel id="browser-sessions" title="Browser Sessions">
+          <div className="space-y-3">
+            {data.browserSessions.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No browser sessions recorded yet.</div>
+            ) : data.browserSessions.map((session) => (
+              <div key={session.session_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{session.session_id}</div>
+                    <div className="mt-1 text-[10px] text-white/45">
+                      active tab: <span className="font-mono text-white/70">{session.active_tab_id}</span> · tabs: <span className="font-mono text-white/70">{session.tab_count}</span>
+                    </div>
+                  </div>
+                  <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                    session.lease_status === "active"
+                      ? "bg-cyan-500/15 text-cyan-200"
+                      : session.lease_status === "expired"
+                        ? "bg-yellow-500/10 text-yellow-200"
+                        : "bg-white/10 text-white/65"
+                  }`}>
+                    {session.lease_status}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>retained: <span className="font-mono text-white/80">{String(session.retained)}</span></div>
+                  <div>trail: <span className="font-mono text-white/80">{session.action_trail_count}</span></div>
+                  <div>updated: <span className="font-mono text-white/80">{new Date(session.updated_at).toLocaleTimeString()}</span></div>
+                  <div>
+                    lease expires: <span className="font-mono text-white/80">{session.lease_expires_at ? new Date(session.lease_expires_at).toLocaleTimeString() : "n/a"}</span>
+                  </div>
+                </div>
+                {session.last_trace_path && (
+                  <div className="mt-2 text-[10px] text-white/40">
+                    trace: <span className="font-mono text-white/60">{session.last_trace_path}</span>
+                  </div>
+                )}
+                <div className="mt-3 space-y-2">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">recent browser trail</div>
+                  {session.recent_actions.length === 0 ? (
+                    <div className="text-[10px] text-white/35">No recorded browser actions.</div>
+                  ) : session.recent_actions.map((action, index) => (
+                    <div key={`${session.session_id}-${action.ts}-${index}`} className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">
+                          {action.kind} · {action.op}
+                        </div>
+                        <div className="text-[9px] font-mono text-white/30">{new Date(action.ts).toLocaleTimeString()}</div>
+                      </div>
+                      <div className="mt-1 text-[10px] text-white/45">
+                        {action.tab_id && <span className="mr-2">tab: <span className="font-mono text-white/65">{action.tab_id}</span></span>}
+                        {action.ref && <span className="mr-2">ref: <span className="font-mono text-white/65">{action.ref}</span></span>}
+                        {action.selector && <span>selector: <span className="font-mono text-white/55">{action.selector}</span></span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Browser Guidance">
+          <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/50">
+            Browser sessions stay fast only while they are leased. Prefer `snapshot + ref`, then export recorded trails as Playwright specs in either strict or hint mode.
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <RuntimeCell label="browser sessions" value={data.browserSessions.length} accent="cyan" />
+            <RuntimeCell label="active leases" value={data.browserSessions.filter((session) => session.lease_status === "active").length} accent="emerald" />
+            <RuntimeCell label="retained" value={data.browserSessions.filter((session) => session.retained).length} accent="gold" />
+            <RuntimeCell label="expired" value={data.browserSessions.filter((session) => session.lease_status === "expired").length} accent="red" />
           </div>
         </Panel>
       </section>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
+import { collectBrowserSessions, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
 import {
   clearSurfaceOutboxMessage,
   emitChannelSurfaceEvent,
@@ -84,6 +85,8 @@ interface SurfaceSummary {
   controlTone: "stable" | "attention" | "offline" | "pending";
   controlRequestedBy?: string;
 }
+
+interface BrowserSessionView extends BrowserSessionSummary {}
 
 interface A2AHandoffView extends A2AHandoffSummary {}
 
@@ -677,6 +680,7 @@ export async function GET(req: NextRequest) {
       controlActions,
       controlActionDetails: collectControlActionDetails(),
       ownerSummaries: collectOwnerSummaries(),
+      browserSessions: collectBrowserSessions(),
       surfaceOutbox: {
         slack: listSurfaceOutboxMessages("slack").length,
         chronos: listSurfaceOutboxMessages("chronos").length,
