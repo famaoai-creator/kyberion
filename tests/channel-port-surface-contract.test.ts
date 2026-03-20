@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeExistsSync, safeReadFile } from '../libs/core/secure-io.js';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 describe('Channel port and surface-agent contract', () => {
   it('ships the architecture and schema for channel ports and surface agents', () => {

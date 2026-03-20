@@ -26,7 +26,7 @@ describe('managed-process core', () => {
   afterEach(async () => {
     vi.resetModules();
     vi.restoreAllMocks();
-    const { runtimeSupervisor } = await import('../libs/core/runtime-supervisor.js');
+    const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
     runtimeSupervisor.resetForTests();
   });
 
@@ -36,8 +36,8 @@ describe('managed-process core', () => {
       spawn: vi.fn(() => child),
     }));
 
-    const { spawnManagedProcess, stopManagedProcess } = await import('../libs/core/managed-process.js');
-    const { runtimeSupervisor } = await import('../libs/core/runtime-supervisor.js');
+    const { spawnManagedProcess, stopManagedProcess } = await import('@agent/core/managed-process');
+    const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
 
     const managed = spawnManagedProcess({
       resourceId: 'proc:test',

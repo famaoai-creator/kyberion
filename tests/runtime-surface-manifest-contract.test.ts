@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
-import { safeReadFile } from '../libs/core/index.js';
-import { loadSurfaceManifest, normalizeSurfaceDefinition, surfaceResourceId } from '../libs/core/surface-runtime.js';
+import { safeReadFile } from '@agent/core';
+import { loadSurfaceManifest, normalizeSurfaceDefinition, surfaceResourceId } from '@agent/core/surface-runtime';
 
 const rootDir = process.cwd();
 

@@ -1,0 +1,101 @@
+{
+  "version": "1.0.0",
+  "authority_roles": {
+    "mission_controller": {
+      "description": "Mission lifecycle authority with mission state and observability write access.",
+      "write_scopes": [
+        "active/missions/",
+        "active/archive/missions/",
+        "knowledge/personal/missions/",
+        "knowledge/personal/governance/",
+        "knowledge/evolution/",
+        "active/shared/coordination/",
+        "active/shared/observability/mission-control/",
+        "active/shared/runtime/mission_queue.jsonl",
+        "active/audit/",
+        "registry.json"
+      ],
+      "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
+      "tier_access": ["public", "confidential", "personal"]
+    },
+    "ecosystem_architect": {
+      "description": "Core architecture and repo evolution authority.",
+      "write_scopes": ["knowledge/", "libs/core/", "libs/actuators/", "scripts/", "pipelines/", "schemas/", "active/missions/"],
+      "allowed_actuators": ["code-actuator", "orchestrator-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "software_developer": {
+      "description": "Implementation authority for test and product code paths.",
+      "write_scopes": ["active/projects/", "tests/", "libs/actuators/"],
+      "allowed_actuators": ["code-actuator", "file-actuator", "system-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "knowledge_steward": {
+      "description": "Knowledge maintenance authority across governed knowledge trees.",
+      "write_scopes": ["knowledge/"],
+      "allowed_actuators": ["wisdom-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "slack_bridge": {
+      "description": "Slack gateway authority for channel ingress and observability.",
+      "write_scopes": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/channels/slack/",
+        "active/shared/observability/mission-control/",
+        "active/audit/"
+      ],
+      "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "chronos_gateway": {
+      "description": "Chronos control surface authority for coordination and terminal routing.",
+      "write_scopes": [
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/chronos/",
+        "active/shared/observability/mission-control/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
+      ],
+      "allowed_actuators": ["presence-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "chronos_operator": {
+      "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
+      "write_scopes": [],
+      "allowed_actuators": ["presence-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "chronos_localadmin": {
+      "description": "Chronos local admin authority for deterministic mission, runtime, and surface control from the local control plane.",
+      "write_scopes": [
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/audit/"
+      ],
+      "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "surface_runtime": {
+      "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
+      "write_scopes": [
+        "active/shared/runtime/",
+        "active/shared/logs/surfaces/",
+        "active/audit/"
+      ],
+      "allowed_actuators": ["presence-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "sovereign_concierge": {
+      "description": "Personal onboarding and identity synchronization authority.",
+      "write_scopes": ["knowledge/personal/", "active/missions/", "active/projects/onboarding/"],
+      "allowed_actuators": ["artifact-actuator", "approval-actuator", "presence-actuator"],
+      "tier_access": ["personal", "confidential", "public"]
+    }
+  }
+}

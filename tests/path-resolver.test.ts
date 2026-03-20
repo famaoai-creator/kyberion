@@ -6,7 +6,7 @@ import {
   scripts, 
   shared, 
   resolve 
-} from '../libs/core/path-resolver.js';
+} from '@agent/core/path-resolver';
 
 describe('system path-resolver', () => {
   it('should resolve semantic paths correctly', () => {

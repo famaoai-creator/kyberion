@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import pdf_parse from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
@@ -7,7 +9,7 @@ import { safeWriteFile, safeReadFile } from '@agent/core';
 import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { distillPdfDesign } from '@agent/core/src/pdf-utils.js';
+import { distillPdfDesign } from '@agent/core';
 
 /**
  * doc-to-text Reborn (Digital Archaeologist)
@@ -100,10 +102,10 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   if (mode === 'aesthetic' || mode === 'all') {
     try {
       // Write buffer to temp file for distillPdfDesign (which takes a file path)
-      const tmpPath = path.join(require('os').tmpdir(), `pdf-extract-${Date.now()}.pdf`);
-      require('fs').writeFileSync(tmpPath, buffer);
+      const tmpPath = path.join(os.tmpdir(), `pdf-extract-${Date.now()}.pdf`);
+      fs.writeFileSync(tmpPath, buffer);
       const protocol = await distillPdfDesign(tmpPath, { aesthetic: true });
-      require('fs').unlinkSync(tmpPath);
+      fs.unlinkSync(tmpPath);
 
       // Map PdfAesthetic to legacy Aesthetic format
       const aesthetic = protocol.aesthetic;

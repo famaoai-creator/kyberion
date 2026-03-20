@@ -1,6 +1,5 @@
-import { logger, resolveServiceBinding } from '../../../core/index.js';
-import { createStandardYargs } from '../../../core/cli-utils.js';
-import { safeReadFile } from '../../../core/secure-io.js';
+import { logger, resolveServiceBinding, safeReadFile } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
 

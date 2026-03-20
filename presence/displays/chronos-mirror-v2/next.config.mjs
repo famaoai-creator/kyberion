@@ -10,12 +10,21 @@ const nextConfig = {
     // @agent/core uses its own tsconfig (non-strict). Skip re-checking here.
     ignoreBuildErrors: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   transpilePackages: ["@agent/core"],
   serverExternalPackages: ["node-pty", "@agentclientprotocol/sdk"],
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       "@agent/core": path.resolve(__dirname, "../../../libs/core"),
+    };
+    config.resolve.extensionAlias = {
+      ...(config.resolve.extensionAlias || {}),
+      ".js": [".ts", ".tsx", ".js"],
+      ".mjs": [".mts", ".mjs"],
+      ".cjs": [".cts", ".cjs"],
     };
     config.resolve.extensions = [
       ...new Set([".ts", ".tsx", ...config.resolve.extensions]),

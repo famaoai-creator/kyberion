@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "team_roles": {
+    "owner": {
+      "description": "Mission owner with final accountability, checkpoint, verify, and finish authority.",
+      "required_capabilities": ["reasoning", "coordination", "analysis"],
+      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+      "preferred_agents": ["nerve-agent", "sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "high"
+    },
+    "planner": {
+      "description": "Breaks mission intent into an execution strategy and task graph.",
+      "required_capabilities": ["reasoning", "strategy", "planning"],
+      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
+      "preferred_agents": ["nerve-agent", "implementation-architect", "sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "high"
+    },
+    "implementer": {
+      "description": "Produces the main code and configuration changes.",
+      "required_capabilities": ["code", "implementation", "refactoring"],
+      "compatible_authority_roles": ["software_developer", "ecosystem_architect"],
+      "preferred_agents": ["implementation-architect", "nerve-agent"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "reviewer": {
+      "description": "Reviews risk, regression potential, and boundary compliance.",
+      "required_capabilities": ["review", "analysis", "architecture"],
+      "compatible_authority_roles": ["ecosystem_architect", "knowledge_steward"],
+      "preferred_agents": ["implementation-architect", "sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "tester": {
+      "description": "Owns validation strategy and test execution planning.",
+      "required_capabilities": ["testing", "analysis", "quality"],
+      "compatible_authority_roles": ["software_developer", "ecosystem_architect"],
+      "preferred_agents": ["nerve-agent", "implementation-architect"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "product_strategist": {
+      "description": "Shapes product direction, requirements, prioritization, and value hypotheses.",
+      "required_capabilities": ["strategy", "product", "analysis"],
+      "compatible_authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
+      "preferred_agents": ["sovereign-brain", "nerve-agent"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "high"
+    },
+    "experience_designer": {
+      "description": "Designs product flows, interaction models, and UX tradeoffs.",
+      "required_capabilities": ["design", "ux", "analysis"],
+      "compatible_authority_roles": ["ecosystem_architect", "software_developer"],
+      "preferred_agents": ["implementation-architect", "sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "operator": {
+      "description": "Handles runtime, deployment, and operational control surfaces.",
+      "required_capabilities": ["operations", "runtime", "monitoring"],
+      "compatible_authority_roles": ["chronos_operator", "chronos_gateway", "mission_controller"],
+      "preferred_agents": ["chronos-mirror", "nerve-agent"],
+      "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "surface_liaison": {
+      "description": "Maintains human-facing communication quality on Slack or Chronos.",
+      "required_capabilities": ["surface", "conversation", "delegation"],
+      "compatible_authority_roles": ["slack_bridge", "chronos_operator", "chronos_gateway", "sovereign_concierge"],
+      "preferred_agents": ["slack-surface-agent", "chronos-mirror", "onboarding-surface-agent"],
+      "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"],
+      "autonomy_level": "low"
+    }
+  }
+}

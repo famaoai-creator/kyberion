@@ -1,3 +1,11 @@
+import {
+  pathResolver,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeReadFile,
+  safeStat,
+  safeWriteFile,
+} from '@agent/core';
 /**
  * scripts/reflex_guard.ts
  * Kyberion Autonomous Nerve System (KANS) - Reflex Guard v1.0 [ZERO-DEP]
@@ -6,15 +14,6 @@
  * Watch stimuli.jsonl for terminal outputs and inject EXECUTION_FINISHED 
  * when a prompt is detected, enabling automated agent response.
  */
-
-const {
-  pathResolver,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeReadFile,
-  safeStat,
-  safeWriteFile,
-} = require('../libs/core/index.js');
 
 // Constants
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');

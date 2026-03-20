@@ -8,7 +8,7 @@ import {
   safeMkdir,
   safeExistsSync,
   withLock
-} from '../libs/core/index.js';
+} from '@agent/core';
 
 const rl = readline.createInterface({
   input: process.stdin,

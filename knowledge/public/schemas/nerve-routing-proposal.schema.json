@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NerveRoutingProposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent", "team_role"],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "const": "delegate_task"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "team_role": {
+      "type": "string"
+    },
+    "task_summary": {
+      "type": "string"
+    },
+    "why": {
+      "type": "string"
+    }
+  }
+}

@@ -6,8 +6,8 @@
  * Evaluates incoming stimuli against Reflex ADFs to trigger autonomic reactions.
  */
 
-import { logger, safeReaddir, safeReadFile, safeExistsSync, pathResolver } from '@agent/core';
-import { NerveMessage } from '@agent/core/nerve-bridge';
+import { logger, safeReaddir, safeReadFile, safeExistsSync, pathResolver } from '../../core/index.js';
+import { NerveMessage } from '../../core/nerve-bridge.js';
 
 export interface ReflexADF {
   id: string;

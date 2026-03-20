@@ -1,0 +1,851 @@
+import { NextRequest, NextResponse } from "next/server";
+import path from "node:path";
+import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
+import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
+import {
+  clearSurfaceOutboxMessage,
+  emitChannelSurfaceEvent,
+  emitMissionOrchestrationObservation,
+  enqueueMissionOrchestrationEvent,
+  ledger,
+  listAgentRuntimeLeaseSummaries,
+  listAgentRuntimeSnapshots,
+  listSurfaceOutboxMessages,
+  loadSurfaceManifest,
+  loadSurfaceState,
+  normalizeSurfaceDefinition,
+  pathResolver,
+  probeSurfaceHealth,
+  restartAgentRuntime,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  startMissionOrchestrationWorker,
+  stopAgentRuntime,
+} from "@agent/core";
+
+interface MissionSummary {
+  missionId: string;
+  status: string;
+  tier: string;
+  missionType?: string;
+  planReady: boolean;
+  nextTaskCount: number;
+  controlSummary: string;
+  controlTone: "planning" | "ready" | "attention" | "pending";
+  controlRequestedBy?: string;
+}
+
+interface RuntimeLeaseSummary {
+  agent_id: string;
+  owner_id: string;
+  owner_type: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface RuntimeDoctorFinding {
+  severity: "warning" | "critical";
+  agentId: string;
+  ownerId: string;
+  reason: string;
+  recommendedAction: "stop_runtime" | "restart_runtime";
+}
+
+interface OwnerSummary {
+  ts: string;
+  mission_id: string;
+  accepted_count: number;
+  reviewed_count: number;
+  completed_count: number;
+  requested_count: number;
+}
+
+interface SurfaceOutboxMessage {
+  message_id: string;
+  surface: "slack" | "chronos";
+  correlation_id: string;
+  channel: string;
+  thread_ts: string;
+  text: string;
+  source: "surface" | "nerve" | "system";
+  created_at: string;
+}
+
+interface SurfaceSummary {
+  id: string;
+  kind: string;
+  startupMode?: string;
+  enabled: boolean;
+  running: boolean;
+  pid?: number;
+  health: string;
+  detail?: string;
+  controlSummary: string;
+  controlTone: "stable" | "attention" | "offline" | "pending";
+  controlRequestedBy?: string;
+}
+
+interface A2AHandoffView extends A2AHandoffSummary {}
+
+interface ControlActionSummary {
+  event_id?: string;
+  ts: string;
+  kind: "mission" | "surface";
+  target: string;
+  operation: string;
+  status: "queued" | "completed" | "failed";
+  requested_by: string;
+  error?: string;
+}
+
+interface ControlActionDetail {
+  ts: string;
+  decision: string;
+  event_type?: string;
+  mission_id?: string;
+  resource_id?: string;
+  operation?: string;
+  why?: string;
+  error?: string;
+}
+
+interface ControlActionDefinition {
+  operation: string;
+  label: string;
+  risk: "safe" | "risky";
+  approvalRequired: boolean;
+  enabled: boolean;
+  disabledReason?: string;
+}
+
+interface ControlActionCatalog {
+  mission: ControlActionDefinition[];
+  surface: ControlActionDefinition[];
+  globalSurface: ControlActionDefinition[];
+}
+
+interface ControlActionAvailability {
+  mission: Record<string, ControlActionDefinition[]>;
+  surface: Record<string, ControlActionDefinition[]>;
+  globalSurface: ControlActionDefinition[];
+}
+
+function readJson<T = any>(filePath: string): T | null {
+  if (!safeExistsSync(filePath)) return null;
+  return JSON.parse(safeReadFile(filePath, { encoding: "utf8" }) as string) as T;
+}
+
+function collectActiveMissions(): MissionSummary[] {
+  const missionRoots = [
+    { dir: pathResolver.active("missions/public"), tier: "public" },
+    { dir: pathResolver.active("missions/confidential"), tier: "confidential" },
+  ];
+  const missions: MissionSummary[] = [];
+
+  for (const root of missionRoots) {
+    try {
+      if (!safeExistsSync(root.dir)) continue;
+      for (const item of safeReaddir(root.dir)) {
+        const missionPath = path.join(root.dir, item);
+        const state = readJson<any>(path.join(missionPath, "mission-state.json"));
+        if (!state || state.status !== "active") continue;
+        const nextTasks = readJson<any[]>(path.join(missionPath, "NEXT_TASKS.json")) || [];
+        const planReady = safeExistsSync(path.join(missionPath, "PLAN.md"));
+        const nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
+        const controlSummary = planReady
+          ? nextTaskCount > 0
+            ? "execution ready"
+            : "plan ready"
+          : "planning pending";
+        const controlTone: MissionSummary["controlTone"] = planReady
+          ? nextTaskCount > 0
+            ? "ready"
+            : "planning"
+          : "attention";
+        missions.push({
+          missionId: state.mission_id || item,
+          status: state.status,
+          tier: state.tier || root.tier,
+          missionType: state.mission_type,
+          planReady,
+          nextTaskCount,
+          controlSummary,
+          controlTone,
+        });
+      }
+    } catch {
+      // Skip roots that are unavailable to the current authority role.
+    }
+  }
+
+  return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
+}
+
+function collectRecentEvents() {
+  const files = [
+    pathResolver.shared("observability/channels/slack/missions.jsonl"),
+    pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+  ];
+  const lines: Array<{ ts: string; decision: string; mission_id?: string; why?: string }> = [];
+  for (const file of files) {
+    if (!safeExistsSync(file)) continue;
+    const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+    for (const line of raw.trim().split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line) as any;
+        lines.push({
+          ts: event.ts || new Date().toISOString(),
+          decision: event.decision || event.event_type || "event",
+          mission_id: event.mission_id || event.resource_id,
+          why: event.why,
+        });
+      } catch {
+        // Ignore malformed lines.
+      }
+    }
+  }
+  return lines
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 8);
+}
+
+function collectControlActions(): ControlActionSummary[] {
+  const file = pathResolver.shared("observability/mission-control/orchestration-events.jsonl");
+  if (!safeExistsSync(file)) return [];
+
+  const lifecycle = new Map<string, ControlActionSummary>();
+  const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+
+  for (const line of raw.trim().split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line) as any;
+      const decision = event.decision || event.event_type;
+      const eventId = typeof event.event_id === "string" ? event.event_id : undefined;
+
+      if (
+        decision === "mission_orchestration_event_enqueued" &&
+        (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
+        eventId
+      ) {
+        const queuedTarget = event.event_type === "surface_control_requested"
+          ? event.payload?.surfaceId || "surface-runtime"
+          : event.mission_id || "system";
+        lifecycle.set(eventId, {
+          event_id: eventId,
+          ts: event.ts || new Date().toISOString(),
+          kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
+          target: queuedTarget,
+          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
+          status: "queued",
+          requested_by: event.requested_by || "unknown",
+        });
+        continue;
+      }
+
+      if (
+        (decision === "mission_control_action_applied" || decision === "surface_control_action_applied") &&
+        typeof event.operation === "string"
+      ) {
+        const syntheticId = `${decision}:${event.mission_id || event.resource_id || "system"}:${event.operation}:${event.ts || ""}`;
+        lifecycle.set(syntheticId, {
+          event_id: eventId,
+          ts: event.ts || new Date().toISOString(),
+          kind: decision === "mission_control_action_applied" ? "mission" : "surface",
+          target: event.mission_id || event.resource_id || "system",
+          operation: event.operation,
+          status: "completed",
+          requested_by: event.requested_by || "unknown",
+        });
+        continue;
+      }
+
+      if (
+        decision === "mission_orchestration_event_failed" &&
+        (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
+        eventId
+      ) {
+        const failedTarget = event.event_type === "surface_control_requested"
+          ? event.payload?.surfaceId || "surface-runtime"
+          : event.mission_id || "system";
+        lifecycle.set(eventId, {
+          event_id: eventId,
+          ts: event.ts || new Date().toISOString(),
+          kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
+          target: failedTarget,
+          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
+          status: "failed",
+          requested_by: event.requested_by || "unknown",
+          error: typeof event.error === "string" ? event.error : undefined,
+        });
+      }
+    } catch {
+      // Ignore malformed lines.
+    }
+  }
+
+  return Array.from(lifecycle.values())
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 10);
+}
+
+function applyPendingActionSummaries(
+  activeMissions: MissionSummary[],
+  surfaces: SurfaceSummary[],
+  controlActions: ControlActionSummary[],
+): {
+  activeMissions: MissionSummary[];
+  surfaces: SurfaceSummary[];
+} {
+  const pendingMissionTargets = new Map(
+    controlActions
+      .filter((action) => action.kind === "mission" && action.status === "queued")
+      .map((action) => [action.target, { operation: action.operation, requestedBy: action.requested_by }]),
+  );
+  const pendingSurfaceTargets = new Map(
+    controlActions
+      .filter((action) => action.kind === "surface" && action.status === "queued")
+      .map((action) => [action.target, { operation: action.operation, requestedBy: action.requested_by }]),
+  );
+
+  return {
+    activeMissions: activeMissions.map((mission) => (
+      pendingMissionTargets.has(mission.missionId)
+        ? {
+            ...mission,
+            controlSummary: `${pendingMissionTargets.get(mission.missionId)?.operation} pending`,
+            controlTone: "pending",
+            controlRequestedBy: pendingMissionTargets.get(mission.missionId)?.requestedBy,
+          }
+        : mission
+    )),
+    surfaces: surfaces.map((surface) => (
+      pendingSurfaceTargets.has(surface.id) || pendingSurfaceTargets.has("surface-runtime")
+        ? {
+            ...surface,
+            controlSummary: `${pendingSurfaceTargets.get(surface.id)?.operation || pendingSurfaceTargets.get("surface-runtime")?.operation} pending`,
+            controlTone: "pending",
+            controlRequestedBy: pendingSurfaceTargets.get(surface.id)?.requestedBy || pendingSurfaceTargets.get("surface-runtime")?.requestedBy,
+          }
+        : surface
+    )),
+  };
+}
+
+function createControlActionDefinition(input: {
+  operation: string;
+  label: string;
+  risk: "safe" | "risky";
+  enabled: boolean;
+  disabledReason?: string;
+  approvalRequired?: boolean;
+}): ControlActionDefinition {
+  return {
+    operation: input.operation,
+    label: input.label,
+    risk: input.risk,
+    approvalRequired: input.approvalRequired === true,
+    enabled: input.enabled,
+    disabledReason: input.disabledReason,
+  };
+}
+
+function collectControlActionCatalog(accessRole: "readonly" | "localadmin"): ControlActionCatalog {
+  const controlEnabled = accessRole === "localadmin";
+  const disabledReason = controlEnabled
+    ? undefined
+    : "Requires localadmin access. Readonly mode can observe but cannot execute control actions.";
+  return {
+    mission: [
+      createControlActionDefinition({ operation: "refresh_team", label: "refresh team", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "prewarm_team", label: "prewarm", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "staff_team", label: "staff", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "resume", label: "resume", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "finish", label: "finish", risk: "risky", approvalRequired: true, enabled: controlEnabled, disabledReason }),
+    ],
+    surface: [
+      createControlActionDefinition({ operation: "start", label: "start", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "stop", label: "stop", risk: "risky", approvalRequired: true, enabled: controlEnabled, disabledReason }),
+    ],
+    globalSurface: [
+      createControlActionDefinition({ operation: "reconcile", label: "reconcile surfaces", risk: "safe", enabled: controlEnabled, disabledReason }),
+      createControlActionDefinition({ operation: "status", label: "status refresh", risk: "safe", enabled: controlEnabled, disabledReason }),
+    ],
+  };
+}
+
+function collectControlActionAvailability(
+  accessRole: "readonly" | "localadmin",
+  activeMissions: MissionSummary[],
+  surfaces: SurfaceSummary[],
+): ControlActionAvailability {
+  const baseCatalog = collectControlActionCatalog(accessRole);
+  const mission: Record<string, ControlActionDefinition[]> = {};
+  const surface: Record<string, ControlActionDefinition[]> = {};
+
+  for (const item of activeMissions) {
+    mission[item.missionId] = baseCatalog.mission.map((action) => {
+      if (accessRole !== "localadmin") return action;
+      if (action.operation === "resume") {
+        return createControlActionDefinition({
+          ...action,
+          enabled: false,
+          disabledReason: "Mission is already active.",
+        });
+      }
+      return action;
+    });
+  }
+
+  for (const item of surfaces) {
+    surface[item.id] = baseCatalog.surface.map((action) => {
+      if (accessRole !== "localadmin") return action;
+      if (action.operation === "start" && item.running) {
+        return createControlActionDefinition({
+          ...action,
+          enabled: false,
+          disabledReason: "Surface is already running.",
+        });
+      }
+      if (action.operation === "stop" && !item.running) {
+        return createControlActionDefinition({
+          ...action,
+          enabled: false,
+          disabledReason: "Surface is already stopped.",
+        });
+      }
+      return action;
+    });
+  }
+
+  const globalSurface = baseCatalog.globalSurface.map((action) => {
+    if (accessRole !== "localadmin") return action;
+    if (surfaces.length === 0) {
+      return createControlActionDefinition({
+        ...action,
+        enabled: false,
+        disabledReason: "No managed surfaces are registered.",
+      });
+    }
+    return action;
+  });
+
+  return { mission, surface, globalSurface };
+}
+
+function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
+  const file = pathResolver.shared("observability/mission-control/orchestration-events.jsonl");
+  if (!safeExistsSync(file)) return {};
+
+  const details: Record<string, ControlActionDetail[]> = {};
+  const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+
+  for (const line of raw.trim().split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line) as any;
+      const eventId = typeof event.event_id === "string" ? event.event_id : undefined;
+      if (!eventId) continue;
+      if (
+        event.event_type !== "mission_control_requested" &&
+        event.event_type !== "surface_control_requested" &&
+        event.decision !== "mission_control_action_applied" &&
+        event.decision !== "surface_control_action_applied" &&
+        event.decision !== "mission_orchestration_event_started" &&
+        event.decision !== "mission_orchestration_event_completed" &&
+        event.decision !== "mission_orchestration_event_failed"
+      ) {
+        continue;
+      }
+
+      if (!details[eventId]) {
+        details[eventId] = [];
+      }
+      details[eventId].push({
+        ts: event.ts || new Date().toISOString(),
+        decision: event.decision || "event",
+        event_type: event.event_type,
+        mission_id: event.mission_id,
+        resource_id: event.resource_id,
+        operation: event.operation,
+        why: event.why,
+        error: event.error,
+      });
+    } catch {
+      // Ignore malformed lines.
+    }
+  }
+
+  for (const key of Object.keys(details)) {
+    details[key] = details[key]
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, 8);
+  }
+
+  return details;
+}
+
+function collectOwnerSummaries(): OwnerSummary[] {
+  const summaries: OwnerSummary[] = [];
+  const files = [
+    pathResolver.shared("observability/channels/slack/missions.jsonl"),
+    pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+  ];
+
+  for (const file of files) {
+    if (!safeExistsSync(file)) continue;
+    const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+    for (const line of raw.trim().split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line) as any;
+        if ((event.decision || event.event_type) !== "mission_owner_notified") continue;
+        summaries.push({
+          ts: event.ts || new Date().toISOString(),
+          mission_id: event.mission_id || "unknown",
+          accepted_count: Number(event.accepted_count || 0),
+          reviewed_count: Number(event.reviewed_count || 0),
+          completed_count: Number(event.completed_count || 0),
+          requested_count: Number(event.requested_count || 0),
+        });
+      } catch {
+        // Ignore malformed lines.
+      }
+    }
+  }
+  return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
+}
+
+function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
+  return [
+    ...listSurfaceOutboxMessages("slack"),
+    ...listSurfaceOutboxMessages("chronos"),
+  ]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 8);
+}
+
+async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
+  const manifest = loadSurfaceManifest();
+  const state = loadSurfaceState();
+  const summaries: SurfaceSummary[] = [];
+
+  for (const entry of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    const record = state.surfaces[entry.id];
+    const health = await probeSurfaceHealth(entry);
+    const controlSummary = !record
+      ? "stopped"
+      : health.status === "healthy"
+        ? "stable"
+        : health.status === "unhealthy"
+          ? "needs attention"
+          : "needs restart";
+    const controlTone: SurfaceSummary["controlTone"] = !record
+      ? "offline"
+      : health.status === "healthy"
+        ? "stable"
+        : "attention";
+    summaries.push({
+      id: entry.id,
+      kind: entry.kind,
+      startupMode: entry.startupMode,
+      enabled: entry.enabled !== false,
+      running: Boolean(record),
+      pid: record?.pid,
+      health: health.status,
+      detail: health.detail,
+      controlSummary,
+      controlTone,
+    });
+  }
+
+  return summaries;
+}
+
+function buildRuntimeDoctor(
+  runtimeLeases: RuntimeLeaseSummary[],
+  activeMissions: MissionSummary[],
+  runtimeSnapshots: ReturnType<typeof listAgentRuntimeSnapshots>,
+): RuntimeDoctorFinding[] {
+  const activeMissionIds = new Set(activeMissions.map((mission) => mission.missionId));
+  const runtimeByAgent = new Map(runtimeSnapshots.map((snapshot) => [snapshot.agent.agentId, snapshot]));
+  const findings: RuntimeDoctorFinding[] = [];
+
+  for (const lease of runtimeLeases) {
+    const runtime = runtimeByAgent.get(lease.agent_id);
+    if (!runtime) continue;
+
+    if (lease.owner_type === "mission" && !activeMissionIds.has(lease.owner_id)) {
+      findings.push({
+        severity: "critical",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Mission-scoped runtime lease without an active mission owner.",
+        recommendedAction: "stop_runtime",
+      });
+      continue;
+    }
+
+    if (runtime.agent.status === "error") {
+      findings.push({
+        severity: "warning",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Runtime lease is attached to an agent in error state.",
+        recommendedAction: "restart_runtime",
+      });
+      continue;
+    }
+
+    const executionMode = typeof lease.metadata?.execution_mode === "string" ? lease.metadata.execution_mode : undefined;
+    const channel = typeof lease.metadata?.channel === "string" ? lease.metadata.channel : undefined;
+    if (executionMode === "conversation" && channel === "slack" && runtime.runtime?.idleForMs && runtime.runtime.idleForMs > 5 * 60 * 1000) {
+      findings.push({
+        severity: "warning",
+        agentId: lease.agent_id,
+        ownerId: lease.owner_id,
+        reason: "Conversation-scoped lease appears stale (>5m idle).",
+        recommendedAction: "stop_runtime",
+      });
+    }
+  }
+
+  return findings.slice(0, 12);
+}
+
+function recordRuntimeRemediationArtifacts(input: {
+  action: "cleanup_runtime_lease" | "restart_runtime_lease";
+  agentId: string;
+  lease?: RuntimeLeaseSummary;
+}) {
+  const lease = input.lease;
+  if (!lease) return;
+
+  if (lease.owner_type === "mission") {
+    ledger.record("MISSION_RUNTIME_REMEDIATION", {
+      mission_id: lease.owner_id,
+      role: "chronos_localadmin",
+      agent_id: input.agentId,
+      remediation_action: input.action,
+      owner_type: lease.owner_type,
+      metadata: lease.metadata || {},
+    });
+  }
+
+  const channel = typeof lease.metadata?.channel === "string" ? lease.metadata.channel : undefined;
+  if (channel) {
+    emitChannelSurfaceEvent("chronos_localadmin", channel, "runtime-remediation", {
+      correlation_id: typeof lease.metadata?.thread === "string" ? lease.metadata.thread : input.agentId,
+      decision: "runtime_lease_remediation_applied",
+      why: "Chronos operator applied runtime remediation to a leased agent runtime.",
+      policy_used: "mission_orchestration_control_plane_v1",
+      mission_id: lease.owner_type === "mission" ? lease.owner_id : undefined,
+      agent_id: input.agentId,
+      resource_id: input.agentId,
+      action: input.action,
+      owner_type: lease.owner_type,
+      owner_id: lease.owner_id,
+      thread: typeof lease.metadata?.thread === "string" ? lease.metadata.thread : undefined,
+    });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const denied = guardRequest(req);
+    if (denied) return denied;
+    const accessRole = getChronosAccessRoleOrThrow(req);
+    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const runtime = listAgentRuntimeSnapshots();
+    const rawActiveMissions = collectActiveMissions();
+    const runtimeLeases = listAgentRuntimeLeaseSummaries().slice(0, 12);
+    const rawSurfaces = await collectSurfaceSummaries();
+    const controlActions = collectControlActions();
+    const { activeMissions, surfaces } = applyPendingActionSummaries(rawActiveMissions, rawSurfaces, controlActions);
+    const controlActionCatalog = collectControlActionCatalog(accessRole);
+    const controlActionAvailability = collectControlActionAvailability(accessRole, activeMissions, surfaces);
+    return NextResponse.json({
+      activeMissions,
+      surfaces,
+      accessRole,
+      recentEvents: collectRecentEvents(),
+      agentMessages: collectAgentMessages(),
+      a2aHandoffs: collectA2AHandoffs(),
+      controlActionCatalog,
+      controlActionAvailability,
+      controlActions,
+      controlActionDetails: collectControlActionDetails(),
+      ownerSummaries: collectOwnerSummaries(),
+      surfaceOutbox: {
+        slack: listSurfaceOutboxMessages("slack").length,
+        chronos: listSurfaceOutboxMessages("chronos").length,
+      },
+      recentSurfaceOutbox: collectRecentSurfaceOutbox(),
+      runtime: {
+        total: runtime.length,
+        ready: runtime.filter((entry) => entry.agent.status === "ready").length,
+        busy: runtime.filter((entry) => entry.agent.status === "busy").length,
+        error: runtime.filter((entry) => entry.agent.status === "error").length,
+      },
+      runtimeLeases,
+      runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, runtime),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to load mission intelligence" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const denied = guardRequest(req);
+    if (denied) return denied;
+    const requiresAdmin = requireChronosAccess(req, "localadmin");
+    if (requiresAdmin) return requiresAdmin;
+    const accessRole = getChronosAccessRoleOrThrow(req);
+    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const body = await req.json();
+    const action = body?.action;
+
+    if (
+      action !== "cleanup_runtime_lease" &&
+      action !== "restart_runtime_lease" &&
+      action !== "clear_surface_outbox" &&
+      action !== "mission_control" &&
+      action !== "surface_control"
+    ) {
+      return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+    }
+
+    if (action === "mission_control") {
+      const missionId = typeof body?.missionId === "string" ? body.missionId.toUpperCase() : "";
+      const operation = typeof body?.operation === "string" ? body.operation : "";
+      if (!missionId || !operation) {
+        return NextResponse.json({ error: "Missing missionId or operation" }, { status: 400 });
+      }
+      if (!["resume", "refresh_team", "prewarm_team", "staff_team", "finish"].includes(operation)) {
+        return NextResponse.json({ error: "Unsupported mission operation" }, { status: 400 });
+      }
+
+      const event = enqueueMissionOrchestrationEvent({
+        eventType: "mission_control_requested",
+        missionId,
+        requestedBy: "chronos_localadmin",
+        payload: {
+          operation,
+          requested_by_surface: "chronos",
+        },
+      });
+      startMissionOrchestrationWorker(event);
+
+      return NextResponse.json({
+        status: "queued",
+        action,
+        missionId,
+        operation,
+        eventId: event.event_id,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === "surface_control") {
+      const surfaceId = typeof body?.surfaceId === "string" ? body.surfaceId : "";
+      const operation = typeof body?.operation === "string" ? body.operation : "";
+      if (!operation) {
+        return NextResponse.json({ error: "Missing surface operation" }, { status: 400 });
+      }
+
+      if (!(operation === "reconcile" || operation === "status" || ((operation === "start" || operation === "stop") && surfaceId))) {
+        return NextResponse.json({ error: "Unsupported surface operation" }, { status: 400 });
+      }
+      const event = enqueueMissionOrchestrationEvent({
+        eventType: "surface_control_requested",
+        missionId: "MSN-CHRONOS-SURFACE-CONTROL",
+        requestedBy: "chronos_localadmin",
+        payload: {
+          operation,
+          surfaceId: surfaceId || undefined,
+          requested_by_surface: "chronos",
+        },
+      });
+      startMissionOrchestrationWorker(event);
+
+      return NextResponse.json({
+        status: "queued",
+        action,
+        surfaceId,
+        operation,
+        eventId: event.event_id,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === "clear_surface_outbox") {
+      const surface = body?.surface === "chronos" ? "chronos" : body?.surface === "slack" ? "slack" : "";
+      const messageId = typeof body?.messageId === "string" ? body.messageId : "";
+      if (!surface || !messageId) {
+        return NextResponse.json({ error: "Missing surface or messageId" }, { status: 400 });
+      }
+      const message = listSurfaceOutboxMessages(surface).find((entry) => entry.message_id === messageId);
+      clearSurfaceOutboxMessage(surface, messageId);
+      emitMissionOrchestrationObservation({
+        decision: "surface_outbox_cleared",
+        event_type: "surface_outbox_cleared",
+        requested_by: "chronos_localadmin",
+        resource_id: messageId,
+        surface,
+        why: "Chronos operator cleared a surface outbox message.",
+      });
+      emitChannelSurfaceEvent("chronos_localadmin", surface, "outbox", {
+        correlation_id: message?.correlation_id || messageId,
+        decision: "surface_outbox_cleared",
+        why: "Chronos operator cleared a surface outbox message from the shared outbox contract.",
+        policy_used: "mission_orchestration_control_plane_v1",
+        mission_id: typeof message?.correlation_id === "string" && message.correlation_id.startsWith("MSN-")
+          ? message.correlation_id
+          : undefined,
+        resource_id: messageId,
+        surface,
+        thread: message?.thread_ts,
+        channel: message?.channel,
+      });
+      return NextResponse.json({
+        status: "ok",
+        action,
+        surface,
+        messageId,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    const agentId = typeof body?.agentId === "string" ? body.agentId : "";
+    if (!agentId) {
+      return NextResponse.json({ error: "Missing agentId" }, { status: 400 });
+    }
+    const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === agentId);
+
+    if (action === "cleanup_runtime_lease") {
+      await stopAgentRuntime(agentId, "chronos_localadmin");
+    } else {
+      await restartAgentRuntime(agentId, "chronos_localadmin");
+    }
+    emitMissionOrchestrationObservation({
+      decision: "runtime_lease_remediation_applied",
+      event_type: "runtime_lease_remediation_applied",
+      requested_by: "chronos_localadmin",
+      resource_id: agentId,
+      action,
+      why: "Chronos operator applied runtime lease remediation from the doctor view.",
+    });
+    recordRuntimeRemediationArtifacts({ action, agentId, lease });
+    return NextResponse.json({
+      status: "ok",
+      action,
+      agentId,
+      ts: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to apply runtime remediation" }, { status: 500 });
+  }
+}

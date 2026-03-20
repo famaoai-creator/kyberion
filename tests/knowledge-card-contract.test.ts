@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
-import { safeReadFile } from '../libs/core/index.js';
+import { safeReadFile } from '@agent/core';
 import { parseFrontmatter } from '../scripts/context_ranker.js';
 
 const rootDir = process.cwd();

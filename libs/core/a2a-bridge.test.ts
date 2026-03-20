@@ -5,14 +5,20 @@ const mocks = vi.hoisted(() => {
   const info = vi.fn();
   const record = vi.fn();
   const get = vi.fn();
-  const spawn = vi.fn();
+  const ensureAgentRuntime = vi.fn();
+  const getAgentRuntimeHandle = vi.fn();
+  const askAgentRuntime = vi.fn();
+  const stopAgentRuntime = vi.fn();
   const getAgentManifest = vi.fn();
   return {
     warn,
     info,
     record,
     get,
-    spawn,
+    ensureAgentRuntime,
+    getAgentRuntimeHandle,
+    askAgentRuntime,
+    stopAgentRuntime,
     getAgentManifest,
   };
 });
@@ -30,10 +36,11 @@ vi.mock('./agent-registry', () => ({
   },
 }));
 
-vi.mock('./agent-lifecycle', () => ({
-  agentLifecycle: {
-    spawn: mocks.spawn,
-  },
+vi.mock('./agent-runtime-supervisor.js', () => ({
+  ensureAgentRuntime: mocks.ensureAgentRuntime,
+  getAgentRuntimeHandle: mocks.getAgentRuntimeHandle,
+  askAgentRuntime: mocks.askAgentRuntime,
+  stopAgentRuntime: mocks.stopAgentRuntime,
 }));
 
 vi.mock('./agent-manifest', () => ({
@@ -51,6 +58,7 @@ describe('a2a-bridge', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.getAgentRuntimeHandle.mockReturnValue(null);
   });
 
   it('signs and verifies messages', async () => {
@@ -100,7 +108,6 @@ describe('a2a-bridge', () => {
 
   it('routes messages, auto-spawns allowed agents, and notifies response handlers', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
-    const ask = vi.fn(async (prompt: string) => `echo:${prompt}`);
     mocks.getAgentManifest.mockImplementation((agentId: string) =>
       agentId === 'codex-nerve'
         ? {
@@ -111,7 +118,10 @@ describe('a2a-bridge', () => {
           }
         : undefined,
     );
-    mocks.spawn.mockResolvedValue({ ask });
+    const handle = { ask: vi.fn(async (prompt: string) => `echo:${prompt}`) };
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'codex-nerve' ? handle : null);
+    mocks.askAgentRuntime.mockImplementation(async (_agentId: string, prompt: string) => `echo:${prompt}`);
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x') return { status: 'ready' };
       if (agentId === 'codex-nerve') return { status: 'ready' };
@@ -134,8 +144,8 @@ describe('a2a-bridge', () => {
 
     const result = await a2aBridge.route(envelope);
 
-    expect(mocks.spawn).toHaveBeenCalled();
-    expect(ask).toHaveBeenCalledWith('delegate this');
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalled();
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith('codex-nerve', 'delegate this', 'a2a_bridge');
     expect(mocks.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'a2a_route',
@@ -148,6 +158,95 @@ describe('a2a-bridge', () => {
     expect(responses).toHaveLength(1);
   });
 
+  it('includes intent and context when routing structured payloads', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    const handle = { ask: vi.fn(async () => 'ok') };
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
+    mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.get.mockImplementation((agentId: string) => {
+      if (agentId === 'sender-x' || agentId === 'nerve-agent') return { status: 'ready' };
+      return undefined;
+    });
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-CTX-1',
+        sender: 'sender-x',
+        receiver: 'nerve-agent',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'request_marketing_material',
+        text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
+        context: {
+          channel: 'slack',
+          execution_mode: 'conversation',
+          user_language: 'ja',
+        },
+      },
+    });
+
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith('nerve-agent', [
+      'Intent: request_marketing_material',
+      '',
+      'Context:',
+      '{',
+      '  "channel": "slack",',
+      '  "execution_mode": "conversation",',
+      '  "user_language": "ja"',
+      '}',
+      '',
+      'Request:',
+      'Kyberionの資料を作って欲しいんだけど可能かな？',
+    ].join('\n'), 'a2a_bridge');
+  });
+
+  it('spawns conversation-mode agents inside a conversation sandbox cwd', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    const handle = { ask: vi.fn(async () => 'ok') };
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
+    mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.get.mockReturnValue(undefined);
+
+    await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-CWD-1',
+        sender: 'sender-x',
+        receiver: 'nerve-agent',
+        performative: 'request',
+      },
+      payload: {
+        intent: 'request_marketing_material',
+        text: 'Kyberionのコンセプトを説明して',
+        context: {
+          channel: 'slack',
+          thread: '1773596301.435519',
+          execution_mode: 'conversation',
+        },
+      },
+    });
+
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: expect.stringContaining('active/shared/tmp/agent-runtime-roots/conversation/slack/1773596301.435519/nerve-agent'),
+    }));
+  });
+
   it('denies invalid signatures and accepts unsigned internal senders', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
     mocks.getAgentManifest.mockReturnValue({
@@ -156,7 +255,10 @@ describe('a2a-bridge', () => {
       systemPrompt: 'agent',
       capabilities: [],
     });
-    mocks.spawn.mockResolvedValue({ ask: vi.fn(async () => 'ok') });
+    const handle = { ask: vi.fn(async () => 'ok') };
+    mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'agent-y' ? handle : null);
+    mocks.askAgentRuntime.mockResolvedValue('ok');
 
     await expect(
       a2aBridge.route({

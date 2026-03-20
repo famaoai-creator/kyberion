@@ -4,7 +4,7 @@ import {
   validateCapabilityOutput,
   validateInput,
   validateOutput,
-} from '../libs/core/validate.js';
+} from '@agent/core/validate';
 
 describe('Capability schema contract', () => {
   it('accepts capability-first envelopes', () => {

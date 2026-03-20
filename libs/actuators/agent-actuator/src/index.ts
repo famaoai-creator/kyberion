@@ -2,8 +2,20 @@ import {
   logger,
   createStandardYargs,
   agentRegistry,
-  agentLifecycle,
   a2aBridge,
+  resolveMissionTeamPlan,
+  getMissionTeamAssignment,
+  ensureMissionTeamRuntimeViaSupervisor,
+  enqueueMissionTeamPrewarmRequest,
+  startAgentRuntimeSupervisorForRequest,
+  ensureAgentRuntime,
+  stopAgentRuntime,
+  shutdownAllAgentRuntimes,
+  listAgentRuntimeSnapshots,
+  getAgentRuntimeSnapshot,
+  refreshAgentRuntime,
+  restartAgentRuntime,
+  askAgentRuntime,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -28,7 +40,7 @@ import { safeReadFile } from '@agent/core';
  */
 
 interface AgentAction {
-  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart';
+  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission' | 'prewarm_mission';
   params: {
     agentId?: string;
     provider?: AgentProvider;
@@ -42,6 +54,7 @@ interface AgentAction {
     query?: string;
     envelope?: A2AMessage;
     filter?: { status?: string; provider?: string };
+    teamRole?: string;
   };
 }
 
@@ -52,7 +65,7 @@ export async function handleAction(input: AgentAction) {
     case 'spawn': {
       if (!params.provider) throw new Error('provider is required for spawn');
 
-      const handle = await agentLifecycle.spawn({
+      const handle = await ensureAgentRuntime({
         agentId: params.agentId,
         provider: params.provider,
         modelId: params.modelId,
@@ -62,6 +75,7 @@ export async function handleAction(input: AgentAction) {
         parentAgentId: params.parentAgentId,
         missionId: params.missionId,
         trustRequired: params.trustRequired,
+        requestedBy: 'agent_actuator',
       });
 
       const record = handle.getRecord();
@@ -79,14 +93,11 @@ export async function handleAction(input: AgentAction) {
         throw new Error(`Agent ${params.agentId} is ${record.status}, not ready`);
       }
 
-      const mediator = agentLifecycle.getMediator(params.agentId);
-      if (!mediator) throw new Error(`No mediator for ${params.agentId}`);
-
       agentRegistry.updateStatus(params.agentId, 'busy');
       agentRegistry.touch(params.agentId);
 
       try {
-        const response = await mediator.ask(params.query);
+        const response = await askAgentRuntime(params.agentId, params.query, 'agent_actuator');
         agentRegistry.updateStatus(params.agentId, 'ready');
         return { status: 'ok', agentId: params.agentId, response };
       } catch (e: any) {
@@ -97,12 +108,12 @@ export async function handleAction(input: AgentAction) {
 
     case 'shutdown': {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
-      await agentLifecycle.shutdown(params.agentId);
+      await stopAgentRuntime(params.agentId, 'agent_actuator');
       return { status: 'shutdown', agentId: params.agentId };
     }
 
     case 'shutdown_all': {
-      await agentLifecycle.shutdownAll();
+      await shutdownAllAgentRuntimes('agent_actuator');
       return { status: 'all_shutdown' };
     }
 
@@ -113,7 +124,7 @@ export async function handleAction(input: AgentAction) {
 
     case 'health': {
       const snapshot = agentRegistry.getHealthSnapshot();
-      const agents = agentLifecycle.listSnapshots().map(entry => ({
+      const agents = listAgentRuntimeSnapshots().map(entry => ({
         agentId: entry.agent.agentId,
         provider: entry.agent.provider,
         modelId: entry.agent.modelId,
@@ -132,27 +143,75 @@ export async function handleAction(input: AgentAction) {
 
     case 'snapshot': {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
-      const snapshot = agentLifecycle.getSnapshot(params.agentId);
+      const snapshot = getAgentRuntimeSnapshot(params.agentId);
       if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
       return { status: 'ok', snapshot };
     }
 
     case 'refresh': {
       if (!params.agentId) throw new Error('agentId is required for refresh');
-      const result = await agentLifecycle.refreshContext(params.agentId);
+      const result = await refreshAgentRuntime(params.agentId, 'agent_actuator');
       return { status: 'ok', agentId: params.agentId, ...result };
     }
 
     case 'restart': {
       if (!params.agentId) throw new Error('agentId is required for restart');
-      const handle = await agentLifecycle.restart(params.agentId);
-      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: agentLifecycle.getSnapshot(params.agentId) };
+      const handle = await restartAgentRuntime(params.agentId, 'agent_actuator');
+      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
     }
 
     case 'a2a': {
       if (!params.envelope) throw new Error('envelope is required for a2a');
       const response = await a2aBridge.route(params.envelope);
       return { status: 'ok', response };
+    }
+
+    case 'team_plan': {
+      if (!params.missionId) throw new Error('missionId is required for team_plan');
+      const plan = resolveMissionTeamPlan({
+        missionId: params.missionId,
+      });
+      return { status: 'ok', missionId: params.missionId, plan };
+    }
+
+    case 'team_role': {
+      if (!params.missionId) throw new Error('missionId is required for team_role');
+      if (!params.teamRole) throw new Error('teamRole is required for team_role');
+      const plan = resolveMissionTeamPlan({
+        missionId: params.missionId,
+      });
+      const assignment = getMissionTeamAssignment(plan, params.teamRole);
+      if (!assignment) {
+        throw new Error(`Team role ${params.teamRole} not found for mission ${params.missionId}`);
+      }
+      return { status: 'ok', missionId: params.missionId, assignment };
+    }
+
+    case 'staff_mission': {
+      if (!params.missionId) throw new Error('missionId is required for staff_mission');
+      const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
+        missionId: params.missionId,
+        requestedBy: 'agent_actuator',
+        reason: 'Agent actuator mission staffing request.',
+        timeoutMs: 600_000,
+      });
+      return { status: 'ok', missionId: params.missionId, runtimePlan: runtimePlan.runtime_plan };
+    }
+
+    case 'prewarm_mission': {
+      if (!params.missionId) throw new Error('missionId is required for prewarm_mission');
+      const request = enqueueMissionTeamPrewarmRequest({
+        missionId: params.missionId,
+        requestedBy: 'agent_actuator',
+        reason: 'Agent actuator mission prewarm request.',
+      });
+      startAgentRuntimeSupervisorForRequest(request);
+      return {
+        status: 'queued',
+        missionId: params.missionId,
+        requestId: request.request_id,
+        teamRoles: request.team_roles || [],
+      };
     }
 
     default:

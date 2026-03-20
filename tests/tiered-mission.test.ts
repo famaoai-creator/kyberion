@@ -11,7 +11,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync
-} from '../libs/core/index.js';
+} from '@agent/core';
 
 describe('Tiered Mission Architecture', () => {
   const TEST_MISSION_ID = 'TEST-MSN-TIER-999';

@@ -1,16 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import path from "node:path";
-import { agentLifecycle } from "@agent/core/agent-lifecycle";
-import { safeExistsSync, safeReadFile, recordChronosDelegationSummary, recordChronosSurfaceRequest } from "@agent/core";
-import { runSurfaceConversation } from "@agent/core";
 import { guardRequest } from "../../../lib/api-guard";
-import { getAgentManifest } from "@agent/core/agent-manifest";
+
+async function loadChronosCore() {
+  const [
+    core,
+    pathResolverModule,
+    secureIo,
+    channelSurface,
+    runtimeSupervisor,
+    pipelineContract,
+    agentManifest,
+    orchestrationEvents,
+  ] = await Promise.all([
+    import("@agent/core/core"),
+    import("@agent/core/path-resolver"),
+    import("@agent/core/secure-io"),
+    import("@agent/core/channel-surface"),
+    import("@agent/core/agent-runtime-supervisor"),
+    import("@agent/core/pipeline-contract"),
+    import("@agent/core/agent-manifest"),
+    import("@agent/core/mission-orchestration-events"),
+  ]);
+
+  return {
+    logger: core.logger,
+    pathResolver: pathResolverModule.pathResolver,
+    safeExistsSync: secureIo.safeExistsSync,
+    safeMkdir: secureIo.safeMkdir,
+    safeReadFile: secureIo.safeReadFile,
+    safeReaddir: secureIo.safeReaddir,
+    safeRmSync: secureIo.safeRmSync,
+    safeWriteFile: secureIo.safeWriteFile,
+    recordChronosDelegationSummary: channelSurface.recordChronosDelegationSummary,
+    recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
+    runSurfaceConversation: channelSurface.runSurfaceConversation,
+    listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
+    isSlackMissionConfirmation: channelSurface.isSlackMissionConfirmation,
+    ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
+    getAgentRuntimeHandle: runtimeSupervisor.getAgentRuntimeHandle,
+    listAgentRuntimeSnapshots: runtimeSupervisor.listAgentRuntimeSnapshots,
+    stopAgentRuntime: runtimeSupervisor.stopAgentRuntime,
+    validatePipelineAdf: pipelineContract.validatePipelineAdf,
+    getAgentManifest: agentManifest.getAgentManifest,
+    loadAgentManifests: agentManifest.loadAgentManifests,
+    safeExec: secureIo.safeExec,
+    emitMissionOrchestrationObservation: orchestrationEvents.emitMissionOrchestrationObservation,
+    enqueueMissionOrchestrationEvent: orchestrationEvents.enqueueMissionOrchestrationEvent,
+    startMissionOrchestrationWorker: orchestrationEvents.startMissionOrchestrationWorker,
+  };
+}
 
 function findProjectRoot(): string {
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     try {
-      if (safeExistsSync(path.join(dir, "AGENTS.md"))) return dir;
+      if (existsSync(path.join(dir, "AGENTS.md"))) return dir;
     } catch (_) {}
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -22,6 +69,8 @@ const PROJECT_ROOT = findProjectRoot();
 
 const CHRONOS_AGENT_ID = "chronos-mirror";
 const CHRONOS_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000);
+const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\s+(\S+)/;
+const QUICK_ACTION_PATTERN = /^chronos:\/\/quick-action\/([a-z-]+)$/;
 
 const g = globalThis as any;
 
@@ -40,16 +89,18 @@ function scheduleChronosShutdown() {
   }
   g.__kyberionChronosIdleTimer = setTimeout(async () => {
     try {
-      await agentLifecycle.shutdown(CHRONOS_AGENT_ID);
+      const { stopAgentRuntime } = await loadChronosCore();
+      await stopAgentRuntime(CHRONOS_AGENT_ID, "chronos_api");
     } catch (_) {}
     clearChronosCache();
   }, CHRONOS_IDLE_TIMEOUT_MS);
   g.__kyberionChronosIdleTimer.unref?.();
 }
 
-async function ensureChronosAgent() {
+async function ensureChronosAgent(context?: { missionId?: string; teamRole?: string; requesterId?: string }) {
+  const { ensureAgentRuntime, getAgentManifest, getAgentRuntimeHandle } = await loadChronosCore();
   const cachedHandle = g.__kyberionChronosHandle;
-  const runtimeHandle = agentLifecycle.getHandle(CHRONOS_AGENT_ID);
+  const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
   if (cachedHandle && runtimeHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
     scheduleChronosShutdown();
@@ -63,13 +114,22 @@ async function ensureChronosAgent() {
   if (!g.__kyberionChronosReady) {
     g.__kyberionChronosReady = (async () => {
       const manifest = getAgentManifest(CHRONOS_AGENT_ID, PROJECT_ROOT);
-      const handle = await agentLifecycle.spawn({
+      const handle = await ensureAgentRuntime({
         agentId: CHRONOS_AGENT_ID,
         provider: manifest?.provider || "gemini",
         modelId: manifest?.modelId || "gemini-2.5-flash",
         systemPrompt: manifest?.systemPrompt,
         capabilities: manifest?.capabilities || ["a2ui", "dashboard", "commands", "gateway"],
         cwd: PROJECT_ROOT,
+        requestedBy: "chronos_api",
+        runtimeOwnerId: context?.missionId || CHRONOS_AGENT_ID,
+        runtimeOwnerType: context?.missionId ? "mission" : "surface",
+        runtimeMetadata: {
+          lease_kind: "chronos_surface",
+          mission_id: context?.missionId,
+          team_role: context?.teamRole,
+          requester_id: context?.requesterId || "chronos-ui",
+        },
       });
       g.__kyberionChronosHandle = handle;
       scheduleChronosShutdown();
@@ -85,31 +145,744 @@ async function ensureChronosAgent() {
   return g.__kyberionChronosHandle;
 }
 
+type MissionProposal = {
+  intent: "create_mission";
+  mission_type?: string;
+  summary?: string;
+  assigned_persona?: string;
+  tier?: "personal" | "confidential" | "public";
+  vision_ref?: string;
+  why?: string;
+};
+
+type ChronosMissionProposalState = {
+  surface: "chronos";
+  channel: "chronos";
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  createdAt: string;
+};
+
+function withMissionRole<T>(role: string, fn: () => T): T {
+  const previousRole = process.env.MISSION_ROLE;
+  process.env.MISSION_ROLE = role;
+  try {
+    return fn();
+  } finally {
+    if (previousRole === undefined) {
+      delete process.env.MISSION_ROLE;
+    } else {
+      process.env.MISSION_ROLE = previousRole;
+    }
+  }
+}
+
+function chronosMissionProposalStatePath(sessionId: string, pathResolver: Awaited<ReturnType<typeof loadChronosCore>>["pathResolver"]): string {
+  const safeSession = sessionId.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return pathResolver.resolve(`active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`);
+}
+
+function sanitizeMissionSlug(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "REQUEST";
+}
+
+function buildSurfaceMissionId(prefix: string, threadTs: string, proposal: MissionProposal, sourceText?: string): string {
+  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || "request";
+  const slug = sanitizeMissionSlug(base);
+  const numericThread = threadTs.replace(/\D+/g, "").slice(-8) || Date.now().toString().slice(-8);
+  return `MSN-${prefix}-${slug}-${numericThread}`;
+}
+
+function getChronosMissionProposalState(
+  sessionId: string,
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): ChronosMissionProposalState | null {
+  const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
+  return withMissionRole("chronos_gateway", () => {
+    if (!core.safeExistsSync(statePath)) return null;
+    return JSON.parse(core.safeReadFile(statePath, { encoding: "utf8" }) as string) as ChronosMissionProposalState;
+  });
+}
+
+function saveChronosMissionProposalState(
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): string {
+  const statePath = chronosMissionProposalStatePath(params.sessionId, core.pathResolver);
+  return withMissionRole("chronos_gateway", () => {
+    core.safeMkdir(path.dirname(statePath));
+    core.safeWriteFile(
+      statePath,
+      JSON.stringify(
+        {
+          surface: "chronos",
+          channel: "chronos",
+          threadTs: params.sessionId,
+          proposal: params.proposal,
+          sourceText: params.sourceText,
+          createdAt: new Date().toISOString(),
+        } satisfies ChronosMissionProposalState,
+        null,
+        2,
+      ),
+    );
+    return statePath;
+  });
+}
+
+function clearChronosMissionProposalState(
+  sessionId: string,
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+): void {
+  const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
+  withMissionRole("chronos_gateway", () => {
+    if (!core.safeExistsSync(statePath)) return;
+    core.safeRmSync(statePath, { force: true });
+  });
+}
+
+async function issueChronosMissionFromProposal(
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  core: Awaited<ReturnType<typeof loadChronosCore>>,
+) {
+  const missionId = buildSurfaceMissionId("CHRONOS", params.sessionId, params.proposal, params.sourceText);
+  const tier = params.proposal.tier || "public";
+  const missionType = params.proposal.mission_type || "development";
+  const persona = params.proposal.assigned_persona || "Ecosystem Architect";
+  const env = { ...process.env, MISSION_ROLE: "mission_controller" };
+
+  const startOutput = core.safeExec(
+    "node",
+    ["dist/scripts/mission_controller.js", "start", missionId, tier, persona, "default", missionType],
+    { env, cwd: PROJECT_ROOT },
+  );
+
+  let orchestrationStatus: "queued" | "failed" = "queued";
+  let orchestrationJobPath: string | undefined;
+  let orchestrationError: string | undefined;
+  try {
+    const event = withMissionRole("chronos_gateway", () =>
+      core.enqueueMissionOrchestrationEvent({
+        eventType: "mission_issue_requested",
+        missionId,
+        requestedBy: "chronos_gateway",
+        correlationId: randomUUID(),
+        payload: {
+          sessionId: params.sessionId,
+          proposal: params.proposal,
+          sourceText: params.sourceText,
+          tier,
+          persona,
+          missionType,
+          channel: "chronos",
+          threadTs: params.sessionId,
+        },
+      }),
+    );
+    orchestrationJobPath = withMissionRole("chronos_gateway", () => core.startMissionOrchestrationWorker(event));
+  } catch (error) {
+    orchestrationStatus = "failed";
+    orchestrationError = error instanceof Error ? error.message : String(error);
+  }
+
+  withMissionRole("chronos_gateway", () => {
+    core.emitMissionOrchestrationObservation({
+      decision: "mission_issued",
+      source: "chronos",
+      mission_id: missionId,
+      session_id: params.sessionId,
+      mission_type: missionType,
+      tier,
+      requested_by: "chronos_gateway",
+      orchestration_status: orchestrationStatus,
+      orchestration_job_path: orchestrationJobPath,
+    });
+  });
+
+  return {
+    missionId,
+    tier,
+    missionType,
+    persona,
+    startOutput,
+    orchestrationStatus,
+    orchestrationJobPath,
+    orchestrationError,
+  };
+}
+
+async function tryHandleDeterministicPipelineQuery(query: string) {
+  const match = query.match(RUN_PIPELINE_PATTERN);
+  if (!match) return null;
+
+  const { pathResolver, safeExec, logger } = await loadChronosCore();
+  const inputPath = pathResolver.rootResolve(match[1]);
+  const output = safeExec("node", ["dist/scripts/run_pipeline.js", "--input", inputPath], { cwd: PROJECT_ROOT });
+
+  logger.info(`[CHRONOS] Deterministic pipeline query executed via built script: ${match[1]}`);
+
+  return {
+    status: "ok",
+    response: `Pipeline ${match[1]} completed.`,
+    a2ui: [
+      {
+        type: "display:section",
+        props: {
+          title: "Pipeline Execution",
+          description: `Deterministic execution of ${match[1]} through the built pipeline runner.`,
+          items: [
+            {
+              type: "display:log",
+              props: {
+                title: "Execution Output",
+                lines: output.split("\n").filter(Boolean).slice(-40),
+              },
+            },
+          ],
+        },
+      },
+    ],
+    pipeline: {
+      input: match[1],
+      status: "completed",
+    },
+    delegations: undefined,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function tryHandleChronosQuickAction(query: string) {
+  const match = query.match(QUICK_ACTION_PATTERN);
+  if (!match) return null;
+
+  const action = match[1];
+  const core = await loadChronosCore();
+
+  const collectActiveMissions = () => {
+    const roots = [
+      { dir: core.pathResolver.active("missions/public"), tier: "public" },
+      { dir: core.pathResolver.active("missions/confidential"), tier: "confidential" },
+    ];
+
+    const missions: Array<{
+      missionId: string;
+      status: string;
+      tier: string;
+      missionType?: string;
+      checkpoints: number;
+      nextTaskCount: number;
+      planReady: boolean;
+    }> = [];
+
+    for (const root of roots) {
+      if (!core.safeExistsSync(root.dir)) continue;
+      for (const item of core.safeReaddir(root.dir)) {
+        const missionDir = path.join(root.dir, item);
+        const statePath = path.join(missionDir, "mission-state.json");
+        if (!core.safeExistsSync(statePath)) continue;
+        const state = JSON.parse(core.safeReadFile(statePath, { encoding: "utf8" }) as string);
+        missions.push({
+          missionId: state.mission_id || item,
+          status: state.status,
+          tier: state.tier || root.tier,
+          missionType: state.mission_type,
+          checkpoints: state.git?.checkpoints?.length || 0,
+          nextTaskCount: core.safeExistsSync(path.join(missionDir, "NEXT_TASKS.json"))
+            ? ((JSON.parse(core.safeReadFile(path.join(missionDir, "NEXT_TASKS.json"), { encoding: "utf8" }) as string) as any[])?.length || 0)
+            : 0,
+          planReady: core.safeExistsSync(path.join(missionDir, "PLAN.md")),
+        });
+      }
+    }
+
+    return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
+  };
+
+  const readJson = (filePath: string) => JSON.parse(core.safeReadFile(filePath, { encoding: "utf8" }) as string);
+
+  switch (action) {
+    case "dashboard": {
+      const missions = collectActiveMissions();
+      const runtime = core.listAgentRuntimeSnapshots();
+      const pendingOutbox = [
+        ...core.listSurfaceOutboxMessages("slack"),
+        ...core.listSurfaceOutboxMessages("chronos"),
+      ].length;
+
+      return {
+        status: "ok",
+        response: `Dashboard ready. ${missions.length} missions, ${runtime.length} agent runtimes, ${pendingOutbox} pending outbox messages.`,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Operator Snapshot",
+              title: "Chronos Dashboard",
+              description: "Mission state, runtime health, and pending delivery are aligned into a single control surface snapshot.",
+              status: `${missions.length} missions`,
+            },
+          },
+          {
+            type: "display:metrics-row",
+            props: {
+              metrics: [
+                { label: "missions", value: missions.length, trend: "flat" },
+                { label: "runtime", value: runtime.length, trend: "flat" },
+                { label: "ready", value: runtime.filter((entry: any) => entry.agent.status === "ready").length, trend: "flat" },
+                { label: "outbox", value: pendingOutbox, trend: pendingOutbox > 0 ? "up" : "flat" },
+              ],
+            },
+          },
+          {
+            type: "display:table",
+            props: {
+              title: "Active Missions",
+              headers: ["Mission", "Status", "Tier", "Type", "Next", "Plan"],
+              rows: missions.slice(0, 12).map((mission) => [
+                mission.missionId,
+                mission.status,
+                mission.tier,
+                mission.missionType || "development",
+                String(mission.nextTaskCount),
+                mission.planReady ? "ready" : "pending",
+              ]),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "missions": {
+      const missions = collectActiveMissions();
+      return {
+        status: "ok",
+        response: `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Mission Control",
+              title: "Visible Missions",
+              description: "Chronos lists missions from active mission state under public and confidential tiers.",
+              status: `${missions.length} visible`,
+            },
+          },
+          {
+            type: "display:table",
+            props: {
+              title: "Mission Registry View",
+              headers: ["Mission", "Status", "Tier", "Checkpoints", "Next Tasks", "Plan"],
+              rows: missions.map((mission) => [
+                mission.missionId,
+                mission.status,
+                mission.tier,
+                String(mission.checkpoints),
+                String(mission.nextTaskCount),
+                mission.planReady ? "ready" : "pending",
+              ]),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "agents": {
+      const manifests = core.loadAgentManifests();
+      const runtimes = core.listAgentRuntimeSnapshots();
+      const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry]));
+      return {
+        status: "ok",
+        response: `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Agent Catalog",
+              title: "Available Agents",
+              description: "Manifest definitions are merged with current runtime status so operator decisions match actual runtime state.",
+              status: `${runtimes.length} active runtimes`,
+            },
+          },
+          {
+            type: "display:table",
+            props: {
+              title: "Agents",
+              headers: ["Agent", "Provider", "Model", "Status", "Capabilities"],
+              rows: manifests.map((manifest: any) => {
+                const runtime = runtimeById.get(manifest.agentId);
+                return [
+                  manifest.agentId,
+                  manifest.provider,
+                  manifest.modelId || "-",
+                  runtime?.agent.status || "offline",
+                  (manifest.capabilities || []).join(", "),
+                ];
+              }),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "vital-check": {
+      const missions = collectActiveMissions();
+      const runtimes = core.listAgentRuntimeSnapshots();
+      const readyCount = runtimes.filter((entry: any) => entry.agent.status === "ready").length;
+      const pendingOutbox = core.listSurfaceOutboxMessages("slack").length + core.listSurfaceOutboxMessages("chronos").length;
+      return {
+        status: "ok",
+        response: `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Vital Check",
+              title: "System Vital Signs",
+              description: "Mission load, runtime readiness, and surface delivery pressure.",
+              status: readyCount === runtimes.length ? "healthy" : "degraded",
+            },
+          },
+          {
+            type: "display:metrics-row",
+            props: {
+              metrics: [
+                { label: "missions", value: missions.length, trend: "flat" },
+                { label: "runtimes", value: runtimes.length, trend: "flat" },
+                { label: "ready", value: readyCount, trend: readyCount === runtimes.length ? "flat" : "down" },
+                { label: "outbox", value: pendingOutbox, trend: pendingOutbox > 0 ? "up" : "flat" },
+              ],
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "diagnostics": {
+      const runtimes = core.listAgentRuntimeSnapshots();
+      const problematic = runtimes.filter((entry: any) => entry.agent.status !== "ready");
+      const recentFiles = [
+        core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+        core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
+      ];
+      const recentLines = recentFiles.flatMap((file) => {
+        if (!core.safeExistsSync(file)) return [];
+        return (core.safeReadFile(file, { encoding: "utf8" }) as string).trim().split("\n").filter(Boolean).slice(-5);
+      }).slice(-10);
+      return {
+        status: "ok",
+        response: `Diagnostics loaded. ${problematic.length} non-ready runtimes detected.`,
+        a2ui: [
+          {
+            type: "display:section",
+            props: {
+              title: "Runtime Diagnostics",
+              description: "Non-ready runtime entries and recent control-plane events.",
+              items: [
+                {
+                  type: "display:table",
+                  props: {
+                    title: "Non-ready Runtimes",
+                    headers: ["Agent", "Status", "Owner", "Kind"],
+                    rows: problematic.length > 0
+                      ? problematic.map((entry: any) => [
+                          entry.agent.agentId,
+                          entry.agent.status,
+                          entry.agent.ownerId || "-",
+                          entry.agent.ownerType || "-",
+                        ])
+                      : [["none", "ready", "-", "-"]],
+                  },
+                },
+                {
+                  type: "display:log",
+                  props: {
+                    title: "Recent Events",
+                    lines: recentLines,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "capability-audit": {
+      const manifests = core.loadAgentManifests();
+      const capabilityCounts = manifests
+        .flatMap((manifest: any) => manifest.capabilities || [])
+        .reduce((acc: Record<string, number>, capability: string) => {
+          acc[capability] = (acc[capability] || 0) + 1;
+          return acc;
+        }, {});
+      const rows = Object.entries(capabilityCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 16)
+        .map(([capability, count]) => [capability, String(count)]);
+      return {
+        status: "ok",
+        response: `Capability audit complete. ${manifests.length} agent manifests were scanned.`,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Capability Audit",
+              title: "Manifest Capability Coverage",
+              description: "Capability density derived from current agent manifests.",
+              status: `${manifests.length} manifests`,
+            },
+          },
+          {
+            type: "display:table",
+            props: {
+              title: "Capabilities",
+              headers: ["Capability", "Agents"],
+              rows,
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "provider-check": {
+      const manifests = core.loadAgentManifests();
+      const runtimes = core.listAgentRuntimeSnapshots();
+      const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry.agent.status]));
+      return {
+        status: "ok",
+        response: `Provider inventory loaded for ${manifests.length} manifests.`,
+        a2ui: [
+          {
+            type: "display:table",
+            props: {
+              title: "Provider Status",
+              headers: ["Agent", "Provider", "Model", "Runtime"],
+              rows: manifests.map((manifest: any) => [
+                manifest.agentId,
+                manifest.provider,
+                manifest.modelId || "-",
+                runtimeById.get(manifest.agentId) || "offline",
+              ]),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "audit-log": {
+      const eventFiles = [
+        core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+        core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
+      ];
+      const events: Array<{ time: string; label: string; detail?: string; status?: string }> = [];
+      for (const file of eventFiles) {
+        if (!core.safeExistsSync(file)) continue;
+        const lines = (core.safeReadFile(file, { encoding: "utf8" }) as string).trim().split("\n").filter(Boolean);
+        for (const line of lines.slice(-12)) {
+          const event = JSON.parse(line);
+          events.push({
+            time: String(event.ts || new Date().toISOString()).slice(11, 19),
+            label: String(event.decision || event.event_type || "event"),
+            detail: String(event.mission_id || event.resource_id || "system"),
+            status: event.decision?.includes("failed") ? "error" : event.decision?.includes("completed") ? "ok" : "warning",
+          });
+        }
+      }
+      return {
+        status: "ok",
+        response: `Recent orchestration and mission audit events loaded.`,
+        a2ui: [
+          {
+            type: "display:timeline",
+            props: {
+              title: "Recent Audit Events",
+              events: events.slice(-12).reverse(),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "policies": {
+      const securityPolicyPath = core.pathResolver.knowledge("public/governance/security-policy.json");
+      const securityPolicy = readJson(securityPolicyPath);
+      const chronosPolicy = securityPolicy.role_permissions?.chronos_operator || {};
+      return {
+        status: "ok",
+        response: "Chronos operator policy loaded.",
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Governance",
+              title: "Chronos Operator Policy",
+              description: "Read scopes and runtime boundaries applied to the Chronos surface.",
+              status: "policy loaded",
+            },
+          },
+          {
+            type: "display:badges",
+            props: {
+              title: "Read Scopes",
+              items: (chronosPolicy.allow_read || []).map((scope: string) => ({ label: scope, tone: "info" })),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "knowledge": {
+      const roots = ["knowledge/public", "knowledge/public/architecture", "knowledge/public/governance"];
+      const files = roots.flatMap((root) => {
+        const dir = core.pathResolver.rootResolve(root);
+        if (!core.safeExistsSync(dir)) return [];
+        return core.safeReaddir(dir).map((name) => `${root}/${name}`);
+      }).slice(0, 24);
+      return {
+        status: "ok",
+        response: "Public knowledge surface refreshed.",
+        a2ui: [
+          {
+            type: "display:list",
+            props: {
+              title: "Public Knowledge Files",
+              items: files.map((file) => ({ label: file })),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    case "build-test": {
+      const buildOutput = core.safeExec("pnpm", ["run", "build"], { cwd: PROJECT_ROOT });
+      const testOutput = core.safeExec("pnpm", ["test"], { cwd: PROJECT_ROOT });
+      return {
+        status: "ok",
+        response: "Build and test completed.",
+        a2ui: [
+          {
+            type: "display:section",
+            props: {
+              title: "Build & Test",
+              description: "Deterministic local verification from Chronos.",
+              items: [
+                { type: "display:log", props: { title: "Build Output", lines: buildOutput.split("\n").slice(-20) } },
+                { type: "display:log", props: { title: "Test Output", lines: testOutput.split("\n").slice(-20) } },
+              ],
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    default:
+      return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
   try {
-    process.env.MISSION_ROLE ||= "chronos_gateway";
+    process.env.MISSION_ROLE ||= "chronos_operator";
+    const core = await loadChronosCore();
+    const {
+      isSlackMissionConfirmation,
+      recordChronosDelegationSummary,
+      recordChronosSurfaceRequest,
+      runSurfaceConversation,
+      safeReadFile,
+    } = core;
     const body = await req.json();
     const query = (body.query || body.intent || "").trim();
+    const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId : "chronos-default";
+    const pendingMissionProposal = getChronosMissionProposalState(sessionId, core);
+    const missionId = typeof body.missionId === "string" ? body.missionId : undefined;
+    const teamRole = typeof body.teamRole === "string" ? body.teamRole : undefined;
 
     if (!query) {
       return NextResponse.json({ error: "Missing query" }, { status: 400 });
     }
 
+    if (pendingMissionProposal && isSlackMissionConfirmation(query)) {
+      const issued = await issueChronosMissionFromProposal({
+        sessionId,
+        proposal: pendingMissionProposal.proposal,
+        sourceText: pendingMissionProposal.sourceText,
+      }, core);
+      clearChronosMissionProposalState(sessionId, core);
+      return NextResponse.json({
+        status: "ok",
+        response: [
+          `Mission ${issued.missionId} started.`,
+          `Type: ${issued.missionType}`,
+          `Tier: ${issued.tier}`,
+          `Persona: ${issued.persona}`,
+          issued.orchestrationStatus === "queued"
+            ? "Background orchestration has been queued."
+            : "Background orchestration could not be queued.",
+        ].join("\n"),
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Mission Started",
+              title: issued.missionId,
+              description: `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}.`,
+              status: issued.orchestrationStatus,
+            },
+          },
+          {
+            type: "display:badges",
+            props: {
+              title: "Mission Context",
+              items: [
+                { label: issued.missionType, tone: "info" },
+                { label: issued.tier, tone: "warning" },
+                { label: issued.persona, tone: "success" },
+              ],
+            },
+          },
+        ],
+        mission: issued,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const quickActionResponse = await tryHandleChronosQuickAction(query);
+    if (quickActionResponse) {
+      return NextResponse.json(quickActionResponse);
+    }
+
     const requestArtifactPath = recordChronosSurfaceRequest({
       query,
-      sessionId: body.sessionId,
+      sessionId,
       requesterId: body.requesterId || "chronos-ui",
     });
     const requestArtifact = JSON.parse(safeReadFile(requestArtifactPath, { encoding: "utf8" }) as string);
 
-    await ensureChronosAgent();
+    const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query);
+    if (deterministicPipelineResponse) {
+      return NextResponse.json(deterministicPipelineResponse);
+    }
+
+    await ensureChronosAgent({
+      missionId,
+      teamRole,
+      requesterId: body.requesterId || "chronos-ui",
+    });
     const conversation = await runSurfaceConversation({
       agentId: CHRONOS_AGENT_ID,
       query,
       senderAgentId: CHRONOS_AGENT_ID,
       cwd: PROJECT_ROOT,
+      missionId,
+      teamRole,
       delegationSummaryInstruction:
         "以下は委任先エージェントからの回答です。ユーザーに分かりやすくまとめて表示してください。必要なら A2UI を使ってください。追加の A2A は出力しないでください。",
     });
@@ -122,6 +895,66 @@ export async function POST(req: NextRequest) {
         delegationResults.length,
         delegationResults.map((d: any) => d.receiver).filter(Boolean)
       );
+    }
+
+    if (conversation.missionProposals && conversation.missionProposals.length > 0) {
+      const proposal = conversation.missionProposals[0];
+      saveChronosMissionProposalState({
+        sessionId,
+        proposal,
+        sourceText: query,
+      }, core);
+      const confirmationText = [
+        conversation.text || "I can turn this into a mission.",
+        "",
+        "If you want me to proceed, reply with `はい` or `お願いします` in this session.",
+      ].join("\n").trim();
+
+      return NextResponse.json({
+        status: "ok",
+        response: confirmationText,
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Mission Proposal",
+              title: proposal.summary || proposal.why || proposal.mission_type || "New mission",
+              description: conversation.text || "Chronos has prepared a mission proposal and is waiting for confirmation.",
+              status: "awaiting confirmation",
+            },
+          },
+          {
+            type: "display:badges",
+            props: {
+              title: "Proposed Configuration",
+              items: [
+                { label: proposal.mission_type || "development", tone: "info" },
+                { label: proposal.tier || "public", tone: "warning" },
+                { label: proposal.assigned_persona || "Ecosystem Architect", tone: "success" },
+              ],
+            },
+          },
+          {
+            type: "display:section",
+            props: {
+              title: "Next Step",
+              description: "Confirm from Chronos to issue the mission through mission_controller and queue orchestration.",
+              items: [
+                {
+                  type: "display:alert",
+                  props: {
+                    severity: "info",
+                    title: "Reply with confirmation",
+                    message: "Send `はい` or `お願いします` in this session to start the mission.",
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        delegations: delegationResults.length > 0 ? delegationResults : undefined,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     return NextResponse.json({

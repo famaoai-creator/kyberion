@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { logger, runSkill } from '../libs/core/index.js';
+import { logger, runSkill } from '@agent/core';
 
 describe('Coverage Boost: Core UI & Logic', () => {
   let logSpy: any;

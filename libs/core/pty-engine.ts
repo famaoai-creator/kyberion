@@ -191,8 +191,7 @@ class PtyRegistry {
     let adapter: TerminalAdapter;
 
     try {
-      const ptyModule = require('node-pty');
-      const ptyInstance = ptyModule.spawn(targetShell, args, {
+      const ptyInstance = pty.spawn(targetShell, args, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,

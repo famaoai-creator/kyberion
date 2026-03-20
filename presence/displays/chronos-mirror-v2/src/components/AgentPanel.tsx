@@ -47,6 +47,8 @@ interface HealthSnapshot {
   error: number;
 }
 
+type ChronosAccessRole = "readonly" | "localadmin";
+
 interface ManifestEntry {
   agentId: string;
   provider: string;
@@ -84,6 +86,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [health, setHealth] = useState<HealthSnapshot>({ total: 0, ready: 0, busy: 0, error: 0 });
+  const [accessRole, setAccessRole] = useState<ChronosAccessRole>("readonly");
   const [manifests, setManifests] = useState<ManifestEntry[]>([]);
   const [providers, setProviders] = useState<ProviderOption[]>([]);
   const [showSpawn, setShowSpawn] = useState(false);
@@ -104,6 +107,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         const data = await res.json();
         setAgents(data.agents || []);
         setHealth(data);
+        setAccessRole(data.accessRole || "readonly");
       }
     } catch (_) {}
   }, []);
@@ -114,6 +118,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       if (res.ok) {
         const data = await res.json();
         setManifests(data.manifests || []);
+        setAccessRole(data.accessRole || "readonly");
       }
     } catch (_) {}
   }, []);
@@ -132,6 +137,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           protocol: p.protocol,
         }));
         setProviders(opts);
+        setAccessRole(data.accessRole || "readonly");
         // Auto-select first available provider if none selected
         setSpawnProvider((prev) => {
           if (prev) return prev;
@@ -298,7 +304,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <div className="text-[8px] uppercase tracking-widest opacity-40">{agent.status}</div>
               <button
                 onClick={() => handleAgentAction(agent.agentId, "refresh")}
-                disabled={mutatingAgent === agent.agentId || !agent.supportsSoftRefresh}
+                disabled={accessRole !== "localadmin" || mutatingAgent === agent.agentId || !agent.supportsSoftRefresh}
                 className="p-1.5 rounded-lg hover:bg-emerald-900/30 text-emerald-400/40 hover:text-emerald-400 transition disabled:opacity-20"
                 title={agent.supportsSoftRefresh ? "Soft refresh context" : "Soft refresh unsupported"}
               >
@@ -306,7 +312,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </button>
               <button
                 onClick={() => handleAgentAction(agent.agentId, "restart")}
-                disabled={mutatingAgent === agent.agentId}
+                disabled={accessRole !== "localadmin" || mutatingAgent === agent.agentId}
                 className="p-1.5 rounded-lg hover:bg-amber-900/30 text-amber-400/40 hover:text-amber-400 transition disabled:opacity-20"
                 title="Restart agent runtime"
               >
@@ -321,7 +327,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </button>
               <button
                 onClick={() => handleShutdown(agent.agentId)}
-                disabled={mutatingAgent === agent.agentId}
+                disabled={accessRole !== "localadmin" || mutatingAgent === agent.agentId}
                 className="p-1.5 rounded-lg hover:bg-red-900/30 text-red-400/40 hover:text-red-400 transition disabled:opacity-20"
               >
                 <Trash2 size={12} />
@@ -486,10 +492,11 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/5 flex justify-between items-center">
           <div className="text-[9px] opacity-30 font-mono">
-            {health.total} agent{health.total !== 1 ? "s" : ""} registered
-            {manifests.length > 0 && ` · ${manifests.length} manifests`}
-          </div>
-          {!showSpawn && (
+              {health.total} agent{health.total !== 1 ? "s" : ""} registered
+              {manifests.length > 0 && ` · ${manifests.length} manifests`}
+              {` · ${accessRole}`}
+            </div>
+          {!showSpawn && accessRole === "localadmin" && (
             <button
               onClick={() => { setShowSpawn(true); setSpawnMode("manifest"); setSelectedManifest(""); }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-kyberion-gold/20 border border-kyberion-gold/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-kyberion-gold/30 transition"

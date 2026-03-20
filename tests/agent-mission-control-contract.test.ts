@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeExistsSync, safeReadFile } from '../libs/core/secure-io.js';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 describe('Agent mission control concept contract', () => {
   it('defines mission control schemas and coordination directories', () => {

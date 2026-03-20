@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '../libs/core/secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 
 const rootDir = process.cwd();
 

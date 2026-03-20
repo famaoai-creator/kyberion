@@ -225,6 +225,12 @@ export class ACPMediator {
         },
         async requestPermission(params: any) {
           const title = (params.toolCall?.title || '').toLowerCase();
+          const toolCallId = (params.toolCall?.toolCallId || '').toLowerCase();
+
+          if (toolCallId.includes('ask_user') || title.includes('asking user')) {
+            logger.warn(`[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`);
+            return { outcome: 'denied' as const };
+          }
 
           // Actuator restriction: check manifest whitelist/blacklist
           const manifest = getAgentManifest(this.options.threadId);

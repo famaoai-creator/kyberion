@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { probeSurfaceHealth } from '../libs/core/surface-runtime.js';
+import { probeSurfaceHealth } from '@agent/core/surface-runtime';
 
 describe('Runtime surface health probe', () => {
   const originalFetch = globalThis.fetch;

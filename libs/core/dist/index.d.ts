@@ -1,0 +1,75 @@
+/**
+ * @agent/core - Unified Entry Point
+ * All shared utilities and wrappers are centralized here.
+ * [STABLE RECONSTRUCTION VERSION 2]
+ */
+export * from './core.js';
+export * from './skill-wrapper.js';
+export * from './capability-wrapper.js';
+export * from './metrics.js';
+export * from './error-codes.js';
+export * as secureIo from './secure-io.js';
+export { safeReadFile, safeWriteFile, safeAppendFileSync, safeCopyFileSync, safeMoveSync, safeSymlinkSync, safeRmSync, safeUnlinkSync, safeMkdir, safeExistsSync, safeExec, safeReaddir, safeStat, safeLstat, safeReadlink, safeOpenAppendFile, safeFsyncFile } from './secure-io.js';
+export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } from './secure-io.js';
+export * as pathResolver from './path-resolver.js';
+export { rootDir, knowledge, scripts, active, vault, capabilityAssets, shared, sharedTmp, sharedExports, isProtected, capabilityEntry, capabilityDir, skillDir, missionDir, missionEvidenceDir, findMissionPath, resolve, rootResolve } from './path-resolver.js';
+export * from './fs-utils.js';
+export * from './cli-utils.js';
+export * from './ledger.js';
+export * from './src/logic-utils.js';
+export * from './src/lock-utils.js';
+export * from './src/retry-utils.js';
+export { parseData, stringifyData } from './data-utils.js';
+export * from './detectors.js';
+export * from './validators.js';
+export * as classifier from './classifier.js';
+export * from './knowledge-provider.js';
+export { secureFetch } from './network.js';
+export { distillPdfDesign } from './src/pdf-utils.js';
+export { generateNativePdf } from './src/native-pdf-engine/engine.js';
+export { generateNativePptx } from './src/native-pptx-engine/engine.js';
+export * as tierGuard from './tier-guard.js';
+export { detectTier, validateReadPermission, validateWritePermission, scanForConfidentialMarkers, validateSovereignBoundary } from './tier-guard.js';
+export * as secretGuard from './secret-guard.js';
+export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
+export * as orchestrator from './orchestrator.js';
+export { say } from './voice-synth.js';
+export * from './platform.js';
+export { terminalBridge } from './terminal-bridge.js';
+export { ReflexTerminal, ReflexTerminalOptions } from './reflex-terminal.js';
+export * from './sensor-engine.js';
+export * from './sensory-memory.js';
+export * from './stimuli-journal.js';
+export { MissionStatus, isValidTransition, transitionStatus } from './mission-status';
+export * from './a2ui';
+export * from './pty-engine';
+export * from './terminal-keys';
+export * from './agent-mediator';
+export * from './acp-mediator';
+export * from './agent-adapter';
+export * from './agent-registry';
+export * from './agent-lifecycle';
+export * from './a2a-bridge';
+export * from './agent-manifest';
+export * from './provider-discovery';
+export * from './runtime-supervisor';
+export * from './surface-runtime';
+export * from './artifact-store';
+export * from './approval-store';
+export * from './managed-process';
+export * from './mission-team-composer';
+export * from './mission-team-orchestrator';
+export * from './agent-runtime-supervisor';
+export * from './mission-orchestration-events';
+export * from './mission-orchestration-worker';
+export * from './mission-task-events';
+export * from './pipeline-contract';
+export * from './channel-surface';
+export * from './service-binding';
+export * from './policy-engine';
+export * from './trust-engine';
+export * from './audit-chain';
+export * from './agent-slo';
+export * from './kill-switch';
+export * from './shared-business-types.js';
+//# sourceMappingURL=index.d.ts.map

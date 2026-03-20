@@ -1,4 +1,4 @@
-import { handleAction } from '../libs/actuators/code-actuator/src/index';
+import { handleAction } from '../libs/actuators/code-actuator/src/index.js';
 import { logger } from '@agent/core';
 
 async function main() {

@@ -1,5 +1,5 @@
-import { ReflexTerminal } from '../libs/core/reflex-terminal.js';
-import { logger } from '../libs/core/index.js';
+import { ReflexTerminal } from '@agent/core/reflex-terminal';
+import { logger } from '@agent/core';
 
 async function checkRTMode() {
   logger.info('🔍 Checking ReflexTerminal Real Mode...');

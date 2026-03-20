@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { derivePipelineStatus, safeReadFile, validatePipelineAdf } from '../libs/core/index.js';
+import { derivePipelineStatus, safeReadFile, validatePipelineAdf } from '@agent/core';
 
 describe('Pipeline ADF contract', () => {
   it('accepts the canonical JSON pipeline shape used by runtime pipelines', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { safeExec, safeExistsSync, pathResolver } from '../libs/core/index.js';
+import { safeExec, safeExistsSync, pathResolver } from '@agent/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 

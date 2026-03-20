@@ -1,10 +1,10 @@
 import * as path from 'node:path';
-import { secureFetch } from '../libs/core/network.js';
-import { entropyGate } from '../libs/core/entropy-gate.js';
+import { secureFetch } from '@agent/core/network';
+import { entropyGate } from '@agent/core/entropy-gate';
 import chalk from 'chalk';
 import { safeReadFile, safeReaddir, safeExistsSync, pathResolver } from '@agent/core';
 
-import { secretGuard } from '../libs/core/secret-guard.js';
+import { secretGuard } from '@agent/core/secret-guard';
 
 const API_KEY = secretGuard.getSecret('MOLTBOOK_API_KEY');
 const MISSIONS_DIR = pathResolver.active('missions');
