@@ -89,10 +89,14 @@ interface BrowserRecordedAction {
   op: string;
   tab_id?: string;
   url?: string;
+  title?: string;
   ref?: string;
   selector?: string;
   text?: string;
   key?: string;
+  element_name?: string;
+  element_role?: string | null;
+  content_excerpt?: string;
   ts: string;
 }
 
@@ -386,6 +390,7 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         op: 'snapshot',
         tab_id: runtime.activeTabId,
         url: snapshot.url,
+        title: snapshot.title,
       });
     }
     case 'console':
@@ -417,13 +422,17 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         tab_id: runtime.activeTabId,
         url: page.url(),
       });
-    case 'content':
-      return recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: params.selector ? await page.innerText(params.selector) : await page.content() }, {
+    case 'content': {
+      const selector = params.selector ? resolve(params.selector) : undefined;
+      const content = selector ? await page.innerText(selector) : await page.content();
+      return recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: content }, {
         kind: 'capture',
         op: 'content',
         tab_id: runtime.activeTabId,
-        selector: params.selector ? resolve(params.selector) : undefined,
+        selector,
+        content_excerpt: typeof content === 'string' ? content.trim().slice(0, 120) : undefined,
       });
+    }
     case 'evaluate':
       return recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) }, {
         kind: 'capture',
@@ -489,22 +498,51 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
     case 'click_ref': {
       const ref = resolve(params.ref);
       const selector = resolveRefSelector(ctx, ref);
+      const element = findSnapshotElement(ctx, ref);
       await page.click(selector, { timeout: params.timeout || 5000 });
-      return recordBrowserAction(ctx, { kind: 'apply', op: 'click_ref', tab_id: runtime.activeTabId, ref, selector });
+      return recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'click_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+        element_name: element?.name,
+        element_role: element?.role,
+      });
     }
     case 'fill_ref': {
       const ref = resolve(params.ref);
       const text = resolve(params.text);
       const selector = resolveRefSelector(ctx, ref);
+      const element = findSnapshotElement(ctx, ref);
       await page.fill(selector, text, { timeout: params.timeout || 5000 });
-      return recordBrowserAction(ctx, { kind: 'apply', op: 'fill_ref', tab_id: runtime.activeTabId, ref, selector, text });
+      return recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'fill_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+        text,
+        element_name: element?.name,
+        element_role: element?.role,
+      });
     }
     case 'press_ref': {
       const ref = resolve(params.ref);
       const key = resolve(params.key);
       const selector = resolveRefSelector(ctx, ref);
+      const element = findSnapshotElement(ctx, ref);
       await page.press(selector, key, { timeout: params.timeout || 5000 });
-      return recordBrowserAction(ctx, { kind: 'apply', op: 'press_ref', tab_id: runtime.activeTabId, ref, selector, key });
+      return recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'press_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+        key,
+        element_name: element?.name,
+        element_role: element?.role,
+      });
     }
     case 'wait':
       if (params.selector) { await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 }); } 
@@ -532,6 +570,12 @@ function resolveRefSelector(ctx: any, ref: string): string {
   return selector;
 }
 
+function findSnapshotElement(ctx: any, ref: string): BrowserSnapshotElement | undefined {
+  const elements = ctx?.last_snapshot?.elements;
+  if (!Array.isArray(elements)) return undefined;
+  return elements.find((element: BrowserSnapshotElement) => element.ref === ref);
+}
+
 function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>): any {
   const trail = Array.isArray(ctx?.action_trail) ? ctx.action_trail : [];
   return {
@@ -557,23 +601,54 @@ function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
     switch (action.op) {
       case 'goto':
       case 'open_tab':
-        if (action.url) lines.push(`  await page.goto(${JSON.stringify(action.url)});`);
+        if (action.url) {
+          lines.push(`  await page.goto(${JSON.stringify(action.url)});`);
+          lines.push(`  await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+        }
+        break;
+      case 'snapshot':
+        if (action.url) lines.push(`  await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+        if (action.title) lines.push(`  await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
         break;
       case 'click':
       case 'click_ref':
-        if (action.selector) lines.push(`  await page.click(${JSON.stringify(action.selector)});`);
+        if (action.selector) {
+          if (action.element_name || action.element_role) {
+            lines.push(`  // assert target is visible before click: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
+          }
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          lines.push(`  await page.click(${JSON.stringify(action.selector)});`);
+        }
         break;
       case 'fill':
       case 'fill_ref':
-        if (action.selector) lines.push(`  await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`);
+        if (action.selector) {
+          if (action.element_name || action.element_role) {
+            lines.push(`  // assert target is ready for input: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
+          }
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          lines.push(`  await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`);
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`);
+        }
         break;
       case 'press':
       case 'press_ref':
-        if (action.selector) lines.push(`  await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`);
+        if (action.selector) {
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          lines.push(`  await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`);
+        }
         break;
       case 'wait':
       case 'wait_ref':
-        if (action.selector) lines.push(`  await page.waitForSelector(${JSON.stringify(action.selector)});`);
+        if (action.selector) {
+          lines.push(`  await page.waitForSelector(${JSON.stringify(action.selector)});`);
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+        }
+        break;
+      case 'content':
+        if (action.selector && action.content_excerpt) {
+          lines.push(`  await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`);
+        }
         break;
       default:
         break;

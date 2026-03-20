@@ -182,6 +182,7 @@ describe('browser-actuator v3 contract', () => {
         { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
         { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
         { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
+        { type: 'capture', op: 'content', params: { selector: 'button:nth-of-type(1)', export_as: 'content' } },
         { type: 'transform', op: 'export_playwright', params: { path: specPath, export_as: 'spec_path' } },
         { type: 'transform', op: 'export_adf', params: { path: adfPath, export_as: 'adf_path' } },
       ],
@@ -192,11 +193,18 @@ describe('browser-actuator v3 contract', () => {
       expect.objectContaining({ op: 'snapshot', kind: 'capture' }),
       expect.objectContaining({ op: 'click_ref', kind: 'apply', ref: '@e1' }),
       expect.objectContaining({ op: 'fill_ref', kind: 'apply', ref: '@e1', text: 'hello' }),
+      expect.objectContaining({ op: 'content', kind: 'capture', selector: 'button:nth-of-type(1)' }),
     ]);
     expect(result.context.spec_path).toBe(specPath);
     expect(result.context.adf_path).toBe(adfPath);
-    expect(fs.readFileSync(specPath, 'utf8')).toContain('await page.click("button:nth-of-type(1)");');
-    expect(fs.readFileSync(specPath, 'utf8')).toContain('await page.fill("button:nth-of-type(1)", "hello");');
+    const spec = fs.readFileSync(specPath, 'utf8');
+    expect(spec).toContain('await expect(page).toHaveURL("https://example.com");');
+    expect(spec).toContain('await expect(page).toHaveTitle("Test Page");');
+    expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
+    expect(spec).toContain('await page.click("button:nth-of-type(1)");');
+    expect(spec).toContain('await page.fill("button:nth-of-type(1)", "hello");');
+    expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toHaveValue("hello");');
+    expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toContainText("content");');
     expect(JSON.parse(fs.readFileSync(adfPath, 'utf8'))).toMatchObject({
       action: 'pipeline',
       session_id: 'browser-test',
