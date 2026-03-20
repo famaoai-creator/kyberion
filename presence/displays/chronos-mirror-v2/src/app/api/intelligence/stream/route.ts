@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { collectA2AHandoffs, collectAgentMessages } from "../../../../lib/agent-message-feed";
 import {
+  collectBrowserSessions,
   collectControlActionDetails,
   collectControlActions,
   collectOwnerSummaries,
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
           controlActions: collectControlActions(),
           controlActionDetails: collectControlActionDetails(),
           ownerSummaries: collectOwnerSummaries(),
+          browserSessions: collectBrowserSessions(),
         };
         const serialized = JSON.stringify(payload);
         if (serialized === previousPayload) return;

@@ -46,6 +46,9 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('risky actions');
     expect(component).toContain('approval required');
     expect(component).toContain('Recent Orchestration Events');
+    expect(component).toContain('Browser Sessions');
+    expect(component).toContain('recent browser trail');
+    expect(component).toContain('strict or hint mode');
     expect(component).toContain('Live Agent Conversation');
     expect(component).toContain('Selected Mission Thread');
     expect(component).toContain('A2A Handoff Trail');
@@ -99,6 +102,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(streamRoute).toContain('collectControlActions');
     expect(streamRoute).toContain('collectControlActionDetails');
     expect(streamRoute).toContain('collectOwnerSummaries');
+    expect(streamRoute).toContain('collectBrowserSessions');
     expect(streamRoute).toContain('retry: 3000');
     expect(route).toContain('controlActionCatalog');
     expect(route).toContain('controlActionAvailability');
@@ -113,6 +117,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('controlActions');
     expect(route).toContain('controlActionDetails');
     expect(route).toContain('ownerSummaries');
+    expect(route).toContain('browserSessions');
     expect(route).toContain('surfaceOutbox');
     expect(route).toContain('recentSurfaceOutbox');
     expect(route).toContain('clear_surface_outbox');
