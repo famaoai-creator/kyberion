@@ -2,7 +2,7 @@ import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSyn
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { chromium, BrowserContext, Page } from 'playwright';
+import { chromium, Browser, BrowserContext, Page } from 'playwright';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -31,6 +31,13 @@ interface BrowserAction {
     locale?: string;
     lease_ms?: number;
     keep_alive?: boolean;
+    user_data_dir?: string;
+    browser_channel?: 'chromium' | 'chrome';
+    profile_directory?: string;
+    launch_args?: string[];
+    connect_over_cdp?: boolean;
+    cdp_url?: string;
+    cdp_port?: number;
   };
   context?: Record<string, any>;
 }
@@ -119,6 +126,8 @@ interface BrowserRuntimeLease {
   userDataDir: string;
   sessionMetadataPath: string;
   leaseExpiresAt?: number;
+  browser?: Browser;
+  externalConnection?: boolean;
 }
 
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
@@ -143,7 +152,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 300000;
 
-  const userDataDir = path.join(BROWSER_RUNTIME_DIR, sessionId);
+  const userDataDir = path.resolve(process.cwd(), options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId));
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
   if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
   const sessionMetadataPath = path.join(BROWSER_SESSION_DIR, `${sessionId}.json`);
@@ -315,6 +324,21 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         op: 'close_session',
         tab_id: runtime.activeTabId,
       });
+    case 'pause_for_operator': {
+      const message = resolve(params.message || 'Operator input required. Press Enter to continue.');
+      await waitForOperatorContinue({
+        sessionId: ctx.session_id || 'default',
+        message,
+        continueFile: params.continue_file ? path.resolve(process.cwd(), resolve(params.continue_file)) : undefined,
+        pollMs: Number(params.poll_ms || 250),
+        timeoutMs: params.timeout_ms ? Number(params.timeout_ms) : undefined,
+      });
+      return recordBrowserAction(ctx, {
+        kind: 'control',
+        op: 'pause_for_operator',
+        tab_id: runtime.activeTabId,
+      });
+    }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
         const res = await executePipelineInternal(params.then, runtime, ctx, options, state, resolve);
@@ -750,7 +774,11 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     action_trail_count: 0,
     recent_actions: [],
   });
-  await lease.runtime.context.close();
+  if (lease.externalConnection && lease.browser) {
+    await lease.browser.close();
+  } else {
+    await lease.runtime.context.close();
+  }
   browserRuntimeLeases.delete(sessionId);
   return true;
 }
@@ -758,6 +786,40 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
 async function restartBrowserSession(sessionId: string): Promise<boolean> {
   const closed = await closeBrowserSession(sessionId);
   return closed;
+}
+
+async function waitForOperatorContinue(options: {
+  sessionId: string;
+  message: string;
+  continueFile?: string;
+  pollMs: number;
+  timeoutMs?: number;
+}): Promise<void> {
+  const startedAt = Date.now();
+  if (process.stdin.isTTY) {
+    logger.info(`⏸️ [BROWSER] ${options.message}`);
+    logger.info('⏎ [BROWSER] Press Enter in this terminal when manual browser work is complete.');
+    await new Promise<void>((resolve) => {
+      const onData = () => {
+        process.stdin.off('data', onData);
+        resolve();
+      };
+      process.stdin.resume();
+      process.stdin.once('data', onData);
+    });
+    return;
+  }
+
+  const continueFile = options.continueFile || path.join(BROWSER_RUNTIME_DIR, `${options.sessionId}.continue`);
+  logger.info(`⏸️ [BROWSER] ${options.message}`);
+  logger.info(`📄 [BROWSER] Waiting for continue file: ${continueFile}`);
+  while (true) {
+    if (safeExistsSync(continueFile)) return;
+    if (options.timeoutMs && Date.now() - startedAt > options.timeoutMs) {
+      throw new Error(`Timed out waiting for operator continue file: ${continueFile}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, options.pollMs));
+  }
 }
 
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
@@ -818,18 +880,43 @@ async function getOrCreateBrowserContext(
     return existing.runtime.context;
   }
 
+  if (options.connect_over_cdp) {
+    const cdpUrl = options.cdp_url || `http://127.0.0.1:${Number(options.cdp_port || 9222)}`;
+    logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
+    const browser = await chromium.connectOverCDP(cdpUrl);
+    const context = browser.contexts()[0];
+    if (!context) {
+      await browser.close();
+      throw new Error(`No browser context available via CDP at ${cdpUrl}`);
+    }
+    browserRuntimeLeases.set(sessionId, {
+      runtime: createBrowserRuntime(context),
+      userDataDir,
+      sessionMetadataPath,
+      browser,
+      externalConnection: true,
+    });
+    return context;
+  }
+
   logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
   const context = await chromium.launchPersistentContext(userDataDir, {
+    channel: options.browser_channel === 'chrome' ? 'chrome' : undefined,
     headless: options.headless !== false,
     viewport: options.viewport || { width: 1280, height: 720 },
     locale: options.locale || 'ja-JP',
     recordVideo: options.record_video ? { dir: videoDir } : undefined,
+    args: [
+      ...(Array.isArray(options.launch_args) ? options.launch_args : []),
+      ...(options.profile_directory ? [`--profile-directory=${options.profile_directory}`] : []),
+    ],
   });
 
   browserRuntimeLeases.set(sessionId, {
     runtime: createBrowserRuntime(context),
     userDataDir,
     sessionMetadataPath,
+    externalConnection: false,
   });
   return context;
 }
@@ -847,6 +934,7 @@ function getOrCreateBrowserRuntime(
     runtime,
     userDataDir,
     sessionMetadataPath,
+    externalConnection: false,
   });
   return runtime;
 }
@@ -868,7 +956,11 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       action_trail_count: 0,
       recent_actions: [],
     });
-    void lease.runtime.context.close();
+    if (lease.externalConnection && lease.browser) {
+      void lease.browser.close();
+    } else {
+      void lease.runtime.context.close();
+    }
     browserRuntimeLeases.delete(sessionId);
   }
 }
@@ -887,7 +979,11 @@ function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_acti
 
 async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
   for (const [sessionId, lease] of browserRuntimeLeases.entries()) {
-    await lease.runtime.context.close();
+    if (lease.externalConnection && lease.browser) {
+      await lease.browser.close();
+    } else {
+      await lease.runtime.context.close();
+    }
     browserRuntimeLeases.delete(sessionId);
   }
 }
@@ -972,28 +1068,6 @@ function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMe
 async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<BrowserSnapshot> {
   const { sessionId, tabId, maxElements } = options;
   const raw = await page.evaluate((max) => {
-    function buildCssPathFromDom(el: Element): string {
-      const segments: string[] = [];
-      let current: Element | null = el;
-      while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
-        const tag = current.tagName.toLowerCase();
-        const htmlEl = current as HTMLElement;
-        if (htmlEl.id) {
-          segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
-          break;
-        }
-        let index = 1;
-        let sibling = current.previousElementSibling;
-        while (sibling) {
-          if (sibling.tagName === current.tagName) index++;
-          sibling = sibling.previousElementSibling;
-        }
-        segments.unshift(`${tag}:nth-of-type(${index})`);
-        current = current.parentElement;
-      }
-      return segments.length ? segments.join(' > ') : 'body';
-    }
-
     const candidates = Array.from(document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]'));
     const visible = candidates.filter((node) => {
       const el = node as HTMLElement;
@@ -1011,6 +1085,24 @@ async function buildSnapshot(page: Page, options: { sessionId: string; tabId: st
       const name = aria || placeholder || text || el.getAttribute('name') || el.id || el.tagName.toLowerCase();
       const href = el instanceof HTMLAnchorElement ? el.href : null;
       const value = 'value' in el ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '') : null;
+      const segments: string[] = [];
+      let current: Element | null = el;
+      while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
+        const tag = current.tagName.toLowerCase();
+        const htmlEl = current as HTMLElement;
+        if (htmlEl.id) {
+          segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
+          break;
+        }
+        let elementIndex = 1;
+        let sibling = current.previousElementSibling;
+        while (sibling) {
+          if (sibling.tagName === current.tagName) elementIndex += 1;
+          sibling = sibling.previousElementSibling;
+        }
+        segments.unshift(`${tag}:nth-of-type(${elementIndex})`);
+        current = current.parentElement;
+      }
       return {
         ref: `@e${index + 1}`,
         tag: el.tagName.toLowerCase(),
@@ -1023,7 +1115,7 @@ async function buildSnapshot(page: Page, options: { sessionId: string; tabId: st
         value,
         visible: true,
         editable: el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement,
-        selector: buildCssPathFromDom(el),
+        selector: segments.length ? segments.join(' > ') : 'body',
       };
     });
   }, maxElements);
@@ -1067,4 +1159,5 @@ export {
   resetBrowserRuntimeLeasesForTest,
   closeBrowserSession,
   restartBrowserSession,
+  waitForOperatorContinue,
 };

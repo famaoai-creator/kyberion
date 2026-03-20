@@ -61,13 +61,21 @@ const mocks = vi.hoisted(() => {
     },
   };
 
+  const connectedBrowser = {
+    contexts: vi.fn(() => [context]),
+    close: vi.fn(async () => undefined),
+  };
+
   const launchPersistentContext = vi.fn(async () => context);
+  const connectOverCDP = vi.fn(async () => connectedBrowser);
 
   return {
     page,
     page2,
     context,
+    connectedBrowser,
     launchPersistentContext,
+    connectOverCDP,
     close,
     tracingStart,
     tracingStop,
@@ -78,6 +86,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('playwright', () => ({
   chromium: {
     launchPersistentContext: mocks.launchPersistentContext,
+    connectOverCDP: mocks.connectOverCDP,
   },
 }));
 
@@ -300,5 +309,74 @@ describe('browser-actuator v3 contract', () => {
 
     expect(await closeBrowserSession('browser-admin')).toBe(true);
     expect(mocks.close).toHaveBeenCalledTimes(2);
+  });
+
+  it('pauses for operator continuation using a continue file in non-tty mode', async () => {
+    const { handleAction } = await import('./index');
+    const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
+    fs.mkdirSync(outDir, { recursive: true });
+    const continueFile = path.join(outDir, 'browser-operator.continue');
+    if (fs.existsSync(continueFile)) fs.rmSync(continueFile, { force: true });
+
+    const stdinIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    setTimeout(() => {
+      fs.writeFileSync(continueFile, 'continue\n');
+    }, 25);
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-pause',
+      steps: [{ type: 'control', op: 'pause_for_operator', params: { continue_file: continueFile, poll_ms: 10, timeout_ms: 500 } }],
+      options: { headless: true },
+    });
+
+    Object.defineProperty(process.stdin, 'isTTY', { value: stdinIsTTY, configurable: true });
+    expect(fs.existsSync(continueFile)).toBe(true);
+  });
+
+  it('passes existing chrome profile launch options to playwright persistent context', async () => {
+    const { handleAction } = await import('./index');
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-profile',
+      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      options: {
+        headless: true,
+        browser_channel: 'chrome',
+        user_data_dir: 'active/shared/tmp/browser/chrome-profile',
+        profile_directory: 'Profile 1',
+        launch_args: ['--disable-features=Translate'],
+      },
+    });
+
+    expect(mocks.launchPersistentContext).toHaveBeenLastCalledWith(
+      path.resolve(process.cwd(), 'active/shared/tmp/browser/chrome-profile'),
+      expect.objectContaining({
+      channel: 'chrome',
+      args: ['--disable-features=Translate', '--profile-directory=Profile 1'],
+    }));
+  });
+
+  it('attaches to an existing Chrome instance over CDP without launching a new browser', async () => {
+    const { handleAction, closeBrowserSession } = await import('./index');
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-cdp',
+      steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+      options: {
+        connect_over_cdp: true,
+        cdp_port: 9333,
+        lease_ms: 60_000,
+      },
+    });
+
+    expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9333');
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+
+    expect(await closeBrowserSession('browser-cdp')).toBe(true);
+    expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
   });
 });
