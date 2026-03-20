@@ -41,8 +41,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateWritePermission = exports.validateReadPermission = exports.detectTier = exports.tierGuard = exports.generateNativePptx = exports.generateNativePdf = exports.distillPdfDesign = exports.secureFetch = exports.classifier = exports.stringifyData = exports.parseData = exports.rootResolve = exports.resolve = exports.findMissionPath = exports.missionEvidenceDir = exports.missionDir = exports.skillDir = exports.capabilityDir = exports.capabilityEntry = exports.isProtected = exports.sharedExports = exports.sharedTmp = exports.shared = exports.capabilityAssets = exports.vault = exports.active = exports.scripts = exports.knowledge = exports.rootDir = exports.pathResolver = exports.safeUnlink = exports.safeAppendFile = exports.safeFsyncFile = exports.safeOpenAppendFile = exports.safeReadlink = exports.safeLstat = exports.safeStat = exports.safeReaddir = exports.safeExec = exports.safeExistsSync = exports.safeMkdir = exports.safeUnlinkSync = exports.safeRmSync = exports.safeSymlinkSync = exports.safeMoveSync = exports.safeCopyFileSync = exports.safeAppendFileSync = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
-exports.transitionStatus = exports.isValidTransition = exports.ReflexTerminal = exports.terminalBridge = exports.say = exports.orchestrator = exports.isSecretPath = exports.grantAccess = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = void 0;
+exports.generateNativeXlsx = exports.generateNativePptx = exports.generateNativePdf = exports.distillDocxDesign = exports.distillXlsxDesign = exports.distillPptxDesign = exports.distillPdfDesign = exports.secureFetch = exports.classifier = exports.stringifyData = exports.parseData = exports.rootResolve = exports.resolve = exports.findMissionPath = exports.missionEvidenceDir = exports.missionDir = exports.skillDir = exports.capabilityDir = exports.capabilityEntry = exports.isProtected = exports.sharedExports = exports.sharedTmp = exports.shared = exports.capabilityAssets = exports.vault = exports.active = exports.scripts = exports.knowledge = exports.rootDir = exports.pathResolver = exports.safeUnlink = exports.safeAppendFile = exports.safeFsyncFile = exports.safeOpenAppendFile = exports.safeReadlink = exports.safeLstat = exports.safeStat = exports.safeReaddir = exports.safeExec = exports.safeExistsSync = exports.safeMkdir = exports.safeUnlinkSync = exports.safeRmSync = exports.safeSymlinkSync = exports.safeMoveSync = exports.safeCopyFileSync = exports.safeAppendFileSync = exports.safeWriteFile = exports.safeReadFile = exports.secureIo = void 0;
+exports.transitionStatus = exports.isValidTransition = exports.ReflexTerminal = exports.terminalBridge = exports.say = exports.docxUtils = exports.xlsxUtils = exports.pptxUtils = exports.orchestrator = exports.isSecretPath = exports.grantAccess = exports.getActiveSecrets = exports.getSecret = exports.secretGuard = exports.validateSovereignBoundary = exports.scanForConfidentialMarkers = exports.validateWritePermission = exports.validateReadPermission = exports.detectTier = exports.tierGuard = exports.generateNativeDocx = void 0;
 // Core Foundation (logger, ui, sre, Cache, fileUtils, errorHandler)
 __exportStar(require("./core.js"), exports);
 // Specific Wrappers & Metrics
@@ -115,10 +115,20 @@ var network_js_1 = require("./network.js");
 Object.defineProperty(exports, "secureFetch", { enumerable: true, get: function () { return network_js_1.secureFetch; } });
 var pdf_utils_js_1 = require("./src/pdf-utils.js");
 Object.defineProperty(exports, "distillPdfDesign", { enumerable: true, get: function () { return pdf_utils_js_1.distillPdfDesign; } });
+var pptx_utils_js_1 = require("./src/pptx-utils.js");
+Object.defineProperty(exports, "distillPptxDesign", { enumerable: true, get: function () { return pptx_utils_js_1.distillPptxDesign; } });
+var xlsx_utils_js_1 = require("./src/xlsx-utils.js");
+Object.defineProperty(exports, "distillXlsxDesign", { enumerable: true, get: function () { return xlsx_utils_js_1.distillXlsxDesign; } });
+var docx_utils_js_1 = require("./src/docx-utils.js");
+Object.defineProperty(exports, "distillDocxDesign", { enumerable: true, get: function () { return docx_utils_js_1.distillDocxDesign; } });
 var engine_js_1 = require("./src/native-pdf-engine/engine.js");
 Object.defineProperty(exports, "generateNativePdf", { enumerable: true, get: function () { return engine_js_1.generateNativePdf; } });
 var engine_js_2 = require("./src/native-pptx-engine/engine.js");
 Object.defineProperty(exports, "generateNativePptx", { enumerable: true, get: function () { return engine_js_2.generateNativePptx; } });
+var engine_js_3 = require("./src/native-xlsx-engine/engine.js");
+Object.defineProperty(exports, "generateNativeXlsx", { enumerable: true, get: function () { return engine_js_3.generateNativeXlsx; } });
+var engine_js_4 = require("./src/native-docx-engine/engine.js");
+Object.defineProperty(exports, "generateNativeDocx", { enumerable: true, get: function () { return engine_js_4.generateNativeDocx; } });
 // Governance & Security (Shield Layer)
 exports.tierGuard = __importStar(require("./tier-guard.js"));
 var tier_guard_js_1 = require("./tier-guard.js");
@@ -137,7 +147,9 @@ Object.defineProperty(exports, "isSecretPath", { enumerable: true, get: function
 exports.orchestrator = __importStar(require("./orchestrator.js"));
 // Domain Engines (Moved to @agent/shared-*)
 // export * as excelUtils from './excel-utils.js';
-// export * as pptxUtils from './pptx-utils.js';
+exports.pptxUtils = __importStar(require("./src/pptx-utils.js"));
+exports.xlsxUtils = __importStar(require("./src/xlsx-utils.js"));
+exports.docxUtils = __importStar(require("./src/docx-utils.js"));
 // export * as finance from './finance.js';
 // export * as mcpClient from './mcp-client-engine.js';
 // Voice & Presentation
