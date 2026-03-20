@@ -19,6 +19,12 @@ status: active
 ## 1. Goal
 Interact with web applications, extract content, and execute complex browser scenarios using Playwright.
 
+Current direction:
+
+- Playwright remains the execution engine
+- agent-facing interaction should move toward `snapshot + ref`
+- durable browser automation should be exportable into ADF and Playwright test skeletons
+
 ## 2. Dependencies
 - **Actuator**: `Browser-Actuator`
 
@@ -32,17 +38,29 @@ Interact with web applications, extract content, and execute complex browser sce
     }
     ```
 2.  **Screenshot**: Use `screenshot` to capture visual evidence of a page's state.
-3.  **Scenario Execution**: For complex interactions (login, form submission), define a structured scenario array.
+3.  **Snapshot First**: Prefer taking a structured DOM snapshot and operating on stable refs rather than reasoning over raw selectors.
+    ```json
+    {
+      "action": "snapshot",
+      "session_id": "browser-session-1"
+    }
+    ```
+4.  **Scenario Execution**: For complex interactions (login, form submission), define a structured scenario array.
     ```json
     {
       "action": "execute_scenario",
       "scenario": [
         { "action": "goto", "url": "https://example.com/login" },
-        { "action": "fill", "selector": "#username", "text": "admin" },
-        { "action": "click", "selector": "#submit" }
+        { "action": "fill_ref", "ref": "@e1", "text": "admin" },
+        { "action": "click_ref", "ref": "@e2" }
       ]
     }
     ```
 
+Selector-based steps are still acceptable for deterministic engineering automation, but `snapshot + ref` is the preferred contract for agent-driven interaction.
+
 ## 4. Expected Output
 State changes within the web application, extracted content, or visual evidence (screenshots).
+
+## 5. Reference
+- `knowledge/public/architecture/browser-actuator-v3.md`

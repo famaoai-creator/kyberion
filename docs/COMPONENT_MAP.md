@@ -236,6 +236,7 @@ The charter assumes strict isolation between these tiers.
 - `knowledge/public/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
 - `knowledge/public/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
 - `knowledge/public/architecture/slack-chronos-control-model.md`: also defines gateway, service binding, delivery actuator, and system actuator boundaries
+- `knowledge/public/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
 - `dependency-graph.mmd`: repo-level dependency visualization
 
 ## Recommended reading order for new contributors
