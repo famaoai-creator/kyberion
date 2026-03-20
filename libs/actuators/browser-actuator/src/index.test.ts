@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const mocks = vi.hoisted(() => {
   const pageHandlers = new Map<string, Record<string, Function>>();
@@ -162,5 +164,46 @@ describe('browser-actuator v3 contract', () => {
     expect(result.context.network).toEqual([
       expect.objectContaining({ tab_id: 'research', url: 'https://example.org/api' }),
     ]);
+  });
+
+  it('records action trails and exports playwright/adf artifacts', async () => {
+    const { handleAction } = await import('./index');
+    const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
+    fs.mkdirSync(outDir, { recursive: true });
+    const specPath = path.join(outDir, 'browser-test-playwright.spec.ts');
+    const adfPath = path.join(outDir, 'browser-test-pipeline.json');
+    if (fs.existsSync(specPath)) fs.rmSync(specPath, { force: true });
+    if (fs.existsSync(adfPath)) fs.rmSync(adfPath, { force: true });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
+        { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
+        { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
+        { type: 'transform', op: 'export_playwright', params: { path: specPath, export_as: 'spec_path' } },
+        { type: 'transform', op: 'export_adf', params: { path: adfPath, export_as: 'adf_path' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.context.action_trail).toEqual([
+      expect.objectContaining({ op: 'snapshot', kind: 'capture' }),
+      expect.objectContaining({ op: 'click_ref', kind: 'apply', ref: '@e1' }),
+      expect.objectContaining({ op: 'fill_ref', kind: 'apply', ref: '@e1', text: 'hello' }),
+    ]);
+    expect(result.context.spec_path).toBe(specPath);
+    expect(result.context.adf_path).toBe(adfPath);
+    expect(fs.readFileSync(specPath, 'utf8')).toContain('await page.click("button:nth-of-type(1)");');
+    expect(fs.readFileSync(specPath, 'utf8')).toContain('await page.fill("button:nth-of-type(1)", "hello");');
+    expect(JSON.parse(fs.readFileSync(adfPath, 'utf8'))).toMatchObject({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
+        { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
+      ],
+    });
   });
 });
