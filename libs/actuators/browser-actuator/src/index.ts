@@ -33,6 +33,31 @@ interface BrowserAction {
   context?: Record<string, any>;
 }
 
+interface BrowserSnapshotElement {
+  ref: string;
+  tag: string;
+  role: string | null;
+  text: string;
+  name: string;
+  type: string | null;
+  placeholder: string | null;
+  href: string | null;
+  value: string | null;
+  visible: boolean;
+  editable: boolean;
+  selector: string;
+}
+
+interface BrowserSnapshot {
+  session_id: string;
+  tab_id: string;
+  url: string;
+  title: string;
+  captured_at: string;
+  element_count: number;
+  elements: BrowserSnapshotElement[];
+}
+
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
 
@@ -83,7 +108,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     await dialog.accept();
   });
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx = { ...initialCtx, session_id: sessionId, timestamp: new Date().toISOString() };
   
   const resolveKey = (key: string): any => {
     // {{env.VAR_NAME}} → process.env.VAR_NAME
@@ -235,6 +260,20 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 async function opCapture(op: string, params: any, page: Page, ctx: any, resolve: Function) {
   switch (op) {
     case 'goto': await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' }); return { ...ctx, last_url: page.url() };
+    case 'snapshot': {
+      const snapshot = await buildSnapshot(page, {
+        sessionId: ctx.session_id || 'default',
+        tabId: params.tab_id || 'tab-1',
+        maxElements: Number(params.max_elements || 200),
+      });
+      return {
+        ...ctx,
+        last_snapshot: snapshot,
+        last_capture: snapshot,
+        ref_map: Object.fromEntries(snapshot.elements.map((element) => [element.ref, element.selector])),
+        [params.export_as || 'last_snapshot']: snapshot,
+      };
+    }
     case 'screenshot':
       const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
@@ -276,15 +315,113 @@ async function opApply(op: string, params: any, page: Page, ctx: any, resolve: F
     case 'click': await page.click(resolve(params.selector), { timeout: params.timeout || 5000 }); break;
     case 'fill': await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 }); break;
     case 'press': await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 }); break;
+    case 'click_ref': {
+      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      await page.click(selector, { timeout: params.timeout || 5000 });
+      break;
+    }
+    case 'fill_ref': {
+      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      await page.fill(selector, resolve(params.text), { timeout: params.timeout || 5000 });
+      break;
+    }
+    case 'press_ref': {
+      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      await page.press(selector, resolve(params.key), { timeout: params.timeout || 5000 });
+      break;
+    }
     case 'wait':
       if (params.selector) { await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 }); } 
       else { await page.waitForTimeout(params.duration || 1000); }
       break;
+    case 'wait_ref': {
+      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      await page.waitForSelector(selector, { state: params.state || 'visible', timeout: params.timeout || 10000 });
+      break;
+    }
     case 'log': logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`); break;
     default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
   return ctx;
+}
+
+function resolveRefSelector(ctx: any, ref: string): string {
+  const selector = ctx?.ref_map?.[ref];
+  if (!selector) {
+    throw new Error(`Unknown browser ref: ${ref}. Capture a snapshot before using *_ref actions.`);
+  }
+  return selector;
+}
+
+async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<BrowserSnapshot> {
+  const { sessionId, tabId, maxElements } = options;
+  const raw = await page.evaluate((max) => {
+    function buildCssPathFromDom(el: Element): string {
+      const segments: string[] = [];
+      let current: Element | null = el;
+      while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
+        const tag = current.tagName.toLowerCase();
+        const htmlEl = current as HTMLElement;
+        if (htmlEl.id) {
+          segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
+          break;
+        }
+        let index = 1;
+        let sibling = current.previousElementSibling;
+        while (sibling) {
+          if (sibling.tagName === current.tagName) index++;
+          sibling = sibling.previousElementSibling;
+        }
+        segments.unshift(`${tag}:nth-of-type(${index})`);
+        current = current.parentElement;
+      }
+      return segments.length ? segments.join(' > ') : 'body';
+    }
+
+    const candidates = Array.from(document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]'));
+    const visible = candidates.filter((node) => {
+      const el = node as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+    });
+
+    return visible.slice(0, max).map((node, index) => {
+      const el = node as HTMLElement;
+      const role = el.getAttribute('role');
+      const aria = el.getAttribute('aria-label');
+      const placeholder = el.getAttribute('placeholder');
+      const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+      const name = aria || placeholder || text || el.getAttribute('name') || el.id || el.tagName.toLowerCase();
+      const href = el instanceof HTMLAnchorElement ? el.href : null;
+      const value = 'value' in el ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '') : null;
+      return {
+        ref: `@e${index + 1}`,
+        tag: el.tagName.toLowerCase(),
+        role,
+        text,
+        name,
+        type: el.getAttribute('type'),
+        placeholder,
+        href,
+        value,
+        visible: true,
+        editable: el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement,
+        selector: buildCssPathFromDom(el),
+      };
+    });
+  }, maxElements);
+
+  return {
+    session_id: sessionId,
+    tab_id: tabId,
+    url: page.url(),
+    title: await page.title(),
+    captured_at: new Date().toISOString(),
+    element_count: raw.length,
+    elements: raw,
+  };
 }
 
 /**
@@ -306,4 +443,4 @@ if (require.main === module) {
   });
 }
 
-export { handleAction };
+export { handleAction, buildSnapshot, resolveRefSelector };
