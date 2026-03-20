@@ -640,9 +640,20 @@ function renderPlaywrightSkeleton(
     '',
     "test('browser recorded flow', async ({ page }) => {",
   ];
+  const setupLines: string[] = [];
+  const actionLines: string[] = [];
+  const assertionLines: string[] = [];
+  let stepNumber = 0;
 
-  const addAssertion = (statement: string) => {
-    lines.push(assertionMode === 'strict' ? `  ${statement}` : `  // assertion hint: ${statement}`);
+  const addAction = (statement: string, label?: string) => {
+    stepNumber += 1;
+    actionLines.push(`  // step ${stepNumber}: ${label || 'browser action'}`);
+    actionLines.push(`  ${statement}`);
+  };
+  const addAssertion = (statement: string, label?: string) => {
+    const rendered = assertionMode === 'strict' ? `  ${statement}` : `  // assertion hint: ${statement}`;
+    if (label) assertionLines.push(`  // ${label}`);
+    assertionLines.push(rendered);
   };
 
   for (const action of trail) {
@@ -650,52 +661,52 @@ function renderPlaywrightSkeleton(
       case 'goto':
       case 'open_tab':
         if (action.url) {
-          lines.push(`  await page.goto(${JSON.stringify(action.url)});`);
-          addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+          addAction(`await page.goto(${JSON.stringify(action.url)});`, `navigate to ${action.url}`);
+          addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`, 'navigation assertion');
         }
         break;
       case 'snapshot':
-        if (action.url) addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`);
+        if (action.url) addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`, 'snapshot assertion');
         if (action.title) addAssertion(`await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
         break;
       case 'click':
       case 'click_ref':
         if (action.selector) {
-          if (action.element_name || action.element_role) {
-            lines.push(`  // assert target is visible before click: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
-          }
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
-          lines.push(`  await page.click(${JSON.stringify(action.selector)});`);
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
+            `before click${action.element_name ? `: ${action.element_name}` : ''}`,
+          );
+          addAction(`await page.click(${JSON.stringify(action.selector)});`, `click ${action.ref || action.selector}`);
         }
         break;
       case 'fill':
       case 'fill_ref':
         if (action.selector) {
-          if (action.element_name || action.element_role) {
-            lines.push(`  // assert target is ready for input: ${[action.element_name, action.element_role].filter(Boolean).join(' / ')}`);
-          }
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
-          lines.push(`  await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`);
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`);
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
+            `before fill${action.element_name ? `: ${action.element_name}` : ''}`,
+          );
+          addAction(`await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`, `fill ${action.ref || action.selector}`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`, 'value assertion');
         }
         break;
       case 'press':
       case 'press_ref':
         if (action.selector) {
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
-          lines.push(`  await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`, 'before keypress');
+          addAction(`await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`, `press ${action.key || 'Enter'}`);
         }
         break;
       case 'wait':
       case 'wait_ref':
         if (action.selector) {
-          lines.push(`  await page.waitForSelector(${JSON.stringify(action.selector)});`);
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`);
+          addAction(`await page.waitForSelector(${JSON.stringify(action.selector)});`, `wait for ${action.ref || action.selector}`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`, 'wait assertion');
         }
         break;
       case 'content':
         if (action.selector && action.content_excerpt) {
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`);
+          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`, 'content assertion');
         }
         break;
       default:
@@ -703,8 +714,50 @@ function renderPlaywrightSkeleton(
     }
   }
 
+  if (setupLines.length > 0) {
+    lines.push('  // setup');
+    lines.push(...setupLines);
+    lines.push('');
+  }
+  if (actionLines.length > 0) {
+    lines.push('  // recorded actions');
+    lines.push(...actionLines);
+    lines.push('');
+  }
+  if (assertionLines.length > 0) {
+    lines.push(`  // ${assertionMode === 'strict' ? 'assertions' : 'assertion hints'}`);
+    lines.push(...assertionLines);
+    lines.push('');
+  }
   lines.push('});', '');
   return lines.join('\n');
+}
+
+async function closeBrowserSession(sessionId: string): Promise<boolean> {
+  cleanupExpiredBrowserRuntimeLeases();
+  const lease = browserRuntimeLeases.get(sessionId);
+  if (!lease) return false;
+  saveBrowserSessionMetadata(lease.sessionMetadataPath, {
+    session_id: sessionId,
+    user_data_dir: lease.userDataDir,
+    active_tab_id: lease.runtime.activeTabId,
+    tab_count: lease.runtime.tabs.size,
+    tabs: [],
+    updated_at: new Date().toISOString(),
+    lease_status: 'released',
+    retained: false,
+    lease_expires_at: undefined,
+    action_trail_count: 0,
+    recent_actions: [],
+  });
+  await lease.runtime.context.close();
+  browserRuntimeLeases.delete(sessionId);
+  return true;
+}
+
+async function restartBrowserSession(sessionId: string): Promise<boolean> {
+  const closed = await closeBrowserSession(sessionId);
+  return closed;
 }
 
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
@@ -1012,4 +1065,6 @@ export {
   renderPlaywrightSkeleton,
   renderBrowserAdf,
   resetBrowserRuntimeLeasesForTest,
+  closeBrowserSession,
+  restartBrowserSession,
 };

@@ -420,6 +420,7 @@ export function MissionIntelligence() {
   const [outboxTarget, setOutboxTarget] = useState<string | null>(null);
   const [missionActionTarget, setMissionActionTarget] = useState<string | null>(null);
   const [surfaceActionTarget, setSurfaceActionTarget] = useState<string | null>(null);
+  const [browserSessionTarget, setBrowserSessionTarget] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedMissionCardActionId, setExpandedMissionCardActionId] = useState<string | null>(null);
@@ -613,6 +614,28 @@ export function MissionIntelligence() {
       setError(err.message || "Surface control action failed");
     } finally {
       setSurfaceActionTarget(null);
+    }
+  };
+
+  const runBrowserSessionControl = async (sessionId: string, action: "close_browser_session" | "restart_browser_session") => {
+    try {
+      setBrowserSessionTarget(`${sessionId}:${action}`);
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          sessionId,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Browser session control action failed");
+      setActionResult(`${sessionId}: ${action}`);
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Browser session control action failed");
+    } finally {
+      setBrowserSessionTarget(null);
     }
   };
 
@@ -1080,6 +1103,24 @@ export function MissionIntelligence() {
                     trace: <span className="font-mono text-white/60">{session.last_trace_path}</span>
                   </div>
                 )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runBrowserSessionControl(session.session_id, "close_browser_session")}
+                    disabled={browserSessionTarget === `${session.session_id}:close_browser_session` || session.lease_status !== "active"}
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {browserSessionTarget === `${session.session_id}:close_browser_session` ? "closing" : "close session"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runBrowserSessionControl(session.session_id, "restart_browser_session")}
+                    disabled={browserSessionTarget === `${session.session_id}:restart_browser_session`}
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {browserSessionTarget === `${session.session_id}:restart_browser_session` ? "restarting" : "restart session"}
+                  </button>
+                </div>
                 <div className="mt-3 space-y-2">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">recent browser trail</div>
                   {session.recent_actions.length === 0 ? (

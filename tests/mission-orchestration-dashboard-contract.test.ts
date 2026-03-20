@@ -48,6 +48,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('Recent Orchestration Events');
     expect(component).toContain('Browser Sessions');
     expect(component).toContain('recent browser trail');
+    expect(component).toContain('close session');
+    expect(component).toContain('restart session');
     expect(component).toContain('strict or hint mode');
     expect(component).toContain('Live Agent Conversation');
     expect(component).toContain('Selected Mission Thread');
@@ -118,6 +120,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('controlActionDetails');
     expect(route).toContain('ownerSummaries');
     expect(route).toContain('browserSessions');
+    expect(route).toContain('close_browser_session');
+    expect(route).toContain('restart_browser_session');
     expect(route).toContain('surfaceOutbox');
     expect(route).toContain('recentSurfaceOutbox');
     expect(route).toContain('clear_surface_outbox');

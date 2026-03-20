@@ -259,4 +259,46 @@ describe('browser-actuator v3 contract', () => {
     expect(spec).toContain('// assertion hint: await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
     expect(spec).toContain('await page.click("button:nth-of-type(1)");');
   });
+
+  it('groups exported playwright skeleton into recorded actions and assertions with step labels', async () => {
+    const { renderPlaywrightSkeleton } = await import('./index');
+
+    const spec = renderPlaywrightSkeleton([
+      { kind: 'capture', op: 'snapshot', url: 'https://example.com', title: 'Test Page', ts: new Date().toISOString() },
+      { kind: 'apply', op: 'click_ref', selector: 'button:nth-of-type(1)', ref: '@e1', element_name: 'Submit', element_role: 'button', ts: new Date().toISOString() },
+      { kind: 'apply', op: 'fill_ref', selector: 'input:nth-of-type(1)', ref: '@e2', text: 'hello', element_name: 'Name', element_role: 'textbox', ts: new Date().toISOString() },
+    ], { assertions: 'strict' });
+
+    expect(spec).toContain('// recorded actions');
+    expect(spec).toContain('// assertions');
+    expect(spec).toContain('// step 1: click @e1');
+    expect(spec).toContain('// step 2: fill @e2');
+    expect(spec).toContain('// before click: Submit');
+    expect(spec).toContain('// before fill: Name');
+    expect(spec).toContain('// value assertion');
+  });
+
+  it('closes and restarts browser sessions through exported helpers', async () => {
+    const { handleAction, closeBrowserSession, restartBrowserSession } = await import('./index');
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-admin',
+      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      options: { headless: true, lease_ms: 60_000 },
+    });
+
+    expect(await restartBrowserSession('browser-admin')).toBe(true);
+    expect(mocks.close).toHaveBeenCalledTimes(1);
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-admin',
+      steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+      options: { headless: true, lease_ms: 60_000 },
+    });
+
+    expect(await closeBrowserSession('browser-admin')).toBe(true);
+    expect(mocks.close).toHaveBeenCalledTimes(2);
+  });
 });

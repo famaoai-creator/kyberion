@@ -3,6 +3,7 @@ import path from "node:path";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
 import { collectBrowserSessions, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
+import { applyBrowserSessionControl } from "../../../lib/browser-session-control";
 import {
   clearSurfaceOutboxMessage,
   emitChannelSurfaceEvent,
@@ -717,9 +718,36 @@ export async function POST(req: NextRequest) {
       action !== "restart_runtime_lease" &&
       action !== "clear_surface_outbox" &&
       action !== "mission_control" &&
-      action !== "surface_control"
+      action !== "surface_control" &&
+      action !== "close_browser_session" &&
+      action !== "restart_browser_session"
     ) {
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+    }
+
+    if (action === "close_browser_session" || action === "restart_browser_session") {
+      const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
+      if (!sessionId) {
+        return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
+      }
+      const ok = applyBrowserSessionControl(sessionId, action);
+      if (!ok) {
+        return NextResponse.json({ error: "Browser session not found" }, { status: 404 });
+      }
+      emitMissionOrchestrationObservation({
+        decision: "browser_session_control_applied",
+        event_type: "browser_session_control_applied",
+        requested_by: "chronos_localadmin",
+        resource_id: sessionId,
+        action,
+        why: "Chronos operator applied browser session control from the browser session panel.",
+      });
+      return NextResponse.json({
+        status: "ok",
+        action,
+        sessionId,
+        ts: new Date().toISOString(),
+      });
     }
 
     if (action === "mission_control") {
