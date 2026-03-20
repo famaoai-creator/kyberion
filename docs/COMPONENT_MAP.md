@@ -50,6 +50,10 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `scripts/mission_journal.ts`
 - `scripts/run_mission_orchestration_event_worker.ts`
 - `scripts/run_agent_runtime_supervisor.ts`
+- `libs/core/mission-orchestration-events.ts`
+- `libs/core/mission-orchestration-worker.ts`
+- `libs/core/agent-runtime-supervisor.ts`
+- `libs/core/a2a-bridge.ts`
 - `pipelines/vital-check.json`
 - `active/missions/`
 - `knowledge/public/architecture/agent-mission-control-model.md`
@@ -66,6 +70,13 @@ The current shape is:
   - runtime spawn/reuse/stop authority
 - `a2a-bridge`
   - work delegation to agent runtimes
+
+Local boot sequence:
+
+```bash
+pnpm agent-runtime:supervisor
+pnpm mission:orchestrator
+```
 
 Operational entrypoints should stay at the top level of `scripts/`.
 Ad hoc demos and one-off verification utilities should not live in the tracked operational script tree.
@@ -102,6 +113,13 @@ Chronos access modes:
   - route-local observer mode for health, missions, runtimes, outbox, and diagnostics
 - `localadmin`
   - route-local operator mode for deterministic mission/runtime/surface control actions
+
+Local Chronos boot:
+
+```bash
+export KYBERION_LOCALHOST_AUTOADMIN=true
+pnpm chronos:dev
+```
 
 Chronos does not directly own mission state. It delegates to:
 
@@ -213,6 +231,7 @@ The charter assumes strict isolation between these tiers.
 - `docs/PACKAGING_CONTRACT.md`: workspace/package import rules and boundary expectations
   - runtime code uses package imports only
   - white-box source imports in tests must stay explicitly whitelisted
+- `README.md`: current operator-oriented summary of mission controller, orchestration worker, runtime supervisor, Slack, and Chronos
 - `knowledge/public/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
 - `knowledge/public/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
 - `knowledge/public/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy

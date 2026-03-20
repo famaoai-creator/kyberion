@@ -4,7 +4,13 @@
 [![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
 [![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
 
-Kyberion is an **autonomous agent operating system** — a TypeScript monorepo that gives an AI agent a structured body (actuators), a tiered memory (knowledge), and a governed mission lifecycle to operate within.
+Kyberion is a **mission-first autonomous agent operating system**. It is a TypeScript monorepo that gives an AI agent:
+
+- a structured execution body through `libs/actuators/`
+- a tiered memory and governance layer through `knowledge/`
+- a durable mission lifecycle through `mission_controller`
+- a multi-agent orchestration model through events, A2A, and the runtime supervisor
+- operator-facing control surfaces through Slack and Chronos Mirror
 
 It is designed to be the runtime environment for an AI agent that performs real work: writing code, generating documents, calling APIs, and managing its own knowledge — all under a policy-driven governance layer.
 
@@ -23,46 +29,44 @@ It is designed to be the runtime environment for an AI agent that performs real 
 ## Architecture
 
 ```
-              ┌──────────────────────────────────┐
-              │  scripts/  (Entry Points)         │
-              │  mission_controller, run_intent,  │
-              │  run_a2a, context_ranker, cli     │
-              └──────────────┬───────────────────┘
-                             │
-              ┌──────────────▼───────────────────┐
-              │  libs/core  (Shared Kernel)       │
-              │  secure-io, path-resolver,        │
-              │  tier-guard, mission-status,       │
-              │  ledger, metrics, validators       │
-              └──────────────┬───────────────────┘
-                             │
-           ┌─────────────────┼─────────────────┐
-           │                 │                  │
-  ┌────────▼───────┐ ┌──────▼───────┐ ┌───────▼──────┐
-  │ libs/actuators/ │ │  knowledge/  │ │   active/    │
-  │ file, browser,  │ │ public/      │ │ missions/    │
-  │ code, network,  │ │ confidential/│ │ runtime/     │
-  │ system, wisdom  │ │ personal/    │ │ shared/      │
-  └────────────────┘ └──────────────┘ └──────────────┘
+Sovereign intent
+  -> surface ingress (Slack / Chronos / CLI)
+  -> mission proposal or direct reply
+  -> mission_controller (durable mission authority)
+  -> mission-orchestration-worker (event-driven control plane)
+  -> agent-runtime-supervisor (runtime authority)
+  -> a2a-bridge (agent work delegation)
+  -> libs/actuators/* (execution body)
+  -> artifacts, events, and outbox delivery
 ```
 
 | Path | Role |
 |---|---|
-| `libs/core/` | Shared kernel — secure I/O, path resolution, tier-guard, mission status machine, ledger |
+| `libs/core/` | Shared kernel — secure I/O, path resolution, mission orchestration events, runtime supervisor, A2A bridge |
 | `libs/actuators/` | Execution capabilities (file, browser, code, network, system, wisdom, media, etc.) |
 | `knowledge/` | Tiered memory — `public/` (governance), `confidential/` (org-internal), `personal/` (gitignored) |
-| `scripts/` | Entry points — mission controller, intent runner, A2A handler, context ranker |
+| `scripts/` | Entry points — mission controller, orchestration worker, runtime supervisor, dashboards, runtime surfaces |
 | `pipelines/` | ADF workflow definitions |
 | `active/` | Runtime workspace for missions, queues, and shared state (gitignored) |
+| `satellites/` | External bridges such as Slack |
+| `presence/displays/chronos-mirror-v2/` | Chronos operator control surface |
 
 ## Getting Started
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git && cd kyberion
 pnpm install
-pnpm run build && npx tsc -p libs/core/tsconfig.json
+pnpm build
 pnpm onboard                    # set up identity
 pnpm run cli -- list            # explore actuators
+```
+
+To boot the local control plane:
+
+```bash
+pnpm agent-runtime:supervisor
+pnpm mission:orchestrator
+KYBERION_LOCALHOST_AUTOADMIN=true pnpm chronos:dev
 ```
 
 ## Missions
@@ -95,6 +99,26 @@ planned ──► active ──► validating ──► distilling ──► com
                                           │
               active ──► distilling ───────┘
 ```
+
+### Orchestration Shape
+
+Kyberion keeps the mission model simple and pushes flexibility into the control plane:
+
+- `mission_controller`
+  - the only durable mission authority
+- `mission-orchestration-worker`
+  - reacts to events and performs deterministic control-plane actions
+- `agent-runtime-supervisor`
+  - the only runtime spawn/reuse/stop authority
+- `a2a-bridge`
+  - routes work requests between agents
+
+This gives a `single-owner, multi-worker` mission model:
+
+- one mission
+- one active owner
+- many delegated workers
+- event-driven retries and reconciliation
 
 ### Knowledge Distillation
 
@@ -144,6 +168,67 @@ Kyberion missions now follow a **single-owner, multi-worker** model.
 
 See `knowledge/public/architecture/agent-mission-control-model.md` for the authoritative model.
 
+## Control Surfaces
+
+### Slack
+
+Slack acts as a governed ingress surface. It can:
+
+- gather sovereign intent
+- carry `mission_proposal -> confirmation -> mission issue`
+- receive deterministic mission status updates from the shared outbox model
+
+### Chronos Mirror
+
+Chronos Mirror v2 is the operator-facing control surface. It provides:
+
+- mission intelligence and recent orchestration events
+- runtime lease doctor and remediation
+- surface outbox visibility
+- mission and surface control actions
+- live mission-scoped agent conversation and A2A handoff trails
+
+Access is intentionally split:
+
+- `readonly`
+  - inspect only
+- `localadmin`
+  - deterministic operator actions through backend controllers
+
+For localhost development:
+
+```bash
+export KYBERION_LOCALHOST_AUTOADMIN=true
+pnpm chronos:dev
+```
+
+See `knowledge/public/architecture/mission-orchestration-control-plane.md` for the control-plane model.
+
+## Build and Packaging
+
+Kyberion now separates package build from operational validation.
+
+- `pnpm build`
+  - builds package-local workspace artifacts first
+  - then builds repo-level `dist/`
+- operational validation and CI runtime checks execute built scripts under `dist/scripts/`
+- runtime code must import shared kernel modules through `@agent/core` public entrypoints only
+
+Examples:
+
+```ts
+import { safeReadFile } from "@agent/core/secure-io";
+import { pathResolver } from "@agent/core/path-resolver";
+```
+
+Do not import from:
+
+- `@agent/core/src/*`
+- `@agent/core/dist/*`
+- `../libs/core/*`
+
+See [docs/PACKAGING_CONTRACT.md](./docs/PACKAGING_CONTRACT.md).
+
 ## Governance
 
 ### Three-Tier Knowledge
@@ -177,6 +262,8 @@ pnpm run typecheck             # type check
 pnpm run test:unit             # unit tests
 pnpm run test:coverage         # with coverage
 pnpm run lint                  # lint
+pnpm chronos:lint              # Chronos app lint
+pnpm chronos:build             # Chronos production build
 pnpm vital                     # ecosystem health check
 ```
 

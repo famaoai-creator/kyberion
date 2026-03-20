@@ -1,6 +1,8 @@
-# Quick Start: Your Personal AI Agent Team
+# Quick Start: Mission-First Kyberion
 
-Kyberion is built on one idea: **you define who you are, and the system assembles the right AI team for you**. In three steps, you go from persona definition to automated workflows — with your knowledge kept secure in your own tier.
+Kyberion is built on one idea: **keep the mission model simple and let the control plane handle the orchestration**.
+
+You define intent, Kyberion creates or resumes a mission, and the runtime supervisor plus orchestration worker coordinate the rest.
 
 ## The Concept
 
@@ -15,7 +17,7 @@ The init wizard asks who you are. Based on your answer, it configures the ecosys
 
 ---
 
-## Step 1: Setup
+## Step 1: Setup and Build
 
 ```bash
 # Clone the repository
@@ -25,7 +27,7 @@ cd kyberion
 # Install dependencies
 pnpm install
 
-# Build runtime artifacts
+# Build package-local artifacts and repo dist
 pnpm build
 
 # Start background surfaces from the canonical manifest
@@ -44,11 +46,18 @@ The wizard will help you establish your:
 ## Step 2: Verify Your Environment
 
 ```bash
-npm run doctor
+pnpm run doctor
 pnpm capabilities
 ```
 
-`npm run doctor` で基本的な健全性を、`pnpm capabilities` で現在の OS / バイナリ環境に対してどのアクチュエータ機能が利用可能かを確認できます。
+`pnpm run doctor` で基本的な健全性を、`pnpm capabilities` で現在の OS / バイナリ環境に対してどのアクチュエータ機能が利用可能かを確認できます。
+
+If you want the local control plane running:
+
+```bash
+pnpm agent-runtime:supervisor
+pnpm mission:orchestrator
+```
 
 ## Step 3: Discover What You Can Run
 
@@ -95,11 +104,26 @@ The wizard created `knowledge/personal/` for you — a Git-ignored directory for
 | **Confidential** | `knowledge/confidential/` | Company standards, client-specific rules      |
 | **Public**       | `knowledge/`              | Shared frameworks, tech-stack guides          |
 
-Your personal settings always take priority. See [3-Tier Model](./README.md#3-tier-model) for details.
+Your personal settings always take priority. See [README: Governance](../README.md#governance) for details.
 
 ## Step 5: Your First Mission
 
 Every mission begins in **Phase 0: Alignment**. You must discuss your intent with the agent and establish a `TASK_BOARD.md` before executing actuators and mission flows.
+
+If you want an operator UI while doing this, start Chronos:
+
+```bash
+export KYBERION_LOCALHOST_AUTOADMIN=true
+pnpm chronos:dev
+```
+
+Chronos is the local control surface for:
+
+- mission state
+- runtime leases
+- surface outbox and delivery
+- control action queue
+- live agent conversation and A2A handoffs
 
 ### For CEOs / Executives
 
@@ -123,6 +147,7 @@ Every mission begins in **Phase 0: Alignment**. You must discuss your intent wit
 
 ## Next Steps
 
+- Read the top-level overview: [`README.md`](../README.md)
 - Browse available playbooks: [`knowledge/orchestration/mission-playbooks/`](./knowledge/orchestration/mission-playbooks/)
 - Install an external plugin:
   ```bash
