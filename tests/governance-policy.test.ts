@@ -113,6 +113,20 @@ describe('Read Permission Control (validateReadPermission)', () => {
     expect(result.allowed).toBe(true);
   });
 
+  it('chronos_operator cannot read personal mission knowledge', () => {
+    const file = pathResolver.knowledge('personal/missions');
+    process.env.MISSION_ROLE = 'chronos_operator';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(false);
+  });
+
+  it('chronos_localadmin remains blocked from personal mission knowledge', () => {
+    const file = pathResolver.knowledge('personal/missions');
+    process.env.MISSION_ROLE = 'chronos_localadmin';
+    const result = validateReadPermission(file);
+    expect(result.allowed).toBe(false);
+  });
+
   it('ecosystem_architect can read confidential knowledge (privileged)', () => {
     const file = pathResolver.knowledge('confidential/secret-doc.md');
     process.env.MISSION_ROLE = 'ecosystem_architect';

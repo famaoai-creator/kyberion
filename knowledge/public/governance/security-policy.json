@@ -83,15 +83,52 @@
       "allow_write": [
         "presence/bridge/runtime/",
         "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/orchestration/",
         "active/shared/observability/channels/slack/",
+        "active/shared/observability/mission-control/",
         "active/audit/"
       ]
     },
     "chronos_gateway": {
       "allow_write": [
         "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
         "active/shared/observability/chronos/",
+        "active/shared/observability/mission-control/",
         "active/shared/runtime/terminal/",
+        "active/audit/"
+      ]
+    },
+    "chronos_operator": {
+      "allow_read": [
+        "active/missions/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/shared/coordination/chronos/"
+      ],
+      "allow_write": []
+    },
+    "chronos_localadmin": {
+      "allow_read": [
+        "active/missions/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/shared/coordination/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/audit/"
+      ]
+    },
+    "surface_runtime": {
+      "allow_write": [
+        "active/shared/runtime/",
+        "active/shared/logs/surfaces/",
         "active/audit/"
       ]
     },

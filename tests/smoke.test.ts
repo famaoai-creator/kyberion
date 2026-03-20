@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile } from '../libs/core/index.js';
+import { safeExistsSync, safeReadFile } from '@agent/core';
 import { main as runCli } from '../scripts/cli.js';
 
 const rootDir = process.cwd();

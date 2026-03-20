@@ -17,7 +17,7 @@ import {
   surfaceManifestPath,
   surfaceResourceId,
   surfaceStatePath,
-} from '../libs/core/index.js';
+} from '@agent/core';
 
 type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status';
 

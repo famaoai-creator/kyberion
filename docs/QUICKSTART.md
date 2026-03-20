@@ -65,6 +65,26 @@ pnpm run cli -- search browser
 pnpm run cli -- info browser-actuator
 ```
 
+## Step 3.5: Keep Package Imports Clean
+
+When you write or change runtime code, import shared kernel modules through `@agent/core` public entrypoints only.
+
+Examples:
+
+```ts
+import { safeReadFile } from "@agent/core/secure-io";
+import { rootResolve } from "@agent/core/path-resolver";
+```
+
+Do not import from:
+
+- `@agent/core/src/*`
+- `@agent/core/dist/*`
+- `../libs/core/*`
+
+Reference:
+- [`docs/PACKAGING_CONTRACT.md`](./PACKAGING_CONTRACT.md)
+
 ## Step 4: Set Up Your Knowledge
 
 The wizard created `knowledge/personal/` for you — a Git-ignored directory for your private configuration.

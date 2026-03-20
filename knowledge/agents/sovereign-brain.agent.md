@@ -1,7 +1,7 @@
 ---
 agentId: sovereign-brain
 provider: gemini
-modelId: gemini-2.5-pro
+modelId: auto-gemini-3
 capabilities: [reasoning, strategy, coordination, analysis]
 auto_spawn: false
 trust_required: 3.0

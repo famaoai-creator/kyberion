@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadSurfaceState, readSurfaceLogTail, resolveSurfaceCwd, saveSurfaceState, surfaceStatePath } from '../libs/core/surface-runtime.js';
-import { pathResolver } from '../libs/core/index.js';
+import { loadSurfaceState, readSurfaceLogTail, resolveSurfaceCwd, saveSurfaceState, surfaceStatePath } from '@agent/core/surface-runtime';
+import { pathResolver } from '@agent/core';
 
 describe('Runtime surface state helpers', () => {
   afterEach(() => {

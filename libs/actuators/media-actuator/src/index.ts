@@ -1,13 +1,25 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  derivePipelineStatus,
+  pathResolver,
+  pptxUtils,
+  xlsxUtils,
+  docxUtils,
+  distillPdfDesign,
+  generateNativePptx,
+  generateNativeXlsx,
+  generateNativeDocx,
+  generateNativePdf,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as fs from 'node:fs'; // Only for fs.statSync in render operations
 import { execSync } from 'node:child_process';
 import * as excelUtils from '@agent/shared-media';
-import * as pptxUtils from '@agent/core/src/pptx-utils.js';
-import * as xlsxUtils from '@agent/core/src/xlsx-utils.js';
-import * as docxUtils from '@agent/core/src/docx-utils.js';
-import * as pdfUtils from '@agent/core/src/pdf-utils.js';
 
 /**
  * Media-Actuator v2.1.3 [SECURE-IO REINFORCED]
@@ -103,7 +115,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'pdf_extract': {
       const pdfPath = path.resolve(rootDir, resolve(params.path));
-      const pdfDesign = await pdfUtils.distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
+      const pdfDesign = await distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
     }
     default: return ctx;
@@ -226,7 +238,6 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
 
-      const { generateNativePptx } = await import('@agent/core/src/native-pptx-engine/engine.js');
       await generateNativePptx(protocol, outPath);
 
       const stats = fs.statSync(outPath);
@@ -237,7 +248,6 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const xlsxProtocol = ctx[params.design_from || 'last_xlsx_design'];
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path));
       if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
-      const { generateNativeXlsx } = await import('@agent/core/src/native-xlsx-engine/engine.js');
       await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
       const xlsxStats = fs.statSync(xlsxOutPath);
       logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
@@ -247,7 +257,6 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
       const docxOutPath = path.resolve(rootDir, resolve(params.path));
       if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
-      const { generateNativeDocx } = await import('@agent/core/src/native-docx-engine/engine.js');
       await generateNativeDocx(docxProtocol, docxOutPath);
       const docxStats = fs.statSync(docxOutPath);
       logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
@@ -257,7 +266,6 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
       const pdfOutPath = path.resolve(rootDir, resolve(params.path));
       if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
-      const { generateNativePdf } = await import('@agent/core/src/native-pdf-engine/engine.js');
       await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
       const pdfStats = fs.statSync(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);

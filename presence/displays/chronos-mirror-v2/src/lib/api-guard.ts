@@ -8,7 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 const API_TOKEN = process.env.KYBERION_API_TOKEN;
+const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
 const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === "true";
+const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN === "true";
+
+export type ChronosAccessRole = "readonly" | "localadmin";
 
 // In-memory rate limit store
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
@@ -40,6 +44,35 @@ function checkRateLimit(ip: string): boolean {
  * Validate an incoming API request.
  * Returns null if OK, or a NextResponse error if rejected.
  */
+function resolveToken(req: NextRequest): string | null {
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  return bearer || req.cookies.get("kyberion_token")?.value || null;
+}
+
+export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
+  const ip = getClientIP(req);
+  const isLocal = isLoopback(ip);
+  const token = resolveToken(req);
+
+  if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
+    return "localadmin";
+  }
+  if (API_TOKEN && token === API_TOKEN) {
+    return "readonly";
+  }
+  if (isLocal && ALLOW_LOCALHOST_AUTOADMIN) {
+    return "localadmin";
+  }
+  if (isLocal) {
+    return "readonly";
+  }
+  if (!API_TOKEN && !LOCALADMIN_TOKEN && ALLOW_UNAUTH_REMOTE) {
+    return "readonly";
+  }
+  return null;
+}
+
 export function guardRequest(req: NextRequest): NextResponse | null {
   // Rate limiting (always applied)
   const ip = getClientIP(req);
@@ -50,30 +83,44 @@ export function guardRequest(req: NextRequest): NextResponse | null {
     );
   }
 
-  const isLocal = isLoopback(ip);
-  const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = req.cookies.get("kyberion_token")?.value;
-
-  // Authentication: if KYBERION_API_TOKEN is set, require it
-  if (API_TOKEN) {
-    if (token !== API_TOKEN && cookieToken !== API_TOKEN) {
-      if (!isLocal) {
-        return NextResponse.json(
-          { error: "Unauthorized. Set Authorization: Bearer <token>" },
-          { status: 401 }
-        );
-      }
-    }
-  } else {
-    // No token set: allow local only unless explicitly enabled
-    if (!isLocal && !ALLOW_UNAUTH_REMOTE) {
-      return NextResponse.json(
-        { error: "Unauthorized. Set KYBERION_API_TOKEN or enable KYBERION_ALLOW_UNAUTH_REMOTE=true" },
-        { status: 401 }
-      );
-    }
+  if (!resolveChronosAccessRole(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN." },
+      { status: 401 }
+    );
   }
 
   return null; // OK
+}
+
+export function requireChronosAccess(req: NextRequest, requiredRole: ChronosAccessRole): NextResponse | null {
+  const resolved = resolveChronosAccessRole(req);
+  if (!resolved) {
+    return NextResponse.json(
+      { error: "Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN." },
+      { status: 401 }
+    );
+  }
+  if (requiredRole === "localadmin" && resolved !== "localadmin") {
+    return NextResponse.json(
+      { error: "Forbidden. This action requires Chronos localadmin access." },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+export function roleToMissionRole(accessRole: ChronosAccessRole): string {
+  if (accessRole === "localadmin") {
+    return "chronos_localadmin";
+  }
+  return "chronos_operator";
+}
+
+export function getChronosAccessRoleOrThrow(req: NextRequest): ChronosAccessRole {
+  const resolved = resolveChronosAccessRole(req);
+  if (!resolved) {
+    throw new Error("Chronos access role was requested before authentication succeeded.");
+  }
+  return resolved;
 }

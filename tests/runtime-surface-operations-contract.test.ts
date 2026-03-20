@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '../libs/core/index.js';
+import { safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
 
@@ -33,8 +33,7 @@ describe('Runtime surface operations contract', () => {
   it('includes troubleshooting diagnostics in surface runtime status', () => {
     const surfaceRuntime = read('scripts/surface_runtime.ts');
     const lifecycleModel = read('knowledge/public/architecture/runtime-surface-lifecycle-model.md');
-    expect(surfaceRuntime).toContain("../libs/core/index.js");
-    expect(surfaceRuntime).not.toContain("from '@agent/core'");
+    expect(surfaceRuntime).toContain("from '@agent/core'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');

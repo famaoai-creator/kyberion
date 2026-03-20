@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '../libs/core/index.js';
+import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '@agent/core';
 import chalk from 'chalk';
 
 const ROOT_DIR = pathResolver.rootDir();

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission Orchestration Event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "mission_id",
+    "requested_by",
+    "created_at",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "mission_issue_requested",
+        "mission_team_prewarm_requested",
+        "mission_kickoff_requested",
+        "mission_followup_requested",
+        "mission_reconciliation_requested",
+        "mission_control_requested",
+        "surface_control_requested"
+      ]
+    },
+    "mission_id": { "type": "string" },
+    "requested_by": { "type": "string" },
+    "created_at": { "type": "string" },
+    "correlation_id": { "type": "string" },
+    "causation_id": { "type": "string" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "channel": { "type": "string" },
+        "threadTs": { "type": "string" },
+        "sourceText": { "type": "string" },
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "persona": { "type": "string" },
+        "missionType": { "type": "string" },
+        "teamRoles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "proposal": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

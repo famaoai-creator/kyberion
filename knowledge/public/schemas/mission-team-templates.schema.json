@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "templates"],
+  "properties": {
+    "version": { "type": "string" },
+    "templates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["required_roles", "optional_roles"],
+        "properties": {
+          "required_roles": { "type": "array", "items": { "type": "string" } },
+          "optional_roles": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

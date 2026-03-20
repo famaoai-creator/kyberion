@@ -208,6 +208,8 @@ export type SkillMetadata = CapabilityMetadata;
 export type SkillDefinition = CapabilityDefinition;
 export type SkillIndex = CapabilityIndex;
 
+export type { MissionContract } from './src/types/mission-contract.js';
+
 // ---------------------------------------------------------------------------
 // JSON Schema (lightweight internal representation)
 // ---------------------------------------------------------------------------

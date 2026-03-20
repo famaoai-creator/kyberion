@@ -7,7 +7,7 @@
 
 import { expect } from 'vitest';
 import type { CapabilityInput } from '@agent/core/types';
-import type { MissionContract } from '@agent/core/src/types/mission-contract';
+import type { MissionContract } from '@agent/core/types';
 
 /**
  * Custom matcher interface for TypeScript

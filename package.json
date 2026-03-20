@@ -2,6 +2,7 @@
   "name": "kyberion",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Monorepo for Kyberion Ecosystem",
   "engines": {
     "node": ">=20.0.0"
@@ -32,7 +33,11 @@
     "generate-index": "node dist/scripts/cli.js list > /dev/null",
     "cli": "node dist/scripts/cli.js",
     "mission": "node dist/scripts/mission_controller.js",
+    "mission:prewarm": "node dist/scripts/mission_controller.js prewarm",
     "mission:create": "node dist/scripts/create_mission.js",
+    "mission:team": "node dist/scripts/compose_mission_team.js",
+    "agent-runtime:supervisor": "node dist/scripts/run_agent_runtime_supervisor.js",
+    "mission:orchestrator": "node dist/scripts/run_mission_orchestration_event_worker.js",
     "mission:handoff": "node dist/scripts/mission_controller.js handoff",
     "vital": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json",
     "diagnose": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json",
@@ -46,6 +51,8 @@
     "surfaces:stop": "node dist/scripts/surface_runtime.js --action stop",
     "slack:bridge": "node dist/satellites/slack-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
+    "chronos:lint": "pnpm --dir presence/displays/chronos-mirror-v2 lint",
+    "chronos:build": "pnpm --dir presence/displays/chronos-mirror-v2 build",
     "terminal:bridge": "pnpm --filter @presence/terminal-bridge start",
     "capabilities": "node dist/scripts/capability_discovery.js",
     "system:upgrade:check": "node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-check.json",
@@ -120,6 +127,8 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@next/eslint-plugin-next": "^16.2.0",
     "@playwright/test": "^1.41.0",
     "@types/js-yaml": "^4.0.9",
     "@types/jszip": "^3.4.1",
@@ -128,6 +137,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "c8": "^10.1.3",
     "eslint": "^9.0.0",
+    "eslint-config-next": "^16.2.0",
     "globals": "^15.0.0",
     "husky": "^9.1.7",
     "json-schema-to-typescript": "^15.0.4",

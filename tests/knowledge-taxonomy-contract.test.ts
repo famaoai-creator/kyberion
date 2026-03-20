@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { safeReadFile } from '../libs/core/index.js';
+import { safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
 

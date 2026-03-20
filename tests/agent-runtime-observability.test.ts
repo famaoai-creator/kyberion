@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { agentLifecycle } from '../libs/core/agent-lifecycle.js';
-import { runtimeSupervisor } from '../libs/core/runtime-supervisor.js';
-import { agentRegistry } from '../libs/core/agent-registry.js';
-import { ACPMediator } from '../libs/core/acp-mediator.js';
+import { agentLifecycle } from '@agent/core/agent-lifecycle';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { agentRegistry } from '@agent/core/agent-registry';
+import { ACPMediator } from '@agent/core/acp-mediator';
 
 describe('agent runtime observability', () => {
   afterEach(async () => {

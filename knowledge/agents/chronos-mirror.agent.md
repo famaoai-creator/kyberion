@@ -1,7 +1,7 @@
 ---
 agentId: chronos-mirror
 provider: gemini
-modelId: auto-gemini-3
+modelId: gemini-2.5-flash
 capabilities: [a2ui, dashboard, commands, gateway]
 auto_spawn: false
 trust_required: 0

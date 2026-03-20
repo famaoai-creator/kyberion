@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '../libs/core/secure-io.js';
-import { getAllFiles } from '../libs/core/fs-utils.js';
+import { safeReadFile } from '@agent/core/secure-io';
+import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [

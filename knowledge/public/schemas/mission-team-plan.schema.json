@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["mission_id", "mission_type", "tier", "template", "assignments"],
+  "properties": {
+    "mission_id": { "type": "string" },
+    "mission_type": { "type": "string" },
+    "tier": { "type": "string" },
+    "template": { "type": "string" },
+    "assigned_persona": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["team_role", "required", "status"],
+        "properties": {
+          "team_role": { "type": "string" },
+          "required": { "type": "boolean" },
+          "status": { "enum": ["assigned", "unfilled"] },
+          "agent_id": { "type": ["string", "null"] },
+          "authority_role": { "type": ["string", "null"] },
+          "provider": { "type": ["string", "null"] },
+          "modelId": { "type": ["string", "null"] },
+          "required_capabilities": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

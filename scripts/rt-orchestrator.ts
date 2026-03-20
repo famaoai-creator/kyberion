@@ -4,9 +4,9 @@
  * Now with Stimuli Inbox monitoring.
  */
 
-import { ReflexTerminal } from '../libs/core/reflex-terminal.js';
-import { logger, safeExistsSync, safeReadFile, safeStat, safeWriteFile } from '../libs/core/index.js';
-import * as pathResolver from '../libs/core/path-resolver.js';
+import { ReflexTerminal } from '@agent/core/reflex-terminal';
+import { logger, safeExistsSync, safeReadFile, safeStat, safeWriteFile } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
 
 const INBOX_PATH = pathResolver.resolve('active/shared/rt_inbox.jsonl');
 

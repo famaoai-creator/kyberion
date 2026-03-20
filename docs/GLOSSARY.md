@@ -84,6 +84,23 @@ Kyberion's background messaging, daemon, and observability model. See `docs/arch
 
 The runtime ownership registry for PTY sessions, agent runtimes, and services. It tracks liveness, idle reaping, and resource snapshots.
 
+### Packaging Contract
+
+The repo-wide import boundary rule that keeps `pnpm` workspaces, Next, Node scripts, and tests aligned.
+
+In practice this means:
+
+- runtime code imports `@agent/core` through public package entrypoints
+- `src/` and `dist/` are internal layout details
+- `@agent/core` subpath imports are explicit and extensionless
+
+Reference:
+- `docs/PACKAGING_CONTRACT.md`
+
+### Agent Runtime Supervisor
+
+The operational front door for agent runtimes. It owns runtime ensure, ask, refresh, restart, stop, and prewarm flows so callers do not spawn providers independently.
+
 ### Reflex
 
 A predefined automatic response, often expressed declaratively in ADF instead of TypeScript.
@@ -100,13 +117,17 @@ The mission-local and global storage model for task claims, handoffs, reviews, m
 
 The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
 
+### Orchestration Worker
+
+The deterministic event worker that reacts to mission control-plane events, prewarms agent runtimes, emits A2A task requests, and reconciles mission artifacts back into durable state.
+
 ### Gateway
 
 A channel-facing ingress component that receives external events and normalizes them into governed internal artifacts. Examples include the Slack bridge and the Chronos API surface.
 
 ### Channel Outbox
 
-A channel-scoped delivery queue under `active/shared/coordination/channels/<channel>/outbox/` used to return approved responses to external systems such as Slack.
+A surface-scoped delivery queue under `active/shared/coordination/channels/<surface>/outbox/` used to return deterministic approved updates to external systems such as Slack and Chronos.
 
 ### Service Binding
 
@@ -128,6 +149,14 @@ A narrow actuator for creating, loading, deciding, and listing human approval re
 
 The authenticated interactive control surface behind Chronos Mirror v2. It can manage runtime sessions and summarize delegations, but it is not the authoritative mission owner.
 
+### Chronos Operator
+
+The read-only Chronos access level mapped to `chronos_operator`. It can inspect mission state, recent control-plane activity, runtime leases, and delivery backlogs without mutating system state.
+
+### Chronos Local Admin
+
+The bounded local control-plane access level mapped to `chronos_localadmin`. It can invoke deterministic backend actions such as mission control, runtime remediation, and surface control, but it still does not become the mission authority itself.
+
 ### Channel
 
 An external interaction context such as Slack or Chronos. A channel may have multiple concrete ports for ingress, egress, and streaming.
@@ -139,6 +168,14 @@ A concrete ingress or egress interface of a channel, described by role, directio
 ### Surface Agent
 
 A lightweight channel-local agent that improves interaction quality, context shaping, and handoff preparation without becoming the durable mission owner.
+
+### Surface Outbox
+
+The generic delivery contract shared by surfaces. Workers enqueue system updates there; bridges and control surfaces consume and render them asynchronously.
+
+### Runtime Lease Doctor
+
+The diagnostic view that inspects runtime lease metadata, finds stale/orphaned/error runtimes, and recommends or triggers remediation actions such as stop or restart.
 
 ### System Actuator
 

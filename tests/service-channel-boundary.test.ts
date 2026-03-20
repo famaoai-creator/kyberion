@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeReadFile } from '../libs/core/secure-io.js';
+import { safeReadFile } from '@agent/core/secure-io';
 
 function read(relPath: string): string {
   return safeReadFile(relPath, { encoding: 'utf8' }) as string;

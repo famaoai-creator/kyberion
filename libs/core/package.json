@@ -3,96 +3,132 @@
   "version": "1.0.0",
   "private": true,
   "description": "Core utilities and wrappers for Kyberion.",
-  "main": "../../dist/libs/core/index.js",
-  "types": "../../dist/libs/core/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "../../dist/libs/core/index.d.ts",
-      "default": "../../dist/libs/core/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
-    "./validators": {
-      "types": "../../dist/libs/core/validators.d.ts",
-      "default": "../../dist/libs/core/validators.js"
+    "./index": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
-    "./fs-utils": {
-      "types": "../../dist/libs/core/fs-utils.d.ts",
-      "default": "../../dist/libs/core/fs-utils.js"
-    },
-    "./cli-utils": {
-      "types": "../../dist/libs/core/cli-utils.d.ts",
-      "default": "../../dist/libs/core/cli-utils.js"
-    },
-    "./secure-io": {
-      "types": "../../dist/libs/core/secure-io.d.ts",
-      "default": "../../dist/libs/core/secure-io.js"
-    },
-    "./classifier": {
-      "types": "../../dist/libs/core/classifier.d.ts",
-      "default": "../../dist/libs/core/classifier.js"
-    },
-    "./path-resolver": {
-      "types": "../../dist/libs/core/path-resolver.d.ts",
-      "default": "../../dist/libs/core/path-resolver.js"
-    },
-    "./tier-guard": {
-      "types": "../../dist/libs/core/tier-guard.d.ts",
-      "default": "../../dist/libs/core/tier-guard.js"
-    },
-    "./network": {
-      "types": "../../dist/libs/core/network.d.ts",
-      "default": "../../dist/libs/core/network.js"
-    },
-    "./core": {
-      "types": "../../dist/libs/core/core.d.ts",
-      "default": "../../dist/libs/core/core.js"
-    },
-    "./logger": {
-      "types": "../../dist/libs/core/logger.d.ts",
-      "default": "../../dist/libs/core/logger.js"
-    },
-    "./metrics": {
-      "types": "../../dist/libs/core/metrics.d.ts",
-      "default": "../../dist/libs/core/metrics.js"
-    },
-    "./error-codes": {
-      "types": "../../dist/libs/core/error-codes.d.ts",
-      "default": "../../dist/libs/core/error-codes.js"
-    },
-    "./validate": {
-      "types": "../../dist/libs/core/validate.d.ts",
-      "default": "../../dist/libs/core/validate.js"
-    },
-    "./orchestrator": {
-      "types": "../../dist/libs/core/orchestrator.d.ts",
-      "default": "../../dist/libs/core/orchestrator.js"
-    },
-    "./ledger": {
-      "types": "../../dist/libs/core/ledger.d.ts",
-      "default": "../../dist/libs/core/ledger.js"
-    },
-    "./secret-guard": {
-      "types": "../../dist/libs/core/secret-guard.d.ts",
-      "default": "../../dist/libs/core/secret-guard.js"
-    },
-    "./test-utils": {
-      "types": "../../dist/libs/core/test-utils.d.ts",
-      "default": "../../dist/libs/core/test-utils.js"
-    },
-    "./pulse-guard": {
-      "types": "../../dist/libs/core/pulse-guard.d.ts",
-      "default": "../../dist/libs/core/pulse-guard.js"
+    "./a2a-bridge": {
+      "types": "./dist/a2a-bridge.d.ts",
+      "default": "./dist/a2a-bridge.js"
     },
     "./acp-mediator": {
-      "types": "../../dist/libs/core/acp-mediator.d.ts",
-      "default": "../../dist/libs/core/acp-mediator.js"
+      "types": "./dist/acp-mediator.d.ts",
+      "default": "./dist/acp-mediator.js"
+    },
+    "./agent-lifecycle": {
+      "types": "./dist/agent-lifecycle.d.ts",
+      "default": "./dist/agent-lifecycle.js"
+    },
+    "./agent-manifest": {
+      "types": "./dist/agent-manifest.d.ts",
+      "default": "./dist/agent-manifest.js"
+    },
+    "./agent-registry": {
+      "types": "./dist/agent-registry.d.ts",
+      "default": "./dist/agent-registry.js"
+    },
+    "./agent-runtime-supervisor": {
+      "types": "./dist/agent-runtime-supervisor.d.ts",
+      "default": "./dist/agent-runtime-supervisor.js"
+    },
+    "./channel-surface": {
+      "types": "./dist/channel-surface.d.ts",
+      "default": "./dist/channel-surface.js"
+    },
+    "./cli-utils": {
+      "types": "./dist/cli-utils.d.ts",
+      "default": "./dist/cli-utils.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./entropy-gate": {
+      "types": "./dist/entropy-gate.d.ts",
+      "default": "./dist/entropy-gate.js"
+    },
+    "./fs-utils": {
+      "types": "./dist/fs-utils.d.ts",
+      "default": "./dist/fs-utils.js"
+    },
+    "./managed-process": {
+      "types": "./dist/managed-process.d.ts",
+      "default": "./dist/managed-process.js"
+    },
+    "./mission-orchestration-events": {
+      "types": "./dist/mission-orchestration-events.d.ts",
+      "default": "./dist/mission-orchestration-events.js"
+    },
+    "./mission-team-composer": {
+      "types": "./dist/mission-team-composer.d.ts",
+      "default": "./dist/mission-team-composer.js"
+    },
+    "./mission-team-orchestrator": {
+      "types": "./dist/mission-team-orchestrator.d.ts",
+      "default": "./dist/mission-team-orchestrator.js"
+    },
+    "./network": {
+      "types": "./dist/network.d.ts",
+      "default": "./dist/network.js"
+    },
+    "./path-resolver": {
+      "types": "./dist/path-resolver.d.ts",
+      "default": "./dist/path-resolver.js"
+    },
+    "./pipeline-contract": {
+      "types": "./dist/pipeline-contract.d.ts",
+      "default": "./dist/pipeline-contract.js"
+    },
+    "./provider-discovery": {
+      "types": "./dist/provider-discovery.d.ts",
+      "default": "./dist/provider-discovery.js"
+    },
+    "./reflex-terminal": {
+      "types": "./dist/reflex-terminal.d.ts",
+      "default": "./dist/reflex-terminal.js"
+    },
+    "./runtime-supervisor": {
+      "types": "./dist/runtime-supervisor.d.ts",
+      "default": "./dist/runtime-supervisor.js"
+    },
+    "./secret-guard": {
+      "types": "./dist/secret-guard.d.ts",
+      "default": "./dist/secret-guard.js"
+    },
+    "./secure-io": {
+      "types": "./dist/secure-io.d.ts",
+      "default": "./dist/secure-io.js"
     },
     "./shared-business-types": {
-      "types": "../../dist/libs/core/shared-business-types.d.ts",
-      "default": "../../dist/libs/core/shared-business-types.js"
+      "types": "./dist/shared-business-types.d.ts",
+      "default": "./dist/shared-business-types.js"
     },
-    "./nerve-bridge": {
-      "types": "../../dist/libs/core/nerve-bridge.d.ts",
-      "default": "../../dist/libs/core/nerve-bridge.js"
+    "./surface-runtime": {
+      "types": "./dist/surface-runtime.d.ts",
+      "default": "./dist/surface-runtime.js"
+    },
+    "./trust-engine": {
+      "types": "./dist/trust-engine.d.ts",
+      "default": "./dist/trust-engine.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "default": "./dist/validate.js"
+    },
+    "./validators": {
+      "types": "./dist/validators.d.ts",
+      "default": "./dist/validators.js"
     }
   },
   "dependencies": {

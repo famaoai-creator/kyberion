@@ -5,7 +5,7 @@
  * mission contracts, and schema-based test data.
  */
 
-import type { MissionContract } from '@agent/core/src/types/mission-contract';
+import type { MissionContract } from '@agent/core/types';
 import type { CapabilityInput, TierLevel } from '@agent/core/types';
 
 /**

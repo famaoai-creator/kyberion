@@ -6,6 +6,7 @@
 
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { logger, pathResolver, safeAppendFileSync, safeExistsSync, safeReadFile } from '@agent/core';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
@@ -65,7 +66,6 @@ Agent resonance is stable.`;
 
 function osRelease() {
   try {
-    const { execSync } = require('node:child_process');
     return execSync('uname -sr', { encoding: 'utf8' }).trim();
   } catch (e) { return 'unknown'; }
 }

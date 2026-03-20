@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["version", "team_roles"],
+  "properties": {
+    "version": { "type": "string" },
+    "team_roles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description", "required_capabilities", "compatible_authority_roles", "preferred_agents", "preferred_models", "autonomy_level"],
+        "properties": {
+          "description": { "type": "string" },
+          "required_capabilities": { "type": "array", "items": { "type": "string" } },
+          "compatible_authority_roles": { "type": "array", "items": { "type": "string" } },
+          "preferred_agents": { "type": "array", "items": { "type": "string" } },
+          "preferred_models": { "type": "array", "items": { "type": "string" } },
+          "autonomy_level": { "enum": ["low", "medium", "high"] }
+        }
+      }
+    }
+  }
+}

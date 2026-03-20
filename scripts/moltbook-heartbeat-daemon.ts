@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { safeAppendFile, pathResolver, logger } from '@agent/core';
-import { secretGuard } from '../libs/core/secret-guard.js';
+import { secretGuard } from '@agent/core/secret-guard';
 
 /**
  * scripts/moltbook-heartbeat-daemon.ts
