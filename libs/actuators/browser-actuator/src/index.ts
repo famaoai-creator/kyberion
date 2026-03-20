@@ -84,6 +84,18 @@ interface BrowserRuntime {
   networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
 }
 
+interface BrowserRecordedAction {
+  kind: 'control' | 'capture' | 'apply';
+  op: string;
+  tab_id?: string;
+  url?: string;
+  ref?: string;
+  selector?: string;
+  text?: string;
+  key?: string;
+  ts: string;
+}
+
 const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
@@ -139,6 +151,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     session_id: sessionId,
     active_tab_id: runtime.activeTabId,
     browser_tabs: await summarizeTabs(runtime),
+    action_trail: Array.isArray(initialCtx?.action_trail) ? initialCtx.action_trail : [],
     timestamp: new Date().toISOString(),
   };
   
@@ -235,21 +248,30 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' });
       }
       if (params.select !== false) runtime.activeTabId = tabId;
-      return {
+      return recordBrowserAction({
         ...ctx,
         active_tab_id: runtime.activeTabId,
         browser_tabs: await summarizeTabs(runtime),
-      };
+      }, {
+        kind: 'control',
+        op: 'open_tab',
+        tab_id: tabId,
+        url: params.url ? resolve(params.url) : undefined,
+      });
     }
     case 'select_tab': {
       const tabId = resolve(params.tab_id);
       if (!runtime.tabs.has(tabId)) throw new Error(`Unknown browser tab: ${tabId}`);
       runtime.activeTabId = tabId;
-      return {
+      return recordBrowserAction({
         ...ctx,
         active_tab_id: runtime.activeTabId,
         browser_tabs: await summarizeTabs(runtime),
-      };
+      }, {
+        kind: 'control',
+        op: 'select_tab',
+        tab_id: tabId,
+      });
     }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -327,45 +349,87 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
   const page = getActivePage(runtime);
   switch (op) {
-    case 'goto': await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' }); return { ...ctx, last_url: page.url() };
+    case 'goto': {
+      const url = resolve(params.url);
+      await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
+      return recordBrowserAction({ ...ctx, last_url: page.url() }, {
+        kind: 'capture',
+        op: 'goto',
+        tab_id: runtime.activeTabId,
+        url,
+      });
+    }
     case 'tabs':
-      return {
+      return recordBrowserAction({
         ...ctx,
         browser_tabs: await summarizeTabs(runtime),
         [params.export_as || 'browser_tabs']: await summarizeTabs(runtime),
-      };
+      }, {
+        kind: 'capture',
+        op: 'tabs',
+        tab_id: runtime.activeTabId,
+      });
     case 'snapshot': {
       const snapshot = await buildSnapshot(page, {
         sessionId: ctx.session_id || 'default',
         tabId: runtime.activeTabId,
         maxElements: Number(params.max_elements || 200),
       });
-      return {
+      return recordBrowserAction({
         ...ctx,
         last_snapshot: snapshot,
         last_capture: snapshot,
         ref_map: Object.fromEntries(snapshot.elements.map((element) => [element.ref, element.selector])),
         [params.export_as || 'last_snapshot']: snapshot,
-      };
+      }, {
+        kind: 'capture',
+        op: 'snapshot',
+        tab_id: runtime.activeTabId,
+        url: snapshot.url,
+      });
     }
     case 'console':
-      return {
+      return recordBrowserAction({
         ...ctx,
         [params.export_as || 'console_events']: runtime.consoleEvents.slice(-(params.limit || 50)),
-      };
+      }, {
+        kind: 'capture',
+        op: 'console',
+        tab_id: runtime.activeTabId,
+      });
     case 'network':
-      return {
+      return recordBrowserAction({
         ...ctx,
         [params.export_as || 'network_events']: runtime.networkEvents.slice(-(params.limit || 50)),
-      };
+      }, {
+        kind: 'capture',
+        op: 'network',
+        tab_id: runtime.activeTabId,
+      });
     case 'screenshot':
       const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
-      return { ...ctx, [params.export_as || 'last_screenshot']: outPath };
-    case 'content': return { ...ctx, [params.export_as || 'last_capture']: params.selector ? await page.innerText(params.selector) : await page.content() };
-    case 'evaluate': return { ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) };
+      return recordBrowserAction({ ...ctx, [params.export_as || 'last_screenshot']: outPath }, {
+        kind: 'capture',
+        op: 'screenshot',
+        tab_id: runtime.activeTabId,
+        url: page.url(),
+      });
+    case 'content':
+      return recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: params.selector ? await page.innerText(params.selector) : await page.content() }, {
+        kind: 'capture',
+        op: 'content',
+        tab_id: runtime.activeTabId,
+        selector: params.selector ? resolve(params.selector) : undefined,
+      });
+    case 'evaluate':
+      return recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) }, {
+        kind: 'capture',
+        op: 'evaluate',
+        tab_id: runtime.activeTabId,
+      });
     default: 
       throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
@@ -386,6 +450,22 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const res = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
       return { ...ctx, [params.export_as]: res };
     }
+    case 'export_playwright': {
+      const trail = readRecordedActions(ctx, params.from);
+      const outPath = path.resolve(process.cwd(), resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`));
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      const content = renderPlaywrightSkeleton(trail);
+      safeWriteFile(outPath, content);
+      return { ...ctx, [params.export_as || 'playwright_spec_path']: outPath };
+    }
+    case 'export_adf': {
+      const trail = readRecordedActions(ctx, params.from);
+      const outPath = path.resolve(process.cwd(), resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`));
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      const adf = renderBrowserAdf(trail, ctx.session_id || 'default');
+      safeWriteFile(outPath, JSON.stringify(adf, null, 2));
+      return { ...ctx, [params.export_as || 'adf_path']: outPath };
+    }
     default: 
       throw new Error(`Unsupported transform operator in Browser-Actuator: ${op}`);
   }
@@ -397,38 +477,51 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
   const page = getActivePage(runtime);
   switch (op) {
-    case 'click': await page.click(resolve(params.selector), { timeout: params.timeout || 5000 }); break;
-    case 'fill': await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 }); break;
-    case 'press': await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 }); break;
+    case 'click':
+      await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'click', tab_id: runtime.activeTabId, selector: resolve(params.selector) });
+    case 'fill':
+      await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'fill', tab_id: runtime.activeTabId, selector: resolve(params.selector), text: resolve(params.text) });
+    case 'press':
+      await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'press', tab_id: runtime.activeTabId, selector: resolve(params.selector), key: resolve(params.key) });
     case 'click_ref': {
-      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      const ref = resolve(params.ref);
+      const selector = resolveRefSelector(ctx, ref);
       await page.click(selector, { timeout: params.timeout || 5000 });
-      break;
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'click_ref', tab_id: runtime.activeTabId, ref, selector });
     }
     case 'fill_ref': {
-      const selector = resolveRefSelector(ctx, resolve(params.ref));
-      await page.fill(selector, resolve(params.text), { timeout: params.timeout || 5000 });
-      break;
+      const ref = resolve(params.ref);
+      const text = resolve(params.text);
+      const selector = resolveRefSelector(ctx, ref);
+      await page.fill(selector, text, { timeout: params.timeout || 5000 });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'fill_ref', tab_id: runtime.activeTabId, ref, selector, text });
     }
     case 'press_ref': {
-      const selector = resolveRefSelector(ctx, resolve(params.ref));
-      await page.press(selector, resolve(params.key), { timeout: params.timeout || 5000 });
-      break;
+      const ref = resolve(params.ref);
+      const key = resolve(params.key);
+      const selector = resolveRefSelector(ctx, ref);
+      await page.press(selector, key, { timeout: params.timeout || 5000 });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'press_ref', tab_id: runtime.activeTabId, ref, selector, key });
     }
     case 'wait':
       if (params.selector) { await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 }); } 
       else { await page.waitForTimeout(params.duration || 1000); }
-      break;
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'wait', tab_id: runtime.activeTabId, selector: params.selector ? resolve(params.selector) : undefined });
     case 'wait_ref': {
-      const selector = resolveRefSelector(ctx, resolve(params.ref));
+      const ref = resolve(params.ref);
+      const selector = resolveRefSelector(ctx, ref);
       await page.waitForSelector(selector, { state: params.state || 'visible', timeout: params.timeout || 10000 });
-      break;
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'wait_ref', tab_id: runtime.activeTabId, ref, selector });
     }
-    case 'log': logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`); break;
+    case 'log':
+      logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`);
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'log', tab_id: runtime.activeTabId });
     default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
-  return ctx;
 }
 
 function resolveRefSelector(ctx: any, ref: string): string {
@@ -437,6 +530,102 @@ function resolveRefSelector(ctx: any, ref: string): string {
     throw new Error(`Unknown browser ref: ${ref}. Capture a snapshot before using *_ref actions.`);
   }
   return selector;
+}
+
+function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>): any {
+  const trail = Array.isArray(ctx?.action_trail) ? ctx.action_trail : [];
+  return {
+    ...ctx,
+    action_trail: [...trail, { ...action, ts: new Date().toISOString() }],
+  };
+}
+
+function readRecordedActions(ctx: any, from?: string): BrowserRecordedAction[] {
+  const candidate = from ? ctx?.[from] : ctx?.action_trail;
+  if (!Array.isArray(candidate)) return [];
+  return candidate as BrowserRecordedAction[];
+}
+
+function renderPlaywrightSkeleton(trail: BrowserRecordedAction[]): string {
+  const lines = [
+    "import { test, expect } from '@playwright/test';",
+    '',
+    "test('browser recorded flow', async ({ page }) => {",
+  ];
+
+  for (const action of trail) {
+    switch (action.op) {
+      case 'goto':
+      case 'open_tab':
+        if (action.url) lines.push(`  await page.goto(${JSON.stringify(action.url)});`);
+        break;
+      case 'click':
+      case 'click_ref':
+        if (action.selector) lines.push(`  await page.click(${JSON.stringify(action.selector)});`);
+        break;
+      case 'fill':
+      case 'fill_ref':
+        if (action.selector) lines.push(`  await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`);
+        break;
+      case 'press':
+      case 'press_ref':
+        if (action.selector) lines.push(`  await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`);
+        break;
+      case 'wait':
+      case 'wait_ref':
+        if (action.selector) lines.push(`  await page.waitForSelector(${JSON.stringify(action.selector)});`);
+        break;
+      default:
+        break;
+    }
+  }
+
+  lines.push('});', '');
+  return lines.join('\n');
+}
+
+function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
+  const steps: PipelineStep[] = [];
+  for (const action of trail) {
+    switch (action.op) {
+      case 'goto':
+      case 'open_tab':
+        if (action.url) steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });
+        break;
+      case 'click_ref':
+        if (action.ref) steps.push({ type: 'apply', op: 'click_ref', params: { ref: action.ref } });
+        break;
+      case 'fill_ref':
+        if (action.ref) steps.push({ type: 'apply', op: 'fill_ref', params: { ref: action.ref, text: action.text || '' } });
+        break;
+      case 'press_ref':
+        if (action.ref) steps.push({ type: 'apply', op: 'press_ref', params: { ref: action.ref, key: action.key || 'Enter' } });
+        break;
+      case 'wait_ref':
+        if (action.ref) steps.push({ type: 'apply', op: 'wait_ref', params: { ref: action.ref } });
+        break;
+      case 'click':
+        if (action.selector) steps.push({ type: 'apply', op: 'click', params: { selector: action.selector } });
+        break;
+      case 'fill':
+        if (action.selector) steps.push({ type: 'apply', op: 'fill', params: { selector: action.selector, text: action.text || '' } });
+        break;
+      case 'press':
+        if (action.selector) steps.push({ type: 'apply', op: 'press', params: { selector: action.selector, key: action.key || 'Enter' } });
+        break;
+      case 'wait':
+        if (action.selector) steps.push({ type: 'apply', op: 'wait', params: { selector: action.selector } });
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    action: 'pipeline',
+    session_id: sessionId,
+    steps,
+  };
 }
 
 function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
@@ -605,4 +794,4 @@ if (require.main === module) {
   });
 }
 
-export { handleAction, buildSnapshot, resolveRefSelector };
+export { handleAction, buildSnapshot, resolveRefSelector, renderPlaywrightSkeleton, renderBrowserAdf };
