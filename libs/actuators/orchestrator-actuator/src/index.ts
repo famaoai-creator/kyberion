@@ -221,7 +221,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           archetype_id: archetype.id,
           confidence: archetype.score,
           summary: archetype.summary_template,
-          user_facing_summary: `依頼を ${archetype.id} として解釈しました。${missingInputs.length > 0 ? '不足入力があります。' : '実行計画へ進めます。'}`,
+          user_facing_summary: `The request was normalized as ${archetype.id}.${missingInputs.length > 0 ? ' Additional input is required.' : ' Execution planning can proceed.'}`,
           normalized_scope: archetype.normalized_scope || [],
           target_actuators: archetype.target_actuators || [],
           deliverables: archetype.deliverables || [],
@@ -245,14 +245,14 @@ async function opTransform(op: string, params: any, ctx: any) {
             priority: 'now',
             action: 'Answer the clarification questions',
             reason: 'The request still has blocking ambiguity.',
-            suggested_followup_request: `次の不足入力を補ってください: ${missingInputs.join(', ')}`,
+            suggested_followup_request: `Please provide the following missing inputs: ${missingInputs.join(', ')}`,
           }]
         : [{
             id: 'review-plan',
             priority: 'next',
             action: 'Review the execution preview and start execution',
             reason: 'The request is sufficiently structured.',
-            suggested_followup_request: 'この計画で進めてください。',
+            suggested_followup_request: 'Please proceed with this plan.',
           }];
       return {
         ...ctx,
@@ -556,7 +556,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           action: `Review main artifact ${String(mainArtifact.id || 'artifact')}`,
           reason: 'Primary deliverable is ready for review.',
           suggested_command: `node dist/scripts/cli.js artifact ${mainArtifactPath}`,
-          suggested_followup_request: `主成果物 ${String(mainArtifact.id || 'artifact')} を確認してください。`,
+          suggested_followup_request: `Please review the main deliverable ${String(mainArtifact.id || 'artifact')}.`,
         });
         if (isLikelyBinaryArtifact) {
           nextActions.push({
@@ -565,7 +565,7 @@ async function opTransform(op: string, params: any, ctx: any) {
             action: `Open main artifact ${String(mainArtifact.id || 'artifact')}`,
             reason: 'The primary deliverable is a binary artifact and may be easier to review in a local viewer.',
             suggested_command: `node dist/scripts/cli.js open-artifact ${mainArtifactPath}`,
-            suggested_followup_request: `主成果物 ${String(mainArtifact.id || 'artifact')} をローカル viewer で確認してください。`,
+            suggested_followup_request: `Please open the main deliverable ${String(mainArtifact.id || 'artifact')} in a local viewer.`,
           });
         }
       }
@@ -578,7 +578,7 @@ async function opTransform(op: string, params: any, ctx: any) {
           action: 'Review evidence and validation artifacts',
           reason: 'Evidence artifacts are available in the delivery pack.',
           ...(evidenceArtifact?.path ? { suggested_command: `node dist/scripts/cli.js artifact ${String(evidenceArtifact.path)}` } : {}),
-          suggested_followup_request: 'テスト結果や証跡を確認してください。',
+          suggested_followup_request: 'Please review the evidence and validation artifacts.',
         });
       }
       return {

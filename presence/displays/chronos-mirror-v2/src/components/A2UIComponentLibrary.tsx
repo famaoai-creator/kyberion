@@ -1,18 +1,25 @@
 import React from 'react';
 import { Info, AlertTriangle, CheckCircle, Activity, Clock, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 /**
  * A2UI Component Library for Chronos Mirror v2
  */
 
+function useA2UIText() {
+  const locale = resolveChronosLocale();
+  return (key: string | undefined, fallbackEn: string) => key ? uxText(key, fallbackEn, locale) : fallbackEn;
+}
+
 // --- display:gauge ---
-export const KyberionGauge = ({ label, value, unit }: { label: string; value: number; unit: string }) => {
+export const KyberionGauge = ({ label, labelKey, value, unit }: { label: string; labelKey?: string; value: number; unit: string }) => {
+  const tx = useA2UIText();
   const percentage = Math.min(100, Math.max(0, value));
   const color = percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-kyberion-gold' : 'bg-red-500';
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="flex justify-between text-[10px] uppercase tracking-widest opacity-60">
-        <span>{label}</span>
+        <span>{tx(labelKey, label)}</span>
         <span>{value}{unit}</span>
       </div>
       <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
@@ -23,48 +30,55 @@ export const KyberionGauge = ({ label, value, unit }: { label: string; value: nu
 };
 
 // --- display:log ---
-export const KyberionLog = ({ title, lines }: { title: string; lines: string[] }) => (
-  <div className="flex flex-col gap-3 w-full">
-    <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2 text-slate-300/80">
-      <Info size={12} /> {title}
+export const KyberionLog = ({ title, titleKey, lines }: { title: string; titleKey?: string; lines: string[] }) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2 text-slate-300/80">
+        <Info size={12} /> {tx(titleKey, title)}
+      </div>
+      <div className="bg-slate-950/70 rounded-2xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[320px] border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        {lines.map((line, i) => (
+          <div key={i} className="opacity-70 border-l border-cyan-200/20 pl-3 leading-5 break-words">{line}</div>
+        ))}
+      </div>
     </div>
-    <div className="bg-slate-950/70 rounded-2xl p-4 font-mono text-[10px] space-y-1 overflow-y-auto max-h-[320px] border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      {lines.map((line, i) => (
-        <div key={i} className="opacity-70 border-l border-cyan-200/20 pl-3 leading-5 break-words">{line}</div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 // --- display:table ---
-export const KyberionTable = ({ title, headers, rows }: { title?: string; headers: string[]; rows: string[][] }) => (
-  <div className="flex flex-col gap-3 w-full">
-    {title && <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">{title}</div>}
-    <div className="bg-slate-950/70 rounded-2xl border border-white/8 overflow-hidden overflow-x-auto shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <table className="w-full text-[10px]">
-        <thead>
-          <tr className="border-b border-white/10 bg-white/[0.03]">
-            {headers.map((h, i) => (
-              <th key={i} className="px-4 py-3 text-left uppercase tracking-widest text-slate-400/85 font-bold whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.03] transition">
-              {(Array.isArray(row) ? row : Object.values(row)).map((cell: any, ci: number) => (
-                <td key={ci} className="px-4 py-3 text-slate-100/75 align-top">{typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}</td>
+export const KyberionTable = ({ title, titleKey, headers, rows }: { title?: string; titleKey?: string; headers: string[]; rows: string[][] }) => {
+  const tx = useA2UIText();
+  return (
+    <div className="flex flex-col gap-3 w-full">
+      {title && <div className="text-[10px] uppercase tracking-widest opacity-60 text-slate-300/80">{tx(titleKey, title)}</div>}
+      <div className="bg-slate-950/70 rounded-2xl border border-white/8 overflow-hidden overflow-x-auto shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <table className="w-full text-[10px]">
+          <thead>
+            <tr className="border-b border-white/10 bg-white/[0.03]">
+              {headers.map((h, i) => (
+                <th key={i} className="px-4 py-3 text-left uppercase tracking-widest text-slate-400/85 font-bold whitespace-nowrap">{h}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} className="border-b border-white/5 hover:bg-white/[0.03] transition">
+                {(Array.isArray(row) ? row : Object.values(row)).map((cell: any, ci: number) => (
+                  <td key={ci} className="px-4 py-3 text-slate-100/75 align-top">{typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- display:status ---
-export const KyberionStatus = ({ label, status, detail }: { label: string; status: string; detail?: string }) => {
+export const KyberionStatus = ({ label, labelKey, status, detail }: { label: string; labelKey?: string; status: string; detail?: string }) => {
+  const tx = useA2UIText();
   const config: Record<string, { icon: React.ReactNode; border: string }> = {
     ok:      { icon: <CheckCircle size={14} className="text-green-500" />,               border: 'border-green-500/20' },
     warning: { icon: <AlertTriangle size={14} className="text-yellow-500" />,             border: 'border-yellow-500/20' },
@@ -76,7 +90,7 @@ export const KyberionStatus = ({ label, status, detail }: { label: string; statu
     <div className={`flex items-center gap-3 p-3 bg-slate-950/55 rounded-xl border ${c.border} shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]`}>
       {c.icon}
       <div className="flex-1">
-        <div className="text-[10px] uppercase tracking-widest text-white/78 font-bold">{label}</div>
+        <div className="text-[10px] uppercase tracking-widest text-white/78 font-bold">{tx(labelKey, label)}</div>
         {detail && <div className="text-[9px] text-slate-300/45 mt-0.5">{detail}</div>}
       </div>
       <div className="text-[9px] uppercase tracking-widest text-slate-300/45">{status}</div>
