@@ -1,5 +1,5 @@
-import * as pathResolver from './path-resolver';
-import { safeExistsSync, safeReadFile } from './secure-io';
+import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 /**
  * KnowledgeProvider abstracts the access to the `knowledge/` directory.

@@ -9,10 +9,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import AdmZip from 'adm-zip';
-import { generateNativePptx } from '../engine';
-import { buildShape, buildConnector, buildTable } from '../builders';
-import { distillPptxDesign } from '../../pptx-utils';
-import type { PptxDesignProtocol, PptxElement } from '../../types/pptx-protocol';
+import { generateNativePptx } from '../engine.js';
+import { buildShape, buildConnector, buildTable } from '../builders.js';
+import { distillPptxDesign } from '../../pptx-utils.js';
+import type { PptxDesignProtocol, PptxElement } from '../../types/pptx-protocol.js';
 
 // ─── Helpers ────────────────────────────────────────────────
 

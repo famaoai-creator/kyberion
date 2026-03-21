@@ -2,8 +2,8 @@ import express from 'express';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'node:path';
-import { ReflexTerminal } from '../../../libs/core/reflex-terminal.js';
-import { 
+import {
+  ReflexTerminal,
   logger, 
   pathResolver, 
   runtimeSupervisor,
@@ -15,7 +15,7 @@ import {
   safeUnlinkSync, 
   safeReaddir,
   safeAppendFileSync
-} from '../../../libs/core/index.js';
+} from '@agent/core';
 import {
   buildSessionPaths,
   listPersistedSessionStates,

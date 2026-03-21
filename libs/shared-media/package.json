@@ -2,6 +2,7 @@
   "name": "@agent/shared-media",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Domain-specific utilities for Media and Office formats.",
   "main": "../../dist/libs/shared-media/src/index.js",
   "types": "../../dist/libs/shared-media/src/index.d.ts",

@@ -1,6 +1,6 @@
-import { logger } from './core';
-import { safeExistsSync } from './secure-io';
-import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process';
+import { logger } from './core.js';
+import { safeExistsSync } from './secure-io.js';
+import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';

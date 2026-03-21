@@ -1,32 +1,172 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Kyberion Architecture Description Format (ADF)",
+  "description": "Renderer-neutral architecture graph contract for infrastructure, platform, and system diagrams.",
   "type": "object",
+  "required": ["nodes", "edges"],
   "properties": {
+    "version": {
+      "type": "string",
+      "default": "1.1.0"
+    },
+    "title": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Primary cloud or platform provider, for example aws, azure, gcp, kubernetes."
+    },
+    "render_hints": {
+      "type": "object",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": ["drawio", "mermaid", "d2", "html"]
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["TB", "BT", "LR", "RL"]
+        },
+        "theme": {
+          "type": "string"
+        },
+        "icon_pack": {
+          "type": "string",
+          "description": "Named icon pack such as aws-architecture."
+        },
+        "group_by": {
+          "type": "string",
+          "enum": ["provider", "boundary", "group", "network_zone", "none"]
+        }
+      },
+      "additionalProperties": true
+    },
     "nodes": {
       "type": "array",
       "items": {
         "type": "object",
+        "required": ["id", "type", "name"],
         "properties": {
-          "id": { "type": "string" },
-          "type": { "type": "string", "description": "e.g., aws_instance, rds" },
-          "name": { "type": "string" },
-          "parent": { "type": "string", "description": "ID of the container node (VPC/Subnet)" }
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Logical resource type, for example aws_instance, aws_vpc, browser, service."
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Resource-specific provider override."
+          },
+          "technology": {
+            "type": "string",
+            "description": "Human-readable technology label, for example EC2, RDS PostgreSQL, ALB."
+          },
+          "icon_key": {
+            "type": "string",
+            "description": "Explicit key for icon resolution when it differs from type."
+          },
+          "parent": {
+            "type": "string",
+            "description": "ID of the container node."
+          },
+          "group": {
+            "type": "string",
+            "description": "Renderer-neutral grouping label such as application, data, public-tier."
+          },
+          "boundary": {
+            "type": "string",
+            "description": "Boundary name such as vpc, subnet, account, region, cluster."
+          },
+          "network_zone": {
+            "type": "string",
+            "enum": ["public", "private", "isolated", "dmz", "shared"]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "render_hints": {
+            "type": "object",
+            "properties": {
+              "container": {
+                "type": "boolean"
+              },
+              "preferred_width": {
+                "type": "number"
+              },
+              "preferred_height": {
+                "type": "number"
+              },
+              "label_position": {
+                "type": "string",
+                "enum": ["top", "bottom", "center"]
+              }
+            },
+            "additionalProperties": true
+          }
         },
-        "required": ["id", "type", "name"]
+        "additionalProperties": true
       }
     },
     "edges": {
       "type": "array",
       "items": {
         "type": "object",
+        "required": ["from", "to"],
         "properties": {
-          "from": { "type": "string" },
-          "to": { "type": "string" },
-          "label": { "type": "string" }
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "Connection protocol, for example HTTPS, TCP, JDBC."
+          },
+          "port": {
+            "type": ["string", "number"]
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["uni", "bi", "none"],
+            "default": "uni"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "render_hints": {
+            "type": "object",
+            "properties": {
+              "style": {
+                "type": "string",
+                "enum": ["solid", "dashed", "dotted"]
+              },
+              "emphasis": {
+                "type": "string",
+                "enum": ["low", "normal", "high"]
+              }
+            },
+            "additionalProperties": true
+          }
         },
-        "required": ["from", "to"]
+        "additionalProperties": true
       }
     }
-  }
+  },
+  "additionalProperties": true
 }

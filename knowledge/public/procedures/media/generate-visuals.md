@@ -7,13 +7,20 @@ Generate visual artifacts such as diagrams, PDF documents, and visual evidence G
 - **Actuator**: `Media-Actuator`
 
 ## 3. Step-by-Step Instructions
-1.  **Diagramming**: Define Mermaid code and use `Media-Actuator` to render it.
+1.  **Diagramming**: Define Mermaid or D2 code and use `Media-Actuator` pipeline ops to render it.
     ```json
     {
-      "action": "render",
-      "type": "mermaid",
-      "input_path": "diagram.mmd",
-      "output_path": "diagram.svg"
+      "action": "pipeline",
+      "steps": [
+        {
+          "type": "apply",
+          "op": "mermaid_render",
+          "params": {
+            "input_path": "diagram.mmd",
+            "path": "diagram.svg"
+          }
+        }
+      ]
     }
     ```
 2.  **PDF Publishing**: Prepare Markdown content and convert it to PDF via `Media-Actuator`.

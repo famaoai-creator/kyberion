@@ -4,12 +4,12 @@
  * Standardized with Secure-IO and Physical Evidence-as-State.
  */
 
-import { 
+import {
   logger, 
   terminalBridge, 
   safeReadFile, 
   safeWriteFile, 
-  pathResolver, 
+  pathResolver,
   secretGuard,
   safeMkdir,
   safeExistsSync,
@@ -17,10 +17,10 @@ import {
   safeReaddir,
   sensoryMemory,
   capabilityEntry,
-} from '../../libs/core/index.js';
-import { reflexEngine } from '../../libs/shared-nerve/src/index.js';
-import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
-import { safeExec } from '../../libs/core/secure-io.js';
+  safeExec,
+} from '@agent/core';
+import { reflexEngine } from '@agent/shared-nerve';
+import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
 
 const ROOT_DIR = pathResolver.rootDir();

@@ -2,8 +2,8 @@
  * Devin 評価プロジェクト 計画書 (PowerPoint)
  * Native PPTX Engine を使用
  */
-import { generateNativePptx } from '../engine';
-import type { PptxDesignProtocol, PptxElement, PptxSlide, PptxTextRun } from '../../../types/pptx-protocol';
+import { generateNativePptx } from '../engine.js';
+import type { PptxDesignProtocol, PptxElement, PptxSlide, PptxTextRun } from '../../types/pptx-protocol.js';
 
 // ─── Color Palette ──────────────────────────────────────────
 const C = {

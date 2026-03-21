@@ -3,8 +3,8 @@ import * as path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
-import * as pathResolver from './path-resolver';
-import { validateWritePermission, validateReadPermission } from './tier-guard';
+import * as pathResolver from './path-resolver.js';
+import { validateWritePermission, validateReadPermission } from './tier-guard.js';
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)

@@ -1,0 +1,26 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "aws-architecture"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "drawio_from_graph",
+      "params": {
+        "input_path": "knowledge/public/schemas/architecture-adf.example.json"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "drawio_write",
+      "params": {
+        "path": "active/shared/tmp/media/aws-terraform-architecture.drawio"
+      }
+    }
+  ]
+}

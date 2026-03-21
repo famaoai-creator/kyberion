@@ -1,4 +1,5 @@
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Worker Proxy for Kyberion.
@@ -8,7 +9,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 export function runInWorker(scriptPath: string, data: any): Promise<any> {
   if (isMainThread) {
     return new Promise((resolve, reject) => {
-      const worker = new Worker(__filename, {
+      const worker = new Worker(new URL(import.meta.url), {
         workerData: { scriptPath, data },
       });
       worker.on('message', resolve);
@@ -33,6 +34,8 @@ export function runInWorker(scriptPath: string, data: any): Promise<any> {
     return Promise.resolve(); // Keep TS happy
   }
 }
+
+export const workerProxyPath = fileURLToPath(import.meta.url);
 
 if (!isMainThread) {
   (async () => {

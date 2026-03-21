@@ -2,13 +2,16 @@
   "name": "{{SKILL_NAME}}",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "author": "Kyberion Agent",
   "license": "MIT",
   "description": "{{DESCRIPTION}}",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "watch": "tsc -p tsconfig.json -w",
+    "start": "node dist/main.js"
   },
   "engines": {
     "node": ">=20.0.0"

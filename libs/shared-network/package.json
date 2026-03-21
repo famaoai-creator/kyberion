@@ -2,6 +2,7 @@
   "name": "@agent/shared-network",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "../../dist/libs/shared-network/src/index.js",
   "types": "../../dist/libs/shared-network/src/index.d.ts",
   "scripts": { "build": "tsc" },

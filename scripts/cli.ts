@@ -1,5 +1,6 @@
 import { logger, pathResolver, safeExistsSync, safeExec, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 
 interface RawActuatorEntry {
@@ -16,6 +17,19 @@ interface RawActuatorIndex {
   s?: RawActuatorEntry[];
   actuators?: RawActuatorEntry[];
   skills?: RawActuatorEntry[];
+}
+
+interface ActuatorExampleRecord {
+  id: string;
+  title: string;
+  path: string;
+  description: string;
+  tags?: string[];
+}
+
+interface ActuatorExampleCatalog {
+  actuator: string;
+  examples: ActuatorExampleRecord[];
 }
 
 export interface ActuatorRecord {
@@ -133,12 +147,14 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  list                 List available actuators in the global actuator index');
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
+  console.log('  examples <name>      List actuator-owned examples for a specific actuator');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
   console.log('');
   console.log('Examples:');
   console.log('  npm run cli -- list');
   console.log('  npm run cli -- search browser');
   console.log('  npm run cli -- info orchestrator-actuator');
+  console.log('  npm run cli -- examples browser-actuator');
   console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
@@ -165,6 +181,27 @@ function printActuatorList(actuators: ActuatorRecord[]) {
   });
 }
 
+function printActuatorExampleSummary(actuators: ActuatorRecord[]) {
+  printHeader();
+  console.log('Actuator-owned examples\n');
+
+  let totalExamples = 0;
+  for (const actuator of actuators) {
+    const examples = loadActuatorExamples(actuator);
+    if (examples.length === 0) continue;
+    totalExamples += examples.length;
+    console.log(`- ${chalk.bold(actuator.name)} (${examples.length})`);
+    console.log(`  ${examples.map(example => example.id).join(', ')}`);
+  }
+
+  if (totalExamples === 0) {
+    console.log('No actuator-owned examples found.');
+    return;
+  }
+
+  console.log(`\nTotal examples: ${totalExamples}`);
+}
+
 function printActuatorInfo(actuator: ActuatorRecord) {
   printHeader();
   console.log(`${chalk.bold(actuator.name)} (${actuator.status})`);
@@ -173,6 +210,44 @@ function printActuatorInfo(actuator: ActuatorRecord) {
 
   const runnableScript = resolveActuatorPath(actuator.path);
   console.log(`Runnable: ${runnableScript ? runnableScript : 'Not built yet (run pnpm build)'}`);
+  const examples = loadActuatorExamples(actuator);
+  console.log(`Examples: ${examples.length}`);
+}
+
+function resolveActuatorExamplesCatalogPath(actuator: ActuatorRecord): string {
+  return path.join(rootDir, actuator.path, 'examples', 'catalog.json');
+}
+
+function loadActuatorExamples(actuator: ActuatorRecord): ActuatorExampleRecord[] {
+  const catalogPath = resolveActuatorExamplesCatalogPath(actuator);
+  if (!safeExistsSync(catalogPath)) {
+    return [];
+  }
+
+  const content = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
+  const parsed = JSON.parse(content) as ActuatorExampleCatalog;
+  return Array.isArray(parsed.examples) ? parsed.examples : [];
+}
+
+function printActuatorExamples(actuator: ActuatorRecord) {
+  printHeader();
+  const examples = loadActuatorExamples(actuator);
+  console.log(`${chalk.bold(actuator.name)} examples\n`);
+
+  if (examples.length === 0) {
+    console.log('No actuator-owned examples found.');
+    return;
+  }
+
+  examples.forEach(example => {
+    console.log(`- ${chalk.bold(example.id)}: ${example.title}`);
+    console.log(`  ${example.description}`);
+    console.log(`  ${chalk.gray(example.path)}`);
+    console.log(`  run: node dist/${actuator.path}/src/index.js --input ${example.path}`);
+    if (example.tags?.length) {
+      console.log(`  tags: ${example.tags.join(', ')}`);
+    }
+  });
 }
 
 export function resolveActuatorPath(actuatorPath: string): string | null {
@@ -277,6 +352,21 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'examples') {
+    if (!firstArg) {
+      printActuatorExampleSummary(actuators);
+      return;
+    }
+
+    const actuator = findActuator(actuators, firstArg);
+    if (!actuator) {
+      throw new Error(`Actuator "${firstArg}" not found.`);
+    }
+
+    printActuatorExamples(actuator);
+    return;
+  }
+
   if (command === 'run') {
     runActuator(actuators, firstArg, restArgs, missionId);
     return;
@@ -285,7 +375,9 @@ export async function main(args = process.argv.slice(2)) {
   throw new Error(`Unknown command "${command}". Try \`npm run cli -- help\`.`);
 }
 
-if (require.main === module) {
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
   main().catch(err => {
     logger.error(err.message);
     process.exit(1);

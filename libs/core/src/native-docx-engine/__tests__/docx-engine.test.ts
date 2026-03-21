@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
 import { pathResolver } from '../../../index.js';
-import { generateNativeDocx } from '../engine';
+import { generateNativeDocx } from '../engine.js';
 import { distillDocxDesign } from '../../docx-utils.js';
 import type { DocxDesignProtocol } from '../../types/docx-protocol.js';
 

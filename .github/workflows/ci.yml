@@ -38,6 +38,9 @@ jobs:
       - name: TypeScript type check
         run: pnpm run typecheck
 
+      - name: Check ESM integrity
+        run: pnpm run check:esm
+
       - name: Validate capability discovery
         run: node dist/scripts/capability_discovery.js > /dev/null
 

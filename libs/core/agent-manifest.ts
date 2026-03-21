@@ -1,7 +1,7 @@
-import { logger } from './core';
-import { safeReadFile, safeExistsSync, safeReaddir } from './secure-io';
+import { logger } from './core.js';
+import { safeReadFile, safeExistsSync, safeReaddir } from './secure-io.js';
 import * as path from 'node:path';
-import type { AgentProvider } from './agent-registry';
+import type { AgentProvider } from './agent-registry.js';
 
 /**
  * Agent Manifest Loader v1.0

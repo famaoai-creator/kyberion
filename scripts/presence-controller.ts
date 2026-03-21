@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { logger, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
@@ -173,7 +174,10 @@ async function main() {
   }
 }
 
-if (require.main === module || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+
+if ((entrypoint && modulePath === entrypoint) || (typeof process !== 'undefined' && process.env.VITEST !== 'true')) {
   main().catch(err => {
     console.error(err);
     process.exit(1);

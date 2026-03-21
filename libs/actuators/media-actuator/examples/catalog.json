@@ -1,0 +1,47 @@
+{
+  "actuator": "media-actuator",
+  "examples": [
+    {
+      "id": "executive-summary-pptx",
+      "title": "Executive Summary PPTX",
+      "path": "libs/actuators/media-actuator/examples/executive-summary-pptx.json",
+      "description": "Applies a common executive theme and presentation pattern, then renders a short decision-oriented PPTX deck.",
+      "tags": ["presentation", "pptx", "theme", "pattern", "example"]
+    },
+    {
+      "id": "marketing-deck-pptx",
+      "title": "Kyberion Marketing Deck PPTX",
+      "path": "libs/actuators/media-actuator/examples/marketing-deck-pptx.json",
+      "description": "Uses the bundled Kyberion marketing deck pattern content and renders a themed PPTX artifact.",
+      "tags": ["marketing", "pptx", "theme", "pattern", "example"]
+    },
+    {
+      "id": "strategic-roadmap-pptx",
+      "title": "Strategic Roadmap PPTX",
+      "path": "libs/actuators/media-actuator/examples/strategic-roadmap-pptx.json",
+      "description": "Builds a roadmap-style PPTX with custom milestone content on top of the strategic roadmap pattern.",
+      "tags": ["roadmap", "pptx", "strategy", "theme", "example"]
+    },
+    {
+      "id": "diagram-mermaid-architecture",
+      "title": "Mermaid Architecture Diagram",
+      "path": "libs/actuators/media-actuator/examples/diagram-mermaid-architecture.json",
+      "description": "Renders a Mermaid architecture graph to SVG using the shared Kyberion theme vocabulary.",
+      "tags": ["diagram", "mermaid", "svg", "architecture", "example"]
+    },
+    {
+      "id": "diagram-d2-process",
+      "title": "D2 Process Diagram",
+      "path": "libs/actuators/media-actuator/examples/diagram-d2-process.json",
+      "description": "Renders a D2 workflow diagram to SVG for more polished stakeholder-facing process visuals.",
+      "tags": ["diagram", "d2", "svg", "process", "example"]
+    },
+    {
+      "id": "aws-terraform-drawio",
+      "title": "AWS Terraform Draw.io Document",
+      "path": "libs/actuators/media-actuator/examples/aws-terraform-drawio.json",
+      "description": "Generates a local .drawio architecture document from an AWS-style graph without sending topology data to external services.",
+      "tags": ["diagram", "drawio", "aws", "terraform", "local-only", "example"]
+    }
+  ]
+}

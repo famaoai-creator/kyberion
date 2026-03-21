@@ -1,7 +1,7 @@
 /**
  * worksheet XML generator for XLSX packages
  */
-import type { XlsxWorksheet, XlsxCell, XlsxRow, XlsxColumn } from '../types/xlsx-protocol';
+import type { XlsxWorksheet, XlsxCell, XlsxRow, XlsxColumn } from '../types/xlsx-protocol.js';
 
 function escXml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

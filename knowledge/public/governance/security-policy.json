@@ -142,6 +142,11 @@
         "knowledge/"
       ]
     },
+    "generate_types": {
+      "allow_write": [
+        "libs/core/src/types/"
+      ]
+    },
     "ceo": {
       "allow_write": [
         "knowledge/ceo/",

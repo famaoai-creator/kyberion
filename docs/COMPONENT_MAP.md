@@ -86,10 +86,13 @@ If temporary artifacts are needed, prefer governed runtime storage under `active
 
 - `scripts/capability_discovery.ts`
 - `scripts/cli.ts`
+- `scripts/check_esm_integrity.ts`
 - `knowledge/public/orchestration/global_actuator_index.json`
 - `libs/actuators/*`
 
 This path tells users what is available and lets them run an actuator.
+
+Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
 
 ### 4. Channel ingress and interactive control
 

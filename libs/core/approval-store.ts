@@ -5,7 +5,7 @@ import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
   type GovernedArtifactRole,
-} from './artifact-store';
+} from './artifact-store.js';
 
 export interface ApprovalRequestDraft {
   title: string;

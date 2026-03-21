@@ -1,8 +1,8 @@
-import { logger } from './core';
-import { ptyEngine } from './pty-engine';
-import { dispatchA2UI } from './a2ui';
-import { getAgentManifest, isActuatorAllowed } from './agent-manifest';
-import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './managed-process';
+import { logger } from './core.js';
+import { ptyEngine } from './pty-engine.js';
+import { dispatchA2UI } from './a2ui.js';
+import { getAgentManifest, isActuatorAllowed } from './agent-manifest.js';
+import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './managed-process.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 
