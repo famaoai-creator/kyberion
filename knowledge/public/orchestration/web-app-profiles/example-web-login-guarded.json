@@ -1,0 +1,34 @@
+{
+  "app_id": "example-web-login-guarded",
+  "title": "Example Web Login + Guarded Routes",
+  "base_url": "http://127.0.0.1:4173",
+  "execution_preset": "standard-web-auth",
+  "login_route": "/login",
+  "logout_route": "/logout",
+  "guarded_routes": [
+    "/app/home",
+    "/app/settings"
+  ],
+  "selectors": {
+    "login": {
+      "email": "[data-testid='email']",
+      "password": "[data-testid='password']",
+      "submit": "[data-testid='sign-in']"
+    },
+    "navigation": {
+      "home": "[data-testid='nav-home']",
+      "settings": "[data-testid='nav-settings']",
+      "logout": "[data-testid='nav-logout']"
+    }
+  },
+  "session_handoff": {
+    "kind": "webview-session-handoff",
+    "target_url": "http://127.0.0.1:4173/app/home",
+    "origin": "http://127.0.0.1:4173",
+    "browser_session_id": "example-web-login-guarded",
+    "prefer_persistent_context": true
+  },
+  "debug_routes": {
+    "session_export": "/__kyberion/session-export"
+  }
+}

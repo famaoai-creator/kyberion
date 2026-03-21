@@ -1,0 +1,48 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/request-to-status-operator-packet.context.json",
+    "request_text": "MSN-PROJECT-TRACE-TEST-2 の状態を教えて"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "request_to_status_brief",
+      "params": {
+        "export_as": "status_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "collect_system_status_snapshot",
+      "params": {
+        "from": "status_brief",
+        "export_as": "system_status_snapshot"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "status_snapshot_to_report",
+      "params": {
+        "from": "system_status_snapshot",
+        "export_as": "system_status_report"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "status_report_to_operator_packet",
+      "params": {
+        "from": "system_status_report",
+        "export_as": "operator_packet"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "operator_packet",
+        "path": "active/shared/tmp/orchestrator/status-operator-interaction-packet.json"
+      }
+    }
+  ]
+}

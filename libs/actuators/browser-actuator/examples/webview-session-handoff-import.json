@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "session_id": "webview-handoff-demo",
+  "options": {
+    "headless": true
+  },
+  "context": {
+    "context_path": "active/shared/tmp/browser/webview-session-handoff-import.context.json"
+  },
+  "steps": [
+    {
+      "type": "apply",
+      "op": "import_session_handoff",
+      "params": {
+        "path": "libs/actuators/browser-actuator/examples/assets/webview-session-handoff.json",
+        "export_as": "imported_handoff"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "export_session_handoff",
+      "params": {
+        "path": "active/shared/tmp/browser/webview-session-handoff-exported.json",
+        "export_as": "roundtrip_handoff"
+      }
+    }
+  ]
+}

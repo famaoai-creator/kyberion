@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "session_id": "web-runtime-session-handoff-export",
+  "options": {
+    "headless": true
+  },
+  "context": {
+    "context_path": "active/shared/tmp/browser/web-runtime-session-handoff-export.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "http://127.0.0.1:4173/app/home",
+        "waitUntil": "domcontentloaded"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "export_session_handoff",
+      "params": {
+        "path": "active/shared/tmp/browser/web-runtime-session-handoff.json",
+        "browser_session_id": "example-web-login-guarded",
+        "prefer_persistent_context": true,
+        "export_as": "runtime_session_handoff"
+      }
+    }
+  ]
+}

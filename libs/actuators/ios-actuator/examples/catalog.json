@@ -1,0 +1,54 @@
+{
+  "actuator": "ios-actuator",
+  "examples": [
+    {
+      "id": "simctl-health-check",
+      "title": "Simctl Health Check",
+      "path": "libs/actuators/ios-actuator/examples/simctl-health-check.json",
+      "description": "Checks whether local xcrun/simctl is available, lists iOS simulators, and records a selected simulator UDID.",
+      "tags": ["ios", "simctl", "health-check", "local-only", "example"]
+    },
+    {
+      "id": "ios-observability-template",
+      "title": "iOS Observability Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-observability-template.json",
+      "description": "Launches an app on a simulator and captures a governed screenshot for operator analysis.",
+      "tags": ["ios", "simulator", "screenshot", "observability", "template"]
+    },
+    {
+      "id": "ios-deep-link-template",
+      "title": "iOS Deep Link Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-deep-link-template.json",
+      "description": "Opens an iOS deep link in the booted simulator and captures a screenshot for validation.",
+      "tags": ["ios", "simulator", "deep-link", "navigation", "template"]
+    },
+    {
+      "id": "ios-boot-and-observe-template",
+      "title": "iOS Boot And Observe Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-boot-and-observe-template.json",
+      "description": "Boots a named iOS simulator, launches the profiled app, and captures a screenshot.",
+      "tags": ["ios", "simulator", "boot", "launch", "screenshot", "template"]
+    },
+    {
+      "id": "ios-install-launch-template",
+      "title": "iOS Install Launch Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-install-launch-template.json",
+      "description": "Boots a named iOS simulator, installs a local .app bundle, launches it, and captures a screenshot.",
+      "tags": ["ios", "simulator", "install", "launch", "screenshot", "template"]
+    },
+    {
+      "id": "ios-webview-session-handoff",
+      "title": "iOS WebView Session Handoff",
+      "path": "libs/actuators/ios-actuator/examples/ios-webview-session-handoff.json",
+      "description": "Builds a governed session handoff artifact for moving authenticated iOS app state into a browser/webview context.",
+      "tags": ["ios", "webview", "session-handoff", "auth", "example"]
+    },
+    {
+      "id": "ios-runtime-webview-handoff-template",
+      "title": "iOS Runtime WebView Handoff Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json",
+      "description": "Reads a runtime-exported WebView session handoff artifact from the iOS simulator app container.",
+      "tags": ["ios", "webview", "runtime-export", "session-handoff", "template"]
+    }
+  ]
+}

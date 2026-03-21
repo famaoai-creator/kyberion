@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "System Status Report",
+  "type": "object",
+  "required": ["kind", "scope", "headline", "summary", "findings"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["system-status-report"]
+    },
+    "scope": { "type": "string" },
+    "headline": { "type": "string" },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "message"],
+        "properties": {
+          "id": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "error"]
+          },
+          "message": { "type": "string" },
+          "detail": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "priority", "action"],
+        "properties": {
+          "id": { "type": "string" },
+          "priority": {
+            "type": "string",
+            "enum": ["now", "next", "later"]
+          },
+          "action": { "type": "string" },
+          "reason": { "type": "string" },
+          "suggested_command": { "type": "string" },
+          "suggested_pipeline_path": { "type": "string" },
+          "suggested_followup_request": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

@@ -74,6 +74,7 @@ export * from './src/retry-utils.js';
 export { parseData, stringifyData } from './data-utils.js'; // Explicitly avoid detectFormat conflict
 export * from './detectors.js';
 export * from './validators.js';
+export * from './mobile-profile-validators.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
@@ -169,4 +170,5 @@ export * from './kill-switch.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';
+export * from './types.js';
 // export * as visionJudge from './vision-judge.js';

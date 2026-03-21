@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { extractBranchArg, normalizeActuators, searchActuators } from './cli.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { extractBranchArg, main, normalizeActuators, searchActuators } from './cli.js';
 
 describe('Kyberion CLI helpers', () => {
   it('normalizes compact actuator index entries', () => {
@@ -36,5 +36,53 @@ describe('Kyberion CLI helpers', () => {
       branchId: 'ceo-mode',
       args: ['--', '--help'],
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('prints shared mobile app profile summary', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['mobile-profiles']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('Mobile app profiles');
+    expect(output).toContain('example-mobile-login-passkey');
+    expect(output).toContain('knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+  });
+
+  it('prints a specific shared mobile app profile', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['mobile-profiles', 'example-mobile-login-passkey']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('example-mobile-login-passkey (android)');
+    expect(output).toContain('Example Mobile Login + Passkey');
+    expect(output).toContain('Path: knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+  });
+
+  it('prints shared web app profile summary', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['web-profiles']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('Web app profiles');
+    expect(output).toContain('example-web-login-guarded');
+    expect(output).toContain('knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
+  });
+
+  it('prints a specific shared web app profile', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['web-profiles', 'example-web-login-guarded']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('example-web-login-guarded (browser)');
+    expect(output).toContain('Example Web Login + Guarded Routes');
+    expect(output).toContain('Path: knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
   });
 });

@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-project-relationship.schema.json",
+  "title": "Mission Project Relationship",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["relationship_type"],
+      "properties": {
+        "project_id": { "type": "string" },
+        "project_path": { "type": "string" },
+        "relationship_type": {
+          "type": "string",
+          "enum": ["belongs_to", "supports", "governs", "independent"]
+        },
+        "affected_artifacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "gate_impact": {
+          "type": "string",
+          "enum": ["none", "informational", "review_required", "blocking"]
+        },
+        "traceability_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

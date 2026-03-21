@@ -1,0 +1,12 @@
+{
+  "profiles": [
+    {
+      "id": "example-web-login-guarded",
+      "platform": "browser",
+      "title": "Example Web Login + Guarded Routes",
+      "path": "knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json",
+      "description": "Shared profile for a Web app with login, guarded routes, and a debug-only session export route.",
+      "tags": ["browser", "session-handoff", "login", "guarded-routes", "example"]
+    }
+  ]
+}

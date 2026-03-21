@@ -1,0 +1,10 @@
+{
+  "default_preset": "standard-web-auth",
+  "presets": {
+    "standard-web-auth": {
+      "default_email": "tester@example.com",
+      "default_password": "debug-password",
+      "handoff_output_path": "active/shared/tmp/browser/generated-web-session-handoff.json"
+    }
+  }
+}

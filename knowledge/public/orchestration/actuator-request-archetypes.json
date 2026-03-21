@@ -1,0 +1,59 @@
+{
+  "default_archetype": "structured-delivery",
+  "archetypes": [
+    {
+      "id": "web-design-clone-delivery",
+      "trigger_keywords": ["web", "website", "lp", "landing page", "design", "踏襲", "サイト"],
+      "summary_template": "Reference Web experience plus new concept, with implementation and validation artifacts.",
+      "normalized_scope": ["reference-observation", "design-clone", "implementation", "test-pack"],
+      "target_actuators": ["browser-actuator", "modeling-actuator", "media-actuator"],
+      "deliverables": ["web implementation", "design spec", "test results"],
+      "required_inputs": ["reference source", "preserved elements", "new concept", "target environment"]
+    },
+    {
+      "id": "mobile-design-clone-delivery",
+      "trigger_keywords": ["mobile", "ios", "android", "app", "webview", "モバイル", "アプリ"],
+      "summary_template": "Reference mobile experience plus new concept, with profile-driven validation and handoff artifacts.",
+      "normalized_scope": ["reference-observation", "ui-flow", "implementation-skeleton", "test-pack"],
+      "target_actuators": ["android-actuator", "ios-actuator", "browser-actuator", "modeling-actuator", "media-actuator"],
+      "deliverables": ["mobile implementation skeleton", "design spec", "test results"],
+      "required_inputs": ["reference source", "platform", "preserved elements", "new concept", "execution environment"]
+    },
+    {
+      "id": "proposal-storyline-delivery",
+      "trigger_keywords": ["proposal", "deck", "pitch", "提案", "提案書", "ストーリー", "資料"],
+      "summary_template": "Source materials plus narrative brief, resolved into a proposal storyline and media pack.",
+      "normalized_scope": ["source-extraction", "storyline", "media-render", "evidence-pack"],
+      "target_actuators": ["media-actuator", "modeling-actuator"],
+      "deliverables": ["proposal deck", "executive summary", "appendix or source map"],
+      "required_inputs": ["source materials", "target audience", "storyline", "required output format"]
+    },
+    {
+      "id": "project-document-pack",
+      "trigger_keywords": ["charter", "requirements", "design", "test plan", "プロジェクト", "要件定義", "設計書", "運用設計", "ゲート"],
+      "summary_template": "Project operating system artifacts instantiated and linked with mission traceability.",
+      "normalized_scope": ["project-os", "document-pack", "gate-readiness", "traceability"],
+      "target_actuators": ["media-actuator", "orchestrator-actuator", "artifact-actuator"],
+      "deliverables": ["project-os documents", "gate packet", "mission ledger"],
+      "required_inputs": ["project name", "delivery scope", "phase or gate", "related missions"]
+    },
+    {
+      "id": "status-inquiry",
+      "trigger_keywords": ["status", "state", "health", "readiness", "状態", "稼働", "ヘルス", "健全性"],
+      "summary_template": "Runtime and governance state summarized into a reviewable system status report.",
+      "normalized_scope": ["status-brief", "status-collection", "status-report"],
+      "target_actuators": ["orchestrator-actuator"],
+      "deliverables": ["system status report"],
+      "required_inputs": ["scope"]
+    },
+    {
+      "id": "structured-delivery",
+      "trigger_keywords": ["作って", "やって", "まとめて", "改善", "deliver", "build"],
+      "summary_template": "Generic structured delivery request requiring normalization before execution.",
+      "normalized_scope": ["request-normalization", "artifact-plan", "execution-plan"],
+      "target_actuators": ["orchestrator-actuator", "modeling-actuator", "media-actuator"],
+      "deliverables": ["execution brief", "resolution plan"],
+      "required_inputs": ["objective", "target artifact", "environment", "acceptance criteria"]
+    }
+  ]
+}

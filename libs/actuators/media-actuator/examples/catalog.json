@@ -42,6 +42,48 @@
       "path": "libs/actuators/media-actuator/examples/aws-terraform-drawio.json",
       "description": "Generates a local .drawio architecture document from an AWS-style graph without sending topology data to external services.",
       "tags": ["diagram", "drawio", "aws", "terraform", "local-only", "example"]
+    },
+    {
+      "id": "seat-chart-xlsx",
+      "title": "Seat Chart XLSX",
+      "path": "libs/actuators/media-actuator/examples/seat-chart-xlsx.json",
+      "description": "Renders a printable office seat chart workbook from a native XLSX ADF sample.",
+      "tags": ["xlsx", "operations", "seat-chart", "office", "example"]
+    },
+    {
+      "id": "project-wbs-xlsx",
+      "title": "Project WBS XLSX",
+      "path": "libs/actuators/media-actuator/examples/project-wbs-xlsx.json",
+      "description": "Renders a project WBS workbook suitable for execution planning and delivery checkpoints.",
+      "tags": ["xlsx", "wbs", "project-management", "planning", "example"]
+    },
+    {
+      "id": "raid-register-xlsx",
+      "title": "RAID Register XLSX",
+      "path": "libs/actuators/media-actuator/examples/raid-register-xlsx.json",
+      "description": "Renders a RAID tracker workbook with category-specific styling for operator review.",
+      "tags": ["xlsx", "raid", "governance", "tracking", "example"]
+    },
+    {
+      "id": "pptx-master-theme-extract",
+      "title": "PPTX Master Theme Extract",
+      "path": "libs/actuators/media-actuator/examples/pptx-master-theme-extract.json",
+      "description": "Generates a source deck, distills its theme and master placeholders, and stores the extracted context for inspection.",
+      "tags": ["pptx", "theme", "extract", "master-slide", "example"]
+    },
+    {
+      "id": "pptx-master-theme-reuse",
+      "title": "PPTX Master Theme Reuse",
+      "path": "libs/actuators/media-actuator/examples/pptx-master-theme-reuse.json",
+      "description": "Extracts a theme from a source PowerPoint and renders a derivative deck that reuses the master slide contract.",
+      "tags": ["pptx", "theme", "master-slide", "reuse", "example"]
+    },
+    {
+      "id": "proposal-storyline-pptx",
+      "title": "Proposal Storyline PPTX",
+      "path": "libs/actuators/media-actuator/examples/proposal-storyline-pptx.json",
+      "description": "Builds a proposal storyline from a structured brief, turns it into slide content, and renders a themed PPTX deck.",
+      "tags": ["proposal", "pptx", "storyline", "brief", "theme", "example"]
     }
   ]
 }

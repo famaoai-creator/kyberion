@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mobile App Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["app_id", "platform", "package_name", "selectors"],
+  "properties": {
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["android", "ios"]
+    },
+    "title": {
+      "type": "string"
+    },
+    "package_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "launch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "bundle_id": {
+          "type": "string"
+        },
+        "app_path": {
+          "type": "string"
+        }
+      }
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "login": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": { "$ref": "#/definitions/selector" },
+            "password": { "$ref": "#/definitions/selector" },
+            "submit": { "$ref": "#/definitions/selector" }
+          }
+        },
+        "passkey": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "trigger": { "$ref": "#/definitions/selector" }
+          }
+        }
+      }
+    },
+    "webview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entry_url": {
+          "type": "string"
+        },
+        "allowed_origins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "session_handoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target_url": {
+              "type": "string"
+            },
+            "browser_session_id": {
+              "type": "string"
+            },
+            "prefer_persistent_context": {
+              "type": "boolean"
+            }
+          }
+        },
+        "runtime_export": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": ["json"]
+            },
+            "android_device_path": {
+              "type": "string"
+            },
+            "ios_container_relative_path": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "resource_id": { "type": "string" },
+        "class_name": { "type": "string" },
+        "package_name": { "type": "string" }
+      }
+    }
+  }
+}

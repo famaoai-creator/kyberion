@@ -1,0 +1,55 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/media/proposal-storyline-pptx.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/proposal-brief-example.json",
+        "export_as": "proposal_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "proposal_storyline_from_brief",
+      "params": {
+        "from": "proposal_brief",
+        "export_as": "proposal_storyline"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "proposal_content_from_storyline",
+      "params": {
+        "from": "proposal_storyline",
+        "export_as": "proposal_content_data"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "executive-neutral"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "content_data": "{{proposal_content_data}}",
+        "output_format": "pptx"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "design_from": "last_pptx_design",
+        "path": "active/shared/tmp/media/proposal-storyline-example.pptx"
+      }
+    }
+  ]
+}

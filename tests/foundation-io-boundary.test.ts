@@ -20,6 +20,8 @@ describe('Foundation IO boundary', () => {
     const importers = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => relPath !== 'libs/core/fs-primitives.ts')
+      .filter((relPath) => !relPath.startsWith('dist/'))
+      .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
         return /from\s+['"][^'"]*fs-primitives(?:\.js)?['"]/.test(content);

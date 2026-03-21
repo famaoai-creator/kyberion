@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/ios/ios-runtime-webview-handoff-template.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
+        "export_as": "app_profile",
+        "validate_as": "mobile-app-profile"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "simctl_health_check",
+      "params": {
+        "export_as": "ios_health"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "capture_runtime_session_handoff",
+      "params": {
+        "app_profile_from": "app_profile",
+        "path": "active/shared/tmp/ios/ios-runtime-webview-handoff.json",
+        "export_as": "runtime_session_handoff"
+      }
+    }
+  ]
+}

@@ -99,6 +99,11 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
+    case 'json_read': {
+      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const parsed = JSON.parse(safeReadFile(sourcePath, { encoding: 'utf8' }) as string);
+      return { ...ctx, [params.export_as || 'last_json']: parsed };
+    }
     case 'pptx_extract': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
       const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
@@ -153,21 +158,30 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     case 'merge_content': {
       const pattern = ctx.active_pattern;
       const theme = ctx.active_theme;
-      const contentData = params.content_data || pattern?.content_data || [];
+      const contentData = resolve(params.content_data) || pattern?.content_data || [];
       const outputFormat = resolve(params.output_format) || pattern?.media_actuator_config?.engine || 'pptx';
 
       if (outputFormat === 'pptx') {
         const themeColors = theme?.colors || {};
+        const activeMaster = ctx.active_pptx_master;
+        const canvas = ctx.active_canvas || { w: 10, h: 5.625 };
         const protocol: any = {
           version: '3.0.0',
           generatedAt: new Date().toISOString(),
-          canvas: { w: 10, h: 5.625 },
+          canvas,
           theme: {
             dk1: (themeColors.primary || '#000000').replace('#', ''),
+            dk2: (themeColors.secondary || themeColors.text || '#44546A').replace('#', ''),
             lt1: (themeColors.background || '#FFFFFF').replace('#', ''),
+            lt2: (themeColors.background || '#E7E6E6').replace('#', ''),
             accent1: (themeColors.accent || '#38BDF8').replace('#', ''),
+            accent2: (themeColors.secondary || '#334155').replace('#', ''),
           },
-          master: { elements: [] },
+          master: {
+            elements: Array.isArray(activeMaster?.elements) ? activeMaster.elements : [],
+            extensions: activeMaster?.extensions,
+            bgXml: activeMaster?.bgXml,
+          },
           slides: contentData.map((data: any, idx: number) => {
             const elements: any[] = [];
             // Title
@@ -224,6 +238,103 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const value = resolve(params.value);
       if (key) return { ...ctx, [key]: value };
       return ctx;
+    }
+    case 'theme_from_pptx_design': {
+      const fromKey = resolve(params.from) || 'last_pptx_design';
+      const design = ctx[fromKey];
+      if (!design) {
+        throw new Error(`theme_from_pptx_design could not find context key: ${fromKey}`);
+      }
+
+      const derivedTheme = deriveThemeFromPptxDesign(design, resolve(params.name));
+      const nextCtx: Record<string, any> = {
+        ...ctx,
+        active_theme: derivedTheme,
+        active_theme_name: derivedTheme.name || resolve(params.name) || 'pptx-extracted-theme',
+        active_pptx_master: design.master,
+        active_canvas: design.canvas,
+        active_theme_source: fromKey,
+      };
+
+      if (params.export_as) {
+        nextCtx[params.export_as] = derivedTheme;
+      }
+      if (params.export_master_as) {
+        nextCtx[params.export_master_as] = design.master;
+      }
+      return nextCtx;
+    }
+    case 'proposal_storyline_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const brief = ctx[fromKey];
+      if (!brief || typeof brief !== 'object') {
+        throw new Error(`proposal_storyline_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
+      const evidence = Array.isArray(brief.evidence) ? brief.evidence : [];
+      const slides = [
+        {
+          id: 'cover',
+          title: brief.title || 'Proposal',
+          objective: brief.story?.core_message || brief.objective || 'Proposal overview',
+          body: [
+            `${brief.client || 'Client'} proposal`,
+            ...(Array.isArray(brief.audience) ? [`Audience: ${brief.audience.join(', ')}`] : []),
+          ],
+          visual: 'cover statement',
+        },
+        ...chapters.map((chapter: string, idx: number) => ({
+          id: `chapter_${idx + 1}`,
+          title: chapter,
+          objective: chapter,
+          body: [
+            brief.story?.core_message || brief.objective || 'Core proposal message',
+            evidence[idx]?.point || `Key point for ${chapter}`,
+          ],
+          visual: evidence[idx]?.title || 'supporting visual',
+        })),
+        {
+          id: 'next_steps',
+          title: 'Next Steps',
+          objective: brief.story?.closing_cta || 'Agree next action',
+          body: [
+            brief.story?.closing_cta || 'Confirm scope and move to execution planning',
+            `Tone: ${brief.story?.tone || 'professional'}`,
+          ],
+          visual: 'timeline / next action',
+        },
+      ];
+
+      return {
+        ...ctx,
+        [params.export_as || 'proposal_storyline']: {
+          kind: 'proposal-storyline-adf',
+          title: brief.title || 'Proposal',
+          client: brief.client,
+          core_message: brief.story?.core_message,
+          slides,
+        },
+      };
+    }
+    case 'proposal_content_from_storyline': {
+      const fromKey = resolve(params.from) || 'proposal_storyline';
+      const storyline = ctx[fromKey];
+      if (!storyline || typeof storyline !== 'object' || !Array.isArray(storyline.slides)) {
+        throw new Error(`proposal_content_from_storyline could not find context key: ${fromKey}`);
+      }
+
+      const contentData = storyline.slides.map((slide: any) => ({
+        title: slide.title,
+        body: Array.isArray(slide.body) ? slide.body : [slide.objective].filter(Boolean),
+        subtitle: slide.objective,
+        visual: slide.visual,
+      }));
+
+      return {
+        ...ctx,
+        [params.export_as || 'proposal_content_data']: contentData,
+      };
     }
     case 'drawio_from_graph': {
       const graph = resolveGraphDefinition(rootDir, params, ctx, resolve);
@@ -715,6 +826,72 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
 
 function normalizeFontFamily(input: string): string {
   return input.split(',')[0].trim();
+}
+
+function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<string, any> {
+  const palette = design?.theme || {};
+  const slideElements = Array.isArray(design?.slides) ? design.slides.flatMap((slide: any) => slide?.elements || []) : [];
+  const titleFont = pickFontFromElements(design?.master?.elements, ['title', 'ctrTitle']);
+  const bodyFont = pickFontFromElements(design?.master?.elements, ['body', 'subTitle']);
+  const slideTitleFont = pickFontFromElements(slideElements, ['title', 'ctrTitle']);
+  const slideBodyFont = pickFontFromElements(slideElements, ['body', 'subTitle']);
+  const fallbackFont = pickFontFromElements(slideElements, []);
+
+  return {
+    name: explicitName || 'pptx-extracted-theme',
+    colors: {
+      primary: normalizeHexColor(palette.dk1 || palette.tx1 || palette.accent2 || palette.accent1, '#1F2937'),
+      secondary: normalizeHexColor(palette.dk2 || palette.tx2 || palette.accent2 || palette.accent3, '#4B5563'),
+      accent: normalizeHexColor(palette.accent1 || palette.hlink || palette.accent2, '#2563EB'),
+      background: normalizeHexColor(palette.lt1 || palette.bg1 || palette.lt2, '#FFFFFF'),
+      text: normalizeHexColor(palette.tx1 || palette.dk1 || palette.dk2, '#111827'),
+    },
+    fonts: {
+      heading: titleFont || slideTitleFont || fallbackFont || 'Aptos, sans-serif',
+      body: bodyFont || slideBodyFont || fallbackFont || 'Aptos, sans-serif',
+    },
+  };
+}
+
+function pickFontFromElements(elements: any[] | undefined, placeholderTypes: string[]): string | undefined {
+  if (!Array.isArray(elements)) {
+    return undefined;
+  }
+
+  const candidates = placeholderTypes.length > 0
+    ? elements.filter((element) => placeholderTypes.includes(element?.placeholderType))
+    : elements;
+
+  for (const element of candidates) {
+    if (typeof element?.style?.fontFamily === 'string' && element.style.fontFamily.trim()) {
+      return element.style.fontFamily.trim();
+    }
+
+    if (Array.isArray(element?.textRuns)) {
+      for (const run of element.textRuns) {
+        if (typeof run?.options?.fontFamily === 'string' && run.options.fontFamily.trim()) {
+          return run.options.fontFamily.trim();
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeHexColor(value: string | undefined, fallback: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return fallback;
+  }
+
+  const normalized = value.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return `#${normalized.toUpperCase()}`;
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(normalized)) {
+    return `#${normalized.slice(2).toUpperCase()}`;
+  }
+  return fallback;
 }
 
 function escapeXml(input: string): string {

@@ -1,5 +1,17 @@
-import { logger, pathResolver, safeExistsSync, safeExec, safeReadFile, safeReaddir } from '@agent/core';
+import {
+  logger,
+  pathResolver,
+  safeExistsSync,
+  safeExec,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+  assertValidMobileAppProfileIndex,
+  assertValidWebAppProfileIndex,
+} from '@agent/core';
+import type { MobileAppProfileIndex } from '@agent/core';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 
@@ -32,11 +44,65 @@ interface ActuatorExampleCatalog {
   examples: ActuatorExampleRecord[];
 }
 
+interface OperatorPacketAction {
+  id: string;
+  priority?: 'now' | 'next' | 'later';
+  action: string;
+  reason?: string;
+  suggested_command?: string;
+  suggested_pipeline_path?: string;
+  suggested_followup_request?: string;
+}
+
+interface OperatorInteractionPacket {
+  kind: 'operator-interaction-packet';
+  interaction_type: 'clarification' | 'execution-preview' | 'status-summary';
+  headline: string;
+  summary: string;
+  readiness?: string;
+  confidence?: number;
+  questions?: Array<{
+    id: string;
+    question: string;
+    reason: string;
+    default_assumption?: string;
+    impact?: string;
+  }>;
+  next_actions?: OperatorPacketAction[];
+  suggested_response_style?: 'clarify-first' | 'preview-and-confirm' | 'status-summary';
+  refresh_command?: string;
+  refresh_packet_path?: string;
+}
+
+interface SystemStatusReportLike {
+  kind: 'system-status-report';
+  headline: string;
+  summary: string;
+  findings?: Array<{ id: string; severity: string; message: string; detail?: string }>;
+  next_actions?: OperatorPacketAction[];
+}
+
+interface OperatorResponsePreview {
+  kind: 'operator-response-preview';
+  format: 'plain-text';
+  text: string;
+}
+
 export interface ActuatorRecord {
   name: string;
   path: string;
   description: string;
   status: string;
+}
+
+type MobileAppProfileRecord = MobileAppProfileIndex['profiles'][number];
+interface WebAppProfileIndexRecord {
+  id: string;
+  platform: 'browser';
+  title: string;
+  path: string;
+  description: string;
+  tags?: string[];
 }
 
 const rootDir = pathResolver.rootDir();
@@ -148,6 +214,12 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
   console.log('  examples <name>      List actuator-owned examples for a specific actuator');
+  console.log('  mobile-profiles [id] List shared mobile app profiles or inspect one profile');
+  console.log('  web-profiles [id]    List shared web app profiles or inspect one profile');
+  console.log('  artifact <path>      Inspect a generated artifact for review');
+  console.log('  open-artifact <path> Open a generated artifact with the local viewer');
+  console.log('  packet <path>        Render an operator packet, status report, or response preview');
+  console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
   console.log('');
   console.log('Examples:');
@@ -155,6 +227,12 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- search browser');
   console.log('  npm run cli -- info orchestrator-actuator');
   console.log('  npm run cli -- examples browser-actuator');
+  console.log('  npm run cli -- mobile-profiles');
+  console.log('  npm run cli -- web-profiles');
+  console.log('  npm run cli -- artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx');
+  console.log('  npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx');
+  console.log('  npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json');
+  console.log('  npm run cli -- accept-next-action active/shared/tmp/orchestrator/status-operator-interaction-packet.json review-target-mission-artifacts');
   console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
@@ -249,6 +327,313 @@ function printActuatorExamples(actuator: ActuatorRecord) {
     }
   });
 }
+
+function resolveMobileAppProfileIndexPath(): string {
+  return pathResolver.knowledge('public/orchestration/mobile-app-profiles/index.json');
+}
+
+function loadMobileAppProfiles(): MobileAppProfileRecord[] {
+  const indexPath = resolveMobileAppProfileIndexPath();
+  if (!safeExistsSync(indexPath)) {
+    return [];
+  }
+  const content = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
+  const parsed = JSON.parse(content) as MobileAppProfileIndex;
+  assertValidMobileAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
+  return parsed.profiles;
+}
+
+function printMobileAppProfilesSummary() {
+  printHeader();
+  const profiles = loadMobileAppProfiles();
+  console.log('Mobile app profiles\n');
+
+  if (profiles.length === 0) {
+    console.log('No shared mobile app profiles found.');
+    return;
+  }
+
+  profiles.forEach(profile => {
+    console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
+    console.log(`  ${profile.title}`);
+    console.log(`  ${profile.description}`);
+    console.log(`  ${chalk.gray(profile.path)}`);
+    if (profile.tags?.length) {
+      console.log(`  tags: ${profile.tags.join(', ')}`);
+    }
+  });
+}
+
+function printMobileAppProfile(profileId: string) {
+  const profiles = loadMobileAppProfiles();
+  const profile = profiles.find(entry => entry.id === profileId);
+  if (!profile) {
+    throw new Error(`Mobile app profile "${profileId}" not found.`);
+  }
+
+  printHeader();
+  console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
+  console.log(profile.title);
+  console.log(profile.description);
+  console.log(`Path: ${profile.path}`);
+  if (profile.tags?.length) {
+    console.log(`Tags: ${profile.tags.join(', ')}`);
+  }
+}
+
+function resolveWebAppProfileIndexPath(): string {
+  return pathResolver.knowledge('public/orchestration/web-app-profiles/index.json');
+}
+
+function loadWebAppProfiles(): WebAppProfileIndexRecord[] {
+  const indexPath = resolveWebAppProfileIndexPath();
+  if (!safeExistsSync(indexPath)) {
+    return [];
+  }
+  const content = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
+  const parsed = JSON.parse(content) as { profiles: WebAppProfileIndexRecord[] };
+  assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
+  return parsed.profiles;
+}
+
+function printWebAppProfilesSummary() {
+  printHeader();
+  const profiles = loadWebAppProfiles();
+  console.log('Web app profiles\n');
+
+  if (profiles.length === 0) {
+    console.log('No shared web app profiles found.');
+    return;
+  }
+
+  profiles.forEach(profile => {
+    console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
+    console.log(`  ${profile.title}`);
+    console.log(`  ${profile.description}`);
+    console.log(`  ${chalk.gray(profile.path)}`);
+    if (profile.tags?.length) {
+      console.log(`  tags: ${profile.tags.join(', ')}`);
+    }
+  });
+}
+
+function printWebAppProfile(profileId: string) {
+  const profiles = loadWebAppProfiles();
+  const profile = profiles.find(entry => entry.id === profileId);
+  if (!profile) {
+    throw new Error(`Web app profile "${profileId}" not found.`);
+  }
+
+  printHeader();
+  console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
+  console.log(profile.title);
+  console.log(profile.description);
+  console.log(`Path: ${profile.path}`);
+  if (profile.tags?.length) {
+    console.log(`Tags: ${profile.tags.join(', ')}`);
+  }
+}
+
+function printArtifactInfo(targetPath: string) {
+  const resolvedPath = path.resolve(rootDir, targetPath);
+  if (!safeExistsSync(resolvedPath)) {
+    throw new Error(`Artifact not found: ${targetPath}`);
+  }
+  const stat = safeStat(resolvedPath);
+  const ext = path.extname(resolvedPath).toLowerCase();
+  printHeader();
+  console.log(chalk.bold(path.basename(resolvedPath)));
+  console.log(`Path: ${targetPath}`);
+  console.log(`Size: ${stat.size} bytes`);
+  console.log(`Modified: ${stat.mtime.toISOString()}`);
+  if (['.json', '.md', '.txt', '.log', '.adf', '.xml', '.yaml', '.yml'].includes(ext)) {
+    const content = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
+    const preview = content.split('\n').slice(0, 40).join('\n');
+    console.log('\nPreview:\n');
+    console.log(preview);
+    if (content.split('\n').length > 40) {
+      console.log('\n... truncated ...');
+    }
+    return;
+  }
+  console.log('\nBinary artifact. Review this path with an appropriate local viewer if needed.');
+}
+
+function resolveOpenArtifactCommand(targetPath: string): { command: string; args: string[] } {
+  const platform = os.platform();
+  if (platform === 'darwin') {
+    return { command: 'open', args: [targetPath] };
+  }
+  if (platform === 'win32') {
+    return { command: 'cmd', args: ['/c', 'start', '', targetPath] };
+  }
+  return { command: 'xdg-open', args: [targetPath] };
+}
+
+function openArtifact(targetPath: string) {
+  const resolvedPath = path.resolve(rootDir, targetPath);
+  if (!safeExistsSync(resolvedPath)) {
+    throw new Error(`Artifact not found: ${targetPath}`);
+  }
+  const opener = resolveOpenArtifactCommand(resolvedPath);
+  printHeader();
+  console.log(chalk.bold(path.basename(resolvedPath)));
+  console.log(`Opening: ${targetPath}`);
+  console.log(`Command: ${[opener.command, ...opener.args].join(' ')}\n`);
+  safeExec(opener.command, opener.args, { cwd: rootDir, timeoutMs: 120000 });
+}
+
+function printOperatorPacket(packet: OperatorInteractionPacket) {
+  printHeader();
+  console.log(chalk.bold(packet.headline));
+  console.log(packet.summary);
+  if (packet.readiness) {
+    console.log(`Readiness: ${packet.readiness}`);
+  }
+  if (typeof packet.confidence === 'number') {
+    console.log(`Confidence: ${packet.confidence}`);
+  }
+  if (packet.suggested_response_style) {
+    console.log(`Response style: ${packet.suggested_response_style}`);
+  }
+  if (packet.questions?.length) {
+    console.log('\nQuestions:');
+    packet.questions.forEach(question => {
+      console.log(`- ${chalk.bold(question.id)}: ${question.question}`);
+      console.log(`  reason: ${question.reason}`);
+      if (question.default_assumption) console.log(`  default: ${question.default_assumption}`);
+      if (question.impact) console.log(`  impact: ${question.impact}`);
+    });
+  }
+  if (packet.next_actions?.length) {
+    console.log('\nNext actions:');
+    packet.next_actions.forEach(action => {
+      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
+      if (action.reason) console.log(`  reason: ${action.reason}`);
+      if (action.suggested_command) console.log(`  command: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  pipeline: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  follow-up: ${action.suggested_followup_request}`);
+    });
+  }
+}
+
+function printSystemStatusReport(report: SystemStatusReportLike) {
+  printHeader();
+  console.log(chalk.bold(report.headline));
+  console.log(report.summary);
+  if (report.findings?.length) {
+    console.log('\nFindings:');
+    report.findings.forEach(finding => {
+      console.log(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
+      if (finding.detail) console.log(`  detail: ${finding.detail}`);
+    });
+  }
+  if (report.next_actions?.length) {
+    console.log('\nNext actions:');
+    report.next_actions.forEach(action => {
+      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
+      if (action.reason) console.log(`  reason: ${action.reason}`);
+      if (action.suggested_command) console.log(`  command: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  pipeline: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  follow-up: ${action.suggested_followup_request}`);
+    });
+  }
+}
+
+function printResponsePreview(preview: OperatorResponsePreview) {
+  printHeader();
+  console.log(preview.text);
+}
+
+function loadPacketFile(targetPath: string): { kind?: string } {
+  const resolvedPath = path.resolve(rootDir, targetPath);
+  if (!safeExistsSync(resolvedPath)) {
+    throw new Error(`Packet file not found: ${targetPath}`);
+  }
+  const content = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
+  return JSON.parse(content) as { kind?: string };
+}
+
+function printInteractionPacketFile(targetPath: string) {
+  const parsed = loadPacketFile(targetPath);
+  if (parsed.kind === 'operator-interaction-packet') {
+    printOperatorPacket(parsed as OperatorInteractionPacket);
+    return;
+  }
+  if (parsed.kind === 'system-status-report') {
+    printSystemStatusReport(parsed as SystemStatusReportLike);
+    return;
+  }
+  if (parsed.kind === 'operator-response-preview') {
+    printResponsePreview(parsed as OperatorResponsePreview);
+    return;
+  }
+  throw new Error(`Unsupported packet kind: ${parsed.kind || 'unknown'}`);
+}
+
+function loadPacketLike(targetPath: string): OperatorInteractionPacket | SystemStatusReportLike {
+  const parsed = loadPacketFile(targetPath);
+  if (parsed.kind === 'operator-interaction-packet' || parsed.kind === 'system-status-report') {
+    return parsed as OperatorInteractionPacket | SystemStatusReportLike;
+  }
+  throw new Error(`Unsupported packet kind: ${parsed.kind || 'unknown'}`);
+}
+
+function tokenizeSuggestedCommand(command: string): string[] {
+  const tokens = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+  return tokens.map(token => token.replace(/^['"]|['"]$/g, ''));
+}
+
+function acceptNextAction(packetPath: string, actionId: string) {
+  const packet = loadPacketLike(packetPath);
+  const nextActions = Array.isArray(packet.next_actions) ? packet.next_actions : [];
+  const action = nextActions.find(item => item.id === actionId);
+  if (!action) {
+    throw new Error(`Next action "${actionId}" not found in packet.`);
+  }
+  printHeader();
+  console.log(chalk.bold(`Executing next action: ${action.id}`));
+  console.log(action.action);
+  let output = '';
+  if (action.suggested_command) {
+    const [command, ...args] = tokenizeSuggestedCommand(action.suggested_command);
+    if (!command) {
+      throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
+    }
+    console.log(`Command: ${action.suggested_command}\n`);
+    output = safeExec(command, args, { cwd: rootDir, timeoutMs: 120000 });
+  } else if (action.suggested_pipeline_path) {
+    console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
+    output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path], {
+      cwd: rootDir,
+      timeoutMs: 120000,
+    });
+  } else {
+    throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path.`);
+  }
+  if (output) {
+    process.stdout.write(output);
+    if (!output.endsWith('\n')) {
+      process.stdout.write('\n');
+    }
+  }
+  if (packet.kind === 'operator-interaction-packet' && packet.refresh_command && packet.refresh_packet_path) {
+    console.log('\nRefreshing status packet...\n');
+    const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
+    if (!refreshCommand) {
+      throw new Error('refresh_command is empty.');
+    }
+    const refreshOutput = safeExec(refreshCommand, refreshArgs, { cwd: rootDir, timeoutMs: 120000 });
+    if (refreshOutput) {
+      process.stdout.write(refreshOutput);
+      if (!refreshOutput.endsWith('\n')) {
+        process.stdout.write('\n');
+      }
+    }
+    printInteractionPacketFile(packet.refresh_packet_path);
+  }
+}
+
 
 export function resolveActuatorPath(actuatorPath: string): string | null {
   const candidates = [
@@ -364,6 +749,62 @@ export async function main(args = process.argv.slice(2)) {
     }
 
     printActuatorExamples(actuator);
+    return;
+  }
+
+  if (command === 'mobile-profiles') {
+    if (!firstArg) {
+      printMobileAppProfilesSummary();
+      return;
+    }
+
+    printMobileAppProfile(firstArg);
+    return;
+  }
+
+  if (command === 'web-profiles') {
+    if (!firstArg) {
+      printWebAppProfilesSummary();
+      return;
+    }
+
+    printWebAppProfile(firstArg);
+    return;
+  }
+
+  if (command === 'artifact') {
+    if (!firstArg) {
+      throw new Error('Missing artifact path. Try `npm run cli -- artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.');
+    }
+
+    printArtifactInfo(firstArg);
+    return;
+  }
+
+  if (command === 'open-artifact') {
+    if (!firstArg) {
+      throw new Error('Missing artifact path. Try `npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.');
+    }
+
+    openArtifact(firstArg);
+    return;
+  }
+
+  if (command === 'packet') {
+    if (!firstArg) {
+      throw new Error('Missing packet path. Try `npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json`.');
+    }
+
+    printInteractionPacketFile(firstArg);
+    return;
+  }
+
+  if (command === 'accept-next-action') {
+    if (!firstArg || !restArgs[0]) {
+      throw new Error('Usage: npm run cli -- accept-next-action <packet-path> <action-id>');
+    }
+
+    acceptNextAction(firstArg, restArgs[0]);
     return;
   }
 

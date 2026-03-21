@@ -1,0 +1,51 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/modeling/web-profile-to-browser-plan.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json",
+        "export_as": "web_profile"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "web_profile_to_ui_flow_adf",
+      "params": {
+        "from": "web_profile",
+        "export_as": "ui_flow_adf"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "ui_flow_to_test_inventory",
+      "params": {
+        "from": "ui_flow_adf",
+        "export_as": "test_case_inventory"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "test_inventory_to_browser_pipeline",
+      "params": {
+        "from": "test_case_inventory",
+        "ui_flow_from": "ui_flow_adf",
+        "profile_from": "web_profile",
+        "handoff_output_path": "active/shared/tmp/browser/generated-web-session-handoff.json",
+        "export_as": "browser_execution_pipeline"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "browser_execution_pipeline",
+        "path": "active/shared/tmp/modeling/example-web-browser-execution-plan.json"
+      }
+    }
+  ]
+}

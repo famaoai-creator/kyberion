@@ -1,0 +1,15 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/ios/simctl-health-check.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "simctl_health_check",
+      "params": {
+        "export_as": "ios_health"
+      }
+    }
+  ]
+}

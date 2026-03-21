@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/android/android-passkey-auth-dry-run.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json",
+        "export_as": "app_profile",
+        "validate_as": "mobile-app-profile"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "read_text_file",
+      "params": {
+        "path": "libs/actuators/android-actuator/examples/assets/mock-ui-tree.xml",
+        "export_as": "last_ui_tree"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "authenticate_with_passkey",
+      "params": {
+        "from": "last_ui_tree",
+        "app_profile_from": "app_profile",
+        "dry_run": true,
+        "export_as": "passkey_auth_plan"
+      }
+    }
+  ]
+}

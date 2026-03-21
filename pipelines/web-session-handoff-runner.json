@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "name": "web-session-handoff-runner",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Web runtime session handoff export template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Web runtime session handoff import template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json"
+      }
+    }
+  ]
+}

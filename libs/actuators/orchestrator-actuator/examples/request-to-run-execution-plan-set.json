@@ -1,0 +1,72 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/request-to-run-execution-plan-set.context.json",
+    "request_text": "既存の提案資料をベースに、このストーリーで提案書を作成して。設計書と成果物パックも出してください。"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "request_to_execution_brief",
+      "params": {
+        "provided_inputs": ["source materials", "target audience", "storyline", "required output format"],
+        "export_as": "execution_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "execution_brief_to_resolution_plan",
+      "params": {
+        "from": "execution_brief",
+        "export_as": "resolution_plan"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "resolution_plan_to_pipeline_bundle",
+      "params": {
+        "from": "resolution_plan",
+        "brief_from": "execution_brief",
+        "export_as": "pipeline_bundle"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "pipeline_bundle_to_execution_plan_set",
+      "params": {
+        "from": "pipeline_bundle",
+        "variables": {
+          "proposal_brief_path": "libs/actuators/media-actuator/examples/assets/proposal-brief-example.json",
+          "delivery_pack_id": "proposal-delivery-run-demo",
+          "delivery_summary": "Governed proposal delivery pack",
+          "request_text": "既存の提案資料をベースに、このストーリーで提案書を作成して。設計書と成果物パックも出してください。"
+        },
+        "output_dir": "active/shared/runtime/generated-pipelines/proposal-delivery-run-demo",
+        "export_as": "execution_plan_set"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_execution_plan_set",
+      "params": {
+        "from": "execution_plan_set"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "run_execution_plan_set",
+      "params": {
+        "from": "execution_plan_set",
+        "export_as": "execution_run_report"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "execution_run_report",
+        "path": "active/shared/tmp/orchestrator/request-execution-run-report.json"
+      }
+    }
+  ]
+}

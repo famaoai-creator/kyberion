@@ -28,6 +28,41 @@
       "path": "libs/actuators/browser-actuator/examples/passkey-webauthn-io.json",
       "description": "Registers, authenticates, and deletes a passkey against webauthn.io using the Browser-Actuator virtual authenticator flow.",
       "tags": ["passkey", "webauthn", "browser", "example"]
+    },
+    {
+      "id": "webview-session-handoff-import",
+      "title": "WebView Session Handoff Import",
+      "path": "libs/actuators/browser-actuator/examples/webview-session-handoff-import.json",
+      "description": "Imports a governed mobile-to-browser session handoff artifact, restores browser state, and re-exports a round-trip handoff artifact.",
+      "tags": ["webview", "session-handoff", "cookies", "storage", "example"]
+    },
+    {
+      "id": "android-runtime-session-handoff-import",
+      "title": "Android Runtime Session Handoff Import",
+      "path": "libs/actuators/browser-actuator/examples/android-runtime-session-handoff-import.json",
+      "description": "Imports the governed runtime handoff artifact captured from Android and re-exports a browser-side round-trip artifact.",
+      "tags": ["android", "webview", "session-handoff", "cookies", "storage", "example"]
+    },
+    {
+      "id": "ios-runtime-session-handoff-import",
+      "title": "iOS Runtime Session Handoff Import",
+      "path": "libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json",
+      "description": "Imports the governed runtime handoff artifact captured from iOS and re-exports a browser-side round-trip artifact.",
+      "tags": ["ios", "webview", "session-handoff", "cookies", "storage", "example"]
+    },
+    {
+      "id": "web-runtime-session-handoff-export-template",
+      "title": "Web Runtime Session Handoff Export Template",
+      "path": "libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json",
+      "description": "Navigates to a locally running Web app and exports the current browser session as a governed handoff artifact.",
+      "tags": ["browser", "web", "session-handoff", "export", "template"]
+    },
+    {
+      "id": "web-runtime-session-handoff-import",
+      "title": "Web Runtime Session Handoff Import",
+      "path": "libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json",
+      "description": "Imports a governed Web session handoff artifact and re-exports a round-trip artifact for follow-up assertions.",
+      "tags": ["browser", "web", "session-handoff", "import", "example"]
     }
   ]
 }

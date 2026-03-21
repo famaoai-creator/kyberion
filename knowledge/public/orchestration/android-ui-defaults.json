@@ -1,0 +1,23 @@
+{
+  "login": {
+    "email": {
+      "resource_id": "email",
+      "class_name": "EditText"
+    },
+    "password": {
+      "resource_id": "password",
+      "class_name": "EditText"
+    },
+    "submit": {
+      "text": "sign in",
+      "resource_id": "sign_in",
+      "class_name": "Button"
+    }
+  },
+  "passkey": {
+    "trigger": {
+      "text": "passkey",
+      "class_name": "Button"
+    }
+  }
+}

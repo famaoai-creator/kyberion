@@ -1,0 +1,12 @@
+{
+  "default_provider": "webauthn.io",
+  "providers": {
+    "webauthn.io": {
+      "baseUrl": "https://webauthn.io/",
+      "usernameSelector": "#input-email",
+      "registerSelector": "#register-button",
+      "authenticateSelector": "#login-button",
+      "postAuthUrlIncludes": "/profile"
+    }
+  }
+}

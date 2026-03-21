@@ -1,0 +1,188 @@
+{
+  "version": "3.0.0",
+  "generatedAt": "2026-03-21T00:00:00.000Z",
+  "theme": {
+    "name": "RAID Register Theme",
+    "colors": {
+      "dk1": "0F172A",
+      "lt1": "FFFFFF",
+      "dk2": "334155",
+      "lt2": "F1F5F9",
+      "accent1": "DC2626",
+      "accent2": "EA580C",
+      "accent3": "0F766E",
+      "accent4": "2563EB",
+      "accent5": "7C3AED",
+      "accent6": "CA8A04"
+    },
+    "majorFont": "Aptos",
+    "minorFont": "Aptos"
+  },
+  "styles": {
+    "fonts": [
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#111827" } },
+      { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } },
+      { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#0F172A" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }
+    ],
+    "fills": [
+      { "patternType": "none" },
+      { "patternType": "gray125" },
+      { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#E2E8F0" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FFEDD5" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }
+    ],
+    "borders": [
+      {},
+      {
+        "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } }
+      }
+    ],
+    "numFmts": [],
+    "cellXfs": [
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#111827" } }, "fill": { "patternType": "none" }, "border": {} },
+      { "font": { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#FFFFFF" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#991B1B" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#9A3412" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FFEDD5" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#166534" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#1D4ED8" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#7F1D1D" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FECACA" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } }
+    ],
+    "namedStyles": [{ "name": "Normal", "xfId": 0, "builtinId": 0 }],
+    "dxfs": [
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#991B1B" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" }, "bgColor": { "rgb": "#FEE2E2" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#9A3412" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FFEDD5" }, "bgColor": { "rgb": "#FFEDD5" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#166534" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" }, "bgColor": { "rgb": "#DCFCE7" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#1D4ED8" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" }, "bgColor": { "rgb": "#DBEAFE" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#7F1D1D" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FECACA" }, "bgColor": { "rgb": "#FECACA" } }
+      }
+    ]
+  },
+  "sharedStrings": [],
+  "sharedStringsRich": [],
+  "definedNames": [],
+  "workbookProperties": { "defaultThemeVersion": 164011 },
+  "sheets": [
+    {
+      "id": "sheet1",
+      "name": "RAID",
+      "dimension": "A1:I10",
+      "sheetView": { "showGridLines": false, "zoomScale": 95, "frozenRows": 4 },
+      "columns": [
+        { "min": 1, "max": 1, "width": 12, "customWidth": true },
+        { "min": 2, "max": 2, "width": 16, "customWidth": true },
+        { "min": 3, "max": 3, "width": 38, "customWidth": true },
+        { "min": 4, "max": 4, "width": 12, "customWidth": true },
+        { "min": 5, "max": 5, "width": 12, "customWidth": true },
+        { "min": 6, "max": 6, "width": 12, "customWidth": true },
+        { "min": 7, "max": 7, "width": 14, "customWidth": true },
+        { "min": 8, "max": 8, "width": 14, "customWidth": true },
+        { "min": 9, "max": 9, "width": 22, "customWidth": true }
+      ],
+      "rows": [
+        { "index": 1, "height": 32, "customHeight": true, "cells": [{ "ref": "A1", "type": "s", "value": "Actuator Improvement RAID Register", "styleIndex": 1 }] },
+        { "index": 2, "height": 20, "customHeight": true, "cells": [{ "ref": "A2", "type": "s", "value": "Operator Tracker / 週次レビュー用 / 意味色 + Priority で critical を即判定", "styleIndex": 2 }] },
+        { "index": 3, "height": 20, "customHeight": true, "cells": [
+          { "ref": "A3", "type": "s", "value": "Open Risk 2", "styleIndex": 4 },
+          { "ref": "C3", "type": "s", "value": "Assumption 1", "styleIndex": 5 },
+          { "ref": "E3", "type": "s", "value": "Issue 1", "styleIndex": 6 },
+          { "ref": "G3", "type": "s", "value": "Dependency 1", "styleIndex": 7 }
+        ] },
+        { "index": 4, "height": 22, "customHeight": true, "cells": [
+          { "ref": "A4", "type": "s", "value": "Type", "styleIndex": 3 },
+          { "ref": "B4", "type": "s", "value": "ID", "styleIndex": 3 },
+          { "ref": "C4", "type": "s", "value": "Summary", "styleIndex": 3 },
+          { "ref": "D4", "type": "s", "value": "Owner", "styleIndex": 3 },
+          { "ref": "E4", "type": "s", "value": "Impact", "styleIndex": 3 },
+          { "ref": "F4", "type": "s", "value": "Priority", "styleIndex": 3 },
+          { "ref": "G4", "type": "s", "value": "Due", "styleIndex": 3 },
+          { "ref": "H4", "type": "s", "value": "Status", "styleIndex": 3 },
+          { "ref": "I4", "type": "s", "value": "Response", "styleIndex": 3 }
+        ] },
+        { "index": 5, "cells": [{ "ref": "A5", "type": "s", "value": "Risk", "styleIndex": 4 }, { "ref": "B5", "type": "s", "value": "R-01", "styleIndex": 4 }, { "ref": "C5", "type": "s", "value": "Diagram renderer dependencies differ across operator machines.", "styleIndex": 4 }, { "ref": "D5", "type": "s", "value": "Owner", "styleIndex": 4 }, { "ref": "E5", "type": "s", "value": "High", "styleIndex": 4 }, { "ref": "F5", "type": "s", "value": "P1", "styleIndex": 11 }, { "ref": "G5", "type": "s", "value": "2026-03-24", "styleIndex": 4 }, { "ref": "H5", "type": "s", "value": "Open", "styleIndex": 4 }, { "ref": "I5", "type": "s", "value": "Document prerequisites and add validation checks.", "styleIndex": 4 }] },
+        { "index": 6, "cells": [{ "ref": "A6", "type": "s", "value": "Assumption", "styleIndex": 5 }, { "ref": "B6", "type": "s", "value": "A-01", "styleIndex": 5 }, { "ref": "C6", "type": "s", "value": "Seat chart consumers prefer a printable single-sheet format.", "styleIndex": 5 }, { "ref": "D6", "type": "s", "value": "Media", "styleIndex": 5 }, { "ref": "E6", "type": "s", "value": "Medium", "styleIndex": 5 }, { "ref": "F6", "type": "s", "value": "P2", "styleIndex": 5 }, { "ref": "G6", "type": "s", "value": "2026-03-25", "styleIndex": 5 }, { "ref": "H6", "type": "s", "value": "Validate", "styleIndex": 5 }, { "ref": "I6", "type": "s", "value": "Review with operators before adding multi-floor variants.", "styleIndex": 5 }] },
+        { "index": 7, "cells": [{ "ref": "A7", "type": "s", "value": "Issue", "styleIndex": 6 }, { "ref": "B7", "type": "s", "value": "I-01", "styleIndex": 6 }, { "ref": "C7", "type": "s", "value": "PPTX theme extraction lacked a reusable bridge into merge_content.", "styleIndex": 6 }, { "ref": "D7", "type": "s", "value": "Media", "styleIndex": 6 }, { "ref": "E7", "type": "s", "value": "Medium", "styleIndex": 6 }, { "ref": "F7", "type": "s", "value": "P1", "styleIndex": 11 }, { "ref": "G7", "type": "s", "value": "2026-03-21", "styleIndex": 6 }, { "ref": "H7", "type": "s", "value": "Mitigated", "styleIndex": 6 }, { "ref": "I7", "type": "s", "value": "Added theme_from_pptx_design and master carry-over.", "styleIndex": 6 }] },
+        { "index": 8, "cells": [{ "ref": "A8", "type": "s", "value": "Dependency", "styleIndex": 7 }, { "ref": "B8", "type": "s", "value": "D-01", "styleIndex": 7 }, { "ref": "C8", "type": "s", "value": "Office artifact validation requires native desktop viewers for final visual QA.", "styleIndex": 7 }, { "ref": "D8", "type": "s", "value": "Operator", "styleIndex": 7 }, { "ref": "E8", "type": "s", "value": "Medium", "styleIndex": 7 }, { "ref": "F8", "type": "s", "value": "P2", "styleIndex": 7 }, { "ref": "G8", "type": "s", "value": "2026-03-26", "styleIndex": 7 }, { "ref": "H8", "type": "s", "value": "Watching", "styleIndex": 7 }, { "ref": "I8", "type": "s", "value": "Keep native render deterministic and attach generated files for review.", "styleIndex": 7 }] },
+        { "index": 9, "cells": [{ "ref": "A9", "type": "s", "value": "Risk", "styleIndex": 4 }, { "ref": "B9", "type": "s", "value": "R-02", "styleIndex": 4 }, { "ref": "C9", "type": "s", "value": "Master slide source decks may vary in placeholder quality.", "styleIndex": 4 }, { "ref": "D9", "type": "s", "value": "Owner", "styleIndex": 4 }, { "ref": "E9", "type": "s", "value": "Medium", "styleIndex": 4 }, { "ref": "F9", "type": "s", "value": "P1", "styleIndex": 11 }, { "ref": "G9", "type": "s", "value": "2026-03-28", "styleIndex": 4 }, { "ref": "H9", "type": "s", "value": "Open", "styleIndex": 4 }, { "ref": "I9", "type": "s", "value": "Fallback to derived colors and discovered fonts if placeholders are sparse.", "styleIndex": 4 }] },
+        { "index": 10, "height": 18, "customHeight": true, "cells": [{ "ref": "A10", "type": "s", "value": "意味色: 赤=Risk / 橙=Assumption / 緑=Issue / 青=Dependency。Priority=P1 は critical として追加強調。", "styleIndex": 10 }] }
+      ],
+      "mergeCells": [
+        { "ref": "A1:I1" },
+        { "ref": "A2:I2" },
+        { "ref": "A3:B3" },
+        { "ref": "C3:D3" },
+        { "ref": "E3:F3" },
+        { "ref": "G3:H3" },
+        { "ref": "A10:I10" }
+      ],
+      "tables": [],
+      "conditionalFormats": [
+        {
+          "sqref": "A5:I9",
+          "rules": [
+            { "type": "expression", "priority": 1, "dxfId": 0, "formula": "$A5=\"Risk\"" },
+            { "type": "expression", "priority": 2, "dxfId": 1, "formula": "$A5=\"Assumption\"" },
+            { "type": "expression", "priority": 3, "dxfId": 2, "formula": "$A5=\"Issue\"" },
+            { "type": "expression", "priority": 4, "dxfId": 3, "formula": "$A5=\"Dependency\"" },
+            { "type": "expression", "priority": 5, "dxfId": 4, "formula": "AND($F5=\"P1\",OR($H5=\"Open\",$H5=\"Watching\",$H5=\"Validate\"))" }
+          ]
+        }
+      ],
+      "dataValidations": [
+        {
+          "sqref": "A5:A9",
+          "type": "list",
+          "formula1": "\"Risk,Assumption,Issue,Dependency\"",
+          "showErrorMessage": true,
+          "errorTitle": "Invalid Type",
+          "error": "Use one of: Risk, Assumption, Issue, Dependency"
+        },
+        {
+          "sqref": "F5:F9",
+          "type": "list",
+          "formula1": "\"P1,P2,P3\"",
+          "showErrorMessage": true,
+          "errorTitle": "Invalid Priority",
+          "error": "Use one of: P1, P2, P3"
+        },
+        {
+          "sqref": "H5:H9",
+          "type": "list",
+          "formula1": "\"Open,Validate,Mitigated,Watching,Closed\"",
+          "showErrorMessage": true,
+          "errorTitle": "Invalid Status",
+          "error": "Use one of: Open, Validate, Mitigated, Watching, Closed"
+        }
+      ],
+      "autoFilter": { "ref": "A4:I9" },
+      "pageSetup": { "orientation": "landscape", "fitToWidth": 1, "fitToHeight": 0 }
+    }
+  ]
+}

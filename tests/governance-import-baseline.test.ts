@@ -40,6 +40,7 @@ function walk(dirPath: string, relativeBase = ''): string[] {
 
     if (CODE_EXTENSIONS.has(path.extname(entry.name))) {
       if (EXCLUDED_FILES.has(relPath)) continue;
+      if (relPath.endsWith('.d.ts')) continue;
       files.push(relPath);
     }
   }

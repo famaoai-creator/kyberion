@@ -5,6 +5,8 @@
  * Import path: './types.js' (TypeScript resolves .js -> .ts under Node16 module resolution)
  */
 
+export * from './src/types/index.js';
+
 // ---------------------------------------------------------------------------
 // Knowledge Tiers
 // ---------------------------------------------------------------------------

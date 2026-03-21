@@ -1,0 +1,42 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/request-to-pipeline-bundle.context.json",
+    "request_text": "既存の提案資料をベースに、このストーリーで提案書を作成して。設計書と成果物パックも出してください。"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "request_to_execution_brief",
+      "params": {
+        "provided_inputs": ["source materials", "target audience", "storyline", "required output format"],
+        "export_as": "execution_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "execution_brief_to_resolution_plan",
+      "params": {
+        "from": "execution_brief",
+        "export_as": "resolution_plan"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "resolution_plan_to_pipeline_bundle",
+      "params": {
+        "from": "resolution_plan",
+        "brief_from": "execution_brief",
+        "export_as": "pipeline_bundle"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "pipeline_bundle",
+        "path": "active/shared/tmp/orchestrator/request-pipeline-bundle.json"
+      }
+    }
+  ]
+}

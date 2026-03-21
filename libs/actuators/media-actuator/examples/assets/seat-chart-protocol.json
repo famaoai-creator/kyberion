@@ -1,0 +1,165 @@
+{
+  "version": "3.0.0",
+  "generatedAt": "2026-03-21T00:00:00.000Z",
+  "theme": {
+    "name": "Seat Chart Theme",
+    "colors": {
+      "dk1": "0F172A",
+      "lt1": "FFFFFF",
+      "dk2": "334155",
+      "lt2": "E2E8F0",
+      "accent1": "0F766E",
+      "accent2": "2563EB",
+      "accent3": "7C3AED",
+      "accent4": "EA580C",
+      "accent5": "0EA5E9",
+      "accent6": "65A30D"
+    },
+    "majorFont": "Aptos",
+    "minorFont": "Aptos"
+  },
+  "styles": {
+    "fonts": [
+      { "name": "Aptos", "size": 11, "color": { "rgb": "#1F2937" } },
+      { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } },
+      { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#0F172A" } },
+      { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#0F172A" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }
+    ],
+    "fills": [
+      { "patternType": "none" },
+      { "patternType": "gray125" },
+      { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#E2E8F0" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#EDE9FE" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FFEDD5" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FEF3C7" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }
+    ],
+    "borders": [
+      {},
+      {
+        "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } }
+      }
+    ],
+    "numFmts": [],
+    "cellXfs": [
+      { "font": { "name": "Aptos", "size": 11, "color": { "rgb": "#1F2937" } }, "fill": { "patternType": "none" }, "border": {} },
+      { "font": { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#E2E8F0" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#EDE9FE" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 11, "bold": true, "color": { "rgb": "#7C2D12" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FFEDD5" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#854D0E" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEF3C7" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } }
+    ],
+    "namedStyles": [{ "name": "Normal", "xfId": 0, "builtinId": 0 }]
+  },
+  "sharedStrings": [],
+  "sharedStringsRich": [],
+  "definedNames": [],
+  "workbookProperties": { "defaultThemeVersion": 164011 },
+  "sheets": [
+    {
+      "id": "sheet1",
+      "name": "座席表",
+      "dimension": "A1:H10",
+      "sheetView": { "showGridLines": false, "zoomScale": 95, "frozenRows": 4 },
+      "columns": [
+        { "min": 1, "max": 1, "width": 15, "customWidth": true },
+        { "min": 2, "max": 2, "width": 17, "customWidth": true },
+        { "min": 3, "max": 3, "width": 17, "customWidth": true },
+        { "min": 4, "max": 4, "width": 12, "customWidth": true },
+        { "min": 5, "max": 5, "width": 14, "customWidth": true },
+        { "min": 6, "max": 6, "width": 17, "customWidth": true },
+        { "min": 7, "max": 7, "width": 17, "customWidth": true },
+        { "min": 8, "max": 8, "width": 15, "customWidth": true }
+      ],
+      "rows": [
+        { "index": 1, "height": 32, "customHeight": true, "cells": [{ "ref": "A1", "type": "s", "value": "Kyberion Tokyo Office 座席表", "styleIndex": 1 }] },
+        { "index": 2, "height": 20, "customHeight": true, "cells": [{ "ref": "A2", "type": "s", "value": "Print Layout Sheet / 2026年4月オンサイト体制 / 中央通路固定", "styleIndex": 2 }] },
+        { "index": 3, "height": 20, "customHeight": true, "cells": [
+          { "ref": "A3", "type": "s", "value": "総席数 20", "styleIndex": 8 },
+          { "ref": "C3", "type": "s", "value": "来客席 2", "styleIndex": 8 },
+          { "ref": "E3", "type": "s", "value": "執務ゾーン 3", "styleIndex": 8 },
+          { "ref": "G3", "type": "s", "value": "印刷向け / A4横", "styleIndex": 8 }
+        ] },
+        { "index": 4, "height": 22, "customHeight": true, "cells": [
+          { "ref": "A4", "type": "s", "value": "Executive", "styleIndex": 3 },
+          { "ref": "B4", "type": "s", "value": "Engineering", "styleIndex": 3 },
+          { "ref": "C4", "type": "s", "value": "Engineering", "styleIndex": 3 },
+          { "ref": "D4", "type": "s", "value": "Aisle", "styleIndex": 3 },
+          { "ref": "E4", "type": "s", "value": "Operations", "styleIndex": 3 },
+          { "ref": "F4", "type": "s", "value": "Customer", "styleIndex": 3 },
+          { "ref": "G4", "type": "s", "value": "Customer", "styleIndex": 3 },
+          { "ref": "H4", "type": "s", "value": "Guest", "styleIndex": 3 }
+        ] },
+        { "index": 5, "height": 34, "customHeight": true, "cells": [
+          { "ref": "A5", "type": "s", "value": "CEO\\nFamao", "styleIndex": 7 },
+          { "ref": "B5", "type": "s", "value": "Lead Eng\\nMori", "styleIndex": 5 },
+          { "ref": "C5", "type": "s", "value": "Platform\\nSato", "styleIndex": 5 },
+          { "ref": "D5", "type": "s", "value": "Walkway", "styleIndex": 9 },
+          { "ref": "E5", "type": "s", "value": "PMO\\nKobayashi", "styleIndex": 6 },
+          { "ref": "F5", "type": "s", "value": "CS\\nArai", "styleIndex": 6 },
+          { "ref": "G5", "type": "s", "value": "CS\\nLee", "styleIndex": 6 },
+          { "ref": "H5", "type": "s", "value": "来客1", "styleIndex": 8 }
+        ] },
+        { "index": 6, "height": 34, "customHeight": true, "cells": [
+          { "ref": "A6", "type": "s", "value": "Board\\nReserve", "styleIndex": 7 },
+          { "ref": "B6", "type": "s", "value": "Backend\\nTanaka", "styleIndex": 5 },
+          { "ref": "C6", "type": "s", "value": "Frontend\\nSuzuki", "styleIndex": 5 },
+          { "ref": "D6", "type": "s", "value": "Walkway", "styleIndex": 9 },
+          { "ref": "E6", "type": "s", "value": "Finance IT\\nNakamura", "styleIndex": 6 },
+          { "ref": "F6", "type": "s", "value": "Sales\\nIto", "styleIndex": 6 },
+          { "ref": "G6", "type": "s", "value": "Partner\\nGoto", "styleIndex": 6 },
+          { "ref": "H6", "type": "s", "value": "来客2", "styleIndex": 8 }
+        ] },
+        { "index": 7, "height": 34, "customHeight": true, "cells": [
+          { "ref": "A7", "type": "s", "value": "Meeting Booth", "styleIndex": 8 },
+          { "ref": "B7", "type": "s", "value": "QA\\nYamada", "styleIndex": 5 },
+          { "ref": "C7", "type": "s", "value": "SRE\\nKato", "styleIndex": 5 },
+          { "ref": "D7", "type": "s", "value": "Walkway", "styleIndex": 9 },
+          { "ref": "E7", "type": "s", "value": "Legal\\nIshii", "styleIndex": 6 },
+          { "ref": "F7", "type": "s", "value": "Advisory\\nMatsui", "styleIndex": 7 },
+          { "ref": "G7", "type": "s", "value": "Partner\\nChen", "styleIndex": 6 },
+          { "ref": "H7", "type": "s", "value": "Guest Wi-Fi", "styleIndex": 8 }
+        ] },
+        { "index": 8, "height": 30, "customHeight": true, "cells": [
+          { "ref": "A8", "type": "s", "value": "Storage", "styleIndex": 9 },
+          { "ref": "B8", "type": "s", "value": "Desk 2B", "styleIndex": 9 },
+          { "ref": "C8", "type": "s", "value": "Desk 2C", "styleIndex": 9 },
+          { "ref": "D8", "type": "s", "value": "Walkway", "styleIndex": 9 },
+          { "ref": "E8", "type": "s", "value": "Desk 2E", "styleIndex": 9 },
+          { "ref": "F8", "type": "s", "value": "Focus Booth", "styleIndex": 8 },
+          { "ref": "G8", "type": "s", "value": "Printer", "styleIndex": 9 },
+          { "ref": "H8", "type": "s", "value": "Reception", "styleIndex": 8 }
+        ] },
+        { "index": 9, "height": 18, "customHeight": true, "cells": [{ "ref": "A9", "type": "s", "value": "凡例", "styleIndex": 3 }, { "ref": "B9", "type": "s", "value": "緑=Engineering", "styleIndex": 10 }, { "ref": "D9", "type": "s", "value": "青=Operations", "styleIndex": 10 }, { "ref": "F9", "type": "s", "value": "橙=Executive/Guest", "styleIndex": 10 }] },
+        { "index": 10, "height": 18, "customHeight": true, "cells": [{ "ref": "A10", "type": "s", "value": "注記: 通路セルは印刷時の余白代わりに淡色で固定し、視線が左右へ散らないようにしている。", "styleIndex": 10 }] }
+      ],
+      "mergeCells": [
+        { "ref": "A1:H1" },
+        { "ref": "A2:H2" },
+        { "ref": "A3:B3" },
+        { "ref": "C3:D3" },
+        { "ref": "E3:F3" },
+        { "ref": "G3:H3" },
+        { "ref": "A10:H10" }
+      ],
+      "tables": [],
+      "conditionalFormats": [],
+      "dataValidations": [],
+      "pageSetup": { "orientation": "landscape", "fitToWidth": 1, "fitToHeight": 1 }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.mobile" content-desc="" clickable="false" enabled="true" bounds="[0,0][1080,2400]"/>
+  <node index="1" text="Login" resource-id="com.example.mobile:id/title" class="android.widget.TextView" package="com.example.mobile" content-desc="" clickable="false" enabled="true" bounds="[72,210][400,290]"/>
+  <node index="2" text="" resource-id="com.example.mobile:id/email" class="android.widget.EditText" package="com.example.mobile" content-desc="Email address" clickable="true" enabled="true" bounds="[72,420][1008,540]"/>
+  <node index="3" text="" resource-id="com.example.mobile:id/password" class="android.widget.EditText" package="com.example.mobile" content-desc="Password" clickable="true" enabled="true" bounds="[72,580][1008,700]"/>
+  <node index="4" text="Sign in" resource-id="com.example.mobile:id/sign_in" class="android.widget.Button" package="com.example.mobile" content-desc="" clickable="true" enabled="true" bounds="[72,820][1008,948]"/>
+  <node index="5" text="Use passkey instead" resource-id="com.example.mobile:id/passkey" class="android.widget.Button" package="com.example.mobile" content-desc="" clickable="true" enabled="true" bounds="[72,980][1008,1108]"/>
+</hierarchy>

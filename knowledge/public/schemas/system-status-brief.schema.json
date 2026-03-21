@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "System Status Brief",
+  "type": "object",
+  "required": ["kind", "request_text", "scope", "focus_areas"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["system-status-brief"]
+    },
+    "request_text": { "type": "string" },
+    "scope": {
+      "type": "string",
+      "enum": ["system", "surfaces", "actuators", "projects", "missions"]
+    },
+    "focus_areas": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "recommended_sources": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

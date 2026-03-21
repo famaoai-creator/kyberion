@@ -1,0 +1,171 @@
+{
+  "version": "3.0.0",
+  "generatedAt": "2026-03-21T00:00:00.000Z",
+  "theme": {
+    "name": "Project WBS Theme",
+    "colors": {
+      "dk1": "0F172A",
+      "lt1": "FFFFFF",
+      "dk2": "334155",
+      "lt2": "E2E8F0",
+      "accent1": "2563EB",
+      "accent2": "0F766E",
+      "accent3": "7C3AED",
+      "accent4": "EA580C",
+      "accent5": "DC2626",
+      "accent6": "65A30D"
+    },
+    "majorFont": "Aptos",
+    "minorFont": "Aptos"
+  },
+  "styles": {
+    "fonts": [
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#111827" } },
+      { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } },
+      { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#FFFFFF" } },
+      { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#0F172A" } },
+      { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }
+    ],
+    "fills": [
+      { "patternType": "none" },
+      { "patternType": "gray125" },
+      { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#E2E8F0" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FEF3C7" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" } },
+      { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }
+    ],
+    "borders": [
+      {},
+      {
+        "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } },
+        "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } }
+      }
+    ],
+    "numFmts": [],
+    "cellXfs": [
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#111827" } }, "fill": { "patternType": "none" }, "border": {} },
+      { "font": { "name": "Aptos", "size": 22, "bold": true, "color": { "rgb": "#FFFFFF" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#E2E8F0" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#FFFFFF" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#0F172A" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#E2E8F0" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#0F172A" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#166534" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#92400E" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEF3C7" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#991B1B" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "horizontal": "center", "vertical": "center" } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": { "left": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "right": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "top": { "style": "thin", "color": { "rgb": "#CBD5E1" } }, "bottom": { "style": "thin", "color": { "rgb": "#CBD5E1" } } }, "alignment": { "vertical": "center", "wrapText": true } },
+      { "font": { "name": "Aptos", "size": 10, "color": { "rgb": "#334155" } }, "fill": { "patternType": "solid", "fgColor": { "rgb": "#F8FAFC" } }, "border": {}, "alignment": { "horizontal": "left", "vertical": "center" } }
+    ],
+    "namedStyles": [{ "name": "Normal", "xfId": 0, "builtinId": 0 }],
+    "dxfs": [
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#166534" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#DCFCE7" }, "bgColor": { "rgb": "#DCFCE7" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#1D4ED8" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#DBEAFE" }, "bgColor": { "rgb": "#DBEAFE" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#92400E" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEF3C7" }, "bgColor": { "rgb": "#FEF3C7" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#991B1B" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FEE2E2" }, "bgColor": { "rgb": "#FEE2E2" } }
+      },
+      {
+        "font": { "name": "Aptos", "size": 10, "bold": true, "color": { "rgb": "#7F1D1D" } },
+        "fill": { "patternType": "solid", "fgColor": { "rgb": "#FECACA" }, "bgColor": { "rgb": "#FECACA" } }
+      }
+    ]
+  },
+  "sharedStrings": [],
+  "sharedStringsRich": [],
+  "definedNames": [],
+  "workbookProperties": { "defaultThemeVersion": 164011 },
+  "sheets": [
+    {
+      "id": "sheet1",
+      "name": "WBS",
+      "dimension": "A1:G14",
+      "sheetView": { "showGridLines": false, "zoomScale": 95, "frozenRows": 4 },
+      "columns": [
+        { "min": 1, "max": 1, "width": 8, "customWidth": true },
+        { "min": 2, "max": 2, "width": 18, "customWidth": true },
+        { "min": 3, "max": 3, "width": 38, "customWidth": true },
+        { "min": 4, "max": 4, "width": 14, "customWidth": true },
+        { "min": 5, "max": 5, "width": 14, "customWidth": true },
+        { "min": 6, "max": 6, "width": 14, "customWidth": true },
+        { "min": 7, "max": 7, "width": 14, "customWidth": true }
+      ],
+      "rows": [
+        { "index": 1, "height": 32, "customHeight": true, "cells": [{ "ref": "A1", "type": "s", "value": "Actuator Improvement Mission WBS", "styleIndex": 1 }] },
+        { "index": 2, "height": 20, "customHeight": true, "cells": [{ "ref": "A2", "type": "s", "value": "Operator Tracker / Owner: famao / Horizon: 2026-03-21 to 2026-04-04", "styleIndex": 2 }] },
+        { "index": 3, "height": 20, "customHeight": true, "cells": [
+          { "ref": "A3", "type": "s", "value": "総タスク 9", "styleIndex": 5 },
+          { "ref": "C3", "type": "s", "value": "完了 5", "styleIndex": 6 },
+          { "ref": "E3", "type": "s", "value": "進行中 3", "styleIndex": 7 },
+          { "ref": "G3", "type": "s", "value": "要確認 1", "styleIndex": 8 }
+        ] },
+        { "index": 4, "height": 22, "customHeight": true, "cells": [
+          { "ref": "A4", "type": "s", "value": "WBS", "styleIndex": 3 },
+          { "ref": "B4", "type": "s", "value": "Phase", "styleIndex": 3 },
+          { "ref": "C4", "type": "s", "value": "Task", "styleIndex": 3 },
+          { "ref": "D4", "type": "s", "value": "Owner", "styleIndex": 3 },
+          { "ref": "E4", "type": "s", "value": "Start", "styleIndex": 3 },
+          { "ref": "F4", "type": "s", "value": "Finish", "styleIndex": 3 },
+          { "ref": "G4", "type": "s", "value": "Status", "styleIndex": 3 }
+        ] },
+        { "index": 5, "cells": [{ "ref": "A5", "type": "s", "value": "1", "styleIndex": 4 }, { "ref": "B5", "type": "s", "value": "Foundation", "styleIndex": 4 }, { "ref": "C5", "type": "s", "value": "Media-Actuator sample portfolio design", "styleIndex": 4 }, { "ref": "D5", "type": "s", "value": "Owner", "styleIndex": 4 }, { "ref": "E5", "type": "s", "value": "2026-03-21", "styleIndex": 4 }, { "ref": "F5", "type": "s", "value": "2026-03-22", "styleIndex": 4 }, { "ref": "G5", "type": "s", "value": "In Progress", "styleIndex": 7 }] },
+        { "index": 6, "cells": [{ "ref": "A6", "type": "s", "value": "1.1", "styleIndex": 9 }, { "ref": "B6", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C6", "type": "s", "value": "Seat chart Excel sample", "styleIndex": 9 }, { "ref": "D6", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E6", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F6", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "G6", "type": "s", "value": "Done", "styleIndex": 6 }] },
+        { "index": 7, "cells": [{ "ref": "A7", "type": "s", "value": "1.2", "styleIndex": 9 }, { "ref": "B7", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C7", "type": "s", "value": "WBS workbook sample", "styleIndex": 9 }, { "ref": "D7", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E7", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F7", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "G7", "type": "s", "value": "Done", "styleIndex": 6 }] },
+        { "index": 8, "cells": [{ "ref": "A8", "type": "s", "value": "1.3", "styleIndex": 9 }, { "ref": "B8", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C8", "type": "s", "value": "RAID tracker workbook sample", "styleIndex": 9 }, { "ref": "D8", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E8", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F8", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "G8", "type": "s", "value": "Done", "styleIndex": 6 }] },
+        { "index": 9, "cells": [{ "ref": "A9", "type": "s", "value": "2", "styleIndex": 4 }, { "ref": "B9", "type": "s", "value": "Presentation Theme", "styleIndex": 4 }, { "ref": "C9", "type": "s", "value": "Extract master slide theme and reuse it", "styleIndex": 4 }, { "ref": "D9", "type": "s", "value": "Owner", "styleIndex": 4 }, { "ref": "E9", "type": "s", "value": "2026-03-21", "styleIndex": 4 }, { "ref": "F9", "type": "s", "value": "2026-03-22", "styleIndex": 4 }, { "ref": "G9", "type": "s", "value": "In Progress", "styleIndex": 7 }] },
+        { "index": 10, "cells": [{ "ref": "A10", "type": "s", "value": "2.1", "styleIndex": 9 }, { "ref": "B10", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C10", "type": "s", "value": "Generate source deck with curated visual language", "styleIndex": 9 }, { "ref": "D10", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E10", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F10", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "G10", "type": "s", "value": "Done", "styleIndex": 6 }] },
+        { "index": 11, "cells": [{ "ref": "A11", "type": "s", "value": "2.2", "styleIndex": 9 }, { "ref": "B11", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C11", "type": "s", "value": "Distill theme and master placeholders from source deck", "styleIndex": 9 }, { "ref": "D11", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E11", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F11", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "G11", "type": "s", "value": "Done", "styleIndex": 6 }] },
+        { "index": 12, "cells": [{ "ref": "A12", "type": "s", "value": "2.3", "styleIndex": 9 }, { "ref": "B12", "type": "s", "value": "", "styleIndex": 9 }, { "ref": "C12", "type": "s", "value": "Render derivative deck using extracted theme", "styleIndex": 9 }, { "ref": "D12", "type": "s", "value": "Media", "styleIndex": 9 }, { "ref": "E12", "type": "s", "value": "2026-03-21", "styleIndex": 9 }, { "ref": "F12", "type": "s", "value": "2026-03-22", "styleIndex": 9 }, { "ref": "G12", "type": "s", "value": "In Progress", "styleIndex": 7 }] },
+        { "index": 13, "cells": [{ "ref": "A13", "type": "s", "value": "3", "styleIndex": 4 }, { "ref": "B13", "type": "s", "value": "Validation", "styleIndex": 4 }, { "ref": "C13", "type": "s", "value": "Build and run generated examples", "styleIndex": 4 }, { "ref": "D13", "type": "s", "value": "Owner", "styleIndex": 4 }, { "ref": "E13", "type": "s", "value": "2026-03-21", "styleIndex": 4 }, { "ref": "F13", "type": "s", "value": "2026-03-21", "styleIndex": 4 }, { "ref": "G13", "type": "s", "value": "Watch", "styleIndex": 8 }] },
+        { "index": 14, "height": 18, "customHeight": true, "cells": [{ "ref": "A14", "type": "s", "value": "視覚階層: タイトル帯 → KPI帯 → Phase行 → Task行。Status列は意味色で固定。", "styleIndex": 10 }] }
+      ],
+      "mergeCells": [
+        { "ref": "A1:G1" },
+        { "ref": "A2:G2" },
+        { "ref": "A3:B3" },
+        { "ref": "C3:D3" },
+        { "ref": "E3:F3" },
+        { "ref": "A14:G14" }
+      ],
+      "tables": [],
+      "conditionalFormats": [
+        {
+          "sqref": "A5:G13",
+          "rules": [
+            { "type": "expression", "priority": 1, "dxfId": 0, "formula": "$G5=\"Done\"" },
+            { "type": "expression", "priority": 2, "dxfId": 1, "formula": "$G5=\"In Progress\"" },
+            { "type": "expression", "priority": 3, "dxfId": 2, "formula": "$G5=\"Watch\"" },
+            { "type": "expression", "priority": 4, "dxfId": 3, "formula": "$G5=\"Blocked\"" },
+            { "type": "expression", "priority": 5, "dxfId": 4, "formula": "AND(DATEVALUE($F5)<TODAY(),$G5<>\"Done\")" }
+          ]
+        }
+      ],
+      "dataValidations": [
+        {
+          "sqref": "G5:G13",
+          "type": "list",
+          "formula1": "\"Done,In Progress,Watch,Blocked\"",
+          "showErrorMessage": true,
+          "errorTitle": "Invalid Status",
+          "error": "Use one of: Done, In Progress, Watch, Blocked"
+        }
+      ],
+      "autoFilter": { "ref": "A4:G13" },
+      "pageSetup": { "orientation": "landscape", "fitToWidth": 1, "fitToHeight": 0 }
+    }
+  ]
+}

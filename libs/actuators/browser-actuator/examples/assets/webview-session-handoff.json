@@ -1,0 +1,22 @@
+{
+  "kind": "webview-session-handoff",
+  "target_url": "https://example.com/",
+  "origin": "https://example.com",
+  "browser_session_id": "webview-handoff-demo",
+  "prefer_persistent_context": true,
+  "cookies": [],
+  "local_storage": {
+    "auth_token": "browser-demo-token",
+    "user_id": "operator-001"
+  },
+  "session_storage": {
+    "handoff_nonce": "browser-nonce-001"
+  },
+  "headers": {
+    "x-kyberion-handoff": "true"
+  },
+  "source": {
+    "platform": "android",
+    "app_id": "example-mobile-login-passkey"
+  }
+}

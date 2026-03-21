@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Browser Passkey Providers Catalog",
+  "type": "object",
+  "required": ["default_provider", "providers"],
+  "properties": {
+    "default_provider": { "type": "string" },
+    "providers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["baseUrl", "usernameSelector", "registerSelector", "authenticateSelector"],
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "usernameSelector": { "type": "string" },
+          "registerSelector": { "type": "string" },
+          "authenticateSelector": { "type": "string" },
+          "postAuthUrlIncludes": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -21,3 +21,13 @@ node dist/libs/actuators/browser-actuator/src/index.js --input libs/actuators/br
   手動介入ありの headed browser テンプレート
 - `passkey-webauthn-io.json`:
   passkey の register / authenticate / delete
+- `webview-session-handoff-import.json`:
+  mobile actuator が出力した session handoff artifact を browser context に import し、cookies/storage を復元する
+- `android-runtime-session-handoff-import.json`:
+  Android runtime handoff artifact を import して browser 側で round-trip export する
+- `ios-runtime-session-handoff-import.json`:
+  iOS runtime handoff artifact を import して browser 側で round-trip export する
+- `web-runtime-session-handoff-export-template.json`:
+  ローカル起動中の Web app から current browser session を handoff artifact として export する
+- `web-runtime-session-handoff-import.json`:
+  Web runtime handoff artifact を import して browser 側で round-trip export する
