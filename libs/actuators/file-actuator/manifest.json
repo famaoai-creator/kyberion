@@ -1,0 +1,22 @@
+{
+  "actuator_id": "file-actuator",
+  "version": "1.0.0",
+  "description": "Generic File-Actuator for Kyberion",
+  "capabilities": [
+    { "op": "read", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "append", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "delete", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mkdir", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "stat", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "exists", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "search", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "tail", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "copy", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "move", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "regex_replace", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "json_parse", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "path_join", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

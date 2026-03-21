@@ -1,0 +1,27 @@
+{
+  "service_id": "smoke-test",
+  "name": "Adaptive Execution Smoke Test",
+  "base_url": "https://postman-echo.com",
+  "operations": {
+    "test_fallback": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "cli",
+          "command": "non-existent-cli",
+          "args": ["do", "something"],
+          "output_mapping": { "result": "output" }
+        },
+        {
+          "type": "api",
+          "path": "get?foo={{val}}",
+          "method": "GET",
+          "output_mapping": { "result": "args.foo" }
+        }
+      ],
+      "parameters": {
+        "val": { "required": true, "type": "string" }
+      }
+    }
+  }
+}
