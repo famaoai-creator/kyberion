@@ -1,0 +1,9 @@
+{
+  "actuator_id": "presence-actuator",
+  "version": "1.0.0",
+  "description": "Human Presence and Messaging Bridge",
+  "capabilities": [
+    { "op": "dispatch", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "receive_event", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

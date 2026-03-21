@@ -1,0 +1,13 @@
+{
+  "actuator_id": "wisdom-actuator",
+  "version": "1.0.0",
+  "description": "Dynamic Knowledge and Wisdom Engine",
+  "capabilities": [
+    { "op": "knowledge_search", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "knowledge_inject", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "knowledge_export", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "knowledge_import", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "regex_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "yaml_update", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

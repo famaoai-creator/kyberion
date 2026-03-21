@@ -5,7 +5,28 @@
       "base_url": "https://www.moltbook.com/api/v1"
     },
     "slack": {
-      "base_url": "https://slack.com/api"
+      "base_url": "https://slack.com/api",
+      "preset_path": "knowledge/public/orchestration/service-presets/slack.json"
+    },
+    "github": {
+      "base_url": "https://api.github.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/github.json"
+    },
+    "jira": {
+      "base_url": "https://atlassian.net/rest/api/3",
+      "preset_path": "knowledge/public/orchestration/service-presets/jira.json"
+    },
+    "notion": {
+      "base_url": "https://api.notion.com/v1",
+      "preset_path": "knowledge/public/orchestration/service-presets/notion.json"
+    },
+    "aws-ce": {
+      "base_url": "https://ce.us-east-1.amazonaws.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/aws-ce.json"
+    },
+    "smoke-test": {
+      "base_url": "https://postman-echo.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/smoke-test.json"
     }
   }
 }

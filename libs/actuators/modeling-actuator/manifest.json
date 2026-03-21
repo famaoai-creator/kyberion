@@ -1,0 +1,11 @@
+{
+  "actuator_id": "modeling-actuator",
+  "version": "1.0.0",
+  "description": "Architectural Analysis and ADF Transformation Engine",
+  "capabilities": [
+    { "op": "ajv_validate", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "web_profile_to_ui_flow_adf", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "ui_flow_to_test_inventory", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_inventory_to_browser_pipeline", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
