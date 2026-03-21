@@ -412,6 +412,7 @@ function recordAgentRuntimeEvent(event: Record<string, unknown>): void {
 
 async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
   const upperId = id.toUpperCase();
+  const isEphemeral = process.argv.includes('--ephemeral');
   const normalizedRelationships = normalizeRelationships(relationships);
   const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
   const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
@@ -419,7 +420,8 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
 
   // Auto-calculate tier based on template injections
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
-  const missionDir = resolveMissionDir(upperId, finalTier);
+  const missionBaseDir = isEphemeral ? pathResolver.active('missions/ephemeral') : resolveMissionDir(upperId, finalTier);
+  const missionDir = isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir;
   
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
 
@@ -465,19 +467,22 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     logger.info(`📁 [Architecture] Created evidence directory for mission ${upperId}.`);
   }
 
-  // Initialize Micro-Repo
-  initMissionRepo(missionDir);
+  // Initialize Micro-Repo (Skip for ephemeral)
+  if (!isEphemeral) {
+    initMissionRepo(missionDir);
+  }
 
   // Initial state with tier
-  const missionGitHash = getGitHash(missionDir);
+  const missionGitHash = !isEphemeral ? getGitHash(missionDir) : 'ephemeral';
 
   // Initial state with tier
-  const initialState: MissionState = {
+  const initialState: MissionState & { is_ephemeral?: boolean } = {
     mission_id: upperId,
     mission_type: missionType,
     tier: finalTier,
     status: 'planned',
     execution_mode: 'local',
+    is_ephemeral: isEphemeral,
     relationships: normalizedRelationships,
     priority: 3,
     assigned_persona: persona,
@@ -488,7 +493,7 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
       latest_commit: missionGitHash,
       checkpoints: []
     },
-    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier (Independent Micro-Repo).` }]
+    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier ${isEphemeral ? '(Ephemeral Mode)' : '(Independent Micro-Repo)'}.` }]
   };
   await saveState(upperId, initialState);
 
@@ -498,10 +503,11 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     tier: finalTier,
     type: missionType,
     persona: persona,
-    owner: owner
+    owner: owner,
+    is_ephemeral: isEphemeral
   });
 
-  logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven).`);
+  logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven${isEphemeral ? ', Ephemeral' : ''}).`);
 }
 
 /**
@@ -1209,8 +1215,9 @@ function gatherDistillContext(missionId: string, state: MissionState, missionPat
  * Extracts structural information without LLM inference.
  */
 function buildFallbackWisdom(missionId: string, state: MissionState): any {
-  const failureEvents = state.history.filter(h => h.event === 'FAIL' || h.event === 'VERIFY');
+  const failureEvents = state.history.filter(h => h.event === 'FAIL' || h.event === 'VERIFY' || h.note.includes('failed') || h.note.includes('Error'));
   const hasFailures = failureEvents.length > 0;
+  const lastError = failureEvents.length > 0 ? failureEvents[failureEvents.length - 1].note : 'None';
 
   return {
     title: `Mission ${missionId} Completion Summary`,
@@ -1219,7 +1226,10 @@ function buildFallbackWisdom(missionId: string, state: MissionState): any {
     importance: hasFailures ? 5 : 3,
     sections: {
       summary: `Mission ${missionId} completed with ${state.git.checkpoints.length} checkpoints and ${state.history.length} lifecycle events.`,
-      key_learnings: ['(Automatic distillation — manual review recommended)'],
+      key_learnings: [
+        '(Automatic distillation — manual review recommended)',
+        hasFailures ? `Last detected friction: ${lastError}` : 'No significant friction detected.'
+      ],
       patterns_discovered: ['None extracted (Claude CLI unavailable)'],
       failures_and_recoveries: hasFailures
         ? failureEvents.map(e => `${e.ts}: ${e.note}`)
@@ -1974,6 +1984,26 @@ async function prewarmMissionTeam(id: string, teamRolesArg?: string) {
   }, null, 2));
 }
 
+async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
+  const upperId = missionId.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+  grantAccess(upperId, serviceId, ttl);
+  logger.success(`🔑 Access to "${serviceId}" granted to mission ${upperId} for ${ttl} minutes.`);
+}
+
+async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
+  const upperId = missionId.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} not found.`);
+  if (on) {
+    grantAccess(upperId, 'SUDO', ttl, true);
+    logger.warn(`⚠️ [SUDO] Full system authority granted to mission ${upperId} for ${ttl} minutes!`);
+  } else {
+    logger.info(`[SUDO] Sudo will expire naturally or can be revoked by clearing auth-grants.json.`);
+  }
+}
+
 /**
  * 7. Main Entry
  */
@@ -1997,6 +2027,8 @@ async function main() {
   switch (action) {
     case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
     case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
+    case 'grant': await grantMissionAccess(arg1, arg2, arg3 ? parseInt(arg3) : undefined); break;
+    case 'sudo': await grantMissionSudo(arg1, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined); break;
     case 'checkpoint':
       if (arg3) {
         await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
