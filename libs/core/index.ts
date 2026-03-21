@@ -107,6 +107,9 @@ export { resolveIdentityContext, hasAuthority } from './authority.js';
 export * as transformer from './transformer.js';
 export { transform, getValueByPath } from './transformer.js';
 
+export * as serviceEngine from './service-engine.js';
+export { executeServicePreset } from './service-engine.js';
+
 export * as secretGuard from './secret-guard.js';
 export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
 

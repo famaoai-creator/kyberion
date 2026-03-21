@@ -1,0 +1,11 @@
+{
+  "actuator_id": "vision-actuator",
+  "version": "1.1.0",
+  "description": "Visual Generation and Capture Actuator",
+  "capabilities": [
+    { "op": "generate_image", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "capture_screen", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "record_screen", "platforms": ["darwin", "linux"] },
+    { "op": "run_workflow", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
