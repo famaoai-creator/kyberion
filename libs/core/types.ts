@@ -213,6 +213,46 @@ export type SkillIndex = CapabilityIndex;
 export type { MissionContract } from './src/types/mission-contract.js';
 
 // ---------------------------------------------------------------------------
+// Identity & Authority (Refined Governance)
+// ---------------------------------------------------------------------------
+
+/** Logical identity personality. */
+export type Persona = 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
+
+/** Discrete permissions granted to a process or mission. */
+export type Authority = 
+  | 'SUDO'               // Full system access
+  | 'GIT_WRITE'          // Repository modification
+  | 'SECRET_READ'        // Reading sensitive keys (scoped)
+  | 'NETWORK_FETCH'      // External API access
+  | 'SYSTEM_EXEC'        // Shell command execution
+  | 'KNOWLEDGE_WRITE';   // Direct knowledge tier modification
+
+/** Unified context for the current execution thread. */
+export interface IdentityContext {
+  persona: Persona;
+  authorities: Authority[];
+  missionId?: string;
+  role?: string; // Functional role within a specific mission
+}
+
+// ---------------------------------------------------------------------------
+// Data Transformation & Normalization
+// ---------------------------------------------------------------------------
+
+/** Simple key-to-key or JSONPath-based mapping. */
+export interface OutputMapping {
+  [targetKey: string]: string; // targetKey: sourcePath (e.g. "id": "$.number")
+}
+
+/** Transformation contract for normalizing actuator outputs. */
+export interface TransformerContract {
+  type: 'json_map' | 'regex_extract';
+  mapping: OutputMapping;
+  defaults?: Record<string, any>;
+}
+
+// ---------------------------------------------------------------------------
 // JSON Schema (lightweight internal representation)
 // ---------------------------------------------------------------------------
 

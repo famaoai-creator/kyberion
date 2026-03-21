@@ -10,8 +10,8 @@ import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 
 /**
- * Sovereign Secret Guard v1.4 [STANDARDIZED]
- * Implements Personal Knowledge Connection Mapping with Secure-IO.
+ * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
+ * Implements Personal Knowledge Connection Mapping with Secure-IO and Temporal Authority.
  */
 
 const SECRETS_FILE = pathResolver.resolve('vault/secrets/secrets.json');
@@ -22,13 +22,13 @@ const _cachedPersonalSecrets = new Map<string, string>();
 
 interface AuthGrant {
   missionId: string;
-  serviceId: string;
+  serviceId?: string;
+  authority?: string;
   expiresAt: number; // Timestamp
 }
 
 /**
  * Loads and maps secrets from personal connection files.
- * Handles both connections/*.json and connections/service/*.json
  */
 const _loadPersonalSecrets = () => {
   try {
@@ -50,9 +50,7 @@ const _loadPersonalSecrets = () => {
         _mapContentToSecrets(serviceName, content);
       }
     }
-  } catch (_) {
-    // Fail silently during boot
-  }
+  } catch (_) {}
 };
 
 const _mapContentToSecrets = (serviceName: string, content: any) => {
@@ -66,20 +64,38 @@ const _mapContentToSecrets = (serviceName: string, content: any) => {
   }
 };
 
-// Initial load
 _loadPersonalSecrets();
 
 /**
- * Issued by Orchestrator to authorize a secret for a limited time.
+ * Issued by Orchestrator to authorize a secret or authority for a limited time.
  */
-export const grantAccess = (missionId: string, serviceId: string, ttlMinutes = 15): void => {
+export const grantAccess = (missionId: string, serviceIdOrAuth: string, ttlMinutes = 15, isAuthority = false): void => {
   const grants = _loadGrants();
-  grants.push({
+  const grant: AuthGrant = {
     missionId,
-    serviceId: serviceId.toLowerCase(),
     expiresAt: Date.now() + (ttlMinutes * 60 * 1000)
-  });
+  };
+
+  if (isAuthority) {
+    grant.authority = serviceIdOrAuth;
+  } else {
+    grant.serviceId = serviceIdOrAuth.toLowerCase();
+  }
+
+  grants.push(grant);
   _saveGrants(grants);
+};
+
+/**
+ * Checks if a specific authority is granted to a mission.
+ */
+export const checkAuthority = (missionId: string, authority: string): boolean => {
+  const grants = _loadGrants();
+  return grants.some(g => 
+    g.missionId === missionId && 
+    g.authority === authority && 
+    g.expiresAt > Date.now()
+  );
 };
 
 /**
@@ -95,7 +111,7 @@ export const getSecret = (key: string, scope?: string): string | null => {
     
     const activeGrant = grants.find(g => 
       g.missionId === currentMission && 
-      g.serviceId.toLowerCase() === scope.toLowerCase() && 
+      g.serviceId?.toLowerCase() === scope.toLowerCase() && 
       g.expiresAt > Date.now()
     );
 
@@ -109,11 +125,7 @@ export const getSecret = (key: string, scope?: string): string | null => {
   }
 
   let value = process.env[key];
-
-  if (!value) {
-    value = _cachedPersonalSecrets.get(key);
-  }
-
+  if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
       const secrets = JSON.parse(safeReadFile(SECRETS_FILE, { encoding: 'utf8' }) as string);
@@ -129,6 +141,7 @@ export const getSecret = (key: string, scope?: string): string | null => {
 };
 
 function _loadGrants(): AuthGrant[] {
+  if (!safeExistsSync(GRANTS_FILE)) return [];
   try {
     const content = safeReadFile(GRANTS_FILE, { encoding: 'utf8' }) as string;
     return JSON.parse(content);
@@ -136,34 +149,22 @@ function _loadGrants(): AuthGrant[] {
 }
 
 function _saveGrants(grants: AuthGrant[]) {
-  // Prune expired grants before saving
   const freshGrants = grants.filter(g => g.expiresAt > Date.now());
-  const content = JSON.stringify(freshGrants, null, 2);
-  
-  // Use safeWriteFile which handles directories and basic safety
-  safeWriteFile(GRANTS_FILE, content);
-  
-  // For physical sync assurance in multi-process (legacy necessity)
-  try {
-    safeFsyncFile(GRANTS_FILE);
-  } catch (_) {}
+  safeWriteFile(GRANTS_FILE, JSON.stringify(freshGrants, null, 2));
+  try { safeFsyncFile(GRANTS_FILE); } catch (_) {}
 }
 
 export const getActiveSecrets = () => Array.from(_activeSecrets);
 
-/**
- * Checks if a given path points to a known secret location.
- */
 export const isSecretPath = (filePath: string): boolean => {
   const resolved = path.resolve(filePath);
-  const secretPaths = [
+  return [
     SECRETS_FILE,
     PERSONAL_CONNECTIONS_DIR,
     GRANTS_FILE,
     pathResolver.resolve('vault/secrets/'),
     pathResolver.resolve('knowledge/personal/connections/')
-  ];
-  return secretPaths.some(p => resolved.startsWith(p));
+  ].some(p => resolved.startsWith(p));
 };
 
-export const secretGuard = { getSecret, getActiveSecrets, grantAccess, isSecretPath };
+export const secretGuard = { getSecret, getActiveSecrets, grantAccess, checkAuthority, isSecretPath };
