@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-mermaid-diagram.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "document_diagram_asset_from_brief",
+      "params": {
+        "from": "document_brief",
+        "export_as": "document_diagram_asset"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "{{document_brief.layout_template_id}}"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "mermaid_render",
+      "params": {
+        "path": "active/shared/tmp/media/document-brief-mermaid-diagram.svg",
+        "from": "document_diagram_source",
+        "background_color": "#f8fafc",
+        "width": 1400
+      }
+    }
+  ]
+}

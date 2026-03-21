@@ -1,0 +1,41 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "spreadsheet",
+  "document_type": "tracker",
+  "document_profile": "operator-tracker",
+  "render_target": "xlsx",
+  "locale": "en-US",
+  "layout_template_id": "operator-tracker-standard",
+  "payload": {
+    "sheet_name": "Tracker",
+    "title": "Actuator Improvement Tracker",
+    "subtitle": "Owner: famao / Horizon: 2026-03-21 to 2026-04-04",
+    "summary_cards": [
+      { "label": "Total", "value": "9", "tone": "info" },
+      { "label": "Done", "value": "5", "tone": "success" },
+      { "label": "In Progress", "value": "3", "tone": "warning" },
+      { "label": "Watch", "value": "1", "tone": "danger" }
+    ],
+    "columns": [
+      { "key": "wbs", "label": "WBS", "width": 10 },
+      { "key": "phase", "label": "Phase", "width": 18 },
+      { "key": "task", "label": "Task", "width": 42 },
+      { "key": "owner", "label": "Owner", "width": 16 },
+      { "key": "finish", "label": "Finish", "width": 14 },
+      { "key": "status", "label": "Status", "width": 16, "validation_key": "status" }
+    ],
+    "row_tone_key": "status",
+    "row_tones": {
+      "Done": "success",
+      "In Progress": "warning",
+      "Watch": "danger"
+    },
+    "rows": [
+      { "wbs": "1", "phase": "Foundation", "task": "Media-Actuator sample portfolio design", "owner": "Owner", "finish": "2026-03-22", "status": "In Progress" },
+      { "wbs": "1.1", "phase": "", "task": "Seat chart Excel sample", "owner": "Media", "finish": "2026-03-21", "status": "Done" },
+      { "wbs": "1.2", "phase": "", "task": "WBS workbook sample", "owner": "Media", "finish": "2026-03-21", "status": "Done" },
+      { "wbs": "2", "phase": "Presentation Theme", "task": "Extract master slide theme and reuse it", "owner": "Owner", "finish": "2026-03-22", "status": "In Progress" },
+      { "wbs": "3", "phase": "Validation", "task": "Build and run generated examples", "owner": "Owner", "finish": "2026-03-21", "status": "Watch" }
+    ]
+  }
+}

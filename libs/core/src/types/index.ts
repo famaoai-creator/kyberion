@@ -7,6 +7,7 @@ export * from './ui-flow-adf.js';
 export * from './test-case-adf.js';
 export * from './proposal-brief.js';
 export * from './proposal-storyline-adf.js';
+export * from './document-brief.js';
 export * from './actuator-execution-brief.js';
 export * from './actuator-resolution-plan.js';
 export * from './delivery-pack.js';

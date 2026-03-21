@@ -1,0 +1,28 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "diagram",
+  "document_type": "architecture-diagram",
+  "document_profile": "aws-solution-overview",
+  "render_target": "drawio",
+  "locale": "en-US",
+  "layout_template_id": "aws-architecture",
+  "payload": {
+    "title": "AWS Terraform Architecture",
+    "graph": {
+      "title": "AWS Architecture",
+      "provider": "aws",
+      "render_hints": {
+        "theme": "aws-architecture"
+      },
+      "nodes": [
+        { "id": "vpc", "label": "VPC", "type": "network", "icon_key": "network-vpc", "group": "region" },
+        { "id": "alb", "label": "ALB", "type": "load-balancer", "icon_key": "network-elb-application-load-balancer", "group": "region" },
+        { "id": "ecs", "label": "ECS Service", "type": "compute", "icon_key": "containers-elastic-container-service", "group": "region" }
+      ],
+      "edges": [
+        { "from": "vpc", "to": "alb", "label": "ingress" },
+        { "from": "alb", "to": "ecs", "label": "http" }
+      ]
+    }
+  }
+}

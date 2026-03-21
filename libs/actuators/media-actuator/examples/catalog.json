@@ -84,6 +84,69 @@
       "path": "libs/actuators/media-actuator/examples/proposal-storyline-pptx.json",
       "description": "Builds a proposal storyline from a structured brief, turns it into slide content, and renders a themed PPTX deck.",
       "tags": ["proposal", "pptx", "storyline", "brief", "theme", "example"]
+    },
+    {
+      "id": "document-brief-proposal-pptx",
+      "title": "Proposal PPTX (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-proposal-pptx.json",
+      "description": "Builds a proposal deck from the canonical document-brief contract using presentation/proposal/pptx routing plus a knowledge-owned theme template.",
+      "tags": ["proposal", "pptx", "document-brief", "canonical", "presentation", "theme", "example"]
+    },
+    {
+      "id": "document-brief-mermaid-diagram",
+      "title": "Mermaid Diagram (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json",
+      "description": "Builds a Mermaid diagram from the canonical document-brief contract using diagram/architecture-diagram/mmd routing.",
+      "tags": ["diagram", "mermaid", "document-brief", "canonical", "mmd", "example"]
+    },
+    {
+      "id": "document-brief-d2-diagram",
+      "title": "D2 Diagram (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-d2-diagram.json",
+      "description": "Builds a D2 diagram from the canonical document-brief contract using diagram/process-diagram/d2 routing.",
+      "tags": ["diagram", "d2", "document-brief", "canonical", "example"]
+    },
+    {
+      "id": "document-brief-drawio-diagram",
+      "title": "Draw.io Diagram (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-drawio-diagram.json",
+      "description": "Builds a local draw.io document from the canonical document-brief contract using diagram/architecture-diagram/drawio routing.",
+      "tags": ["diagram", "drawio", "document-brief", "canonical", "example"]
+    },
+    {
+      "id": "document-brief-wbs-spreadsheet",
+      "title": "WBS Spreadsheet (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json",
+      "description": "Builds an XLSX tracker from the canonical document-brief contract using spreadsheet/tracker/xlsx routing.",
+      "tags": ["spreadsheet", "xlsx", "document-brief", "canonical", "tracker", "example"]
+    },
+    {
+      "id": "document-brief-semantic-tracker-spreadsheet",
+      "title": "Semantic Tracker Spreadsheet (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-semantic-tracker-spreadsheet.json",
+      "description": "Builds an XLSX tracker from semantic rows and column definitions without requiring a prebuilt XLSX protocol file.",
+      "tags": ["spreadsheet", "xlsx", "document-brief", "canonical", "tracker", "semantic", "example"]
+    },
+    {
+      "id": "document-brief-report-docx",
+      "title": "Report DOCX (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-report-docx.json",
+      "description": "Builds a DOCX report from the canonical document-brief contract using document/report/docx routing.",
+      "tags": ["document", "docx", "document-brief", "canonical", "report", "example"]
+    },
+    {
+      "id": "document-brief-report-pdf",
+      "title": "Report PDF (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-report-pdf.json",
+      "description": "Builds a PDF report from the canonical document-brief contract using document/report/pdf routing.",
+      "tags": ["document", "pdf", "document-brief", "canonical", "report", "example"]
+    },
+    {
+      "id": "document-brief-invoice-pdf",
+      "title": "Invoice PDF (Canonical Document Brief)",
+      "path": "libs/actuators/media-actuator/examples/document-brief-invoice-pdf.json",
+      "description": "Builds an invoice PDF from the canonical document-brief contract plus a knowledge-owned document layout template.",
+      "tags": ["invoice", "pdf", "document-brief", "canonical", "template", "example"]
     }
   ]
 }

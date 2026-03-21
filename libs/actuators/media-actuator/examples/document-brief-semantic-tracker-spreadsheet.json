@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-semantic-tracker-spreadsheet.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "document_spreadsheet_design_from_brief",
+      "params": {
+        "from": "document_brief",
+        "export_as": "last_xlsx_design"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "xlsx_render",
+      "params": {
+        "path": "active/shared/tmp/media/document-brief-semantic-tracker-example.xlsx"
+      }
+    }
+  ]
+}

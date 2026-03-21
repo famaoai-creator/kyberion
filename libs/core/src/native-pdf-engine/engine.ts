@@ -578,13 +578,50 @@ function buildAestheticContent(
   for (const el of elements) {
     if (el.type === 'text' && el.text) {
       const fontSize = el.fontSize || 12;
-      s += `/F1 ${fontSize} Tf\n${el.x} ${pageHeight - el.y} Td\n`;
+      s += `/F1 ${fontSize} Tf\n1 0 0 1 ${el.x} ${pageHeight - el.y} Tm\n`;
       s += unicode && hasNonAscii(el.text)
         ? `${encodePdfString(el.text, true)} Tj\n`
         : `(${escapeLit(el.text)}) Tj\n`;
     }
   }
   return s + 'ET';
+}
+
+function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
+  if (hasNonAscii(protocol.source?.body || '')) return true;
+  if (hasNonAscii(protocol.source?.title || '')) return true;
+  if (hasNonAscii(protocol.metadata?.title || '')) return true;
+  if (hasNonAscii(protocol.metadata?.author || '')) return true;
+  if (hasNonAscii(protocol.metadata?.subject || '')) return true;
+  for (const page of protocol.content?.pages ?? []) {
+    if (hasNonAscii(page.text || '')) return true;
+  }
+  for (const element of protocol.aesthetic?.elements ?? []) {
+    if (element.type === 'text' && hasNonAscii((element as any).text || '')) return true;
+  }
+  return false;
+}
+
+function buildPrimaryFontObject(protocol: PdfDesignProtocol): string {
+  if (!protocolRequiresCjkFont(protocol)) {
+    return '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  }
+
+  return [
+    '<<',
+    '/Type /Font',
+    '/Subtype /Type0',
+    '/BaseFont /HeiseiKakuGo-W5',
+    '/Encoding /UniJIS-UCS2-H',
+    '/DescendantFonts [<<',
+    '  /Type /Font',
+    '  /Subtype /CIDFontType0',
+    '  /BaseFont /HeiseiKakuGo-W5',
+    '  /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 6 >>',
+    '  /DW 1000',
+    '>>]',
+    '>>',
+  ].join(' ');
 }
 
 function buildImageContent(images: PdfImageElement[], pageHeight: number, imgMap: Map<string, { id: number; name: string }>): string {
@@ -1253,7 +1290,7 @@ export async function generateNativePdf(
   writeReserved(infoId, `<< /Title ${encodePdfString(title, opts.unicode)} /Producer (Kyberion Native PDF 2.0 Engine) /CreationDate (${dateStr}) >>`);
 
   // Font
-  writeReserved(fontId, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  writeReserved(fontId, buildPrimaryFontObject(protocol));
 
   // Pages Root
   writeReserved(pagesRootId, `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`);
@@ -1306,4 +1343,3 @@ export async function generateNativePdf(
 
   fs.writeFileSync(outputPath, finalBuf);
 }
-

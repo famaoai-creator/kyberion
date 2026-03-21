@@ -8,7 +8,7 @@
 
 export interface OperatorInteractionPacket {
   kind: 'operator-interaction-packet';
-  interaction_type: 'clarification' | 'execution-preview' | 'status-summary';
+  interaction_type: 'clarification' | 'execution-preview' | 'status-summary' | 'delivery-summary';
   headline: string;
   summary: string;
   readiness?: string;
@@ -24,9 +24,17 @@ export interface OperatorInteractionPacket {
   next_actions?: {
     id: string;
     action: string;
+    next_action_type?: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
     reason?: string;
+    priority?: 'now' | 'next' | 'later';
+    suggested_command?: string;
+    suggested_pipeline_path?: string;
+    suggested_followup_request?: string;
     [k: string]: unknown;
   }[];
+  suggested_response_style?: 'clarify-first' | 'preview-and-confirm' | 'status-summary';
+  refresh_command?: string;
+  refresh_packet_path?: string;
   llm_touchpoints?: {
     stage: string;
     purpose: string;

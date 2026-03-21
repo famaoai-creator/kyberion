@@ -1,0 +1,64 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "document",
+  "document_type": "invoice",
+  "document_profile": "qualified-invoice",
+  "render_target": "pdf",
+  "locale": "ja-JP",
+  "layout_template_id": "jp-qualified-invoice-standard",
+  "payload": {
+    "invoice_number": "INV-2026-0001",
+    "issue_date": "2026-03-21",
+    "transaction_date": "2026-03-21",
+    "due_date": "2026-04-30",
+    "subject": "Kyberion導入支援費用",
+    "currency": "JPY",
+    "tax_rounding": "round",
+    "issuer": {
+      "name": "株式会社Kyberion Consulting",
+      "registration_number": "T1234567890123",
+      "postal_code": "100-0001",
+      "address": "東京都千代田区千代田1-1-1",
+      "phone": "03-1234-5678",
+      "email": "billing@kyberion.example",
+      "contact": "経理部"
+    },
+    "recipient": {
+      "name": "株式会社サンプル商事 御中",
+      "department": "情報システム部",
+      "contact": "山田 太郎"
+    },
+    "payment": {
+      "method": "銀行振込",
+      "bank_name": "サンプル銀行",
+      "branch_name": "本店営業部",
+      "account_type": "普通",
+      "account_number": "1234567",
+      "account_name": "カ）カイベリオンコンサルティング",
+      "transfer_fee_policy": "振込手数料は貴社にてご負担ください。"
+    },
+    "notes": [
+      "本請求書は適格請求書保存方式に対応したサンプルです。",
+      "ご不明点があれば経理部までご連絡ください。"
+    ],
+    "items": [
+      {
+        "description": "Kyberion導入方針策定支援",
+        "quantity": 1,
+        "unit": "式",
+        "unit_price_ex_tax": 180000,
+        "tax_rate": 10,
+        "service_period": "2026年3月",
+        "transaction_note": "初期導入アセスメントを含む"
+      },
+      {
+        "description": "Actuatorシナリオ設計支援",
+        "quantity": 2,
+        "unit": "回",
+        "unit_price_ex_tax": 65000,
+        "tax_rate": 10,
+        "service_period": "2026年3月"
+      }
+    ]
+  }
+}

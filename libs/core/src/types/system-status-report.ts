@@ -20,9 +20,13 @@ export interface SystemStatusReport {
   }[];
   next_actions?: {
     id: string;
+    next_action_type?: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
     priority: 'now' | 'next' | 'later';
     action: string;
     reason?: string;
+    suggested_command?: string;
+    suggested_pipeline_path?: string;
+    suggested_followup_request?: string;
     [k: string]: unknown;
   }[];
   metrics?: {
