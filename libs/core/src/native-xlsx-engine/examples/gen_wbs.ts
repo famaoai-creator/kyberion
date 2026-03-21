@@ -3,7 +3,7 @@
  * Media Actuator native-xlsx-engine を使用
  * 予実管理対応版: 実績開始/実績終了 + 条件付き書式（ステータスで色変更）
  */
-import { generateNativeXlsx } from '../engine';
+import { generateNativeXlsx } from '../engine.js';
 import type { XlsxDesignProtocol, XlsxRow, XlsxCell, XlsxCellStyle, XlsxFont, XlsxFill, XlsxBorder, XlsxMergeCell, XlsxColumn, XlsxDxfStyle, XlsxConditionalFormat } from '../../types/xlsx-protocol.js';
 
 // ─── Date Helpers ───────────────────────────────────────────

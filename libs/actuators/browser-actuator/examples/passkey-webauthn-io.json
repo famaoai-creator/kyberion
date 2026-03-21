@@ -1,0 +1,76 @@
+{
+  "action": "pipeline",
+  "session_id": "browser-passkey-webauthn-io",
+  "context": {
+    "username": "kyberion_passkey_demo"
+  },
+  "options": {
+    "headless": true,
+    "keep_alive": false,
+    "browser_channel": "chromium"
+  },
+  "steps": [
+    {
+      "type": "apply",
+      "op": "register_passkey",
+      "params": {
+        "provider": "webauthn.io",
+        "username": "{{username}}",
+        "protocol": "ctap2",
+        "transport": "internal",
+        "has_resident_key": true,
+        "has_user_verification": true,
+        "automatic_presence": true,
+        "user_verified": true,
+        "wait_ms": 1500,
+        "export_as": "registration"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "passkey_credentials",
+      "params": {
+        "export_as": "credentials_after_register"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "authenticate_passkey",
+      "params": {
+        "provider": "webauthn.io",
+        "username": "{{username}}",
+        "wait_ms": 1500,
+        "export_as": "authentication"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "passkey_credentials",
+      "params": {
+        "export_as": "credentials_after_auth"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "delete_passkey",
+      "params": {
+        "username": "{{username}}",
+        "export_as": "deletion"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "passkey_credentials",
+      "params": {
+        "export_as": "credentials_after_delete"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "passkey_events",
+      "params": {
+        "export_as": "passkey_events"
+      }
+    }
+  ]
+}

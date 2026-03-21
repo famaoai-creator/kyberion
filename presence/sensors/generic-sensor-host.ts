@@ -4,8 +4,8 @@
  * [SECURE-IO COMPLIANT]
  */
 
-import { KyberionSensor, PollingSensor, logger, safeReadFile, safeExec, pathResolver, safeReaddir, safeStat, safeExistsSync } from '../../libs/core/index.js';
-import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
+import { KyberionSensor, PollingSensor, logger, safeReadFile, safeExec, pathResolver, safeReaddir, safeStat, safeExistsSync } from '@agent/core';
+import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
 
 interface SensorADF {

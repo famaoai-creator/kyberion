@@ -1,6 +1,7 @@
 {
   "name": "@kyberion/slack-bridge",
   "version": "1.0.0",
+  "type": "module",
   "description": "Sensory Satellite for Slack (Socket Mode)",
   "main": "../../dist/satellites/slack-bridge/src/index.js",
   "types": "../../dist/satellites/slack-bridge/src/index.d.ts",

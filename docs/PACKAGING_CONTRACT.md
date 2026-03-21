@@ -4,6 +4,23 @@ Kyberion uses `pnpm` workspaces, but runtime code must not depend on workspace l
 
 This document defines the package-boundary rules that keep builds stable across Node, Next, scripts, and tests.
 
+## ESM Discipline
+
+Kyberion's runtime contract is ESM-first.
+
+- `package.json` in governed runtime packages must declare `type: "module"`
+- runtime code imports exported packages by package name
+- relative TS imports include `.js` extensions
+- source trees must not keep legacy shadow `.js` artifacts beside `.ts` siblings
+
+The enforcement command is:
+
+```bash
+pnpm run check:esm
+```
+
+This check is part of `pnpm run validate` and CI.
+
 ## Rules
 
 ### Runtime code imports by package name

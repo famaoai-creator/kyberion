@@ -1,4 +1,4 @@
-import { logger } from './core';
+import { logger } from './core.js';
 
 export type RuntimeResourceKind = 'pty' | 'agent' | 'service' | 'gateway' | 'ui';
 export type RuntimeShutdownPolicy = 'manual' | 'idle' | 'detached';

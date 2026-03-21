@@ -1,4 +1,4 @@
-import Ajv, { type ValidateFunction } from 'ajv';
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -28,6 +28,9 @@ export interface PipelineAdf {
 }
 
 let validatePipelineFn: ValidateFunction | null = null;
+const Ajv = AjvModule as unknown as new (options?: Record<string, unknown>) => {
+  compile(schema: object): ValidateFunction;
+};
 
 function getPipelineValidator() {
   if (validatePipelineFn) return validatePipelineFn;

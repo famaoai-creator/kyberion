@@ -1,0 +1,92 @@
+{
+  "version": "1.1.0",
+  "title": "AWS Terraform Architecture",
+  "provider": "aws",
+  "render_hints": {
+    "engine": "drawio",
+    "direction": "LR",
+    "theme": "aws-architecture",
+    "icon_pack": "aws-architecture",
+    "group_by": "boundary"
+  },
+  "nodes": [
+    {
+      "id": "vpc-main",
+      "type": "aws_vpc",
+      "name": "main-vpc",
+      "technology": "Amazon VPC",
+      "boundary": "vpc",
+      "render_hints": {
+        "container": true
+      }
+    },
+    {
+      "id": "public-a",
+      "type": "aws_subnet",
+      "name": "public-a",
+      "technology": "Public Subnet",
+      "parent": "vpc-main",
+      "boundary": "subnet",
+      "network_zone": "public",
+      "render_hints": {
+        "container": true
+      }
+    },
+    {
+      "id": "private-a",
+      "type": "aws_subnet",
+      "name": "private-a",
+      "technology": "Private Subnet",
+      "parent": "vpc-main",
+      "boundary": "subnet",
+      "network_zone": "private",
+      "render_hints": {
+        "container": true
+      }
+    },
+    {
+      "id": "alb",
+      "type": "aws_lb",
+      "name": "public-alb",
+      "technology": "Application Load Balancer",
+      "parent": "public-a",
+      "group": "edge"
+    },
+    {
+      "id": "web-1",
+      "type": "aws_instance",
+      "name": "web-1",
+      "technology": "Amazon EC2",
+      "parent": "private-a",
+      "group": "application"
+    },
+    {
+      "id": "db",
+      "type": "aws_rds_instance",
+      "name": "orders-db",
+      "technology": "Amazon RDS PostgreSQL",
+      "parent": "private-a",
+      "group": "data"
+    }
+  ],
+  "edges": [
+    {
+      "from": "alb",
+      "to": "web-1",
+      "label": "HTTPS",
+      "protocol": "HTTPS",
+      "port": 443
+    },
+    {
+      "from": "web-1",
+      "to": "db",
+      "label": "JDBC",
+      "protocol": "TCP",
+      "port": 5432,
+      "render_hints": {
+        "style": "solid",
+        "emphasis": "high"
+      }
+    }
+  ]
+}

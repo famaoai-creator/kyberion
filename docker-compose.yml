@@ -11,6 +11,7 @@ services:
       NODE_ENV: development
     command: >
       bash -lc "pnpm install --frozen-lockfile &&
+      pnpm run validate &&
       pnpm build &&
       node dist/scripts/cli.js list implemented"
 

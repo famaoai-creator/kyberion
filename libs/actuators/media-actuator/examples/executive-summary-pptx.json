@@ -1,0 +1,53 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "executive-neutral"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/executive-summary.json"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx",
+        "content_data": [
+          {
+            "title": "Q2 Executive Summary",
+            "body": [
+              "Revenue grew 18% year over year.",
+              "Large-enterprise pipeline conversion improved from 21% to 29%.",
+              "Cybersecurity remediation remains the primary execution risk."
+            ],
+            "visual": "Executive KPI Snapshot"
+          },
+          {
+            "title": "Decision Required",
+            "body": [
+              "Approve phased hiring for platform reliability.",
+              "Reallocate 8% of discretionary budget toward compliance automation.",
+              "Review operating model changes at the next board checkpoint."
+            ],
+            "visual": "Decision Matrix"
+          }
+        ]
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/executive-summary-example.pptx"
+      }
+    }
+  ]
+}

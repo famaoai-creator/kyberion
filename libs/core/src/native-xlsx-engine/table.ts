@@ -1,7 +1,7 @@
 /**
  * Table XML generator for XLSX packages
  */
-import type { XlsxTable } from '../types/xlsx-protocol';
+import type { XlsxTable } from '../types/xlsx-protocol.js';
 
 function escXml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

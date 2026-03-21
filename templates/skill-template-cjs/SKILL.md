@@ -12,6 +12,13 @@ tags:
 
 # {{SKILL_NAME}}
 
+## Runtime Policy
+
+- This template is for explicit compatibility cases only.
+- Prefer `skill-template-ts` for all new work.
+- Use this template only when a dependency or host requires CommonJS.
+- If that constraint disappears, migrate back to the TypeScript ESM template.
+
 ## Overview
 
 Briefly describes the activity this skill performs in the third person. Avoid using "I" or "this skill can". Focus on what it *does* (e.g., "Generates professional reports from raw metrics").

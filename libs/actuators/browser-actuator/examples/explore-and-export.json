@@ -1,0 +1,59 @@
+{
+  "action": "pipeline",
+  "session_id": "browser-explore-and-export",
+  "options": {
+    "headless": true,
+    "keep_alive": false
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "https://example.com/",
+        "waitUntil": "networkidle"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "snapshot",
+        "max_elements": 80
+      }
+    },
+    {
+      "type": "capture",
+      "op": "content",
+      "params": {
+        "export_as": "page_html"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/browser/explore-example-com.png",
+        "export_as": "screenshot_path",
+        "fullPage": true
+      }
+    },
+    {
+      "type": "transform",
+      "op": "export_playwright",
+      "params": {
+        "path": "active/shared/tmp/browser/explore-example-com.spec.ts",
+        "export_as": "playwright_spec_path",
+        "assertions": "strict"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "export_adf",
+      "params": {
+        "path": "active/shared/tmp/browser/explore-example-com.adf.json",
+        "export_as": "adf_path"
+      }
+    }
+  ]
+}

@@ -1,10 +1,14 @@
 # Pipelines
 
-Pre-built JSON ADF pipelines for runtime execution. Execute via the built pipeline runner:
+実運用または共通オーケストレーション向けの JSON ADF pipeline を配置するディレクトリです。Execute via the built pipeline runner:
 
 ```bash
 node dist/scripts/run_pipeline.js --input pipelines/<name>.json
 ```
+
+Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 actuator 配下の `examples/` へ配置します。
+
+- Browser-Actuator examples: `libs/actuators/browser-actuator/examples/`
 
 ## Available Pipelines
 

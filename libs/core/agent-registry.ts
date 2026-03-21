@@ -1,5 +1,5 @@
-import { logger } from './core';
-import { trustEngine } from './trust-engine';
+import { logger } from './core.js';
+import { trustEngine } from './trust-engine.js';
 
 /**
  * Agent Registry v1.0

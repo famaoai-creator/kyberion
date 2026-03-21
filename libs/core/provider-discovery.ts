@@ -1,4 +1,4 @@
-import { logger } from './core';
+import { logger } from './core.js';
 import { spawnSync } from 'node:child_process';
 
 /**

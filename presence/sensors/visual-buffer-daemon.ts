@@ -4,7 +4,7 @@
  */
 
 import * as path from 'node:path';
-import { 
+import {
   logger, 
   pathResolver, 
   platform, 
@@ -15,7 +15,7 @@ import {
   safeExistsSync, 
   safeReaddir, 
   safeUnlink 
-} from '../../libs/core/index.js';
+} from '@agent/core';
 
 const ROOT_DIR = pathResolver.rootDir();
 const FRAMES_DIR = path.join(ROOT_DIR, 'active/shared/runtime/vision/frames');

@@ -1,0 +1,16 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "apply",
+      "op": "d2_render",
+      "params": {
+        "path": "active/shared/tmp/media/diagram-d2-process.svg",
+        "source": "direction: right\nidea: \"Intent Received\"\nalign: \"Victory Conditions\"\nimplement: \"Actuator Execution\"\nvalidate: \"Verification\"\ndistill: \"Knowledge Distillation\"\nidea -> align -> implement -> validate -> distill\n",
+        "theme_id": 300,
+        "layout": "dagre",
+        "pad": 24
+      }
+    }
+  ]
+}

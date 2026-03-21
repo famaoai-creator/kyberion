@@ -3,7 +3,7 @@
  */
 
 import * as ExcelJS from 'exceljs';
-import { ExcelDesignProtocol, SheetDesign } from './types/excel-protocol.js';
+import type { ExcelDesignProtocol, SheetDesign } from './src/types/excel-protocol.js';
 import { extractThemePalette } from './excel-theme-resolver.js';
 
 /**

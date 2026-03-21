@@ -1,7 +1,7 @@
 /**
  * Drawing XML generator for XLSX packages
  */
-import type { XlsxDrawing, XlsxDrawingElement, XlsxDrawingAnchor } from '../types/xlsx-protocol';
+import type { XlsxDrawing, XlsxDrawingElement, XlsxDrawingAnchor } from '../types/xlsx-protocol.js';
 
 function escXml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

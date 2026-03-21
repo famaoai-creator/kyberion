@@ -1,0 +1,63 @@
+{
+  "action": "pipeline",
+  "session_id": "browser-multi-tab-observability",
+  "options": {
+    "headless": true,
+    "keep_alive": false,
+    "lease_ms": 60000
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "https://example.com/",
+        "waitUntil": "networkidle"
+      }
+    },
+    {
+      "type": "control",
+      "op": "open_tab",
+      "params": {
+        "url": "https://example.org/",
+        "tab_id": "reference",
+        "select": true
+      }
+    },
+    {
+      "type": "capture",
+      "op": "tabs",
+      "params": {
+        "export_as": "tabs"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "network",
+      "params": {
+        "export_as": "network_events",
+        "limit": 20
+      }
+    },
+    {
+      "type": "control",
+      "op": "select_tab",
+      "params": {
+        "tab_id": "tab-1"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/browser/multi-tab-primary.png",
+        "export_as": "primary_screenshot"
+      }
+    },
+    {
+      "type": "control",
+      "op": "close_session",
+      "params": {}
+    }
+  ]
+}

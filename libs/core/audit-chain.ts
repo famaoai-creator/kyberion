@@ -1,5 +1,5 @@
-import { logger } from './core';
-import { safeReadFile, safeWriteFile, safeAppendFileSync, safeExistsSync, safeMkdir } from './secure-io';
+import { logger } from './core.js';
+import { safeReadFile, safeWriteFile, safeAppendFileSync, safeExistsSync, safeMkdir } from './secure-io.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 

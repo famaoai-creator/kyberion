@@ -1,4 +1,4 @@
-import { logger } from './core';
+import { logger } from './core.js';
 
 /**
  * Agent SLO / Error Budget System v1.0

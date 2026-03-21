@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { generateNativeXlsx } from '../engine';
+import { generateNativeXlsx } from '../engine.js';
 import { distillXlsxDesign } from '../../xlsx-utils.js';
 import type { XlsxDesignProtocol } from '../../types/xlsx-protocol.js';
 

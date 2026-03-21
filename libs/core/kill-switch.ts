@@ -1,8 +1,8 @@
-import { logger } from './core';
-import { agentRegistry } from './agent-registry';
-import { stopAgentRuntime } from './agent-runtime-supervisor';
-import { trustEngine } from './trust-engine';
-import { auditChain } from './audit-chain';
+import { logger } from './core.js';
+import { agentRegistry } from './agent-registry.js';
+import { stopAgentRuntime } from './agent-runtime-supervisor.js';
+import { trustEngine } from './trust-engine.js';
+import { auditChain } from './audit-chain.js';
 
 /**
  * Kill Switch & Anomaly Detection v1.0

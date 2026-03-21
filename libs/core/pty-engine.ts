@@ -1,9 +1,9 @@
 import * as pty from 'node-pty';
 import { spawn as spawnChild, ChildProcess } from 'node:child_process';
-import { logger } from './core';
+import { logger } from './core.js';
 import * as crypto from 'node:crypto';
 import * as os from 'node:os';
-import { runtimeSupervisor } from './runtime-supervisor';
+import { runtimeSupervisor } from './runtime-supervisor.js';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1

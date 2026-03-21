@@ -6,10 +6,10 @@
  * An interpreter that executes autonomic reactions defined in a Reflex ADF.
  */
 
-import { logger, safeReadFile, pathResolver } from '../../libs/core/index.js';
-import { listenToNerve } from '../../libs/core/nerve-bridge.js';
-import { reflexEngine, ReflexADF } from '../../libs/shared-nerve/src/index.js';
-import { handleAction as dispatchService } from '../../libs/actuators/service-actuator/src/index.js';
+import { logger, safeReadFile, pathResolver } from '@agent/core';
+import { listenToNerve } from '@agent/core/nerve-bridge';
+import { reflexEngine, type ReflexADF } from '@agent/shared-nerve';
+import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
 
 async function main() {

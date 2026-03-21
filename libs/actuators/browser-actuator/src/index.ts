@@ -1,8 +1,9 @@
 import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { chromium, Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -100,9 +101,17 @@ interface BrowserRuntime {
   context: BrowserContext;
   tabs: Map<string, Page>;
   pageIds: WeakMap<Page, string>;
+  cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
   consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
   networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
+  webAuthn?: {
+    authenticatorId?: string;
+    enabled: boolean;
+    options?: Record<string, any>;
+    credentials: Array<Record<string, any>>;
+    events: Array<{ type: string; credential?: Record<string, any>; credentialId?: string; ts: string }>;
+  };
 }
 
 interface BrowserRecordedAction {
@@ -134,6 +143,15 @@ const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/brow
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
+const PASSKEY_SITE_PRESETS = {
+  'webauthn.io': {
+    baseUrl: 'https://webauthn.io/',
+    usernameSelector: '#input-email',
+    registerSelector: '#register-button',
+    authenticateSelector: '#login-button',
+    postAuthUrlIncludes: '/profile',
+  },
+} as const;
 
 /**
  * Main Entry Point
@@ -358,6 +376,37 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         iterations++;
       }
       return ctx;
+    case 'setup_passkey_authenticator': {
+      const page = getActivePage(runtime);
+      const setup = await setupVirtualPasskeyAuthenticator(runtime, page, {
+        enableUI: params.enable_ui === true,
+        replaceExisting: params.replace_existing !== false,
+        protocol: resolve(params.protocol || 'ctap2') as 'ctap2' | 'u2f',
+        transport: resolve(params.transport || 'internal') as 'usb' | 'nfc' | 'ble' | 'internal',
+        hasResidentKey: params.has_resident_key !== false,
+        hasUserVerification: params.has_user_verification !== false,
+        hasLargeBlob: params.has_large_blob === true,
+        automaticPresenceSimulation: params.automatic_presence !== false,
+        isUserVerified: params.user_verified !== false,
+      });
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_authenticator']: setup,
+      }, {
+        kind: 'control',
+        op: 'setup_passkey_authenticator',
+        tab_id: runtime.activeTabId,
+      });
+    }
+    case 'remove_passkey_authenticator': {
+      const page = getActivePage(runtime);
+      await removeVirtualPasskeyAuthenticator(runtime, page);
+      return recordBrowserAction(ctx, {
+        kind: 'control',
+        op: 'remove_passkey_authenticator',
+        tab_id: runtime.activeTabId,
+      });
+    }
 
     default: 
       throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
@@ -501,6 +550,26 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         op: 'evaluate',
         tab_id: runtime.activeTabId,
       });
+    case 'passkey_credentials': {
+      const credentials = await getVirtualPasskeyCredentials(runtime, page);
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_credentials']: credentials,
+      }, {
+        kind: 'capture',
+        op: 'passkey_credentials',
+        tab_id: runtime.activeTabId,
+      });
+    }
+    case 'passkey_events':
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_events']: runtime.webAuthn?.events || [],
+      }, {
+        kind: 'capture',
+        op: 'passkey_events',
+        tab_id: runtime.activeTabId,
+      });
     default: 
       throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
@@ -621,6 +690,67 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
     case 'log':
       logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`);
       return recordBrowserAction(ctx, { kind: 'apply', op: 'log', tab_id: runtime.activeTabId });
+    case 'set_passkey_user_verified': {
+      const authenticatorId = getPasskeyAuthenticatorId(runtime);
+      const cdp = await getOrCreatePageCdpSession(runtime, page);
+      await cdp.send('WebAuthn.setUserVerified', {
+        authenticatorId,
+        isUserVerified: params.is_user_verified !== false,
+      });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'set_passkey_user_verified', tab_id: runtime.activeTabId });
+    }
+    case 'set_passkey_presence': {
+      const authenticatorId = getPasskeyAuthenticatorId(runtime);
+      const cdp = await getOrCreatePageCdpSession(runtime, page);
+      await cdp.send('WebAuthn.setAutomaticPresenceSimulation', {
+        authenticatorId,
+        enabled: params.enabled !== false,
+      });
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'set_passkey_presence', tab_id: runtime.activeTabId });
+    }
+    case 'clear_passkey_credentials': {
+      const authenticatorId = getPasskeyAuthenticatorId(runtime);
+      const cdp = await getOrCreatePageCdpSession(runtime, page);
+      await cdp.send('WebAuthn.clearCredentials', { authenticatorId });
+      if (runtime.webAuthn) runtime.webAuthn.credentials = [];
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'clear_passkey_credentials', tab_id: runtime.activeTabId });
+    }
+    case 'register_passkey': {
+      const registration = await registerPasskey(page, runtime, ctx, params, resolve);
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_registration']: registration,
+        passkey_credentials: registration.credentials,
+      }, {
+        kind: 'apply',
+        op: 'register_passkey',
+        tab_id: runtime.activeTabId,
+      });
+    }
+    case 'authenticate_passkey': {
+      const authentication = await authenticatePasskey(page, runtime, ctx, params, resolve);
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_authentication']: authentication,
+        passkey_credentials: authentication.credentials,
+      }, {
+        kind: 'apply',
+        op: 'authenticate_passkey',
+        tab_id: runtime.activeTabId,
+      });
+    }
+    case 'delete_passkey': {
+      const deletion = await deletePasskey(page, runtime, ctx, params, resolve);
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'passkey_deletion']: deletion,
+        passkey_credentials: deletion.credentials,
+      }, {
+        kind: 'apply',
+        op: 'delete_passkey',
+        tab_id: runtime.activeTabId,
+      });
+    }
     default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
@@ -991,13 +1121,20 @@ async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
 function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
   const tabs = new Map<string, Page>();
   const pageIds = new WeakMap<Page, string>();
+  const cdpSessions = new WeakMap<Page, CDPSession>();
   const runtime: BrowserRuntime = {
     context,
     tabs,
     pageIds,
+    cdpSessions,
     activeTabId: 'tab-1',
     consoleEvents: [],
     networkEvents: [],
+    webAuthn: {
+      enabled: false,
+      credentials: [],
+      events: [],
+    },
   };
 
   const pages = context.pages();
@@ -1006,6 +1143,343 @@ function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
   }
   if (pages.length > 0) runtime.activeTabId = pageIds.get(pages[0]) || 'tab-1';
   return runtime;
+}
+
+async function getOrCreatePageCdpSession(runtime: BrowserRuntime, page: Page): Promise<CDPSession> {
+  const existing = runtime.cdpSessions.get(page);
+  if (existing) return existing;
+  const session = await runtime.context.newCDPSession(page);
+  runtime.cdpSessions.set(page, session);
+  attachWebAuthnObservers(runtime, session);
+  return session;
+}
+
+function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): void {
+  if (!runtime.webAuthn) {
+    runtime.webAuthn = { enabled: false, credentials: [], events: [] };
+  }
+
+  session.on('WebAuthn.credentialAdded', (event: any) => {
+    runtime.webAuthn!.events.push({
+      type: 'credentialAdded',
+      credential: event.credential,
+      ts: new Date().toISOString(),
+    });
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+  });
+  session.on('WebAuthn.credentialAsserted', (event: any) => {
+    runtime.webAuthn!.events.push({
+      type: 'credentialAsserted',
+      credential: event.credential,
+      ts: new Date().toISOString(),
+    });
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+  });
+  session.on('WebAuthn.credentialDeleted', (event: any) => {
+    runtime.webAuthn!.events.push({
+      type: 'credentialDeleted',
+      credentialId: event.credentialId,
+      ts: new Date().toISOString(),
+    });
+    runtime.webAuthn!.credentials = runtime.webAuthn!.credentials.filter(
+      (credential) => credential.credentialId !== event.credentialId,
+    );
+  });
+  session.on('WebAuthn.credentialUpdated', (event: any) => {
+    runtime.webAuthn!.events.push({
+      type: 'credentialUpdated',
+      credential: event.credential,
+      ts: new Date().toISOString(),
+    });
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+  });
+}
+
+async function setupVirtualPasskeyAuthenticator(
+  runtime: BrowserRuntime,
+  page: Page,
+  options: {
+    enableUI: boolean;
+    replaceExisting: boolean;
+    protocol: 'ctap2' | 'u2f';
+    transport: 'usb' | 'nfc' | 'ble' | 'internal';
+    hasResidentKey: boolean;
+    hasUserVerification: boolean;
+    hasLargeBlob: boolean;
+    automaticPresenceSimulation: boolean;
+    isUserVerified: boolean;
+  },
+): Promise<Record<string, any>> {
+  const cdp = await getOrCreatePageCdpSession(runtime, page);
+  await cdp.send('WebAuthn.enable', { enableUI: options.enableUI });
+
+  if (!runtime.webAuthn) {
+    runtime.webAuthn = { enabled: true, credentials: [], events: [] };
+  }
+  runtime.webAuthn.enabled = true;
+
+  if (options.replaceExisting !== false && runtime.webAuthn.authenticatorId) {
+    await cdp.send('WebAuthn.removeVirtualAuthenticator', {
+      authenticatorId: runtime.webAuthn.authenticatorId,
+    });
+    runtime.webAuthn.credentials = [];
+  }
+
+  const authenticator = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: options.protocol,
+      transport: options.transport,
+      hasResidentKey: options.hasResidentKey,
+      hasUserVerification: options.hasUserVerification,
+      hasLargeBlob: options.hasLargeBlob,
+      automaticPresenceSimulation: options.automaticPresenceSimulation,
+      isUserVerified: options.isUserVerified,
+    },
+  });
+
+  runtime.webAuthn.authenticatorId = authenticator.authenticatorId;
+  runtime.webAuthn.options = {
+    protocol: options.protocol,
+    transport: options.transport,
+    hasResidentKey: options.hasResidentKey,
+    hasUserVerification: options.hasUserVerification,
+    hasLargeBlob: options.hasLargeBlob,
+    automaticPresenceSimulation: options.automaticPresenceSimulation,
+    isUserVerified: options.isUserVerified,
+  };
+
+  await cdp.send('WebAuthn.setAutomaticPresenceSimulation', {
+    authenticatorId: authenticator.authenticatorId,
+    enabled: options.automaticPresenceSimulation,
+  });
+  await cdp.send('WebAuthn.setUserVerified', {
+    authenticatorId: authenticator.authenticatorId,
+    isUserVerified: options.isUserVerified,
+  });
+
+  return {
+    authenticator_id: authenticator.authenticatorId,
+    ...runtime.webAuthn.options,
+  };
+}
+
+async function removeVirtualPasskeyAuthenticator(runtime: BrowserRuntime, page: Page): Promise<void> {
+  const authenticatorId = getPasskeyAuthenticatorId(runtime);
+  const cdp = await getOrCreatePageCdpSession(runtime, page);
+  await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+  runtime.webAuthn = {
+    enabled: true,
+    credentials: [],
+    events: [],
+  };
+}
+
+async function getVirtualPasskeyCredentials(runtime: BrowserRuntime, page: Page): Promise<Array<Record<string, any>>> {
+  const authenticatorId = getPasskeyAuthenticatorId(runtime);
+  const cdp = await getOrCreatePageCdpSession(runtime, page);
+  const result = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
+  const credentials = Array.isArray(result.credentials) ? result.credentials : [];
+  if (!runtime.webAuthn) {
+    runtime.webAuthn = { enabled: true, authenticatorId, credentials: [], events: [] };
+  }
+  runtime.webAuthn.credentials = credentials;
+  return credentials;
+}
+
+function getPasskeyAuthenticatorId(runtime: BrowserRuntime): string {
+  const authenticatorId = runtime.webAuthn?.authenticatorId;
+  if (!authenticatorId) {
+    throw new Error('No virtual passkey authenticator is active. Run setup_passkey_authenticator first.');
+  }
+  return authenticatorId;
+}
+
+function upsertPasskeyCredential(
+  credentials: Array<Record<string, any>>,
+  nextCredential: Record<string, any> | undefined,
+): Array<Record<string, any>> {
+  if (!nextCredential?.credentialId) return credentials;
+  const next = credentials.filter((credential) => credential.credentialId !== nextCredential.credentialId);
+  next.push(nextCredential);
+  return next;
+}
+
+function getPasskeyPreset(provider?: string) {
+  const presetKey = provider || 'webauthn.io';
+  const preset = PASSKEY_SITE_PRESETS[presetKey as keyof typeof PASSKEY_SITE_PRESETS];
+  if (!preset) {
+    throw new Error(`Unsupported passkey provider: ${presetKey}`);
+  }
+  return preset;
+}
+
+async function registerPasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+  const preset = getPasskeyPreset(resolve(params.provider));
+  const username = String(resolve(params.username ?? ctx.username ?? 'kyberion_passkey_user'));
+  const waitMs = Number(params.wait_ms || 1500);
+  if (params.navigate !== false) {
+    await page.goto(String(resolve(params.url || preset.baseUrl)), { waitUntil: params.waitUntil || 'networkidle' });
+  }
+  if (!runtime.webAuthn?.authenticatorId || params.setup_authenticator !== false) {
+    await setupVirtualPasskeyAuthenticator(runtime, page, {
+      enableUI: params.enable_ui === true,
+      replaceExisting: params.replace_existing !== false,
+      protocol: (resolve(params.protocol || 'ctap2') as 'ctap2' | 'u2f'),
+      transport: (resolve(params.transport || 'internal') as 'usb' | 'nfc' | 'ble' | 'internal'),
+      hasResidentKey: params.has_resident_key !== false,
+      hasUserVerification: params.has_user_verification !== false,
+      hasLargeBlob: params.has_large_blob === true,
+      automaticPresenceSimulation: params.automatic_presence !== false,
+      isUserVerified: params.user_verified !== false,
+    });
+  }
+  await page.fill(resolve(params.username_selector || preset.usernameSelector), username, { timeout: params.timeout || 5000 });
+  await page.click(resolve(params.register_selector || preset.registerSelector), { timeout: params.timeout || 5000 });
+  await page.waitForTimeout(waitMs);
+  const credentials = await getVirtualPasskeyCredentials(runtime, page);
+  return {
+    provider: resolve(params.provider || 'webauthn.io'),
+    username,
+    credentials,
+    url: page.url(),
+  };
+}
+
+async function authenticatePasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+  const preset = getPasskeyPreset(resolve(params.provider));
+  const waitMs = Number(params.wait_ms || 1500);
+  const username = params.username !== undefined ? String(resolve(params.username)) : undefined;
+  let authPage = page;
+  if (params.clear_session !== false) {
+    await clearPasskeySiteSession(runtime, authPage);
+  }
+  if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
+    authPage = await openFreshPasskeyPage(runtime);
+  }
+  if (params.navigate !== false) {
+    await authPage.goto(String(resolve(params.url || preset.baseUrl)), { waitUntil: params.waitUntil || 'networkidle' });
+  }
+  if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
+    const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
+    return {
+      provider: resolve(params.provider || 'webauthn.io'),
+      username,
+      credentials,
+      url: authPage.url(),
+      authenticated: true,
+      mode: 'already_authenticated',
+    };
+  }
+  try {
+    if (username) {
+      await authPage.fill(resolve(params.username_selector || preset.usernameSelector), username, { timeout: params.timeout || 5000 });
+    }
+    await authPage.click(resolve(params.authenticate_selector || preset.authenticateSelector), { timeout: params.timeout || 5000 });
+  } catch (err) {
+    if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
+      const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
+      return {
+        provider: resolve(params.provider || 'webauthn.io'),
+        username,
+        credentials,
+        url: authPage.url(),
+        authenticated: true,
+        mode: 'already_authenticated',
+      };
+    }
+    throw err;
+  }
+  await authPage.waitForTimeout(waitMs);
+  const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
+  return {
+    provider: resolve(params.provider || 'webauthn.io'),
+    username,
+    credentials,
+    url: authPage.url(),
+    authenticated: preset.postAuthUrlIncludes ? authPage.url().includes(preset.postAuthUrlIncludes) : true,
+  };
+}
+
+async function deletePasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+  const authenticatorId = getPasskeyAuthenticatorId(runtime);
+  const cdp = await getOrCreatePageCdpSession(runtime, page);
+  const credentials = await getVirtualPasskeyCredentials(runtime, page);
+  let credentialToDelete: Record<string, any> | undefined;
+
+  if (params.credential_id) {
+    const credentialId = String(resolve(params.credential_id));
+    credentialToDelete = credentials.find((credential) => credential.credentialId === credentialId);
+  } else if (params.username) {
+    const username = String(resolve(params.username));
+    credentialToDelete = credentials.find((credential) => credential.userName === username || credential.userDisplayName === username);
+  } else if (credentials.length === 1) {
+    credentialToDelete = credentials[0];
+  }
+
+  if (!credentialToDelete?.credentialId) {
+    throw new Error('Unable to determine passkey credential to delete. Provide credential_id or username.');
+  }
+
+  await cdp.send('WebAuthn.removeCredential', {
+    authenticatorId,
+    credentialId: credentialToDelete.credentialId,
+  });
+  const remainingCredentials = await getVirtualPasskeyCredentials(runtime, page);
+  return {
+    deleted_credential_id: credentialToDelete.credentialId,
+    credentials: remainingCredentials,
+    deleted: true,
+  };
+}
+
+async function clearPasskeySiteSession(runtime: BrowserRuntime, page: Page): Promise<void> {
+  await runtime.context.clearCookies();
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+}
+
+async function openFreshPasskeyPage(runtime: BrowserRuntime): Promise<Page> {
+  const page = await runtime.context.newPage();
+  const tabId = `tab-${runtime.tabs.size + 1}`;
+  registerBrowserPage(runtime, page, tabId);
+  runtime.activeTabId = tabId;
+  if (runtime.webAuthn?.enabled && runtime.webAuthn.options) {
+    await clonePasskeyAuthenticatorToPage(runtime, page);
+  }
+  return page;
+}
+
+async function clonePasskeyAuthenticatorToPage(runtime: BrowserRuntime, page: Page): Promise<void> {
+  const options = runtime.webAuthn?.options;
+  if (!options) return;
+
+  const existingCredentials = [...(runtime.webAuthn?.credentials || [])];
+  const cdp = await getOrCreatePageCdpSession(runtime, page);
+  await cdp.send('WebAuthn.enable', { enableUI: false });
+  const authenticator = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: options.protocol,
+      transport: options.transport,
+      hasResidentKey: options.hasResidentKey,
+      hasUserVerification: options.hasUserVerification,
+      hasLargeBlob: options.hasLargeBlob,
+      automaticPresenceSimulation: options.automaticPresenceSimulation,
+      isUserVerified: options.isUserVerified,
+    },
+  });
+  for (const credential of existingCredentials) {
+    await cdp.send('WebAuthn.addCredential', {
+      authenticatorId: authenticator.authenticatorId,
+      credential: credential as any,
+    });
+  }
+  runtime.webAuthn = {
+    ...runtime.webAuthn,
+    authenticatorId: authenticator.authenticatorId,
+    credentials: existingCredentials,
+  };
 }
 
 function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: string): void {
@@ -1143,7 +1617,9 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-if (require.main === module) {
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
   main().catch(err => {
     logger.error(err.message);
     process.exit(1);

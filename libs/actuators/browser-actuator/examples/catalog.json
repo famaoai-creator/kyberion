@@ -1,0 +1,33 @@
+{
+  "actuator": "browser-actuator",
+  "examples": [
+    {
+      "id": "explore-and-export",
+      "title": "Explore A Page And Export Artifacts",
+      "path": "libs/actuators/browser-actuator/examples/explore-and-export.json",
+      "description": "Visits a page, captures a snapshot and screenshot, then exports Playwright and ADF artifacts for follow-up automation work.",
+      "tags": ["exploration", "export", "playwright", "adf", "example"]
+    },
+    {
+      "id": "multi-tab-observability",
+      "title": "Multi-Tab Observability Flow",
+      "path": "libs/actuators/browser-actuator/examples/multi-tab-observability.json",
+      "description": "Opens multiple tabs, captures tab state, records network activity, and saves a screenshot for the primary tab.",
+      "tags": ["tabs", "observability", "network", "screenshot", "example"]
+    },
+    {
+      "id": "operator-pause-template",
+      "title": "Operator Pause Template",
+      "path": "libs/actuators/browser-actuator/examples/operator-pause-template.json",
+      "description": "Launches a visible browser session, pauses for manual work, then captures tabs, console, and network activity after operator continuation.",
+      "tags": ["operator", "manual", "pause", "headed", "template"]
+    },
+    {
+      "id": "passkey-webauthn-io",
+      "title": "Passkey Flow On WebAuthn.io",
+      "path": "libs/actuators/browser-actuator/examples/passkey-webauthn-io.json",
+      "description": "Registers, authenticates, and deletes a passkey against webauthn.io using the Browser-Actuator virtual authenticator flow.",
+      "tags": ["passkey", "webauthn", "browser", "example"]
+    }
+  ]
+}

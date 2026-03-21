@@ -1,7 +1,7 @@
 /**
  * sharedStrings.xml generator for XLSX packages
  */
-import type { XlsxDesignProtocol, XlsxTextRun } from '../types/xlsx-protocol';
+import type { XlsxDesignProtocol, XlsxTextRun } from '../types/xlsx-protocol.js';
 
 function escXml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

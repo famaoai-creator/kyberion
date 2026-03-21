@@ -1,4 +1,4 @@
-import { secretGuard } from './secret-guard';
+import { secretGuard } from './secret-guard.js';
 
 export interface ServiceBinding {
   serviceId: string;

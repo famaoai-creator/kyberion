@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { runtimeSupervisor, type RuntimeResourceKind, type RuntimeShutdownPolicy } from './runtime-supervisor';
+import { runtimeSupervisor, type RuntimeResourceKind, type RuntimeShutdownPolicy } from './runtime-supervisor.js';
 
 export interface ManagedProcessSpec {
   resourceId: string;

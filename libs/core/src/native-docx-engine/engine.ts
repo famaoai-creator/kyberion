@@ -23,10 +23,10 @@ import type {
   DocxBorderEdge,
   DocxShading,
   DocxDrawing,
-} from '../types/docx-protocol';
+} from '../types/docx-protocol.js';
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
-import { generateTheme } from '../native-pptx-engine/theme';
+import { generateTheme } from '../native-pptx-engine/theme.js';
 
 const WML_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';

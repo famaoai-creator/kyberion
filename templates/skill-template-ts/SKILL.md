@@ -22,8 +22,17 @@ Briefly describes the activity this skill performs in the third person. Focus on
 ## Usage
 
 ```bash
-npx ts-node __SKILL_NAME__/scripts/main.ts [options]
+pnpm build
+pnpm start -- [options]
 ```
+
+## Runtime Policy
+
+- This template is the default path for new skills.
+- Keep `package.json` as `type: "module"`.
+- Use package imports such as `@agent/core` and `@agent/core/secure-io`.
+- Do not add source-adjacent shadow `.js` files.
+- If CommonJS is absolutely required, switch to `skill-template-cjs` intentionally.
 
 ## Progressive Disclosure
 

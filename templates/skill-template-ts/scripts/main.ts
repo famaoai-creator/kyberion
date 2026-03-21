@@ -3,21 +3,24 @@
  * Implementation based on @agent/core standards.
  */
 
-// @ts-ignore
-import { runSkillAsync } from '@agent/core';
-const { logger, safeReadFile, safeWriteFile } = require('@agent/core/secure-io');
-const pathResolver = require('@agent/core/path-resolver');
+import { logger, runSkillAsync } from '@agent/core';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
 
 async function main() {
   await runSkillAsync('{{SKILL_NAME}}', async (args: any) => {
     logger.info('Executing {{SKILL_NAME}}...');
-    
+
+    void safeReadFile;
+    void safeWriteFile;
+    void pathResolver;
+
     // Implementation goes here
-    
+
     return {
       status: 'success',
       message: 'Skill executed successfully.'
-    };
+    } as const;
   });
 }
 

@@ -11,7 +11,7 @@ Generate a visual architecture diagram from IaC (Terraform, CloudFormation) file
 1.  **Parsing**: Use `File-Actuator` to read `.tf` or `.yaml` files.
 2.  **Relationship Extraction**: Identify connections (e.g., `security_group_id`, `vpc_id`) between resources.
 3.  **Mermaid Generation**: Draft a Mermaid `graph TD` representing the infrastructure topology.
-4.  **Rendering**: Use `Media-Actuator` with the `render` (mermaid) action to produce an SVG/PNG.
+4.  **Rendering**: Use `Media-Actuator` with `mermaid_render` to produce an SVG/PNG.
 
 ## 4. Expected Output
 A high-fidelity infrastructure diagram.

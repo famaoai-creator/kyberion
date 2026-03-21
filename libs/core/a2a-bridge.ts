@@ -1,8 +1,8 @@
-import { logger } from './core';
-import { agentRegistry, AgentProvider } from './agent-registry';
-import { type AgentHandle } from './agent-lifecycle';
-import { getAgentManifest, loadAgentManifests } from './agent-manifest';
-import { auditChain } from './audit-chain';
+import { logger } from './core.js';
+import { agentRegistry, AgentProvider } from './agent-registry.js';
+import { type AgentHandle } from './agent-lifecycle.js';
+import { getAgentManifest, loadAgentManifests } from './agent-manifest.js';
+import { auditChain } from './audit-chain.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';

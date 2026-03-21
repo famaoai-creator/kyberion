@@ -2,6 +2,7 @@
   "name": "@agent/shared-vision",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Domain-specific utilities for Visual context and Browser interaction.",
   "main": "../../dist/libs/shared-vision/src/index.js",
   "types": "../../dist/libs/shared-vision/src/index.d.ts",

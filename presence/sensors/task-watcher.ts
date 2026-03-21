@@ -4,7 +4,7 @@
  * Periodically checks for assigned GitHub issues and Jira tickets.
  */
 
-import { PollingSensor, logger, safeExec } from '../../libs/core/index.js';
+import { PollingSensor, logger, safeExec } from '@agent/core';
 
 class TaskWatcher extends PollingSensor {
   private lastKnownIssues: string[] = [];

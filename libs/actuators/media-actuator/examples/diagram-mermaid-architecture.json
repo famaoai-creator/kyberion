@@ -1,0 +1,22 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "kyberion-sovereign"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "mermaid_render",
+      "params": {
+        "path": "active/shared/tmp/media/diagram-mermaid-architecture.svg",
+        "source": "flowchart TD\n    A[User Intent] --> B[Kyberion Brain]\n    B --> C[Modeling Actuator]\n    B --> D[Media Actuator]\n    B --> E[Browser Actuator]\n    D --> F[SVG / PPTX / PDF]\n    E --> G[External Systems]\n    C --> H[Structured Diagrams]\n",
+        "background_color": "#f8fafc",
+        "width": 1400
+      }
+    }
+  ]
+}

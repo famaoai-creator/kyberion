@@ -1,6 +1,7 @@
 import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -85,7 +86,10 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-if (require.main === module) {
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+
+if (entrypoint && modulePath === entrypoint) {
   main().catch(err => {
     logger.error(err.message);
     process.exit(1);

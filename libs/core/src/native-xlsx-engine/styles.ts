@@ -2,7 +2,7 @@
  * styles.xml generator for XLSX packages
  * Generates the complete styles part from XlsxDesignProtocol.styles
  */
-import type { XlsxDesignProtocol, XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge, XlsxCellStyle, XlsxNumberFormat, XlsxColor, XlsxDxfStyle } from '../types/xlsx-protocol';
+import type { XlsxDesignProtocol, XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge, XlsxCellStyle, XlsxNumberFormat, XlsxColor, XlsxDxfStyle } from '../types/xlsx-protocol.js';
 
 function colorXml(color: XlsxColor | undefined, tagName: string): string {
   if (!color) return '';

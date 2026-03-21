@@ -1,12 +1,12 @@
 import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PptxDesignProtocol } from '../../types/pptx-protocol';
-import { generateContentTypes } from './content-types';
-import { generateGlobalRels, generatePresentationRels, generateSlideRels, generateLayoutRels, generateMasterRels } from './rels';
-import { generatePresentation } from './presentation';
-import { generateTheme } from './theme';
-import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders';
+import type { PptxDesignProtocol } from '../types/pptx-protocol.js';
+import { generateContentTypes } from './content-types.js';
+import { generateGlobalRels, generatePresentationRels, generateSlideRels, generateLayoutRels, generateMasterRels } from './rels.js';
+import { generatePresentation } from './presentation.js';
+import { generateTheme } from './theme.js';
+import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders.js';
 
 export async function generateNativePptx(protocol: PptxDesignProtocol, outputPath: string): Promise<void> {
   if (!protocol?.slides?.length) {
