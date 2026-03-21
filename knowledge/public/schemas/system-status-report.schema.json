@@ -35,6 +35,10 @@
         "required": ["id", "priority", "action"],
         "properties": {
           "id": { "type": "string" },
+          "next_action_type": {
+            "type": "string",
+            "enum": ["execute_now", "inspect", "clarify", "start_mission", "resume_mission"]
+          },
           "priority": {
             "type": "string",
             "enum": ["now", "next", "later"]

@@ -243,6 +243,7 @@ async function opTransform(op: string, params: any, ctx: any) {
         ? [{
             id: 'answer-clarifications',
             priority: 'now',
+            next_action_type: 'clarify',
             action: 'Answer the clarification questions',
             reason: 'The request still has blocking ambiguity.',
             suggested_followup_request: `Please provide the following missing inputs: ${missingInputs.join(', ')}`,
@@ -250,6 +251,7 @@ async function opTransform(op: string, params: any, ctx: any) {
         : [{
             id: 'review-plan',
             priority: 'next',
+            next_action_type: 'execute_now',
             action: 'Review the execution preview and start execution',
             reason: 'The request is sufficiently structured.',
             suggested_followup_request: 'Please proceed with this plan.',
@@ -1005,6 +1007,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
   const actions: Array<{
     id: string;
     priority: 'now' | 'next' | 'later';
+    next_action_type?: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
     action: string;
     reason: string;
     suggested_command?: string;
@@ -1017,6 +1020,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: `restart-${surfaceId}`,
         priority: 'now',
+        next_action_type: 'execute_now',
         action: `Investigate logs and restart ${surfaceId}`,
         reason: finding.detail || finding.message,
         suggested_command: `node dist/scripts/surface_runtime.js --action reconcile --surface ${surfaceId}`,
@@ -1028,6 +1032,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'fix-esm-integrity',
         priority: 'now',
+        next_action_type: 'execute_now',
         action: 'Run `pnpm run check:esm` and resolve import/runtime mismatches',
         reason: finding.detail || finding.message,
         suggested_command: 'pnpm run check:esm',
@@ -1039,6 +1044,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'fix-catalog-integrity',
         priority: 'now',
+        next_action_type: 'execute_now',
         action: 'Run `pnpm run check:catalogs` and repair invalid orchestration catalogs',
         reason: finding.detail || finding.message,
         suggested_command: 'pnpm run check:catalogs',
@@ -1050,6 +1056,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'review-active-missions',
         priority: 'next',
+        next_action_type: 'inspect',
         action: 'Review active missions and confirm checkpoints or finish criteria',
         reason: finding.detail || finding.message,
         suggested_followup_request: 'active な mission の checkpoint または finish 条件を確認してください。',
@@ -1061,6 +1068,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'review-target-mission-artifacts',
         priority: 'next',
+        next_action_type: 'inspect',
         action: `Review artifacts for ${missionId}`,
         reason: 'The requested mission is already completed.',
         suggested_command: `node dist/scripts/mission_controller.js status ${missionId}`,
@@ -1073,6 +1081,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'continue-target-mission',
         priority: 'now',
+        next_action_type: 'resume_mission',
         action: `Resume or verify ${missionId}`,
         reason: 'The requested mission is still active.',
         suggested_command: `node dist/scripts/mission_controller.js resume ${missionId}`,
@@ -1085,6 +1094,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
       actions.push({
         id: 'review-target-project-ledger',
         priority: 'next',
+        next_action_type: 'inspect',
         action: 'Inspect the project mission ledger and gate artifacts',
         reason: finding.detail || finding.message,
         suggested_followup_request: '対象 project の mission ledger と gate 資料を確認してください。',
@@ -1096,6 +1106,7 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
     actions.push({
       id: 'no-action-required',
       priority: 'later',
+      next_action_type: 'inspect',
       action: 'No immediate action required',
       reason: 'The status report did not identify corrective work.',
       suggested_followup_request: '必要なら別の mission または project を指定して詳細状態を確認してください。',

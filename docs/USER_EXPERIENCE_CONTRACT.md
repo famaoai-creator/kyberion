@@ -100,10 +100,21 @@ Do not expose raw enum names or implementation-specific state labels unless they
 A next action should be more than a suggestion.
 Where possible, it should be directly runnable.
 
+Next actions are not the same thing as missions.
+A mission is a durable execution unit with ownership and lifecycle.
+A next action is the immediate operator-facing step that may:
+
+- execute something immediately
+- inspect a current state or artifact
+- request clarification
+- start a new mission
+- resume an existing mission
+
 Useful fields include:
 
 - `title`
 - `reason`
+- `next_action_type`
 - `suggested_command`
 - `suggested_pipeline_path`
 - `suggested_followup_request`
