@@ -45,6 +45,12 @@ export { generateNativeDocx } from './src/native-docx-engine/engine.js';
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';
 export { detectTier, validateReadPermission, validateWritePermission, scanForConfidentialMarkers, validateSovereignBoundary } from './tier-guard.js';
+export * as authority from './authority.js';
+export { resolveIdentityContext, hasAuthority } from './authority.js';
+export * as transformer from './transformer.js';
+export { transform, getValueByPath } from './transformer.js';
+export * as serviceEngine from './service-engine.js';
+export { executeServicePreset } from './service-engine.js';
 export * as secretGuard from './secret-guard.js';
 export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
 // Orchestration
