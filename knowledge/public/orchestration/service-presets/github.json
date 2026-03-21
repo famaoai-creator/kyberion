@@ -1,0 +1,31 @@
+{
+  "service_id": "github",
+  "name": "GitHub REST API Presets",
+  "base_url": "https://api.github.com",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "create_issue": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "api",
+          "path": "repos/{{owner}}/{{repo}}/issues",
+          "method": "POST",
+          "output_mapping": { "id": "number", "url": "html_url" }
+        },
+        {
+          "type": "cli",
+          "command": "gh",
+          "args": ["issue", "create", "--title", "{{title}}", "--body", "{{body}}", "--repo", "{{owner}}/{{repo}}", "--json", "number,url"],
+          "output_mapping": { "id": "number", "url": "url" }
+        }
+      ],
+      "description": "Creates a new issue in a repository.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" }
+      }
+    }
+  }
+}

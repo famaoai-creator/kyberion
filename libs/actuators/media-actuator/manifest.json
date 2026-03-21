@@ -1,0 +1,23 @@
+{
+  "actuator_id": "media-actuator",
+  "version": "1.0.0",
+  "description": "Document and asset generation engine",
+  "capabilities": [
+    { "op": "json_read", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pptx_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "xlsx_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "docx_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pdf_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pptx_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "xlsx_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "docx_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pdf_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mermaid_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "d2_render", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "drawio_write", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "apply_theme", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "merge_content", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "proposal_storyline_from_brief", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "document_report_design_from_brief", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

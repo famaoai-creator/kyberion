@@ -1,0 +1,10 @@
+{
+  "actuator_id": "service-actuator",
+  "version": "1.0.0",
+  "description": "Unified External SaaS/API Reachability Layer",
+  "capabilities": [
+    { "op": "api", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "cli", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

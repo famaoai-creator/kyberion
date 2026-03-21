@@ -1,0 +1,36 @@
+{
+  "service_id": "jira",
+  "name": "Jira Cloud REST API Presets",
+  "base_url": "https://{{domain}}.atlassian.net/rest/api/3",
+  "auth_strategy": "Basic",
+  "operations": {
+    "create_issue": {
+      "path": "issue",
+      "method": "POST",
+      "description": "Creates a Jira issue.",
+      "parameters": {
+        "project_key": { "required": true, "type": "string" },
+        "summary": { "required": true, "type": "string" },
+        "description": { "required": false, "type": "string" },
+        "issue_type": { "default": "Task" }
+      },
+      "payload_template": {
+        "fields": {
+          "project": { "key": "{{project_key}}" },
+          "summary": "{{summary}}",
+          "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "{{description}}" }] }]
+          },
+          "issuetype": { "name": "{{issue_type}}" }
+        }
+      }
+    },
+    "get_issue": {
+      "path": "issue/{{issue_key}}",
+      "method": "GET",
+      "description": "Retrieves an issue by key."
+    }
+  }
+}

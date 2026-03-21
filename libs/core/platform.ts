@@ -34,12 +34,17 @@ export interface OSDriver {
   playSound(path: string): Promise<void>;
   open(target: string): Promise<void>;
   getCapabilities(): Promise<PlatformCapabilities>;
+  checkBinary(cmd: string): Promise<boolean>;
 }
 
 /**
  * macOS Implementation
  */
 class MacOSDriver implements OSDriver {
+  async checkBinary(cmd: string): Promise<boolean> {
+    return await commandExists(cmd);
+  }
+
   async captureScreen(outputPath: string): Promise<void> {
     if (!(await commandExists('screencapture'))) throw new Error('screencapture not found');
     await safeExec('screencapture', ['-x', '-t', 'jpg', outputPath]);
@@ -76,6 +81,10 @@ class MacOSDriver implements OSDriver {
  * Windows Implementation
  */
 class WindowsDriver implements OSDriver {
+  async checkBinary(cmd: string): Promise<boolean> {
+    return await commandExists(cmd);
+  }
+
   async captureScreen(): Promise<void> {
     logger.warn('[Platform] Screen capture not yet implemented for Windows.');
   }
@@ -106,6 +115,10 @@ class WindowsDriver implements OSDriver {
  * Linux Implementation
  */
 class LinuxDriver implements OSDriver {
+  async checkBinary(cmd: string): Promise<boolean> {
+    return await commandExists(cmd);
+  }
+
   async captureScreen(outputPath: string): Promise<void> {
     await safeExec('import', ['-window', 'root', outputPath]);
   }
@@ -133,6 +146,7 @@ class LinuxDriver implements OSDriver {
 }
 
 class UnknownDriver implements OSDriver {
+  async checkBinary(): Promise<boolean> { return false; }
   async captureScreen() {}
   async speak() {}
   async playSound() {}

@@ -1,0 +1,21 @@
+{
+  "actuator_id": "orchestrator-actuator",
+  "version": "1.0.0",
+  "description": "Mission and Task Management Orchestrator",
+  "capabilities": [
+    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "shell", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "intent_detect", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "json_query", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "variable_hydrate", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "request_to_execution_brief", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "execution_brief_to_resolution_plan", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "collect_system_status_snapshot", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "status_snapshot_to_report", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "run_execution_plan_set", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mkdir", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "git_checkpoint", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
