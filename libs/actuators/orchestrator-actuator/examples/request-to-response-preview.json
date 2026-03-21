@@ -1,0 +1,41 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/request-to-response-preview.context.json",
+    "request_text": "このWebアプリのデザインを踏襲して、こういったコンセプトのwebサイトを作成して。設計書とテスト結果も出して。"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "request_to_execution_brief",
+      "params": {
+        "provided_inputs": ["reference source", "new concept", "target environment"],
+        "export_as": "execution_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "execution_brief_to_operator_packet",
+      "params": {
+        "from": "execution_brief",
+        "export_as": "operator_packet"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "operator_packet_to_response_preview",
+      "params": {
+        "from": "operator_packet",
+        "export_as": "response_preview"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "response_preview",
+        "path": "active/shared/tmp/orchestrator/operator-response-preview.json"
+      }
+    }
+  ]
+}

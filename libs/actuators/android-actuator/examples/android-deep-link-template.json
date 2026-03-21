@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/android/android-deep-link.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "adb_health_check",
+      "params": {
+        "export_as": "android_health"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "open_deep_link",
+      "params": {
+        "url": "myapp://replace/me"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "capture_screen",
+      "params": {
+        "path": "active/shared/tmp/android/android-deep-link-screen.png"
+      }
+    }
+  ]
+}

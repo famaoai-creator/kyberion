@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { compileFromFile } from 'json-schema-to-typescript';
-
-type SafeWriteFn = (filePath: string, data: string | Buffer, options?: Record<string, unknown>) => void;
+import { safeWriteFile } from '@agent/core/secure-io';
 
 interface GenerationTarget {
   schemaPath: string;
@@ -33,17 +32,69 @@ const targets: GenerationTarget[] = [
     schemaPath: 'knowledge/public/schemas/architecture-adf.schema.json',
     outputPath: 'libs/core/src/types/architecture-adf.ts',
   },
+  {
+    schemaPath: 'knowledge/public/schemas/mobile-app-profile.schema.json',
+    outputPath: 'libs/core/src/types/mobile-app-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/mobile-app-profile-index.schema.json',
+    outputPath: 'libs/core/src/types/mobile-app-profile-index.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/webview-session-handoff.schema.json',
+    outputPath: 'libs/core/src/types/webview-session-handoff.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/web-app-profile.schema.json',
+    outputPath: 'libs/core/src/types/web-app-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/ui-flow-adf.schema.json',
+    outputPath: 'libs/core/src/types/ui-flow-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/test-case-adf.schema.json',
+    outputPath: 'libs/core/src/types/test-case-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/proposal-brief.schema.json',
+    outputPath: 'libs/core/src/types/proposal-brief.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/proposal-storyline-adf.schema.json',
+    outputPath: 'libs/core/src/types/proposal-storyline-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/actuator-execution-brief.schema.json',
+    outputPath: 'libs/core/src/types/actuator-execution-brief.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/actuator-resolution-plan.schema.json',
+    outputPath: 'libs/core/src/types/actuator-resolution-plan.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/delivery-pack.schema.json',
+    outputPath: 'libs/core/src/types/delivery-pack.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/actuator-pipeline-bundle.schema.json',
+    outputPath: 'libs/core/src/types/actuator-pipeline-bundle.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/system-status-brief.schema.json',
+    outputPath: 'libs/core/src/types/system-status-brief.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/system-status-report.schema.json',
+    outputPath: 'libs/core/src/types/system-status-report.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/operator-interaction-packet.schema.json',
+    outputPath: 'libs/core/src/types/operator-interaction-packet.ts',
+  },
 ];
 
 async function main(): Promise<void> {
-  const secureIoModule = await import('../libs/core/secure-io.js');
-  const safeWriteFile = ((secureIoModule as any).safeWriteFile ||
-    (secureIoModule as any).default?.safeWriteFile) as SafeWriteFn | undefined;
-
-  if (!safeWriteFile) {
-    throw new Error('secure-io safeWriteFile export not found');
-  }
-
   for (const target of targets) {
     const schemaPath = path.resolve(process.cwd(), target.schemaPath);
     const outputPath = path.resolve(process.cwd(), target.outputPath);

@@ -1,7 +1,7 @@
 {
   "v": "1.0.0",
-  "t": 12,
-  "u": "2026-03-15T00:00:00.000Z",
+  "t": 14,
+  "u": "2026-03-21T00:00:00.000Z",
   "actuators": [
     { "n": "file-actuator", "path": "libs/actuators/file-actuator", "d": "Unified File I/O and Search", "s": "implemented" },
     { "n": "code-actuator", "path": "libs/actuators/code-actuator", "d": "Logic Analysis and Refactoring", "s": "implemented" },
@@ -14,6 +14,8 @@
     { "n": "service-actuator", "path": "libs/actuators/service-actuator", "d": "External SaaS and API Connectors", "s": "implemented" },
     { "n": "artifact-actuator", "path": "libs/actuators/artifact-actuator", "d": "Governed coordination and observability artifact management", "s": "implemented" },
     { "n": "approval-actuator", "path": "libs/actuators/approval-actuator", "d": "Human approval request state transitions and decision handling", "s": "implemented" },
-    { "n": "orchestrator-actuator", "path": "libs/actuators/orchestrator-actuator", "d": "Central Mission Orchestration", "s": "implemented" }
+    { "n": "orchestrator-actuator", "path": "libs/actuators/orchestrator-actuator", "d": "Central Mission Orchestration", "s": "implemented" },
+    { "n": "android-actuator", "path": "libs/actuators/android-actuator", "d": "Local adb-based Android application automation", "s": "implemented" },
+    { "n": "ios-actuator", "path": "libs/actuators/ios-actuator", "d": "Local xcrun simctl-based iOS simulator automation", "s": "implemented" }
   ]
 }

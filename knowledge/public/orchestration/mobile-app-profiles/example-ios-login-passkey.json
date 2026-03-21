@@ -1,0 +1,45 @@
+{
+  "app_id": "example-ios-login-passkey",
+  "platform": "ios",
+  "title": "Example iOS Login + Passkey",
+  "package_name": "com.example.iosmobile",
+  "launch": {
+    "bundle_id": "com.example.iosmobile",
+    "app_path": "active/shared/apps/example-ios/ExampleIOSMobile.app"
+  },
+  "selectors": {
+    "login": {
+      "email": {
+        "text": "email",
+        "class_name": "XCUIElementTypeTextField"
+      },
+      "password": {
+        "text": "password",
+        "class_name": "XCUIElementTypeSecureTextField"
+      },
+      "submit": {
+        "text": "sign in",
+        "class_name": "XCUIElementTypeButton"
+      }
+    },
+    "passkey": {
+      "trigger": {
+        "text": "passkey",
+        "class_name": "XCUIElementTypeButton"
+      }
+    }
+  },
+  "webview": {
+    "entry_url": "https://example.iosmobile.app/webview/login",
+    "allowed_origins": ["https://example.iosmobile.app"],
+    "session_handoff": {
+      "target_url": "https://example.iosmobile.app/webview/login",
+      "browser_session_id": "ios-webview-example",
+      "prefer_persistent_context": true
+    },
+    "runtime_export": {
+      "format": "json",
+      "ios_container_relative_path": "Library/Application Support/kyberion/webview-session.json"
+    }
+  }
+}

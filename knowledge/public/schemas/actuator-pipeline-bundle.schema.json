@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Actuator Pipeline Bundle",
+  "type": "object",
+  "required": ["kind", "archetype_id", "status", "jobs"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["actuator-pipeline-bundle"]
+    },
+    "archetype_id": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["ready", "clarification_required"]
+    },
+    "summary": { "type": "string" },
+    "missing_inputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "actuator", "template_path"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "actuator": { "type": "string" },
+          "template_path": { "type": "string" },
+          "recommended_procedure": { "type": "string" },
+          "parameter_overrides": {
+            "type": "object"
+          },
+          "outputs": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

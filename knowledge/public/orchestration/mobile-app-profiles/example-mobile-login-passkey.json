@@ -1,0 +1,46 @@
+{
+  "app_id": "example-mobile-login-passkey",
+  "platform": "android",
+  "title": "Example Mobile Login + Passkey",
+  "package_name": "com.example.mobile",
+  "launch": {
+    "component": "com.example.mobile/.MainActivity"
+  },
+  "selectors": {
+    "login": {
+      "email": {
+        "resource_id": "email",
+        "class_name": "EditText"
+      },
+      "password": {
+        "resource_id": "password",
+        "class_name": "EditText"
+      },
+      "submit": {
+        "text": "sign in",
+        "resource_id": "sign_in",
+        "class_name": "Button"
+      }
+    },
+    "passkey": {
+      "trigger": {
+        "text": "passkey",
+        "resource_id": "passkey",
+        "class_name": "Button"
+      }
+    }
+  },
+  "webview": {
+    "entry_url": "https://example.mobile.app/webview/login",
+    "allowed_origins": ["https://example.mobile.app"],
+    "session_handoff": {
+      "target_url": "https://example.mobile.app/webview/login",
+      "browser_session_id": "android-webview-example",
+      "prefer_persistent_context": true
+    },
+    "runtime_export": {
+      "format": "json",
+      "android_device_path": "/sdcard/kyberion/example-mobile-webview-session.json"
+    }
+  }
+}

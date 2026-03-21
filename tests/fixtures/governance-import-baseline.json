@@ -1,5 +1,6 @@
 {
   "fs_imports": [
+    "libs/actuators/browser-actuator/src/index.test.ts",
     "libs/actuators/media-actuator/src/artisan/extraction-engine.ts",
     "libs/actuators/media-actuator/src/index.ts",
     "libs/core/fs-primitives.ts",
@@ -29,7 +30,6 @@
   "child_process_imports": [
     "libs/actuators/browser-actuator/src/index.ts",
     "libs/actuators/code-actuator/src/index.ts",
-    "libs/actuators/media-actuator/src/index.ts",
     "libs/actuators/modeling-actuator/src/index.ts",
     "libs/actuators/orchestrator-actuator/src/index.ts",
     "libs/actuators/system-actuator/src/index.ts",

@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Actuator Execution Brief",
+  "type": "object",
+  "required": ["kind", "request_text", "archetype_id", "target_actuators", "deliverables", "missing_inputs"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["actuator-execution-brief"]
+    },
+    "request_text": {
+      "type": "string"
+    },
+    "archetype_id": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "user_facing_summary": {
+      "type": "string"
+    },
+    "normalized_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "target_actuators": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "deliverables": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "missing_inputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "clarification_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "question": { "type": "string" },
+          "reason": { "type": "string" },
+          "default_assumption": { "type": "string" },
+          "impact": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "readiness": {
+      "type": "string",
+      "enum": ["fully_automatable", "needs_clarification", "needs_external_asset", "blocked_by_runtime"]
+    },
+    "readiness_reason": {
+      "type": "string"
+    },
+    "llm_touchpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage", "purpose", "output_contract"],
+        "properties": {
+          "stage": { "type": "string" },
+          "purpose": { "type": "string" },
+          "output_contract": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "recommended_next_step": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

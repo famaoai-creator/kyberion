@@ -1,0 +1,63 @@
+# Actuator Intent Normalization
+
+曖昧な依頼をそのまま actuator 実行へ落とさず、まず `execution brief` に正規化するための考え方です。
+
+## Core Rule
+
+- 自然言語の依頼をそのまま actuator へ渡さない
+- 最低でも次を明示する
+  - 何を作るか
+  - 何を根拠にするか
+  - 何が不足しているか
+  - どの actuator 群に落ちるか
+  - 何を成果物とするか
+
+## Two-Step Contract
+
+1. `actuator-execution-brief`
+- request の正規化
+- archetype 判定
+- missing input と assumption の明示
+
+2. `actuator-resolution-plan`
+- 実行 phase
+- 使用 actuator
+- 期待 artifact
+- exit criteria
+
+3. `operator-interaction-packet`
+- LLM が人間に返すための対話契約
+- clarification / execution-preview / status-summary を分離
+- 内部 plan をそのまま見せず、必要な説明だけを返す
+
+## Recommended Flow
+
+1. request text を archetype へ分類
+2. brief を生成
+3. missing input が重大なら clarification
+4. plan へ落とす
+5. `pipeline bundle` を生成する
+6. その後に individual actuator template を埋めて実行する
+
+## Pipeline Bundle Rule
+
+- `resolution plan` だけで終わらせない
+- 不足入力が残る場合は `status: clarification_required`
+- 入力が揃ったら `status: ready` の `actuator-pipeline-bundle` を生成する
+- bundle には少なくとも次を含める
+  - `actuator`
+  - `template_path`
+  - `recommended_procedure`
+  - `parameter_overrides`
+  - `outputs`
+
+## LLM Touchpoint Rule
+
+- LLM の主な接点は `operator-interaction-packet`
+- actuator 実行層と人間向け返答層を分ける
+- LLM は少なくとも次を明示する
+  - 理解した依頼
+  - readiness
+  - 足りない入力
+  - 次の一手
+- 内部の `pipeline bundle` や `execution plan set` は必要に応じて要約し、対話では平文化する

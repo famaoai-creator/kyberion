@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "id": "example-mobile-login-passkey",
+      "platform": "android",
+      "title": "Example Mobile Login + Passkey",
+      "path": "knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json",
+      "description": "Example Android app profile covering launch, login form selectors, and passkey trigger selectors.",
+      "tags": ["android", "login", "passkey", "example"]
+    }
+  ]
+}

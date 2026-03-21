@@ -4,7 +4,7 @@ import {
   safeLstat,
   safeReadFile,
   safeReaddir,
-} from '../libs/core/secure-io.js';
+} from '@agent/core/secure-io';
 
 const ROOT = process.cwd();
 const ALLOWED_CJS_FILES = new Set([
@@ -17,10 +17,7 @@ const ALLOWED_CJS_FILES = new Set([
 const ALLOWED_NON_MODULE_PACKAGES = new Set([
   'templates/skill-template-cjs/package.json',
 ]);
-const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set([
-  'scripts/check_esm_integrity.ts',
-  'scripts/generate_types.ts',
-]);
+const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/core/',

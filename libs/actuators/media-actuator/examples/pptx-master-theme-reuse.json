@@ -1,0 +1,101 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/media/pptx-master-theme-reuse.context.json"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "forest-briefing"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx",
+        "content_data": [
+          {
+            "title": "Architecture Program Review",
+            "body": [
+              "Original source deck establishes palette, fonts, and placeholder geometry.",
+              "This deck exists only to seed a reusable theme contract.",
+              "The extracted master should flow into derivative stakeholder decks."
+            ],
+            "visual": "Source visual language"
+          },
+          {
+            "title": "Source Slide 2",
+            "body": [
+              "Visual hierarchy is designed for management briefings.",
+              "Text density is moderate and favors compact bullets.",
+              "The downstream deck should inherit this structure."
+            ],
+            "visual": "Master placeholder map"
+          }
+        ]
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/pptx-master-theme-reuse-source.pptx"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "pptx_extract",
+      "params": {
+        "path": "active/shared/tmp/media/pptx-master-theme-reuse-source.pptx",
+        "export_as": "reusable_source_design"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "theme_from_pptx_design",
+      "params": {
+        "from": "reusable_source_design",
+        "name": "forest-briefing-derived",
+        "export_as": "reused_theme",
+        "export_master_as": "reused_master"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx",
+        "content_data": [
+          {
+            "title": "Derivative Deck: Operating Decisions",
+            "body": [
+              "This deck was rendered from content merged onto an extracted master theme.",
+              "The source PowerPoint determined palette, placeholder layout, and fonts.",
+              "It demonstrates a local-only pattern for native Office theme reuse."
+            ],
+            "visual": "Decision checkpoint"
+          },
+          {
+            "title": "Board Actions",
+            "body": [
+              "Approve sample portfolio for Media-Actuator operators.",
+              "Promote extracted PPTX theme flow to reusable procedure status.",
+              "Extend the same bridge to DOCX and XLSX style extraction later."
+            ],
+            "visual": "Action list"
+          }
+        ]
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/pptx-master-theme-reuse-derived.pptx"
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/raid-register-protocol.json",
+        "export_as": "last_xlsx_design"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "xlsx_render",
+      "params": {
+        "path": "active/shared/tmp/media/raid-register-example.xlsx"
+      }
+    }
+  ]
+}

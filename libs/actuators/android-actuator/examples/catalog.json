@@ -1,0 +1,96 @@
+{
+  "actuator": "android-actuator",
+  "examples": [
+    {
+      "id": "adb-health-check",
+      "title": "ADB Health Check",
+      "path": "libs/actuators/android-actuator/examples/adb-health-check.json",
+      "description": "Checks whether local adb is available, lists connected devices, and records the selected Android serial.",
+      "tags": ["android", "adb", "health-check", "local-only", "example"]
+    },
+    {
+      "id": "android-observability-template",
+      "title": "Android Observability Template",
+      "path": "libs/actuators/android-actuator/examples/android-observability-template.json",
+      "description": "Captures a governed screenshot and UI tree from the current Android app for operator analysis.",
+      "tags": ["android", "screenshot", "ui-tree", "observability", "template"]
+    },
+    {
+      "id": "android-deep-link-template",
+      "title": "Android Deep Link Template",
+      "path": "libs/actuators/android-actuator/examples/android-deep-link-template.json",
+      "description": "Opens an Android deep link and then captures a screenshot for validation.",
+      "tags": ["android", "deep-link", "navigation", "template"]
+    },
+    {
+      "id": "android-ui-tree-analysis",
+      "title": "Android UI Tree Analysis",
+      "path": "libs/actuators/android-actuator/examples/android-ui-tree-analysis.json",
+      "description": "Analyzes a captured UI tree, summarizes visible nodes, and finds text matches without requiring a connected device.",
+      "tags": ["android", "ui-tree", "analysis", "selector", "example"]
+    },
+    {
+      "id": "android-ui-node-tap-dry-run",
+      "title": "Android UI Node Tap Dry Run",
+      "path": "libs/actuators/android-actuator/examples/android-ui-node-tap-dry-run.json",
+      "description": "Resolves the center coordinates of a matched UI node and prepares a tap target without requiring adb.",
+      "tags": ["android", "ui-tree", "tap", "selector", "dry-run", "example"]
+    },
+    {
+      "id": "android-ui-node-input-dry-run",
+      "title": "Android UI Node Input Dry Run",
+      "path": "libs/actuators/android-actuator/examples/android-ui-node-input-dry-run.json",
+      "description": "Resolves an editable UI node and prepares a text input action without requiring adb.",
+      "tags": ["android", "ui-tree", "input", "selector", "dry-run", "example"]
+    },
+    {
+      "id": "android-ui-node-wait-selector-template",
+      "title": "Android UI Node Wait Selector Template",
+      "path": "libs/actuators/android-actuator/examples/android-ui-node-wait-selector-template.json",
+      "description": "Waits for a node by selector and then taps it on a connected Android device or emulator.",
+      "tags": ["android", "wait", "selector", "tap", "template"]
+    },
+    {
+      "id": "android-login-form-dry-run",
+      "title": "Android Login Form Dry Run",
+      "path": "libs/actuators/android-actuator/examples/android-login-form-dry-run.json",
+      "description": "Builds a high-level login plan by resolving email, password, and submit controls from a UI tree.",
+      "tags": ["android", "login", "form", "selector", "dry-run", "example"]
+    },
+    {
+      "id": "android-passkey-auth-dry-run",
+      "title": "Android Passkey Auth Dry Run",
+      "path": "libs/actuators/android-actuator/examples/android-passkey-auth-dry-run.json",
+      "description": "Builds a high-level passkey authentication trigger plan from a UI tree without requiring adb.",
+      "tags": ["android", "passkey", "auth", "selector", "dry-run", "example"]
+    },
+    {
+      "id": "android-login-passkey-flow-dry-run",
+      "title": "Android Login Passkey Flow Dry Run",
+      "path": "libs/actuators/android-actuator/examples/android-login-passkey-flow-dry-run.json",
+      "description": "Validates the full login plus passkey flow contract from a saved UI tree without requiring adb.",
+      "tags": ["android", "login", "passkey", "flow", "dry-run", "example"]
+    },
+    {
+      "id": "android-login-passkey-flow-template",
+      "title": "Android Login Passkey Flow Template",
+      "path": "libs/actuators/android-actuator/examples/android-login-passkey-flow-template.json",
+      "description": "Launches an Android app, waits for login controls, fills credentials, triggers passkey auth, and captures a screenshot.",
+      "tags": ["android", "login", "passkey", "flow", "template"]
+    },
+    {
+      "id": "android-webview-session-handoff",
+      "title": "Android WebView Session Handoff",
+      "path": "libs/actuators/android-actuator/examples/android-webview-session-handoff.json",
+      "description": "Builds a governed session handoff artifact for moving authenticated Android app state into a browser/webview context.",
+      "tags": ["android", "webview", "session-handoff", "auth", "example"]
+    },
+    {
+      "id": "android-runtime-webview-handoff-template",
+      "title": "Android Runtime WebView Handoff Template",
+      "path": "libs/actuators/android-actuator/examples/android-runtime-webview-handoff-template.json",
+      "description": "Pulls a runtime-exported WebView session handoff artifact from an Android device and records foreground activity state.",
+      "tags": ["android", "webview", "runtime-export", "session-handoff", "template"]
+    }
+  ]
+}

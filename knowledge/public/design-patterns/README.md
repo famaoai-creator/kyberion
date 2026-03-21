@@ -70,6 +70,7 @@ design-patterns/
   infographic/    # 図解・フロー可視化パターン
   media-templates/
     themes.json   # カラーパレット・フォント・ブランドアセット定義
+    excel-sheet-themes.json # Excel workbook / sheet UX の共通規律
 ```
 
 ## Transform Operations
@@ -90,6 +91,14 @@ design-patterns/
 - `executive-neutral`: 白背景ベースの意思決定資料向け
 - `forest-briefing`: ロードマップや運用報告向け
 - `sunrise-report`: 明るめのレポート・要約資料向け
+
+## Excel Sheet Themes
+
+Excel 系は `themes.json` だけでは足りず、`sheet UX` の規律も別に持つ。
+
+- `executive-sheet`: 上部 KPI 帯を持つ意思決定用 workbook
+- `operator-tracker`: 更新頻度が高い WBS / RAID 向け
+- `print-layout-sheet`: 配布・印刷前提の座席表向け
 
 ---
 *Status: Managed under MISSION-DESIGN-PATTERNS*

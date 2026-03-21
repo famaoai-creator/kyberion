@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Operator Interaction Packet",
+  "type": "object",
+  "required": ["kind", "interaction_type", "headline", "summary"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["operator-interaction-packet"]
+    },
+    "interaction_type": {
+      "type": "string",
+      "enum": ["clarification", "execution-preview", "status-summary", "delivery-summary"]
+    },
+    "headline": { "type": "string" },
+    "summary": { "type": "string" },
+    "readiness": { "type": "string" },
+    "confidence": { "type": "number" },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "question": { "type": "string" },
+          "reason": { "type": "string" },
+          "default_assumption": { "type": "string" },
+          "impact": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "action"],
+        "properties": {
+          "id": { "type": "string" },
+          "action": { "type": "string" },
+          "reason": { "type": "string" },
+          "priority": {
+            "type": "string",
+            "enum": ["now", "next", "later"]
+          },
+          "suggested_command": { "type": "string" },
+          "suggested_pipeline_path": { "type": "string" },
+          "suggested_followup_request": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "suggested_response_style": {
+      "type": "string",
+      "enum": ["clarify-first", "preview-and-confirm", "status-summary"]
+    },
+    "refresh_command": { "type": "string" },
+    "refresh_packet_path": { "type": "string" },
+    "llm_touchpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage", "purpose", "output_contract"],
+        "properties": {
+          "stage": { "type": "string" },
+          "purpose": { "type": "string" },
+          "output_contract": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

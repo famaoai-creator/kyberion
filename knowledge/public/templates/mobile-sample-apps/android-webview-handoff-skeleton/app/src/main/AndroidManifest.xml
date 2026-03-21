@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".ExampleApplication"
+        android:allowBackup="false"
+        android:label="Example Mobile">
+        <activity
+            android:name=".WebViewLoginActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".handoff.DebugHandoffReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.kyberion.debug.EXPORT_WEBVIEW_SESSION" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

@@ -1,0 +1,12 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "adb_health_check",
+      "params": {
+        "export_as": "android_health"
+      }
+    }
+  ]
+}

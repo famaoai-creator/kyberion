@@ -1,0 +1,134 @@
+{
+  "concept": "project-operating-system",
+  "layers": [
+    {
+      "id": "why",
+      "name": "Why",
+      "artifacts": [
+        "project-charter",
+        "business-impact-analysis",
+        "stakeholder-communication-register"
+      ]
+    },
+    {
+      "id": "what",
+      "name": "What",
+      "artifacts": [
+        "requirements-definition",
+        "slo-sli-definition",
+        "information-asset-registry"
+      ]
+    },
+    {
+      "id": "how",
+      "name": "How",
+      "artifacts": [
+        "basic-design",
+        "architecture-design",
+        "detailed-design",
+        "operational-design",
+        "data-flow-lifecycle-map",
+        "operation-runbook",
+        "environment-setup-guide"
+      ]
+    },
+    {
+      "id": "control",
+      "name": "Control",
+      "artifacts": [
+        "project-management-plan",
+        "mission-ledger",
+        "raid-log",
+        "issue-log",
+        "change-control-ledger",
+        "gate-review-packet"
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "Evidence",
+      "artifacts": [
+        "test-plan",
+        "test-validation-report",
+        "security-audit-report",
+        "incident-report",
+        "mission-closure-report"
+      ]
+    }
+  ],
+  "lifecycle": [
+    {
+      "phase": "initiate",
+      "required": [
+        "project-charter",
+        "business-impact-analysis",
+        "stakeholder-communication-register"
+      ]
+    },
+    {
+      "phase": "define",
+      "required": [
+        "requirements-definition",
+        "slo-sli-definition",
+        "information-asset-registry"
+      ]
+    },
+    {
+      "phase": "design",
+      "required": [
+        "basic-design",
+        "architecture-design",
+        "detailed-design",
+        "operational-design",
+        "data-flow-lifecycle-map",
+        "operation-runbook"
+      ]
+    },
+    {
+      "phase": "build",
+      "required": [
+        "project-management-plan",
+        "mission-ledger",
+        "raid-log",
+        "issue-log",
+        "change-control-ledger"
+      ]
+    },
+    {
+      "phase": "validate",
+      "required": [
+        "test-plan",
+        "test-validation-report",
+        "security-audit-report",
+        "gate-review-packet"
+      ]
+    },
+    {
+      "phase": "transfer_run",
+      "required": [
+        "cutover-migration-plan",
+        "operation-runbook",
+        "user-manual-faq",
+        "incident-report",
+        "mission-closure-report"
+      ]
+    }
+  ],
+  "dependencies": [
+    ["project-charter", "requirements-definition"],
+    ["requirements-definition", "architecture-design"],
+    ["requirements-definition", "basic-design"],
+    ["basic-design", "detailed-design"],
+    ["architecture-design", "detailed-design"],
+    ["detailed-design", "operational-design"],
+    ["requirements-definition", "test-plan"],
+    ["test-plan", "test-validation-report"],
+    ["detailed-design", "test-validation-report"],
+    ["project-management-plan", "mission-ledger"],
+    ["mission-ledger", "gate-review-packet"],
+    ["project-management-plan", "gate-review-packet"],
+    ["test-validation-report", "gate-review-packet"],
+    ["gate-review-packet", "cutover-migration-plan"],
+    ["gate-review-packet", "mission-closure-report"]
+  ]
+}

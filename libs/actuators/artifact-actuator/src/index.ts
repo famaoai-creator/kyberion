@@ -14,12 +14,29 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface ArtifactAction {
-  action: 'write_json' | 'append_event' | 'read_json' | 'list' | 'ensure_dir';
+  action: 'write_json' | 'append_event' | 'read_json' | 'list' | 'ensure_dir' | 'write_delivery_pack';
   params: {
     role?: GovernedArtifactRole;
     logicalPath?: string;
     logicalDir?: string;
     value?: unknown;
+    packId?: string;
+    summary?: string;
+    requestText?: string;
+    mainArtifactId?: string;
+    conversationSummary?: string;
+    recommendedNextAction?: string;
+    artifactsByRole?: {
+      primary?: string[];
+      specification?: string[];
+      evidence?: string[];
+    };
+    artifacts?: Array<{
+      id: string;
+      kind: string;
+      path: string;
+      description?: string;
+    }>;
   };
 }
 
@@ -57,6 +74,29 @@ export async function handleAction(input: ArtifactAction) {
         status: 'ensured',
         path: ensureGovernedArtifactDir(role, input.params.logicalDir),
       };
+    case 'write_delivery_pack': {
+      if (!input.params.logicalDir) throw new Error('logicalDir is required');
+      const dir = ensureGovernedArtifactDir(role, input.params.logicalDir);
+      const packId = input.params.packId || `delivery-pack-${Date.now()}`;
+      const logicalPath = path.join(input.params.logicalDir, `${packId}.json`);
+      const payload = {
+        kind: 'delivery-pack',
+        pack_id: packId,
+        summary: input.params.summary || 'Governed delivery pack',
+        main_artifact_id: input.params.mainArtifactId || '',
+        request_text: input.params.requestText || '',
+        conversation_summary: input.params.conversationSummary || '',
+        recommended_next_action: input.params.recommendedNextAction || '',
+        artifacts_by_role: input.params.artifactsByRole || {},
+        artifacts: Array.isArray(input.params.artifacts) ? input.params.artifacts : [],
+      };
+      return {
+        status: 'written',
+        dir,
+        path: writeGovernedArtifactJson(role, logicalPath, payload),
+        value: payload,
+      };
+    }
     default:
       throw new Error(`Unsupported artifact action: ${input.action}`);
   }

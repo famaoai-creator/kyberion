@@ -1,0 +1,19 @@
+{
+  "actuator": "modeling-actuator",
+  "examples": [
+    {
+      "id": "web-profile-to-ui-flow",
+      "title": "Web Profile To UI Flow ADF",
+      "path": "libs/actuators/modeling-actuator/examples/web-profile-to-ui-flow.json",
+      "description": "Transforms a shared Web app profile into a minimal UI Flow ADF and test inventory.",
+      "tags": ["web", "ui-flow", "test-design", "adf", "example"]
+    },
+    {
+      "id": "web-profile-to-browser-plan",
+      "title": "Web Profile To Browser Execution Plan",
+      "path": "libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json",
+      "description": "Transforms a shared Web app profile into UI flow, test inventory, and a Browser-Actuator execution pipeline.",
+      "tags": ["web", "ui-flow", "test-design", "browser", "execution-plan", "example"]
+    }
+  ]
+}

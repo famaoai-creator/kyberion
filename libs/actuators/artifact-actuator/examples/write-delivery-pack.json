@@ -1,0 +1,24 @@
+{
+  "action": "write_delivery_pack",
+  "params": {
+    "role": "mission_controller",
+    "logicalDir": "active/shared/runtime/delivery-packs/demo",
+    "packId": "demo-web-delivery-pack",
+    "summary": "Demo delivery pack for a governed web design-clone request.",
+    "requestText": "このWebアプリのデザインを踏襲して、こういったコンセプトのwebサイトを作成して。設計書とテスト結果も出して。",
+    "artifacts": [
+      {
+        "id": "execution-brief",
+        "kind": "actuator-execution-brief",
+        "path": "active/shared/tmp/orchestrator/request-to-resolution-plan.context.json",
+        "description": "Normalized execution brief and missing input analysis."
+      },
+      {
+        "id": "resolution-plan",
+        "kind": "actuator-resolution-plan",
+        "path": "active/shared/tmp/orchestrator/request-resolution-plan.json",
+        "description": "Resolved actuator phases and deliverables."
+      }
+    ]
+  }
+}

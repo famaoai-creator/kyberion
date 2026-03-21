@@ -143,15 +143,7 @@ const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/brow
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
-const PASSKEY_SITE_PRESETS = {
-  'webauthn.io': {
-    baseUrl: 'https://webauthn.io/',
-    usernameSelector: '#input-email',
-    registerSelector: '#register-button',
-    authenticateSelector: '#login-button',
-    postAuthUrlIncludes: '/profile',
-  },
-} as const;
+const PASSKEY_PROVIDER_CATALOG_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/browser-passkey-providers.json');
 
 /**
  * Main Entry Point
@@ -570,6 +562,31 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         op: 'passkey_events',
         tab_id: runtime.activeTabId,
       });
+    case 'export_session_handoff': {
+      const targetUrl = String(resolve(params.target_url || page.url())).trim();
+      const origin = deriveOrigin(targetUrl || page.url());
+      const handoff = await buildSessionHandoff(page, runtime, ctx, {
+        targetUrl,
+        origin,
+        browserSessionId: resolve(params.browser_session_id || ctx.session_id || 'default'),
+        preferPersistentContext: params.prefer_persistent_context !== false,
+      });
+      const outPath = params.path ? path.resolve(process.cwd(), resolve(params.path)) : undefined;
+      if (outPath) {
+        if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+        safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
+      }
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'session_handoff']: handoff,
+        ...(outPath ? { session_handoff_path: outPath } : {}),
+      }, {
+        kind: 'capture',
+        op: 'export_session_handoff',
+        tab_id: runtime.activeTabId,
+        url: targetUrl,
+      });
+    }
     default: 
       throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
@@ -751,8 +768,105 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
         tab_id: runtime.activeTabId,
       });
     }
+    case 'import_session_handoff': {
+      const handoff = await resolveSessionHandoff(params, ctx, resolve);
+      if (Array.isArray(handoff.cookies) && handoff.cookies.length > 0) {
+        await runtime.context.addCookies(handoff.cookies as any);
+      }
+      if (handoff.headers && Object.keys(handoff.headers).length > 0) {
+        await runtime.context.setExtraHTTPHeaders(handoff.headers as Record<string, string>);
+      }
+      const targetUrl = String(handoff.target_url || resolve(params.target_url || '')).trim();
+      if (!targetUrl) throw new Error('import_session_handoff requires a target_url');
+      await page.goto(targetUrl, { waitUntil: params.waitUntil || 'domcontentloaded' });
+      if ((handoff.local_storage && Object.keys(handoff.local_storage).length > 0) || (handoff.session_storage && Object.keys(handoff.session_storage).length > 0)) {
+        await page.evaluate(({ localStorageEntries, sessionStorageEntries }) => {
+          for (const [key, value] of Object.entries(localStorageEntries || {})) {
+            window.localStorage.setItem(key, String(value));
+          }
+          for (const [key, value] of Object.entries(sessionStorageEntries || {})) {
+            window.sessionStorage.setItem(key, String(value));
+          }
+        }, {
+          localStorageEntries: handoff.local_storage || {},
+          sessionStorageEntries: handoff.session_storage || {},
+        });
+        if (params.reload_after_import !== false) {
+          await page.reload({ waitUntil: params.waitUntil || 'domcontentloaded' });
+        }
+      }
+      return recordBrowserAction({
+        ...ctx,
+        [params.export_as || 'imported_session_handoff']: handoff,
+        last_url: page.url(),
+      }, {
+        kind: 'apply',
+        op: 'import_session_handoff',
+        tab_id: runtime.activeTabId,
+        url: targetUrl,
+      });
+    }
     default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
+  }
+}
+
+async function buildSessionHandoff(
+  page: Page,
+  runtime: BrowserRuntime,
+  ctx: any,
+  options: {
+    targetUrl: string;
+    origin: string;
+    browserSessionId: string;
+    preferPersistentContext: boolean;
+  },
+) {
+  const storage = await page.evaluate(() => ({
+    local_storage: Object.fromEntries(Object.entries(window.localStorage)),
+    session_storage: Object.fromEntries(Object.entries(window.sessionStorage)),
+  }));
+  const cookies = await runtime.context.cookies([options.targetUrl]);
+  return {
+    kind: 'webview-session-handoff',
+    target_url: options.targetUrl,
+    origin: options.origin,
+    browser_session_id: options.browserSessionId,
+    prefer_persistent_context: options.preferPersistentContext,
+    cookies,
+    local_storage: storage.local_storage,
+    session_storage: storage.session_storage,
+    source: {
+      platform: 'browser',
+      app_id: ctx?.app_profile?.app_id || ctx?.app_id || ctx?.session_id || 'browser',
+    },
+  };
+}
+
+async function resolveSessionHandoff(params: any, ctx: any, resolve: Function): Promise<any> {
+  if (params.from) {
+    const fromValue = ctx[String(params.from)];
+    if (fromValue && typeof fromValue === 'object') return fromValue;
+  }
+
+  if (params.path) {
+    const filePath = path.resolve(process.cwd(), resolve(params.path));
+    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    return JSON.parse(content);
+  }
+
+  if (params.handoff && typeof params.handoff === 'object') {
+    return params.handoff;
+  }
+
+  throw new Error('import_session_handoff requires params.from, params.path, or params.handoff');
+}
+
+function deriveOrigin(targetUrl: string): string {
+  try {
+    return new URL(targetUrl).origin;
+  } catch {
+    return '';
   }
 }
 
@@ -1305,12 +1419,35 @@ function upsertPasskeyCredential(
 }
 
 function getPasskeyPreset(provider?: string) {
-  const presetKey = provider || 'webauthn.io';
-  const preset = PASSKEY_SITE_PRESETS[presetKey as keyof typeof PASSKEY_SITE_PRESETS];
+  const catalog = loadPasskeyProviderCatalog();
+  const presetKey = provider || catalog.default_provider || 'webauthn.io';
+  const preset = catalog.providers?.[presetKey];
   if (!preset) {
     throw new Error(`Unsupported passkey provider: ${presetKey}`);
   }
   return preset;
+}
+
+function loadPasskeyProviderCatalog(): { default_provider?: string; providers: Record<string, any> } {
+  if (safeExistsSync(PASSKEY_PROVIDER_CATALOG_PATH)) {
+    try {
+      const parsed = JSON.parse(safeReadFile(PASSKEY_PROVIDER_CATALOG_PATH, { encoding: 'utf8' }) as string);
+      if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
+    } catch (_) {}
+  }
+
+  return {
+    default_provider: 'webauthn.io',
+    providers: {
+      'webauthn.io': {
+        baseUrl: 'https://webauthn.io/',
+        usernameSelector: '#input-email',
+        registerSelector: '#register-button',
+        authenticateSelector: '#login-button',
+        postAuthUrlIncludes: '/profile',
+      },
+    },
+  };
 }
 
 async function registerPasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {

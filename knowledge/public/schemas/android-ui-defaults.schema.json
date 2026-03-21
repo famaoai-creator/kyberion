@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Android UI Defaults",
+  "type": "object",
+  "required": ["login", "passkey"],
+  "properties": {
+    "login": {
+      "type": "object",
+      "required": ["email", "password", "submit"],
+      "properties": {
+        "email": { "$ref": "#/definitions/nodeSelector" },
+        "password": { "$ref": "#/definitions/nodeSelector" },
+        "submit": { "$ref": "#/definitions/nodeSelector" }
+      },
+      "additionalProperties": false
+    },
+    "passkey": {
+      "type": "object",
+      "required": ["trigger"],
+      "properties": {
+        "trigger": { "$ref": "#/definitions/nodeSelector" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "nodeSelector": {
+      "type": "object",
+      "properties": {
+        "resource_id": { "type": "string" },
+        "class_name": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

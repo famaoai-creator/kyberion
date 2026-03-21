@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Test Case ADF",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "app_id", "cases"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["test-case-adf"]
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "title", "objective", "steps", "expected"],
+        "properties": {
+          "case_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "objective": { "type": "string", "minLength": 1 },
+          "steps": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "expected": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "automation_backend": {
+            "type": "string",
+            "enum": ["browser", "android", "ios"]
+          }
+        }
+      }
+    }
+  }
+}

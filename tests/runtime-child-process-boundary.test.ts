@@ -18,7 +18,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/doctor_core.ts',
   'libs/actuators/browser-actuator/src/index.ts',
   'libs/actuators/code-actuator/src/index.ts',
-  'libs/actuators/media-actuator/src/index.ts',
   'libs/actuators/modeling-actuator/src/index.ts',
   'libs/actuators/orchestrator-actuator/src/index.ts',
   'libs/actuators/system-actuator/src/index.ts',
@@ -37,6 +36,7 @@ describe('Runtime child_process boundary', () => {
     const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
+      .filter((relPath) => !relPath.endsWith('.d.ts'))
       .filter((relPath) => !relPath.startsWith('tests/'))
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/dist/'))

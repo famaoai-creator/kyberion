@@ -1,0 +1,67 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/media/pptx-master-theme-extract.context.json"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "sunrise-report"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx",
+        "content_data": [
+          {
+            "title": "Board Update: Actuator Improvement",
+            "body": [
+              "Passkey support and example discovery are now available.",
+              "Media-Actuator gained Mermaid, D2, and local Draw.io generation.",
+              "Next focus is production-grade templates and operator-facing catalogs."
+            ],
+            "visual": "Mission status strip"
+          },
+          {
+            "title": "Design Language Seed",
+            "body": [
+              "Warm accent palette for executive reporting.",
+              "Aptos heading/body pairing with a light narrative background.",
+              "Master placeholders will be distilled and reused downstream."
+            ],
+            "visual": "Theme extraction candidate"
+          }
+        ]
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/pptx-master-theme-source.pptx"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "pptx_extract",
+      "params": {
+        "path": "active/shared/tmp/media/pptx-master-theme-source.pptx",
+        "export_as": "source_pptx_design"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "theme_from_pptx_design",
+      "params": {
+        "from": "source_pptx_design",
+        "name": "sunrise-report-derived",
+        "export_as": "derived_theme",
+        "export_master_as": "derived_master"
+      }
+    }
+  ]
+}

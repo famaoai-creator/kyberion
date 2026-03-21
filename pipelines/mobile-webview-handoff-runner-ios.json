@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "name": "mobile-webview-handoff-runner-ios",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "iOS handoff capture template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run ios-actuator -- --input libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Browser handoff import template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json"
+      }
+    }
+  ]
+}

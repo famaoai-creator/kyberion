@@ -28,6 +28,7 @@ interface ServiceAction {
 
 const PID_FILE = path.join(process.cwd(), 'active/shared/services-pids.json');
 const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
+const SERVICE_ENDPOINTS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json');
 
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
@@ -63,6 +64,22 @@ function emitRecoveryStimulus(serviceId: string) {
     control: { status: 'pending', feedback: 'auto', evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }] }
   };
   safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+}
+
+function resolveServiceBaseUrl(serviceId: string): string {
+  if (safeExistsSync(SERVICE_ENDPOINTS_PATH)) {
+    try {
+      const catalog = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
+      const baseUrl = catalog?.services?.[serviceId]?.base_url;
+      if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
+      const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
+      if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
+    } catch (_) {}
+  }
+
+  if (serviceId === 'moltbook') return 'https://www.moltbook.com/api/v1';
+  if (serviceId === 'slack') return 'https://slack.com/api';
+  return `https://api.${serviceId}.com/v1`;
 }
 
 function registerServiceRuntime(serviceId: string, pid: number | undefined, manifestPath?: string) {
@@ -236,14 +253,7 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       throw new Error(`Streaming not implemented for ${input.service_id}`);
 
     case 'API':
-      let baseUrl: string;
-      if (input.service_id === 'moltbook') {
-        baseUrl = 'https://www.moltbook.com/api/v1';
-      } else if (input.service_id === 'slack') {
-        baseUrl = 'https://slack.com/api';
-      } else {
-        baseUrl = `https://api.${input.service_id}.com/v1`;
-      }
+      const baseUrl = resolveServiceBaseUrl(input.service_id);
 
       const httpMethod = input.method || (input.params ? 'POST' : 'GET');
       return await secureFetch({

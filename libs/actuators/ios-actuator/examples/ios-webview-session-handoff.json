@@ -1,0 +1,46 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/ios/ios-webview-session-handoff.context.json",
+    "cookies_seed": [
+      {
+        "name": "session",
+        "value": "ios-demo-session",
+        "domain": "example.iosmobile.app",
+        "path": "/",
+        "httpOnly": false,
+        "secure": true
+      }
+    ],
+    "local_storage_seed": {
+      "auth_token": "ios-demo-token",
+      "user_id": "operator-001"
+    },
+    "session_storage_seed": {
+      "handoff_nonce": "ios-nonce-001"
+    }
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
+        "export_as": "app_profile",
+        "validate_as": "mobile-app-profile"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "emit_session_handoff",
+      "params": {
+        "app_profile_from": "app_profile",
+        "cookies_from": "cookies_seed",
+        "local_storage_from": "local_storage_seed",
+        "session_storage_from": "session_storage_seed",
+        "path": "active/shared/tmp/ios/ios-webview-session-handoff.json",
+        "export_as": "webview_handoff"
+      }
+    }
+  ]
+}

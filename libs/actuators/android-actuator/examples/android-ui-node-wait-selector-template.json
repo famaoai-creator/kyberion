@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "options": {
+    "timeout_ms": 12000
+  },
+  "context": {
+    "context_path": "active/shared/tmp/android/android-ui-node-wait-selector-template.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "adb_health_check",
+      "params": {
+        "export_as": "android_health"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "wait_for_ui_node",
+      "params": {
+        "resource_id": "passkey",
+        "class_name": "Button",
+        "clickable": true,
+        "timeout_ms": 8000,
+        "interval_ms": 1000,
+        "export_as": "waited_passkey_node"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "tap_ui_node",
+      "params": {
+        "from": "waited_passkey_node"
+      }
+    }
+  ]
+}

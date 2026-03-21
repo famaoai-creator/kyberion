@@ -60,6 +60,15 @@ interface MissionState {
     prerequisites?: string[];
     successors?: string[];
     blockers?: string[];
+    project?: {
+      project_id?: string;
+      project_path?: string;
+      relationship_type: 'belongs_to' | 'supports' | 'governs' | 'independent';
+      affected_artifacts?: string[];
+      gate_impact?: 'none' | 'informational' | 'review_required' | 'blocking';
+      traceability_refs?: string[];
+      note?: string;
+    };
   };
   delegation?: {
     agent_id: string;
@@ -81,6 +90,74 @@ interface MissionState {
   history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
 }
 
+type MissionRelationships = NonNullable<MissionState['relationships']>;
+
+function getOptionValue(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return undefined;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith('--')) return undefined;
+  return value;
+}
+
+function parseCsvOption(flag: string): string[] | undefined {
+  const raw = getOptionValue(flag);
+  if (!raw) return undefined;
+  return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
+  const projectId = getOptionValue('--project-id');
+  const projectPath = getOptionValue('--project-path');
+  const relationshipType = getOptionValue('--project-relationship') as MissionRelationships['project'] extends infer T
+    ? T extends { relationship_type: infer R } ? R : never
+    : never;
+  const affectedArtifacts = parseCsvOption('--affected-artifacts');
+  const traceabilityRefs = parseCsvOption('--traceability-refs');
+  const gateImpact = getOptionValue('--gate-impact') as MissionRelationships['project'] extends infer T
+    ? T extends { gate_impact: infer G } ? G : never
+    : never;
+  const note = getOptionValue('--project-note');
+
+  const hasProjectOptions = Boolean(
+    projectId || projectPath || relationshipType || affectedArtifacts?.length || traceabilityRefs?.length || gateImpact || note
+  );
+
+  if (!hasProjectOptions) {
+    return {};
+  }
+
+  return {
+    project: {
+      relationship_type: relationshipType || 'independent',
+      project_id: projectId,
+      project_path: projectPath,
+      affected_artifacts: affectedArtifacts || [],
+      gate_impact: gateImpact || 'none',
+      traceability_refs: traceabilityRefs || [],
+      note,
+    },
+  };
+}
+
+function normalizeRelationships(input: any = {}, overlays: Partial<MissionRelationships> = {}): MissionRelationships {
+  const relationships: MissionRelationships = { ...(input || {}) };
+
+  if (overlays.project) {
+    relationships.project = {
+      relationship_type: overlays.project.relationship_type || relationships.project?.relationship_type || 'independent',
+      project_id: overlays.project.project_id || relationships.project?.project_id,
+      project_path: overlays.project.project_path || relationships.project?.project_path,
+      affected_artifacts: overlays.project.affected_artifacts || relationships.project?.affected_artifacts || [],
+      gate_impact: overlays.project.gate_impact || relationships.project?.gate_impact || 'none',
+      traceability_refs: overlays.project.traceability_refs || relationships.project?.traceability_refs || [],
+      note: overlays.project.note || relationships.project?.note,
+    };
+  }
+
+  return relationships;
+}
+
 function readFocusedMissionId(): string | null {
   if (!safeExistsSync(MISSION_FOCUS_PATH)) return null;
   try {
@@ -97,6 +174,64 @@ function writeFocusedMissionId(missionId: string): void {
     mission_id: missionId.toUpperCase(),
     ts: new Date().toISOString(),
   }, null, 2));
+}
+
+function resolveProjectLedgerPath(projectPath: string): string {
+  const resolved = pathResolver.rootResolve(projectPath);
+  if (resolved.endsWith('.md')) return resolved;
+  return path.join(resolved, '04_control', 'mission-ledger.md');
+}
+
+function resolveProjectLedgerJsonPath(projectPath: string): string {
+  const resolved = pathResolver.rootResolve(projectPath);
+  if (resolved.endsWith('.json')) return resolved;
+  if (resolved.endsWith('.md')) return resolved.replace(/\.md$/i, '.json');
+  return path.join(resolved, '04_control', 'mission-ledger.json');
+}
+
+function ensureProjectMissionLedgerExists(ledgerPath: string): void {
+  if (safeExistsSync(ledgerPath)) return;
+  const blueprintPath = pathResolver.knowledge('public/templates/blueprints/mission-ledger.md');
+  const ledgerDir = path.dirname(ledgerPath);
+  if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
+  const blueprint = safeReadFile(blueprintPath, { encoding: 'utf8' }) as string;
+  safeWriteFile(ledgerPath, blueprint);
+}
+
+function escapeTableCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+}
+
+function upsertMissionLedgerRow(content: string, row: string, missionId: string): string {
+  const lines = content.split('\n');
+  const headerIndex = lines.findIndex((line) => line.includes('| Mission ID | Relationship | Status | Summary |'));
+  if (headerIndex === -1) {
+    return `${content.trimEnd()}\n\n## Mission Ledger\n\n| Mission ID | Relationship | Status | Summary | Affected Artifacts | Gate Impact | Traceability Refs |\n|---|---|---|---|---|---|---|\n${row}\n`;
+  }
+
+  let tableEnd = headerIndex + 2;
+  while (tableEnd < lines.length && lines[tableEnd].trim().startsWith('|')) {
+    tableEnd += 1;
+  }
+
+  const tableRows = lines.slice(headerIndex + 2, tableEnd);
+  const filteredRows = tableRows.filter((line) => !line.startsWith(`| ${missionId} |`));
+  filteredRows.push(row);
+  const nextLines = [
+    ...lines.slice(0, headerIndex + 2),
+    ...filteredRows,
+    ...lines.slice(tableEnd),
+  ];
+  return `${nextLines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
+}
+
+function readJsonFileSafe(filePath: string): any | null {
+  if (!safeExistsSync(filePath)) return null;
+  try {
+    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  } catch (_) {
+    return null;
+  }
 }
 
 /**
@@ -277,6 +412,7 @@ function recordAgentRuntimeEvent(event: Record<string, unknown>): void {
 
 async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
   const upperId = id.toUpperCase();
+  const normalizedRelationships = normalizeRelationships(relationships);
   const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
   const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
   const template = templates.find((t: any) => t.name === missionType) || templates[0];
@@ -342,7 +478,7 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
     tier: finalTier,
     status: 'planned',
     execution_mode: 'local',
-    relationships: relationships,
+    relationships: normalizedRelationships,
     priority: 3,
     assigned_persona: persona,
     confidence_score: 1.0,
@@ -417,6 +553,7 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
   }
   checkPrerequisites();
   const upperId = id.toUpperCase();
+  const normalizedRelationships = normalizeRelationships(relationships);
   
   // Try to find existing mission first
   let state = loadState(upperId);
@@ -425,7 +562,7 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
   // Check Dependencies unless forced
   const force = process.argv.includes('--force');
   if (!force) {
-    const prereqs = state?.relationships?.prerequisites || relationships?.prerequisites;
+    const prereqs = state?.relationships?.prerequisites || normalizedRelationships?.prerequisites;
     if (prereqs) {
       const missing: string[] = [];
       for (const pre of prereqs) {
@@ -446,7 +583,7 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
   
   try {
     if (!state) {
-      await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona, relationships);
+      await createMission(upperId, finalTier, tenantId, missionType, visionRef, persona, normalizedRelationships);
       state = loadState(upperId);
       if (state) {
         state.status = transitionStatus(state.status, 'active');
@@ -454,6 +591,15 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
         await saveState(upperId, state);
       }
     } else {
+      if (normalizedRelationships.project) {
+        state.relationships = {
+          ...(state.relationships || {}),
+          project: {
+            ...(state.relationships?.project || {}),
+            ...normalizedRelationships.project,
+          },
+        };
+      }
       state.status = transitionStatus(state.status, 'active');
       state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Mission resumed.' });
       await saveState(upperId, state);
@@ -478,6 +624,80 @@ async function startMission(id: string, tier: 'personal' | 'confidential' | 'pub
     logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
   } catch (err: any) {
     logger.error(`Failed to start mission: ${err.message}`);
+  }
+}
+
+async function syncProjectLedger(id: string) {
+  if (!id) {
+    logger.error('Usage: mission_controller sync-project-ledger <MISSION_ID>');
+    return;
+  }
+
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+
+  const project = state.relationships?.project;
+  if (!project?.project_path) {
+    logger.error(`Mission ${upperId} has no relationships.project.project_path.`);
+    return;
+  }
+
+  const ledgerPath = resolveProjectLedgerPath(project.project_path);
+  const ledgerJsonPath = resolveProjectLedgerJsonPath(project.project_path);
+  ensureProjectMissionLedgerExists(ledgerPath);
+  const ledgerDir = path.dirname(ledgerJsonPath);
+  if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
+
+  const summary = escapeTableCell(project.note || `${state.mission_type || 'mission'} / ${state.assigned_persona}`);
+  const artifacts = escapeTableCell((project.affected_artifacts || []).join(', '));
+  const traceability = escapeTableCell((project.traceability_refs || []).join(', '));
+  const row = `| ${upperId} | ${project.relationship_type} | ${state.status} | ${summary} | ${artifacts} | ${project.gate_impact || 'none'} | ${traceability} |`;
+
+  const current = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+  const updated = upsertMissionLedgerRow(current, row, upperId);
+  safeWriteFile(ledgerPath, updated);
+
+  const projectId = project.project_id || path.basename(path.dirname(path.dirname(ledgerJsonPath)));
+  const jsonLedger = readJsonFileSafe(ledgerJsonPath) || {
+    project_id: projectId,
+    project_name: projectId,
+    entries: [],
+  };
+  jsonLedger.project_id = jsonLedger.project_id || projectId;
+  jsonLedger.project_name = jsonLedger.project_name || projectId;
+  const nextEntry = {
+    mission_id: upperId,
+    relationship_type: project.relationship_type,
+    status: state.status,
+    summary: project.note || `${state.mission_type || 'mission'} / ${state.assigned_persona}`,
+    affected_artifacts: project.affected_artifacts || [],
+    gate_impact: project.gate_impact || 'none',
+    traceability_refs: project.traceability_refs || [],
+    owner: state.assigned_persona,
+    last_updated: new Date().toISOString(),
+  };
+  jsonLedger.entries = Array.isArray(jsonLedger.entries) ? jsonLedger.entries : [];
+  jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
+  jsonLedger.entries.push(nextEntry);
+  safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+
+  logger.success(`🔗 Synced mission ${upperId} into project ledger: ${path.relative(ROOT_DIR, ledgerPath)} (+ ${path.relative(ROOT_DIR, ledgerJsonPath)})`);
+}
+
+async function syncProjectLedgerIfLinked(id: string): Promise<void> {
+  const state = loadState(id.toUpperCase());
+  if (!state?.relationships?.project?.project_path) {
+    return;
+  }
+
+  try {
+    await syncProjectLedger(id);
+  } catch (err: any) {
+    logger.warn(`⚠️ Project ledger sync skipped for ${id}: ${err.message}`);
   }
 }
 
@@ -570,6 +790,7 @@ async function delegateMission(id: string, agentId: string, a2aMessageId: string
   });
   
   await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId);
   logger.success(`✅ Mission ${upperId} marked as DELEGATED.`);
 }
 
@@ -618,6 +839,7 @@ async function importMission(id: string, remoteUrl: string) {
     });
     
     await saveState(upperId, state);
+    await syncProjectLedgerIfLinked(upperId);
     logger.success(`✅ Results imported for ${upperId}. Manual/Auto verification required.`);
   } catch (err: any) {
     logger.error(`Import failed: ${err.message}`);
@@ -664,6 +886,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
   });
   
   await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId);
   logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
 }
 
@@ -763,6 +986,7 @@ async function distillMission(id: string) {
   });
 
   await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId);
 
   // 8. Record to ledger
   ledger.record('MISSION_DISTILL', {
@@ -1205,6 +1429,7 @@ async function finishMission(id: string, seal: boolean = false) {
     state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
   }
   await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId);
 
   // 3. Optional Sealing
   if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
@@ -1342,6 +1567,7 @@ async function recordCheckpointForMission(activeMissionId: string, missionPath: 
 
       logger.success(`✅ Recorded checkpoint ${hash} in mission repo${commitCreated ? '' : ' (state-only)'}.`);
     });
+    await syncProjectLedgerIfLinked(activeMissionId);
   } catch (err: any) {
     logger.error(`Checkpoint failed: ${err.message}`);
   }
@@ -1400,6 +1626,7 @@ async function resumeMission(id?: string) {
 
   state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Session re-established.' });
   await saveState(targetId, state);
+  await syncProjectLedgerIfLinked(targetId);
   writeFocusedMissionId(targetId);
   logger.success(`✅ Mission ${targetId} is back in focus.`);
 }
@@ -1584,6 +1811,11 @@ function showMissionStatus(id: string) {
   if (state.relationships?.prerequisites?.length) {
     console.log(`  Prereqs:     ${state.relationships.prerequisites.join(', ')}`);
   }
+  if (state.relationships?.project) {
+    console.log(`  Project:     ${state.relationships.project.project_id || '-'}`);
+    console.log(`  Relation:    ${state.relationships.project.relationship_type}`);
+    console.log(`  Gate Impact: ${state.relationships.project.gate_impact || 'none'}`);
+  }
 
   // Show next valid actions
   const nextActions: Record<string, string> = {
@@ -1639,6 +1871,7 @@ Queue Commands:
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
   status   <ID>                  Show detailed status of a specific mission
+  sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
 
@@ -1649,6 +1882,15 @@ Maintenance Commands:
 
 Typical Workflow:
   start → checkpoint (repeat) → verify → distill → finish
+
+Project Traceability Options:
+  --project-id <ID>              Link mission to a project identifier
+  --project-path <PATH>          Record the related project-os path
+  --project-relationship <TYPE>  belongs_to | supports | governs | independent
+  --affected-artifacts <CSV>     Comma-separated project artifacts impacted by the mission
+  --gate-impact <TYPE>           none | informational | review_required | blocking
+  --traceability-refs <CSV>      Comma-separated evidence or document refs
+  --project-note <TEXT>          Free-text note for the project relationship
 `);
 }
 
@@ -1750,10 +1992,11 @@ async function main() {
   const arg6 = process.argv[8];
   const arg7 = process.argv[9];
   const hasRefresh = process.argv.includes('--refresh');
+  const relationshipOptions = extractProjectRelationshipOptions();
 
   switch (action) {
-    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
-    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, JSON.parse(arg7 || '{}')); break;
+    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
+    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
     case 'checkpoint':
       if (arg3) {
         await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
@@ -1774,6 +2017,7 @@ async function main() {
     case 'purge': await purgeMissions(arg1 !== '--execute'); break;
     case 'list': listMissions(arg1); break;
     case 'status': showMissionStatus(arg1); break;
+    case 'sync-project-ledger': await syncProjectLedger(arg1); break;
     case 'team': showMissionTeam(arg1, hasRefresh); break;
     case 'staff': await staffMissionTeam(arg1); break;
     case 'prewarm': await prewarmMissionTeam(arg1, arg2); break;

@@ -30,6 +30,9 @@ Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 
 | `intelligent-code-review`  | AI-assisted code review pipeline                            |
 | `knowledge-extraction`     | Extract knowledge from codebases and documents              |
 | `living-docs`              | Generate and maintain living documentation                  |
+| `mobile-webview-handoff-runner-android` | Android runtime handoff capture -> browser import orchestration |
+| `mobile-webview-handoff-runner-ios` | iOS runtime handoff capture -> browser import orchestration |
+| `web-session-handoff-runner` | Web runtime handoff export -> import orchestration |
 | `release-pipeline`         | Release preparation (changelog + security + PR)             |
 | `security-audit`           | Standard security scan                                      |
 | `team-onboarding`          | Generate onboarding materials for new team members          |

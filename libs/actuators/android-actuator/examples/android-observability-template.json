@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/android/android-observability.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "adb_health_check",
+      "params": {
+        "export_as": "android_health"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "capture_screen",
+      "params": {
+        "path": "active/shared/tmp/android/android-observability-screen.png"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "extract_ui_tree",
+      "params": {
+        "path": "active/shared/tmp/android/android-observability-ui.xml"
+      }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "default_theme": "operator-tracker",
+  "themes": {
+    "executive-sheet": {
+      "name": "Executive Sheet",
+      "intent": "役員向けのレビュー資料。上部に要約帯を置き、主要指標を先に見せる。",
+      "visual_rules": {
+        "title_band": "濃色背景 + 白文字",
+        "summary_band": "KPIカード風の薄色面",
+        "header_band": "濃色背景 + 中央寄せ",
+        "section_band": "薄いアクセント背景",
+        "body_rows": "白またはごく薄いグレー"
+      },
+      "status_palette": {
+        "good": "#DCFCE7",
+        "watch": "#FEF3C7",
+        "risk": "#FEE2E2",
+        "info": "#DBEAFE"
+      }
+    },
+    "operator-tracker": {
+      "name": "Operator Tracker",
+      "intent": "日次更新向け。凍結、フィルタ、意味色、細い罫線を優先する。",
+      "visual_rules": {
+        "title_band": "ブランド色の濃色帯",
+        "summary_band": "左右2-4枚のKPI帯",
+        "header_band": "黒系背景 + 白文字",
+        "phase_rows": "淡色帯で塊を表現",
+        "task_rows": "白背景、必要に応じて zebra"
+      },
+      "status_palette": {
+        "done": "#DCFCE7",
+        "in_progress": "#DBEAFE",
+        "watch": "#FEF3C7",
+        "blocked": "#FEE2E2"
+      }
+    },
+    "print-layout-sheet": {
+      "name": "Print Layout Sheet",
+      "intent": "印刷配布向け。情報量は抑え、余白とブロック感を優先する。",
+      "visual_rules": {
+        "title_band": "高コントラスト",
+        "summary_band": "簡潔な凡例",
+        "grid_density": "低め",
+        "cell_padding": "高め"
+      },
+      "status_palette": {
+        "primary": "#E2E8F0",
+        "accent": "#DBEAFE",
+        "support": "#EDE9FE",
+        "reserved": "#FFEDD5"
+      }
+    }
+  }
+}

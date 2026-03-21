@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/request-to-resolution-plan.context.json",
+    "request_text": "このWebアプリのデザインを踏襲して、こういったコンセプトのwebサイトを作成して。設計書とテスト結果も出して。"
+  },
+  "steps": [
+    {
+      "type": "transform",
+      "op": "request_to_execution_brief",
+      "params": {
+        "provided_inputs": ["reference source", "new concept", "target environment"],
+        "export_as": "execution_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "execution_brief_to_resolution_plan",
+      "params": {
+        "from": "execution_brief",
+        "export_as": "resolution_plan"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "resolution_plan",
+        "path": "active/shared/tmp/orchestrator/request-resolution-plan.json"
+      }
+    }
+  ]
+}

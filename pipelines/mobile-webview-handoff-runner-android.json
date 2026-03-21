@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "name": "mobile-webview-handoff-runner-android",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Android handoff capture template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run android-actuator -- --input libs/actuators/android-actuator/examples/android-runtime-webview-handoff-template.json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Browser handoff import template を実行します"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/android-runtime-session-handoff-import.json"
+      }
+    }
+  ]
+}

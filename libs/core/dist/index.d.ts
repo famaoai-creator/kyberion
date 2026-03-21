@@ -22,6 +22,7 @@ export * from './src/retry-utils.js';
 export { parseData, stringifyData } from './data-utils.js';
 export * from './detectors.js';
 export * from './validators.js';
+export * from './mobile-profile-validators.js';
 export * as classifier from './classifier.js';
 export * from './knowledge-provider.js';
 export { secureFetch } from './network.js';
@@ -82,4 +83,5 @@ export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
 export * from './shared-business-types.js';
+export * from './types.js';
 //# sourceMappingURL=index.d.ts.map

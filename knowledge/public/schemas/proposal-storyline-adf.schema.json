@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proposal Storyline ADF",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "title", "slides"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["proposal-storyline-adf"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "client": {
+      "type": "string"
+    },
+    "core_message": {
+      "type": "string"
+    },
+    "slides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "objective"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "objective": { "type": "string", "minLength": 1 },
+          "body": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "visual": { "type": "string" }
+        }
+      }
+    }
+  }
+}

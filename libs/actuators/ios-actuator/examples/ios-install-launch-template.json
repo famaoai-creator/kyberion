@@ -1,0 +1,52 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/ios/ios-install-launch-template.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
+        "export_as": "app_profile",
+        "validate_as": "mobile-app-profile"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "simctl_health_check",
+      "params": {
+        "export_as": "ios_health"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "boot_simulator",
+      "params": {
+        "device_name": "iPhone 17 Pro"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "install_app",
+      "params": {
+        "app_profile_from": "app_profile"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "launch_app",
+      "params": {
+        "app_profile_from": "app_profile"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "capture_screen",
+      "params": {
+        "path": "active/shared/tmp/ios/ios-install-launch-template.png"
+      }
+    }
+  ]
+}

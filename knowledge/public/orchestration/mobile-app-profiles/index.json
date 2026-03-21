@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "id": "example-mobile-login-passkey",
+      "platform": "android",
+      "title": "Example Mobile Login + Passkey",
+      "path": "knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json",
+      "description": "Example Android app profile covering launch, login form selectors, and passkey trigger selectors.",
+      "tags": ["android", "login", "passkey", "example"]
+    },
+    {
+      "id": "example-ios-login-passkey",
+      "platform": "ios",
+      "title": "Example iOS Login + Passkey",
+      "path": "knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
+      "description": "Example iOS simulator app profile covering bundle ID, launch metadata, and passkey-oriented flow entry points.",
+      "tags": ["ios", "simulator", "login", "passkey", "example"]
+    }
+  ]
+}
