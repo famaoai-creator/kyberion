@@ -2,6 +2,7 @@ import { logger, resolveServiceBinding, safeReadFile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Helper to safely access global ptyEngine
@@ -126,7 +127,10 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-if (require.main === module) {
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+
+if (entrypoint && modulePath === entrypoint) {
   main().catch(err => {
     logger.error(err.message);
     process.exit(1);

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io';
-import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
 
 export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
 

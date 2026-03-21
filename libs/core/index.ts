@@ -125,46 +125,46 @@ export * from './sensory-memory.js';
 export * from './stimuli-journal.js';
 
 // Mission Status Guard
-export { isValidTransition, transitionStatus } from './mission-status';
-export type { MissionStatus } from './mission-status';
+export { isValidTransition, transitionStatus } from './mission-status.js';
+export type { MissionStatus } from './mission-status.js';
 
 // A2UI Protocol
-export * from './a2ui';
+export * from './a2ui.js';
 
 // PTY Engine (Logical Kernel)
-export * from './pty-engine';
-export * from './terminal-keys';
-export * from './agent-mediator';
-export * from './acp-mediator';
-export * from './agent-adapter';
+export * from './pty-engine.js';
+export * from './terminal-keys.js';
+export * from './agent-mediator.js';
+export * from './acp-mediator.js';
+export * from './agent-adapter.js';
 
 // Agent Registry & Lifecycle
-export * from './agent-registry';
-export * from './agent-lifecycle';
-export * from './a2a-bridge';
-export * from './agent-manifest';
-export * from './provider-discovery';
-export * from './runtime-supervisor';
-export * from './surface-runtime';
-export * from './artifact-store';
-export * from './approval-store';
-export * from './managed-process';
-export * from './mission-team-composer';
-export * from './mission-team-orchestrator';
-export * from './agent-runtime-supervisor';
-export * from './mission-orchestration-events';
-export * from './mission-orchestration-worker';
-export * from './mission-task-events';
-export * from './pipeline-contract';
-export * from './channel-surface';
-export * from './service-binding';
+export * from './agent-registry.js';
+export * from './agent-lifecycle.js';
+export * from './a2a-bridge.js';
+export * from './agent-manifest.js';
+export * from './provider-discovery.js';
+export * from './runtime-supervisor.js';
+export * from './surface-runtime.js';
+export * from './artifact-store.js';
+export * from './approval-store.js';
+export * from './managed-process.js';
+export * from './mission-team-composer.js';
+export * from './mission-team-orchestrator.js';
+export * from './agent-runtime-supervisor.js';
+export * from './mission-orchestration-events.js';
+export * from './mission-orchestration-worker.js';
+export * from './mission-task-events.js';
+export * from './pipeline-contract.js';
+export * from './channel-surface.js';
+export * from './service-binding.js';
 
 // Governance (Agent Governance Toolkit inspired)
-export * from './policy-engine';
-export * from './trust-engine';
-export * from './audit-chain';
-export * from './agent-slo';
-export * from './kill-switch';
+export * from './policy-engine.js';
+export * from './trust-engine.js';
+export * from './audit-chain.js';
+export * from './agent-slo.js';
+export * from './kill-switch.js';
 
 
 // Shared Business Types

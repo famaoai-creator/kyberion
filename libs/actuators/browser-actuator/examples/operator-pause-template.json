@@ -1,0 +1,65 @@
+{
+  "action": "pipeline",
+  "session_id": "browser-operator-pause-template",
+  "options": {
+    "headless": false,
+    "keep_alive": true,
+    "lease_ms": 300000,
+    "browser_channel": "chrome"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "https://example.com/",
+        "waitUntil": "networkidle"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "snapshot"
+      }
+    },
+    {
+      "type": "control",
+      "op": "pause_for_operator",
+      "params": {
+        "message": "Browser is open for manual intervention. Complete the flow, then create the continue file.",
+        "continue_file": "active/shared/tmp/browser/operator-pause-template.continue",
+        "poll_ms": 500,
+        "timeout_ms": 600000
+      }
+    },
+    {
+      "type": "capture",
+      "op": "tabs",
+      "params": {
+        "export_as": "tabs_after_operator"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "console",
+      "params": {
+        "export_as": "console_after_operator",
+        "limit": 50
+      }
+    },
+    {
+      "type": "capture",
+      "op": "network",
+      "params": {
+        "export_as": "network_after_operator",
+        "limit": 50
+      }
+    },
+    {
+      "type": "control",
+      "op": "close_session",
+      "params": {}
+    }
+  ]
+}

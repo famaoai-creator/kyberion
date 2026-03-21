@@ -26,6 +26,9 @@ COPY . .
 # Synchronize lockfile for Linux environment and install all dependencies
 RUN pnpm install --frozen-lockfile
 
+# Validate runtime/package hygiene before producing artifacts
+RUN pnpm run validate
+
 # Build runtime artifacts
 RUN pnpm run build
 

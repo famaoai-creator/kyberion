@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "provider": "aws",
+  "notes": "Use local AWS Architecture Icons if available. When assets are absent, the Draw.io generator falls back to styled native shapes without external fetches.",
+  "resources": {
+    "aws_vpc": {
+      "label": "Amazon VPC",
+      "fillColor": "#FFF7ED",
+      "strokeColor": "#C2410C",
+      "accentColor": "#FF9900",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Amazon-VPC.svg",
+        "active/shared/assets/aws-icons/Networking-and-Content-Delivery/Amazon-VPC.svg"
+      ]
+    },
+    "aws_subnet": {
+      "label": "Subnet",
+      "fillColor": "#FFF7ED",
+      "strokeColor": "#EA580C",
+      "accentColor": "#FF9900",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Subnet.svg",
+        "active/shared/assets/aws-icons/Networking-and-Content-Delivery/Amazon-VPC_subnet.svg"
+      ]
+    },
+    "aws_lb": {
+      "label": "Elastic Load Balancing",
+      "fillColor": "#FFF7ED",
+      "strokeColor": "#C2410C",
+      "accentColor": "#FF9900",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Elastic-Load-Balancing.svg",
+        "active/shared/assets/aws-icons/Networking-and-Content-Delivery/Elastic-Load-Balancing.svg"
+      ]
+    },
+    "aws_instance": {
+      "label": "Amazon EC2",
+      "fillColor": "#F8FAFC",
+      "strokeColor": "#334155",
+      "accentColor": "#FF9900",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Amazon-EC2.svg",
+        "active/shared/assets/aws-icons/Compute/Amazon-EC2.svg"
+      ]
+    },
+    "aws_rds_instance": {
+      "label": "Amazon RDS",
+      "fillColor": "#EFF6FF",
+      "strokeColor": "#1D4ED8",
+      "accentColor": "#60A5FA",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Amazon-RDS.svg",
+        "active/shared/assets/aws-icons/Database/Amazon-RDS.svg"
+      ]
+    },
+    "aws_s3_bucket": {
+      "label": "Amazon S3",
+      "fillColor": "#ECFDF5",
+      "strokeColor": "#047857",
+      "accentColor": "#10B981",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/Amazon-S3.svg",
+        "active/shared/assets/aws-icons/Storage/Amazon-S3.svg"
+      ]
+    },
+    "aws_lambda_function": {
+      "label": "AWS Lambda",
+      "fillColor": "#FFF7ED",
+      "strokeColor": "#C2410C",
+      "accentColor": "#F97316",
+      "asset_candidates": [
+        "active/shared/assets/aws-icons/AWS-Lambda.svg",
+        "active/shared/assets/aws-icons/Compute/AWS-Lambda.svg"
+      ]
+    },
+    "default": {
+      "label": "AWS Service",
+      "fillColor": "#FFFFFF",
+      "strokeColor": "#232F3E",
+      "accentColor": "#FF9900"
+    }
+  }
+}

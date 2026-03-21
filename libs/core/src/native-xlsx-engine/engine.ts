@@ -6,18 +6,18 @@
 import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { XlsxDesignProtocol } from '../types/xlsx-protocol';
-import { generateContentTypes } from './content-types';
-import { generateGlobalRels, generateWorkbookRels, generateSheetRels } from './rels';
-import { generateStyles } from './styles';
-import { generateSharedStrings } from './shared-strings';
-import { generateWorkbook } from './workbook';
-import { generateWorksheet } from './worksheet';
-import { generateDrawing } from './drawing';
-import { generateTable } from './table';
+import type { XlsxDesignProtocol } from '../types/xlsx-protocol.js';
+import { generateContentTypes } from './content-types.js';
+import { generateGlobalRels, generateWorkbookRels, generateSheetRels } from './rels.js';
+import { generateStyles } from './styles.js';
+import { generateSharedStrings } from './shared-strings.js';
+import { generateWorkbook } from './workbook.js';
+import { generateWorksheet } from './worksheet.js';
+import { generateDrawing } from './drawing.js';
+import { generateTable } from './table.js';
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
-import { generateTheme } from '../native-pptx-engine/theme';
+import { generateTheme } from '../native-pptx-engine/theme.js';
 
 export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPath: string): Promise<void> {
   if (!protocol?.sheets?.length) {

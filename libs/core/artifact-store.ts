@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver';
+import { pathResolver } from './path-resolver.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -7,7 +7,7 @@ import {
   safeReadFile,
   safeReaddir,
   safeWriteFile,
-} from './secure-io';
+} from './secure-io.js';
 
 export type GovernedArtifactRole =
   | 'slack_bridge'

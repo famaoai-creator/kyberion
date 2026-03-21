@@ -1,12 +1,12 @@
-import { logger } from './core';
-import { ACPMediator, ACPMediatorOptions } from './acp-mediator';
-import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter';
-import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry';
-import { getAgentManifest, validateRequirements } from './agent-manifest';
+import { logger } from './core.js';
+import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
+import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter.js';
+import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry.js';
+import { getAgentManifest, validateRequirements } from './agent-manifest.js';
 import * as crypto from 'node:crypto';
-import { safeExistsSync } from './secure-io';
+import { safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
-import { runtimeSupervisor } from './runtime-supervisor';
+import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 
 /** Walk up from cwd to find the project root (contains AGENTS.md) */

@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "kyberion-sovereign"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/kyberion-marketing-deck-example.pptx"
+      }
+    }
+  ]
+}

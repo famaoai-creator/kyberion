@@ -81,5 +81,15 @@ design-patterns/
 | `merge_content` | テーマ + パターン + コンテンツを統合してレンダリング可能なプロトコルを生成 |
 | `set` | コンテキスト変数を任意に設定 |
 
+## Common Themes
+
+共通 theme 定義は `media-templates/themes.json` に集約する。
+
+- `kyberion-standard`: 汎用の標準テーマ
+- `kyberion-sovereign`: 役員向け・戦略資料向けの濃色アクセント
+- `executive-neutral`: 白背景ベースの意思決定資料向け
+- `forest-briefing`: ロードマップや運用報告向け
+- `sunrise-report`: 明るめのレポート・要約資料向け
+
 ---
 *Status: Managed under MISSION-DESIGN-PATTERNS*

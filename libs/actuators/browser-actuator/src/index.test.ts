@@ -19,22 +19,27 @@ const mocks = vi.hoisted(() => {
       screenshot: vi.fn(async () => undefined),
       innerText: vi.fn(async () => 'content'),
       content: vi.fn(async () => '<html></html>'),
-      evaluate: vi.fn(async () => [
-        {
-          ref: '@e1',
-          tag: 'button',
-          role: 'button',
-          text: 'Submit',
-          name: 'Submit',
-          type: null,
-          placeholder: null,
-          href: null,
-          value: null,
-          visible: true,
-          editable: false,
-          selector: 'button:nth-of-type(1)',
-        },
-      ]),
+      evaluate: vi.fn(async (arg?: unknown) => {
+        if (typeof arg === 'function') {
+          return [
+            {
+              ref: '@e1',
+              tag: 'button',
+              role: 'button',
+              text: 'Submit',
+              name: 'Submit',
+              type: null,
+              placeholder: null,
+              href: null,
+              value: null,
+              visible: true,
+              editable: false,
+              selector: 'button:nth-of-type(1)',
+            },
+          ];
+        }
+        return undefined;
+      }),
       title: vi.fn(async () => currentTitle),
       url: vi.fn(() => currentUrl),
       on: vi.fn((event: string, handler: Function) => {
@@ -54,6 +59,35 @@ const mocks = vi.hoisted(() => {
   const context = {
     pages: vi.fn(() => [page]),
     newPage: vi.fn(async () => page2),
+    clearCookies: vi.fn(async () => undefined),
+    newCDPSession: vi.fn(async () => ({
+      send: vi.fn(async (method: string) => {
+        if (method === 'WebAuthn.addVirtualAuthenticator') {
+          return { authenticatorId: 'auth-1' };
+        }
+        if (method === 'WebAuthn.getCredentials') {
+          return {
+            credentials: [
+              {
+                credentialId: 'cred-1',
+                rpId: 'webauthn.io',
+                userName: 'kyberion_passkey_demo',
+                signCount: 1,
+                isResidentCredential: true,
+              },
+            ],
+          };
+        }
+        if (method === 'WebAuthn.removeCredential') {
+          return {};
+        }
+        if (method === 'WebAuthn.addCredential') {
+          return {};
+        }
+        return {};
+      }),
+      on: vi.fn(),
+    })),
     close,
     tracing: {
       start: tracingStart,
@@ -83,12 +117,16 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('playwright', () => ({
+vi.mock('@playwright/test', async () => {
+  const actual = await vi.importActual<typeof import('@playwright/test')>('@playwright/test');
+  return {
+    ...actual,
   chromium: {
     launchPersistentContext: mocks.launchPersistentContext,
     connectOverCDP: mocks.connectOverCDP,
   },
-}));
+  };
+});
 
 describe('browser-actuator v3 contract', () => {
   beforeEach(async () => {
@@ -253,6 +291,100 @@ describe('browser-actuator v3 contract', () => {
     });
 
     expect(mocks.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('configures a virtual passkey authenticator and inspects stored credentials', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-passkey',
+      steps: [
+        { type: 'control', op: 'setup_passkey_authenticator', params: { export_as: 'authenticator' } },
+        { type: 'capture', op: 'passkey_credentials', params: { export_as: 'credentials' } },
+        { type: 'apply', op: 'set_passkey_user_verified', params: { is_user_verified: false } },
+        { type: 'apply', op: 'set_passkey_presence', params: { enabled: false } },
+        { type: 'apply', op: 'clear_passkey_credentials', params: {} },
+      ],
+      options: { headless: true },
+    });
+
+    expect(mocks.context.newCDPSession).toHaveBeenCalledTimes(1);
+    const cdp = await mocks.context.newCDPSession.mock.results[0].value;
+    expect(cdp.send).toHaveBeenCalledWith('WebAuthn.enable', { enableUI: false });
+    expect(cdp.send).toHaveBeenCalledWith(
+      'WebAuthn.addVirtualAuthenticator',
+      expect.objectContaining({
+        options: expect.objectContaining({
+          protocol: 'ctap2',
+          transport: 'internal',
+          hasResidentKey: true,
+          hasUserVerification: true,
+        }),
+      }),
+    );
+    expect(result.context.authenticator).toMatchObject({
+      authenticator_id: 'auth-1',
+      protocol: 'ctap2',
+      transport: 'internal',
+    });
+    expect(result.context.credentials).toEqual([
+      expect.objectContaining({
+        credentialId: 'cred-1',
+        rpId: 'webauthn.io',
+      }),
+    ]);
+    expect(cdp.send).toHaveBeenCalledWith('WebAuthn.setUserVerified', {
+      authenticatorId: 'auth-1',
+      isUserVerified: false,
+    });
+    expect(cdp.send).toHaveBeenCalledWith('WebAuthn.setAutomaticPresenceSimulation', {
+      authenticatorId: 'auth-1',
+      enabled: false,
+    });
+    expect(cdp.send).toHaveBeenCalledWith('WebAuthn.clearCredentials', {
+      authenticatorId: 'auth-1',
+    });
+  });
+
+  it('provides high-level register, authenticate, and delete passkey flows', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-passkey-flow',
+      context: { username: 'kyberion_passkey_demo' },
+      steps: [
+        { type: 'apply', op: 'register_passkey', params: { provider: 'webauthn.io', username: '{{username}}', export_as: 'registration' } },
+        { type: 'apply', op: 'authenticate_passkey', params: { provider: 'webauthn.io', username: '{{username}}', export_as: 'authentication' } },
+        { type: 'apply', op: 'delete_passkey', params: { username: '{{username}}', export_as: 'deletion' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://webauthn.io/', { waitUntil: 'networkidle' });
+    expect(mocks.context.clearCookies).toHaveBeenCalled();
+    expect(mocks.page.fill).toHaveBeenCalledWith('#input-email', 'kyberion_passkey_demo', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('#register-button', { timeout: 5000 });
+    expect(mocks.page.click).toHaveBeenCalledWith('#login-button', { timeout: 5000 });
+    const cdp = await mocks.context.newCDPSession.mock.results[0].value;
+    expect(cdp.send).toHaveBeenCalledWith('WebAuthn.removeCredential', {
+      authenticatorId: 'auth-1',
+      credentialId: 'cred-1',
+    });
+    expect(result.context.registration).toMatchObject({
+      provider: 'webauthn.io',
+      username: 'kyberion_passkey_demo',
+    });
+    expect(result.context.authentication).toMatchObject({
+      provider: 'webauthn.io',
+      username: 'kyberion_passkey_demo',
+      authenticated: false,
+    });
+    expect(result.context.deletion).toMatchObject({
+      deleted: true,
+      deleted_credential_id: 'cred-1',
+    });
   });
 
   it('exports assertion hints in comment-only mode when requested', async () => {

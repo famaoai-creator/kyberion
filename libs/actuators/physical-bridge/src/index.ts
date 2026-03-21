@@ -1,6 +1,7 @@
 import { logger, safeReadFile, safeWriteFile, pathResolver, safeExec } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Physical-Bridge Actuator v1.0 [KUCA COMPLIANT]
@@ -103,7 +104,10 @@ const main = async () => {
   console.log(JSON.stringify({ status: 'success', results, observation }, null, 2));
 };
 
-if (require.main === module) {
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+
+if (entrypoint && modulePath === entrypoint) {
   main().catch(err => {
     logger.error(`Physical Bridge Error: ${err.message}`);
     process.exit(1);

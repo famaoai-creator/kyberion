@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile, safeReaddir } from '../../../libs/core/index.js';
+import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
 
 export interface SessionPaths {
   base: string;

@@ -2,6 +2,7 @@
   "name": "@agent/core",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Core utilities and wrappers for Kyberion.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -65,6 +66,10 @@
     "./managed-process": {
       "types": "./dist/managed-process.d.ts",
       "default": "./dist/managed-process.js"
+    },
+    "./nerve-bridge": {
+      "types": "./dist/nerve-bridge.d.ts",
+      "default": "./dist/nerve-bridge.js"
     },
     "./mission-orchestration-events": {
       "types": "./dist/mission-orchestration-events.d.ts",

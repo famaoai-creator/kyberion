@@ -1,4 +1,4 @@
-import { PptxElement, PptxPos, PptxStyle } from '../../types/pptx-protocol';
+import type { PptxElement, PptxPos, PptxStyle } from '../types/pptx-protocol.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);

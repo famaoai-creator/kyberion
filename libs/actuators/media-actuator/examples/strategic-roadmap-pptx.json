@@ -1,0 +1,53 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "apply_theme",
+      "params": {
+        "theme": "forest-briefing"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/strategic-roadmap.json"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "merge_content",
+      "params": {
+        "output_format": "pptx",
+        "content_data": [
+          {
+            "title": "Actuator Improvement Mission",
+            "body": [
+              "Phase 1: Browser / Media examples catalog standardization",
+              "Phase 2: Shared theme system and preset governance",
+              "Phase 3: Chronos-side discovery and operator workflow integration"
+            ],
+            "visual": "Mission Timeline"
+          },
+          {
+            "title": "Critical Success Factors",
+            "body": [
+              "Examples stay actuator-owned and discoverable from CLI.",
+              "Theme vocabulary remains shared across decks and reports.",
+              "Operational pipelines stay separated from learning samples."
+            ],
+            "visual": "Success Factor Matrix"
+          }
+        ]
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": {
+        "path": "active/shared/tmp/media/strategic-roadmap-example.pptx"
+      }
+    }
+  ]
+}

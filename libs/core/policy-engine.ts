@@ -1,5 +1,5 @@
-import { logger } from './core';
-import { safeReadFile, safeExistsSync } from './secure-io';
+import { logger } from './core.js';
+import { safeReadFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 
 /**

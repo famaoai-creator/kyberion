@@ -1,8 +1,9 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "default_theme": "kyberion-standard",
   "themes": {
     "kyberion-standard": {
+      "name": "Kyberion Standard",
       "colors": {
         "primary": "#0f172a",
         "secondary": "#334155",
@@ -16,6 +17,76 @@
       },
       "assets": {
         "logo_url": "/assets/logos/kyberion-logo.png"
+      }
+    },
+    "kyberion-sovereign": {
+      "name": "Kyberion Sovereign",
+      "colors": {
+        "primary": "#111827",
+        "secondary": "#374151",
+        "accent": "#c0841a",
+        "background": "#f8fafc",
+        "text": "#111827"
+      },
+      "fonts": {
+        "heading": "Inter, sans-serif",
+        "body": "System-ui, sans-serif"
+      }
+    },
+    "executive-neutral": {
+      "name": "Executive Neutral",
+      "colors": {
+        "primary": "#1f2937",
+        "secondary": "#4b5563",
+        "accent": "#2563eb",
+        "background": "#ffffff",
+        "text": "#111827"
+      },
+      "fonts": {
+        "heading": "Inter, sans-serif",
+        "body": "Arial, sans-serif"
+      }
+    },
+    "forest-briefing": {
+      "name": "Forest Briefing",
+      "colors": {
+        "primary": "#14532d",
+        "secondary": "#166534",
+        "accent": "#65a30d",
+        "background": "#f7fee7",
+        "text": "#14532d"
+      },
+      "fonts": {
+        "heading": "Aptos, sans-serif",
+        "body": "Calibri, sans-serif"
+      }
+    },
+    "sunrise-report": {
+      "name": "Sunrise Report",
+      "colors": {
+        "primary": "#7c2d12",
+        "secondary": "#9a3412",
+        "accent": "#f59e0b",
+        "background": "#fffbeb",
+        "text": "#431407"
+      },
+      "fonts": {
+        "heading": "Aptos Display, sans-serif",
+        "body": "Aptos, sans-serif"
+      }
+    },
+    "aws-architecture": {
+      "name": "AWS Architecture",
+      "colors": {
+        "primary": "#232f3e",
+        "secondary": "#4b5563",
+        "accent": "#ff9900",
+        "background": "#ffffff",
+        "text": "#111827"
+      },
+      "fonts": {
+        "heading": "Arial, sans-serif",
+        "body": "Arial, sans-serif"
       }
     },
     "client-a": {
@@ -43,6 +114,10 @@
         "accent": "#10b981",
         "background": "#ecfdf5",
         "text": "#064e3b"
+      },
+      "fonts": {
+        "heading": "Montserrat, sans-serif",
+        "body": "Open Sans, sans-serif"
       }
     }
   }

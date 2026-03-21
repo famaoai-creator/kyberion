@@ -7,7 +7,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { distillDocxDesign } from '../../docx-utils.js';
-import { generateNativeDocx } from '../engine';
+import { generateNativeDocx } from '../engine.js';
 
 async function main() {
   const sourcePath = process.argv[2];
