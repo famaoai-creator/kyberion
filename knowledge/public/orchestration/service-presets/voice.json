@@ -1,0 +1,23 @@
+{
+  "service_id": "voice",
+  "name": "Kyberion Voice Generation Unified Presets",
+  "operations": {
+    "speak_local": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "cli",
+          "command": "/Users/famao/k/a/kyberion-runtimes/voice/venv/bin/python3",
+          "args": ["libs/actuators/voice-actuator/voice-bridge.py", "{\"action\": \"speak\", \"params\": {{params}} }"],
+          "description": "Local Generative TTS via Python Bridge"
+        },
+        {
+          "type": "cli",
+          "command": "say",
+          "args": ["-v", "Kyoko", "{{text}}"],
+          "description": "macOS Native Fallback"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "../../../schemas/governance-policy.schema.json",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "default_allow": [
     "active/missions/${MISSION_ID}/",
     "active/shared/tmp/",
@@ -10,26 +10,31 @@
   ],
   "tier_restrictions": {
     "personal": {
-      "allow_read": ["personal"],
-      "allow_write": ["personal"],
+      "allow_read": ["personal", "sovereign", "ecosystem_architect"],
+      "allow_write": ["personal", "sovereign"],
       "block_message": "Sovereign Sanctuary: Access restricted to authorized personal processes only."
     },
     "confidential": {
-      "allow_read": ["confidential", "public"],
-      "allow_write": ["confidential"],
+      "allow_read": ["confidential", "public", "sovereign", "ecosystem_architect"],
+      "allow_write": ["confidential", "sovereign", "ecosystem_architect"],
       "block_message": "Organization Confidential: Higher tier required."
     }
   },
   "role_permissions": {
+    "sovereign": {
+      "allow_write": ["/"]
+    },
     "ecosystem_architect": {
       "allow_write": [
-        "active/missions/",
+        "active/",
         "knowledge/",
-        "libs/core/",
-        "libs/actuators/",
+        "libs/",
         "scripts/",
         "pipelines/",
         "schemas/",
+        "presence/",
+        "satellites/",
+        "plugins/",
         "README.md",
         "CAPABILITIES_GUIDE.md",
         "CONTRIBUTING.md",
@@ -37,6 +42,29 @@
         "extracted_design.json",
         "hoge.pdf"
       ]
+    },
+    "mission_controller": {
+      "allow_write": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/audit/",
+        "active/shared/",
+        "knowledge/personal/missions/",
+        "knowledge/personal/governance/",
+        "knowledge/evolution/",
+        "registry.json"
+      ]
+    },
+    "worker": {
+      "allow_write": [
+        "active/projects/",
+        "active/shared/tmp/",
+        "active/missions/${MISSION_ID}/evidence/"
+      ]
+    },
+    "analyst": {
+      "allow_read": ["knowledge/", "active/audit/"],
+      "allow_write": ["active/shared/tmp/", "knowledge/evolution/"]
     },
     "software_developer": {
       "allow_write": [
@@ -56,108 +84,11 @@
         "knowledge/security/"
       ]
     },
-    "mission_controller": {
-      "allow_write": [
-        "active/missions/",
-        "active/archive/missions/",
-        "knowledge/personal/missions/",
-        "knowledge/personal/governance/",
-        "knowledge/evolution/",
-        "active/shared/coordination/",
-        "active/shared/observability/mission-control/",
-        "active/shared/runtime/mission_queue.jsonl",
-        "active/audit/",
-        "registry.json"
-      ]
-    },
-    "infrastructure_sentinel": {
-      "allow_write": [
-        "active/shared/coordination/channels/",
-        "active/shared/observability/",
-        "active/shared/runtime/",
-        "presence/bridge/runtime/",
-        "Library/LaunchAgents/"
-      ]
-    },
-    "slack_bridge": {
-      "allow_write": [
-        "presence/bridge/runtime/",
-        "active/shared/coordination/channels/slack/",
-        "active/shared/coordination/orchestration/",
-        "active/shared/observability/channels/slack/",
-        "active/shared/observability/mission-control/",
-        "active/audit/"
-      ]
-    },
-    "chronos_gateway": {
-      "allow_write": [
-        "active/shared/coordination/chronos/",
-        "active/shared/coordination/orchestration/",
-        "active/shared/observability/chronos/",
-        "active/shared/observability/mission-control/",
-        "active/shared/runtime/terminal/",
-        "active/audit/"
-      ]
-    },
-    "chronos_operator": {
-      "allow_read": [
-        "active/missions/",
-        "active/shared/observability/",
-        "active/shared/runtime/",
-        "active/shared/coordination/chronos/"
-      ],
-      "allow_write": []
-    },
-    "chronos_localadmin": {
-      "allow_read": [
-        "active/missions/",
-        "active/shared/observability/",
-        "active/shared/runtime/",
-        "active/shared/coordination/",
-        "active/audit/"
-      ],
-      "allow_write": [
-        "active/shared/coordination/channels/",
-        "active/shared/coordination/chronos/",
-        "active/shared/coordination/orchestration/",
-        "active/shared/observability/",
-        "active/shared/runtime/",
-        "active/audit/"
-      ]
-    },
     "surface_runtime": {
       "allow_write": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
         "active/audit/"
-      ]
-    },
-    "strategic_sales": {
-      "allow_write": [
-        "active/projects/proposals/"
-      ]
-    },
-    "knowledge_steward": {
-      "allow_write": [
-        "knowledge/"
-      ]
-    },
-    "generate_types": {
-      "allow_write": [
-        "libs/core/src/types/"
-      ]
-    },
-    "ceo": {
-      "allow_write": [
-        "knowledge/ceo/",
-        "knowledge/personal/my-identity.json"
-      ]
-    },
-    "sovereign_concierge": {
-      "allow_write": [
-        "knowledge/personal/",
-        "active/missions/",
-        "active/projects/onboarding/"
       ]
     }
   },
@@ -174,6 +105,8 @@
   },
   "network_guardrails": {
     "allowed_domains": [
+      "localhost",
+      "127.0.0.1",
       "github.com",
       "api.github.com",
       "registry.npmjs.org",
