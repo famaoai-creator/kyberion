@@ -1,13 +1,13 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, platform } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, platform, transform } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
 /**
- * Service-Actuator v1.2.0 [ADAPTIVE PRESETS ENABLED]
+ * Service-Actuator v1.3.0 [ADAPTIVE PRESETS & CORE TRANSFORMER]
  * Unified Reachability Layer for External SaaS/APIs.
- * Supports intelligent CLI/API fallback and output normalization.
+ * Supports intelligent CLI/API fallback and standardized output normalization via @agent/core.
  */
 function isUnsafeCliAllowed(): boolean {
   return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
@@ -164,19 +164,6 @@ async function startService(id: string, service: any, pids: any) {
   logger.success(`  - ${id} started (PID: ${child.pid}).`);
 }
 
-function getValueByPath(obj: any, path: string): any {
-  return path.split('.').reduce((prev, curr) => prev && prev[curr], obj);
-}
-
-async function applyOutputMapping(data: any, mapping: Record<string, string> | undefined) {
-  if (!mapping) return data;
-  const result: any = {};
-  for (const [targetKey, sourceKey] of Object.entries(mapping)) {
-    result[targetKey] = getValueByPath(data, sourceKey) ?? null;
-  }
-  return result;
-}
-
 async function handleAction(input: any, onEvent?: (data: any) => void) {
   if (input.action === 'pipeline') {
     const results = [];
@@ -237,7 +224,11 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
             const rawOutput = safeExec(bin, args);
             let parsedOutput: any = rawOutput;
             try { parsedOutput = JSON.parse(rawOutput); } catch (_) { /* ignore */ }
-            return await applyOutputMapping(parsedOutput, alt.output_mapping);
+            
+            if (alt.output_mapping) {
+              return transform(parsedOutput, { type: 'json_map', mapping: alt.output_mapping });
+            }
+            return parsedOutput;
           } 
           
           if (alt.type === 'api') {
@@ -258,7 +249,11 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
               data: method !== 'GET' ? payload : undefined,
               params: method === 'GET' ? payload : undefined
             });
-            return await applyOutputMapping(result, alt.output_mapping);
+
+            if (alt.output_mapping) {
+              return transform(result, { type: 'json_map', mapping: alt.output_mapping });
+            }
+            return result;
           }
         } catch (err: any) {
           logger.error(`  [PRESET] Alternative failed: ${err.message}. Trying next...`);
@@ -345,7 +340,7 @@ const main = async () => {
   const result = await handleAction(inputData);
   console.log(JSON.stringify(result, null, 2));
 };
-// CLI Integration
+
 const isMain = process.argv[1] && (
   process.argv[1].endsWith('service-actuator/src/index.ts') || 
   process.argv[1].endsWith('service-actuator/dist/index.js') ||

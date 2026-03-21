@@ -1,11 +1,12 @@
 /**
  * TypeScript version of the Knowledge Tier Guard.
- * v2.1 - POLICY-AS-CODE (ADF DRIVEN)
+ * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
  */
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
+import { resolveIdentityContext } from './authority.js';
 import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
 
 export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
@@ -20,20 +21,10 @@ export const TIERS: TierWeightMap = {
 const PROJECT_ROOT = pathResolver.rootDir();
 const POLICY_PATH = pathResolver.knowledge('public/governance/security-policy.json');
 
-/**
- * Normalize a path pattern for consistent comparison.
- * Strips trailing slashes so "knowledge/personal/missions/" and
- * "knowledge/personal/missions" match equivalently via pathStartsWith.
- */
 function normalizePath(p: string): string {
   return p.replace(/\/+$/, '');
 }
 
-/**
- * Check if targetPath starts with or equals the patternPath.
- * Both sides are normalized to avoid trailing-slash mismatches.
- * Ensures "knowledge/personal" does NOT match "knowledge/personal-other/".
- */
 function pathStartsWith(targetPath: string, patternPath: string): boolean {
   const t = normalizePath(targetPath);
   const p = normalizePath(patternPath);
@@ -47,14 +38,7 @@ function isOutsideProjectRoot(relativePath: string): boolean {
 }
 
 /**
- * Validates write permission based on security-policy.json ADF.
- *
- * Evaluation order (Explicit Allow > Implicit Deny):
- *   1. Default Allow — sandbox paths always writable
- *   2. Role-based Allow (authoritative) — explicit grants override tier restrictions
- *   3. Tier-based Deny (fallback) — applies only when no explicit grant matched
- *   4. Architect Privilege — ecosystem_architect has broad knowledge access
- *   5. Default Deny
+ * Validates write permission based on security-policy.json ADF and Persona.
  */
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
@@ -65,8 +49,8 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
   }
 
-  // 1. Identify Role
-  const currentRole = resolveCurrentRole();
+  // 1. Identify Identity Context (Persona & Authority)
+  const { persona: currentPersona } = resolveIdentityContext();
 
   // 2. Load Policy
   let policy: any = null;
@@ -86,14 +70,14 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   );
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
-  // B. Role-based Allow (authoritative — overrides tier restrictions)
-  const roleRules = policy.role_permissions[currentRole];
+  // B. Persona-based Allow (authoritative — overrides tier restrictions)
+  const roleRules = policy.role_permissions[currentPersona];
   if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
   // C. Architect Privilege (broad knowledge access)
-  if (currentRole === 'ecosystem_architect' && pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
+  if (currentPersona === 'ecosystem_architect' && pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
 
-  // D. Tier-based Restrictions (fallback deny — only reached if no explicit grant matched)
+  // D. Tier-based Restrictions (fallback deny)
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
@@ -104,7 +88,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   // E. Default Deny
   return {
     allowed: false,
-    reason: `[POLICY_VIOLATION] Role '${currentRole}' is NOT authorized to write to '${relativePath}'.`
+    reason: `[POLICY_VIOLATION] Persona '${currentPersona}' is NOT authorized to write to '${relativePath}'.`
   };
 }
 
@@ -119,51 +103,7 @@ export function detectTier(filePath: string): TierLevel {
 }
 
 /**
- * Legacy Support
- */
-export function detectTenant(filePath: string): string | null {
-  const resolved = path.resolve(filePath);
-  const vaultRoot = path.resolve(PROJECT_ROOT, 'vault');
-  if (resolved.startsWith(vaultRoot)) {
-    const relative = path.relative(vaultRoot, resolved);
-    return relative.split(path.sep)[0] || null;
-  }
-  return null;
-}
-
-/**
- * Resolves the current role using the same strategy as validateWritePermission.
- */
-function resolveCurrentRole(): string {
-  let currentRole = (process.env.MISSION_ROLE || '').toLowerCase().replace(/\s+/g, '_');
-
-  if ((!currentRole || currentRole === 'unknown') && process.env.MISSION_ID) {
-    const statePath = pathResolver.active(`missions/${process.env.MISSION_ID}/mission-state.json`);
-    try {
-      if (rawExistsSync(statePath)) {
-        const state = JSON.parse(rawReadTextFile(statePath));
-        currentRole = (state.assigned_persona || 'unknown').toLowerCase().replace(/\s+/g, '_');
-      }
-    } catch (_) {}
-  }
-
-  if (!currentRole || currentRole === 'unknown') {
-    const argv1 = process.argv[1] || '';
-    const procName = argv1 ? path.basename(argv1, path.extname(argv1)) : 'unknown';
-    currentRole = procName.toLowerCase().replace(/[-]/g, '_');
-  }
-
-  return currentRole;
-}
-
-/**
- * Validates read permission based on security-policy.json ADF.
- *
- * Evaluation order (mirrors write permission logic):
- *   1. Public tier — always readable
- *   2. Role-based Allow — explicit allow_read grants
- *   3. Architect / Concierge Privilege — broad knowledge read access
- *   4. Tier-based Deny — Personal and Confidential restrictions
+ * Validates read permission based on security-policy.json ADF and Persona.
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
@@ -173,19 +113,14 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
   }
 
-  // Fast path: non-knowledge files are always readable
   if (!pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
-
-  // Public knowledge is always readable
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
-  // Non-sensitive tiers don't need restriction
   if (!pathStartsWith(relativePath, 'knowledge/personal') &&
       !pathStartsWith(relativePath, 'knowledge/confidential')) {
     return { allowed: true };
   }
 
-  // Load policy
   let policy: any = null;
   try {
     if (rawExistsSync(POLICY_PATH)) {
@@ -195,20 +130,16 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
 
   if (!policy) return { allowed: true };
 
-  const currentRole = resolveCurrentRole();
+  const { persona: currentPersona } = resolveIdentityContext();
 
-  // Role-based Allow (authoritative)
-  const roleRules = policy.role_permissions[currentRole];
+  const roleRules = policy.role_permissions[currentPersona];
   if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
-  // Write access implies read access
   if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
-  // Architect and Concierge have broad read access
-  if (['ecosystem_architect', 'sovereign_concierge', 'mission_controller'].includes(currentRole)) {
+  if (['ecosystem_architect', 'sovereign', 'sovereign_concierge', 'mission_controller'].includes(currentPersona)) {
     return { allowed: true };
   }
 
-  // Tier-based deny
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
@@ -233,33 +164,21 @@ export function validateSovereignBoundary(content: string, activeSecrets: string
 
 export function scanForConfidentialMarkers(content: string): MarkerScanResult {
   if (!content) return { hasMarkers: false, markers: [] };
-
   const markers: string[] = [];
   const patterns = loadMarkerPatterns();
-
   for (const pattern of patterns) {
     try {
       const re = new RegExp(pattern.regex, 'm');
       if (re.test(content)) {
         markers.push(pattern.name);
       }
-    } catch (_) {
-      // Ignore invalid regex
-    }
+    } catch (_) {}
   }
-
   return { hasMarkers: markers.length > 0, markers };
 }
 
-type MarkerPattern = { name: string; regex: string };
-let cachedMarkerPatterns: MarkerPattern[] | null = null;
-
-function loadMarkerPatterns(): MarkerPattern[] {
-  if (cachedMarkerPatterns) return cachedMarkerPatterns;
-
-  const patterns: MarkerPattern[] = [];
-
-  // Knowledge sync rules (PII/secret patterns)
+function loadMarkerPatterns(): { name: string; regex: string }[] {
+  const patterns: { name: string; regex: string }[] = [];
   try {
     const policyPath = pathResolver.knowledge('public/governance/knowledge-sync-rules.json');
     if (rawExistsSync(policyPath)) {
@@ -270,20 +189,5 @@ function loadMarkerPatterns(): MarkerPattern[] {
       }
     }
   } catch (_) {}
-
-  // Security scanner patterns (augment with critical items)
-  try {
-    const vulnPath = pathResolver.capabilityAssets('security-scanner/vulnerability-patterns.json');
-    if (rawExistsSync(vulnPath)) {
-      const vulns = JSON.parse(rawReadTextFile(vulnPath));
-      if (Array.isArray(vulns)) {
-        for (const v of vulns) {
-          if (v?.name && v?.regex) patterns.push({ name: v.name, regex: v.regex });
-        }
-      }
-    }
-  } catch (_) {}
-
-  cachedMarkerPatterns = patterns;
   return patterns;
 }

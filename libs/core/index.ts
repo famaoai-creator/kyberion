@@ -101,6 +101,12 @@ export {
   validateSovereignBoundary 
 } from './tier-guard.js';
 
+export * as authority from './authority.js';
+export { resolveIdentityContext, hasAuthority } from './authority.js';
+
+export * as transformer from './transformer.js';
+export { transform, getValueByPath } from './transformer.js';
+
 export * as secretGuard from './secret-guard.js';
 export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
 
