@@ -3,6 +3,282 @@
   "default_locale": "en",
   "domains": {
     "ux": {
+      "chronos_mission_intelligence": {
+        "en": "Mission Intelligence",
+        "ja": "ミッション・インテリジェンス"
+      },
+      "chronos_agent_runtimes": {
+        "en": "Agent Runtimes",
+        "ja": "Agent Runtime"
+      },
+      "chronos_quick_actions": {
+        "en": "Quick Actions",
+        "ja": "Quick Action"
+      },
+      "chronos_grouped_by_operator_intent": {
+        "en": "Grouped by operator intent.",
+        "ja": "operator の意図ごとに整理。"
+      },
+      "chronos_jump_to_section": {
+        "en": "Jump to section",
+        "ja": "セクションへ移動"
+      },
+      "chronos_header_title": {
+        "en": "Clear operator view for mission state, runtime health, and delivery flow.",
+        "ja": "ミッション状態、ランタイム健全性、デリバリーフローを明瞭に扱う operator view."
+      },
+      "chronos_header_description": {
+        "en": "Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.",
+        "ja": "左から順に、意図を選び、現在の surface を確認し、control plane か runtime doctor が必要と示したときだけ介入します。"
+      },
+      "chronos_chat_no_response": {
+        "en": "No response",
+        "ja": "応答がありません。"
+      },
+      "chronos_chat_connection_error": {
+        "en": "Connection error",
+        "ja": "接続エラー"
+      },
+      "chronos_chat_minimize": {
+        "en": "MINIMIZE",
+        "ja": "最小化"
+      },
+      "chronos_chat_welcome": {
+        "en": "Welcome, Sovereign. The mirror is ready for your command.",
+        "ja": "ようこそ、Sovereign。mirror は command を受け付ける準備ができています。"
+      },
+      "chronos_chat_listening": {
+        "en": "Listening...",
+        "ja": "音声を聞いています..."
+      },
+      "chronos_chat_placeholder": {
+        "en": "Command the mirror...",
+        "ja": "mirror に指示してください..."
+      },
+      "chronos_mission_loading": {
+        "en": "Loading mission intelligence...",
+        "ja": "mission intelligence を読み込み中..."
+      },
+      "chronos_mission_hero_title": {
+        "en": "Read mission health first, then act on runtime or delivery issues.",
+        "ja": "まず mission health を確認し、その後に runtime や delivery の問題へ対応します。"
+      },
+      "chronos_mission_hero_description": {
+        "en": "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.",
+        "ja": "この view は operator 向けです。active mission の進行を確認し、最近の orchestration transition を見て、その後 control plane に介入が必要な場合だけ stale runtime や pending delivery を処理します。"
+      },
+      "chronos_last_action": {
+        "en": "last action",
+        "ja": "last action"
+      },
+      "chronos_access": {
+        "en": "access",
+        "ja": "access"
+      },
+      "chronos_control_actions_disabled": {
+        "en": " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.",
+        "ja": " · localadmin token が与えられるか localhost auto-admin が有効になるまで control action は無効です。"
+      },
+      "chronos_control_actions_enabled": {
+        "en": " · control actions enabled.",
+        "ja": " · control action は有効です。"
+      },
+      "chronos_active_missions": {
+        "en": "Active Missions",
+        "ja": "Active Missions"
+      },
+      "chronos_durable_contracts_in_execution": {
+        "en": "Durable contracts in execution",
+        "ja": "実行中の durable contract"
+      },
+      "chronos_recent_events": {
+        "en": "Recent Events",
+        "ja": "Recent Events"
+      },
+      "chronos_latest_orchestration_transitions": {
+        "en": "Latest orchestration transitions",
+        "ja": "最近の orchestration transition"
+      },
+      "chronos_surfaces": {
+        "en": "surfaces",
+        "ja": "surfaces"
+      },
+      "chronos_hide_latest_action": {
+        "en": "hide latest action",
+        "ja": "最新 action を隠す"
+      },
+      "chronos_show_latest_action": {
+        "en": "show latest action",
+        "ja": "最新 action を表示"
+      },
+      "chronos_retrying": {
+        "en": "retrying",
+        "ja": "再試行中"
+      },
+      "chronos_retry_latest_action": {
+        "en": "retry latest action",
+        "ja": "最新 action を再試行"
+      },
+      "chronos_no_managed_surfaces": {
+        "en": "No managed surfaces.",
+        "ja": "管理対象 surface はありません。"
+      },
+      "chronos_last_control_action": {
+        "en": "last control action",
+        "ja": "前回の control action"
+      },
+      "chronos_background": {
+        "en": "background",
+        "ja": "background"
+      },
+      "chronos_running": {
+        "en": "running",
+        "ja": "running"
+      },
+      "chronos_stopped": {
+        "en": "stopped",
+        "ja": "stopped"
+      },
+      "chronos_detail": {
+        "en": "detail",
+        "ja": "detail"
+      },
+      "chronos_control_summary": {
+        "en": "control summary",
+        "ja": "control summary"
+      },
+      "chronos_requested_by": {
+        "en": "requested by",
+        "ja": "requested by"
+      },
+      "chronos_safe_actions": {
+        "en": "safe actions",
+        "ja": "safe actions"
+      },
+      "chronos_working": {
+        "en": "working",
+        "ja": "実行中"
+      },
+      "chronos_risky_actions_approval_required": {
+        "en": "risky actions · approval required",
+        "ja": "risky actions · approval required"
+      },
+      "chronos_control_model": {
+        "en": "Control Model",
+        "ja": "Control Model"
+      },
+      "chronos_control_model_description": {
+        "en": "Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.",
+        "ja": "Chronos は control surface です。mission や runtime state を直接変更しません。各 button は mission_controller、agent-runtime-supervisor、または surface_runtime を通じて deterministic backend action を発行し、その後 control-plane view を更新します。"
+      },
+      "chronos_live_agent_conversation": {
+        "en": "Live Agent Conversation",
+        "ja": "Live Agent Conversation"
+      },
+      "chronos_all_missions": {
+        "en": "all missions",
+        "ja": "all missions"
+      },
+      "chronos_no_mission_scoped_messages": {
+        "en": "No mission-scoped agent messages observed yet.",
+        "ja": "mission 単位の agent message はまだありません。"
+      },
+      "chronos_owner": {
+        "en": "owner",
+        "ja": "owner"
+      },
+      "chronos_channel": {
+        "en": "channel",
+        "ja": "channel"
+      },
+      "chronos_thread": {
+        "en": "thread",
+        "ja": "thread"
+      },
+      "chronos_selected_mission_thread": {
+        "en": "Selected Mission Thread",
+        "ja": "Selected Mission Thread"
+      },
+      "chronos_select_mission_to_inspect_thread": {
+        "en": "select a mission to inspect a unified thread",
+        "ja": "mission を選択して unified thread を確認します"
+      },
+      "chronos_no_unified_mission_thread": {
+        "en": "No unified mission thread is available yet.",
+        "ja": "unified mission thread はまだありません。"
+      },
+      "chronos_a2a_handoff_trail": {
+        "en": "A2A Handoff Trail",
+        "ja": "A2A Handoff Trail"
+      },
+      "chronos_no_a2a_handoffs_for_filter": {
+        "en": "No A2A handoffs observed for the current mission filter.",
+        "ja": "現在の mission filter では A2A handoff はありません。"
+      },
+      "chronos_mission": {
+        "en": "mission",
+        "ja": "mission"
+      },
+      "chronos_intent": {
+        "en": "intent",
+        "ja": "intent"
+      },
+      "chronos_recent_surface_outbox": {
+        "en": "Recent Surface Outbox",
+        "ja": "Recent Surface Outbox"
+      },
+      "chronos_no_recent_surface_outbox": {
+        "en": "No pending or recent surface outbox messages.",
+        "ja": "pending または recent な surface outbox message はありません。"
+      },
+      "chronos_correlation": {
+        "en": "correlation",
+        "ja": "correlation"
+      },
+      "chronos_clearing": {
+        "en": "clearing",
+        "ja": "削除中"
+      },
+      "chronos_clear_outbox": {
+        "en": "clear outbox",
+        "ja": "outbox を消去"
+      },
+      "chronos_agent_registry": {
+        "en": "Agent Registry",
+        "ja": "Agent Registry"
+      },
+      "chronos_no_agents_running": {
+        "en": "No agents running. Spawn one to get started.",
+        "ja": "稼働中の agent はありません。起動して開始してください。"
+      },
+      "chronos_refresh": {
+        "en": "Refresh",
+        "ja": "更新"
+      },
+      "chronos_close": {
+        "en": "Close",
+        "ja": "閉じる"
+      },
+      "chronos_no_logs_yet": {
+        "en": "No logs yet. Send a message to this agent first.",
+        "ja": "まだログはありません。先にこの agent へメッセージを送ってください。"
+      },
+      "chronos_from_manifest": {
+        "en": "From Manifest",
+        "ja": "Manifest から"
+      },
+      "chronos_custom": {
+        "en": "Custom",
+        "ja": "Custom"
+      },
+      "chronos_select_agent_definition": {
+        "en": "Select Agent Definition",
+        "ja": "Agent Definition を選択"
+      },
+      "chronos_all_agents_running": {
+        "en": "All defined agents are already running.",
+        "ja": "定義済み agent はすべて稼働中です。"
+      },
       "execution_brief": {
         "en": "Request understanding",
         "ja": "理解した依頼"
@@ -50,6 +326,58 @@
       "readiness_runtime": {
         "en": "missing runtime prerequisites",
         "ja": "実行環境が不足"
+      },
+      "cli_readiness": {
+        "en": "Readiness",
+        "ja": "実行準備度"
+      },
+      "cli_confidence": {
+        "en": "Confidence",
+        "ja": "確信度"
+      },
+      "cli_response_style": {
+        "en": "Response style",
+        "ja": "応答スタイル"
+      },
+      "cli_questions": {
+        "en": "Questions",
+        "ja": "質問"
+      },
+      "cli_reason": {
+        "en": "reason",
+        "ja": "理由"
+      },
+      "cli_default": {
+        "en": "default",
+        "ja": "既定"
+      },
+      "cli_impact": {
+        "en": "impact",
+        "ja": "影響"
+      },
+      "cli_next_actions": {
+        "en": "Next actions",
+        "ja": "次アクション"
+      },
+      "cli_command": {
+        "en": "command",
+        "ja": "コマンド"
+      },
+      "cli_pipeline": {
+        "en": "pipeline",
+        "ja": "パイプライン"
+      },
+      "cli_follow_up": {
+        "en": "follow-up",
+        "ja": "追加入力依頼"
+      },
+      "cli_findings": {
+        "en": "Findings",
+        "ja": "所見"
+      },
+      "cli_detail": {
+        "en": "detail",
+        "ja": "詳細"
       }
     }
   }

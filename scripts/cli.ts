@@ -528,60 +528,58 @@ function openArtifact(targetPath: string) {
 }
 
 function printOperatorPacket(packet: OperatorInteractionPacket) {
-  const locale = resolveLocale();
   printHeader();
   console.log(chalk.bold(packet.headline));
   console.log(packet.summary);
   if (packet.readiness) {
-    console.log(`${locale === 'ja' ? '実行準備度' : 'Readiness'}: ${packet.readiness}`);
+    console.log(`${t('cli_readiness')}: ${packet.readiness}`);
   }
   if (typeof packet.confidence === 'number') {
-    console.log(`${locale === 'ja' ? '確信度' : 'Confidence'}: ${packet.confidence}`);
+    console.log(`${t('cli_confidence')}: ${packet.confidence}`);
   }
   if (packet.suggested_response_style) {
-    console.log(`${locale === 'ja' ? '応答スタイル' : 'Response style'}: ${packet.suggested_response_style}`);
+    console.log(`${t('cli_response_style')}: ${packet.suggested_response_style}`);
   }
   if (packet.questions?.length) {
-    console.log(`\n${locale === 'ja' ? '質問' : 'Questions'}:`);
+    console.log(`\n${t('cli_questions')}:`);
     packet.questions.forEach(question => {
       console.log(`- ${chalk.bold(question.id)}: ${question.question}`);
-      console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${question.reason}`);
-      if (question.default_assumption) console.log(`  ${locale === 'ja' ? '既定' : 'default'}: ${question.default_assumption}`);
-      if (question.impact) console.log(`  ${locale === 'ja' ? '影響' : 'impact'}: ${question.impact}`);
+      console.log(`  ${t('cli_reason')}: ${question.reason}`);
+      if (question.default_assumption) console.log(`  ${t('cli_default')}: ${question.default_assumption}`);
+      if (question.impact) console.log(`  ${t('cli_impact')}: ${question.impact}`);
     });
   }
   if (packet.next_actions?.length) {
-    console.log(`\n${locale === 'ja' ? '次アクション' : 'Next actions'}:`);
+    console.log(`\n${t('cli_next_actions')}:`);
     packet.next_actions.forEach(action => {
       console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
-      if (action.reason) console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${action.reason}`);
-      if (action.suggested_command) console.log(`  ${locale === 'ja' ? 'コマンド' : 'command'}: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  ${locale === 'ja' ? 'パイプライン' : 'pipeline'}: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  ${locale === 'ja' ? '追加入力依頼' : 'follow-up'}: ${action.suggested_followup_request}`);
+      if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
+      if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
     });
   }
 }
 
 function printSystemStatusReport(report: SystemStatusReportLike) {
-  const locale = resolveLocale();
   printHeader();
   console.log(chalk.bold(report.headline));
   console.log(report.summary);
   if (report.findings?.length) {
-    console.log(`\n${locale === 'ja' ? '所見' : 'Findings'}:`);
+    console.log(`\n${t('cli_findings')}:`);
     report.findings.forEach(finding => {
       console.log(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
-      if (finding.detail) console.log(`  ${locale === 'ja' ? '詳細' : 'detail'}: ${finding.detail}`);
+      if (finding.detail) console.log(`  ${t('cli_detail')}: ${finding.detail}`);
     });
   }
   if (report.next_actions?.length) {
-    console.log(`\n${locale === 'ja' ? '次アクション' : 'Next actions'}:`);
+    console.log(`\n${t('cli_next_actions')}:`);
     report.next_actions.forEach(action => {
       console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
-      if (action.reason) console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${action.reason}`);
-      if (action.suggested_command) console.log(`  ${locale === 'ja' ? 'コマンド' : 'command'}: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  ${locale === 'ja' ? 'パイプライン' : 'pipeline'}: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  ${locale === 'ja' ? '追加入力依頼' : 'follow-up'}: ${action.suggested_followup_request}`);
+      if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
+      if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
     });
   }
 }
