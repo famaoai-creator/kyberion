@@ -4,6 +4,7 @@ import {
   safeExistsSync,
   safeExec,
   safeReadFile,
+  safeWriteFile,
   safeReaddir,
   safeStat,
   assertValidMobileAppProfileIndex,
@@ -47,6 +48,7 @@ interface ActuatorExampleCatalog {
 interface OperatorPacketAction {
   id: string;
   priority?: 'now' | 'next' | 'later';
+  next_action_type?: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
   action: string;
   reason?: string;
   suggested_command?: string;
@@ -80,6 +82,22 @@ interface SystemStatusReportLike {
   summary: string;
   findings?: Array<{ id: string; severity: string; message: string; detail?: string }>;
   next_actions?: OperatorPacketAction[];
+}
+
+interface NextActionExecutionOutcome {
+  kind: 'next-action-execution-outcome';
+  action_id: string;
+  action_title: string;
+  source_packet_path: string;
+  executed_via: 'command' | 'pipeline';
+  executed_target: string;
+  execution_failed: boolean;
+  failure_summary?: string;
+  recommended_next_action_type: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
+  deterministic_reason: string;
+  llm_consult_recommended: boolean;
+  llm_consult_prompt?: string;
+  timestamp: string;
 }
 
 interface OperatorResponsePreview {
@@ -552,7 +570,7 @@ function printOperatorPacket(packet: OperatorInteractionPacket) {
   if (packet.next_actions?.length) {
     console.log(`\n${t('cli_next_actions')}:`);
     packet.next_actions.forEach(action => {
-      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
+      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`);
       if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
       if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
       if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
@@ -575,7 +593,7 @@ function printSystemStatusReport(report: SystemStatusReportLike) {
   if (report.next_actions?.length) {
     console.log(`\n${t('cli_next_actions')}:`);
     report.next_actions.forEach(action => {
-      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
+      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`);
       if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
       if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
       if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
@@ -628,6 +646,68 @@ function tokenizeSuggestedCommand(command: string): string[] {
   return tokens.map(token => token.replace(/^['"]|['"]$/g, ''));
 }
 
+export function classifyNextActionExecutionOutcome(
+  packetPath: string,
+  action: OperatorPacketAction,
+  executedVia: 'command' | 'pipeline',
+  executedTarget: string,
+  executionFailed: boolean,
+  failureSummary: string | undefined,
+  output: string,
+): NextActionExecutionOutcome {
+  const normalizedOutput = String(output || '').toLowerCase();
+  const explicitType = action.next_action_type;
+
+  let recommended: NextActionExecutionOutcome['recommended_next_action_type'] = explicitType || 'inspect';
+  let deterministicReason = explicitType
+    ? `The action declared next_action_type=${explicitType}.`
+    : 'No explicit next_action_type was provided, so inspection is the safe default.';
+
+  if (!explicitType) {
+    if (normalizedOutput.includes('missing input') || normalizedOutput.includes('clarification')) {
+      recommended = 'clarify';
+      deterministicReason = 'The execution output suggests that additional clarification is still required.';
+    } else if (normalizedOutput.includes('mission_controller.js resume') || normalizedOutput.includes('resum')) {
+      recommended = 'resume_mission';
+      deterministicReason = 'The execution path or output indicates a mission resume action.';
+    } else if (normalizedOutput.includes('mission_controller.js start') || normalizedOutput.includes('activate')) {
+      recommended = 'start_mission';
+      deterministicReason = 'The execution path or output indicates mission creation or activation.';
+    } else if (executedVia === 'pipeline') {
+      recommended = 'inspect';
+      deterministicReason = 'Pipeline execution completed; the next safe step is to inspect outputs and evidence.';
+    } else if (action.suggested_command) {
+      recommended = 'inspect';
+      deterministicReason = 'Command execution completed; the next safe step is to inspect resulting state or artifacts.';
+    }
+  }
+
+  const llmConsultRecommended = (
+    recommended === 'clarify' ||
+    normalizedOutput.includes('error') ||
+    normalizedOutput.includes('failed') ||
+    normalizedOutput.includes('warning')
+  );
+
+  return {
+    kind: 'next-action-execution-outcome',
+    action_id: action.id,
+    action_title: action.action,
+    source_packet_path: packetPath,
+    executed_via: executedVia,
+    executed_target: executedTarget,
+    execution_failed: executionFailed,
+    ...(failureSummary ? { failure_summary: failureSummary } : {}),
+    recommended_next_action_type: recommended,
+    deterministic_reason: deterministicReason,
+    llm_consult_recommended: llmConsultRecommended,
+    ...(llmConsultRecommended ? {
+      llm_consult_prompt: `Classify the outcome of next action "${action.id}" and propose the safest follow-up. Deterministic classification suggested "${recommended}". Output observed: ${output.slice(0, 1200)}`,
+    } : {}),
+    timestamp: new Date().toISOString(),
+  };
+}
+
 function acceptNextAction(packetPath: string, actionId: string) {
   const packet = loadPacketLike(packetPath);
   const nextActions = Array.isArray(packet.next_actions) ? packet.next_actions : [];
@@ -639,21 +719,48 @@ function acceptNextAction(packetPath: string, actionId: string) {
   console.log(chalk.bold(`Executing next action: ${action.id}`));
   console.log(action.action);
   let output = '';
-  if (action.suggested_command) {
-    const [command, ...args] = tokenizeSuggestedCommand(action.suggested_command);
-    if (!command) {
-      throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
+  let executedVia: 'command' | 'pipeline';
+  let executedTarget = '';
+  let executionFailed = false;
+  let failureSummary: string | undefined;
+  try {
+    if (action.suggested_command) {
+      const [command, ...args] = tokenizeSuggestedCommand(action.suggested_command);
+      if (!command) {
+        throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
+      }
+      console.log(`Command: ${action.suggested_command}\n`);
+      output = safeExec(command, args, { cwd: rootDir, timeoutMs: 120000 });
+      executedVia = 'command';
+      executedTarget = action.suggested_command;
+    } else if (action.suggested_pipeline_path) {
+      console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
+      output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path], {
+        cwd: rootDir,
+        timeoutMs: 120000,
+      });
+      executedVia = 'pipeline';
+      executedTarget = action.suggested_pipeline_path;
+    } else {
+      throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path.`);
     }
-    console.log(`Command: ${action.suggested_command}\n`);
-    output = safeExec(command, args, { cwd: rootDir, timeoutMs: 120000 });
-  } else if (action.suggested_pipeline_path) {
-    console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
-    output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path], {
-      cwd: rootDir,
-      timeoutMs: 120000,
-    });
-  } else {
-    throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path.`);
+  } catch (error: any) {
+    executionFailed = true;
+    failureSummary = error?.message || String(error);
+    const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
+    const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+    output = [stdout, stderr, failureSummary].filter(Boolean).join('\n');
+    if (!executedTarget) {
+      if (action.suggested_command) {
+        executedVia = 'command';
+        executedTarget = action.suggested_command;
+      } else if (action.suggested_pipeline_path) {
+        executedVia = 'pipeline';
+        executedTarget = action.suggested_pipeline_path;
+      } else {
+        throw error;
+      }
+    }
   }
   if (output) {
     process.stdout.write(output);
@@ -661,6 +768,13 @@ function acceptNextAction(packetPath: string, actionId: string) {
       process.stdout.write('\n');
     }
   }
+  const outcome = classifyNextActionExecutionOutcome(packetPath, action, executedVia, executedTarget, executionFailed, failureSummary, output);
+  const outcomePath = path.join(rootDir, 'active/shared/tmp/orchestrator', `next-action-outcome-${action.id}.json`);
+  safeWriteFile(outcomePath, JSON.stringify(outcome, null, 2));
+  console.log(`\nOutcome classification: ${outcome.recommended_next_action_type}`);
+  console.log(`Reason: ${outcome.deterministic_reason}`);
+  console.log(`LLM consult recommended: ${outcome.llm_consult_recommended ? 'yes' : 'no'}`);
+  console.log(`Outcome artifact: ${outcomePath}`);
   if (packet.kind === 'operator-interaction-packet' && packet.refresh_command && packet.refresh_packet_path) {
     console.log('\nRefreshing status packet...\n');
     const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
