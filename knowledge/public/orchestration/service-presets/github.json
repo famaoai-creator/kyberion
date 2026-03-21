@@ -1,0 +1,56 @@
+{
+  "service_id": "github",
+  "name": "GitHub REST API Presets",
+  "base_url": "https://api.github.com",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "create_issue": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues",
+      "method": "POST",
+      "description": "Creates a new issue in a repository.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" },
+        "body": { "required": false, "type": "string" }
+      },
+      "output_mapping": { "id": "number", "url": "html_url" }
+    },
+    "list_repos": {
+      "type": "api",
+      "path": "user/repos",
+      "method": "GET",
+      "description": "Lists repositories for the authenticated user.",
+      "parameters": {
+        "sort": { "default": "updated" },
+        "per_page": { "default": 30 }
+      }
+    },
+    "create_pull_request": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls",
+      "method": "POST",
+      "description": "Creates a pull request.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" },
+        "head": { "required": true, "type": "string" },
+        "base": { "required": true, "type": "string" }
+      },
+      "output_mapping": { "number": "number", "url": "html_url" }
+    },
+    "merge_pull_request": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/merge",
+      "method": "PUT",
+      "description": "Merges a pull request.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" }
+      }
+    }
+  }
+}

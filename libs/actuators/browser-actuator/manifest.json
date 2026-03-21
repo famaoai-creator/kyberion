@@ -1,0 +1,15 @@
+{
+  "actuator_id": "browser-actuator",
+  "version": "1.0.0",
+  "description": "Playwright-driven Web Browser Actuator",
+  "capabilities": [
+    { "op": "goto", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "click", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "fill", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "snapshot", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "content", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "screenshot", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pdf", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "export_session_handoff", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
