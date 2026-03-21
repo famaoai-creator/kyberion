@@ -1,0 +1,43 @@
+{
+  "service_id": "vision",
+  "name": "Kyberion Visual Generation and Capture Unified Presets",
+  "operations": {
+    "generate_image": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "api",
+          "base_url": "http://127.0.0.1:8188",
+          "path": "prompt",
+          "method": "POST",
+          "description": "Local ComfyUI via HTTP API"
+        },
+        {
+          "type": "cli",
+          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "args": ["run", "--workflow", "active/shared/tmp/temp_vision_workflow.json", "--wait"],
+          "description": "Local ComfyUI via CLI"
+        }
+      ]
+    },
+    "capture_screen": {
+      "type": "cli",
+      "command": "screencapture",
+      "args": ["-x", "-t", "jpg", "{{output}}"],
+      "description": "macOS Native Screen Capture",
+      "parameters": {
+        "output": { "default": "active/shared/exports/screen_capture.jpg" }
+      }
+    },
+    "record_screen": {
+      "type": "cli",
+      "command": "ffmpeg",
+      "args": ["-f", "avfoundation", "-i", "1:0", "-t", "{{duration}}", "-y", "{{output}}"],
+      "description": "Screen Recording via FFmpeg",
+      "parameters": {
+        "output": { "default": "active/shared/exports/screen_record.mp4" },
+        "duration": { "default": "5" }
+      }
+    }
+  }
+}

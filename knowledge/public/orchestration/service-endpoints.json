@@ -27,6 +27,12 @@
     "smoke-test": {
       "base_url": "https://postman-echo.com",
       "preset_path": "knowledge/public/orchestration/service-presets/smoke-test.json"
+    },
+    "vision": {
+      "preset_path": "knowledge/public/orchestration/service-presets/vision.json"
+    },
+    "voice": {
+      "preset_path": "knowledge/public/orchestration/service-presets/voice.json"
     }
   }
 }

@@ -3,7 +3,8 @@ import {
   safeWriteFile, 
   safeReaddir, 
   safeStat,
-  safeFsyncFile
+  safeFsyncFile,
+  safeExistsSync
 } from './secure-io.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
