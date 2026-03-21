@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "default_locale": "en",
+  "domains": {
+    "ux": {
+      "execution_brief": {
+        "en": "Request understanding",
+        "ja": "理解した依頼"
+      },
+      "resolution_plan": {
+        "en": "Execution plan",
+        "ja": "実行計画"
+      },
+      "pipeline_bundle": {
+        "en": "Execution bundle",
+        "ja": "実行セット"
+      },
+      "execution_plan_set": {
+        "en": "Generated execution files",
+        "ja": "実行ファイル群"
+      },
+      "delivery_pack": {
+        "en": "Deliverable pack",
+        "ja": "成果物パック"
+      },
+      "operator_interaction_packet": {
+        "en": "Interaction card",
+        "ja": "対話カード"
+      },
+      "operator_response_preview": {
+        "en": "Response preview",
+        "ja": "返答プレビュー"
+      },
+      "system_status_report": {
+        "en": "Status report",
+        "ja": "状態レポート"
+      },
+      "readiness_ready": {
+        "en": "ready to run",
+        "ja": "そのまま実行可能"
+      },
+      "readiness_clarification": {
+        "en": "needs clarification",
+        "ja": "追加確認が必要"
+      },
+      "readiness_assets": {
+        "en": "needs external assets",
+        "ja": "外部素材が必要"
+      },
+      "readiness_runtime": {
+        "en": "missing runtime prerequisites",
+        "ja": "実行環境が不足"
+      }
+    }
+  }
+}

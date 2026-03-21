@@ -28,9 +28,17 @@ Distilled operational knowledge or reusable method stored in the knowledge tier,
 
 A human-readable structured contract between reasoning and execution layers. In Kyberion, ADF is preferred over opaque script fragments.
 
+### Operator Interaction Packet
+
+A human-facing interaction contract that carries clarification prompts, status summaries, delivery summaries, and recommended next actions without exposing raw internal execution details.
+
 ### Mission
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
+
+### Project Operating System
+
+A document/control model that treats project artifacts as an operating system for decision-making, delivery, validation, and transfer rather than as a loose bundle of documents.
 
 ### Mission Lease
 
@@ -72,9 +80,29 @@ The cleanup and learning phase where results are preserved as reusable wisdom.
 
 The reasoning/planning layer that interprets intent, chooses procedures, and shapes execution.
 
+### Intent Layer
+
+The human-facing layer where requests, clarification, status explanations, and next actions are handled.
+
+### Control Layer
+
+The operational governance layer where missions, projects, phases, gates, leases, and ledgers are managed.
+
+### Knowledge Layer
+
+The reusable layer for procedures, schemas, templates, policies, catalogs, and profiles.
+
 ### Spinal Cord
 
 The actuator layer that performs the physical work chosen by the reasoning layer.
+
+### Execution Layer
+
+The deterministic layer where actuators, pipelines, generated plans, and governed artifact output run.
+
+### Memory Layer
+
+The layer where evidence, reports, distillation output, and accumulated operational history are retained.
 
 ### Nerve System
 

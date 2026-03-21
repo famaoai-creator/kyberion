@@ -56,7 +56,7 @@ interface OperatorPacketAction {
 
 interface OperatorInteractionPacket {
   kind: 'operator-interaction-packet';
-  interaction_type: 'clarification' | 'execution-preview' | 'status-summary';
+  interaction_type: 'clarification' | 'execution-preview' | 'status-summary' | 'delivery-summary';
   headline: string;
   summary: string;
   readiness?: string;
@@ -106,10 +106,54 @@ interface WebAppProfileIndexRecord {
 }
 
 const rootDir = pathResolver.rootDir();
+const vocabularyPath = pathResolver.knowledge('public/orchestration/user-facing-vocabulary.json');
 const indexCandidates = [
   pathResolver.knowledge('public/orchestration/global_actuator_index.json'),
   pathResolver.knowledge('orchestration/global_actuator_index.json'),
 ];
+
+type VocabularyCatalog = {
+  default_locale: string;
+  domains?: Record<string, Record<string, Record<string, string>>>;
+};
+
+function resolveLocale(args: string[] = process.argv.slice(2)): string {
+  const localeArgIndex = args.indexOf('--locale');
+  const localeArg = localeArgIndex >= 0 ? args[localeArgIndex + 1] : '';
+  const envLocale = process.env.KYBERION_UI_LOCALE || process.env.LANG || '';
+  const rawLocale = String(localeArg || envLocale || 'en').trim();
+  const normalized = rawLocale.replace(/_/g, '-').toLowerCase();
+  if (normalized.startsWith('ja')) return 'ja';
+  return 'en';
+}
+
+function stripLocaleArg(args: string[]): string[] {
+  const nextArgs = [...args];
+  const localeArgIndex = nextArgs.indexOf('--locale');
+  if (localeArgIndex === -1) {
+    return nextArgs;
+  }
+  nextArgs.splice(localeArgIndex, nextArgs[localeArgIndex + 1] ? 2 : 1);
+  return nextArgs;
+}
+
+function loadVocabularyCatalog(): VocabularyCatalog | null {
+  if (!safeExistsSync(vocabularyPath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(safeReadFile(vocabularyPath, { encoding: 'utf8' }) as string) as VocabularyCatalog;
+  } catch {
+    return null;
+  }
+}
+
+function t(key: string, locale = resolveLocale()): string {
+  const catalog = loadVocabularyCatalog();
+  const entry = catalog?.domains?.ux?.[key];
+  if (!entry) return key;
+  return entry[locale] || entry[catalog?.default_locale || 'en'] || key;
+}
 
 export function resolveIndexPath(): string {
   const resolved = indexCandidates.find(candidate => safeExistsSync(candidate));
@@ -484,58 +528,60 @@ function openArtifact(targetPath: string) {
 }
 
 function printOperatorPacket(packet: OperatorInteractionPacket) {
+  const locale = resolveLocale();
   printHeader();
   console.log(chalk.bold(packet.headline));
   console.log(packet.summary);
   if (packet.readiness) {
-    console.log(`Readiness: ${packet.readiness}`);
+    console.log(`${locale === 'ja' ? '実行準備度' : 'Readiness'}: ${packet.readiness}`);
   }
   if (typeof packet.confidence === 'number') {
-    console.log(`Confidence: ${packet.confidence}`);
+    console.log(`${locale === 'ja' ? '確信度' : 'Confidence'}: ${packet.confidence}`);
   }
   if (packet.suggested_response_style) {
-    console.log(`Response style: ${packet.suggested_response_style}`);
+    console.log(`${locale === 'ja' ? '応答スタイル' : 'Response style'}: ${packet.suggested_response_style}`);
   }
   if (packet.questions?.length) {
-    console.log('\nQuestions:');
+    console.log(`\n${locale === 'ja' ? '質問' : 'Questions'}:`);
     packet.questions.forEach(question => {
       console.log(`- ${chalk.bold(question.id)}: ${question.question}`);
-      console.log(`  reason: ${question.reason}`);
-      if (question.default_assumption) console.log(`  default: ${question.default_assumption}`);
-      if (question.impact) console.log(`  impact: ${question.impact}`);
+      console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${question.reason}`);
+      if (question.default_assumption) console.log(`  ${locale === 'ja' ? '既定' : 'default'}: ${question.default_assumption}`);
+      if (question.impact) console.log(`  ${locale === 'ja' ? '影響' : 'impact'}: ${question.impact}`);
     });
   }
   if (packet.next_actions?.length) {
-    console.log('\nNext actions:');
+    console.log(`\n${locale === 'ja' ? '次アクション' : 'Next actions'}:`);
     packet.next_actions.forEach(action => {
       console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
-      if (action.reason) console.log(`  reason: ${action.reason}`);
-      if (action.suggested_command) console.log(`  command: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  pipeline: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  follow-up: ${action.suggested_followup_request}`);
+      if (action.reason) console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${action.reason}`);
+      if (action.suggested_command) console.log(`  ${locale === 'ja' ? 'コマンド' : 'command'}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  ${locale === 'ja' ? 'パイプライン' : 'pipeline'}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  ${locale === 'ja' ? '追加入力依頼' : 'follow-up'}: ${action.suggested_followup_request}`);
     });
   }
 }
 
 function printSystemStatusReport(report: SystemStatusReportLike) {
+  const locale = resolveLocale();
   printHeader();
   console.log(chalk.bold(report.headline));
   console.log(report.summary);
   if (report.findings?.length) {
-    console.log('\nFindings:');
+    console.log(`\n${locale === 'ja' ? '所見' : 'Findings'}:`);
     report.findings.forEach(finding => {
       console.log(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
-      if (finding.detail) console.log(`  detail: ${finding.detail}`);
+      if (finding.detail) console.log(`  ${locale === 'ja' ? '詳細' : 'detail'}: ${finding.detail}`);
     });
   }
   if (report.next_actions?.length) {
-    console.log('\nNext actions:');
+    console.log(`\n${locale === 'ja' ? '次アクション' : 'Next actions'}:`);
     report.next_actions.forEach(action => {
       console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}: ${action.action}`);
-      if (action.reason) console.log(`  reason: ${action.reason}`);
-      if (action.suggested_command) console.log(`  command: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  pipeline: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  follow-up: ${action.suggested_followup_request}`);
+      if (action.reason) console.log(`  ${locale === 'ja' ? '理由' : 'reason'}: ${action.reason}`);
+      if (action.suggested_command) console.log(`  ${locale === 'ja' ? 'コマンド' : 'command'}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path) console.log(`  ${locale === 'ja' ? 'パイプライン' : 'pipeline'}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request) console.log(`  ${locale === 'ja' ? '追加入力依頼' : 'follow-up'}: ${action.suggested_followup_request}`);
     });
   }
 }
@@ -705,7 +751,8 @@ export async function main(args = process.argv.slice(2)) {
   printMissionContextBanner(missionId);
 
   const actuators = loadActuators();
-  const [command = 'help', firstArg, ...restArgs] = args;
+  const normalizedArgs = stripLocaleArg(args);
+  const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (command === 'help' || command === '--help' || command === '-h') {
     printHelp(actuators);
