@@ -48,6 +48,11 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/public/schemas/web-app-profile-index.schema.json',
     dataPath: 'knowledge/public/orchestration/web-app-profiles/index.json',
   },
+  {
+    id: 'user-facing-vocabulary',
+    schemaPath: 'knowledge/public/schemas/user-facing-vocabulary.schema.json',
+    dataPath: 'knowledge/public/orchestration/user-facing-vocabulary.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -103,6 +108,25 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       if (!profilePath) continue;
       if (!safeExistsSync(path.resolve(ROOT, profilePath))) {
         violations.push(`${check.id}: referenced profile not found (${profilePath})`);
+      }
+    }
+  }
+
+  if (check.id === 'user-facing-vocabulary') {
+    const typed = data as {
+      default_locale?: string;
+      domains?: Record<string, Record<string, Record<string, string>>>;
+    };
+    const defaultLocale = String(typed.default_locale || '');
+    const domains = typed.domains || {};
+    if (!defaultLocale) {
+      violations.push('user-facing-vocabulary: default_locale must not be empty');
+    }
+    for (const [domainName, domainEntries] of Object.entries(domains)) {
+      for (const [entryKey, localized] of Object.entries(domainEntries || {})) {
+        if (!localized[defaultLocale]) {
+          violations.push(`user-facing-vocabulary: ${domainName}.${entryKey} must define the default locale "${defaultLocale}"`);
+        }
       }
     }
   }

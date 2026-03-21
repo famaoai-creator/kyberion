@@ -2,6 +2,12 @@
 
 Kyberion is a sovereign-agent ecosystem organized around a small number of high-leverage layers. This document is the practical "where do I start?" map for the current repository.
 
+For a layer-oriented view of the concepts themselves, read:
+
+- `docs/USER_EXPERIENCE_CONTRACT.md`
+- `knowledge/public/architecture/kyberion-concept-map.md`
+- `knowledge/public/architecture/llm-execution-boundary.md`
+
 ## System at a glance
 
 ```text
@@ -15,6 +21,24 @@ Sovereign intent
   -> active/ and presence/ runtime state and signals
   -> satellites/* external channels and edge integrations
 ```
+
+## Layer model
+
+Kyberion is easier to understand when concepts are separated into five layers:
+
+- `Intent`
+  - human requests, clarification, operator packets, next actions
+- `Control`
+  - missions, projects, phases, gates, ledgers
+- `Knowledge`
+  - procedures, schemas, templates, policies, catalogs
+- `Execution`
+  - actuators, pipelines, generated pipelines, delivery packs
+- `Memory`
+  - evidence, run reports, status reports, distillation, wisdom
+
+This repo map focuses on the physical layout.
+The concept map explains how those ideas fit together logically.
 
 ## Top-level directories
 

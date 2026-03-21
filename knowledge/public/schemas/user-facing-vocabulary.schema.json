@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User Facing Vocabulary Catalog",
+  "type": "object",
+  "required": ["version", "default_locale", "domains"],
+  "properties": {
+    "version": { "type": "string" },
+    "default_locale": { "type": "string", "minLength": 2 },
+    "domains": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

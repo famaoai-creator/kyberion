@@ -6,6 +6,7 @@ import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { SovereignChat } from "../components/SovereignChat";
 import { AgentPanel } from "../components/AgentPanel";
 import { MissionIntelligence } from "../components/MissionIntelligence";
+import { resolveChronosLocale } from "../lib/ux-vocabulary";
 
 type QuickAction = {
   label: string;
@@ -102,6 +103,7 @@ const STATUS_CARDS: StatusCard[] = [
 ];
 
 export default function ChronosMirrorV2() {
+  const locale = resolveChronosLocale();
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
@@ -144,7 +146,7 @@ export default function ChronosMirrorV2() {
     element.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const activeSurfaceTitle = useMemo(() => surface?.title || "Mission Intelligence", [surface?.title]);
+  const activeSurfaceTitle = useMemo(() => surface?.title || (locale === "ja" ? "ミッション・インテリジェンス" : "Mission Intelligence"), [surface?.title, locale]);
 
   return (
     <main className="min-h-screen w-screen overflow-hidden bg-[#081019] text-kyberion-gold">
@@ -165,10 +167,14 @@ export default function ChronosMirrorV2() {
               <div>
                 <div className="text-[10px] uppercase tracking-[0.35em] text-cyan-100/55">Chronos Mirror</div>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-                  Clear operator view for mission state, runtime health, and delivery flow.
+                  {locale === "ja"
+                    ? "ミッション状態、ランタイム健全性、デリバリーフローを明瞭に扱う operator view."
+                    : "Clear operator view for mission state, runtime health, and delivery flow."}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200/70">
-                  Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.
+                  {locale === "ja"
+                    ? "左から順に、意図を選び、現在の surface を確認し、control plane か runtime doctor が必要と示したときだけ介入します。"
+                    : "Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to."}
                 </p>
               </div>
             </div>
@@ -178,7 +184,7 @@ export default function ChronosMirrorV2() {
               className="flex items-center gap-2 self-start rounded-xl border border-cyan-200/15 bg-cyan-300/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-50 transition hover:border-cyan-200/35 hover:bg-cyan-300/16"
             >
               <Cpu size={14} />
-              <span>Agent Runtimes</span>
+              <span>{locale === "ja" ? "Agent Runtime" : "Agent Runtimes"}</span>
             </button>
           </div>
         </header>
@@ -189,8 +195,8 @@ export default function ChronosMirrorV2() {
               <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Quick Actions</div>
-                    <div className="mt-1 text-sm text-slate-200/65">Grouped by operator intent.</div>
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">{locale === "ja" ? "Quick Action" : "Quick Actions"}</div>
+                    <div className="mt-1 text-sm text-slate-200/65">{locale === "ja" ? "operator の意図ごとに整理。" : "Grouped by operator intent."}</div>
                   </div>
                 </div>
 
@@ -255,7 +261,7 @@ export default function ChronosMirrorV2() {
                         </div>
                       </div>
                       <p className="mt-3 text-[11px] leading-5 text-slate-200/58">{card.detail}</p>
-                      <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">Jump to section</div>
+                      <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">{locale === "ja" ? "セクションへ移動" : "Jump to section"}</div>
                     </button>
                   );
                 })}
