@@ -1,0 +1,23 @@
+{
+  "actuator_id": "system-actuator",
+  "version": "1.0.0",
+  "description": "System-level control and execution",
+  "capabilities": [
+    { "op": "shell", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mkdir", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "glob_files", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "vision_consult", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "pulse_status", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "regex_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "json_query", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "sre_analyze", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "run_js", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "keyboard", "platforms": ["darwin"] },
+    { "op": "mouse_click", "platforms": ["darwin"] },
+    { "op": "voice", "platforms": ["darwin"] },
+    { "op": "notify", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

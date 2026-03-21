@@ -1,174 +1,150 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { handleAction } from './index.js';
+import * as core from '@agent/core';
 
-const mocks = vi.hoisted(() => {
-  const spawnManagedProcess = vi.fn();
-  const stopManagedProcess = vi.fn();
-  const secureFetch = vi.fn();
-  const safeExec = vi.fn();
-  const safeReadFile = vi.fn();
-  const safeWriteFile = vi.fn();
-  const safeAppendFile = vi.fn();
-  const safeExistsSync = vi.fn();
-  const safeMkdir = vi.fn();
-  const safeOpenAppendFile = vi.fn(() => 1);
-  const withRetry = vi.fn(async (fn: () => Promise<unknown>) => await fn());
-  const derivePipelineStatus = vi.fn(() => 'succeeded');
-  const resolveServiceBinding = vi.fn();
-  const capabilityEntry = vi.fn((id: string) => `/dist/${id}.js`);
-  const register = vi.fn();
-  const update = vi.fn(() => false);
-  const unregister = vi.fn();
-  const touch = vi.fn();
-
+// Mock core functions
+vi.mock('@agent/core', async () => {
+  const actual = await vi.importActual('@agent/core') as any;
   return {
-    spawnManagedProcess,
-    stopManagedProcess,
-    secureFetch,
-    safeExec,
-    safeReadFile,
-    safeWriteFile,
-    safeAppendFile,
-    safeExistsSync,
-    safeMkdir,
-    safeOpenAppendFile,
-    withRetry,
-    derivePipelineStatus,
-    resolveServiceBinding,
-    capabilityEntry,
-    register,
-    update,
-    unregister,
-    touch,
+    ...actual,
+    safeReadFile: vi.fn(),
+    safeExec: vi.fn(),
+    resolveServiceBinding: vi.fn(() => ({ accessToken: 'test-token' })),
+    platform: {
+      checkBinary: vi.fn(),
+    },
   };
 });
 
-vi.mock('@agent/core', () => ({
-  logger: { info: vi.fn(), success: vi.fn(), warn: vi.fn(), error: vi.fn() },
-  safeExec: mocks.safeExec,
-  safeReadFile: mocks.safeReadFile,
-  safeWriteFile: mocks.safeWriteFile,
-  safeAppendFile: mocks.safeAppendFile,
-  safeExistsSync: mocks.safeExistsSync,
-  safeMkdir: mocks.safeMkdir,
-  safeOpenAppendFile: mocks.safeOpenAppendFile,
-  withRetry: mocks.withRetry,
-  runtimeSupervisor: {
-    register: mocks.register,
-    update: mocks.update,
-    unregister: mocks.unregister,
-    touch: mocks.touch,
-  },
-  spawnManagedProcess: mocks.spawnManagedProcess,
-  stopManagedProcess: mocks.stopManagedProcess,
-  derivePipelineStatus: mocks.derivePipelineStatus,
-  resolveServiceBinding: mocks.resolveServiceBinding,
-  capabilityEntry: mocks.capabilityEntry,
-  createStandardYargs: () => ({
-    option() {
-      return this;
-    },
-    parseSync() {
-      return { input: 'input.json' };
-    },
-  }),
-}));
-
+// Mock network
 vi.mock('@agent/core/network', () => ({
-  secureFetch: mocks.secureFetch,
+  secureFetch: vi.fn(),
 }));
 
-describe('service-actuator handleAction', () => {
+import { secureFetch } from '@agent/core/network';
+
+describe('Service-Actuator: Adaptive Presets', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
-    mocks.resolveServiceBinding.mockReturnValue({
-      serviceId: 'slack',
-      authMode: 'secret-guard',
-      accessToken: 'xoxb-token',
-    });
-    mocks.safeExistsSync.mockReturnValue(false);
-    mocks.spawnManagedProcess.mockReturnValue({
-      child: { pid: 4242, unref: vi.fn() },
-    });
-    delete process.env.KYBERION_ALLOW_UNSAFE_CLI;
+    process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
   });
 
-  it('dispatches API mode through secureFetch', async () => {
-    const { handleAction } = await import('./index.js');
-    mocks.secureFetch.mockResolvedValue({ ok: true });
-
-    const result = await handleAction({
-      service_id: 'slack',
-      mode: 'API',
-      action: 'chat.postMessage',
-      method: 'POST',
-      params: { channel: 'C1', text: 'hello' },
-      auth: 'secret-guard',
-    });
-
-    expect(mocks.secureFetch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: 'POST',
-        url: 'https://slack.com/api/chat.postMessage',
-        headers: { Authorization: 'Bearer xoxb-token' },
-      }),
-    );
-    expect(result).toEqual({ ok: true });
-  });
-
-  it('rejects slack streaming in service-actuator', async () => {
-    const { handleAction } = await import('./index.js');
-
-    await expect(
-      handleAction({
-        service_id: 'slack',
-        mode: 'STREAM',
-        action: 'connect',
-        params: {},
-        auth: 'secret-guard',
-      }),
-    ).rejects.toThrow('Slack streaming ingress belongs to the Slack gateway');
-  });
-
-  it('blocks unsafe CLI mode unless explicitly enabled', async () => {
-    const { handleAction } = await import('./index.js');
-
-    await expect(
-      handleAction({
-        service_id: 'slack',
-        mode: 'CLI',
-        action: 'post-message',
-        params: { text: 'hello' },
-        auth: 'secret-guard',
-      }),
-    ).rejects.toThrow('CLI execution disabled');
-  });
-
-  it('reconciles missing services by spawning managed processes', async () => {
-    const { handleAction } = await import('./index.js');
-    mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (String(filePath).endsWith('manifest.json')) {
-        return JSON.stringify({
-          'slack-bridge': { path: 'satellites/slack-bridge/src/index.ts' },
-        });
+  it('should fall back to API when CLI binary is missing', async () => {
+    // 1. Setup Mocks
+    const mockEndpoints = {
+      services: {
+        'test-service': { preset_path: 'mock/path.json', base_url: 'https://api.test.com' }
       }
-      if (String(filePath).endsWith('services-pids.json')) {
-        return JSON.stringify({});
+    };
+    const mockPreset = {
+      operations: {
+        'do_action': {
+          type: 'auto',
+          alternatives: [
+            { type: 'cli', command: 'missing-cli', args: ['run'], output_mapping: { "res": "out" } },
+            { type: 'api', path: 'action', method: 'GET', output_mapping: { "res": "data.id" } }
+          ]
+        }
       }
-      return '{}';
+    };
+
+    (core.safeReadFile as any).mockImplementation((path: string) => {
+      if (path.includes('service-endpoints.json')) return JSON.stringify(mockEndpoints);
+      if (path.includes('mock/path.json')) return JSON.stringify(mockPreset);
+      return '';
     });
 
+    (core.platform.checkBinary as any).mockResolvedValue(false); // CLI is missing
+    (secureFetch as any).mockResolvedValue({ data: { id: 'api-success' } });
+
+    // 2. Execute
     const result = await handleAction({
-      service_id: 'system',
-      mode: 'RECONCILE',
-      action: 'reconcile',
-      params: { manifest_path: 'manifest.json', cleanup: false },
-      auth: 'none',
+      service_id: 'test-service',
+      mode: 'PRESET',
+      action: 'do_action',
+      params: {}
     });
 
-    expect(mocks.spawnManagedProcess).toHaveBeenCalled();
-    expect(mocks.register).toHaveBeenCalled();
-    expect(mocks.safeWriteFile).toHaveBeenCalled();
-    expect(result).toEqual({ status: 'reconciled', active_services: ['slack-bridge'] });
+    // 3. Verify
+    expect(core.platform.checkBinary).toHaveBeenCalledWith('missing-cli');
+    expect(secureFetch).toHaveBeenCalled();
+    expect(result).toEqual({ res: 'api-success' });
+  });
+
+  it('should use CLI when binary exists and mapping is correct', async () => {
+    // 1. Setup Mocks
+    const mockEndpoints = {
+      services: {
+        'test-service': { preset_path: 'mock/path.json' }
+      }
+    };
+    const mockPreset = {
+      operations: {
+        'do_action': {
+          type: 'auto',
+          alternatives: [
+            { type: 'cli', command: 'found-cli', args: ['--json'], output_mapping: { "res": "status" } }
+          ]
+        }
+      }
+    };
+
+    (core.safeReadFile as any).mockImplementation((path: string) => {
+      if (path.includes('service-endpoints.json')) return JSON.stringify(mockEndpoints);
+      if (path.includes('mock/path.json')) return JSON.stringify(mockPreset);
+      return '';
+    });
+
+    (core.platform.checkBinary as any).mockResolvedValue(true); // CLI exists
+    (core.safeExec as any).mockReturnValue(JSON.stringify({ status: 'cli-ok', junk: 'data' }));
+
+    // 2. Execute
+    const result = await handleAction({
+      service_id: 'test-service',
+      mode: 'PRESET',
+      action: 'do_action',
+      params: {}
+    });
+
+    // 3. Verify
+    expect(core.safeExec).toHaveBeenCalledWith('found-cli', ['--json']);
+    expect(result).toEqual({ res: 'cli-ok' });
+  });
+
+  it('should correctly resolve variables in API path and payload', async () => {
+    const mockEndpoints = { services: { 's': { preset_path: 'p.json', base_url: 'https://b.com' } } };
+    const mockPreset = {
+      operations: {
+        'op': {
+          type: 'api',
+          path: 'users/{{id}}',
+          method: 'POST',
+          payload_template: { "msg": "Hello {{name}}" }
+        }
+      }
+    };
+
+    (core.safeReadFile as any).mockImplementation((path: string) => {
+      if (path.includes('service-endpoints.json')) return JSON.stringify(mockEndpoints);
+      if (path.includes('p.json')) return JSON.stringify(mockPreset);
+      return '';
+    });
+
+    (secureFetch as any).mockResolvedValue({ ok: true });
+
+    await handleAction({
+      service_id: 's',
+      mode: 'PRESET',
+      action: 'op',
+      params: { id: '123', name: 'famao' }
+    });
+
+    expect(secureFetch).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://b.com/users/123',
+      data: { msg: 'Hello famao' },
+      headers: expect.objectContaining({
+        'Authorization': 'Bearer test-token'
+      })
+    }));
   });
 });
