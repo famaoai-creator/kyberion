@@ -37,3 +37,21 @@ node dist/libs/actuators/media-actuator/src/index.js --input libs/actuators/medi
   抽出した theme / master をベースに派生 PowerPoint を生成
 - `proposal-storyline-pptx.json`:
   structured proposal brief から storyline と slide content を生成し、PPTX 提案書を render する
+- `document-brief-proposal-pptx.json`:
+  canonical な `document-brief` から提案書 PPTX を生成する。`presentation / proposal / pptx / layout_template_id` で区別する
+- `document-brief-mermaid-diagram.json`:
+  canonical な `document-brief` から Mermaid 図を生成する。`diagram / architecture-diagram / mmd` で区別する
+- `document-brief-d2-diagram.json`:
+  canonical な `document-brief` から D2 図を生成する。`diagram / process-diagram / d2` で区別する
+- `document-brief-drawio-diagram.json`:
+  canonical な `document-brief` から Draw.io 図を生成する。`diagram / architecture-diagram / drawio` で区別する
+- `document-brief-wbs-spreadsheet.json`:
+  canonical な `document-brief` から XLSX トラッカーを生成する。`spreadsheet / tracker / xlsx` で区別する
+- `document-brief-semantic-tracker-spreadsheet.json`:
+  canonical な `document-brief` から semantic payload だけで XLSX トラッカーを生成する。protocol file を必須にしない
+- `document-brief-report-docx.json`:
+  canonical な `document-brief` から DOCX レポートを生成する。`document / report / docx` で区別する
+- `document-brief-report-pdf.json`:
+  canonical な `document-brief` から PDF レポートを生成する。`document / report / pdf` で区別する
+- `document-brief-invoice-pdf.json`:
+  canonical な `document-brief` から請求書 PDF を生成する。区別は `artifact_family / document_type / document_profile / render_target / layout_template_id` で行う

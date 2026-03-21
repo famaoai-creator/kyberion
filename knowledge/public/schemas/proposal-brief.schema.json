@@ -21,6 +21,18 @@
       "type": "string",
       "minLength": 1
     },
+    "document_profile": {
+      "type": "string"
+    },
+    "layout_template_id": {
+      "type": "string"
+    },
+    "render_target": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
     "audience": {
       "type": "array",
       "items": { "type": "string" }

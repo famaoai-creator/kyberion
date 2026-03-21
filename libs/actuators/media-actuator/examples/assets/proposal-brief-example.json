@@ -1,5 +1,9 @@
 {
   "kind": "proposal-brief",
+  "document_profile": "executive-proposal",
+  "layout_template_id": "executive-neutral",
+  "render_target": "pptx",
+  "locale": "en-US",
   "title": "Digital Onboarding Transformation Proposal",
   "client": "Aster Bank",
   "objective": "Redesign onboarding and approval journeys to improve conversion and operational efficiency.",

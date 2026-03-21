@@ -1,0 +1,61 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "document",
+  "document_type": "report",
+  "document_profile": "summary-report",
+  "render_target": "docx",
+  "locale": "ja-JP",
+  "payload": {
+    "title": "Actuator Improvement Weekly Report",
+    "summary": "This report summarizes the current actuator abstraction progress and the next delivery tranche.",
+    "sections": [
+      {
+        "heading": "Current State",
+        "body": [
+          "Document-brief now routes invoice, proposal, and diagram deliverables through a canonical semantic contract."
+        ],
+        "callouts": [
+          {
+            "tone": "info",
+            "title": "Readiness",
+            "body": "Canonical routes now cover invoice, proposal, diagram, spreadsheet, and report deliverables."
+          }
+        ],
+        "tables": [
+          {
+            "title": "Canonical Coverage",
+            "columns": ["Family", "Type", "Targets"],
+            "rows": [
+              ["document", "invoice", "pdf"],
+              ["presentation", "proposal", "pptx"],
+              ["diagram", "architecture-diagram", "mmd / d2 / drawio"]
+            ]
+          }
+        ],
+        "bullets": [
+          "Invoice PDF is canonical",
+          "Proposal PPTX is canonical",
+          "Diagram outputs are canonical"
+        ]
+      },
+      {
+        "heading": "Next Focus",
+        "body": [
+          "Spreadsheet and report output are being aligned to the same abstraction."
+        ],
+        "callouts": [
+          {
+            "tone": "warning",
+            "title": "Remaining Work",
+            "body": "Move more tracker/report spacing, table styling, and validations into knowledge-owned layout catalogs."
+          }
+        ],
+        "bullets": [
+          "Spread canonical spreadsheet bridge",
+          "Refine report templates",
+          "Expand layout catalogs"
+        ]
+      }
+    ]
+  }
+}

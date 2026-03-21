@@ -266,10 +266,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'proposal_storyline_from_brief': {
       const fromKey = resolve(params.from) || 'last_json';
-      const brief = ctx[fromKey];
-      if (!brief || typeof brief !== 'object') {
+      const rawBrief = ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
         throw new Error(`proposal_storyline_from_brief could not find context key: ${fromKey}`);
       }
+      const brief = normalizeProposalBrief(rawBrief);
 
       const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
       const evidence = Array.isArray(brief.evidence) ? brief.evidence : [];
@@ -313,6 +314,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           title: brief.title || 'Proposal',
           client: brief.client,
           core_message: brief.story?.core_message,
+          document_profile: brief.document_profile,
+          layout_template_id: brief.layout_template_id,
           slides,
         },
       };
@@ -335,6 +338,90 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         ...ctx,
         [params.export_as || 'proposal_content_data']: contentData,
       };
+    }
+    case 'document_pdf_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const brief = ctx[fromKey];
+      if (!brief || typeof brief !== 'object') {
+        throw new Error(`document_pdf_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const invoiceProtocol = buildDocumentPdfProtocol(brief);
+      return {
+        ...ctx,
+        [params.export_as || 'last_pdf_design']: invoiceProtocol,
+      };
+    }
+    case 'document_diagram_asset_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`document_diagram_asset_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const brief = normalizeDiagramDocumentBrief(rawBrief);
+      const nextCtx: Record<string, any> = {
+        ...ctx,
+        [params.export_as || 'document_diagram_asset']: brief.payload.source || brief.payload.graph,
+        document_diagram_render_target: brief.render_target,
+        document_diagram_layout_template_id: brief.layout_template_id,
+        document_diagram_brief: brief,
+      };
+
+      if (brief.render_target === 'drawio') {
+        const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
+        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
+        nextCtx.last_drawio_document = generateDrawioDocument(brief.payload.graph, {
+          title: brief.payload.title || brief.title || 'Diagram',
+          theme: activeTheme,
+          iconMap,
+          iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+        });
+      } else if (typeof brief.payload.source === 'string') {
+        nextCtx.document_diagram_source = brief.payload.source;
+      }
+
+      return nextCtx;
+    }
+    case 'document_spreadsheet_design_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`document_spreadsheet_design_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const brief = normalizeSpreadsheetDocumentBrief(rootDir, rawBrief);
+      return {
+        ...ctx,
+        [params.export_as || 'last_xlsx_design']: brief.payload.protocol || buildTrackerSpreadsheetProtocol(rootDir, brief),
+        document_spreadsheet_brief: brief,
+      };
+    }
+    case 'document_report_design_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`document_report_design_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const brief = normalizeReportDocumentBrief(rawBrief);
+      if (brief.render_target === 'docx') {
+        return {
+          ...ctx,
+          [params.export_as || 'last_docx_design']: buildReportDocxProtocol(rootDir, brief),
+          document_report_brief: brief,
+        };
+      }
+
+      if (brief.render_target === 'pdf') {
+        return {
+          ...ctx,
+          [params.export_as || 'last_pdf_design']: buildReportPdfProtocol(rootDir, brief),
+          document_report_brief: brief,
+        };
+      }
+
+      throw new Error(`Unsupported report render_target: ${brief.render_target}`);
     }
     case 'drawio_from_graph': {
       const graph = resolveGraphDefinition(rootDir, params, ctx, resolve);
@@ -476,6 +563,1396 @@ function ensureParentDir(targetPath: string): void {
   const parentDir = path.dirname(targetPath);
   if (!safeExistsSync(parentDir)) {
     safeMkdir(parentDir, { recursive: true });
+  }
+}
+
+function normalizeInvoiceDocumentBrief(input: any): any {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Invoice document brief must be an object.');
+  }
+
+  if (input.kind !== 'document-brief') {
+    throw new Error(`Unsupported document brief kind: ${String(input.kind || 'unknown')}`);
+  }
+  if (input.artifact_family !== 'document') {
+    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+  }
+  if (input.document_type !== 'invoice') {
+    throw new Error(`Unsupported document_type in document-brief: ${String(input.document_type)}`);
+  }
+  if (input.render_target !== 'pdf') {
+    throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
+  }
+  if (!input.payload || typeof input.payload !== 'object') {
+    throw new Error('document-brief for invoice requires an object payload.');
+  }
+
+  return {
+    ...input.payload,
+    artifact_family: input.artifact_family,
+    document_type: input.document_type,
+    document_profile: input.document_profile || 'qualified-invoice',
+    render_target: input.render_target,
+    locale: input.locale || 'ja-JP',
+    layout_template_id: input.layout_template_id || input.payload.layout_template_id,
+  };
+}
+
+function normalizeProposalBrief(input: any): any {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Proposal brief must be an object.');
+  }
+
+  if (input.kind === 'document-brief') {
+    if (input.artifact_family !== 'presentation') {
+      throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+    }
+    if (input.document_type !== 'proposal') {
+      throw new Error(`Unsupported document_type in document-brief: ${String(input.document_type)}`);
+    }
+    if (input.render_target !== 'pptx') {
+      throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
+    }
+    if (!input.payload || typeof input.payload !== 'object') {
+      throw new Error('document-brief for proposal requires an object payload.');
+    }
+
+    return {
+      ...input.payload,
+      artifact_family: input.artifact_family,
+      document_type: input.document_type,
+      document_profile: input.document_profile || 'executive-proposal',
+      render_target: input.render_target,
+      locale: input.locale || 'en-US',
+      layout_template_id: input.layout_template_id || input.payload.layout_template_id,
+    };
+  }
+
+  if (input.kind === 'proposal-brief') {
+    return {
+      artifact_family: 'presentation',
+      document_type: 'proposal',
+      document_profile: input.document_profile || 'executive-proposal',
+      render_target: input.render_target || 'pptx',
+      locale: input.locale || 'en-US',
+      layout_template_id: input.layout_template_id,
+      ...input,
+    };
+  }
+
+  throw new Error(`Unsupported proposal brief kind: ${String(input.kind || 'unknown')}`);
+}
+
+function normalizeDiagramDocumentBrief(input: any): any {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Diagram document brief must be an object.');
+  }
+
+  if (input.kind !== 'document-brief') {
+    throw new Error(`Unsupported diagram brief kind: ${String(input.kind || 'unknown')}`);
+  }
+  if (input.artifact_family !== 'diagram') {
+    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+  }
+  if (!['mmd', 'd2', 'drawio'].includes(String(input.render_target))) {
+    throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
+  }
+  if (!input.payload || typeof input.payload !== 'object') {
+    throw new Error('document-brief for diagram requires an object payload.');
+  }
+
+  if (input.render_target === 'drawio') {
+    if (!input.payload.graph || typeof input.payload.graph !== 'object') {
+      throw new Error('document-brief for drawio requires payload.graph.');
+    }
+  } else if (typeof input.payload.source !== 'string' || !input.payload.source.trim()) {
+    throw new Error(`document-brief for ${input.render_target} requires payload.source.`);
+  }
+
+  return {
+    artifact_family: input.artifact_family,
+    document_type: input.document_type,
+    document_profile: input.document_profile || 'solution-overview',
+    render_target: input.render_target,
+    locale: input.locale || 'en-US',
+    layout_template_id: input.layout_template_id,
+    title: input.payload.title || input.title,
+    payload: input.payload,
+  };
+}
+
+function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): any {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Spreadsheet document brief must be an object.');
+  }
+  if (input.kind !== 'document-brief') {
+    throw new Error(`Unsupported spreadsheet brief kind: ${String(input.kind || 'unknown')}`);
+  }
+  if (input.artifact_family !== 'spreadsheet') {
+    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+  }
+  if (input.render_target !== 'xlsx') {
+    throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
+  }
+  if (!input.payload || typeof input.payload !== 'object') {
+    throw new Error('document-brief for spreadsheet requires an object payload.');
+  }
+
+  let protocol = input.payload.protocol;
+  if (!protocol && input.payload.protocol_path) {
+    const protocolPath = path.resolve(rootDir, input.payload.protocol_path);
+    protocol = JSON.parse(safeReadFile(protocolPath, { encoding: 'utf8' }) as string);
+  }
+  if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {
+    throw new Error('document-brief for spreadsheet requires payload.protocol, payload.protocol_path, or semantic payload.columns + payload.rows.');
+  }
+
+  return {
+    artifact_family: input.artifact_family,
+    document_type: input.document_type,
+    document_profile: input.document_profile || 'operator-tracker',
+    render_target: input.render_target,
+    locale: input.locale || 'en-US',
+    layout_template_id: input.layout_template_id,
+    payload: {
+      ...input.payload,
+      protocol,
+    },
+  };
+}
+
+function normalizeReportDocumentBrief(input: any): any {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Report document brief must be an object.');
+  }
+  if (input.kind !== 'document-brief') {
+    throw new Error(`Unsupported report brief kind: ${String(input.kind || 'unknown')}`);
+  }
+  if (input.artifact_family !== 'document') {
+    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+  }
+  if (input.document_type !== 'report') {
+    throw new Error(`Unsupported document_type in document-brief: ${String(input.document_type)}`);
+  }
+  if (!['docx', 'pdf'].includes(String(input.render_target))) {
+    throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
+  }
+  if (!input.payload || typeof input.payload !== 'object') {
+    throw new Error('document-brief for report requires an object payload.');
+  }
+  if (!Array.isArray(input.payload.sections) || input.payload.sections.length === 0) {
+    throw new Error('document-brief for report requires payload.sections.');
+  }
+
+  return {
+    artifact_family: input.artifact_family,
+    document_type: input.document_type,
+    document_profile: input.document_profile || 'summary-report',
+    render_target: input.render_target,
+    locale: input.locale || 'en-US',
+    layout_template_id: input.layout_template_id,
+    payload: input.payload,
+  };
+}
+
+function buildReportDocxProtocol(rootDir: string, brief: any): any {
+  const { template } = resolveDocumentLayoutTemplate(rootDir, {
+    document_type: 'report',
+    layout_template_id: brief.layout_template_id,
+  });
+  const docxLayout = template?.docx || {};
+  const headingFont = normalizeFontFamily(
+    brief.locale?.startsWith('ja')
+      ? template?.fonts?.heading || 'Meiryo'
+      : template?.fonts?.heading || 'Aptos',
+  );
+  const bodyFont = normalizeFontFamily(
+    brief.locale?.startsWith('ja')
+      ? template?.fonts?.body || 'Meiryo'
+      : template?.fonts?.body || 'Aptos',
+  );
+  const bodyBlocks: any[] = [
+    {
+      type: 'paragraph',
+      paragraph: {
+        pPr: { pStyle: 'Heading1' },
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: brief.payload.title || 'Report' }] } }],
+      },
+    },
+  ];
+
+  if (brief.payload.summary) {
+    bodyBlocks.push({
+      type: 'paragraph',
+      paragraph: {
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: brief.payload.summary }] } }],
+      },
+    });
+  }
+
+  for (const section of brief.payload.sections) {
+    bodyBlocks.push({
+      type: 'paragraph',
+      paragraph: {
+        pPr: { pStyle: 'Heading2' },
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: section.heading || 'Section' }] } }],
+      },
+    });
+
+    if (Array.isArray(section.body)) {
+      for (const paragraph of section.body) {
+        bodyBlocks.push({
+          type: 'paragraph',
+          paragraph: {
+            content: [{ type: 'run', run: { content: [{ type: 'text', text: String(paragraph) }] } }],
+          },
+        });
+      }
+    }
+
+    if (Array.isArray(section.bullets)) {
+      section.bullets.forEach((bullet: string) => {
+        bodyBlocks.push({
+          type: 'paragraph',
+          paragraph: {
+            pPr: { numPr: { ilvl: 0, numId: 1 } },
+            content: [{ type: 'run', run: { content: [{ type: 'text', text: String(bullet) }] } }],
+          },
+        });
+      });
+    }
+
+    if (Array.isArray(section.callouts)) {
+      section.callouts.forEach((callout: any) => {
+        const title = [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ');
+        if (title) {
+          bodyBlocks.push({
+            type: 'paragraph',
+            paragraph: {
+              content: [{
+                type: 'run',
+                run: {
+                  rPr: { bold: true, color: { val: String(template?.colors?.accent || '#2563eb').replace('#', '') } },
+                  content: [{ type: 'text', text: title }],
+                },
+              }],
+            },
+          });
+        }
+        if (callout.body) {
+          bodyBlocks.push({
+            type: 'paragraph',
+            paragraph: {
+              content: [{ type: 'run', run: { content: [{ type: 'text', text: String(callout.body) }] } }],
+            },
+          });
+        }
+      });
+    }
+
+    if (Array.isArray(section.tables)) {
+      section.tables.forEach((table: any) => {
+        if (table.title) {
+          bodyBlocks.push({
+            type: 'paragraph',
+            paragraph: {
+              content: [{
+                type: 'run',
+                run: {
+                  rPr: { bold: true },
+                  content: [{ type: 'text', text: String(table.title) }],
+                },
+              }],
+            },
+          });
+        }
+        const columns = Array.isArray(table.columns) ? table.columns.map((value: any) => String(value)) : [];
+        const rows = Array.isArray(table.rows) ? table.rows : [];
+        if (columns.length === 0) {
+          return;
+        }
+        const cellWidth = Math.floor(7500 / columns.length);
+        bodyBlocks.push({
+          type: 'table',
+          table: {
+            tblPr: {
+              tblStyle: 'TableGrid',
+              tblW: { w: 5000, type: 'pct' },
+              tblBorders: {
+                top: { val: 'single', sz: 4, color: 'CBD5E1' },
+                left: { val: 'single', sz: 4, color: 'CBD5E1' },
+                bottom: { val: 'single', sz: 4, color: 'CBD5E1' },
+                right: { val: 'single', sz: 4, color: 'CBD5E1' },
+                insideH: { val: 'single', sz: 4, color: 'CBD5E1' },
+                insideV: { val: 'single', sz: 4, color: 'CBD5E1' },
+              },
+            },
+            tblGrid: columns.map(() => cellWidth),
+            rows: [
+              {
+                trPr: { tblHeader: true },
+                cells: columns.map((column: string) => ({
+                  tcPr: {
+                    tcW: { w: cellWidth, type: 'dxa' },
+                    shd: { val: 'clear', fill: String(template?.colors?.primary || '#1f2937').replace('#', '') },
+                  },
+                  content: [{
+                    type: 'paragraph',
+                    paragraph: {
+                      content: [{
+                        type: 'run',
+                        run: {
+                          rPr: { bold: true, color: { val: 'FFFFFF' } },
+                          content: [{ type: 'text', text: column }],
+                        },
+                      }],
+                    },
+                  }],
+                })),
+              },
+              ...rows.map((row: any) => {
+                const values = Array.isArray(row)
+                  ? row
+                  : columns.map((column: string) => row?.[column] ?? '');
+                return {
+                  cells: values.map((value: any) => ({
+                    tcPr: { tcW: { w: cellWidth, type: 'dxa' } },
+                    content: [{
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [{
+                          type: 'run',
+                          run: { content: [{ type: 'text', text: String(value ?? '') }] },
+                        }],
+                      },
+                    }],
+                  })),
+                };
+              }),
+            ],
+          },
+        });
+      });
+    }
+  }
+
+  return {
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+    theme: {
+      colors: { dk1: '111827', lt1: 'FFFFFF', accent1: '2563EB' },
+      majorFont: headingFont,
+      minorFont: headingFont,
+    },
+    styles: {
+      docDefaults: {
+        rPrDefault: { rFonts: { ascii: bodyFont, hAnsi: bodyFont, eastAsia: bodyFont }, sz: 22 },
+      },
+      definitions: [
+        { styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true },
+        {
+          styleId: 'Heading1',
+          type: 'paragraph',
+          name: 'Heading 1',
+          pPr: { spacing: { after: docxLayout.title_spacing_after || 160 } },
+          rPr: { bold: true, sz: docxLayout.title_font_size || 32 },
+        },
+        {
+          styleId: 'Heading2',
+          type: 'paragraph',
+          name: 'Heading 2',
+          pPr: {
+            spacing: {
+              before: docxLayout.section_spacing_before || 120,
+              after: docxLayout.section_spacing_after || 80,
+            },
+          },
+          rPr: { bold: true, sz: docxLayout.section_font_size || 26 },
+        },
+      ],
+    },
+    numbering: {
+      abstractNums: [{ abstractNumId: 0, levels: [{ ilvl: 0, numFmt: 'bullet', lvlText: '•', jc: 'left' }] }],
+      nums: [{ numId: 1, abstractNumId: 0 }],
+    },
+    body: bodyBlocks,
+    sections: [{
+      pgSz: {
+        w: docxLayout.page?.width || 11906,
+        h: docxLayout.page?.height || 16838,
+      },
+      pgMar: {
+        top: docxLayout.page?.margin_top || 1440,
+        right: docxLayout.page?.margin_right || 1440,
+        bottom: docxLayout.page?.margin_bottom || 1440,
+        left: docxLayout.page?.margin_left || 1440,
+        header: docxLayout.page?.header || 720,
+        footer: docxLayout.page?.footer || 720,
+      },
+    }],
+    headersFooters: [],
+    relationships: [],
+  };
+}
+
+function buildReportPdfProtocol(rootDir: string, brief: any): any {
+  const { template, templateId } = resolveDocumentLayoutTemplate(rootDir, {
+    document_type: 'report',
+    layout_template_id: brief.layout_template_id,
+  });
+  const pdfLayout = template?.pdf || {};
+  const hexToPdfRgb = (hex: string | undefined, fallback: [number, number, number]): [number, number, number] => {
+    if (!hex || typeof hex !== 'string') return fallback;
+    const normalized = hex.replace('#', '').trim();
+    if (normalized.length !== 6) return fallback;
+    const r = Number.parseInt(normalized.slice(0, 2), 16);
+    const g = Number.parseInt(normalized.slice(2, 4), 16);
+    const b = Number.parseInt(normalized.slice(4, 6), 16);
+    if ([r, g, b].some((value) => Number.isNaN(value))) return fallback;
+    return [r / 255, g / 255, b / 255];
+  };
+  const tableStyle = pdfLayout.table || {};
+  const tableWidth = Number(tableStyle.width || 490);
+  const headerFill = hexToPdfRgb(tableStyle.header_fill, [0.12, 0.16, 0.22]);
+  const gridStroke = hexToPdfRgb(tableStyle.grid_stroke, [0.8, 0.84, 0.89]);
+  const outerStroke = hexToPdfRgb(tableStyle.outer_stroke, [0.58, 0.64, 0.72]);
+  const zebraFill = hexToPdfRgb(tableStyle.zebra_fill, [0.97, 0.98, 0.99]);
+  const showZebra = tableStyle.show_zebra !== false;
+  const vectors: any[] = [];
+  const bodySections = [
+    brief.payload.title || 'Report',
+    brief.payload.summary || '',
+    ...brief.payload.sections.flatMap((section: any) => [
+      section.heading || 'Section',
+      ...(Array.isArray(section.body) ? section.body : []),
+      ...(Array.isArray(section.bullets) ? section.bullets.map((item: string) => `- ${item}`) : []),
+    ]),
+  ].filter(Boolean);
+
+  const elements: any[] = [
+    {
+      type: 'text',
+      x: pdfLayout.title_x || pdfLayout.margin_left || 48,
+      y: pdfLayout.title_y || 42,
+      text: brief.payload.title || 'Report',
+      fontSize: pdfLayout.title_font_size || 22,
+    },
+  ];
+
+  let cursorY = (pdfLayout.title_y || 42) + 42;
+  if (brief.payload.summary) {
+    elements.push({
+      type: 'text',
+      x: pdfLayout.margin_left || 48,
+      y: cursorY,
+      text: brief.payload.summary,
+      fontSize: pdfLayout.summary_font_size || 11,
+    });
+    cursorY += pdfLayout.summary_gap || 30;
+  }
+
+  for (const section of brief.payload.sections) {
+    elements.push({
+      type: 'text',
+      x: pdfLayout.margin_left || 48,
+      y: cursorY,
+      text: section.heading || 'Section',
+      fontSize: pdfLayout.section_font_size || 14,
+    });
+    cursorY += 22;
+    if (Array.isArray(section.body)) {
+      for (const paragraph of section.body) {
+        elements.push({
+          type: 'text',
+          x: pdfLayout.content_x || 56,
+          y: cursorY,
+          text: String(paragraph),
+          fontSize: pdfLayout.body_font_size || 10,
+        });
+        cursorY += pdfLayout.line_height || 16;
+      }
+    }
+    if (Array.isArray(section.bullets)) {
+      for (const bullet of section.bullets) {
+        elements.push({
+          type: 'text',
+          x: pdfLayout.bullet_x || 64,
+          y: cursorY,
+          text: `• ${String(bullet)}`,
+          fontSize: pdfLayout.body_font_size || 10,
+        });
+        cursorY += pdfLayout.line_height || 16;
+      }
+    }
+    if (Array.isArray(section.callouts)) {
+      for (const callout of section.callouts) {
+        const title = [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ');
+        const calloutBoxY = cursorY - 4;
+        const calloutBoxHeight = callout.body ? (pdfLayout.line_height || 16) * 2 : (pdfLayout.line_height || 16) + 4;
+        vectors.push({
+          shape: {
+            kind: 'rect',
+            x: (pdfLayout.callout_x || 64) - 8,
+            y: calloutBoxY,
+            width: 470,
+            height: calloutBoxHeight,
+          },
+          fillColor: [0.93, 0.96, 1.0],
+          fillOpacity: 0.7,
+        });
+        if (title) {
+          elements.push({
+            type: 'text',
+            x: pdfLayout.callout_x || 64,
+            y: cursorY,
+            text: title,
+            fontSize: pdfLayout.callout_title_font_size || 11,
+          });
+          cursorY += pdfLayout.line_height || 16;
+        }
+        if (callout.body) {
+          elements.push({
+            type: 'text',
+            x: pdfLayout.callout_x || 64,
+            y: cursorY,
+            text: String(callout.body),
+            fontSize: pdfLayout.body_font_size || 10,
+          });
+          cursorY += pdfLayout.line_height || 16;
+        }
+        cursorY += pdfLayout.callout_gap || 18;
+      }
+    }
+    if (Array.isArray(section.tables)) {
+      for (const table of section.tables) {
+        if (table.title) {
+          elements.push({
+            type: 'text',
+            x: pdfLayout.table_x || 56,
+            y: cursorY,
+            text: String(table.title),
+            fontSize: pdfLayout.table_title_font_size || 11,
+          });
+          cursorY += pdfLayout.line_height || 16;
+        }
+        const columns = Array.isArray(table.columns) ? table.columns.map((value: any) => String(value)) : [];
+        const rows = Array.isArray(table.rows) ? table.rows : [];
+        if (columns.length > 0) {
+          const tableX = pdfLayout.table_x || 56;
+          const columnWidth = tableWidth / columns.length;
+          const tableHeaderY = cursorY - 4;
+          const rowHeight = pdfLayout.line_height || 16;
+          const tableHeight = rowHeight + 4 + (rows.length * rowHeight);
+          vectors.push({
+            shape: {
+              kind: 'rect',
+              x: tableX - 4,
+              y: tableHeaderY,
+              width: tableWidth,
+              height: rowHeight + 4,
+            },
+            fillColor: headerFill,
+            fillOpacity: 0.95,
+          });
+          vectors.push({
+            shape: {
+              kind: 'rect',
+              x: tableX - 4,
+              y: tableHeaderY,
+              width: tableWidth,
+              height: tableHeight,
+            },
+            strokeColor: outerStroke,
+            lineWidth: 0.7,
+          });
+          columns.forEach((column: string, index: number) => {
+            if (index > 0) {
+              vectors.push({
+                shape: {
+                  kind: 'line',
+                  x1: tableX + columnWidth * index - 4,
+                  y1: tableHeaderY,
+                  x2: tableX + columnWidth * index - 4,
+                  y2: tableHeaderY + tableHeight,
+                },
+                strokeColor: gridStroke,
+                lineWidth: 0.4,
+              });
+            }
+            elements.push({
+              type: 'text',
+              x: tableX + (columnWidth * index) + 4,
+              y: cursorY,
+              text: column,
+              fontSize: pdfLayout.body_font_size || 10,
+            });
+          });
+          cursorY += rowHeight;
+          rows.forEach((row: any, rowIndex: number) => {
+            const values = Array.isArray(row)
+              ? row
+              : columns.map((column: string) => row?.[column] ?? '');
+            if (showZebra && rowIndex % 2 === 1) {
+              vectors.push({
+                shape: {
+                  kind: 'rect',
+                  x: tableX - 4,
+                  y: cursorY - 4,
+                  width: tableWidth,
+                  height: rowHeight,
+                },
+                fillColor: zebraFill,
+                fillOpacity: 0.6,
+              });
+            }
+            vectors.push({
+              shape: {
+                kind: 'line',
+                x1: tableX - 4,
+                y1: cursorY - 2,
+                x2: tableX + tableWidth - 4,
+                y2: cursorY - 2,
+              },
+              strokeColor: gridStroke,
+              lineWidth: 0.5,
+            });
+            values.forEach((value: any, index: number) => {
+              elements.push({
+                type: 'text',
+                x: tableX + (columnWidth * index) + 4,
+                y: cursorY,
+                text: String(value ?? ''),
+                fontSize: pdfLayout.body_font_size || 10,
+              });
+            });
+            cursorY += rowHeight;
+          });
+          cursorY += pdfLayout.table_gap || 22;
+        }
+      }
+    }
+    cursorY += pdfLayout.section_gap || 10;
+  }
+
+  return {
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+    source: {
+      format: 'markdown',
+      title: brief.payload.title || 'Report',
+      body: bodySections.join('\n'),
+    },
+    metadata: {
+      title: brief.payload.title || 'Report',
+      subject: brief.document_profile || 'summary-report',
+      author: 'Kyberion Media-Actuator',
+      creationDate: new Date().toISOString(),
+    },
+    content: {
+      text: bodySections.join('\n'),
+      pages: [{ pageNumber: 1, width: 595, height: 842, text: '', vectors }],
+    },
+    aesthetic: {
+      layout: 'single-column',
+      elements,
+      colors: [template?.colors?.primary || '#1f2937', template?.colors?.secondary || '#4b5563', template?.colors?.accent || '#2563eb'],
+      fonts: [brief.locale?.startsWith('ja') ? 'HeiseiKakuGo-W5' : 'Helvetica'],
+      branding: { logoPresence: false, primaryColor: '#1f2937', tone: 'professional' },
+      templateId,
+    },
+    renderOptions: {
+      compress: true,
+      unicode: true,
+      xmpMetadata: true,
+      tagged: false,
+      linearize: false,
+      objectStreams: false,
+    },
+  };
+}
+
+function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
+  const { template } = resolveDocumentLayoutTemplate(rootDir, {
+    document_type: 'tracker',
+    layout_template_id: brief.layout_template_id,
+  });
+  const colors = template?.colors || {};
+  const layout = template?.layout || {};
+  const toneCatalog = template?.tones?.states || {};
+  const validationDefaults = template?.validation_defaults || {};
+  const conditionalDefaults = template?.conditional_format_defaults || {};
+  const title = brief.payload.title || 'Tracker';
+  const subtitle = brief.payload.subtitle || '';
+  const summaryCards = Array.isArray(brief.payload.summary_cards) ? brief.payload.summary_cards : [];
+  const columns = Array.isArray(brief.payload.columns) ? brief.payload.columns : [];
+  const rows = Array.isArray(brief.payload.rows) ? brief.payload.rows : [];
+  const headers = columns.map((column: any) => String(column.label || column.key || 'Column'));
+  const widths = columns.map((column: any) => Number(column.width || layout.default_column_width || 18));
+  const lastColumnLetter = String.fromCharCode(64 + Math.max(headers.length, 1));
+  const summaryRowIndex = summaryCards.length > 0 ? 3 : 0;
+  const headerRowIndex = summaryCards.length > 0 ? 4 : 3;
+  const dataStartIndex = headerRowIndex + 1;
+  const rowToneKey = typeof brief.payload.row_tone_key === 'string' ? brief.payload.row_tone_key : '';
+  const rowTones = brief.payload.row_tones && typeof brief.payload.row_tones === 'object'
+    ? brief.payload.row_tones
+    : {};
+
+  const styleMap = {
+    base: 0,
+    title: 1,
+    subtitle: 2,
+    header: 3,
+    section: 4,
+    info: 5,
+    success: 6,
+    warning: 7,
+    danger: 8,
+    body: 9,
+  } as const;
+
+  const toneToStyle = (tone?: string) => {
+    switch (tone) {
+      case 'success': return styleMap.success;
+      case 'warning': return styleMap.warning;
+      case 'danger': return styleMap.danger;
+      case 'info': return styleMap.info;
+      default: return styleMap.info;
+    }
+  };
+
+  const sheetRows: any[] = [
+    {
+      index: 1,
+      height: layout.title_row_height || 30,
+      customHeight: true,
+      cells: [{ ref: 'A1', type: 's', value: title, styleIndex: styleMap.title }],
+    },
+  ];
+
+  if (subtitle) {
+    sheetRows.push({
+      index: 2,
+      height: layout.subtitle_row_height || 20,
+      customHeight: true,
+      cells: [{ ref: 'A2', type: 's', value: subtitle, styleIndex: styleMap.subtitle }],
+    });
+  }
+
+  if (summaryCards.length > 0) {
+    const cells: any[] = [];
+    summaryCards.forEach((card: any, index: number) => {
+      const colOffset = index * 2;
+      const cellRef = `${String.fromCharCode(65 + colOffset)}3`;
+      cells.push({
+        ref: cellRef,
+        type: 's',
+        value: `${card.label} ${card.value}`,
+        styleIndex: toneToStyle(card.tone),
+      });
+    });
+    sheetRows.push({ index: 3, height: layout.summary_row_height || 20, customHeight: true, cells });
+  }
+
+  sheetRows.push({
+    index: headerRowIndex,
+    height: layout.header_row_height || 22,
+    customHeight: true,
+    cells: headers.map((label, index) => ({
+      ref: `${String.fromCharCode(65 + index)}${headerRowIndex}`,
+      type: 's',
+      value: label,
+      styleIndex: styleMap.header,
+    })),
+  });
+
+  rows.forEach((row: any, rowIndex: number) => {
+    const excelRow = dataStartIndex + rowIndex;
+    const rowToneValue = rowToneKey ? String(row[rowToneKey] ?? '') : '';
+    const resolvedTone = rowToneValue && rowTones[rowToneValue]
+      ? String(rowTones[rowToneValue])
+      : '';
+    const styleIndex = resolvedTone
+      ? toneToStyle(resolvedTone)
+      : (layout.banded_rows === false ? styleMap.base : (rowIndex % 2 === 0 ? styleMap.body : styleMap.base));
+    sheetRows.push({
+      index: excelRow,
+      height: layout.data_row_height || 20,
+      customHeight: Boolean(layout.data_row_height),
+      cells: columns.map((column: any, columnIndex: number) => ({
+        ref: `${String.fromCharCode(65 + columnIndex)}${excelRow}`,
+        type: 's',
+        value: String(row[column.key] ?? ''),
+        styleIndex,
+      })),
+    });
+  });
+
+  const dataValidations = columns
+    .map((column: any, index: number) => {
+      const validationKey = String(column.validation_key || column.key || '');
+      const validation = column.validation || validationDefaults[validationKey];
+      if (!validation || validation.type !== 'list' || !Array.isArray(validation.values) || validation.values.length === 0) {
+        return null;
+      }
+      const colLetter = String.fromCharCode(65 + index);
+      return {
+        sqref: `${colLetter}${dataStartIndex}:${colLetter}${Math.max(dataStartIndex + rows.length - 1, dataStartIndex)}`,
+        type: 'list',
+        formula1: `"${validation.values.join(',')}"`,
+        showErrorMessage: true,
+        errorTitle: validation.errorTitle || `Invalid ${headers[index] || validationKey}`,
+        error: validation.error || `Use one of: ${validation.values.join(', ')}`,
+      };
+    })
+    .filter(Boolean);
+
+  const dxfs: any[] = [];
+  const conditionalFormats: any[] = [];
+  const conditionalStatus = conditionalDefaults[rowToneKey] || conditionalDefaults.status;
+  if (rowToneKey && conditionalStatus?.tones && rows.length > 0) {
+    const toneEntries = Object.entries(conditionalStatus.tones as Record<string, string>);
+    const keyColumnIndex = columns.findIndex((column: any) => String(column.key) === String(conditionalStatus.key_column || rowToneKey));
+    const keyColumnLetter = keyColumnIndex >= 0 ? String.fromCharCode(65 + keyColumnIndex) : '';
+    if (keyColumnLetter) {
+      const startDxfIndex = dxfs.length;
+      for (const [, toneName] of toneEntries) {
+        if (toneName === 'success') {
+          dxfs.push({
+            font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#166534' } },
+            fill: { patternType: 'solid', fgColor: { rgb: colors.success || '#DCFCE7' }, bgColor: { rgb: colors.success || '#DCFCE7' } },
+          });
+        } else if (toneName === 'warning') {
+          dxfs.push({
+            font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#92400E' } },
+            fill: { patternType: 'solid', fgColor: { rgb: colors.warning || '#FEF3C7' }, bgColor: { rgb: colors.warning || '#FEF3C7' } },
+          });
+        } else if (toneName === 'danger') {
+          dxfs.push({
+            font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#991B1B' } },
+            fill: { patternType: 'solid', fgColor: { rgb: colors.danger || '#FEE2E2' }, bgColor: { rgb: colors.danger || '#FEE2E2' } },
+          });
+        } else {
+          dxfs.push({
+            font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#111827' } },
+            fill: { patternType: 'solid', fgColor: { rgb: colors.info || '#DBEAFE' }, bgColor: { rgb: colors.info || '#DBEAFE' } },
+          });
+        }
+      }
+      conditionalFormats.push({
+        sqref: `A${dataStartIndex}:${lastColumnLetter}${Math.max(dataStartIndex + rows.length - 1, dataStartIndex)}`,
+        rules: toneEntries.map(([matchValue], offset) => ({
+          type: 'expression',
+          priority: offset + 1,
+          dxfId: startDxfIndex + offset,
+          formula: `$${keyColumnLetter}${dataStartIndex}=\"${matchValue}\"`,
+        })),
+      });
+    }
+  }
+
+  const overdueRule = conditionalDefaults.overdue_finish;
+  if (overdueRule && rows.length > 0) {
+    const dueColumnIndex = columns.findIndex((column: any) => String(column.key) === String(overdueRule.key_column || 'finish'));
+    const statusColumnIndex = columns.findIndex((column: any) => String(column.key) === String(overdueRule.status_column || rowToneKey || 'status'));
+    if (dueColumnIndex >= 0 && statusColumnIndex >= 0) {
+      const dueLetter = String.fromCharCode(65 + dueColumnIndex);
+      const statusLetter = String.fromCharCode(65 + statusColumnIndex);
+      const doneValues = Array.isArray(overdueRule.done_values) ? overdueRule.done_values : ['Done'];
+      const doneExpr = doneValues.map((value: string) => `$${statusLetter}${dataStartIndex}=\"${value}\"`).join(',');
+      const overdueDxfId = dxfs.length;
+      dxfs.push({
+        font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#7F1D1D' } },
+        fill: { patternType: 'solid', fgColor: { rgb: '#FECACA' }, bgColor: { rgb: '#FECACA' } },
+      });
+      conditionalFormats.push({
+        sqref: `A${dataStartIndex}:${lastColumnLetter}${Math.max(dataStartIndex + rows.length - 1, dataStartIndex)}`,
+        rules: [{
+          type: 'expression',
+          priority: conditionalFormats.reduce((count, item) => count + item.rules.length, 0) + 1,
+          dxfId: overdueDxfId,
+          formula: `AND(DATEVALUE($${dueLetter}${dataStartIndex})<TODAY(),NOT(OR(${doneExpr})))`,
+        }],
+      });
+    }
+  }
+
+  const defaultTone = String(template?.tones?.default || 'info');
+  const infoTextColor = String(toneCatalog.info?.text_color || '#111827');
+  const successTextColor = String(toneCatalog.success?.text_color || '#166534');
+  const warningTextColor = String(toneCatalog.warning?.text_color || '#92400E');
+  const dangerTextColor = String(toneCatalog.danger?.text_color || '#991B1B');
+
+  return {
+    version: '3.0.0',
+    generatedAt: new Date().toISOString(),
+    theme: {
+      name: 'Tracker Theme',
+      colors: {
+        dk1: String(colors.primary || '#0F172A').replace('#', ''),
+        lt1: String(colors.background || '#FFFFFF').replace('#', ''),
+        dk2: String(colors.secondary || '#334155').replace('#', ''),
+        lt2: String(colors.muted || '#F8FAFC').replace('#', ''),
+        accent1: String(colors.accent || '#2563EB').replace('#', ''),
+        accent2: String(colors.secondary || '#334155').replace('#', ''),
+        accent3: '7C3AED',
+        accent4: 'EA580C',
+        accent5: 'DC2626',
+        accent6: '65A30D',
+      },
+      majorFont: template?.fonts?.heading || 'Aptos',
+      minorFont: template?.fonts?.body || 'Aptos',
+    },
+    styles: {
+      fonts: [
+        { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: colors.text || '#111827' } },
+        { name: template?.fonts?.heading || 'Aptos', size: 22, bold: true, color: { rgb: '#FFFFFF' } },
+        { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: '#E2E8F0' } },
+      ],
+      fills: [
+        { patternType: 'none' },
+        { patternType: 'gray125' },
+        { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } },
+        { patternType: 'solid', fgColor: { rgb: colors.info || '#DBEAFE' } },
+        { patternType: 'solid', fgColor: { rgb: colors.success || '#DCFCE7' } },
+        { patternType: 'solid', fgColor: { rgb: colors.warning || '#FEF3C7' } },
+        { patternType: 'solid', fgColor: { rgb: colors.danger || '#FEE2E2' } },
+        { patternType: 'solid', fgColor: { rgb: colors.muted || '#F8FAFC' } },
+      ],
+      borders: [
+        {},
+        {
+          left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+          right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+          top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+          bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } },
+        },
+      ],
+      numFmts: [],
+      cellXfs: [
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: colors.text || '#111827' } }, fill: { patternType: 'none' }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } } },
+        { font: { name: template?.fonts?.heading || 'Aptos', size: 22, bold: true, color: { rgb: '#FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } }, border: {}, alignment: { horizontal: 'left', vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: '#E2E8F0' } }, fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } }, border: {}, alignment: { horizontal: 'left', vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: '#FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: colors.primary || '#0F172A' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { horizontal: 'center', vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: infoTextColor } }, fill: { patternType: 'solid', fgColor: { rgb: colors[String(toneCatalog.info?.fill || defaultTone)] || colors.info || '#DBEAFE' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: infoTextColor } }, fill: { patternType: 'solid', fgColor: { rgb: colors[String(toneCatalog.info?.fill || defaultTone)] || colors.info || '#DBEAFE' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: successTextColor } }, fill: { patternType: 'solid', fgColor: { rgb: colors[String(toneCatalog.success?.fill || 'success')] || colors.success || '#DCFCE7' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: warningTextColor } }, fill: { patternType: 'solid', fgColor: { rgb: colors[String(toneCatalog.warning?.fill || 'warning')] || colors.warning || '#FEF3C7' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, bold: true, color: { rgb: dangerTextColor } }, fill: { patternType: 'solid', fgColor: { rgb: colors[String(toneCatalog.danger?.fill || 'danger')] || colors.danger || '#FEE2E2' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+        { font: { name: template?.fonts?.body || 'Aptos', size: 10, color: { rgb: colors.secondary || '#334155' } }, fill: { patternType: 'solid', fgColor: { rgb: colors.muted || '#F8FAFC' } }, border: { left: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, right: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, top: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } }, bottom: { style: 'thin', color: { rgb: colors.border || '#CBD5E1' } } }, alignment: { vertical: 'center' } },
+      ],
+      namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0 }],
+      dxfs,
+    },
+    sharedStrings: [],
+    sharedStringsRich: [],
+    definedNames: [],
+    workbookProperties: { defaultThemeVersion: 164011 },
+    sheets: [
+      {
+        id: 'sheet1',
+        name: brief.payload.sheet_name || 'Tracker',
+        dimension: `A1:${lastColumnLetter}${Math.max(sheetRows.length, 1)}`,
+        sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: layout.freeze_header === false ? 0 : headerRowIndex },
+        columns: widths.map((width: number, index: number) => ({ min: index + 1, max: index + 1, width, customWidth: true })),
+        rows: sheetRows,
+        mergeCells: subtitle ? [{ ref: `A1:${lastColumnLetter}1` }, { ref: `A2:${lastColumnLetter}2` }] : [{ ref: `A1:${lastColumnLetter}1` }],
+        tables: [],
+        conditionalFormats,
+        dataValidations,
+        autoFilter: { ref: `A${headerRowIndex}:${lastColumnLetter}${Math.max(dataStartIndex + rows.length - 1, headerRowIndex)}` },
+        pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+      },
+    ],
+  };
+}
+
+function resolveDocumentLayoutTemplate(rootDir: string, brief: any): { templateId: string; template: any } {
+  const catalogPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/document-layouts.json');
+  if (!safeExistsSync(catalogPath)) {
+    throw new Error(`Document layout catalog not found: ${catalogPath}`);
+  }
+
+  const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+  const documentType = brief.document_type || 'invoice';
+  const documentCatalog = catalog.documents?.[documentType];
+  if (!documentCatalog) {
+    throw new Error(`Document layout family not found: ${documentType}`);
+  }
+
+  const templateId = brief.layout_template_id || documentCatalog.default_template;
+  const template = documentCatalog.templates?.[templateId];
+  if (!template) {
+    throw new Error(`Document layout template not found: ${templateId}`);
+  }
+
+  return { templateId, template };
+}
+
+function buildDocumentPdfProtocol(rawBrief: any): any {
+  const brief = normalizeInvoiceDocumentBrief(rawBrief);
+  if (brief.document_type !== 'invoice') {
+    throw new Error(`Unsupported document_type for document_pdf_from_brief: ${brief.document_type}`);
+  }
+  if (brief.render_target && brief.render_target !== 'pdf') {
+    throw new Error(`Unsupported render_target for document_pdf_from_brief: ${brief.render_target}`);
+  }
+  if (brief.document_profile !== 'qualified-invoice') {
+    throw new Error(`Unsupported invoice document_profile: ${brief.document_profile}`);
+  }
+
+  const items = Array.isArray(brief.items) ? brief.items : [];
+  if (items.length === 0) {
+    throw new Error('document_pdf_from_brief requires at least one invoice item.');
+  }
+
+  const grouped = new Map<number, { taxableAmount: number; taxAmount: number }>();
+  const roundingMode = typeof brief.tax_rounding === 'string' ? brief.tax_rounding : 'round';
+  let subtotal = 0;
+
+  const itemLines = items.map((item: any, index: number) => {
+    const quantity = Number(item.quantity || 0);
+    const unitPrice = Number(item.unit_price_ex_tax || 0);
+    const rate = Number(item.tax_rate || 0);
+    const lineSubtotal = quantity * unitPrice;
+    subtotal += lineSubtotal;
+
+    const current = grouped.get(rate) || { taxableAmount: 0, taxAmount: 0 };
+    current.taxableAmount += lineSubtotal;
+    grouped.set(rate, current);
+
+    const annotations = [
+      item.unit ? `${quantity}${item.unit}` : `${quantity}`,
+      `単価 ${formatJpy(unitPrice)}`,
+      `税率 ${rate}%`,
+      item.reduced_tax_rate ? '※軽減税率対象' : '',
+      item.service_period ? `対象期間: ${item.service_period}` : '',
+      item.transaction_note || '',
+    ].filter(Boolean);
+
+    return `${index + 1}. ${item.description}\n   ${annotations.join(' / ')}\n   金額(税抜): ${formatJpy(lineSubtotal)}`;
+  });
+
+  let totalTax = 0;
+  const taxSummaryLines = Array.from(grouped.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([rate, summary]) => {
+      summary.taxAmount = applyRounding(summary.taxableAmount * (rate / 100), roundingMode);
+      totalTax += summary.taxAmount;
+      return `- ${rate}%対象: ${formatJpy(summary.taxableAmount)} / 税額: ${formatJpy(summary.taxAmount)}`;
+    });
+
+  const totalAmount = subtotal + totalTax;
+  const issuerLines = [
+    brief.issuer?.name,
+    brief.issuer?.registration_number ? `登録番号: ${brief.issuer.registration_number}` : '',
+    brief.issuer?.postal_code ? `郵便番号: ${brief.issuer.postal_code}` : '',
+    brief.issuer?.address || '',
+    brief.issuer?.contact ? `担当: ${brief.issuer.contact}` : '',
+    brief.issuer?.phone ? `電話: ${brief.issuer.phone}` : '',
+    brief.issuer?.email ? `メール: ${brief.issuer.email}` : '',
+  ].filter(Boolean);
+
+  const recipientLines = [
+    brief.recipient?.name,
+    brief.recipient?.department ? brief.recipient.department : '',
+    brief.recipient?.contact ? `担当: ${brief.recipient.contact}` : '',
+    brief.recipient?.address || '',
+  ].filter(Boolean);
+
+  const paymentLines = brief.payment ? [
+    brief.payment.method ? `支払方法: ${brief.payment.method}` : '',
+    brief.payment.bank_name ? `銀行名: ${brief.payment.bank_name}` : '',
+    brief.payment.branch_name ? `支店名: ${brief.payment.branch_name}` : '',
+    brief.payment.account_type ? `口座種別: ${brief.payment.account_type}` : '',
+    brief.payment.account_number ? `口座番号: ${brief.payment.account_number}` : '',
+    brief.payment.account_name ? `口座名義: ${brief.payment.account_name}` : '',
+    brief.payment.transfer_fee_policy || '',
+  ].filter(Boolean) : [];
+
+  const noteLines = Array.isArray(brief.notes) ? brief.notes.filter(Boolean) : [];
+  const { templateId, template } = resolveDocumentLayoutTemplate(process.cwd(), brief);
+  const pageWidth = Number(template.page?.width || 595);
+  const pageHeight = Number(template.page?.height || 842);
+  const left = Number(template.page?.left || 48);
+  const right = Number(template.page?.right || 547);
+  const accent = (template.colors?.accent || [0.15, 0.29, 0.45]) as [number, number, number];
+  const light = (template.colors?.light || [0.94, 0.96, 0.98]) as [number, number, number];
+  const border = (template.colors?.border || [0.74, 0.79, 0.84]) as [number, number, number];
+  const labels = template.labels || {};
+  const recipientBlock = template.blocks?.recipient || {};
+  const issuerBlock = template.blocks?.issuer || {};
+  const amountBlock = template.blocks?.amount || {};
+  const tableBlock = template.blocks?.table || {};
+  const taxSummaryBlock = template.blocks?.tax_summary || {};
+  const paymentBlock = template.blocks?.payment || {};
+  const notesBlock = template.blocks?.notes || {};
+  const elements: Array<{ type: 'text'; x: number; y: number; text: string; fontSize?: number }> = [];
+  const vectors: any[] = [];
+
+  const pushText = (x: number, y: number, text: string, fontSize = 10) => {
+    elements.push({ type: 'text', x, y, text, fontSize });
+  };
+  const wrapLines = (text: string, maxUnits: number): string[] => {
+    if (!text) return [];
+    const lines: string[] = [];
+    let current = '';
+    let units = 0;
+    for (const ch of text) {
+      const next = ch.charCodeAt(0) > 127 ? 1 : 0.55;
+      if (current && units + next > maxUnits) {
+        lines.push(current);
+        current = ch;
+        units = next;
+      } else {
+        current += ch;
+        units += next;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  };
+  const pushWrappedLines = (x: number, startY: number, lines: string[], fontSize: number, maxUnits: number, lineHeight = 14) => {
+    let y = startY;
+    for (const line of lines) {
+      for (const wrapped of wrapLines(line, maxUnits)) {
+        pushText(x, y, wrapped, fontSize);
+        y += lineHeight;
+      }
+    }
+    return y;
+  };
+  const pushSectionBand = (x: number, y: number, width: number, label: string) => {
+    vectors.push({
+      shape: { kind: 'rect', x, y, width, height: 18 },
+      fillColor: light,
+    });
+    pushText(x + 6, y + 13, label, 10);
+  };
+
+  pushText(left, 42, labels.title || '請求書', 22);
+  pushText(390, 42, `${labels.invoice_number || '請求書番号'}: ${brief.invoice_number}`, 10);
+  pushText(390, 58, `${labels.issue_date || '発行日'}: ${brief.issue_date}`, 10);
+  pushText(390, 74, `${labels.transaction_date || '取引日'}: ${brief.transaction_date}`, 10);
+  if (brief.due_date) pushText(390, 90, `${labels.due_date || '支払期日'}: ${brief.due_date}`, 10);
+  if (brief.subject) pushText(left, 78, `${labels.subject || '件名'}: ${brief.subject}`, 11);
+
+  const recipientX = Number(recipientBlock.x || left);
+  const recipientY = Number(recipientBlock.y || 110);
+  const recipientWidth = Number(recipientBlock.width || 235);
+  const recipientHeight = Number(recipientBlock.height || 104);
+  const issuerX = Number(issuerBlock.x || 312);
+  const issuerY = Number(issuerBlock.y || 110);
+  const issuerWidth = Number(issuerBlock.width || 235);
+  const issuerHeight = Number(issuerBlock.height || 122);
+
+  vectors.push({ shape: { kind: 'rect', x: recipientX, y: recipientY, width: recipientWidth, height: recipientHeight }, strokeColor: border, lineWidth: 0.8 });
+  vectors.push({ shape: { kind: 'rect', x: issuerX, y: issuerY, width: issuerWidth, height: issuerHeight }, strokeColor: border, lineWidth: 0.8 });
+  pushSectionBand(recipientX, recipientY, recipientWidth, labels.recipient || '請求先');
+  pushSectionBand(issuerX, issuerY, issuerWidth, labels.issuer || '発行者');
+  pushWrappedLines(recipientX + 8, recipientY + 26, recipientLines.slice(0, 1), Number(recipientBlock.name_font_size || 11), Number(recipientBlock.name_max_units || 18), Number(recipientBlock.name_line_height || 15));
+  pushWrappedLines(recipientX + 8, recipientY + 43, recipientLines.slice(1), Number(recipientBlock.body_font_size || 10), Number(recipientBlock.body_max_units || 20), Number(recipientBlock.body_line_height || 14));
+  pushWrappedLines(issuerX + 8, issuerY + 26, issuerLines.slice(0, 1), Number(issuerBlock.name_font_size || 11), Number(issuerBlock.name_max_units || 17), Number(issuerBlock.name_line_height || 15));
+  pushWrappedLines(issuerX + 8, issuerY + 43, issuerLines.slice(1, 1 + Number(issuerBlock.body_line_limit || 4)), Number(issuerBlock.body_font_size || 9), Number(issuerBlock.body_max_units || 21), Number(issuerBlock.body_line_height || 13));
+
+  const tableWidth = right - left;
+
+  vectors.push({
+    shape: {
+      kind: 'rect',
+      x: Number(amountBlock.x || left),
+      y: Number(amountBlock.y || 246),
+      width: Number(amountBlock.width || tableWidth),
+      height: Number(amountBlock.height || 48),
+    },
+    fillColor: light,
+    strokeColor: border,
+    lineWidth: 0.8,
+  });
+  pushText(Number(amountBlock.label_x || left + 8), Number(amountBlock.label_y || 264), labels.amount_due || '御請求金額（税込）', Number(amountBlock.label_font_size || 12));
+  pushText(Number(amountBlock.value_x || 380), Number(amountBlock.value_y || 266), formatJpy(totalAmount), Number(amountBlock.value_font_size || 18));
+
+  const tableTop = Number(tableBlock.top || 314);
+  const rowHeight = Number(tableBlock.row_height || 22);
+  const descX = Number(tableBlock.description_x || left);
+  const qtyX = Number(tableBlock.quantity_x || 328);
+  const unitPriceX = Number(tableBlock.unit_price_x || 378);
+  const taxRateX = Number(tableBlock.tax_rate_x || 450);
+  const amountX = Number(tableBlock.amount_x || 494);
+  const tableRows = items.length + 1;
+
+  vectors.push({ shape: { kind: 'rect', x: left, y: tableTop, width: tableWidth, height: rowHeight }, fillColor: accent });
+  [
+    [labels.table_description || '内容', descX + 6],
+    [labels.table_quantity || '数量', qtyX + 6],
+    [labels.table_unit_price || '単価(税抜)', unitPriceX + 6],
+    [labels.table_tax_rate || '税率', taxRateX + 6],
+    [labels.table_amount || '金額(税抜)', amountX + 6],
+  ].forEach(([label, x]) => pushText(Number(x), tableTop + 15, String(label), Number(tableBlock.header_font_size || 10)));
+  vectors.push({
+    shape: { kind: 'rect', x: left, y: tableTop, width: tableWidth, height: rowHeight * (tableRows + 1) },
+    strokeColor: border,
+    lineWidth: 0.8,
+  });
+  [qtyX, unitPriceX, taxRateX, amountX].forEach((x) => {
+    vectors.push({
+      shape: { kind: 'line', x1: x, y1: tableTop, x2: x, y2: tableTop + rowHeight * (tableRows + 1) },
+      strokeColor: border,
+      lineWidth: 0.8,
+    });
+  });
+  for (let row = 1; row <= tableRows; row++) {
+    const y = tableTop + rowHeight * row;
+    vectors.push({
+      shape: { kind: 'line', x1: left, y1: y, x2: right, y2: y },
+      strokeColor: border,
+      lineWidth: 0.6,
+    });
+  }
+  items.forEach((item: any, index: number) => {
+    const y = tableTop + rowHeight * (index + 1) + 15;
+    const quantity = Number(item.quantity || 0);
+    const lineSubtotal = quantity * Number(item.unit_price_ex_tax || 0);
+    const desc = `${item.description}${item.service_period ? ` (${item.service_period})` : ''}${item.reduced_tax_rate ? ' ※軽減税率' : ''}`;
+    pushText(descX + 6, y, wrapLines(desc, Number(tableBlock.description_max_units || 28))[0] || desc, Number(tableBlock.body_font_size || 9));
+    pushText(qtyX + 6, y, item.unit ? `${quantity}${item.unit}` : String(quantity), Number(tableBlock.body_font_size || 9));
+    pushText(unitPriceX + 6, y, formatJpy(Number(item.unit_price_ex_tax || 0)), Number(tableBlock.body_font_size || 9));
+    pushText(taxRateX + 6, y, `${item.tax_rate}%`, Number(tableBlock.body_font_size || 9));
+    pushText(amountX + 6, y, formatJpy(lineSubtotal), Number(tableBlock.body_font_size || 9));
+  });
+
+  const summaryTop = tableTop + rowHeight * (tableRows + 1) + 20;
+  const taxSummaryX = Number(taxSummaryBlock.x || left);
+  const taxSummaryWidth = Number(taxSummaryBlock.width || 240);
+  const taxSummaryHeight = Number(taxSummaryBlock.height || 82);
+  const paymentX = Number(paymentBlock.x || 312);
+  const paymentWidth = Number(paymentBlock.width || 235);
+  const paymentHeight = Number(paymentBlock.height || 120);
+
+  pushSectionBand(taxSummaryX, summaryTop, taxSummaryWidth, labels.tax_summary || '税率別集計');
+  vectors.push({ shape: { kind: 'rect', x: taxSummaryX, y: summaryTop, width: taxSummaryWidth, height: taxSummaryHeight }, strokeColor: border, lineWidth: 0.8 });
+  taxSummaryLines.forEach((line, index) => pushText(taxSummaryX + 8, summaryTop + 24 + index * 15, line, 9));
+  pushText(taxSummaryX + 8, summaryTop + 58, `小計(税抜): ${formatJpy(subtotal)}`, 10);
+  pushText(taxSummaryX + 8, summaryTop + 73, `消費税額計: ${formatJpy(totalTax)}`, 10);
+
+  pushSectionBand(paymentX, summaryTop, paymentWidth, labels.payment || 'お支払い情報');
+  vectors.push({ shape: { kind: 'rect', x: paymentX, y: summaryTop, width: paymentWidth, height: paymentHeight }, strokeColor: border, lineWidth: 0.8 });
+  paymentLines.forEach((line, index) => pushText(paymentX + 8, summaryTop + 24 + index * 15, line, 9));
+
+  const notesTop = summaryTop + Math.max(taxSummaryHeight, paymentHeight) + 20;
+  pushSectionBand(left, notesTop, tableWidth, labels.notes || '備考');
+  vectors.push({ shape: { kind: 'rect', x: left, y: notesTop, width: tableWidth, height: Number(notesBlock.height || 110) }, strokeColor: border, lineWidth: 0.8 });
+  pushWrappedLines(left + 8, notesTop + 24, noteLines, Number(notesBlock.body_font_size || 9), Number(notesBlock.body_max_units || 48), Number(notesBlock.body_line_height || 14));
+  pushText(left + 8, notesTop + 56, labels.invoice_requirements || '【適格請求書の主な記載事項】', 9);
+  [
+    '・発行事業者名および登録番号',
+    '・取引年月日',
+    '・取引内容（軽減税率対象である旨を含む）',
+    '・税率ごとに区分した対価の額および適用税率',
+    '・税率ごとに区分した消費税額等',
+    '・書類の交付を受ける事業者の氏名又は名称',
+  ].forEach((line, index) => pushText(left + 10, notesTop + 72 + index * 12, line, 8));
+
+  const bodySections = [
+    '請求書',
+    '',
+    `請求書番号: ${brief.invoice_number}`,
+    `発行日: ${brief.issue_date}`,
+    `取引日: ${brief.transaction_date}`,
+    brief.due_date ? `支払期日: ${brief.due_date}` : '',
+    brief.subject ? `件名: ${brief.subject}` : '',
+    '',
+    '請求元',
+    ...issuerLines,
+    '',
+    '請求先',
+    ...recipientLines,
+    '',
+    '明細',
+    ...itemLines,
+    '',
+    '税率別集計',
+    ...taxSummaryLines,
+    '',
+    `小計(税抜): ${formatJpy(subtotal)}`,
+    `消費税額計: ${formatJpy(totalTax)}`,
+    `合計請求額: ${formatJpy(totalAmount)}`,
+    '',
+    ...(paymentLines.length ? ['お支払い情報', ...paymentLines, ''] : []),
+    ...(noteLines.length ? ['備考', ...noteLines, ''] : []),
+    '【適格請求書の記載事項】',
+    '- 適格請求書発行事業者名および登録番号',
+    '- 取引年月日',
+    '- 取引内容（軽減税率対象である旨を含む）',
+    '- 税率ごとに区分した対価の額および適用税率',
+    '- 税率ごとに区分した消費税額等',
+    '- 書類の交付を受ける事業者の氏名又は名称',
+  ].filter(Boolean);
+
+  return {
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+    source: {
+      format: 'markdown',
+      title: `請求書 ${brief.invoice_number}`,
+      body: bodySections.join('\n'),
+    },
+    metadata: {
+      title: `請求書 ${brief.invoice_number}`,
+      subject: brief.subject || '日本向け請求書',
+      author: brief.issuer?.name || 'Kyberion Media-Actuator',
+      creationDate: new Date().toISOString(),
+    },
+    content: {
+      text: bodySections.join('\n'),
+      pages: [
+        {
+          pageNumber: 1,
+          width: pageWidth,
+          height: pageHeight,
+          text: '',
+          vectors,
+        },
+      ],
+    },
+    aesthetic: {
+      layout: 'single-column',
+      elements,
+      colors: ['#264a73', '#f0f4f9', '#bfc9d6', '#1f2b3a'],
+      fonts: ['HeiseiKakuGo-W5'],
+      branding: {
+        logoPresence: false,
+        primaryColor: '#264a73',
+        tone: 'professional',
+      },
+      templateId,
+    },
+    renderOptions: {
+      compress: true,
+      unicode: true,
+      xmpMetadata: true,
+      tagged: false,
+      linearize: false,
+      objectStreams: false,
+    },
+  };
+}
+
+function formatJpy(value: number): string {
+  return new Intl.NumberFormat('ja-JP', {
+    style: 'currency',
+    currency: 'JPY',
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function applyRounding(value: number, mode: string): number {
+  switch (mode) {
+    case 'floor':
+      return Math.floor(value);
+    case 'ceil':
+      return Math.ceil(value);
+    default:
+      return Math.round(value);
   }
 }
 

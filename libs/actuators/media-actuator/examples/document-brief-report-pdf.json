@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-report-pdf.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "document_report_design_from_brief",
+      "params": {
+        "from": "document_brief",
+        "export_as": "last_pdf_design"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pdf_render",
+      "params": {
+        "path": "active/shared/tmp/media/document-brief-report-example.pdf"
+      }
+    }
+  ]
+}

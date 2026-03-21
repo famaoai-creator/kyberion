@@ -32,7 +32,7 @@
       "type": "transform",
       "op": "apply_theme",
       "params": {
-        "theme": "executive-neutral"
+        "theme": "{{proposal_brief.layout_template_id}}"
       }
     },
     {

@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-d2-diagram.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "document_diagram_asset_from_brief",
+      "params": {
+        "from": "document_brief",
+        "export_as": "document_diagram_asset"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "d2_render",
+      "params": {
+        "path": "active/shared/tmp/media/document-brief-d2-diagram.svg",
+        "from": "document_diagram_source",
+        "theme_id": 300,
+        "layout": "dagre",
+        "pad": 24
+      }
+    }
+  ]
+}

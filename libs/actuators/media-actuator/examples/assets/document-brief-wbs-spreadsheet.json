@@ -1,0 +1,11 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "spreadsheet",
+  "document_type": "tracker",
+  "document_profile": "wbs",
+  "render_target": "xlsx",
+  "locale": "ja-JP",
+  "payload": {
+    "protocol_path": "libs/actuators/media-actuator/examples/assets/project-wbs-protocol.json"
+  }
+}

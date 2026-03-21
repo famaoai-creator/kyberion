@@ -1,0 +1,288 @@
+{
+  "documents": {
+    "invoice": {
+      "default_template": "jp-qualified-invoice-standard",
+      "templates": {
+        "jp-qualified-invoice-standard": {
+          "document_profile": "qualified-invoice",
+          "locale": "ja-JP",
+          "page": { "width": 595, "height": 842, "left": 48, "right": 547 },
+          "colors": {
+            "accent": [0.15, 0.29, 0.45],
+            "light": [0.94, 0.96, 0.98],
+            "border": [0.74, 0.79, 0.84]
+          },
+          "labels": {
+            "title": "請求書",
+            "invoice_number": "請求書番号",
+            "issue_date": "発行日",
+            "transaction_date": "取引日",
+            "due_date": "支払期日",
+            "subject": "件名",
+            "recipient": "請求先",
+            "issuer": "発行者",
+            "amount_due": "御請求金額（税込）",
+            "table_description": "内容",
+            "table_quantity": "数量",
+            "table_unit_price": "単価（税抜）",
+            "table_tax_rate": "税率",
+            "table_amount": "金額（税抜）",
+            "tax_summary": "税率別集計",
+            "payment": "お支払い情報",
+            "notes": "備考",
+            "invoice_requirements": "【適格請求書の主な記載事項】"
+          },
+          "blocks": {
+            "recipient": {
+              "x": 48, "y": 110, "width": 235, "height": 104,
+              "name_font_size": 11, "body_font_size": 10,
+              "name_max_units": 18, "body_max_units": 20,
+              "name_line_height": 15, "body_line_height": 14
+            },
+            "issuer": {
+              "x": 312, "y": 110, "width": 235, "height": 122,
+              "name_font_size": 11, "body_font_size": 9,
+              "name_max_units": 17, "body_max_units": 21,
+              "name_line_height": 15, "body_line_height": 13,
+              "body_line_limit": 4
+            },
+            "amount": {
+              "x": 48, "y": 246, "width": 499, "height": 48,
+              "label_x": 56, "label_y": 264, "label_font_size": 12,
+              "value_x": 380, "value_y": 266, "value_font_size": 18
+            },
+            "table": {
+              "top": 314,
+              "row_height": 22,
+              "description_x": 48,
+              "quantity_x": 328,
+              "unit_price_x": 378,
+              "tax_rate_x": 450,
+              "amount_x": 494,
+              "description_max_units": 28,
+              "body_font_size": 9,
+              "header_font_size": 10
+            },
+            "tax_summary": { "x": 48, "width": 240, "height": 82 },
+            "payment": { "x": 312, "width": 235, "height": 120 },
+            "notes": { "height": 110, "body_font_size": 9, "body_max_units": 48, "body_line_height": 14 }
+          }
+        },
+        "jp-qualified-invoice-compact": {
+          "document_profile": "qualified-invoice",
+          "locale": "ja-JP",
+          "page": { "width": 595, "height": 842, "left": 48, "right": 547 },
+          "colors": {
+            "accent": [0.10, 0.22, 0.38],
+            "light": [0.95, 0.97, 0.99],
+            "border": [0.76, 0.80, 0.86]
+          },
+          "labels": {
+            "title": "請求書",
+            "invoice_number": "No.",
+            "issue_date": "発行日",
+            "transaction_date": "取引日",
+            "due_date": "支払期日",
+            "subject": "件名",
+            "recipient": "請求先",
+            "issuer": "発行者",
+            "amount_due": "今回ご請求額（税込）",
+            "table_description": "摘要",
+            "table_quantity": "数量",
+            "table_unit_price": "単価",
+            "table_tax_rate": "税率",
+            "table_amount": "金額",
+            "tax_summary": "税区分集計",
+            "payment": "振込先",
+            "notes": "備考",
+            "invoice_requirements": "【適格請求書の主な記載事項】"
+          },
+          "blocks": {
+            "recipient": {
+              "x": 48, "y": 110, "width": 235, "height": 96,
+              "name_font_size": 11, "body_font_size": 9,
+              "name_max_units": 18, "body_max_units": 20,
+              "name_line_height": 15, "body_line_height": 13
+            },
+            "issuer": {
+              "x": 312, "y": 110, "width": 235, "height": 110,
+              "name_font_size": 11, "body_font_size": 8,
+              "name_max_units": 17, "body_max_units": 22,
+              "name_line_height": 15, "body_line_height": 12,
+              "body_line_limit": 4
+            },
+            "amount": {
+              "x": 48, "y": 236, "width": 499, "height": 44,
+              "label_x": 60, "label_y": 252, "label_font_size": 11,
+              "value_x": 392, "value_y": 254, "value_font_size": 17
+            },
+            "table": {
+              "top": 300,
+              "row_height": 21,
+              "description_x": 48,
+              "quantity_x": 332,
+              "unit_price_x": 382,
+              "tax_rate_x": 448,
+              "amount_x": 492,
+              "description_max_units": 29,
+              "body_font_size": 8,
+              "header_font_size": 9
+            },
+            "tax_summary": { "x": 48, "width": 240, "height": 78 },
+            "payment": { "x": 312, "width": 235, "height": 112 },
+            "notes": { "height": 104, "body_font_size": 8, "body_max_units": 50, "body_line_height": 13 }
+          }
+        }
+      }
+    },
+    "report": {
+      "default_template": "report-standard",
+      "templates": {
+        "report-standard": {
+          "document_profile": "summary-report",
+          "locale": "en-US",
+          "fonts": {
+            "heading": "Aptos",
+            "body": "Aptos"
+          },
+          "colors": {
+            "primary": "#1f2937",
+            "secondary": "#4b5563",
+            "accent": "#2563eb",
+            "background": "#ffffff",
+            "text": "#111827"
+          },
+          "docx": {
+            "page": {
+              "width": 11906,
+              "height": 16838,
+              "margin_top": 1440,
+              "margin_right": 1440,
+              "margin_bottom": 1440,
+              "margin_left": 1440,
+              "header": 720,
+              "footer": 720
+            },
+            "title_font_size": 32,
+            "section_font_size": 26,
+            "title_spacing_after": 160,
+            "section_spacing_before": 120,
+            "section_spacing_after": 80
+          },
+          "pdf": {
+            "margin_left": 48,
+            "title_x": 48,
+            "title_y": 42,
+            "content_x": 56,
+            "bullet_x": 64,
+            "callout_x": 64,
+            "table_x": 56,
+            "summary_gap": 30,
+            "callout_gap": 18,
+            "table_gap": 22,
+            "section_gap": 10,
+            "title_font_size": 22,
+            "summary_font_size": 11,
+            "section_font_size": 14,
+            "table_title_font_size": 11,
+            "callout_title_font_size": 11,
+            "body_font_size": 10,
+            "line_height": 16,
+            "table": {
+              "width": 490,
+              "header_fill": "#1f2937",
+              "header_text": "#ffffff",
+              "grid_stroke": "#cbd5e1",
+              "outer_stroke": "#94a3b8",
+              "zebra_fill": "#f8fafc",
+              "show_zebra": true
+            }
+          }
+        }
+      }
+    },
+    "tracker": {
+      "default_template": "operator-tracker-standard",
+      "templates": {
+        "operator-tracker-standard": {
+          "document_profile": "operator-tracker",
+          "locale": "en-US",
+          "fonts": {
+            "heading": "Aptos",
+            "body": "Aptos"
+          },
+          "colors": {
+            "primary": "#0F172A",
+            "secondary": "#334155",
+            "accent": "#2563EB",
+            "background": "#FFFFFF",
+            "text": "#111827",
+            "success": "#DCFCE7",
+            "warning": "#FEF3C7",
+            "danger": "#FEE2E2",
+            "info": "#DBEAFE",
+            "muted": "#F8FAFC",
+            "border": "#CBD5E1"
+          },
+          "layout": {
+            "title_row_height": 30,
+            "subtitle_row_height": 20,
+            "summary_row_height": 20,
+            "header_row_height": 22,
+            "data_row_height": 20,
+            "zoom_scale": 95,
+            "freeze_header": true,
+            "banded_rows": true,
+            "default_column_width": 18
+          },
+          "tones": {
+            "default": "info",
+            "states": {
+              "info": { "fill": "info", "text_color": "#111827", "bold": true },
+              "success": { "fill": "success", "text_color": "#166534", "bold": true },
+              "warning": { "fill": "warning", "text_color": "#92400E", "bold": true },
+              "danger": { "fill": "danger", "text_color": "#991B1B", "bold": true }
+            }
+          },
+          "validation_defaults": {
+            "status": {
+              "type": "list",
+              "values": ["Done", "In Progress", "Watch", "Blocked"],
+              "errorTitle": "Invalid Status",
+              "error": "Use one of: Done, In Progress, Watch, Blocked"
+            },
+            "priority": {
+              "type": "list",
+              "values": ["P1", "P2", "P3"],
+              "errorTitle": "Invalid Priority",
+              "error": "Use one of: P1, P2, P3"
+            },
+            "type": {
+              "type": "list",
+              "values": ["Risk", "Assumption", "Issue", "Dependency"],
+              "errorTitle": "Invalid Type",
+              "error": "Use one of: Risk, Assumption, Issue, Dependency"
+            }
+          },
+          "conditional_format_defaults": {
+            "status": {
+              "key_column": "status",
+              "tones": {
+                "Done": "success",
+                "In Progress": "warning",
+                "Watch": "danger",
+                "Blocked": "danger"
+              }
+            },
+            "overdue_finish": {
+              "key_column": "finish",
+              "status_column": "status",
+              "done_values": ["Done"],
+              "tone": "danger"
+            }
+          }
+        }
+      }
+    }
+  }
+}

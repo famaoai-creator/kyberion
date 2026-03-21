@@ -1,0 +1,13 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "diagram",
+  "document_type": "architecture-diagram",
+  "document_profile": "solution-overview",
+  "render_target": "mmd",
+  "locale": "en-US",
+  "layout_template_id": "kyberion-sovereign",
+  "payload": {
+    "title": "Kyberion Architecture Overview",
+    "source": "flowchart TD\n    A[User Intent] --> B[Kyberion Brain]\n    B --> C[Modeling Actuator]\n    B --> D[Media Actuator]\n    B --> E[Browser Actuator]\n    D --> F[Artifacts]\n    C --> G[Structured Diagrams]\n    E --> H[External Systems]\n"
+  }
+}

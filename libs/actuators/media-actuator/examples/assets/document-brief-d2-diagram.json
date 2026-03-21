@@ -1,0 +1,12 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "diagram",
+  "document_type": "process-diagram",
+  "document_profile": "operator-flow",
+  "render_target": "d2",
+  "locale": "en-US",
+  "payload": {
+    "title": "Mission Flow",
+    "source": "direction: right\nidea: \"Intent\"\nalign: \"Alignment\"\nexecute: \"Execution\"\nreview: \"Review\"\nidea -> align -> execute -> review\n"
+  }
+}

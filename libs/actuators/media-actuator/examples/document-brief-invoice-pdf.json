@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/media/document-brief-invoice-pdf.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-invoice-example.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "document_pdf_from_brief",
+      "params": {
+        "from": "document_brief",
+        "export_as": "document_pdf_protocol"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "pdf_render",
+      "params": {
+        "design_from": "document_pdf_protocol",
+        "path": "active/shared/tmp/media/document-brief-invoice-example.pdf"
+      }
+    }
+  ]
+}

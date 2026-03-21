@@ -71,7 +71,7 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
       aesthetic: { elements: [{ type: 'text', x: 123, y: 456, text: 'PrecisePosition', fontSize: 10 }] }
     } as any, OUT, { compress: false });
     const t = fs.readFileSync(OUT, 'binary');
-    expect(t).toContain('123 44 Td');
+    expect(t).toContain('1 0 0 1 123 44 Tm');
     expect(t).toContain('(PrecisePosition) Tj');
   });
 

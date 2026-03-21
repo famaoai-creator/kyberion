@@ -1,0 +1,45 @@
+{
+  "kind": "document-brief",
+  "artifact_family": "presentation",
+  "document_type": "proposal",
+  "document_profile": "executive-proposal",
+  "render_target": "pptx",
+  "locale": "en-US",
+  "layout_template_id": "executive-neutral",
+  "payload": {
+    "title": "Digital Onboarding Transformation Proposal",
+    "client": "Aster Bank",
+    "objective": "Redesign onboarding and approval journeys to improve conversion and operational efficiency.",
+    "audience": ["Executive Sponsor", "Digital Channel Lead", "Operations Manager"],
+    "story": {
+      "core_message": "A lighter, guided onboarding experience reduces drop-off while preserving governance.",
+      "chapters": [
+        "Why change now",
+        "Target customer journey",
+        "Operating model and controls",
+        "Delivery plan"
+      ],
+      "tone": "executive and evidence-based",
+      "closing_cta": "Approve the discovery and pilot phase."
+    },
+    "evidence": [
+      {
+        "title": "Current pain points",
+        "point": "Existing onboarding requires too many steps and creates avoidable abandonment."
+      },
+      {
+        "title": "Future-state journey",
+        "point": "A guided journey aligns customer intent, verification, and support moments."
+      },
+      {
+        "title": "Governance design",
+        "point": "Operational controls are embedded without exposing the customer to back-office complexity."
+      },
+      {
+        "title": "Pilot roadmap",
+        "point": "A phased rollout de-risks delivery while creating measurable conversion wins."
+      }
+    ],
+    "required_sections": ["executive-summary", "journey", "governance", "plan"]
+  }
+}

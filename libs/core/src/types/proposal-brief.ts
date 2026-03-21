@@ -11,6 +11,10 @@ export interface ProposalBrief {
   title: string;
   client: string;
   objective: string;
+  document_profile?: string;
+  layout_template_id?: string;
+  render_target?: string;
+  locale?: string;
   audience: string[];
   story: {
     core_message: string;
