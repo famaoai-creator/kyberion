@@ -1,0 +1,12 @@
+{
+  "actuator_id": "ios-actuator",
+  "version": "1.0.0",
+  "description": "simctl-driven iOS Simulator Actuator",
+  "capabilities": [
+    { "op": "boot_simulator", "platforms": ["darwin"] },
+    { "op": "install_app", "platforms": ["darwin"] },
+    { "op": "launch_app", "platforms": ["darwin"] },
+    { "op": "capture_screen", "platforms": ["darwin"] },
+    { "op": "emit_session_handoff", "platforms": ["darwin"] }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "service_id": "notion",
+  "name": "Notion API Presets",
+  "base_url": "https://api.notion.com/v1",
+  "auth_strategy": "Bearer",
+  "headers": {
+    "Notion-Version": "2022-06-28"
+  },
+  "operations": {
+    "create_page": {
+      "path": "pages",
+      "method": "POST",
+      "description": "Creates a new page in a database.",
+      "parameters": {
+        "database_id": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "parent": { "database_id": "{{database_id}}" },
+        "properties": {
+          "Name": { "title": [{ "text": { "content": "{{title}}" } }] }
+        }
+      }
+    },
+    "query_database": {
+      "path": "databases/{{database_id}}/query",
+      "method": "POST",
+      "description": "Queries a database."
+    }
+  }
+}

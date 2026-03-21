@@ -1,0 +1,30 @@
+{
+  "service_id": "slack",
+  "name": "Slack Web API Presets",
+  "base_url": "https://slack.com/api",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "post_message": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "api",
+          "path": "chat.postMessage",
+          "method": "POST",
+          "output_mapping": { "ts": "ts", "channel": "channel" }
+        },
+        {
+          "type": "cli",
+          "command": "slack-cli",
+          "args": ["send", "--text", "{{text}}", "--channel", "{{channel}}", "--json"],
+          "output_mapping": { "ts": "ts", "channel": "channel" }
+        }
+      ],
+      "description": "Sends a message to a channel.",
+      "parameters": {
+        "channel": { "required": true, "type": "string" },
+        "text": { "required": true, "type": "string" }
+      }
+    }
+  }
+}

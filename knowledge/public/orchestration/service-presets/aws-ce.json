@@ -1,0 +1,23 @@
+{
+  "service_id": "aws-ce",
+  "name": "AWS Cost Explorer API Presets",
+  "base_url": "https://ce.us-east-1.amazonaws.com",
+  "auth_strategy": "AWS_SIGV4",
+  "operations": {
+    "get_cost_and_usage": {
+      "path": "/",
+      "method": "POST",
+      "description": "Retrieves cost and usage metrics.",
+      "headers": { "X-Amz-Target": "AWSInsightsIndexService.GetCostAndUsage" },
+      "parameters": {
+        "start": { "required": true, "type": "string" },
+        "end": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "TimePeriod": { "Start": "{{start}}", "End": "{{end}}" },
+        "Granularity": "MONTHLY",
+        "Metrics": ["UnblendedCost"]
+      }
+    }
+  }
+}

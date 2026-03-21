@@ -1,0 +1,11 @@
+{
+  "actuator_id": "artifact-actuator",
+  "version": "1.0.0",
+  "description": "Governed Artifact and Delivery Pack Manager",
+  "capabilities": [
+    { "op": "write_json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "append_event", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write_delivery_pack", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
