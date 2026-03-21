@@ -18,6 +18,7 @@ import {
   enqueueMissionTeamPrewarmRequest,
   ensureMissionTeamRuntimeViaSupervisor,
   findMissionPath,
+  grantAccess,
   ledger,
   loadMissionTeamPlan,
   logger,
@@ -2013,14 +2014,18 @@ async function main() {
     process.env.MISSION_ROLE = 'mission_controller';
   }
 
-  const action = process.argv[2];
-  const arg1 = process.argv[3];
-  const arg2 = process.argv[4];
-  const arg3 = process.argv[5];
-  const arg4 = process.argv[6];
-  const arg5 = process.argv[7];
-  const arg6 = process.argv[8];
-  const arg7 = process.argv[9];
+  const flags = ['--ephemeral', '--refresh', '--seal', '--force', '--execute'];
+  const positionalArgs = process.argv.slice(2).filter(arg => !flags.includes(arg) && !arg.startsWith('--project-'));
+
+  const action = positionalArgs[0];
+  const arg1 = positionalArgs[1];
+  const arg2 = positionalArgs[2];
+  const arg3 = positionalArgs[3];
+  const arg4 = positionalArgs[4];
+  const arg5 = positionalArgs[5];
+  const arg6 = positionalArgs[6];
+  const arg7 = positionalArgs[7];
+
   const hasRefresh = process.argv.includes('--refresh');
   const relationshipOptions = extractProjectRelationshipOptions();
 
@@ -2043,10 +2048,10 @@ async function main() {
     case 'seal': await sealMission(arg1); break;
     case 'enqueue': await enqueueMission(arg1, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []); break;
     case 'dispatch': await dispatchNextMission(); break;
-    case 'finish': await finishMission(arg1, arg2 === '--seal'); break;
+    case 'finish': await finishMission(arg1, process.argv.includes('--seal')); break;
     case 'resume': await resumeMission(arg1); break;
-    case 'record-task': await recordTask(arg1, arg2, JSON.parse(process.argv[5] || '{}')); break;
-    case 'purge': await purgeMissions(arg1 !== '--execute'); break;
+    case 'record-task': await recordTask(arg1, arg2, JSON.parse(positionalArgs[3] || '{}')); break;
+    case 'purge': await purgeMissions(!process.argv.includes('--execute')); break;
     case 'list': listMissions(arg1); break;
     case 'status': showMissionStatus(arg1); break;
     case 'sync-project-ledger': await syncProjectLedger(arg1); break;

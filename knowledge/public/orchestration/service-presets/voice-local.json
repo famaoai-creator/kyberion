@@ -1,0 +1,18 @@
+{
+  "service_id": "voice-local",
+  "name": "Local Generative TTS Presets",
+  "operations": {
+    "speak_jp": {
+      "type": "cli",
+      "command": "node",
+      "args": ["dist/libs/actuators/voice-actuator/src/index.js", "--input", "{{tmp_file}}"],
+      "description": "Speaks Japanese using local engine."
+    },
+    "speak_en": {
+      "type": "cli",
+      "command": "node",
+      "args": ["dist/libs/actuators/voice-actuator/src/index.js", "--input", "{{tmp_file}}"],
+      "description": "Speaks English using local engine."
+    }
+  }
+}
