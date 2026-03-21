@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from "lucide-react";
+import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 interface AgentRecord {
   agentId: string;
@@ -84,6 +85,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const locale = resolveChronosLocale();
+  const at = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [health, setHealth] = useState<HealthSnapshot>({ total: 0, ready: 0, busy: 0, error: 0 });
   const [accessRole, setAccessRole] = useState<ChronosAccessRole>("readonly");
@@ -257,7 +260,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <div className="flex items-center gap-3">
             <Cpu className="text-kyberion-gold w-5 h-5" />
-            <span className="text-sm font-bold uppercase tracking-widest">Agent Registry</span>
+            <span className="text-sm font-bold uppercase tracking-widest">{at("chronos_agent_registry", "Agent Registry")}</span>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex gap-2 text-[9px] font-mono">
@@ -278,7 +281,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {agents.length === 0 && !showSpawn && (
             <div className="text-center text-[11px] opacity-30 italic py-8">
-              No agents running. Spawn one to get started.
+              {at("chronos_no_agents_running", "No agents running. Spawn one to get started.")}
             </div>
           )}
           {agents.map((agent) => (
@@ -343,13 +346,13 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <Terminal size={12} /> {viewingLogs}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => fetchLogs(viewingLogs)} className="text-[9px] text-blue-400 hover:text-blue-300">Refresh</button>
-                  <button onClick={() => setViewingLogs(null)} className="text-[9px] opacity-40 hover:opacity-80">Close</button>
+                  <button onClick={() => fetchLogs(viewingLogs)} className="text-[9px] text-blue-400 hover:text-blue-300">{at("chronos_refresh", "Refresh")}</button>
+                  <button onClick={() => setViewingLogs(null)} className="text-[9px] opacity-40 hover:opacity-80">{at("chronos_close", "Close")}</button>
                 </div>
               </div>
               <div className="max-h-[250px] overflow-y-auto font-mono text-[9px] space-y-0.5 bg-black/40 rounded-lg p-3">
                 {logs.length === 0 ? (
-                  <div className="text-center opacity-30 italic py-4">No logs yet. Send a message to this agent first.</div>
+                  <div className="text-center opacity-30 italic py-4">{at("chronos_no_logs_yet", "No logs yet. Send a message to this agent first.")}</div>
                 ) : logs.map((entry, i) => {
                   const typeColors: Record<string, string> = {
                     agent: 'text-green-400', prompt: 'text-blue-400', out: 'text-cyan-400',
@@ -379,7 +382,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     spawnMode === "manifest" ? "bg-kyberion-gold/20 border-kyberion-gold/30" : "border-white/5 opacity-40"
                   }`}
                 >
-                  <FileText size={10} className="inline mr-1" /> From Manifest
+                  <FileText size={10} className="inline mr-1" /> {at("chronos_from_manifest", "From Manifest")}
                 </button>
                 <button
                   onClick={() => setSpawnMode("custom")}
@@ -387,15 +390,15 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     spawnMode === "custom" ? "bg-kyberion-gold/20 border-kyberion-gold/30" : "border-white/5 opacity-40"
                   }`}
                 >
-                  <Plus size={10} className="inline mr-1" /> Custom
+                  <Plus size={10} className="inline mr-1" /> {at("chronos_custom", "Custom")}
                 </button>
               </div>
 
               {spawnMode === "manifest" ? (
                 <>
-                  <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">Select Agent Definition</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">{at("chronos_select_agent_definition", "Select Agent Definition")}</div>
                   {availableManifests.length === 0 ? (
-                    <div className="text-[10px] opacity-30 italic">All defined agents are already running.</div>
+                    <div className="text-[10px] opacity-30 italic">{at("chronos_all_agents_running", "All defined agents are already running.")}</div>
                   ) : (
                     <div className="space-y-1">
                       {availableManifests.map((m) => (

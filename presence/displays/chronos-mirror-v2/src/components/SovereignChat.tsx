@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, PointerEvent as ReactPointerEvent } from "react";
 import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from "lucide-react";
+import { chronosSpeechLocale, resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 const AGENT_URL = "/api/agent";
 
@@ -20,6 +21,7 @@ export function SovereignChat({
   onA2UIMessage?: (message: any) => void;
   onReady?: (sendFn: (query: string) => void) => void;
 }) {
+  const locale = resolveChronosLocale();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -70,14 +72,14 @@ export function SovereignChat({
       const res = await fetch(AGENT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, locale }),
       });
       const data = await res.json();
 
       const agentMsg: ChatMessage = {
         id: `agent-${Date.now()}`,
         role: "agent",
-        content: data.response || data.error || "No response",
+        content: data.response || data.error || uxText("chronos_chat_no_response", "No response", locale),
         timestamp: data.timestamp || new Date().toISOString(),
         status: res.ok ? "complete" : "error",
       };
@@ -94,7 +96,7 @@ export function SovereignChat({
         {
           id: `err-${Date.now()}`,
           role: "agent",
-          content: `Connection error: ${err.message}`,
+          content: `${uxText("chronos_chat_connection_error", "Connection error", locale)}: ${err.message}`,
           timestamp: new Date().toISOString(),
           status: "error",
         },
@@ -123,7 +125,7 @@ export function SovereignChat({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "ja-JP";
+    recognition.lang = chronosSpeechLocale(locale);
     recognition.interimResults = true;
     recognition.continuous = false;
 
@@ -186,7 +188,7 @@ export function SovereignChat({
           className="text-[10px] opacity-40 hover:opacity-80 transition"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          MINIMIZE
+          {uxText("chronos_chat_minimize", "MINIMIZE", locale)}
         </button>
       </div>
 
@@ -194,7 +196,7 @@ export function SovereignChat({
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-center text-[11px] opacity-30 italic pt-8">
-            Welcome, Sovereign. The mirror is ready for your command.
+            {uxText("chronos_chat_welcome", "Welcome, Sovereign. The mirror is ready for your command.", locale)}
           </div>
         )}
         {messages.map((msg) => (
@@ -239,7 +241,9 @@ export function SovereignChat({
                 sendMessage();
               }
             }}
-            placeholder={isListening ? "Listening..." : "Command the mirror..."}
+            placeholder={isListening
+              ? uxText("chronos_chat_listening", "Listening...", locale)
+              : uxText("chronos_chat_placeholder", "Command the mirror...", locale)}
             className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
               isListening ? "border-red-500/50 bg-red-900/10" : "border-white/10 focus:border-kyberion-gold/30"
             }`}

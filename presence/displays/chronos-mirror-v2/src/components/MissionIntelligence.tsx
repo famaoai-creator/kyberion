@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Activity, Bot, GitBranch, Radar } from "lucide-react";
+import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 interface MissionSummary {
   missionId: string;
@@ -414,6 +415,8 @@ interface SurfaceSummary {
 }
 
 export function MissionIntelligence() {
+  const locale = resolveChronosLocale();
+  const mt = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
   const [data, setData] = useState<IntelligencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remediationTarget, setRemediationTarget] = useState<string | null>(null);
@@ -664,7 +667,7 @@ export function MissionIntelligence() {
   if (!data) {
     return (
       <div className="h-full w-full flex items-center justify-center">
-        <div className="text-[11px] uppercase tracking-[0.25em] text-kyberion-gold/40">Loading mission intelligence...</div>
+        <div className="text-[11px] uppercase tracking-[0.25em] text-kyberion-gold/40">{mt("chronos_mission_loading", "Loading mission intelligence...")}</div>
       </div>
     );
   }
@@ -685,13 +688,12 @@ export function MissionIntelligence() {
       <section className="rounded-[26px] border border-kyberion-gold/15 bg-gradient-to-br from-kyberion-gold/10 via-black/10 to-cyan-950/20 px-5 py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">Mission Intelligence</div>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">{mt("chronos_mission_intelligence", "Mission Intelligence")}</div>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-white/90">
-              Read mission health first, then act on runtime or delivery issues.
+              {mt("chronos_mission_hero_title", "Read mission health first, then act on runtime or delivery issues.")}
             </h2>
             <p className="mt-2 max-w-3xl text-[12px] leading-6 text-white/52">
-              This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions,
-              then handle stale runtimes or pending delivery messages only if the control plane needs intervention.
+              {mt("chronos_mission_hero_description", "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.")}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] text-white/48 sm:grid-cols-4">
@@ -717,23 +719,23 @@ export function MissionIntelligence() {
         </div>
         {actionResult && (
           <div className="mt-4 rounded-xl border border-cyan-300/15 bg-cyan-400/8 px-3 py-2 text-[11px] text-cyan-100/80">
-            last action: {actionResult}
+            {mt("chronos_last_action", "last action")}: {actionResult}
           </div>
         )}
         <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-white/60">
-          access: <span className="font-mono text-white/85">{data.accessRole}</span>
+          {mt("chronos_access", "access")}: <span className="font-mono text-white/85">{data.accessRole}</span>
           {data.accessRole === "readonly"
-            ? " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled."
-            : " · control actions enabled."}
+            ? mt("chronos_control_actions_disabled", " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.")
+            : mt("chronos_control_actions_enabled", " · control actions enabled.")}
         </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
           icon={<GitBranch size={14} />}
-          label="Active Missions"
+          label={mt("chronos_active_missions", "Active Missions")}
           value={String(data.activeMissions.length)}
-          detail="Durable contracts in execution"
+          detail={mt("chronos_durable_contracts_in_execution", "Durable contracts in execution")}
         />
         <MetricCard
           icon={<Bot size={14} />}
@@ -743,9 +745,9 @@ export function MissionIntelligence() {
         />
         <MetricCard
           icon={<Radar size={14} />}
-          label="Recent Events"
+          label={mt("chronos_recent_events", "Recent Events")}
           value={String(data.recentEvents.length)}
-          detail="Latest orchestration transitions"
+          detail={mt("chronos_latest_orchestration_transitions", "Latest orchestration transitions")}
         />
       </div>
 
@@ -1168,7 +1170,7 @@ export function MissionIntelligence() {
               return latestAction ? (
                 <>
                   <div className="mr-2 flex items-center rounded-lg border border-white/6 bg-white/[0.03] px-3 py-1.5 text-[10px] text-white/55">
-                    surfaces
+                    {mt("chronos_surfaces", "surfaces")}
                     <span className="ml-2">{latestAction.operation}</span>
                     <span className="ml-2"><ActionStatusBadge action={latestAction} /></span>
                   </div>
@@ -1178,7 +1180,7 @@ export function MissionIntelligence() {
                       onClick={() => setExpandedGlobalSurfaceActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
                       className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
                     >
-                      {expandedGlobalSurfaceActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
+                      {expandedGlobalSurfaceActionId === latestAction.event_id ? mt("chronos_hide_latest_action", "hide latest action") : mt("chronos_show_latest_action", "show latest action")}
                     </button>
                   )}
                   {latestAction.status === "failed" && (
@@ -1189,7 +1191,7 @@ export function MissionIntelligence() {
                       title={retryAction?.disabledReason}
                       className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {surfaceActionTarget === `all:${latestAction.operation}` ? "retrying" : "retry latest action"}
+                      {surfaceActionTarget === `all:${latestAction.operation}` ? mt("chronos_retrying", "retrying") : mt("chronos_retry_latest_action", "retry latest action")}
                     </button>
                   )}
                 </>
@@ -1224,7 +1226,7 @@ export function MissionIntelligence() {
           })()}
           <div className="space-y-3">
             {data.surfaces.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No managed surfaces.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_managed_surfaces", "No managed surfaces.")}</div>
             ) : data.surfaces.map((surface) => {
               const surfaceActions = getAvailableSurfaceActions(data, surface.id);
               const safeSurfaceActions = getActionsByRisk(surfaceActions, "safe");
@@ -1238,7 +1240,7 @@ export function MissionIntelligence() {
                   return latestAction ? (
                     <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                        last control action
+                        {mt("chronos_last_control_action", "last control action")}
                       </div>
                       <ActionStatusBadge action={latestAction} />
                     </div>
@@ -1248,7 +1250,7 @@ export function MissionIntelligence() {
                   <div>
                     <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{surface.id}</div>
                     <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                      {surface.kind} · {surface.startupMode || "background"} · {surface.running ? "running" : "stopped"}
+                      {surface.kind} · {surface.startupMode || mt("chronos_background", "background")} · {surface.running ? mt("chronos_running", "running") : mt("chronos_stopped", "stopped")}
                     </div>
                   </div>
                   <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
@@ -1263,16 +1265,16 @@ export function MissionIntelligence() {
                 </div>
                 <div className="mt-2 text-[10px] text-white/50">
                   pid: <span className="font-mono text-white/75">{surface.pid ?? "-"}</span>
-                  {surface.detail ? <> · detail: <span className="font-mono text-white/75">{surface.detail}</span></> : null}
+                  {surface.detail ? <> · {mt("chronos_detail", "detail")}: <span className="font-mono text-white/75">{surface.detail}</span></> : null}
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${surfaceSummaryBadgeClass(surface.controlTone)}`}>
                     {surface.controlSummary}
                   </div>
-                  <div className="text-[10px] text-white/45">control summary</div>
+                  <div className="text-[10px] text-white/45">{mt("chronos_control_summary", "control summary")}</div>
                   {surface.controlRequestedBy && (
                     <div className="text-[10px] text-white/35">
-                      requested by <span className="font-mono text-white/60">{surface.controlRequestedBy}</span>
+                      {mt("chronos_requested_by", "requested by")} <span className="font-mono text-white/60">{surface.controlRequestedBy}</span>
                     </div>
                   )}
                 </div>
@@ -1288,7 +1290,7 @@ export function MissionIntelligence() {
                           onClick={() => setExpandedSurfaceCardActionId((current) => current === latestAction.event_id ? null : latestAction.event_id || null)}
                           className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
                         >
-                          {expandedSurfaceCardActionId === latestAction.event_id ? "hide latest action" : "show latest action"}
+                          {expandedSurfaceCardActionId === latestAction.event_id ? mt("chronos_hide_latest_action", "hide latest action") : mt("chronos_show_latest_action", "show latest action")}
                         </button>
                         {latestAction.status === "failed" && (
                           <button
@@ -1298,14 +1300,14 @@ export function MissionIntelligence() {
                             title={retryAction?.disabledReason}
                             className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            {surfaceActionTarget === `${surface.id}:${latestAction.operation}` ? "retrying" : "retry latest action"}
+                            {surfaceActionTarget === `${surface.id}:${latestAction.operation}` ? mt("chronos_retrying", "retrying") : mt("chronos_retry_latest_action", "retry latest action")}
                           </button>
                         )}
                       </>
                     );
                   })()}
                   <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-300/10 bg-emerald-400/[0.04] px-2 py-2">
-                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">safe actions</div>
+                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-emerald-200/50">{mt("chronos_safe_actions", "safe actions")}</div>
                     {safeSurfaceActions.map((action) => (
                       <button
                         key={action.operation}
@@ -1315,7 +1317,7 @@ export function MissionIntelligence() {
                         title={action.disabledReason}
                         className={actionButtonClass("safe")}
                       >
-                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
+                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? mt("chronos_working", "working") : action.label}
                       </button>
                     ))}
                     {safeDisabledReason && (
@@ -1325,7 +1327,7 @@ export function MissionIntelligence() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 rounded-lg border border-red-300/10 bg-red-400/[0.04] px-2 py-2">
-                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">risky actions · approval required</div>
+                    <div className="w-full text-[9px] uppercase tracking-[0.18em] text-red-200/50">{mt("chronos_risky_actions_approval_required", "risky actions · approval required")}</div>
                     {riskySurfaceActions.map((action) => (
                       <button
                         key={action.operation}
@@ -1335,7 +1337,7 @@ export function MissionIntelligence() {
                         title={action.disabledReason}
                         className={actionButtonClass("risky")}
                       >
-                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? "working" : action.label}
+                        {surfaceActionTarget === `${surface.id}:${action.operation}` ? mt("chronos_working", "working") : action.label}
                       </button>
                     ))}
                     {riskyDisabledReason && (
@@ -1360,18 +1362,15 @@ export function MissionIntelligence() {
           </div>
         </Panel>
 
-        <Panel title="Control Model">
+        <Panel title={mt("chronos_control_model", "Control Model")}>
           <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-4 text-[11px] leading-6 text-white/55">
-            Chronos is a control surface. It does not mutate mission or runtime state directly.
-            Each button issues a deterministic backend action through <span className="font-mono text-white/80">mission_controller</span>,
-            <span className="font-mono text-white/80"> agent-runtime-supervisor</span>, or
-            <span className="font-mono text-white/80"> surface_runtime</span>, then refreshes the control-plane view.
+            {mt("chronos_control_model_description", "Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.")}
           </div>
         </Panel>
       </section>
 
       <section className="grid gap-4">
-        <Panel title="Live Agent Conversation">
+        <Panel title={mt("chronos_live_agent_conversation", "Live Agent Conversation")}>
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1385,7 +1384,7 @@ export function MissionIntelligence() {
                   : "border-white/10 bg-white/5 text-white/45 hover:bg-white/10"
               }`}
             >
-              all missions
+              {mt("chronos_all_missions", "all missions")}
             </button>
             {data.activeMissions.map((mission) => (
               <button
@@ -1407,7 +1406,7 @@ export function MissionIntelligence() {
           </div>
           <div className="space-y-3">
             {filteredAgentMessages.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No mission-scoped agent messages observed yet.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_mission_scoped_messages", "No mission-scoped agent messages observed yet.")}</div>
             ) : filteredAgentMessages.map((message, index) => (
               <div key={`${message.agentId}-${message.ts}-${index}`} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1427,22 +1426,22 @@ export function MissionIntelligence() {
                 </div>
                 <div className="mt-2 text-[11px] leading-6 text-white/82">{message.content}</div>
                 <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
-                  <span>owner: {message.ownerType}/{message.ownerId}</span>
-                  {message.channel && <span>channel: {message.channel}</span>}
-                  {message.thread && <span>thread: {message.thread}</span>}
+                  <span>{mt("chronos_owner", "owner")}: {message.ownerType}/{message.ownerId}</span>
+                  {message.channel && <span>{mt("chronos_channel", "channel")}: {message.channel}</span>}
+                  {message.thread && <span>{mt("chronos_thread", "thread")}: {message.thread}</span>}
                 </div>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel title="Selected Mission Thread">
+        <Panel title={mt("chronos_selected_mission_thread", "Selected Mission Thread")}>
           <div className="mb-3 text-[10px] uppercase tracking-[0.18em] text-white/45">
-            {effectiveMissionId ? `thread view · ${effectiveMissionId}` : "select a mission to inspect a unified thread"}
+            {effectiveMissionId ? `thread view · ${effectiveMissionId}` : mt("chronos_select_mission_to_inspect_thread", "select a mission to inspect a unified thread")}
           </div>
           <div className="space-y-3">
             {!effectiveMissionId || missionThread.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No unified mission thread is available yet.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_unified_mission_thread", "No unified mission thread is available yet.")}</div>
             ) : missionThread.map((entry, index) => (
               <div key={`${entry.type}-${entry.agentId}-${entry.ts}-${index}`} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1459,18 +1458,18 @@ export function MissionIntelligence() {
                 </div>
                 <div className="mt-2 text-[11px] leading-6 text-white/82">{entry.content}</div>
                 <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
-                  {entry.channel && <span>channel: {entry.channel}</span>}
-                  {entry.thread && <span>thread: {entry.thread}</span>}
+                  {entry.channel && <span>{mt("chronos_channel", "channel")}: {entry.channel}</span>}
+                  {entry.thread && <span>{mt("chronos_thread", "thread")}: {entry.thread}</span>}
                 </div>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel title="A2A Handoff Trail">
+        <Panel title={mt("chronos_a2a_handoff_trail", "A2A Handoff Trail")}>
           <div className="space-y-3">
             {filteredA2AHandoffs.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No A2A handoffs observed for the current mission filter.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_a2a_handoffs_for_filter", "No A2A handoffs observed for the current mission filter.")}</div>
             ) : filteredA2AHandoffs.map((handoff, index) => (
               <div key={`${handoff.sender}-${handoff.receiver}-${handoff.ts}-${index}`} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1488,26 +1487,26 @@ export function MissionIntelligence() {
                   <div className="ml-auto text-[9px] font-mono text-white/30">{new Date(handoff.ts).toLocaleString()}</div>
                 </div>
                 <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-white/35">
-                  mission: {handoff.missionId}
-                  {handoff.intent ? ` · intent: ${handoff.intent}` : ""}
+                  {mt("chronos_mission", "mission")}: {handoff.missionId}
+                  {handoff.intent ? ` · ${mt("chronos_intent", "intent")}: ${handoff.intent}` : ""}
                   {handoff.performative ? ` · ${handoff.performative}` : ""}
                 </div>
                 {handoff.promptExcerpt && (
                   <div className="mt-2 text-[11px] leading-6 text-white/80">{handoff.promptExcerpt}</div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
-                  {handoff.channel && <span>channel: {handoff.channel}</span>}
-                  {handoff.thread && <span>thread: {handoff.thread}</span>}
+                  {handoff.channel && <span>{mt("chronos_channel", "channel")}: {handoff.channel}</span>}
+                  {handoff.thread && <span>{mt("chronos_thread", "thread")}: {handoff.thread}</span>}
                 </div>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel id="recent-surface-outbox" title="Recent Surface Outbox">
+        <Panel id="recent-surface-outbox" title={mt("chronos_recent_surface_outbox", "Recent Surface Outbox")}>
           <div className="space-y-3">
             {data.recentSurfaceOutbox.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No pending or recent surface outbox messages.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_recent_surface_outbox", "No pending or recent surface outbox messages.")}</div>
             ) : data.recentSurfaceOutbox.map((message) => (
               <div key={message.message_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1517,7 +1516,7 @@ export function MissionIntelligence() {
                   <div className="text-[9px] font-mono text-white/30">{new Date(message.created_at).toLocaleString()}</div>
                 </div>
                 <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/28">
-                  correlation: {message.correlation_id}
+                  {mt("chronos_correlation", "correlation")}: {message.correlation_id}
                 </div>
                 <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
                 <button
@@ -1526,7 +1525,7 @@ export function MissionIntelligence() {
                   disabled={outboxTarget === message.message_id}
                   className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {outboxTarget === message.message_id ? "clearing" : "clear outbox"}
+                  {outboxTarget === message.message_id ? mt("chronos_clearing", "clearing") : mt("chronos_clear_outbox", "clear outbox")}
                 </button>
               </div>
             ))}

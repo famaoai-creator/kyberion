@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { safeExistsSync } from "@agent/core/secure-io";
 import { guardRequest } from "../../../lib/api-guard";
+import { normalizeChronosLocale, selectChronosLocaleText } from "../../../lib/ux-vocabulary";
 
 async function loadChronosCore() {
   const [
@@ -316,7 +317,11 @@ async function issueChronosMissionFromProposal(
   };
 }
 
-async function tryHandleDeterministicPipelineQuery(query: string) {
+function l(locale: "en" | "ja", en: string, ja: string): string {
+  return selectChronosLocaleText(locale, { en, ja });
+}
+
+async function tryHandleDeterministicPipelineQuery(query: string, locale: "en" | "ja") {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
@@ -328,7 +333,7 @@ async function tryHandleDeterministicPipelineQuery(query: string) {
 
   return {
     status: "ok",
-    response: `Pipeline ${match[1]} completed.`,
+    response: l(locale, `Pipeline ${match[1]} completed.`, `Pipeline ${match[1]} の実行が完了しました。`),
     a2ui: [
       {
         type: "display:section",
@@ -356,7 +361,7 @@ async function tryHandleDeterministicPipelineQuery(query: string) {
   };
 }
 
-async function tryHandleChronosQuickAction(query: string) {
+async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
   const match = query.match(QUICK_ACTION_PATTERN);
   if (!match) return null;
 
@@ -416,7 +421,11 @@ async function tryHandleChronosQuickAction(query: string) {
 
       return {
         status: "ok",
-        response: `Dashboard ready. ${missions.length} missions, ${runtime.length} agent runtimes, ${pendingOutbox} pending outbox messages.`,
+        response: l(
+          locale,
+          `Dashboard ready. ${missions.length} missions, ${runtime.length} agent runtimes, ${pendingOutbox} pending outbox messages.`,
+          `Dashboard を更新しました。missions=${missions.length}、agent runtimes=${runtime.length}、pending outbox=${pendingOutbox} です。`,
+        ),
         a2ui: [
           {
             type: "display:hero",
@@ -461,7 +470,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const missions = collectActiveMissions();
       return {
         status: "ok",
-        response: `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`,
+        response: l(locale, `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`, `active mission state から mission list を更新しました。Chronos から ${missions.length} 件の mission が見えています。`),
         a2ui: [
           {
             type: "display:hero",
@@ -497,7 +506,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry]));
       return {
         status: "ok",
-        response: `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`,
+        response: l(locale, `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`, `agent catalog を更新しました。manifests=${manifests.length}、active runtimes=${runtimes.length} です。`),
         a2ui: [
           {
             type: "display:hero",
@@ -536,7 +545,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const pendingOutbox = core.listSurfaceOutboxMessages("slack").length + core.listSurfaceOutboxMessages("chronos").length;
       return {
         status: "ok",
-        response: `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`,
+        response: l(locale, `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`, `vital check が完了しました。missions=${missions.length}、ready runtimes=${readyCount}/${runtimes.length}、pending outbox=${pendingOutbox} です。`),
         a2ui: [
           {
             type: "display:hero",
@@ -575,7 +584,7 @@ async function tryHandleChronosQuickAction(query: string) {
       }).slice(-10);
       return {
         status: "ok",
-        response: `Diagnostics loaded. ${problematic.length} non-ready runtimes detected.`,
+        response: l(locale, `Diagnostics loaded. ${problematic.length} non-ready runtimes detected.`, `diagnostics を読み込みました。non-ready runtime は ${problematic.length} 件です。`),
         a2ui: [
           {
             type: "display:section",
@@ -626,7 +635,7 @@ async function tryHandleChronosQuickAction(query: string) {
         .map(([capability, count]) => [capability, String(count)]);
       return {
         status: "ok",
-        response: `Capability audit complete. ${manifests.length} agent manifests were scanned.`,
+        response: l(locale, `Capability audit complete. ${manifests.length} agent manifests were scanned.`, `capability audit が完了しました。${manifests.length} 件の agent manifest を確認しました。`),
         a2ui: [
           {
             type: "display:hero",
@@ -655,7 +664,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry.agent.status]));
       return {
         status: "ok",
-        response: `Provider inventory loaded for ${manifests.length} manifests.`,
+        response: l(locale, `Provider inventory loaded for ${manifests.length} manifests.`, `${manifests.length} 件の manifest について provider inventory を読み込みました。`),
         a2ui: [
           {
             type: "display:table",
@@ -695,7 +704,7 @@ async function tryHandleChronosQuickAction(query: string) {
       }
       return {
         status: "ok",
-        response: `Recent orchestration and mission audit events loaded.`,
+        response: l(locale, `Recent orchestration and mission audit events loaded.`, `最近の orchestration と mission audit event を読み込みました。`),
         a2ui: [
           {
             type: "display:timeline",
@@ -714,7 +723,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const chronosPolicy = securityPolicy.role_permissions?.chronos_operator || {};
       return {
         status: "ok",
-        response: "Chronos operator policy loaded.",
+        response: l(locale, "Chronos operator policy loaded.", "Chronos operator policy を読み込みました。"),
         a2ui: [
           {
             type: "display:hero",
@@ -745,7 +754,7 @@ async function tryHandleChronosQuickAction(query: string) {
       }).slice(0, 24);
       return {
         status: "ok",
-        response: "Public knowledge surface refreshed.",
+        response: l(locale, "Public knowledge surface refreshed.", "public knowledge surface を更新しました。"),
         a2ui: [
           {
             type: "display:list",
@@ -763,7 +772,7 @@ async function tryHandleChronosQuickAction(query: string) {
       const testOutput = core.safeExec("pnpm", ["test"], { cwd: PROJECT_ROOT });
       return {
         status: "ok",
-        response: "Build and test completed.",
+        response: l(locale, "Build and test completed.", "build と test が完了しました。"),
         a2ui: [
           {
             type: "display:section",
@@ -799,6 +808,7 @@ export async function POST(req: NextRequest) {
       safeReadFile,
     } = core;
     const body = await req.json();
+    const locale = normalizeChronosLocale(body.locale);
     const query = (body.query || body.intent || "").trim();
     const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId : "chronos-default";
     const pendingMissionProposal = getChronosMissionProposalState(sessionId, core);
@@ -806,7 +816,7 @@ export async function POST(req: NextRequest) {
     const teamRole = typeof body.teamRole === "string" ? body.teamRole : undefined;
 
     if (!query) {
-      return NextResponse.json({ error: "Missing query" }, { status: 400 });
+      return NextResponse.json({ error: l(locale, "Missing query", "query がありません") }, { status: 400 });
     }
 
     if (pendingMissionProposal && isSlackMissionConfirmation(query)) {
@@ -854,7 +864,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const quickActionResponse = await tryHandleChronosQuickAction(query);
+    const quickActionResponse = await tryHandleChronosQuickAction(query, locale);
     if (quickActionResponse) {
       return NextResponse.json(quickActionResponse);
     }
@@ -866,7 +876,7 @@ export async function POST(req: NextRequest) {
     });
     const requestArtifact = JSON.parse(safeReadFile(requestArtifactPath, { encoding: "utf8" }) as string);
 
-    const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query);
+    const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
       return NextResponse.json(deterministicPipelineResponse);
     }
