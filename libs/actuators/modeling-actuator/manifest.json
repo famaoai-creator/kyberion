@@ -5,6 +5,7 @@
   "capabilities": [
     { "op": "ajv_validate", "platforms": ["darwin", "linux", "win32"] },
     { "op": "terraform_to_architecture_adf", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "terraform_to_topology_ir", "platforms": ["darwin", "linux", "win32"] },
     { "op": "web_profile_to_ui_flow_adf", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ui_flow_to_test_inventory", "platforms": ["darwin", "linux", "win32"] },
     { "op": "test_inventory_to_browser_pipeline", "platforms": ["darwin", "linux", "win32"] }
