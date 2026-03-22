@@ -24,7 +24,7 @@ node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/act
 - `image-adf-country-cover.json`:
   `image-generation-adf` から SDXL 系 text-to-image workflow を組み立てて画像生成する
 - `video-adf-drive-clip.json`:
-  `video-generation-adf` から workflow-backed な動画生成 request を組み立てる
+  `video-generation-adf` から named template ベースの動画生成 request を組み立てる
 - `submit-image-generation-job.json`:
   `image-generation-adf` を long-running `generation-job` として submit し、後で status / wait / collect できるようにする
 - `submit-video-generation-job.json`:
