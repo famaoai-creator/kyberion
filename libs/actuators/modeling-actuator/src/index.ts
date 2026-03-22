@@ -7,6 +7,7 @@ import { execSync } from 'node:child_process';
 import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
+import { terraformToTopologyIr } from './terraform-topology.js';
 
 /**
  * Modeling-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -471,6 +472,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       return {
         ...ctx,
         [params.export_as || 'architecture_adf']: terraformToArchitectureAdf(terraformRoot, { title }),
+      };
+    }
+    case 'terraform_to_topology_ir': {
+      const rootDir = process.cwd();
+      const terraformRoot = path.resolve(rootDir, resolve(params.dir || params.path || ctx[params.from || 'terraform_root']));
+      const title = resolve(params.title) || path.basename(terraformRoot);
+      return {
+        ...ctx,
+        [params.export_as || 'topology_ir']: terraformToTopologyIr(terraformRoot, { title }),
       };
     }
     default: return ctx;

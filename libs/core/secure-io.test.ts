@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { 
   validateFileSize, 
+  buildSafeExecEnv,
   safeReadFile, 
   safeWriteFile, 
   sanitizePath, 
@@ -102,8 +103,17 @@ describe('secure-io core', () => {
 
     it('should block private IP ranges', () => {
       expect(() => validateUrl('http://10.0.0.1')).toThrow('Blocked URL');
+      expect(() => validateUrl('http://127.0.0.1')).toThrow('Blocked URL');
+      expect(() => validateUrl('http://169.254.1.10')).toThrow('Blocked URL');
       expect(() => validateUrl('http://192.168.1.1')).toThrow('Blocked URL');
       expect(() => validateUrl('http://172.16.0.1')).toThrow('Blocked URL');
+    });
+
+    it('should block private and loopback IPv6 ranges', () => {
+      expect(() => validateUrl('http://[::1]')).toThrow('Blocked URL');
+      expect(() => validateUrl('http://[fd00::1]')).toThrow('Blocked URL');
+      expect(() => validateUrl('http://[fe80::1]')).toThrow('Blocked URL');
+      expect(() => validateUrl('http://[::ffff:127.0.0.1]')).toThrow('Blocked URL');
     });
 
     it('should reject non-HTTP protocols', () => {
@@ -116,6 +126,27 @@ describe('secure-io core', () => {
 
     it('should throw for empty input', () => {
       expect(() => validateUrl('')).toThrow('Missing or invalid URL');
+    });
+  });
+
+  describe('buildSafeExecEnv', () => {
+    it('should only inherit allowlisted variables by default', () => {
+      process.env.OPENAI_API_KEY = 'secret-openai-key';
+      process.env.PATH = process.env.PATH || '/usr/bin';
+      process.env.CUSTOM_SECRET = 'should-not-leak';
+
+      const env = buildSafeExecEnv();
+
+      expect(env.PATH).toBe(process.env.PATH);
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.CUSTOM_SECRET).toBeUndefined();
+    });
+
+    it('should allow explicit env overrides when needed', () => {
+      const env = buildSafeExecEnv({ CUSTOM_SECRET: 'explicit-only', MISSION_ID: 'MSN-1' });
+
+      expect(env.CUSTOM_SECRET).toBe('explicit-only');
+      expect(env.MISSION_ID).toBe('MSN-1');
     });
   });
 });
