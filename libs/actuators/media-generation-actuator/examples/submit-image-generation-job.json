@@ -1,0 +1,42 @@
+{
+  "action": "submit_generation",
+  "params": {
+    "action": "generate_image",
+    "params": {
+      "image_adf": {
+        "kind": "image-generation-adf",
+        "version": "1.0.0",
+        "intent": "country_cover_art",
+        "prompt": "golden hour country road, cinematic, warm, dust in the air, detailed illustration",
+        "negative_prompt": "blurry, distorted, low quality",
+        "canvas": {
+          "width": 1024,
+          "height": 1024
+        },
+        "style": {
+          "mood": ["warm", "hopeful"],
+          "camera": ["wide shot"],
+          "render_traits": ["cinematic", "detailed"]
+        },
+        "engine": {
+          "provider": "comfyui",
+          "model_family": "sdxl",
+          "checkpoint": "sd_xl_turbo_1.0_fp16.safetensors",
+          "steps": 6,
+          "cfg_scale": 1,
+          "sampler_name": "euler",
+          "scheduler": "simple"
+        },
+        "output": {
+          "format": "png",
+          "filename_prefix": "KyberionCountryCover",
+          "target_path": "active/shared/exports/KyberionCountryCover.png"
+        }
+      }
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff_seconds": 15
+    }
+  }
+}

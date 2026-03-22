@@ -28,8 +28,11 @@
       "base_url": "https://postman-echo.com",
       "preset_path": "knowledge/public/orchestration/service-presets/smoke-test.json"
     },
+    "media-generation": {
+      "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json"
+    },
     "vision": {
-      "preset_path": "knowledge/public/orchestration/service-presets/vision.json"
+      "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json"
     },
     "voice": {
       "preset_path": "knowledge/public/orchestration/service-presets/voice.json"
