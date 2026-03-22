@@ -103,7 +103,7 @@ npm run cli -- system visual-capture [screen|window]
 
 ## 6. 🛡️ Service Management & Watchdog
 
-Background presence services are managed by `scripts/service_manager.js`.
+Background presence services are managed by `scripts/surface_runtime.ts` and the shared surface manifest.
 
 - **Watchdog Mode**: A dedicated background process that monitors other services every 30 seconds.
 - **Auto-Healing**: Automatically restarts crashed sensors or daemons.
@@ -126,7 +126,7 @@ To add a new sensory input:
     }
     ```
 3.  **Mirror Observability**: Append an explainable event under `active/shared/observability/channels/<channel>/`.
-4.  **Integrate**: Ensure your sensor is listed in `service_manager.js` for lifecycle management.
+4.  **Integrate**: Ensure your long-lived sensor or bridge is declared in `knowledge/public/governance/active-surfaces.json` for lifecycle management.
 
 For the authoritative Slack and Chronos control contract, see:
 

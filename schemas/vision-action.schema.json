@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vision Actuator Request",
+  "description": "Perception-oriented request or compatibility pipeline envelope for vision-actuator.",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": {
+          "enum": [
+            "inspect_image",
+            "ocr_image",
+            "generate_image",
+            "generate_video",
+            "generate_music",
+            "capture_screen",
+            "record_screen",
+            "run_workflow"
+          ]
+        },
+        "params": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["action", "params"],
+            "properties": {
+              "action": {
+                "enum": [
+                  "inspect_image",
+                  "ocr_image",
+                  "generate_image",
+                  "generate_video",
+                  "generate_music",
+                  "capture_screen",
+                  "record_screen",
+                  "run_workflow"
+                ]
+              },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

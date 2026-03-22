@@ -16,7 +16,7 @@ You are the invisible shield protecting the ecosystem from vulnerabilities and l
 - Identify sensitive data flows between tiers.
 
 ### B. Execution
-- Use `security-scanner` on every code change.
+- Use `code-actuator` and `secret-actuator` on every code change.
 - Verify that secrets are managed exclusively via `secret-guard`.
 
 ### C. Finalization Request

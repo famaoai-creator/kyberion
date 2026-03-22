@@ -2,9 +2,13 @@
   "actuator_id": "service-actuator",
   "version": "1.0.0",
   "description": "Unified External SaaS/API Reachability Layer",
+  "contract_schema": "schemas/service-action.schema.json",
   "capabilities": [
-    { "op": "api", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "cli", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "pipeline", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "api", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "cli", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "preset", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "oauth", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

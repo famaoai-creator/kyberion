@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mobile Device Pipeline ADF",
+  "description": "Pipeline envelope for mobile device actuators such as android-actuator and ios-actuator.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "context": { "type": "object" },
+    "options": { "type": "object" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op", "params"],
+        "properties": {
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "op": {
+            "enum": [
+              "read_json",
+              "read_text_file",
+              "adb_health_check",
+              "simctl_health_check",
+              "capture_foreground_activity",
+              "capture_runtime_session_handoff",
+              "extract_ui_tree",
+              "set",
+              "summarize_ui_tree",
+              "find_ui_nodes",
+              "launch_app",
+              "install_app",
+              "boot_simulator",
+              "shutdown_simulator",
+              "uninstall_app",
+              "open_deep_link",
+              "tap",
+              "tap_ui_node",
+              "input_text_into_ui_node",
+              "fill_login_form",
+              "swipe",
+              "input_text",
+              "capture_screen",
+              "wait_for_ui_text",
+              "wait_for_ui_node",
+              "authenticate_with_passkey",
+              "emit_session_handoff",
+              "log"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

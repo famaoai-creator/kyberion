@@ -20,7 +20,7 @@ The Sentinel is a proactive agent component that monitors repository health, sec
 
 ## Routine Check Procedures
 
-1. **Security Scan**: Running `security-scanner` to detect credential leaks.
+1. **Security Scan**: Running governed code and secret review flows over `code-actuator` and `secret-actuator` to detect credential leaks.
 2. **Project Health Audit**: Evaluating CI/CD, tests, and Infrastructure coverage.
 3. **Debt Detection**: Searching for `TODO`/`FIXME` markers to prevent stale tasks.
 

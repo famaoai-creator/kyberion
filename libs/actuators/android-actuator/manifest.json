@@ -2,11 +2,8 @@
   "actuator_id": "android-actuator",
   "version": "1.0.0",
   "description": "ADB-driven Android Device Actuator",
+  "contract_schema": "schemas/mobile-device-pipeline.schema.json",
   "capabilities": [
-    { "op": "capture_foreground_activity", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "extract_ui_tree", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "launch_app", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "tap_ui_node", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "input_text_into_ui_node", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "pipeline", "schema_ref": "schemas/mobile-device-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

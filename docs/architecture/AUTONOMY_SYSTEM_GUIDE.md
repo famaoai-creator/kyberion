@@ -38,9 +38,10 @@ const isUnderAttack = sensoryMemory.hasActiveContext('SECURITY_ALERT', 600000);
 ```
 
 #### 反射の活性化
-`Daemon-Actuator` を使用して、設計図を OS レベルの常駐神経として登録します。
+反射を常駐化する場合は `knowledge/public/governance/active-surfaces.json` に surface を宣言し、`surface-runtime` で反映します。単発実行なら `process-actuator` か governed pipeline を使います。
 ```bash
-node dist/libs/actuators/daemon-actuator/src/index.js --action run-once --nerve error-reflex --adf knowledge/procedures/reflexes/auto-notifier.adf.json
+pnpm surfaces:reconcile
+pnpm surfaces:status
 ```
 
 ---

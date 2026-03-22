@@ -1,18 +1,3 @@
 {
-  "_note": "Background surfaces such as slack-bridge, chronos-mirror-v2, nexus-daemon, and terminal-bridge are managed via knowledge/public/governance/active-surfaces.json and scripts/surface_runtime.ts.",
-  "log-watcher": {
-    "path": "presence/sensors/log-watcher.ts",
-    "description": "Monitors logs for system errors",
-    "env": { "PORT": "4321" }
-  },
-  "visual-buffer": {
-    "path": "presence/sensors/visual-buffer-daemon.ts",
-    "description": "Maintains rolling visual frames",
-    "env": { "PORT": "4321" }
-  },
-  "system-whisperer": {
-    "path": "scripts/system_whisperer.ts",
-    "description": "Injects periodic system status",
-    "env": { "PORT": "4321" }
-  }
+  "_note": "Deprecated compatibility artifact. Managed runtime services and UI surfaces are declared only in knowledge/public/governance/active-surfaces.json and controlled via scripts/surface_runtime.ts."
 }

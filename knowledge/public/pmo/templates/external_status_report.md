@@ -18,7 +18,7 @@ last_updated: 2026-03-06
 2. **マイルストーン進捗**:
    - 計画 vs 実績。
 3. **品質・セキュリティエビデンス**:
-   - `security-scanner` と `test-genie` の最新サマリー。
+   - `code-actuator` / `secret-actuator` と `test-genie` の最新サマリー。
 4. **リスクと対策**:
    - 現在検知されているリスクと、それに対する具体的な Mitigation Plan（緩和策）。
 5. **次期の予定**:

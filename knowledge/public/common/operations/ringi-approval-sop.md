@@ -47,7 +47,7 @@ pnpm run cli -- run browser-actuator -- --scenario=knowledge/personal/automation
 
 ### B. フレームとタイムアウト
 - ワークフロー画面はロードに時間がかかる場合がある。シナリオ内の `timeout: 15000` 以上の待機を推奨。
-- `MEMORY_SENTINEL` 警告が出る場合は、ブラウザのキャッシュやタブの開きすぎに注意する（現在の `browser-navigator` は自動でパージを行う）。
+- `MEMORY_SENTINEL` 警告が出る場合は、ブラウザのキャッシュやタブの開きすぎに注意する（現在の `browser-actuator` session は定期的に軽量化される前提で運用する）。
 
 ## 6. エビデンスの出力
 - 実行結果のサマリーは `active/missions/ringi_approval/` に記録可能。

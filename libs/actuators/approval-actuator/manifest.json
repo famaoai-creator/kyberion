@@ -1,0 +1,12 @@
+{
+  "actuator_id": "approval-actuator",
+  "version": "1.0.0",
+  "description": "Human approval request state transitions and decision handling",
+  "contract_schema": "schemas/approval-action.schema.json",
+  "capabilities": [
+    { "op": "create", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "load", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "decide", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list_pending", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

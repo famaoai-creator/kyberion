@@ -47,7 +47,7 @@ pnpm run cli -- run browser-actuator -- --scenario=knowledge/personal/automation
 - **対策**: スクリプト側で `force: true` オプションを使用するか、数秒待機してオーバーレイが消えるのを待つ。
 
 ### B. 「未処理」のまま残る場合
-- **原因**: フレーム（iframe）構造が深く、`browser-navigator` がリンクを捕捉できていない。
+- **原因**: フレーム（iframe）構造が深く、`browser-actuator` の snapshot だけではリンクを捕捉できていない。
 - **対策**: `knowledge/personal/automation/company-attendance/manager_approval.py` (Python版) を使用して、再帰的フレーム探索で実行する。
 
 ## 6. エビデンスの出力

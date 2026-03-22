@@ -7,6 +7,7 @@ import {
   safeExistsSync
 } from './secure-io.js';
 import { logger } from './core.js';
+import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 
@@ -64,6 +65,33 @@ const _mapContentToSecrets = (serviceName: string, content: any) => {
     }
   }
 };
+
+const _clearServiceSecrets = (serviceName: string) => {
+  const prefix = `${serviceName.toUpperCase()}_`;
+  for (const key of Array.from(_cachedPersonalSecrets.keys())) {
+    if (key.startsWith(prefix)) {
+      _cachedPersonalSecrets.delete(key);
+    }
+  }
+};
+
+function _sanitizeServiceId(serviceId: string): string {
+  return serviceId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+}
+
+function _connectionPath(serviceId: string): string {
+  return path.join(PERSONAL_CONNECTIONS_DIR, `${_sanitizeServiceId(serviceId)}.json`);
+}
+
+function _loadConnectionDocument(serviceId: string): Record<string, any> {
+  const fullPath = _connectionPath(serviceId);
+  if (!safeExistsSync(fullPath)) return {};
+  try {
+    return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+  } catch (_) {
+    return {};
+  }
+}
 
 _loadPersonalSecrets();
 
@@ -141,6 +169,47 @@ export const getSecret = (key: string, scope?: string): string | null => {
   return null;
 };
 
+export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
+  return _loadConnectionDocument(serviceId);
+};
+
+export const storeConnectionDocument = (
+  serviceId: string,
+  patch: Record<string, any>,
+  options: { backup?: boolean; missionId?: string; actor?: string } = {},
+): { path: string; changedKeys: string[] } => {
+  const fullPath = _connectionPath(serviceId);
+  const existing = _loadConnectionDocument(serviceId);
+  const next = { ...existing, ...patch };
+
+  if (safeExistsSync(fullPath) && options.backup !== false) {
+    const backupPath = `${fullPath}.bak`;
+    safeWriteFile(backupPath, JSON.stringify(existing, null, 2) + '\n');
+    try { safeFsyncFile(backupPath); } catch (_) {}
+  }
+
+  safeWriteFile(fullPath, JSON.stringify(next, null, 2) + '\n');
+  try { safeFsyncFile(fullPath); } catch (_) {}
+
+  const serviceName = _sanitizeServiceId(serviceId).toUpperCase();
+  _clearServiceSecrets(serviceName);
+  _mapContentToSecrets(serviceName, next);
+
+  ledger.record('CONFIG_CHANGE', {
+    mission_id: options.missionId || process.env.MISSION_ID || 'None',
+    role: options.actor || process.env.MISSION_ROLE || 'secret_guard',
+    config_target: path.relative(pathResolver.rootDir(), fullPath),
+    config_scope: 'connection',
+    service_id: serviceId,
+    changed_keys: Object.keys(patch).sort(),
+  });
+
+  return {
+    path: fullPath,
+    changedKeys: Object.keys(patch).sort(),
+  };
+};
+
 function _loadGrants(): AuthGrant[] {
   if (!safeExistsSync(GRANTS_FILE)) return [];
   try {
@@ -168,4 +237,12 @@ export const isSecretPath = (filePath: string): boolean => {
   ].some(p => resolved.startsWith(p));
 };
 
-export const secretGuard = { getSecret, getActiveSecrets, grantAccess, checkAuthority, isSecretPath };
+export const secretGuard = {
+  getSecret,
+  getActiveSecrets,
+  grantAccess,
+  checkAuthority,
+  isSecretPath,
+  loadConnectionDocument,
+  storeConnectionDocument,
+};

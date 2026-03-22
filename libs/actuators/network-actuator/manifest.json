@@ -1,0 +1,9 @@
+{
+  "actuator_id": "network-actuator",
+  "version": "2.2.0",
+  "description": "ADF-driven secure fetch and A2A transport pipeline engine",
+  "contract_schema": "schemas/network-pipeline.schema.json",
+  "capabilities": [
+    { "op": "pipeline", "schema_ref": "schemas/network-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

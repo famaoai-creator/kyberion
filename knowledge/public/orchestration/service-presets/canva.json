@@ -1,0 +1,140 @@
+{
+  "service_id": "canva",
+  "name": "Canva Connect API Presets",
+  "base_url": "https://api.canva.com/rest/v1",
+  "auth_strategy": "Bearer",
+  "oauth": {
+    "authorize_url": "https://www.canva.com/api/oauth/authorize",
+    "token_operation": "exchange_oauth_code",
+    "refresh_operation": "refresh_oauth_token",
+    "pkce": true,
+    "scopes": []
+  },
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "operations": {
+    "exchange_oauth_code": {
+      "type": "api",
+      "path": "oauth/token",
+      "method": "POST",
+      "auth_strategy": "Basic",
+      "description": "Exchanges an OAuth authorization code for Canva access and refresh tokens.",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "parameters": {
+        "code": { "required": true, "type": "string" },
+        "code_verifier": { "required": true, "type": "string" },
+        "redirect_uri": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "grant_type": "authorization_code",
+        "code": "{{code}}",
+        "code_verifier": "{{code_verifier}}",
+        "redirect_uri": "{{redirect_uri}}"
+      },
+      "output_mapping": {
+        "access_token": "access_token",
+        "refresh_token": "refresh_token",
+        "expires_in": "expires_in",
+        "scope": "scope",
+        "token_type": "token_type"
+      }
+    },
+    "refresh_oauth_token": {
+      "type": "api",
+      "path": "oauth/token",
+      "method": "POST",
+      "auth_strategy": "Basic",
+      "description": "Refreshes a Canva access token using a refresh token.",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "parameters": {
+        "refresh_token": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "grant_type": "refresh_token",
+        "refresh_token": "{{refresh_token}}"
+      },
+      "output_mapping": {
+        "access_token": "access_token",
+        "refresh_token": "refresh_token",
+        "expires_in": "expires_in",
+        "scope": "scope",
+        "token_type": "token_type"
+      }
+    },
+    "create_design": {
+      "type": "api",
+      "path": "designs",
+      "method": "POST",
+      "description": "Creates a Canva design using a preset design type or explicit dimensions."
+    },
+    "create_design_export_job": {
+      "type": "api",
+      "path": "exports",
+      "method": "POST",
+      "description": "Creates an asynchronous Canva export job for a design.",
+      "parameters": {
+        "design_id": { "required": true, "type": "string" },
+        "format": { "required": true, "type": "object" }
+      },
+      "payload_template": {
+        "design_id": "{{design_id}}",
+        "format": "{{format}}"
+      }
+    },
+    "create_url_import_job": {
+      "type": "api",
+      "path": "url-imports",
+      "method": "POST",
+      "description": "Creates an asynchronous Canva import job from a publicly reachable document URL.",
+      "parameters": {
+        "url": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" },
+        "mime_type": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "url": "{{url}}",
+        "title": "{{title}}",
+        "mime_type": "{{mime_type}}"
+      }
+    },
+    "create_url_asset_upload_job": {
+      "type": "api",
+      "path": "url-asset-uploads",
+      "method": "POST",
+      "description": "Uploads an image or other supported asset to Canva from a public URL.",
+      "parameters": {
+        "name": { "required": true, "type": "string" },
+        "url": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "name": "{{name}}",
+        "url": "{{url}}"
+      }
+    },
+    "create_folder": {
+      "type": "api",
+      "path": "folders",
+      "method": "POST",
+      "description": "Creates a folder in Canva Projects or Uploads."
+    },
+    "list_folder_items": {
+      "type": "api",
+      "path": "folders/{{folder_id}}/items",
+      "method": "GET",
+      "description": "Lists folder contents from Canva Projects.",
+      "parameters": {
+        "folder_id": { "required": true, "type": "string" },
+        "continuation": { "required": false, "type": "string" },
+        "limit": { "required": false, "type": "number" },
+        "item_types": { "required": false, "type": "string" },
+        "sort_by": { "required": false, "type": "string" },
+        "pin_status": { "required": false, "type": "string" }
+      }
+    }
+  }
+}

@@ -130,4 +130,30 @@ describe('metrics core', () => {
     expect(regressions[0].skill).toBe('audit-capability');
     expect(regressions[0].lastDuration).toBe(500);
   });
+
+  it('should honor component-based history entries and public slo targets', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-component-history');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const entries = [
+      { component: 'code-actuator', duration_ms: 1000, status: 'success', timestamp: '2026-03-15T00:00:00.000Z' },
+      { component: 'code-actuator', duration_ms: 17000, status: 'success', timestamp: '2026-03-15T00:01:00.000Z' },
+    ];
+    fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: false,
+    });
+
+    const report = mc.reportFromHistory();
+    expect(report.totalEntries).toBe(2);
+    expect(report.uniqueSkills).toBe(1);
+    expect(report.skills[0].component).toBe('code-actuator');
+    expect(report.skills[0].skill).toBe('code-actuator');
+    expect(report.skills[0].sloCompliance).toBe(50);
+  });
 });

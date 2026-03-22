@@ -2,6 +2,7 @@
   "actuator_id": "artifact-actuator",
   "version": "1.0.0",
   "description": "Governed Artifact and Delivery Pack Manager",
+  "contract_schema": "schemas/artifact-action.schema.json",
   "capabilities": [
     { "op": "write_json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },

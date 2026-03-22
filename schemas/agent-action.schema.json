@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Actuator Request",
+  "type": "object",
+  "required": ["action", "params"],
+  "properties": {
+    "action": {
+      "enum": ["spawn", "ask", "shutdown", "shutdown_all", "list", "health", "a2a", "snapshot", "refresh", "restart", "team_plan", "team_role", "staff_mission", "prewarm_mission"]
+    },
+    "params": { "type": "object" }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Pipeline ADF",
+  "description": "Pipeline envelope for media-actuator document and asset workflows.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "context": { "type": "object" },
+    "options": {
+      "type": "object",
+      "properties": {
+        "max_steps": { "type": "integer" },
+        "timeout_ms": { "type": "integer" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op", "params"],
+        "properties": {
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "op": {
+            "enum": [
+              "json_read",
+              "pptx_extract",
+              "xlsx_extract",
+              "docx_extract",
+              "pdf_extract",
+              "apply_theme",
+              "apply_pattern",
+              "merge_content",
+              "set",
+              "theme_from_pptx_design",
+              "proposal_storyline_from_brief",
+              "proposal_content_from_storyline",
+              "document_pdf_from_brief",
+              "document_diagram_asset_from_brief",
+              "document_spreadsheet_design_from_brief",
+              "document_report_design_from_brief",
+              "drawio_from_graph",
+              "mermaid_render",
+              "d2_render",
+              "pptx_render",
+              "xlsx_render",
+              "docx_render",
+              "pdf_render",
+              "write_file",
+              "drawio_write",
+              "log"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

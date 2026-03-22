@@ -14,7 +14,8 @@ last_updated: 2026-03-06
 ## 1. 必須スキルセット
 
 - `project-health-check`
-- `security-scanner`
+- `code-actuator`
+- `secret-actuator`
 - `ux-auditor`
 - `pmo-governance-lead`
 

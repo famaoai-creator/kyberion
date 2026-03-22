@@ -1,15 +1,10 @@
 {
   "actuator_id": "vision-actuator",
   "version": "1.3.0",
-  "description": "Legacy compatibility facade for visual generation/capture while vision shifts toward perception",
+  "description": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
+  "contract_schema": "schemas/vision-action.schema.json",
   "capabilities": [
     { "op": "inspect_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_video", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_music", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "capture_screen", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_screen", "platforms": ["darwin", "linux"] },
-    { "op": "run_workflow", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] }
   ]
 }
