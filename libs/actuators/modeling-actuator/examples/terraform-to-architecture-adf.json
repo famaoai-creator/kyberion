@@ -1,0 +1,22 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "transform",
+      "op": "terraform_to_architecture_adf",
+      "params": {
+        "dir": "active/shared/tmp/terraform-aws-examples/code/05-cluster-webserver",
+        "title": "05-cluster-webserver",
+        "export_as": "architecture_adf"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "path": "active/shared/tmp/modeling-actuator/terraform-architecture-adf.json",
+        "from": "architecture_adf"
+      }
+    }
+  ]
+}
