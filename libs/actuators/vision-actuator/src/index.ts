@@ -3,16 +3,61 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 
 /**
- * Vision-Actuator v1.2.0 [THIN CLIENT]
- * Proxies visual generation requests to the Adaptive Service Engine.
+ * Vision-Actuator v1.3.0 [LEGACY COMPATIBILITY FACADE]
+ * Preserves legacy visual generation/capture entrypoints while the ecosystem
+ * shifts generative workflows toward media-generation-actuator.
  */
+
+const LEGACY_MEDIA_GENERATION_ACTIONS = new Set([
+  'generate_image',
+  'generate_video',
+  'generate_music',
+  'capture_screen',
+  'record_screen',
+  'run_workflow',
+]);
+
+async function inspectImage(params: any) {
+  const logicalPath = String(params.path || '');
+  if (!logicalPath) throw new Error('inspect_image requires params.path');
+  const buffer = safeReadFile(path.resolve(process.cwd(), logicalPath), { encoding: null }) as Buffer;
+  const ext = path.extname(logicalPath).toLowerCase();
+  return {
+    status: 'succeeded',
+    path: logicalPath,
+    bytes: buffer.length,
+    extension: ext,
+    mime_guess:
+      ext === '.png' ? 'image/png' :
+      ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
+      ext === '.webp' ? 'image/webp' :
+      'application/octet-stream',
+  };
+}
+
+async function ocrImage(params: any) {
+  const logicalPath = String(params.path || '');
+  if (!logicalPath) throw new Error('ocr_image requires params.path');
+  const tesseract = await import('tesseract.js');
+  const result = await tesseract.recognize(path.resolve(process.cwd(), logicalPath), params.language || 'eng');
+  return {
+    status: 'succeeded',
+    path: logicalPath,
+    language: params.language || 'eng',
+    text: result.data.text,
+    confidence: result.data.confidence,
+  };
+}
 
 async function handleSingleAction(input: any) {
   const { action, params } = input;
-  logger.info(`🎨 [VISION:PROXY] Dispatching "${action}" to Service Engine...`);
-
-  // Delegate everything to the 'vision' service preset
-  return await executeServicePreset('vision', action, params);
+  if (action === 'inspect_image') return inspectImage(params);
+  if (action === 'ocr_image') return ocrImage(params);
+  if (!LEGACY_MEDIA_GENERATION_ACTIONS.has(action)) {
+    throw new Error(`Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`);
+  }
+  logger.warn(`🎨 [VISION:LEGACY] "${action}" is a legacy route. Prefer media-generation-actuator.`);
+  return await executeServicePreset('media-generation', action, params);
 }
 
 export async function handleAction(input: any) {

@@ -1,0 +1,8 @@
+{
+  "action": "run-once",
+  "nerve_id": "generation-schedule",
+  "script_path": "dist/scripts/run_generation_schedule_daemon.js",
+  "options": {
+    "ephemeral": false
+  }
+}

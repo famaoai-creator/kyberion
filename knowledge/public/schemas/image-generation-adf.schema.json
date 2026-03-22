@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Image Generation ADF",
+  "description": "Engine-neutral contract for text-to-image generation requests.",
+  "type": "object",
+  "required": ["kind", "version", "prompt", "canvas", "output"],
+  "properties": {
+    "kind": { "type": "string", "const": "image-generation-adf" },
+    "version": { "type": "string", "default": "1.0.0" },
+    "intent": { "type": "string" },
+    "prompt": { "type": "string" },
+    "negative_prompt": { "type": "string" },
+    "canvas": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 64 },
+        "height": { "type": "integer", "minimum": 64 }
+      },
+      "additionalProperties": true
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "mood": { "type": "array", "items": { "type": "string" } },
+        "camera": { "type": "array", "items": { "type": "string" } },
+        "render_traits": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "default": "comfyui" },
+        "model_family": { "type": "string", "default": "sdxl" },
+        "checkpoint": { "type": "string" },
+        "steps": { "type": "integer", "minimum": 1 },
+        "cfg_scale": { "type": "number" },
+        "sampler_name": { "type": "string" },
+        "scheduler": { "type": "string" },
+        "seed": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "output": {
+      "type": "object",
+      "required": ["format"],
+      "properties": {
+        "format": { "type": "string", "enum": ["png", "jpg", "jpeg", "webp"] },
+        "filename_prefix": { "type": "string" },
+        "target_path": { "type": "string" },
+        "await_completion": { "type": "boolean", "default": false },
+        "timeout_ms": { "type": "integer", "minimum": 1000 },
+        "poll_interval_ms": { "type": "integer", "minimum": 100 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

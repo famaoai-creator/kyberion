@@ -1,0 +1,25 @@
+{
+  "kind": "actuator-pipeline-bundle",
+  "archetype_id": "generative-music-from-adf",
+  "status": "ready",
+  "summary": "Generate a governed Japanese country-style anniversary song from a music-generation-adf contract through media-generation-actuator.",
+  "jobs": [
+    {
+      "id": "generate-anniversary-song",
+      "title": "Generate Anniversary Song From Music ADF",
+      "actuator": "media-generation-actuator",
+      "template_path": "libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json",
+      "recommended_procedure": "knowledge/public/procedures/media/generate-music-from-adf.md",
+      "parameter_overrides": {
+        "params": {
+          "music_adf": {
+            "intent": "15th_wedding_anniversary_song"
+          }
+        }
+      },
+      "outputs": [
+        "active/shared/exports/KyberionAnniversary15Country.mp3"
+      ]
+    }
+  ]
+}

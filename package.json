@@ -54,6 +54,7 @@
     "surfaces:status": "node dist/scripts/surface_runtime.js --action status",
     "surfaces:start": "node dist/scripts/surface_runtime.js --action start",
     "surfaces:stop": "node dist/scripts/surface_runtime.js --action stop",
+    "generation:schedule": "node dist/scripts/run_generation_schedule.js",
     "slack:bridge": "node dist/satellites/slack-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
     "chronos:lint": "pnpm --dir presence/displays/chronos-mirror-v2 lint",

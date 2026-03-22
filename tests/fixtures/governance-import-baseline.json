@@ -47,6 +47,7 @@
     "scripts/measure-build-size.ts",
     "scripts/process_portal_inbox.ts",
     "scripts/process_portal_queue.ts",
+    "scripts/run_generation_schedule_daemon.ts",
     "scripts/system_whisperer.ts",
     "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",

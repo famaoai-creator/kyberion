@@ -1,0 +1,45 @@
+{
+  "action": "submit_generation",
+  "params": {
+    "action": "generate_music",
+    "params": {
+      "music_adf": {
+        "kind": "music-generation-adf",
+        "version": "1.0.0",
+        "intent": "15th_wedding_anniversary_song",
+        "style": {
+          "genre": "country",
+          "mood": ["warm", "hopeful", "grateful", "heartfelt"],
+          "vocal": {
+            "presence": true,
+            "gender": "female",
+            "language": "ja"
+          }
+        },
+        "composition": {
+          "duration_sec": 180,
+          "bpm": 84,
+          "time_signature": "4",
+          "key": "D major"
+        },
+        "lyrics": {
+          "mode": "provided",
+          "text": "[Verse]\n結婚十五年 おめでとう"
+        },
+        "arrangement": {
+          "instruments": ["acoustic_guitar", "harmonica", "pedal_steel"],
+          "mix_traits": ["cinematic_countryside", "intimate", "uplifting"]
+        },
+        "output": {
+          "format": "mp3",
+          "filename_prefix": "KyberionAnniversary15Country",
+          "target_path": "active/shared/exports/KyberionAnniversary15Country.mp3"
+        }
+      }
+    },
+    "retry_policy": {
+      "max_attempts": 1,
+      "backoff_seconds": 0
+    }
+  }
+}

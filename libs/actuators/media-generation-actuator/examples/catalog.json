@@ -1,0 +1,54 @@
+{
+  "actuator": "media-generation-actuator",
+  "examples": [
+    {
+      "id": "image-adf-country-cover",
+      "title": "Country Cover Image From ADF",
+      "path": "libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json",
+      "description": "Compiles an image-generation-adf request into a local SDXL ComfyUI workflow.",
+      "tags": ["image", "adf", "comfyui", "sdxl", "example"]
+    },
+    {
+      "id": "video-adf-drive-clip",
+      "title": "Drive Clip Video From ADF",
+      "path": "libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json",
+      "description": "Hydrates a workflow-backed video-generation-adf request for local ComfyUI execution.",
+      "tags": ["video", "adf", "comfyui", "workflow-backed", "example"]
+    },
+    {
+      "id": "submit-image-generation-job",
+      "title": "Submit Image Generation Job",
+      "path": "libs/actuators/media-generation-actuator/examples/submit-image-generation-job.json",
+      "description": "Submits an image-generation-adf request as a first-class generation job for later status polling and artifact collection.",
+      "tags": ["image", "job", "adf", "comfyui", "sdxl", "async", "example"]
+    },
+    {
+      "id": "submit-video-generation-job",
+      "title": "Submit Video Generation Job",
+      "path": "libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json",
+      "description": "Submits a workflow-backed video-generation-adf request as a first-class generation job for later status polling and artifact collection.",
+      "tags": ["video", "job", "adf", "comfyui", "workflow-backed", "async", "example"]
+    },
+    {
+      "id": "music-adf-anniversary-country-ja",
+      "title": "Japanese Anniversary Country Song",
+      "path": "libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json",
+      "description": "Compiles a music-generation-adf contract into an ACE-Step ComfyUI workflow and generates a Japanese country-style anniversary song with female vocals.",
+      "tags": ["music", "adf", "comfyui", "ace-step", "country", "ja", "example"]
+    },
+    {
+      "id": "submit-music-generation-job",
+      "title": "Submit Music Generation Job",
+      "path": "libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json",
+      "description": "Submits a long-running music generation request as a first-class generation job for later status polling and artifact collection.",
+      "tags": ["music", "job", "adf", "comfyui", "ace-step", "async", "example"]
+    },
+    {
+      "id": "music-generation-schedule-anniversary",
+      "title": "Scheduled Anniversary Music Generation",
+      "path": "libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json",
+      "description": "Defines a recurring generation-schedule that can periodically submit music generation jobs from a stable ADF contract.",
+      "tags": ["music", "schedule", "job", "cron", "adf", "example"]
+    }
+  ]
+}

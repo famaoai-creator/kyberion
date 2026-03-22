@@ -1,0 +1,25 @@
+{
+  "kind": "actuator-pipeline-bundle",
+  "archetype_id": "generative-video-from-adf",
+  "status": "ready",
+  "summary": "Generate a governed country-drive video clip from a video-generation-adf contract through media-generation-actuator.",
+  "jobs": [
+    {
+      "id": "generate-drive-clip",
+      "title": "Generate Drive Clip From Video ADF",
+      "actuator": "media-generation-actuator",
+      "template_path": "libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json",
+      "recommended_procedure": "knowledge/public/procedures/media/generate-video-from-adf.md",
+      "parameter_overrides": {
+        "params": {
+          "video_adf": {
+            "intent": "country_drive_campaign_clip"
+          }
+        }
+      },
+      "outputs": [
+        "active/shared/exports/KyberionDriveClip.mp4"
+      ]
+    }
+  ]
+}

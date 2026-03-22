@@ -109,6 +109,8 @@ export { transform, getValueByPath } from './transformer.js';
 
 export * as serviceEngine from './service-engine.js';
 export { executeServicePreset } from './service-engine.js';
+export { compileMusicGenerationADF } from './music-workflow-compiler.js';
+export { compileImageGenerationADF, compileVideoGenerationADF } from './visual-workflow-compiler.js';
 
 export * as secretGuard from './secret-guard.js';
 export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
@@ -168,6 +170,7 @@ export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
 export * from './channel-surface.js';
 export * from './service-binding.js';
+export * from './generation-scheduler.js';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine.js';

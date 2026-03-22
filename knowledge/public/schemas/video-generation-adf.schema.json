@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Video Generation ADF",
+  "description": "Contract for video generation requests. Current implementation supports workflow-backed templates with typed parameters.",
+  "type": "object",
+  "required": ["kind", "version", "prompt", "composition", "engine", "output"],
+  "properties": {
+    "kind": { "type": "string", "const": "video-generation-adf" },
+    "version": { "type": "string", "default": "1.0.0" },
+    "intent": { "type": "string" },
+    "prompt": { "type": "string" },
+    "negative_prompt": { "type": "string" },
+    "composition": {
+      "type": "object",
+      "required": ["duration_sec"],
+      "properties": {
+        "duration_sec": { "type": "number", "minimum": 1 },
+        "fps": { "type": "integer", "minimum": 1 },
+        "aspect_ratio": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "engine": {
+      "type": "object",
+      "required": ["provider", "workflow_template"],
+      "properties": {
+        "provider": { "type": "string", "default": "comfyui" },
+        "workflow_template": { "type": "string", "enum": ["embedded"] },
+        "base_workflow": { "type": "object" },
+        "seed": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "output": {
+      "type": "object",
+      "required": ["format"],
+      "properties": {
+        "format": { "type": "string", "enum": ["mp4", "mov", "webm", "gif"] },
+        "filename_prefix": { "type": "string" },
+        "target_path": { "type": "string" },
+        "await_completion": { "type": "boolean", "default": false },
+        "timeout_ms": { "type": "integer", "minimum": 1000 },
+        "poll_interval_ms": { "type": "integer", "minimum": 100 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

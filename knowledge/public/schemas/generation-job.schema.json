@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generation Job",
+  "description": "Long-running generation job contract for image, video, music, and workflow executions.",
+  "type": "object",
+  "required": [
+    "kind",
+    "job_id",
+    "action",
+    "status",
+    "request",
+    "created_at"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "generation-job"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["generate_image", "generate_video", "generate_music", "run_workflow"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["submitted", "running", "retrying", "succeeded", "failed", "timed_out", "canceled"]
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "engine": {
+          "type": "string"
+        },
+        "prompt_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "target_path": {
+          "type": "string"
+        },
+        "workflow_path": {
+          "type": "string"
+        },
+        "music_adf": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "artifact": {
+          "type": "object"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "copied_to": {
+          "type": "string"
+        },
+        "compiled_music_adf": {
+          "type": "object"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "retry_policy": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "backoff_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "string"
+    },
+    "next_retry_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

@@ -60,6 +60,49 @@ describe('executeServicePreset', () => {
     await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).resolves.toEqual({ res: 'api-success' });
   });
 
+  it('supports media-generation workflow prompts through structured API payloads', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-endpoints.json')) {
+        return JSON.stringify({
+          services: {
+            'media-generation': {
+              preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
+              base_url: 'http://127.0.0.1:8188',
+            },
+          },
+        });
+      }
+      if (filePath.includes('media-generation.json')) {
+        return JSON.stringify({
+          base_url: 'http://127.0.0.1:8188',
+          operations: {
+            generate_video: {
+              type: 'api',
+              path: 'prompt',
+              method: 'POST',
+              payload_template: { prompt: '{{workflow}}' },
+              output_mapping: { prompt_id: 'prompt_id' },
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ prompt_id: 'vid-123' });
+
+    await expect(
+      executeServicePreset('media-generation', 'generate_video', { workflow: { nodeA: { class_type: 'KSampler' } } }, 'none'),
+    ).resolves.toEqual({ prompt_id: 'vid-123' });
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'http://127.0.0.1:8188/prompt',
+      data: {
+        prompt: { nodeA: { class_type: 'KSampler' } },
+      },
+    }));
+  });
+
   it('returns raw output when no output mapping is configured', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
