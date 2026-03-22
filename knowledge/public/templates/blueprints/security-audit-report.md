@@ -17,7 +17,7 @@ last_updated: 2026-03-06
 - **Compliance Status**: Alignment with project security policies.
 
 ## 2. Vulnerability Scan Results [L3] [AUDIT: Security]
-<!-- 指令: security-scannerによる物理的なスキャン結果を添付せよ -->
+<!-- 指令: code-actuator / secret-actuator による governed security review の結果を添付せよ -->
 - 2.1 Static Analysis (SAST) Findings
 - 2.2 Dependency Vulnerability Audit
 

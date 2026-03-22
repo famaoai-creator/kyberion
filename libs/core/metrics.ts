@@ -214,14 +214,20 @@ export class MetricsCollector {
   reportFromHistory() {
     const entries = this.loadHistory();
     const bySkill: Record<string, any> = {};
-    const sloPath = pathResolver.resolve('knowledge/orchestration/slo-targets.json');
-    const sloTargets = safeExistsSync(sloPath)
+    const sloPathCandidates = [
+      pathResolver.resolve('knowledge/public/orchestration/slo-targets.json'),
+      pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
+    ];
+    const sloPath = sloPathCandidates.find(candidate => safeExistsSync(candidate));
+    const sloTargets = sloPath
       ? JSON.parse(safeReadFile(sloPath, { encoding: 'utf8' }) as string)
       : { default: { latency_ms: 5000, success_rate: 99 } };
 
     for (const entry of entries) {
-      if (!bySkill[entry.skill]) {
-        bySkill[entry.skill] = {
+      const componentName = entry.component || entry.skill || entry.capability;
+      if (!componentName) continue;
+      if (!bySkill[componentName]) {
+        bySkill[componentName] = {
           count: 0,
           errors: 0,
           totalMs: 0,
@@ -232,14 +238,14 @@ export class MetricsCollector {
           sloPasses: 0,
         };
       }
-      const s = bySkill[entry.skill];
+      const s = bySkill[componentName];
       s.count++;
       if (entry.status === 'error') s.errors++;
       s.totalMs += entry.duration_ms || 0;
       s.minMs = Math.min(s.minMs, entry.duration_ms || 0);
       s.maxMs = Math.max(s.maxMs, entry.duration_ms || 0);
 
-      const target = (sloTargets.critical_path && sloTargets.critical_path[entry.skill]) || sloTargets.default;
+      const target = (sloTargets.critical_path && sloTargets.critical_path[componentName]) || sloTargets.default;
       const isLatencyOk = (entry.duration_ms || 0) <= target.latency_ms;
       if (isLatencyOk && entry.status !== 'error') s.sloPasses++;
 
@@ -269,6 +275,7 @@ export class MetricsCollector {
       const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - timeImpact + cacheBonus)));
 
       return {
+        component: name,
         skill: name,
         executions: s.count,
         errors: s.errors,

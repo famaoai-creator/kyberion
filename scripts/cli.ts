@@ -24,6 +24,7 @@ interface RawActuatorEntry {
   description?: string;
   s?: string;
   status?: string;
+  contract_schema?: string;
 }
 
 interface RawActuatorIndex {
@@ -117,6 +118,7 @@ export interface ActuatorRecord {
   path: string;
   description: string;
   status: string;
+  contractSchema?: string;
 }
 
 type MobileAppProfileRecord = MobileAppProfileIndex['profiles'][number];
@@ -198,6 +200,7 @@ export function normalizeActuators(index: RawActuatorIndex): ActuatorRecord[] {
       path: actuator.path,
       description: actuator.d || actuator.description || 'No description available.',
       status: actuator.s || actuator.status || 'unknown',
+      contractSchema: actuator.contract_schema,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
@@ -357,6 +360,9 @@ function printActuatorInfo(actuator: ActuatorRecord) {
 
   const runnableScript = resolveActuatorPath(actuator.path);
   console.log(`Runnable: ${runnableScript ? runnableScript : 'Not built yet (run pnpm build)'}`);
+  if (actuator.contractSchema) {
+    console.log(`Contract schema: ${actuator.contractSchema}`);
+  }
   const examples = loadActuatorExamples(actuator);
   console.log(`Examples: ${examples.length}`);
 }

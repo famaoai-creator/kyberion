@@ -1,0 +1,10 @@
+{
+  "actuator_id": "code-actuator",
+  "version": "2.1.0",
+  "description": "ADF-driven code analysis and refactoring pipeline engine",
+  "contract_schema": "schemas/code-pipeline.schema.json",
+  "capabilities": [
+    { "op": "pipeline", "schema_ref": "schemas/code-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

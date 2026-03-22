@@ -2,6 +2,7 @@
   "actuator_id": "agent-actuator",
   "version": "1.0.0",
   "description": "Meta-Actuator for Agent Lifecycle and A2A",
+  "contract_schema": "schemas/agent-action.schema.json",
   "capabilities": [
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ask", "platforms": ["darwin", "linux", "win32"] },

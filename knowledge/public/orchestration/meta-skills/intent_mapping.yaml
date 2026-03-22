@@ -8,7 +8,8 @@ intents:
     trigger_phrases:
       ['audit security', 'is this safe?', 'check for vulnerabilities', 'security scan']
     chain:
-      - 'security-scanner'
+      - 'code-actuator'
+      - 'secret-actuator'
       - 'license-auditor'
       - 'supply-chain-sentinel'
       - 'post-quantum-shield'
@@ -74,7 +75,8 @@ intents:
     trigger_phrases: ['prepare release', 'release notes', 'changelog', 'ship it']
     chain:
       - 'release-note-crafter'
-      - 'security-scanner'
+      - 'code-actuator'
+      - 'secret-actuator'
       - 'license-auditor'
       - 'pr-architect'
 
@@ -122,6 +124,7 @@ intents:
     trigger_phrases: ['product audit', 'project health', 'delivery status', 'project governance']
     chain:
       - 'project-health-check'
-      - 'security-scanner'
+      - 'code-actuator'
+      - 'secret-actuator'
       - 'pmo-governance-lead'
       - 'stakeholder-communicator'

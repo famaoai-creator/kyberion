@@ -14,6 +14,8 @@ Kyberion is a **mission-first autonomous agent operating system**. It is a TypeS
 
 It is designed to be the runtime environment for an AI agent that performs real work: writing code, generating documents, calling APIs, and managing its own knowledge — all under a policy-driven governance layer.
 
+For the practical operator view of Slack, Chronos, directory usage, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md).
+
 ## Key Concepts
 
 | Concept | What it does |
@@ -60,6 +62,10 @@ pnpm build
 pnpm onboard                    # set up identity
 pnpm run cli -- list            # explore actuators
 ```
+
+If you want the shortest path to "how do I actually use this day to day?", read:
+
+- [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md)
 
 To boot the local control plane:
 
@@ -178,6 +184,8 @@ Slack acts as a governed ingress surface. It can:
 - carry `mission_proposal -> confirmation -> mission issue`
 - receive deterministic mission status updates from the shared outbox model
 
+Operational setup and usage are summarized in [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md) and connection material belongs in [`knowledge/personal/connections/`](./knowledge/personal/connections/).
+
 ### Chronos Mirror
 
 Chronos Mirror v2 is the operator-facing control surface. It provides:
@@ -201,6 +209,8 @@ For localhost development:
 export KYBERION_LOCALHOST_AUTOADMIN=true
 pnpm chronos:dev
 ```
+
+See [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md) for the operator interpretation of each Chronos area.
 
 See `knowledge/public/architecture/mission-orchestration-control-plane.md` for the control-plane model.
 

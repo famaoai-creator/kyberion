@@ -1,10 +1,15 @@
 {
+  "_note": "Current SLO targets are keyed by manifest-backed actuator ids. Historical pre-manifest skill telemetry remains in archival dashboards only.",
   "default": {
     "latency_ms": 5000,
     "success_rate": 99.0
   },
   "critical_path": {
-    "api-doc-generator": { "latency_ms": 30000 },
-    "security-scanner": { "latency_ms": 60000, "success_rate": 95.0 }
+    "browser-actuator": { "latency_ms": 10000, "success_rate": 99.0 },
+    "code-actuator": { "latency_ms": 15000, "success_rate": 99.0 },
+    "secret-actuator": { "latency_ms": 10000, "success_rate": 99.5 },
+    "service-actuator": { "latency_ms": 15000, "success_rate": 99.0 },
+    "modeling-actuator": { "latency_ms": 30000, "success_rate": 98.0 },
+    "media-actuator": { "latency_ms": 30000, "success_rate": 98.0 }
   }
 }

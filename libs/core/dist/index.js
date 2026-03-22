@@ -102,6 +102,7 @@ export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
 export * from './channel-surface.js';
 export * from './service-binding.js';
+export * from './oauth-broker.js';
 export * from './generation-scheduler.js';
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine.js';

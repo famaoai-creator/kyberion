@@ -2,6 +2,7 @@
   "actuator_id": "voice-actuator",
   "version": "1.0.0",
   "description": "Local Generative TTS Actuator (Style-Bert-VITS2)",
+  "contract_schema": "schemas/voice-action.schema.json",
   "capabilities": [
     { "op": "speak_local", "platforms": ["darwin", "linux"] },
     { "op": "list_voices", "platforms": ["darwin", "linux"] }

@@ -2,6 +2,7 @@
   "actuator_id": "blockchain-actuator",
   "version": "1.0.0",
   "description": "Immutable Ledger Anchoring System",
+  "contract_schema": "schemas/blockchain-action.schema.json",
   "capabilities": [
     {
       "op": "anchor_mission",

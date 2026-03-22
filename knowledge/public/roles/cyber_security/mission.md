@@ -15,7 +15,7 @@ last_updated: 2026-03-06
 
 ## 2. 核心的スキル
 
-- **能動的防衛**: `red-team-adversary`, `security-scanner`
+- **能動的防衛**: `red-team-adversary`, `code-actuator`, `secret-actuator`
 - **次世代保護**: `post-quantum-shield`, `supply-chain-sentinel`
 - **事後対応**: `crisis-manager`, `data-lineage-guardian`
 

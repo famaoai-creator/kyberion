@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import * as path from 'node:path';
 // chalk imported dynamically
-import { execSync } from 'node:child_process';
 import { safeExistsSync, safeWriteFile, safeReadFile } from '@agent/core';
 
 const rootDir = process.cwd();
@@ -42,8 +41,11 @@ async function processInbox(): Promise<void> {
   let result = '';
   try {
     if (request.intent.includes('security')) {
-      result += execSync('node dist/scripts/cli.js run security-scanner --dir .', { encoding: 'utf8' });
-      result += '\n' + execSync('node dist/scripts/cli.js run generate_debt_report', { encoding: 'utf8' });
+      result = [
+        'Portal security intent mapped to the current actuator catalog.',
+        'Run a governed review using code-actuator and secret-actuator instead of the retired security-scanner skill.',
+        'Recommended flow: use mission_controller to create a review mission, then execute a code/security review pipeline with evidence written under active/shared/tmp/ or the mission evidence directory.',
+      ].join('\n');
     } else {
       result = '意図を解釈しました。適切なスキルセットを起動します。';
     }

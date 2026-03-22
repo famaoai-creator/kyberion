@@ -16,14 +16,14 @@ last_updated: 2026-03-06
 - **Orchestrator (CLI)**: 高リスク作業を検知し、`ApprovalRequest` を生成。
 - **Notification Relay**: クラウド経由で主権者のデバイスへ実用的な要約（MSN-ID, Cost）を送信。
 - **Sovereign Signer (PWA)**: 通知を受け取り、WebAuthn (Passkeys) による身体的署名を実行。
-- **Physical Bridge**: `presence/bridge/approvals/` を介したファイルベースの最終合意同期。
+- **Approval Runtime Buffer**: `active/shared/approvals/` を介したファイルベースの最終合意同期。
 
 ## 3. Data Flow & Security
 1. **Request**: CLI -> `pending/*.json` (Full data).
 2. **Push**: Notification Relay -> Sovereign Device (Summary only).
 3. **Validate**: Device reads `pending/*.json` (via Secure Sync) and matches with Push summary.
 4. **Sign**: Sovereign authenticates via Biometrics -> Generates Passkey Assertion.
-5. **Close**: Device writes `signed/*.signed.json` -> CLI verifies and executes.
+5. **Close**: Device writes `signed/*.signed.json` under the governed approval buffer -> CLI verifies and executes.
 
 ## 4. Security Principles
 - **End-to-End Integrity**: 通知要約と物理ファイルのリクエストハッシュが一致しなければ署名を拒否する。

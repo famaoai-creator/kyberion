@@ -20,7 +20,7 @@ When `knowledge-harvester` adds new files to `knowledge/external-wisdom/`:
 
 ## 2. Refinement Action
 
-- If **"Security"** wisdom found -> Update `security-scanner` instructions and `persona-matrix`.
+- If **"Security"** wisdom found -> Update `code-actuator` / `secret-actuator` review instructions and `persona-matrix`.
 - If **"Coding Style"** wisdom found -> Update `boilerplate-genie` templates.
 - If **"Process"** wisdom found -> Update `mission-control` intent mappings.
 

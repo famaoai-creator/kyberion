@@ -1,5 +1,8 @@
 # 🚀 Performance & Reliability Intelligence Dashboard
 
+> Status: This dashboard is a historical pre-manifest skill telemetry snapshot. It is retained for trend archaeology, not as the current component catalog.
+> Current runtime inventory lives in `knowledge/public/orchestration/global_actuator_index.json` and `knowledge/public/architecture/component-lifecycle-inventory.md`.
+
 _Last Updated: 2026/2/14 13:49:11_
 
 ## 📊 Ecosystem Health Summary

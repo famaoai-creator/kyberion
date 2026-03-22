@@ -27,6 +27,6 @@ last_updated: 2026-03-06
 
 ## 4. 承認プロセス (Approval Standard)
 
-- **PR承認**: `quality-scorer` の点数が80点以上、かつ `security-scanner` で重大な問題がないことを条件とする。
+- **PR承認**: `quality-scorer` の点数が80点以上、かつ `code-actuator` / `secret-actuator` の review で重大な問題がないことを条件とする。
 - **予算承認**: `budget-variance-tracker` で予測範囲内であることを確認する。
 - **オンボーディング**: 新メンバーには `onboarding-wizard` による個別ガイドを24時間以内に提供する。

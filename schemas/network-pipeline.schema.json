@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Network Pipeline ADF",
+  "description": "Pipeline envelope for network-actuator secure fetch and A2A transport.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "context": { "type": "object" },
+    "options": {
+      "type": "object",
+      "properties": {
+        "max_steps": { "type": "integer" },
+        "timeout_ms": { "type": "integer" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op", "params"],
+        "properties": {
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "op": {
+            "enum": [
+              "fetch",
+              "shell",
+              "a2a_poll",
+              "json_query",
+              "regex_extract",
+              "write_file",
+              "a2a_send",
+              "log",
+              "if",
+              "while"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@
   "actuator_id": "media-generation-actuator",
   "version": "1.0.0",
   "description": "Generative image, video, music, and screen capture actuator",
+  "contract_schema": "schemas/media-generation-action.schema.json",
   "capabilities": [
     { "op": "generate_image", "platforms": ["darwin", "linux", "win32"] },
     { "op": "generate_video", "platforms": ["darwin", "linux", "win32"] },

@@ -85,6 +85,7 @@ export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
 export * from './channel-surface.js';
 export * from './service-binding.js';
+export * from './oauth-broker.js';
 export * from './generation-scheduler.js';
 export * from './policy-engine.js';
 export * from './trust-engine.js';

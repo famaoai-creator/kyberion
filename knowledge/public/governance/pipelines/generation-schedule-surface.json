@@ -1,0 +1,14 @@
+{
+  "surface": {
+    "id": "generation-schedule",
+    "kind": "service",
+    "description": "Recurring generation schedule tick service managed by surface-runtime.",
+    "command": "node",
+    "args": ["dist/scripts/run_generation_schedule_daemon.js"],
+    "cwd": ".",
+    "shutdownPolicy": "detached",
+    "startupMode": "background",
+    "ownerType": "surface-runtime-manifest",
+    "enabled": false
+  }
+}

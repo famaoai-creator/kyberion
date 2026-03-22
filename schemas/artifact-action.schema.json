@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Artifact Actuator Request",
+  "type": "object",
+  "required": ["action", "params"],
+  "properties": {
+    "action": { "enum": ["write_json", "append_event", "read_json", "list", "ensure_dir", "write_delivery_pack"] },
+    "params": { "type": "object" }
+  }
+}

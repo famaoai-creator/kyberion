@@ -5,29 +5,22 @@ Kyberionのバックグラウンド動作、ログ出力、およびメッセー
 
 ---
 
-### 1. デーモン管理 (Daemon Management)
+### 1. サーフェスとプロセス管理 (Surface and Process Management)
 
-`Daemon-Actuator` を通じて、Node.jsスクリプトをOSレベルのサービス（macOS: launchd）として管理します。
+長寿命の神経系プロセスは `active-surfaces.json` と `surface-runtime` で宣言的に管理します。単発の補助プロセスは `process-actuator` に委譲します。
 
-#### 常駐デーモンの登録と起動
-システムの核心となる神経（Nexus, Terminal Server等）を永続化します。
+#### 常駐サーフェスの反映と起動
+システムの核心となる神経（Slack Bridge, Chronos, OAuth Callback Surface 等）を shared manifest から再調整します。
 ```bash
-# 登録
-node dist/libs/actuators/daemon-actuator/src/index.js --action register --nerve nexus-daemon --script dist/presence/bridge/nexus-daemon.js
+# 宣言済みサーフェスを reconcile
+pnpm surfaces:reconcile
 
-# 起動
-npm run nerve:start
+# 状態確認
+pnpm surfaces:status
 ```
 
 #### オンデマンド（一時的）な起動
-Web試験の録画など、特定のタスク中だけ動作させ、完了後に自動消去します。
-```bash
-# 一撃で起動 (Ephemeralモード)
-node dist/libs/actuators/daemon-actuator/src/index.js --action run-once --nerve temp-recorder --script scripts/recorder.ts --options '{"ephemeral":true}'
-
-# 停止 (Ephemeralモード時は設定ファイルも自動削除)
-node dist/libs/actuators/daemon-actuator/src/index.js --action stop --nerve temp-recorder
-```
+Web試験の録画や一時 bridge のような寿命付きプロセスは、`process-actuator` の `spawn` / `stop` で管理します。OS 固有の `launchd` 設定を直接生成してはいけません。
 
 ---
 
@@ -35,15 +28,7 @@ node dist/libs/actuators/daemon-actuator/src/index.js --action stop --nerve temp
 
 デーモン間、あるいはエージェントとデーモンの間で構造化された対話（ADF）を行います。
 
-#### メッセージの送信 (Post)
-```bash
-node dist/libs/actuators/daemon-actuator/src/index.js --action post-msg --nerve agent-001 --options '{"target":"visual-nerve", "intent":"START_RECORDING", "payload":{"duration": 5000}}'
-```
-
-#### メッセージの待機 (Wait)
-```bash
-node dist/libs/actuators/daemon-actuator/src/index.js --action wait-msg --nerve agent-001
-```
+メッセージ送受信は `@agent/core/nerve-bridge` を通して行います。旧 `daemon-actuator` CLI は retired です。
 
 #### スクリプトでの利用 (TypeScript)
 ```typescript
@@ -66,20 +51,20 @@ listenToNerve('my-nerve-id', (msg) => {
 
 - **統合パルス**: `active/shared/runtime/pulse.json`
 - **生シグナル**: `presence/bridge/runtime/stimuli.jsonl`
-- **デーモンログ**: `active/shared/logs/<nerve-id>.log`
+- **サーフェスログ**: `active/shared/logs/surfaces/<surface-id>.log`
 
 #### 健康状態の一括確認
 ```bash
-npm run nerve:status
+pnpm surfaces:status
 ```
 
 ---
 
 ### 4. 運用ポリシー (Policies)
 
-1.  **Shield Layer**: `Infrastructure Sentinel` ロールのみが OS 設定（LaunchAgents）の変更を許されます。
-2.  **Clean Room**: 一時的な神経（Ephemeral）は、必ず `stop` アクションを通じてクリーンアップしてください。
-3.  **Coherence**: 独自のログファイルを作る前に、まず `stimuli.jsonl` への注入を検討してください。
+1.  **Shield Layer**: durable runtime の定義変更は `knowledge/public/governance/active-surfaces.json` と review を通してください。
+2.  **Clean Room**: 一時的な神経（Ephemeral）は `process-actuator` で owner を持って起動し、明示的に stop してください。
+3.  **Coherence**: 独自のログファイルを作る前に、まず `stimuli.jsonl` と governed runtime logs を利用してください。
 
 ---
 *Created by Infrastructure Sentinel for the Kyberion Sovereign Ecosystem.*
