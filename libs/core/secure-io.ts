@@ -13,6 +13,43 @@ import { validateWritePermission, validateReadPermission } from './tier-guard.js
 
 export const DEFAULT_MAX_FILE_SIZE_MB = 100;
 export const DEFAULT_TIMEOUT_MS = 30000;
+const SAFE_EXEC_ENV_ALLOWLIST = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'TERM',
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  'PWD',
+  'SHLVL',
+  'NODE_ENV',
+  'NODE_OPTIONS',
+  'COREPACK_HOME',
+  'PNPM_HOME',
+  'NPM_CONFIG_USERCONFIG',
+  'NVM_DIR',
+  'NVM_BIN',
+  'VOLTA_HOME',
+  'MISSION_ID',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
+  'KYBERION_SUDO',
+  'CODEX_HOME',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+] as const;
 
 export interface SafeReadOptions {
   maxSizeMB?: number;
@@ -28,6 +65,28 @@ export interface SafeWriteOptions {
   mode?: number;
   flag?: string;
   __sudo?: string;
+}
+
+export function buildSafeExecEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const safeEnv: NodeJS.ProcessEnv = {
+    FORCE_COLOR: '0',
+    TERM: process.env.TERM || 'dumb',
+  };
+
+  for (const key of SAFE_EXEC_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      safeEnv[key] = value;
+    }
+  }
+
+  for (const [key, value] of Object.entries(extraEnv)) {
+    if (value !== undefined) {
+      safeEnv[key] = value;
+    }
+  }
+
+  return safeEnv;
 }
 
 /**
@@ -262,13 +321,13 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     cwd = process.cwd(),
     encoding = 'utf8',
     maxOutputMB = 10,
-    env = process.env, // Default to current process env
+    env = {},
   } = options;
 
   return execFileSync(command, args, {
     encoding,
     cwd,
-    env, // Pass environment variables to child process
+    env: buildSafeExecEnv(env),
     timeout: timeoutMs,
     maxBuffer: maxOutputMB * 1024 * 1024,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -293,14 +352,26 @@ export function validateUrl(url: string): string {
 
     // SSRF protection: Block private IP ranges and localhost
     const hostname = parsed.hostname.toLowerCase();
-    const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
+    const normalizedHostname = hostname.replace(/^\[(.*)\]$/, '$1');
+    const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::', '::1'];
     
-    if (blockedHostnames.includes(hostname)) {
+    if (blockedHostnames.includes(normalizedHostname)) {
       throw new Error(`Blocked URL: ${hostname}`);
     }
 
     // Basic private IP range detection (IPv4)
-    if (/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(hostname)) {
+    if (/^(10\.|127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(normalizedHostname)) {
+      throw new Error(`Blocked URL: Private IP range (${hostname})`);
+    }
+
+    // IPv6 loopback / link-local / unique-local / IPv4-mapped loopback
+    if (
+      normalizedHostname.startsWith('fe80:') ||
+      normalizedHostname.startsWith('fc') ||
+      normalizedHostname.startsWith('fd') ||
+      normalizedHostname.startsWith('::ffff:7f00:') ||
+      normalizedHostname.startsWith('::ffff:127.')
+    ) {
       throw new Error(`Blocked URL: Private IP range (${hostname})`);
     }
 

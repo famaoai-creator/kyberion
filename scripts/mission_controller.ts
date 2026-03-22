@@ -19,6 +19,7 @@ import {
   ensureMissionTeamRuntimeViaSupervisor,
   findMissionPath,
   grantAccess,
+  hasAuthority,
   ledger,
   loadMissionTeamPlan,
   logger,
@@ -93,32 +94,62 @@ interface MissionState {
 
 type MissionRelationships = NonNullable<MissionState['relationships']>;
 
-function getOptionValue(flag: string): string | undefined {
-  const index = process.argv.indexOf(flag);
+const BOOLEAN_FLAGS = new Set(['--ephemeral', '--refresh', '--seal', '--force', '--execute']);
+const VALUE_FLAGS = new Set([
+  '--project-id',
+  '--project-path',
+  '--project-relationship',
+  '--affected-artifacts',
+  '--gate-impact',
+  '--traceability-refs',
+  '--project-note',
+]);
+
+export function extractMissionControllerPositionalArgs(argv: string[]): string[] {
+  const rawArgs = argv.slice(2);
+  const positionalArgs: string[] = [];
+
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index];
+    if (BOOLEAN_FLAGS.has(arg)) {
+      continue;
+    }
+    if (VALUE_FLAGS.has(arg)) {
+      index += 1;
+      continue;
+    }
+    positionalArgs.push(arg);
+  }
+
+  return positionalArgs;
+}
+
+function getOptionValue(flag: string, argv: string[] = process.argv): string | undefined {
+  const index = argv.indexOf(flag);
   if (index === -1) return undefined;
-  const value = process.argv[index + 1];
+  const value = argv[index + 1];
   if (!value || value.startsWith('--')) return undefined;
   return value;
 }
 
-function parseCsvOption(flag: string): string[] | undefined {
-  const raw = getOptionValue(flag);
+function parseCsvOption(flag: string, argv: string[] = process.argv): string[] | undefined {
+  const raw = getOptionValue(flag, argv);
   if (!raw) return undefined;
   return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
 
-function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
-  const projectId = getOptionValue('--project-id');
-  const projectPath = getOptionValue('--project-path');
-  const relationshipType = getOptionValue('--project-relationship') as MissionRelationships['project'] extends infer T
+export function extractProjectRelationshipOptionsFromArgv(argv: string[]): Partial<MissionRelationships> {
+  const projectId = getOptionValue('--project-id', argv);
+  const projectPath = getOptionValue('--project-path', argv);
+  const relationshipType = getOptionValue('--project-relationship', argv) as MissionRelationships['project'] extends infer T
     ? T extends { relationship_type: infer R } ? R : never
     : never;
-  const affectedArtifacts = parseCsvOption('--affected-artifacts');
-  const traceabilityRefs = parseCsvOption('--traceability-refs');
-  const gateImpact = getOptionValue('--gate-impact') as MissionRelationships['project'] extends infer T
+  const affectedArtifacts = parseCsvOption('--affected-artifacts', argv);
+  const traceabilityRefs = parseCsvOption('--traceability-refs', argv);
+  const gateImpact = getOptionValue('--gate-impact', argv) as MissionRelationships['project'] extends infer T
     ? T extends { gate_impact: infer G } ? G : never
     : never;
-  const note = getOptionValue('--project-note');
+  const note = getOptionValue('--project-note', argv);
 
   const hasProjectOptions = Boolean(
     projectId || projectPath || relationshipType || affectedArtifacts?.length || traceabilityRefs?.length || gateImpact || note
@@ -139,6 +170,16 @@ function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
       note,
     },
   };
+}
+
+function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
+  return extractProjectRelationshipOptionsFromArgv(process.argv);
+}
+
+export function assertCanGrantMissionAuthority(): void {
+  if (!hasAuthority('SUDO')) {
+    throw new Error('Sudo authority is required to grant mission access.');
+  }
 }
 
 function normalizeRelationships(input: any = {}, overlays: Partial<MissionRelationships> = {}): MissionRelationships {
@@ -1986,6 +2027,7 @@ async function prewarmMissionTeam(id: string, teamRolesArg?: string) {
 }
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
+  assertCanGrantMissionAuthority();
   const upperId = missionId.toUpperCase();
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
@@ -1994,6 +2036,7 @@ async function grantMissionAccess(missionId: string, serviceId: string, ttl: num
 }
 
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
+  assertCanGrantMissionAuthority();
   const upperId = missionId.toUpperCase();
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
@@ -2014,8 +2057,7 @@ async function main() {
     process.env.MISSION_ROLE = 'mission_controller';
   }
 
-  const flags = ['--ephemeral', '--refresh', '--seal', '--force', '--execute'];
-  const positionalArgs = process.argv.slice(2).filter(arg => !flags.includes(arg) && !arg.startsWith('--project-'));
+  const positionalArgs = extractMissionControllerPositionalArgs(process.argv);
 
   const action = positionalArgs[0];
   const arg1 = positionalArgs[1];
