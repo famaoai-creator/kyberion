@@ -34,27 +34,34 @@ describe('Channel surface agents', () => {
   const identityPath = pathResolver.rootResolve('knowledge/personal/my-identity.json');
   const visionPath = pathResolver.rootResolve('knowledge/personal/my-vision.md');
   const agentIdentityPath = pathResolver.rootResolve('knowledge/personal/agent-identity.json');
-  const withRole = <T>(role: string, fn: () => T): T => {
+  const withRole = <T>(role: string, fn: () => T, persona?: string): T => {
     const previous = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
     process.env.MISSION_ROLE = role;
+    if (persona !== undefined) process.env.KYBERION_PERSONA = persona;
     try {
       return fn();
     } finally {
       if (previous === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previous;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
     }
   };
   const baselineIdentity = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(identityPath) ? (safeReadFile(identityPath, { encoding: 'utf8' }) as string) : null)
+    () => (safeExistsSync(identityPath) ? (safeReadFile(identityPath, { encoding: 'utf8' }) as string) : null),
+    'sovereign'
   );
   const baselineVision = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(visionPath) ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string) : null)
+    () => (safeExistsSync(visionPath) ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string) : null),
+    'sovereign'
   );
   const baselineAgentIdentity = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(agentIdentityPath) ? (safeReadFile(agentIdentityPath, { encoding: 'utf8' }) as string) : null)
+    () => (safeExistsSync(agentIdentityPath) ? (safeReadFile(agentIdentityPath, { encoding: 'utf8' }) as string) : null),
+    'sovereign'
   );
 
   afterEach(() => {
@@ -71,7 +78,8 @@ describe('Channel surface agents', () => {
     process.env.MISSION_ROLE = 'chronos_gateway';
     if (safeExistsSync(chronosDir)) safeRmSync(chronosDir);
     if (safeExistsSync(chronosObsDir)) safeRmSync(chronosObsDir);
-    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'sovereign';
     if (baselineIdentity !== null) core.safeWriteFile(identityPath, baselineIdentity);
     else if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (baselineVision !== null) core.safeWriteFile(visionPath, baselineVision);
@@ -195,7 +203,8 @@ describe('Channel surface agents', () => {
   });
 
   it('routes uninitialized Slack threads into onboarding and persists identity artifacts', () => {
-    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'sovereign';
     if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (safeExistsSync(visionPath)) safeRmSync(visionPath);
     if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);

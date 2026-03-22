@@ -6,7 +6,6 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
   'libs/actuators/process-actuator/src/index.ts',
-  'libs/actuators/service-actuator/src/index.test.ts',
   'libs/actuators/service-actuator/src/index.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
@@ -31,6 +30,7 @@ describe('Process boundary governance', () => {
     const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
+      .filter((relPath) => !relPath.endsWith('.d.ts'))
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))

@@ -6,13 +6,14 @@ describe('Governance Policy-as-Code Enforcement', () => {
   const TEST_FILE = pathResolver.knowledge('public/test-policy-effect.md');
 
   afterAll(() => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'ecosystem_architect'; 
     if (safeExistsSync(TEST_FILE)) safeUnlinkSync(TEST_FILE);
   });
 
-  it('Scenario: ecosystem_architect can write to knowledge (Allowed by Policy)', async () => {
-    // Simulate role
-    process.env.MISSION_ROLE = 'ecosystem_architect';
+  it('Scenario: ecosystem_architect persona can write to knowledge (Allowed by Policy)', async () => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'software_developer';
     const check = validateWritePermission(TEST_FILE);
     expect(check.allowed).toBe(true);
     
@@ -24,8 +25,8 @@ describe('Governance Policy-as-Code Enforcement', () => {
   it('Scenario: unknown role cannot write to knowledge/confidential (Blocked by Tier Policy)', async () => {
     const CONFIDENTIAL_FILE = pathResolver.knowledge('confidential/test-block.md');
     
-    // Explicitly set restricted environment
     process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.KYBERION_PERSONA = 'unknown';
     process.env.MISSION_ID = ''; 
     
     const root = pathResolver.rootDir();
@@ -50,6 +51,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
   it('Scenario: Default allow runtime temp paths work for everyone', async () => {
     const SCRATCH_FILE = pathResolver.sharedTmp('tests/test-default-allow.txt');
     process.env.MISSION_ROLE = 'any_role';
+    process.env.KYBERION_PERSONA = 'unknown';
     const check = validateWritePermission(SCRATCH_FILE);
     expect(check.allowed).toBe(true);
 
@@ -61,6 +63,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
   it('Scenario: mission_controller can write distilled wisdom output', async () => {
     const WISDOM_FILE = pathResolver.rootResolve('knowledge/evolution/test-mission-controller-distill.md');
     process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'worker';
 
     const check = validateWritePermission(WISDOM_FILE);
     expect(check.allowed).toBe(true);
@@ -73,12 +76,14 @@ describe('Governance Policy-as-Code Enforcement', () => {
 
 describe('Read Permission Control (validateReadPermission)', () => {
   afterAll(() => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'ecosystem_architect';
   });
 
   it('public knowledge is always readable', () => {
     const file = pathResolver.knowledge('public/governance/security-policy.json');
     process.env.MISSION_ROLE = 'any_role';
+    process.env.KYBERION_PERSONA = 'unknown';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
@@ -86,13 +91,15 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('non-knowledge paths are always readable', () => {
     const file = pathResolver.rootResolve('scripts/mission_controller.ts');
     process.env.MISSION_ROLE = 'any_role';
+    process.env.KYBERION_PERSONA = 'unknown';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
 
-  it('personal knowledge is blocked for unknown roles', () => {
+  it('personal knowledge is blocked for unknown persona and authority role', () => {
     const file = pathResolver.knowledge('personal/my-identity.json');
     process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.KYBERION_PERSONA = 'unknown';
     process.env.MISSION_ID = '';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
@@ -101,14 +108,16 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('confidential knowledge is blocked for unknown roles', () => {
     const file = pathResolver.knowledge('confidential/secret-doc.md');
     process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.KYBERION_PERSONA = 'unknown';
     process.env.MISSION_ID = '';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
   });
 
-  it('mission_controller can read personal knowledge (privileged)', () => {
+  it('mission_controller authority role can read personal knowledge', () => {
     const file = pathResolver.knowledge('personal/my-identity.json');
     process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });
@@ -116,6 +125,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('chronos_operator cannot read personal mission knowledge', () => {
     const file = pathResolver.knowledge('personal/missions');
     process.env.MISSION_ROLE = 'chronos_operator';
+    process.env.KYBERION_PERSONA = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
   });
@@ -123,13 +133,15 @@ describe('Read Permission Control (validateReadPermission)', () => {
   it('chronos_localadmin remains blocked from personal mission knowledge', () => {
     const file = pathResolver.knowledge('personal/missions');
     process.env.MISSION_ROLE = 'chronos_localadmin';
+    process.env.KYBERION_PERSONA = 'worker';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(false);
   });
 
-  it('ecosystem_architect can read confidential knowledge (privileged)', () => {
+  it('ecosystem_architect persona can read confidential knowledge', () => {
     const file = pathResolver.knowledge('confidential/secret-doc.md');
-    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'software_developer';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
   });

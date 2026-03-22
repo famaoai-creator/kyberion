@@ -4,6 +4,7 @@ import { emitChannelSurfaceEvent, enqueueChronosOutboxMessage, enqueueSlackOutbo
 import { ensureMissionTeamRuntimeViaSupervisor, shutdownAllAgentRuntimes } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
+import { buildExecutionEnv } from './authority.js';
 import { missionDir } from './path-resolver.js';
 import { safeExec, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
@@ -394,7 +395,7 @@ function summarizeMissionTaskOutcomes(missionId: string): {
 async function handleMissionIssueRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const env = buildExecutionEnv(process.env, 'mission_controller');
   const tier = payload.tier || 'public';
   const persona = payload.persona || 'Ecosystem Architect';
   const missionType = resolveMissionType(payload);
@@ -455,7 +456,7 @@ async function handleMissionTeamPrewarmRequested(event: MissionOrchestrationEven
 async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const env = buildExecutionEnv(process.env, 'mission_controller');
 
   runMissionController(env, [
     'record-task',
@@ -597,7 +598,7 @@ async function handleMissionReconciliationRequested(event: MissionOrchestrationE
 }
 
 async function handleMissionControlRequested(event: MissionOrchestrationEvent<MissionControlPayload>) {
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const env = buildExecutionEnv(process.env, 'mission_controller');
   const missionId = event.mission_id;
   const operation = event.payload.operation;
 
@@ -634,7 +635,7 @@ async function handleMissionControlRequested(event: MissionOrchestrationEvent<Mi
 async function handleSurfaceControlRequested(event: MissionOrchestrationEvent<SurfaceControlPayload>) {
   const operation = event.payload.operation;
   const surfaceId = event.payload.surfaceId;
-  const env = { ...process.env, MISSION_ROLE: 'surface_runtime' };
+  const env = buildExecutionEnv(process.env, 'surface_runtime');
   const args = ['dist/scripts/surface_runtime.js', '--action'];
 
   if (operation === 'reconcile' || operation === 'status') {

@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, platform, transform } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -31,16 +31,8 @@ interface ServiceAction {
 const PID_FILE = path.join(process.cwd(), 'active/shared/services-pids.json');
 const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
 const SERVICE_ENDPOINTS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json');
-
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
-}
-
-function resolveVars(input: string, vars: Record<string, any>): string {
-  return input.replace(/{{(.*?)}}/g, (_, key) => {
-    const value = vars[key.trim()];
-    return value !== undefined ? String(value) : `{{${key}}}`;
-  });
 }
 
 function loadPids() {
@@ -196,70 +188,9 @@ async function handleAction(input: any, onEvent?: (data: any) => void) {
 async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) => void) {
   logger.info(`🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`);
 
-  let binding = input.auth ? resolveServiceBinding(input.service_id, input.auth) : resolveServiceBinding(input.service_id, 'none');
-  let token: string | null = binding.accessToken || null;
-
   switch (input.mode) {
     case 'PRESET':
-      const endpoints = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
-      const serviceConfig = endpoints.services[input.service_id];
-      const preset = JSON.parse(safeReadFile(path.resolve(process.cwd(), serviceConfig.preset_path), { encoding: 'utf8' }) as string);
-      const op = preset.operations[input.action];
-
-      const opType = op.type || 'api';
-      const alternatives = op.alternatives || [{ ...op, type: opType }];
-
-      for (const alt of alternatives) {
-        try {
-          if (alt.type === 'cli') {
-            const bin = resolveVars(alt.command, input.params);
-            const hasCli = await platform.checkBinary(bin);
-            if (!hasCli) {
-              logger.warn(`  [PRESET] CLI ${bin} not found. Skipping alternative.`);
-              continue;
-            }
-            assertUnsafeCliAllowed();
-            const args = (alt.args || []).map((a: string) => resolveVars(a, input.params));
-            logger.info(`🚀 [PRESET:CLI] Executing ${bin} ${args.join(' ')}`);
-            const rawOutput = safeExec(bin, args);
-            let parsedOutput: any = rawOutput;
-            try { parsedOutput = JSON.parse(rawOutput); } catch (_) { /* ignore */ }
-            
-            if (alt.output_mapping) {
-              return transform(parsedOutput, { type: 'json_map', mapping: alt.output_mapping });
-            }
-            return parsedOutput;
-          } 
-          
-          if (alt.type === 'api') {
-            const baseUrl = resolveVars(alt.base_url || preset.base_url || serviceConfig.base_url, input.params);
-            const apiPath = resolveVars(alt.path, input.params);
-            const method = alt.method || 'GET';
-            let payload = input.params;
-            if (alt.payload_template) {
-              payload = JSON.parse(resolveVars(JSON.stringify(alt.payload_template), input.params));
-            }
-            const headers: Record<string, string> = { ...preset.headers, ...alt.headers };
-            if (token) { headers['Authorization'] = `Bearer ${token}`; }
-            logger.info(`🚀 [PRESET:API] Executing ${input.service_id}:${input.action} -> ${method} ${baseUrl}/${apiPath}`);
-            const result = await secureFetch({
-              method: method as any,
-              url: `${baseUrl}/${apiPath}`,
-              headers,
-              data: method !== 'GET' ? payload : undefined,
-              params: method === 'GET' ? payload : undefined
-            });
-
-            if (alt.output_mapping) {
-              return transform(result, { type: 'json_map', mapping: alt.output_mapping });
-            }
-            return result;
-          }
-        } catch (err: any) {
-          logger.error(`  [PRESET] Alternative failed: ${err.message}. Trying next...`);
-        }
-      }
-      throw new Error(`[PRESET] All alternatives failed for ${input.service_id}:${input.action}`);
+      return await executeServicePreset(input.service_id, input.action, input.params, input.auth === 'secret-guard' ? 'secret-guard' : 'none');
 
     case 'RECONCILE':
       const manifestPath = path.resolve(process.cwd(), input.params.manifest_path);
@@ -306,9 +237,14 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       return { status: 'reconciled', active_services: Object.keys(pids) };
 
     case 'STREAM':
+      if (input.service_id === 'slack') {
+        throw new Error('Slack streaming ingress belongs to the Slack gateway (satellites/slack-bridge), not service-actuator.');
+      }
       throw new Error(`Streaming not implemented for ${input.service_id}`);
 
     case 'API':
+      const binding = input.auth ? resolveServiceBinding(input.service_id, input.auth) : resolveServiceBinding(input.service_id, 'none');
+      const token: string | null = binding.accessToken || null;
       const baseUrl = resolveServiceBaseUrl(input.service_id);
       const httpMethod = input.method || (input.params ? 'POST' : 'GET');
       return await secureFetch({
