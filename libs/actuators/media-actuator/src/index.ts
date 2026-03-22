@@ -2092,7 +2092,7 @@ function generateDrawioDocument(
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
   const colors = options.theme?.colors || {};
   const fonts = options.theme?.fonts || {};
-  const nodeMap = new Map(nodes.map((node: any) => [node.id, node]));
+  const nodeMap = new Map<string, any>(nodes.map((node: any) => [node.id, node]));
   const childrenByParent = new Map<string, any[]>();
   const roots: any[] = [];
   const direction = graph?.render_hints?.direction || 'LR';
@@ -2112,11 +2112,12 @@ function generateDrawioDocument(
   const geometry = new Map<string, { x: number; y: number; width: number; height: number }>();
   let cursorX = 40;
   let cursorY = 40;
+  const groupOrder = ['edge', 'web', 'application', 'app', 'data', 'database', 'network', 'security', 'module', 'control', 'state'];
+  const groupPriority = new Map(groupOrder.map((group, index) => [group, index]));
 
   const layoutNode = (node: any, depth: number, parentX: number, parentY: number): { width: number; height: number } => {
     const nodeChildren = childrenByParent.get(node.id) || [];
-    const preferredWidth = Number(node?.render_hints?.preferred_width || 160);
-    const preferredHeight = Number(node?.render_hints?.preferred_height || 120);
+    const { width: preferredWidth, height: preferredHeight } = resolveDrawioNodeSize(node);
     const shouldTreatAsContainer = nodeChildren.length > 0 || node?.render_hints?.container === true || Boolean(node?.boundary && !node?.parent);
     if (!shouldTreatAsContainer) {
       const width = preferredWidth;
@@ -2131,15 +2132,67 @@ function generateDrawioDocument(
       return { width, height };
     }
 
-    let innerX = parentX + 30;
-    let maxBottom = parentY + 90;
-    let maxRight = parentX + 260;
+    const childContainers: any[] = [];
+    const leafChildren: any[] = [];
     for (const child of nodeChildren) {
-      const childBox = layoutNode(child, depth + 1, innerX, parentY + 70);
-      const childGeo = geometry.get(child.id)!;
-      innerX += childBox.width + 30;
-      maxBottom = Math.max(maxBottom, childGeo.y + childGeo.height + 30);
-      maxRight = Math.max(maxRight, childGeo.x + childGeo.width + 30);
+      const childHasChildren = (childrenByParent.get(child.id) || []).length > 0 || child?.render_hints?.container === true || Boolean(child?.boundary && !child?.parent);
+      if (childHasChildren) childContainers.push(child);
+      else leafChildren.push(child);
+    }
+
+      const groupedLeaves = new Map<string, any[]>();
+      for (const child of leafChildren) {
+      const group = typeof child?.render_hints?.semantic_tier === 'string' && child.render_hints.semantic_tier.trim()
+        ? child.render_hints.semantic_tier.trim()
+        : typeof child?.group === 'string' && child.group.trim()
+          ? child.group.trim()
+          : 'application';
+      const bucket = groupedLeaves.get(group) || [];
+      bucket.push(child);
+      groupedLeaves.set(group, bucket);
+    }
+
+    const sortedGroups = [...groupedLeaves.keys()].sort((left, right) => {
+      const leftRank = groupPriority.has(left) ? groupPriority.get(left)! : groupOrder.length;
+      const rightRank = groupPriority.has(right) ? groupPriority.get(right)! : groupOrder.length;
+      return leftRank === rightRank ? left.localeCompare(right) : leftRank - rightRank;
+    });
+
+    let innerY = parentY + 70;
+    let maxBottom = parentY + 180;
+    let maxRight = parentX + 260;
+    const columnGap = 44;
+    const rowGap = 24;
+    const bucketHeaderHeight = 22;
+
+    if (sortedGroups.length > 0) {
+      let bucketX = parentX + 30;
+      for (const group of sortedGroups) {
+        const children = (groupedLeaves.get(group) || []).sort(compareDrawioLeafNodes);
+        let bucketY = innerY + bucketHeaderHeight;
+        let bucketMaxRight = bucketX;
+        for (const child of children) {
+          const childBox = layoutNode(child, depth + 1, bucketX, bucketY);
+          const childGeo = geometry.get(child.id)!;
+          bucketY += childBox.height + rowGap;
+          bucketMaxRight = Math.max(bucketMaxRight, childGeo.x + childGeo.width);
+          maxBottom = Math.max(maxBottom, childGeo.y + childGeo.height + 30);
+          maxRight = Math.max(maxRight, childGeo.x + childGeo.width + 30);
+        }
+        bucketX = bucketMaxRight + columnGap;
+      }
+      innerY = maxBottom + 20;
+    }
+
+    if (childContainers.length > 0) {
+      let containerX = parentX + 30;
+      for (const child of childContainers.sort(compareDrawioNodesByTier)) {
+        const childBox = layoutNode(child, depth + 1, containerX, innerY);
+        const childGeo = geometry.get(child.id)!;
+        containerX += childBox.width + 30;
+        maxBottom = Math.max(maxBottom, childGeo.y + childGeo.height + 30);
+        maxRight = Math.max(maxRight, childGeo.x + childGeo.width + 30);
+      }
     }
 
     const width = Math.max(260, maxRight - parentX);
@@ -2161,24 +2214,36 @@ function generateDrawioDocument(
   const sortedNodes = [...nodes].sort((left, right) => {
     const leftIsContainer = ((childrenByParent.get(left.id) || []).length > 0 || left?.render_hints?.container === true || Boolean(left?.boundary && !left?.parent)) ? 1 : 0;
     const rightIsContainer = ((childrenByParent.get(right.id) || []).length > 0 || right?.render_hints?.container === true || Boolean(right?.boundary && !right?.parent)) ? 1 : 0;
-    return leftIsContainer === rightIsContainer ? left.id.localeCompare(right.id) : rightIsContainer - leftIsContainer;
+    if (leftIsContainer !== rightIsContainer) {
+      return rightIsContainer - leftIsContainer;
+    }
+    const leftDepth = drawioNodeDepth(left, nodeMap);
+    const rightDepth = drawioNodeDepth(right, nodeMap);
+    return leftDepth === rightDepth ? left.id.localeCompare(right.id) : leftDepth - rightDepth;
   });
 
   for (const node of sortedNodes) {
     const geo = geometry.get(node.id) || { x: 40, y: 40, width: 160, height: 120 };
     const hasChildren = (childrenByParent.get(node.id) || []).length > 0 || node?.render_hints?.container === true || Boolean(node?.boundary && !node?.parent);
     const parentId = node.parent && nodeMap.has(node.parent) ? node.parent : '1';
+    const parentGeo = parentId !== '1' ? geometry.get(parentId) : undefined;
+    const relativeX = parentGeo ? Math.max(0, geo.x - parentGeo.x) : geo.x;
+    const relativeY = parentGeo ? Math.max(0, geo.y - parentGeo.y) : geo.y;
     const style = buildDrawioNodeStyle(node, hasChildren, options, colors, fonts);
     const label = escapeXml(node.name || node.id);
     cellXml.push(
       `<mxCell id="${escapeXml(node.id)}" value="${label}" style="${escapeXml(style)}" vertex="1" parent="${escapeXml(parentId)}">` +
-        `<mxGeometry x="${geo.x}" y="${geo.y}" width="${geo.width}" height="${geo.height}" as="geometry"/>` +
+        `<mxGeometry x="${relativeX}" y="${relativeY}" width="${geo.width}" height="${geo.height}" as="geometry"/>` +
       `</mxCell>`,
     );
   }
 
   edges.forEach((edge: any, index: number) => {
-    const style = [
+    const sourceNode = nodeMap.get(edge.from);
+    const targetNode = nodeMap.get(edge.to);
+    const sourceTier = String(sourceNode?.render_hints?.semantic_tier || sourceNode?.group || '').toLowerCase();
+    const targetTier = String(targetNode?.render_hints?.semantic_tier || targetNode?.group || '').toLowerCase();
+    const styleParts = [
       'edgeStyle=orthogonalEdgeStyle',
       'rounded=1',
       'orthogonalLoop=1',
@@ -2187,7 +2252,38 @@ function generateDrawioDocument(
       `strokeColor=${colors.primary || '#232f3e'}`,
       `fontColor=${colors.text || '#111827'}`,
       `fontFamily=${normalizeFontFamily(fonts.body || fonts.heading || 'Arial')}`,
-    ].join(';');
+    ];
+    if (edge.label === 'uses') {
+      styleParts.push('dashed=1', 'strokeOpacity=55');
+    }
+    if (edge.label === 'source') {
+      styleParts.push(
+        'dashed=1',
+        `strokeColor=${colors.accent || '#ff9900'}`,
+        'strokeWidth=2',
+        'endArrow=open',
+        'endFill=0',
+        'labelBackgroundColor=#FFF7ED',
+      );
+    }
+    if (edge.label === 'expands') {
+      styleParts.push(
+        'dashed=1',
+        'dashPattern=8 4',
+        `strokeColor=${colors.secondary || '#4b5563'}`,
+        'strokeWidth=2',
+        'endArrow=block',
+        'endFill=1',
+        'labelBackgroundColor=#EFF6FF',
+      );
+    }
+    const horizontalTiers = new Set(['edge', 'web', 'application', 'app', 'data', 'security']);
+    if (sourceTier === 'security' && ['web', 'application', 'app'].includes(targetTier)) {
+      styleParts.push('exitX=0', 'exitY=0.5', 'entryX=1', 'entryY=0.5');
+    } else if (horizontalTiers.has(sourceTier) && horizontalTiers.has(targetTier) && sourceTier !== targetTier) {
+      styleParts.push('exitX=1', 'exitY=0.5', 'entryX=0', 'entryY=0.5');
+    }
+    const style = styleParts.join(';');
     const label = edge.label ? ` value="${escapeXml(edge.label)}"` : '';
     cellXml.push(
       `<mxCell id="edge-${index + 1}"${label} style="${escapeXml(style)}" edge="1" parent="1" source="${escapeXml(edge.from)}" target="${escapeXml(edge.to)}">` +
@@ -2199,7 +2295,7 @@ function generateDrawioDocument(
   const diagramId = createHash('sha1').update(JSON.stringify(graph)).digest('hex').slice(0, 12);
   return [
     `<mxfile host="kyberion" modified="${new Date().toISOString()}" agent="Kyberion Media-Actuator" version="1.0.0" type="device">`,
-    `  <diagram id="${diagramId}" name="${escapeXml(options.title)}">`,
+    `  <diagram id="${diagramId}" name="${escapeXml(options.title)}" compressed="false">`,
     '    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">',
     '      <root>',
     ...cellXml.map((line) => `        ${line}`),
@@ -2225,19 +2321,28 @@ function buildDrawioNodeStyle(
   const fontFamily = normalizeFontFamily(fonts.body || fonts.heading || 'Arial');
 
   if (isContainer) {
+    const boundaryPalette = resolveDrawioBoundaryPalette(node, background, stroke);
+    const boundaryIcon = resolveDrawioBoundaryIcon(node, options.iconRoot);
     return [
       'swimlane',
       'html=1',
       'rounded=1',
       'whiteSpace=wrap',
-      'horizontal=0',
+      'horizontal=1',
       'startSize=28',
       'container=1',
-      `fillColor=${background}`,
-      `strokeColor=${stroke}`,
+      `fillColor=${boundaryPalette.fill}`,
+      `strokeColor=${boundaryPalette.stroke}`,
       `fontColor=${colors.text || '#111827'}`,
       `fontFamily=${fontFamily}`,
       'fontStyle=1',
+      ...(boundaryIcon ? [
+        `image=${boundaryIcon}`,
+        'align=left',
+        'verticalAlign=middle',
+        'spacingLeft=40',
+        'spacing=8',
+      ] : []),
     ].join(';');
   }
 
@@ -2271,11 +2376,165 @@ function buildDrawioNodeStyle(
   ].join(';');
 }
 
+function resolveDrawioBoundaryIcon(node: any, iconRoot?: string): string | null {
+  const boundary = String(node?.boundary || '');
+  const name = String(node?.name || '').toLowerCase();
+  const tier = String(node?.render_hints?.semantic_tier || '').toLowerCase();
+  const candidates =
+    boundary === 'account' || node?.type === 'aws_account' ? [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Account_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Account_32.svg',
+    ] :
+    boundary === 'region' || node?.type === 'aws_region' ? [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.svg',
+    ] :
+    boundary === 'vpc' || node?.type === 'aws_vpc' ? [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.svg',
+    ] :
+    boundary === 'subnet' || node?.type === 'aws_subnet' ? (
+      name.includes('public') ? [
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.png',
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.svg',
+      ] : [
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.png',
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.svg',
+      ]
+    ) :
+    boundary === 'az' || node?.type === 'aws_availability_zone' ? [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.svg',
+    ] :
+    boundary === 'scope' ? (
+      tier === 'state' || tier === 'data' ? [
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Corporate-data-center_32.png',
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Corporate-data-center_32.svg',
+      ] :
+      tier === 'web' || tier === 'module' ? [
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Server-contents_32.png',
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Server-contents_32.svg',
+      ] : [
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud-logo_32.png',
+        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud-logo_32.svg',
+      ]
+    ) :
+    [];
+
+  for (const candidate of candidates) {
+    const absolutePath = iconRoot
+      ? path.resolve(iconRoot, candidate)
+      : path.resolve(process.cwd(), candidate);
+    if (!safeExistsSync(absolutePath)) continue;
+    const buffer = safeReadFile(absolutePath, { encoding: null }) as Buffer;
+    const extension = path.extname(absolutePath).toLowerCase();
+    const mimeType = extension === '.svg' ? 'image/svg+xml' : extension === '.png' ? 'image/png' : null;
+    if (!mimeType) continue;
+    return `data:${mimeType},${buffer.toString('base64')}`;
+  }
+  return null;
+}
+
+function resolveDrawioBoundaryPalette(
+  node: any,
+  fallbackFill: string,
+  fallbackStroke: string,
+): { fill: string; stroke: string } {
+  const boundary = String(node?.boundary || '');
+  const type = String(node?.type || '');
+  const tier = String(node?.render_hints?.semantic_tier || '').trim().toLowerCase();
+  const laneName = String(node?.name || '').trim().toLowerCase();
+  switch (boundary || type) {
+    case 'account':
+    case 'aws_account':
+      return { fill: '#F8FAFC', stroke: '#0F172A' };
+    case 'region':
+    case 'aws_region':
+      return { fill: '#EFF6FF', stroke: '#1D4ED8' };
+    case 'vpc':
+    case 'aws_vpc':
+      return { fill: '#FFF7ED', stroke: '#C2410C' };
+    case 'az':
+    case 'aws_availability_zone':
+      return { fill: '#F9FAFB', stroke: '#6B7280' };
+    case 'subnet':
+    case 'aws_subnet': {
+      const name = String(node?.name || '').toLowerCase();
+      if (name.includes('public')) return { fill: '#ECFDF5', stroke: '#059669' };
+      if (name.includes('data')) return { fill: '#FEF2F2', stroke: '#DC2626' };
+      return { fill: '#FFF7ED', stroke: '#EA580C' };
+    }
+    case 'lane':
+      switch (tier || laneName) {
+        case 'edge':
+          return { fill: '#ECFDF5', stroke: '#059669' };
+        case 'network':
+          return { fill: '#F0F9FF', stroke: '#0284C7' };
+        case 'web':
+        case 'application':
+        case 'app':
+          return { fill: '#FFF7ED', stroke: '#EA580C' };
+        case 'security':
+          return { fill: '#FEF2F2', stroke: '#DC2626' };
+        case 'data':
+        case 'database':
+          return { fill: '#EFF6FF', stroke: '#2563EB' };
+        case 'control':
+        case 'state':
+          return { fill: '#F8FAFC', stroke: '#64748B' };
+        default:
+          return { fill: '#FFFFFF', stroke: '#94A3B8' };
+      }
+    case 'scope':
+      switch (tier || laneName) {
+        case 'state':
+          return { fill: '#F8FAFC', stroke: '#475569' };
+        case 'data':
+          return { fill: '#EFF6FF', stroke: '#2563EB' };
+        case 'web':
+        case 'module':
+          return { fill: '#FFF7ED', stroke: '#C2410C' };
+        case 'network':
+          return { fill: '#F0F9FF', stroke: '#0284C7' };
+        default:
+          return { fill: '#FFFFFF', stroke: '#232F3E' };
+      }
+    default:
+      return { fill: fallbackFill, stroke: fallbackStroke };
+  }
+}
+
+function resolveDrawioNodeSize(node: any): { width: number; height: number } {
+  const explicitWidth = Number(node?.render_hints?.preferred_width || 0);
+  const explicitHeight = Number(node?.render_hints?.preferred_height || 0);
+  if (explicitWidth > 0 && explicitHeight > 0) {
+    return { width: explicitWidth, height: explicitHeight };
+  }
+
+  const tier = typeof node?.render_hints?.semantic_tier === 'string' ? node.render_hints.semantic_tier : '';
+  if (node?.type === 'terraform_module') {
+    return { width: 196, height: 112 };
+  }
+  if (tier === 'edge' || tier === 'data') {
+    return { width: 92, height: 92 };
+  }
+  if (tier === 'security' || tier === 'control' || tier === 'network') {
+    return { width: 80, height: 80 };
+  }
+  if (tier === 'web' || tier === 'application' || tier === 'app') {
+    return { width: 88, height: 88 };
+  }
+  return { width: 160, height: 120 };
+}
+
 function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string): string | null {
   const candidates = [
     entry?.asset_path,
     ...(Array.isArray(entry?.asset_candidates) ? entry.asset_candidates : []),
-  ].filter(Boolean);
+    ...awsIconCandidatesForResourceType(resourceType),
+  ]
+    .filter(Boolean)
+    .sort((left, right) => iconCandidatePriority(String(left)) - iconCandidatePriority(String(right)));
 
   for (const candidate of candidates) {
     const absolutePath = iconRoot
@@ -2291,7 +2550,7 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
     if (!mimeType) {
       continue;
     }
-    return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    return `data:${mimeType},${buffer.toString('base64')}`;
   }
 
   if (typeof entry?.data_uri === 'string' && entry.data_uri.startsWith('data:')) {
@@ -2299,6 +2558,217 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
   }
 
   return null;
+}
+
+function iconCandidatePriority(candidate: string): number {
+  const normalized = candidate.toLowerCase();
+  if (normalized.endsWith('.png')) return 0;
+  if (normalized.endsWith('.svg')) return 1;
+  return 2;
+}
+
+function compareDrawioNodesByTier(left: any, right: any): number {
+  const leftTier = typeof left?.render_hints?.semantic_tier === 'string' ? left.render_hints.semantic_tier : '';
+  const rightTier = typeof right?.render_hints?.semantic_tier === 'string' ? right.render_hints.semantic_tier : '';
+  const tierOrder = ['network', 'edge', 'web', 'application', 'app', 'data', 'database', 'security', 'module', 'control', 'state'];
+  const leftRank = leftTier ? Math.max(0, tierOrder.indexOf(leftTier)) : tierOrder.length;
+  const rightRank = rightTier ? Math.max(0, tierOrder.indexOf(rightTier)) : tierOrder.length;
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+  return String(left?.name || left?.id).localeCompare(String(right?.name || right?.id));
+}
+
+function drawioNodeDepth(node: any, nodeMap: Map<string, any>): number {
+  let depth = 0;
+  let current = node;
+  const seen = new Set<string>();
+  while (current?.parent && nodeMap.has(current.parent) && !seen.has(current.parent)) {
+    seen.add(current.parent);
+    depth += 1;
+    current = nodeMap.get(current.parent);
+  }
+  return depth;
+}
+
+function compareDrawioLeafNodes(left: any, right: any): number {
+  const leftType = String(left?.type || '');
+  const rightType = String(right?.type || '');
+  const leftName = String(left?.name || left?.id);
+  const rightName = String(right?.name || right?.id);
+  const leftRelatedSg = String(left?.render_hints?.related_security_group || '');
+  const rightRelatedSg = String(right?.render_hints?.related_security_group || '');
+  const leftClusterKey = String(left?.render_hints?.cluster_key || '');
+  const rightClusterKey = String(right?.render_hints?.cluster_key || '');
+  const typeOrder = [
+    'aws_provider',
+    'aws_availability_zones',
+    'terraform_remote_state',
+    'aws_internet_gateway',
+    'aws_nat_gateway',
+    'aws_route_table',
+    'aws_security_group',
+    'aws_security_group_rule',
+    'aws_elb',
+    'aws_lb',
+    'aws_launch_configuration',
+    'aws_autoscaling_group',
+    'aws_db_instance',
+    'aws_rds_instance',
+    'aws_s3_bucket',
+  ];
+  const leftRank = typeOrder.includes(leftType) ? typeOrder.indexOf(leftType) : typeOrder.length;
+  const rightRank = typeOrder.includes(rightType) ? typeOrder.indexOf(rightType) : typeOrder.length;
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+  if (leftClusterKey && rightClusterKey && leftClusterKey !== rightClusterKey) {
+    return leftClusterKey.localeCompare(rightClusterKey);
+  }
+  if (leftClusterKey && !rightClusterKey) {
+    return -1;
+  }
+  if (!leftClusterKey && rightClusterKey) {
+    return 1;
+  }
+  if (leftType === 'aws_security_group' && rightType === 'aws_security_group_rule' && rightRelatedSg.includes(`aws_security_group.${leftName}`)) {
+    return -1;
+  }
+  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group' && leftRelatedSg.includes(`aws_security_group.${rightName}`)) {
+    return 1;
+  }
+  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group_rule' && leftRelatedSg !== rightRelatedSg) {
+    return leftRelatedSg.localeCompare(rightRelatedSg);
+  }
+  return leftName.localeCompare(rightName);
+}
+
+function awsIconCandidatesForResourceType(resourceType: string): string[] {
+  const exactMap: Record<string, string[]> = {
+    aws_provider: [
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Compute_32.png',
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Compute_32.svg',
+    ],
+    aws_vpc: [
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Virtual-private-cloud-VPC_48.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.svg',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Virtual-private-cloud-VPC_48.svg',
+    ],
+    aws_subnet: [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.svg',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.svg',
+    ],
+    aws_region: [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.svg',
+    ],
+    aws_internet_gateway: [
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Internet-Gateway_48.png',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Internet-Gateway_48.svg',
+    ],
+    aws_nat_gateway: [
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_NAT-Gateway_48.png',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_NAT-Gateway_48.svg',
+    ],
+    aws_route_table: [
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-Route-53_Route-Table_48.png',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-Route-53_Route-Table_48.svg',
+    ],
+    aws_availability_zones: [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.svg',
+    ],
+    aws_lb: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.svg',
+    ],
+    aws_elb: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.svg',
+    ],
+    aws_instance: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.svg',
+    ],
+    aws_launch_configuration: [
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/EC2-instance-contents_32.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/EC2-instance-contents_32.svg',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.svg',
+    ],
+    aws_autoscaling_group: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.png',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Auto-Scaling-group_32.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.svg',
+      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Auto-Scaling-group_32.svg',
+    ],
+    aws_rds_instance: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.svg',
+    ],
+    aws_db_instance: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.svg',
+    ],
+    aws_s3_bucket: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg',
+    ],
+    aws_cloudwatch_metric_alarm: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.png',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Management-Governance/Res_Amazon-CloudWatch_Alarm_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg',
+      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Management-Governance/Res_Amazon-CloudWatch_Alarm_48.svg',
+    ],
+    terraform_remote_state: [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg',
+    ],
+    aws_security_group: [
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
+    ],
+    aws_security_group_rule: [
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
+    ],
+  };
+
+  if (exactMap[resourceType]) {
+    return exactMap[resourceType];
+  }
+
+  if (resourceType.startsWith('aws_iam_')) {
+    return [
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
+    ];
+  }
+
+  if (resourceType.includes('cloudwatch')) {
+    return [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg',
+    ];
+  }
+
+  if (resourceType.includes('security_group')) {
+    return [
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
+      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
+    ];
+  }
+
+  if (resourceType.includes('autoscaling')) {
+    return [
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.png',
+      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.svg',
+    ];
+  }
+
+  return [];
 }
 
 function normalizeFontFamily(input: string): string {
