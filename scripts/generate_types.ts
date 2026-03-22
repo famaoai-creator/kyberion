@@ -57,6 +57,26 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/src/types/test-case-adf.ts',
   },
   {
+    schemaPath: 'knowledge/public/schemas/music-generation-adf.schema.json',
+    outputPath: 'libs/core/src/types/music-generation-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/image-generation-adf.schema.json',
+    outputPath: 'libs/core/src/types/image-generation-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/video-generation-adf.schema.json',
+    outputPath: 'libs/core/src/types/video-generation-adf.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/generation-job.schema.json',
+    outputPath: 'libs/core/src/types/generation-job.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/generation-schedule.schema.json',
+    outputPath: 'libs/core/src/types/generation-schedule.ts',
+  },
+  {
     schemaPath: 'knowledge/public/schemas/proposal-brief.schema.json',
     outputPath: 'libs/core/src/types/proposal-brief.ts',
   },

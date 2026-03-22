@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generation Schedule",
+  "description": "Schedule contract for recurring image, video, music, or workflow generation jobs.",
+  "type": "object",
+  "required": [
+    "kind",
+    "schedule_id",
+    "enabled",
+    "trigger",
+    "job_template",
+    "execution_policy",
+    "created_at"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "generation-schedule"
+    },
+    "schedule_id": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["cron", "interval", "event"]
+        },
+        "cron": {
+          "type": "string"
+        },
+        "interval_ms": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "event_name": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "job_template": {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["generate_image", "generate_video", "generate_music", "run_workflow"]
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "execution_policy": {
+      "type": "object",
+      "required": ["concurrency"],
+      "properties": {
+        "concurrency": {
+          "type": "string",
+          "enum": ["allow", "skip_if_running", "replace_running"]
+        },
+        "retry_policy": {
+          "type": "object",
+          "properties": {
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "backoff_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": true
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "delivery_policy": {
+      "type": "object",
+      "properties": {
+        "artifact_dir": {
+          "type": "string"
+        },
+        "latest_alias_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "last_job_id": {
+      "type": "string"
+    },
+    "last_job_status": {
+      "type": "string"
+    },
+    "last_submitted_at": {
+      "type": "string"
+    },
+    "last_completed_at": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

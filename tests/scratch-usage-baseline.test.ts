@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
@@ -16,6 +16,7 @@ describe('Governed temp hierarchy', () => {
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => /\.(ts|tsx|js|jsx|mjs|cjs|md|json)$/.test(relPath))
+      .filter((relPath) => safeExistsSync(path.join(rootDir, relPath)))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
         return content.includes('scratch/');
