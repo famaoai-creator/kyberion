@@ -1,0 +1,40 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/orchestrator/image-bundle-to-execution-plan-set.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_json",
+      "params": {
+        "path": "libs/actuators/orchestrator-actuator/examples/image-generation-pipeline-bundle.json",
+        "export_as": "pipeline_bundle"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "pipeline_bundle_to_execution_plan_set",
+      "params": {
+        "from": "pipeline_bundle",
+        "output_dir": "active/shared/runtime/generated-pipelines/image-generation-demo",
+        "export_as": "execution_plan_set"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_execution_plan_set",
+      "params": {
+        "from": "execution_plan_set"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "from": "execution_plan_set",
+        "path": "active/shared/tmp/orchestrator/image-execution-plan-set.json"
+      }
+    }
+  ]
+}

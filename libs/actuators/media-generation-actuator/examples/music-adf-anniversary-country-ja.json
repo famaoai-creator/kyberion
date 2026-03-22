@@ -1,0 +1,60 @@
+{
+  "action": "generate_music",
+  "params": {
+    "music_adf": {
+      "kind": "music-generation-adf",
+      "version": "1.0.0",
+      "intent": "15th_wedding_anniversary_song",
+      "style": {
+        "genre": "country",
+        "mood": ["warm", "hopeful", "grateful", "heartfelt"],
+        "vocal": {
+          "presence": true,
+          "gender": "female",
+          "language": "ja",
+          "tone": ["gentle", "mature", "intimate"]
+        }
+      },
+      "composition": {
+        "duration_sec": 180,
+        "bpm": 84,
+        "time_signature": "4",
+        "key": "D major",
+        "structure": ["verse", "pre_chorus", "chorus", "verse", "pre_chorus", "chorus", "bridge", "chorus", "outro"]
+      },
+      "lyrics": {
+        "mode": "provided",
+        "text": "[Verse 1]\n小さな部屋の 白いカーテン\n朝の光に 揺れていたね\n何も持たずに 笑い合ってた\nあの日の二人は 若かったね\n焦げたトースト コーヒーの湯気\n忙しい街を 走り抜けて\n泣いた夜にも 手を離さずに\n今日まで一緒に 来られたんだ\n\n[Pre-Chorus]\n派手な奇跡じゃ なくていいから\n同じ明日を 迎えられたらいい\n\n[Chorus]\n結婚十五年 おめでとう\nしわの数だけ 愛が増えたよ\n風の日も 雨の日も 越えてきた\nあなたとだから ここまで来れた\n古い写真より あたたかい今を\nこれから先も 抱きしめて行こう\n笑って 生きていこう\nゆっくり 生きていこう\nこの広い空の下で\n\n[Verse 2]\n小さな喧嘩 言いすぎた夜\n黙った背中が さみしかった\nそれでも朝に 味噌汁の湯気\nそれが答えと わかっていたよ\n増えてく洗濯 減らない用事\n守るものばかり 増えたけれど\nそれでも隣に あなたがいれば\n普通の毎日が 歌になった\n\n[Pre-Chorus]\n遠い未来まで 見えなくたって\n今日の灯りを つないで行けばいい\n\n[Chorus]\n結婚十五年 ありがとう\n名前を呼ぶたび 愛が深くなる\n悔しい日 迷う日も 越えてきた\nあなたとだから 明日を信じる\n古い約束を 新しく結んで\nこれから先も 並んで歩こう\n笑って 生きていこう\nゆっくり 生きていこう\n同じ夕焼けを見て\n\n[Bridge]\n白い髪が 少し増えても\n歩幅が少し 変わっても\nあなたの隣が わたしの居場所\n何年先でも 変わらないよ\nもしも涙で 前がにじんでも\n肩を寄せれば また歩ける\n今日より明日を 好きになれるように\n二人で歌を つないでいこう\n\n[Chorus]\n結婚十五年 おめでとう\nしわの数だけ 愛が増えたよ\n風の日も 雨の日も 越えてきた\nあなたとだから ここまで来れた\n古い写真より あたたかい今を\nこれから先も 抱きしめて行こう\n笑って 生きていこう\nゆっくり 生きていこう\nこの広い空の下で\n\n[Outro]\nあと十年 その先も きっと\n手をつないで 生きていこう"
+      },
+      "arrangement": {
+        "instruments": ["acoustic_guitar", "harmonica", "pedal_steel"],
+        "mix_traits": ["cinematic_countryside", "intimate", "uplifting"]
+      },
+      "engine": {
+        "provider": "comfyui",
+        "model_family": "ace_step_1_5",
+        "profile": "turbo",
+        "cfg_scale": 2,
+        "temperature": 0.85,
+        "top_p": 0.9,
+        "top_k": 0,
+        "min_p": 0,
+        "generate_audio_codes": true,
+        "models": {
+          "unet_name": "acestep_v1.5_turbo.safetensors",
+          "clip_name1": "qwen_0.6b_ace15.safetensors",
+          "clip_name2": "qwen_1.7b_ace15.safetensors",
+          "vae_name": "ace_1.5_vae.safetensors"
+        }
+      },
+      "output": {
+        "format": "mp3",
+        "filename_prefix": "KyberionAnniversary15Country",
+        "target_path": "active/shared/exports/KyberionAnniversary15Country.mp3",
+        "await_completion": true,
+        "timeout_ms": 1800000,
+        "poll_interval_ms": 5000
+      }
+    }
+  }
+}

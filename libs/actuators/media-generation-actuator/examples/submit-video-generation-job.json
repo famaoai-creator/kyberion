@@ -1,0 +1,46 @@
+{
+  "action": "submit_generation",
+  "params": {
+    "action": "generate_video",
+    "params": {
+      "video_adf": {
+        "kind": "video-generation-adf",
+        "version": "1.0.0",
+        "intent": "country_drive_clip",
+        "prompt": "cinematic driving shot on a country road at sunset",
+        "negative_prompt": "glitch, blurry, distorted",
+        "composition": {
+          "duration_sec": 5,
+          "fps": 24,
+          "aspect_ratio": "16:9"
+        },
+        "engine": {
+          "provider": "comfyui",
+          "workflow_template": "embedded",
+          "base_workflow": {
+            "1": {
+              "class_type": "TextNode",
+              "inputs": {
+                "prompt": "{{prompt}}",
+                "negative_prompt": "{{negative_prompt}}",
+                "duration": "{{duration_sec}}",
+                "fps": "{{fps}}",
+                "seed": "{{seed}}",
+                "filename_prefix": "{{filename_prefix}}"
+              }
+            }
+          }
+        },
+        "output": {
+          "format": "mp4",
+          "filename_prefix": "KyberionDriveClip",
+          "target_path": "active/shared/exports/KyberionDriveClip.mp4"
+        }
+      }
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "backoff_seconds": 30
+    }
+  }
+}
