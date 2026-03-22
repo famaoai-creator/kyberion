@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveIdentityContext } from './authority.js';
-import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult } from './types.js';
+import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult, Authority } from './types.js';
 
 export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
 
@@ -37,6 +37,34 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   return firstSegment === '..';
 }
 
+function loadPolicy(): any | null {
+  try {
+    if (rawExistsSync(POLICY_PATH)) {
+      return JSON.parse(rawReadTextFile(POLICY_PATH));
+    }
+  } catch (_) {}
+  return null;
+}
+
+function expandMissionPath(pattern: string, missionId?: string): string {
+  return pattern.replace('${MISSION_ID}', missionId || 'NONE');
+}
+
+function matchesAny(relativePath: string, patterns: string[] = [], missionId?: string): boolean {
+  return patterns.some((p) => pathStartsWith(relativePath, expandMissionPath(p, missionId)));
+}
+
+function hasAuthorityAccess(
+  policy: any,
+  authorities: Authority[],
+  relativePath: string,
+  missionId?: string,
+  accessType: 'allow_read' | 'allow_write' = 'allow_write',
+): boolean {
+  const authorityPermissions = policy.authority_permissions || {};
+  return authorities.some((authority) => matchesAny(relativePath, authorityPermissions[authority]?.[accessType], missionId));
+}
+
 /**
  * Validates write permission based on security-policy.json ADF and Persona.
  */
@@ -50,45 +78,35 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const { persona: currentPersona } = resolveIdentityContext();
-
-  // 2. Load Policy
-  let policy: any = null;
-  try {
-    if (rawExistsSync(POLICY_PATH)) {
-      policy = JSON.parse(rawReadTextFile(POLICY_PATH));
-    }
-  } catch (_) {}
-
+  const { persona: currentPersona, role: currentRole, authorities } = resolveIdentityContext();
+  const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
-  // 3. Evaluate (Explicit Allow > Implicit Deny)
-
-  // A. Default Allow — sandbox paths
-  const defaultAllow = policy.default_allow.map((p: string) =>
-    p.replace('${MISSION_ID}', currentMission || 'NONE')
-  );
+  const defaultAllow = (policy.default_allow || []).map((p: string) => expandMissionPath(p, currentMission));
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
-  // B. Persona-based Allow (authoritative — overrides tier restrictions)
-  const roleRules = policy.role_permissions[currentPersona];
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
+  if (authorities.includes('SUDO')) return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write')) return { allowed: true };
 
-  // C. Architect Privilege (broad knowledge access)
-  if (currentPersona === 'ecosystem_architect' && pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
+  const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
+  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, currentMission)))) {
+    return { allowed: true };
+  }
 
-  // D. Tier-based Restrictions (fallback deny)
+  const personaRules = policy.persona_permissions?.[currentPersona];
+  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, currentMission)))) {
+    return { allowed: true };
+  }
+
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (pathStartsWith(relativePath, 'knowledge/confidential')) {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
-
-  // E. Default Deny
   return {
     allowed: false,
-    reason: `[POLICY_VIOLATION] Persona '${currentPersona}' is NOT authorized to write to '${relativePath}'.`
+    reason: `[POLICY_VIOLATION] Persona '${currentPersona}' with authority role '${currentRole || 'unknown'}' is NOT authorized to write to '${relativePath}'.`
   };
 }
 
@@ -121,22 +139,24 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: true };
   }
 
-  let policy: any = null;
-  try {
-    if (rawExistsSync(POLICY_PATH)) {
-      policy = JSON.parse(rawReadTextFile(POLICY_PATH));
-    }
-  } catch (_) {}
-
+  const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
-  const { persona: currentPersona } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities } = resolveIdentityContext();
 
-  const roleRules = policy.role_permissions[currentPersona];
-  if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
+  if (authorities.includes('SUDO')) return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read')) return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write')) return { allowed: true };
 
-  if (['ecosystem_architect', 'sovereign', 'sovereign_concierge', 'mission_controller'].includes(currentPersona)) {
+  const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
+  if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+
+  const personaRules = policy.persona_permissions?.[currentPersona];
+  if (personaRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+
+  if (['ecosystem_architect', 'sovereign'].includes(currentPersona)) {
     return { allowed: true };
   }
 

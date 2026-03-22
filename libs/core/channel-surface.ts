@@ -9,6 +9,7 @@ import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedAr
 import { a2aBridge } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
 import { buildMissionTeamView, loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
+import { buildExecutionEnv, withExecutionContext } from './authority.js';
 
 type SurfaceRole = GovernedArtifactRole;
 
@@ -210,17 +211,7 @@ export interface SlackOnboardingActionPayload {
 }
 
 function withSurfaceRole<T>(role: SurfaceRole, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
-  process.env.MISSION_ROLE = role;
-  try {
-    return fn();
-  } finally {
-    if (previousRole === undefined) {
-      delete process.env.MISSION_ROLE;
-    } else {
-      process.env.MISSION_ROLE = previousRole;
-    }
-  }
+  return withExecutionContext(role, fn);
 }
 
 function ensureDirAs(role: SurfaceRole, logicalPath: string): string {
@@ -1063,7 +1054,7 @@ export async function issueSlackMissionFromProposal(params: {
   const tier = params.proposal.tier || 'public';
   const missionType = params.proposal.mission_type || 'development';
   const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const env = buildExecutionEnv(process.env, 'mission_controller');
 
   const startOutput = safeExec(
     'node',
@@ -1131,7 +1122,7 @@ export async function issueChronosMissionFromProposal(params: {
   const tier = params.proposal.tier || 'public';
   const missionType = params.proposal.mission_type || 'development';
   const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
+  const env = buildExecutionEnv(process.env, 'mission_controller');
 
   const startOutput = safeExec(
     'node',
