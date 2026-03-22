@@ -106,6 +106,12 @@ interface OperatorResponsePreview {
   text: string;
 }
 
+const APPROVED_PACKET_COMMAND_SCRIPTS = new Set([
+  'dist/scripts/cli.js',
+  'dist/scripts/mission_controller.js',
+  'dist/scripts/run_pipeline.js',
+]);
+
 export interface ActuatorRecord {
   name: string;
   path: string;
@@ -124,6 +130,7 @@ interface WebAppProfileIndexRecord {
 }
 
 const rootDir = pathResolver.rootDir();
+const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
 const vocabularyPath = pathResolver.knowledge('public/orchestration/user-facing-vocabulary.json');
 const indexCandidates = [
   pathResolver.knowledge('public/orchestration/global_actuator_index.json'),
@@ -609,11 +616,49 @@ function printResponsePreview(preview: OperatorResponsePreview) {
 
 function loadPacketFile(targetPath: string): { kind?: string } {
   const resolvedPath = path.resolve(rootDir, targetPath);
+  assertPacketPathAllowed(resolvedPath);
   if (!safeExistsSync(resolvedPath)) {
     throw new Error(`Packet file not found: ${targetPath}`);
   }
   const content = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
   return JSON.parse(content) as { kind?: string };
+}
+
+function isPathWithin(basePath: string, targetPath: string): boolean {
+  const relative = path.relative(basePath, targetPath);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+export function assertPacketPathAllowed(resolvedPath: string): void {
+  if (resolvedPath === ORCHESTRATOR_PACKET_DIR || isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath)) {
+    return;
+  }
+  throw new Error(`Packet path must stay within ${path.relative(rootDir, ORCHESTRATOR_PACKET_DIR)}.`);
+}
+
+export function assertApprovedNextActionCommand(command: string): void {
+  const [bin, ...args] = tokenizeSuggestedCommand(command);
+  if (bin !== 'node') {
+    throw new Error(`Only node-based packet commands are allowed. Received: ${bin || 'empty'}`);
+  }
+  const script = args[0];
+  if (!script || script.startsWith('-')) {
+    throw new Error('Packet commands must target an approved dist/scripts entrypoint.');
+  }
+  if (!APPROVED_PACKET_COMMAND_SCRIPTS.has(script)) {
+    throw new Error(`Packet command script is not approved: ${script}`);
+  }
+}
+
+export function assertApprovedPipelinePath(pipelinePath: string): void {
+  const resolvedPath = path.resolve(rootDir, pipelinePath);
+  const allowed = (
+    isPathWithin(path.join(rootDir, 'pipelines'), resolvedPath) ||
+    isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath)
+  );
+  if (!allowed || path.extname(resolvedPath) !== '.json') {
+    throw new Error(`Pipeline path is not approved: ${pipelinePath}`);
+  }
 }
 
 function printInteractionPacketFile(targetPath: string) {
@@ -725,6 +770,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
   let failureSummary: string | undefined;
   try {
     if (action.suggested_command) {
+      assertApprovedNextActionCommand(action.suggested_command);
       const [command, ...args] = tokenizeSuggestedCommand(action.suggested_command);
       if (!command) {
         throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
@@ -734,6 +780,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
       executedVia = 'command';
       executedTarget = action.suggested_command;
     } else if (action.suggested_pipeline_path) {
+      assertApprovedPipelinePath(action.suggested_pipeline_path);
       console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
       output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path], {
         cwd: rootDir,
@@ -777,6 +824,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
   console.log(`Outcome artifact: ${outcomePath}`);
   if (packet.kind === 'operator-interaction-packet' && packet.refresh_command && packet.refresh_packet_path) {
     console.log('\nRefreshing status packet...\n');
+    assertApprovedNextActionCommand(packet.refresh_command);
     const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
     if (!refreshCommand) {
       throw new Error('refresh_command is empty.');
