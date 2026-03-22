@@ -1,0 +1,118 @@
+{
+  "pattern_id": "PPTX-VISUAL-ROADMAP-02",
+  "category": "strategic",
+  "target_audience": "Stakeholders, Project Teams",
+  "description": "A visual timeline roadmap rendered directly using native PPTX shapes.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "Title Slide",
+      "Visual Timeline"
+    ],
+    "color_palette": "corporate-standard"
+  },
+  "content_data": [
+    {
+      "slide": 1,
+      "title": "Kyberion Strategic Roadmap",
+      "subtitle": "Native Visual Presentation",
+      "body": "Automatically generated with native PPTX shapes."
+    },
+    {
+      "slide": 2,
+      "title": "2026 High-Level Timeline",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 2.0, "y": 1.5, "w": 2.0, "h": 0.4 },
+          "text": "Q1 2026",
+          "style": { "fill": "E2E8F0", "color": "1E293B", "fontSize": 14, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 4.0, "y": 1.5, "w": 2.0, "h": 0.4 },
+          "text": "Q2 2026",
+          "style": { "fill": "CBD5E1", "color": "1E293B", "fontSize": 14, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 6.0, "y": 1.5, "w": 2.0, "h": 0.4 },
+          "text": "Q3 2026",
+          "style": { "fill": "E2E8F0", "color": "1E293B", "fontSize": 14, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 8.0, "y": 1.5, "w": 1.5, "h": 0.4 },
+          "text": "Q4 2026",
+          "style": { "fill": "CBD5E1", "color": "1E293B", "fontSize": 14, "bold": true, "align": "center", "valign": "middle" }
+        },
+        
+        {
+          "type": "text",
+          "pos": { "x": 0.5, "y": 2.2, "w": 1.5, "h": 0.4 },
+          "text": "Infrastructure",
+          "style": { "fontSize": 12, "bold": true, "align": "right", "valign": "middle", "color": "334155" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 2.0, "y": 2.2, "w": 1.3, "h": 0.35 },
+          "text": "Setup",
+          "style": { "fill": "3B82F6", "color": "FFFFFF", "fontSize": 12, "align": "center", "valign": "middle" }
+        },
+        
+        {
+          "type": "text",
+          "pos": { "x": 0.5, "y": 2.8, "w": 1.5, "h": 0.4 },
+          "text": "Core API",
+          "style": { "fontSize": 12, "bold": true, "align": "right", "valign": "middle", "color": "334155" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 3.0, "y": 2.8, "w": 1.5, "h": 0.35 },
+          "text": "Phase 1",
+          "style": { "fill": "10B981", "color": "FFFFFF", "fontSize": 12, "align": "center", "valign": "middle" }
+        },
+
+        {
+          "type": "text",
+          "pos": { "x": 0.5, "y": 3.4, "w": 1.5, "h": 0.4 },
+          "text": "Beta Launch",
+          "style": { "fontSize": 12, "bold": true, "align": "right", "valign": "middle", "color": "334155" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 4.5, "y": 3.4, "w": 1.0, "h": 0.35 },
+          "text": "Beta",
+          "style": { "fill": "F59E0B", "color": "FFFFFF", "fontSize": 12, "align": "center", "valign": "middle" }
+        },
+
+        {
+          "type": "text",
+          "pos": { "x": 0.5, "y": 4.0, "w": 1.5, "h": 0.4 },
+          "text": "Global Release",
+          "style": { "fontSize": 12, "bold": true, "align": "right", "valign": "middle", "color": "334155" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.5, "y": 4.0, "w": 2.5, "h": 0.35 },
+          "text": "V1.0 Rollout",
+          "style": { "fill": "8B5CF6", "color": "FFFFFF", "fontSize": 12, "align": "center", "valign": "middle" }
+        }
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-roadmap-visual",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "corporate-light"
+  }
+}

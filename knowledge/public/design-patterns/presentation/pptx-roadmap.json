@@ -1,0 +1,67 @@
+{
+  "pattern_id": "PPTX-ROADMAP-01",
+  "category": "strategic",
+  "target_audience": "Stakeholders, Project Teams, Executive Sponsors",
+  "description": "A comprehensive, slide-based strategic roadmap designed for PowerPoint presentations. Focuses on quarterly milestones, deliverables, and high-level strategy.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Title Slide",
+      "Executive Summary & Vision",
+      "H1 Roadmap (Q1-Q2)",
+      "H2 Roadmap (Q3-Q4)",
+      "Resource Allocation & Risks",
+      "Next Steps"
+    ],
+    "color_palette": "corporate-standard"
+  },
+  "content_data": [
+    {
+      "slide": 1,
+      "title": "Project Roadmap",
+      "subtitle": "Strategic Vision and Milestones",
+      "body": "Presented by Kyberion Autonomous Agent"
+    },
+    {
+      "slide": 2,
+      "title": "Executive Summary",
+      "subtitle": "High-Level Goals",
+      "body": [
+        "1. Accelerate time-to-market for key features",
+        "2. Improve system reliability and performance",
+        "3. Expand market reach through new integrations"
+      ]
+    },
+    {
+      "slide": 3,
+      "title": "H1 Roadmap (Q1-Q2)",
+      "subtitle": "Foundation and Core Features",
+      "body": [
+        "Q1: Infrastructure Setup, Initial Core API (Phase 1)",
+        "Q2: Beta Launch, User Feedback Integration, UI Refinements"
+      ],
+      "visual": "A timeline graphic spanning two quarters with key milestone markers."
+    },
+    {
+      "slide": 4,
+      "title": "H2 Roadmap (Q3-Q4)",
+      "subtitle": "Scaling and Ecosystem",
+      "body": [
+        "Q3: Global Expansion, Multi-language Support, 3rd Party Integrations",
+        "Q4: Advanced Analytics, AI Feature Rollout, End-of-year Review"
+      ],
+      "visual": "A timeline graphic for Q3 and Q4 highlighting major releases."
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-roadmap-standard",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "corporate-light",
+    "styles": {
+      "font_family": "Arial",
+      "title_size": "44",
+      "body_size": "24"
+    }
+  }
+}
