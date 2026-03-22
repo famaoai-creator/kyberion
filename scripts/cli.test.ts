@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { classifyNextActionExecutionOutcome, extractBranchArg, main, normalizeActuators, searchActuators } from './cli.js';
+import {
+  assertApprovedNextActionCommand,
+  assertApprovedPipelinePath,
+  assertPacketPathAllowed,
+  classifyNextActionExecutionOutcome,
+  extractBranchArg,
+  main,
+  normalizeActuators,
+  searchActuators,
+} from './cli.js';
 
 describe('Kyberion CLI helpers', () => {
   it('normalizes compact actuator index entries', () => {
@@ -84,6 +93,21 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('example-web-login-guarded (browser)');
     expect(output).toContain('Example Web Login + Guarded Routes');
     expect(output).toContain('Path: knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
+  });
+
+  it('allows only approved packet commands', () => {
+    expect(() => assertApprovedNextActionCommand('node dist/scripts/mission_controller.js status MSN-1')).not.toThrow();
+    expect(() => assertApprovedNextActionCommand('bash -lc "echo hacked"')).toThrow('Only node-based packet commands are allowed');
+    expect(() => assertApprovedNextActionCommand('node -e "console.log(1)"')).toThrow('approved dist/scripts entrypoint');
+    expect(() => assertApprovedNextActionCommand('node dist/scripts/archive_missions.js')).toThrow('not approved');
+  });
+
+  it('allows only approved packet and pipeline paths', () => {
+    expect(() => assertPacketPathAllowed('/Users/famao/kyberion/active/shared/tmp/orchestrator/test-packet.json')).not.toThrow();
+    expect(() => assertPacketPathAllowed('/Users/famao/kyberion/tmp/evil.json')).toThrow('Packet path must stay within');
+    expect(() => assertApprovedPipelinePath('pipelines/web-session-handoff-runner.json')).not.toThrow();
+    expect(() => assertApprovedPipelinePath('active/shared/tmp/orchestrator/status-packet.json')).not.toThrow();
+    expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow('Pipeline path is not approved');
   });
 });
 
