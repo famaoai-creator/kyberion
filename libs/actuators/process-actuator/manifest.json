@@ -1,0 +1,12 @@
+{
+  "actuator_id": "process-actuator",
+  "version": "1.0.0",
+  "description": "Managed process lifecycle actuator backed by the runtime supervisor",
+  "contract_schema": "schemas/process-action.schema.json",
+  "capabilities": [
+    { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "stop", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "status", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}

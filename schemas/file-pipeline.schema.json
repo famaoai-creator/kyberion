@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "File Pipeline ADF",
+  "description": "Pipeline envelope for file-actuator. Detailed step vocabulary is actuator-owned.",
+  "type": "object",
+  "required": ["action", "steps"],
+  "properties": {
+    "action": { "const": "pipeline" },
+    "context": { "type": "object" },
+    "options": {
+      "type": "object",
+      "properties": {
+        "max_steps": { "type": "integer" },
+        "timeout_ms": { "type": "integer" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "op", "params"],
+        "properties": {
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "op": {
+            "enum": [
+              "read",
+              "list",
+              "stat",
+              "exists",
+              "search",
+              "tail",
+              "regex_replace",
+              "json_parse",
+              "path_join",
+              "write",
+              "append",
+              "delete",
+              "mkdir",
+              "copy",
+              "move",
+              "if",
+              "while"
+            ]
+          },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

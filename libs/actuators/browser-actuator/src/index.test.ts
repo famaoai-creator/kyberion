@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     pageHandlers.set(label, handlers);
     let currentUrl = initialUrl;
     let currentTitle = initialTitle;
+    const videoPath = `${process.cwd()}/evidence/browser/videos/${label}.webm`;
     return {
       goto: vi.fn(async (url: string) => { currentUrl = url; }),
       click: vi.fn(async () => undefined),
@@ -42,6 +43,9 @@ const mocks = vi.hoisted(() => {
       }),
       title: vi.fn(async () => currentTitle),
       url: vi.fn(() => currentUrl),
+      video: vi.fn(() => ({
+        path: vi.fn(async () => videoPath),
+      })),
       on: vi.fn((event: string, handler: Function) => {
         handlers[event] = handler;
       }),
@@ -291,6 +295,60 @@ describe('browser-actuator v3 contract', () => {
     });
 
     expect(mocks.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes recorded video artifacts for test-scoped sessions', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-video',
+      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      options: {
+        headless: true,
+        record_video: true,
+        video_artifact_dir: 'active/shared/tmp/browser-videos/browser-video',
+      },
+    });
+
+    expect(mocks.launchPersistentContext).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        recordVideo: {
+          dir: path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video'),
+        },
+      }),
+    );
+    expect(result.context.video_output_dir).toBe(
+      path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video'),
+    );
+    expect(result.context.video_recording_pending).toBe(false);
+    expect(result.context.recorded_videos).toEqual([
+      path.join(process.cwd(), 'evidence/browser/videos', 'tab-1.webm'),
+    ]);
+  });
+
+  it('marks video recording as pending for leased sessions kept alive after the test flow', async () => {
+    const { handleAction } = await import('./index');
+    const videoOutputDir = 'active/shared/tmp/browser-videos/browser-video-lease';
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-video-lease',
+      steps: [{ type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } }],
+      options: {
+        headless: true,
+        record_video: true,
+        lease_ms: 60_000,
+        video_artifact_dir: videoOutputDir,
+      },
+    });
+
+    expect(result.context.video_recording_pending).toBe(true);
+    expect(result.context.recorded_videos).toEqual([]);
+    expect(result.context.video_output_dir).toBe(
+      path.resolve(process.cwd(), videoOutputDir),
+    );
   });
 
   it('configures a virtual passkey authenticator and inspects stored credentials', async () => {

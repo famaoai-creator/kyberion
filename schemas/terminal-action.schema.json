@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Terminal Actuator Request",
+  "type": "object",
+  "required": ["action", "params"],
+  "properties": {
+    "action": { "enum": ["spawn", "poll", "write", "kill", "list", "resize"] },
+    "params": { "type": "object" }
+  }
+}

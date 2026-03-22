@@ -1,0 +1,40 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "Retired physical-bridge replacement: browser and system actions are expressed directly as ADF."
+      }
+    },
+    {
+      "op": "browser:goto",
+      "params": {
+        "session_id": "physical-sequence-demo",
+        "url": "https://example.com",
+        "waitUntil": "domcontentloaded"
+      }
+    },
+    {
+      "op": "browser:snapshot",
+      "params": {
+        "session_id": "physical-sequence-demo",
+        "export_as": "page_snapshot"
+      }
+    },
+    {
+      "op": "browser:screenshot",
+      "params": {
+        "session_id": "physical-sequence-demo",
+        "path": "active/shared/tmp/browser/physical-sequence-demo.png",
+        "export_as": "page_screenshot"
+      }
+    },
+    {
+      "op": "system:notify",
+      "params": {
+        "text": "Browser portion complete for physical-sequence-demo."
+      }
+    }
+  ]
+}

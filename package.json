@@ -66,8 +66,6 @@
     "system:upgrade:execute": "node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-execute.json",
     "init": "npm run init-wizard",
     "init-wizard": "node dist/scripts/init_wizard.js",
-    "vision:start": "node dist/presence/sensors/visual-buffer-daemon.js &",
-    "vision:stop": "pkill -f visual-buffer-daemon",
     "bootstrap": "pnpm build && node dist/scripts/surface_runtime.js --action reconcile",
     "benchmark": "node dist/scripts/benchmark.js",
     "plugin": "node dist/scripts/plugin-manager.js",
@@ -82,11 +80,10 @@
     "project-os:init": "tsx scripts/generate_project_os.ts",
     "vault:mount": "node dist/scripts/vault_mount.js",
     "prepare": "husky",
-    "mirror": "node tools/chronos-mirror/bridge.cjs & cd tools/chronos-mirror && pnpm run dev",
     "nerve:pulse": "node dist/scripts/pulse_aggregator.js",
-    "nerve:start": "launchctl load -w ~/Library/LaunchAgents/kyberion.*.plist",
-    "nerve:stop": "launchctl unload -w ~/Library/LaunchAgents/kyberion.*.plist",
-    "nerve:status": "cat active/shared/runtime/pulse.json | jq ."
+    "nerve:start": "pnpm surfaces:reconcile",
+    "nerve:stop": "pnpm surfaces:stop",
+    "nerve:status": "pnpm surfaces:status"
   },
   "lint-staged": {
     "knowledge/**/*.md": [

@@ -27,6 +27,7 @@ describe('executeServicePreset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
+    mocks.resolveServiceBinding.mockReturnValue({ accessToken: 'test-token' });
   });
 
   it('falls back to API when CLI binary is missing', async () => {
@@ -180,6 +181,7 @@ describe('executeServicePreset', () => {
       }
       if (filePath.includes('p.json')) {
         return JSON.stringify({
+          auth_strategy: 'Bearer',
           operations: {
             create_page: {
               type: 'api',
@@ -208,6 +210,62 @@ describe('executeServicePreset', () => {
       headers: expect.objectContaining({
         Authorization: 'Bearer test-token',
       }),
+    }));
+  });
+
+  it('builds basic auth headers from client credentials and encodes form payloads', async () => {
+    mocks.resolveServiceBinding.mockReturnValue({
+      serviceId: 'canva',
+      clientId: 'client-id',
+      clientSecret: 'cnvca-test-secret',
+    });
+
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-endpoints.json')) {
+        return JSON.stringify({
+          services: {
+            canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
+          },
+        });
+      }
+      if (filePath.includes('canva.json')) {
+        return JSON.stringify({
+          auth_strategy: 'Bearer',
+          operations: {
+            exchange_oauth_code: {
+              type: 'api',
+              path: 'oauth/token',
+              method: 'POST',
+              auth_strategy: 'Basic',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              payload_template: {
+                grant_type: 'authorization_code',
+                code: '{{code}}',
+                code_verifier: '{{code_verifier}}',
+              },
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ access_token: 'new-token' });
+
+    await executeServicePreset('canva', 'exchange_oauth_code', {
+      code: 'auth-code',
+      code_verifier: 'verifier',
+    }, 'secret-guard');
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://api.canva.com/rest/v1/oauth/token',
+      headers: expect.objectContaining({
+        Authorization: `Basic ${Buffer.from('client-id:cnvca-test-secret', 'utf8').toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }),
+      data: 'grant_type=authorization_code&code=auth-code&code_verifier=verifier',
     }));
   });
 });

@@ -15,7 +15,7 @@ last_updated: 2026-03-06
 ## 2. Separate Signer Architecture (SSA)
 - **Private Key Isolation**: 秘密鍵は主権者の物理デバイス（Secure Enclave）に隔離され、CLI 環境には一切露出しない。
 - **Passkey Integration**: FIDO2/WebAuthn 標準を採用し、Touch ID/Face ID を署名のトリガーとする。
-- **Physical Bridge**: `presence/bridge/approvals/` を介した非同期通信。
+- **Approval Runtime Buffer**: `active/shared/approvals/` を介した非同期通信。
 
 ## 3. Dynamic Guardrails (Reflex)
 - **Risk-Based Authentication**: リスクレベルおよび金額に基づき、自動承認、CLI承認、パスキー承認を動的に切り替える。

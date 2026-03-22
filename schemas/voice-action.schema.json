@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Voice Actuator Request",
+  "description": "Single voice request or lightweight voice pipeline envelope.",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "enum": ["speak_local", "list_voices"] },
+        "params": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["action", "params"],
+            "properties": {
+              "action": { "enum": ["speak_local", "list_voices"] },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

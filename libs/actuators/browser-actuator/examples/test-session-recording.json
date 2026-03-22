@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "session_id": "browser-test-session-recording",
+  "options": {
+    "headless": false,
+    "record_trace": true,
+    "record_video": true,
+    "video_artifact_dir": "active/shared/tmp/browser-videos/browser-test-session-recording"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "initial_snapshot"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/browser/browser-test-session-recording.png",
+        "fullPage": true,
+        "export_as": "final_screenshot"
+      }
+    }
+  ]
+}

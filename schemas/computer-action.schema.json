@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Kyberion Unified Computer Action (KUCA) v1.0",
-  "description": "ADF for controlling Browser, System, Camera, and Voice using OpenAI ComputerAction style.",
+  "title": "Kyberion Unified Computer Action (KUCA) v1.0 [Deprecated]",
+  "description": "Deprecated legacy schema from the retired physical-bridge wrapper. Prefer direct ADF pipelines over browser-actuator, system-actuator, and media-generation-actuator.",
   "type": "object",
   "required": ["actions"],
   "properties": {

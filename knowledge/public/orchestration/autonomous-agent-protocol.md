@@ -22,7 +22,7 @@ This protocol extends the core Kyberion Agent identity with autonomous execution
 - **Checks**:
   - `git status`: Are there unintended changes?
   - `dependency-lifeline`: Did the change introduce an outdated pattern?
-  - `security-scanner`: Is the new code secure?
+  - `code-actuator` / `secret-actuator`: Is the new code secure and free of secret leakage paths?
 - **Action**: If an improvement is found, propose it to the user: "Task complete. I also noticed [X], would you like me to fix it?"
 
 ## 3. Recursive Task Decomposition (再帰的タスク分解)

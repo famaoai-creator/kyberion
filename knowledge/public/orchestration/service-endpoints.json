@@ -36,6 +36,10 @@
     },
     "voice": {
       "preset_path": "knowledge/public/orchestration/service-presets/voice.json"
+    },
+    "canva": {
+      "base_url": "https://api.canva.com/rest/v1",
+      "preset_path": "knowledge/public/orchestration/service-presets/canva.json"
     }
   }
 }

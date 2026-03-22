@@ -54,7 +54,7 @@ last_updated: 2026-03-06
 ### 5.1 Nexus Daemon による統合
 - **実装**: `presence/bridge/nexus-daemon.ts`
 - **フロー**:
-    1.  **Stimulus Ingestion**: 外部センサーが `presence/bridge/stimuli.jsonl` に「刺激」を書き込む。
+    1.  **Stimulus Ingestion**: 外部センサーが `presence/bridge/runtime/stimuli.jsonl` に「刺激」を書き込む。
     2.  **Terminal Injection**: Nexus Daemon がアイドル状態のターミナルセッションを特定し、刺激を `[SENSORY_INPUT]` コマンドとして PTY へ直接注入する。
     3.  **Autonomous Execution**: 注入された刺激により AI の思考がトリガーされ、ターミナル上で自律的な処理（スキルの実行等）が開始される。
     4.  **Feedback Mirroring**: 処理結果は mission-local または global observability artifact に書き出され、Nexus Daemon が必要に応じて元のソース（Slack 等）へ送り返す。

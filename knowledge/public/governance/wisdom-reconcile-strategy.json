@@ -3,16 +3,8 @@
     {
       "id": "capabilities-guide-sync",
       "pipeline": [
-        { "type": "capture", "op": "read_json", "params": { "path": "knowledge/public/orchestration/global_actuator_index.json", "export_as": "index_data" } },
-        { "type": "transform", "op": "json_query", "params": { "from": "index_data", "path": "s", "export_as": "actuator_list" } },
-        { "type": "transform", "op": "array_count", "params": { "from": "actuator_list", "where": { "s": "implemented" }, "export_as": "impl_count" } },
-        { "type": "transform", "op": "array_count", "params": { "from": "actuator_list", "export_as": "total_count" } },
-        { "type": "apply", "op": "log", "params": { "message": "Counts: Total={{total_count}}, Impl={{impl_count}}" } },
-        { "type": "capture", "op": "read_file", "params": { "path": "CAPABILITIES_GUIDE.md", "export_as": "guide_content" } },
-        { "type": "transform", "op": "regex_replace", "params": { "from": "guide_content", "pattern": "Total Capabilities: \\d+", "template": "Total Capabilities: {{total_count}}", "export_as": "guide_step1" } },
-        { "type": "transform", "op": "regex_replace", "params": { "from": "guide_step1", "pattern": "Implemented: \\d+", "template": "Implemented: {{impl_count}}", "export_as": "guide_step2" } },
-        { "type": "transform", "op": "regex_replace", "params": { "from": "guide_step2", "pattern": "Last updated: \\d{4}/\\d{1,2}/\\d{1,2}", "template": "Last updated: {{today}}", "export_as": "guide_final" } },
-        { "type": "apply", "op": "write_file", "params": { "path": "CAPABILITIES_GUIDE.md", "from": "guide_final" } }
+        { "type": "capture", "op": "shell", "params": { "cmd": "pnpm exec tsx scripts/sync_component_inventory.ts", "export_as": "sync_output" } },
+        { "type": "apply", "op": "log", "params": { "message": "Catalog synchronized via sync_component_inventory: {{sync_output}}" } }
       ]
     }
   ]
