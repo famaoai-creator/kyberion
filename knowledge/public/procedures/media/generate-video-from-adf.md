@@ -13,10 +13,10 @@ Generate a governed video artifact from a `video-generation-adf` contract while 
 
 - `prompt` / `negative_prompt`: shot intent and exclusions
 - `composition`: duration, fps, aspect ratio
-- `engine`: current implementation is workflow-backed with an embedded template
+- `engine`: use a named `workflow_template` when possible; `embedded` remains as an escape hatch
 - `output`: format, governed target path, and optional polling behavior
 
-Current implementation hydrates typed placeholders into a workflow template, then submits the resolved workflow to ComfyUI.
+Current implementation hydrates typed placeholders into a named or embedded workflow template, then submits the resolved workflow to ComfyUI.
 
 ## 4. Execution
 Example inputs:

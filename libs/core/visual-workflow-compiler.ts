@@ -9,6 +9,32 @@ function seedOrRandom(seed?: number): number {
   return Number.isInteger(seed) ? Number(seed) : Math.floor(Date.now() % 2147483647);
 }
 
+function getVideoWorkflowTemplate(templateName: string): Record<string, any> {
+  if (templateName === 'basic_text_clip') {
+    return {
+      '1': {
+        class_type: 'TextNode',
+        inputs: {
+          prompt: '{{prompt}}',
+          negative_prompt: '{{negative_prompt}}',
+          duration: '{{duration_sec}}',
+          fps: '{{fps}}',
+          seed: '{{seed}}',
+        },
+      },
+      '2': {
+        class_type: 'SaveVideo',
+        inputs: {
+          filename_prefix: '{{filename_prefix}}',
+          format: '{{format}}',
+          frames: ['1', 0],
+        },
+      },
+    };
+  }
+  throw new Error(`Unsupported video workflow_template: ${templateName}`);
+}
+
 export function compileImageGenerationADF(adf: KyberionImageGenerationADF) {
   const checkpoint = adf.engine?.checkpoint || 'sd_xl_turbo_1.0_fp16.safetensors';
   const filenamePrefix = adf.output.filename_prefix || slugify(adf.intent || 'image-generation');
@@ -46,10 +72,15 @@ export function compileImageGenerationADF(adf: KyberionImageGenerationADF) {
 }
 
 export function compileVideoGenerationADF(adf: KyberionVideoGenerationADF) {
-  if (adf.engine.workflow_template !== 'embedded' || !adf.engine.base_workflow) {
-    throw new Error('video-generation-adf currently requires engine.workflow_template="embedded" and engine.base_workflow');
+  const template =
+    adf.engine.workflow_template === 'embedded'
+      ? adf.engine.base_workflow
+      : getVideoWorkflowTemplate(adf.engine.workflow_template);
+  if (!template) {
+    throw new Error('video-generation-adf currently requires either a supported named workflow_template or engine.base_workflow for embedded templates');
   }
-  const workflow = JSON.parse(JSON.stringify(adf.engine.base_workflow));
+  const filenamePrefix = adf.output.filename_prefix || slugify(adf.intent || 'video-generation');
+  const workflow = JSON.parse(JSON.stringify(template));
   const replace = (value: any): any => {
     if (typeof value === 'string') {
       return value
@@ -58,7 +89,8 @@ export function compileVideoGenerationADF(adf: KyberionVideoGenerationADF) {
         .replace(/{{\s*duration_sec\s*}}/g, String(adf.composition.duration_sec))
         .replace(/{{\s*fps\s*}}/g, String(adf.composition.fps || 24))
         .replace(/{{\s*seed\s*}}/g, String(seedOrRandom(adf.engine.seed)))
-        .replace(/{{\s*filename_prefix\s*}}/g, adf.output.filename_prefix || slugify(adf.intent || 'video-generation'));
+        .replace(/{{\s*filename_prefix\s*}}/g, filenamePrefix)
+        .replace(/{{\s*format\s*}}/g, adf.output.format);
     }
     if (Array.isArray(value)) return value.map(replace);
     if (value && typeof value === 'object') {
@@ -69,9 +101,10 @@ export function compileVideoGenerationADF(adf: KyberionVideoGenerationADF) {
   return {
     workflow: replace(workflow),
     resolved: {
-      filename_prefix: adf.output.filename_prefix || slugify(adf.intent || 'video-generation'),
+      filename_prefix: filenamePrefix,
       duration_sec: adf.composition.duration_sec,
       fps: adf.composition.fps || 24,
+      workflow_template: adf.engine.workflow_template,
     },
   };
 }

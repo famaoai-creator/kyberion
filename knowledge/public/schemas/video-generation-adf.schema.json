@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Kyberion Video Generation ADF",
-  "description": "Contract for video generation requests. Current implementation supports workflow-backed templates with typed parameters.",
+  "description": "Contract for video generation requests. Supports named workflow templates and embedded templates with typed parameters.",
   "type": "object",
   "required": ["kind", "version", "prompt", "composition", "engine", "output"],
   "properties": {
@@ -25,7 +25,7 @@
       "required": ["provider", "workflow_template"],
       "properties": {
         "provider": { "type": "string", "default": "comfyui" },
-        "workflow_template": { "type": "string", "enum": ["embedded"] },
+        "workflow_template": { "type": "string", "enum": ["embedded", "basic_text_clip"] },
         "base_workflow": { "type": "object" },
         "seed": { "type": "integer" }
       },

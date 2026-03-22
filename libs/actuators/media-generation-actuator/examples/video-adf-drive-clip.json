@@ -14,20 +14,7 @@
       },
       "engine": {
         "provider": "comfyui",
-        "workflow_template": "embedded",
-        "base_workflow": {
-          "1": {
-            "class_type": "TextNode",
-            "inputs": {
-              "prompt": "{{prompt}}",
-              "negative_prompt": "{{negative_prompt}}",
-              "duration": "{{duration_sec}}",
-              "fps": "{{fps}}",
-              "seed": "{{seed}}",
-              "filename_prefix": "{{filename_prefix}}"
-            }
-          }
-        }
+        "workflow_template": "basic_text_clip"
       },
       "output": {
         "format": "mp4",
