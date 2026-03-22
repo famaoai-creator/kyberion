@@ -9,10 +9,14 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["base_url"],
         "properties": {
-          "base_url": { "type": "string" }
+          "base_url": { "type": "string" },
+          "preset_path": { "type": "string" }
         },
+        "anyOf": [
+          { "required": ["base_url"] },
+          { "required": ["preset_path"] }
+        ],
         "additionalProperties": true
       }
     }

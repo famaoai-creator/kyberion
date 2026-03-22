@@ -1,0 +1,25 @@
+{
+  "kind": "actuator-pipeline-bundle",
+  "archetype_id": "generative-image-from-adf",
+  "status": "ready",
+  "summary": "Generate a governed country-style cover image from an image-generation-adf contract through media-generation-actuator.",
+  "jobs": [
+    {
+      "id": "generate-country-cover",
+      "title": "Generate Country Cover Image From Image ADF",
+      "actuator": "media-generation-actuator",
+      "template_path": "libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json",
+      "recommended_procedure": "knowledge/public/procedures/media/generate-image-from-adf.md",
+      "parameter_overrides": {
+        "params": {
+          "image_adf": {
+            "intent": "country_cover_campaign_image"
+          }
+        }
+      },
+      "outputs": [
+        "active/shared/exports/KyberionCountryCover.png"
+      ]
+    }
+  ]
+}

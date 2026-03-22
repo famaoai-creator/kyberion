@@ -1,0 +1,17 @@
+{
+  "actuator_id": "media-generation-actuator",
+  "version": "1.0.0",
+  "description": "Generative image, video, music, and screen capture actuator",
+  "capabilities": [
+    { "op": "generate_image", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "generate_video", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "generate_music", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "submit_generation", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "get_generation_job", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "wait_generation_job", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "collect_generation_artifact", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "capture_screen", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "record_screen", "platforms": ["darwin", "linux"] },
+    { "op": "run_workflow", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
