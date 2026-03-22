@@ -257,7 +257,7 @@ describe('orchestrator-actuator', () => {
           intent: 'country_drive_clip',
           prompt: 'cinematic driving shot',
           composition: { duration_sec: 5, fps: 24 },
-          engine: { provider: 'comfyui', workflow_template: 'embedded', base_workflow: { '1': { class_type: 'TextNode' } } },
+          engine: { provider: 'comfyui', workflow_template: 'basic_text_clip' },
           output: { format: 'mp4' },
         },
       },

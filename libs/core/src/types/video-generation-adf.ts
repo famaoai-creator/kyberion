@@ -7,7 +7,7 @@
  */
 
 /**
- * Contract for video generation requests. Current implementation supports workflow-backed templates with typed parameters.
+ * Contract for video generation requests. Supports named workflow templates and embedded templates with typed parameters.
  */
 export interface KyberionVideoGenerationADF {
   kind: 'video-generation-adf';
@@ -23,7 +23,7 @@ export interface KyberionVideoGenerationADF {
   };
   engine: {
     provider: string;
-    workflow_template: 'embedded';
+    workflow_template: 'embedded' | 'basic_text_clip';
     base_workflow?: {
       [k: string]: unknown;
     };

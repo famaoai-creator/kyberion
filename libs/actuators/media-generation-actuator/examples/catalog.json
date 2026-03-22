@@ -12,8 +12,8 @@
       "id": "video-adf-drive-clip",
       "title": "Drive Clip Video From ADF",
       "path": "libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json",
-      "description": "Hydrates a workflow-backed video-generation-adf request for local ComfyUI execution.",
-      "tags": ["video", "adf", "comfyui", "workflow-backed", "example"]
+      "description": "Compiles a named-template video-generation-adf request for local ComfyUI execution.",
+      "tags": ["video", "adf", "comfyui", "named-template", "example"]
     },
     {
       "id": "submit-image-generation-job",
@@ -26,8 +26,8 @@
       "id": "submit-video-generation-job",
       "title": "Submit Video Generation Job",
       "path": "libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json",
-      "description": "Submits a workflow-backed video-generation-adf request as a first-class generation job for later status polling and artifact collection.",
-      "tags": ["video", "job", "adf", "comfyui", "workflow-backed", "async", "example"]
+      "description": "Submits a named-template video-generation-adf request as a first-class generation job for later status polling and artifact collection.",
+      "tags": ["video", "job", "adf", "comfyui", "named-template", "async", "example"]
     },
     {
       "id": "music-adf-anniversary-country-ja",

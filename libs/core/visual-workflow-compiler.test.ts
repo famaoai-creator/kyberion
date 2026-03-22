@@ -44,4 +44,41 @@ describe('visual workflow compiler', () => {
       inputs: { text: 'cinematic driving shot', fps: '24', duration: '5' },
     });
   });
+
+  it('builds named video workflow templates without embedding raw base_workflow in the ADF', () => {
+    const result = compileVideoGenerationADF({
+      kind: 'video-generation-adf',
+      version: '1.0.0',
+      intent: 'country_drive_clip',
+      prompt: 'cinematic driving shot',
+      negative_prompt: 'glitch',
+      composition: { duration_sec: 5, fps: 24 },
+      engine: {
+        provider: 'comfyui',
+        workflow_template: 'basic_text_clip',
+        seed: 42,
+      },
+      output: { format: 'mp4', filename_prefix: 'drive-shot' },
+    } as any);
+
+    expect(result.workflow['1']).toEqual({
+      class_type: 'TextNode',
+      inputs: {
+        prompt: 'cinematic driving shot',
+        negative_prompt: 'glitch',
+        duration: '5',
+        fps: '24',
+        seed: '42',
+      },
+    });
+    expect(result.workflow['2']).toEqual({
+      class_type: 'SaveVideo',
+      inputs: {
+        filename_prefix: 'drive-shot',
+        format: 'mp4',
+        frames: ['1', 0],
+      },
+    });
+    expect(result.resolved.workflow_template).toBe('basic_text_clip');
+  });
 });
