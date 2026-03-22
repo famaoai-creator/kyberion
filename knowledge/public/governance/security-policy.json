@@ -20,11 +20,29 @@
       "block_message": "Organization Confidential: Higher tier required."
     }
   },
-  "role_permissions": {
+  "persona_permissions": {
     "sovereign": {
+      "allow_read": ["/"],
       "allow_write": ["/"]
     },
     "ecosystem_architect": {
+      "allow_read": [
+        "knowledge/",
+        "libs/",
+        "scripts/",
+        "pipelines/",
+        "schemas/",
+        "presence/",
+        "satellites/",
+        "plugins/",
+        "active/",
+        "README.md",
+        "CAPABILITIES_GUIDE.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "extracted_design.json",
+        "hoge.pdf"
+      ],
       "allow_write": [
         "active/",
         "knowledge/",
@@ -43,19 +61,13 @@
         "hoge.pdf"
       ]
     },
-    "mission_controller": {
-      "allow_write": [
-        "active/missions/",
-        "active/archive/missions/",
-        "active/audit/",
-        "active/shared/",
-        "knowledge/personal/missions/",
-        "knowledge/personal/governance/",
-        "knowledge/evolution/",
-        "registry.json"
-      ]
-    },
     "worker": {
+      "allow_read": [
+        "active/projects/",
+        "active/shared/tmp/",
+        "active/missions/${MISSION_ID}/",
+        "knowledge/public/"
+      ],
       "allow_write": [
         "active/projects/",
         "active/shared/tmp/",
@@ -65,8 +77,39 @@
     "analyst": {
       "allow_read": ["knowledge/", "active/audit/"],
       "allow_write": ["active/shared/tmp/", "knowledge/evolution/"]
+    }
+  },
+  "authority_role_permissions": {
+    "mission_controller": {
+      "allow_read": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/audit/",
+        "active/shared/",
+        "knowledge/personal/",
+        "knowledge/confidential/",
+        "knowledge/evolution/",
+        "registry.json"
+      ],
+      "allow_write": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/audit/",
+        "active/shared/",
+        "active/shared/coordination/",
+        "active/shared/observability/mission-control/",
+        "knowledge/personal/missions/",
+        "knowledge/personal/governance/",
+        "knowledge/evolution/",
+        "registry.json"
+      ]
     },
     "software_developer": {
+      "allow_read": [
+        "active/projects/",
+        "tests/",
+        "libs/actuators/"
+      ],
       "allow_write": [
         "active/projects/",
         "tests/",
@@ -74,22 +117,155 @@
       ]
     },
     "ruthless_auditor": {
+      "allow_read": ["active/audit/"],
       "allow_write": [
         "active/audit/"
       ]
     },
     "cyber_security": {
+      "allow_read": [
+        "active/audit/security/",
+        "knowledge/security/"
+      ],
       "allow_write": [
         "active/audit/security/",
         "knowledge/security/"
       ]
     },
+    "infrastructure_sentinel": {
+      "allow_read": [
+        "active/shared/coordination/channels/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "presence/bridge/runtime/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/channels/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "presence/bridge/runtime/"
+      ]
+    },
+    "slack_bridge": {
+      "allow_read": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/channels/slack/",
+        "active/shared/observability/mission-control/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/channels/slack/",
+        "active/shared/observability/mission-control/",
+        "active/audit/"
+      ]
+    },
+    "chronos_gateway": {
+      "allow_read": [
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/chronos/",
+        "active/shared/observability/mission-control/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/chronos/",
+        "active/shared/observability/mission-control/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
+      ]
+    },
+    "chronos_operator": {
+      "allow_read": [
+        "active/shared/observability/",
+        "active/shared/runtime/"
+      ],
+      "allow_write": []
+    },
+    "chronos_localadmin": {
+      "allow_read": [
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/audit/"
+      ]
+    },
     "surface_runtime": {
+      "allow_read": [
+        "active/shared/runtime/",
+        "active/shared/logs/surfaces/",
+        "active/audit/"
+      ],
       "allow_write": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
         "active/audit/"
       ]
+    }
+  },
+  "authority_permissions": {
+    "SUDO": {
+      "allow_read": ["/"],
+      "allow_write": ["/"]
+    },
+    "KNOWLEDGE_WRITE": {
+      "allow_read": ["knowledge/"],
+      "allow_write": ["knowledge/"]
+    },
+    "GIT_WRITE": {
+      "allow_read": [
+        ".git/",
+        "README.md",
+        "AGENTS.md",
+        "libs/",
+        "scripts/",
+        "tests/",
+        "knowledge/",
+        "satellites/",
+        "presence/"
+      ],
+      "allow_write": [
+        ".git/",
+        "README.md",
+        "AGENTS.md",
+        "libs/",
+        "scripts/",
+        "tests/",
+        "knowledge/",
+        "satellites/",
+        "presence/"
+      ]
+    },
+    "SECRET_READ": {
+      "allow_read": [
+        "vault/",
+        "knowledge/personal/connections/",
+        "active/shared/auth-grants.json"
+      ]
+    },
+    "NETWORK_FETCH": {
+      "allow_read": ["knowledge/public/orchestration/"]
+    },
+    "SYSTEM_EXEC": {
+      "allow_read": ["active/shared/tmp/", "active/shared/exports/"],
+      "allow_write": ["active/shared/tmp/", "active/shared/exports/"]
     }
   },
   "quality_requirements": {

@@ -102,7 +102,7 @@ export {
 } from './tier-guard.js';
 
 export * as authority from './authority.js';
-export { resolveIdentityContext, hasAuthority } from './authority.js';
+export { resolveIdentityContext, hasAuthority, inferPersonaFromRole, buildExecutionEnv, withExecutionContext } from './authority.js';
 
 export * as transformer from './transformer.js';
 export { transform, getValueByPath } from './transformer.js';
