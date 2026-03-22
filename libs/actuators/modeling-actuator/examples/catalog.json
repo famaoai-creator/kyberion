@@ -2,6 +2,13 @@
   "actuator": "modeling-actuator",
   "examples": [
     {
+      "id": "terraform-to-architecture-adf",
+      "title": "Terraform To Architecture ADF",
+      "path": "libs/actuators/modeling-actuator/examples/terraform-to-architecture-adf.json",
+      "description": "Transforms a Terraform root directory into architecture-adf with AWS-aware boundaries, tiers, and module/source separation.",
+      "tags": ["terraform", "architecture", "adf", "aws", "example"]
+    },
+    {
       "id": "web-profile-to-ui-flow",
       "title": "Web Profile To UI Flow ADF",
       "path": "libs/actuators/modeling-actuator/examples/web-profile-to-ui-flow.json",
