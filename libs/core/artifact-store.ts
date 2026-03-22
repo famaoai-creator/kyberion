@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -17,14 +18,7 @@ export type GovernedArtifactRole =
   | 'sovereign_concierge';
 
 function withRole<T>(role: GovernedArtifactRole, fn: () => T): T {
-  const previous = process.env.MISSION_ROLE;
-  process.env.MISSION_ROLE = role;
-  try {
-    return fn();
-  } finally {
-    if (previous === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previous;
-  }
+  return withExecutionContext(role, fn);
 }
 
 export function isGovernedArtifactPath(logicalPath: string): boolean {
