@@ -288,7 +288,9 @@
       "registry.npmjs.org",
       "pnpm.io",
       "google.com",
-      "generativelanguage.googleapis.com"
+      "generativelanguage.googleapis.com",
+      "canva.com",
+      "api.canva.com"
     ],
     "max_request_size_kb": 2048,
     "max_requests_per_mission": 50,

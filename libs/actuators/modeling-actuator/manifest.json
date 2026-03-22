@@ -2,12 +2,9 @@
   "actuator_id": "modeling-actuator",
   "version": "1.0.0",
   "description": "Architectural Analysis and ADF Transformation Engine",
+  "contract_schema": "schemas/modeling-pipeline.schema.json",
   "capabilities": [
-    { "op": "ajv_validate", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "terraform_to_architecture_adf", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "terraform_to_topology_ir", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "web_profile_to_ui_flow_adf", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "ui_flow_to_test_inventory", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_inventory_to_browser_pipeline", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "pipeline", "schema_ref": "schemas/modeling-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

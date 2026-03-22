@@ -2,6 +2,7 @@
   "actuator_id": "secret-actuator",
   "version": "1.0.0",
   "description": "OS Native Secret Manager Bridge",
+  "contract_schema": "schemas/secret-action.schema.json",
   "capabilities": [
     {
       "op": "get",

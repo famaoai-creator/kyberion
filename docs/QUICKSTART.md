@@ -4,6 +4,8 @@ Kyberion is built on one idea: **keep the mission model simple and let the contr
 
 You define intent, Kyberion creates or resumes a mission, and the runtime supervisor plus orchestration worker coordinate the rest.
 
+If you want the operator-oriented version first, read [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md).
+
 ## The Concept
 
 ```
@@ -125,6 +127,8 @@ Chronos is the local control surface for:
 - control action queue
 - live agent conversation and A2A handoffs
 
+If you are unsure when to use terminal vs Slack vs Chronos, or where to place files, see [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md).
+
 ### For CEOs / Executives
 
 > "I want to evaluate our new market entry using the ceo-strategy playbook. Let's do the Alignment phase first."
@@ -156,9 +160,11 @@ Chronos is the local control surface for:
 - Read the Governance Rules: [`AGENTS.md`](../AGENTS.md)
 - Understand key terms: [`docs/GLOSSARY.md`](./GLOSSARY.md)
 - Explore the architecture: [`docs/COMPONENT_MAP.md`](./COMPONENT_MAP.md)
-- Browse the full actuator catalog: [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md)
+- Read the operator surface guide: [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md)
+- Browse the current actuator catalog: [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md)
+- Review current-vs-legacy classification: [`knowledge/public/architecture/component-lifecycle-inventory.md`](../knowledge/public/architecture/component-lifecycle-inventory.md)
 
 ---
 
 **Need Help?**
-See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the full list of capabilities, or ask Kyberion: "Help me find the right actuator for [your task]."
+See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the manifest-backed actuator catalog, or ask Kyberion: "Help me find the right actuator for [your task]."

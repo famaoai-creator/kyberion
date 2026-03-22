@@ -3,8 +3,10 @@
 ## 1. Goal
 Run recurring `generation-schedule` checks as a background daemon so due schedules automatically submit `generation-job` records.
 
+> Status: `daemon-actuator` is retired. Use `surface-runtime` instead of launchd registration.
+
 ## 2. Dependencies
-- **Actuator**: `daemon-actuator`
+- **Runtime**: `surface-runtime`
 - **Runtime**: `run_generation_schedule_daemon.js`
 - **Schedules**: registered under `active/shared/runtime/media-generation/schedules/`
 
@@ -15,19 +17,15 @@ Register one or more schedules first.
 pnpm generation:schedule --action register --input libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json
 ```
 
-## 4. Daemon Registration
-Example daemon input:
+## 4. Surface Declaration
+Example surface record:
 
-- [`register-generation-schedule-daemon.json`](/Users/famaoai/k/a/kyberion/libs/actuators/daemon-actuator/examples/register-generation-schedule-daemon.json)
+- [`generation-schedule-surface.json`](/Users/famao/kyberion/knowledge/public/governance/pipelines/generation-schedule-surface.json)
 
 Run:
 
 ```bash
-node dist/libs/actuators/daemon-actuator/src/index.js \
-  --action run-once \
-  --nerve generation-schedule \
-  --script dist/scripts/run_generation_schedule_daemon.js \
-  --options '{"ephemeral":false}'
+pnpm surfaces:reconcile
 ```
 
 ## 5. What It Does
@@ -37,6 +35,6 @@ node dist/libs/actuators/daemon-actuator/src/index.js \
 - updates `delivery_policy.latest_alias_path` when the previous job succeeded
 
 ## 6. Expected Output
-- launchd registration under `~/Library/LaunchAgents/kyberion.generation-schedule.plist`
+- runtime ownership under `active/shared/runtime/surfaces/state.json`
 - logs under `active/shared/logs/generation-schedule.log`
 - recurring updates under `active/shared/runtime/media-generation/`

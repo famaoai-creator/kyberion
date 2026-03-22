@@ -109,7 +109,8 @@
       "capabilities": [
         "codebase-mapper",
         "local-reviewer",
-        "security-scanner",
+        "code-actuator",
+        "secret-actuator",
         "quality-scorer",
         "log-analyst",
         "bug-predictor",
@@ -262,7 +263,8 @@
     },
     "Cyber Security Lead": {
       "capabilities": [
-        "security-scanner",
+        "code-actuator",
+        "secret-actuator",
         "red-team-adversary",
         "post-quantum-shield",
         "supply-chain-sentinel",

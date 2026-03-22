@@ -23,6 +23,13 @@
       "tags": ["operator", "manual", "pause", "headed", "template"]
     },
     {
+      "id": "test-session-recording",
+      "title": "Test Session Recording",
+      "path": "libs/actuators/browser-actuator/examples/test-session-recording.json",
+      "description": "Runs a browser test session with Playwright trace and video recording enabled so the resulting artifacts can be reviewed after execution.",
+      "tags": ["test", "recording", "video", "trace", "browser", "example"]
+    },
+    {
       "id": "passkey-webauthn-io",
       "title": "Passkey Flow On WebAuthn.io",
       "path": "libs/actuators/browser-actuator/examples/passkey-webauthn-io.json",

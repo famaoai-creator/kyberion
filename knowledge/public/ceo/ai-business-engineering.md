@@ -19,7 +19,7 @@ This monorepo is not just a toolset; it is a **Living Engineering Organization**
 
 Traditionally, legal and technical audits are point-in-time events.
 
-- **Kyberion Approach**: Use `security-scanner` + `license-auditor` + `compliance-officer` in CI/CD.
+- **Kyberion Approach**: Use `code-actuator` + `secret-actuator` + `license-auditor` + `compliance-officer` in CI/CD.
 - **Strategic Value**: Reduces insurance premiums and increases investor trust by providing "Real-time Compliance Evidence."
 
 ### 2.2. Real-time Technical Due Diligence

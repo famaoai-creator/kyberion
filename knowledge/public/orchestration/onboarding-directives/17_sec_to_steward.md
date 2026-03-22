@@ -20,7 +20,7 @@ last_updated: 2026-03-06
 ## 2. コンテキスト & リソース
 
 - CVEデータベース (NVD等)
-- `security-scanner` の過去の実行結果
+- `code-actuator` / `secret-actuator` の過去の実行結果
 
 ## 3. 勝利条件
 

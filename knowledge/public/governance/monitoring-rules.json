@@ -21,7 +21,7 @@
       "critical": 50
     },
     "interval_ms": 5000,
-    "stimuli_path": "presence/bridge/stimuli.jsonl"
+    "stimuli_path": "presence/bridge/runtime/stimuli.jsonl"
   },
   "quarantine": {
     "enabled": true,

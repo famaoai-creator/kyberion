@@ -29,7 +29,7 @@ interface ChannelRegistry {
 }
 
 export function perceive(): Stimulus[] {
-  const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
+  const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
   const REGISTRY_PATH = pathResolver.resolve('presence/bridge/channel-registry.json');
 
   if (!safeExistsSync(STIMULI_PATH)) return [];
@@ -73,7 +73,7 @@ export function getSensoryContext(): string | null {
 }
 
 export async function resolveStimulus(timestamp: string, responseText: string = ''): Promise<void> {
-  const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
+  const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
   if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {
@@ -120,7 +120,7 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
 }
 
 export async function pruneStimuli(): Promise<void> {
-  const STIMULI_PATH = pathResolver.resolve('presence/bridge/stimuli.jsonl');
+  const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
   if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {

@@ -5,6 +5,10 @@ describe('service-binding', () => {
   const originalMissionId = process.env.MISSION_ID;
   const originalSlackBotToken = process.env.SLACK_BOT_TOKEN;
   const originalSlackAppToken = process.env.SLACK_APP_TOKEN;
+  const originalCanvaAccessToken = process.env.CANVA_ACCESS_TOKEN;
+  const originalCanvaRefreshToken = process.env.CANVA_REFRESH_TOKEN;
+  const originalCanvaClientId = process.env.CANVA_CLIENT_ID;
+  const originalCanvaClientSecret = process.env.CANVA_CLIENT_SECRET;
 
   afterEach(() => {
     if (originalMissionId === undefined) delete process.env.MISSION_ID;
@@ -15,6 +19,18 @@ describe('service-binding', () => {
 
     if (originalSlackAppToken === undefined) delete process.env.SLACK_APP_TOKEN;
     else process.env.SLACK_APP_TOKEN = originalSlackAppToken;
+
+    if (originalCanvaAccessToken === undefined) delete process.env.CANVA_ACCESS_TOKEN;
+    else process.env.CANVA_ACCESS_TOKEN = originalCanvaAccessToken;
+
+    if (originalCanvaRefreshToken === undefined) delete process.env.CANVA_REFRESH_TOKEN;
+    else process.env.CANVA_REFRESH_TOKEN = originalCanvaRefreshToken;
+
+    if (originalCanvaClientId === undefined) delete process.env.CANVA_CLIENT_ID;
+    else process.env.CANVA_CLIENT_ID = originalCanvaClientId;
+
+    if (originalCanvaClientSecret === undefined) delete process.env.CANVA_CLIENT_SECRET;
+    else process.env.CANVA_CLIENT_SECRET = originalCanvaClientSecret;
   });
 
   it('returns a plain binding for none auth mode', () => {
@@ -46,6 +62,30 @@ describe('service-binding', () => {
       serviceScoped: true,
       hasAccessToken: true,
       hasAppToken: true,
+    });
+  });
+
+  it('resolves oauth-style service credentials for secret-guard mode', () => {
+    process.env.MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
+    process.env.CANVA_ACCESS_TOKEN = 'canva-access-token';
+    process.env.CANVA_REFRESH_TOKEN = 'canva-refresh-token';
+    process.env.CANVA_CLIENT_ID = 'client-id';
+    process.env.CANVA_CLIENT_SECRET = 'cnvca-test-secret';
+
+    const binding = resolveServiceBinding('canva', 'secret-guard');
+    expect(binding).toMatchObject({
+      serviceId: 'canva',
+      authMode: 'secret-guard',
+      accessToken: 'canva-access-token',
+      refreshToken: 'canva-refresh-token',
+      clientId: 'client-id',
+      clientSecret: 'cnvca-test-secret',
+    });
+    expect(binding.metadata).toMatchObject({
+      hasAccessToken: true,
+      hasRefreshToken: true,
+      hasClientId: true,
+      hasClientSecret: true,
     });
   });
 

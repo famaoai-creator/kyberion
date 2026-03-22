@@ -7,7 +7,6 @@
     "coverage",
     "test-results",
     "libs/actuators/**/*.test.ts",
-    "presence/displays/kyberion-dashboard/",
     "presence/displays/chronos-mirror-v2/"
   ]
 }

@@ -16,39 +16,39 @@ Each scenario demonstrates how multiple actuators and capability flows chain tog
 仕様書が未整備、あるいはレガシー化したプロジェクトの現状を迅速に把握します。
 
 - **ステップ**:
-  1. `codebase-mapper`: プロジェクトのディレクトリ構造を把握。
-  2. `schema-inspector`: DB定義やAPI定義を自動抽出。
-  3. `terraform-arch-mapper` & `diagram-renderer`: インフラ構成を可視化（Mermaid -> PNG）。
-  4. `ppt-artisan`: 抽出情報を整理し、現状分析レポート（PPTX）を自動生成。
+  1. `code-actuator`: プロジェクトの構造やコード資産を収集・整形。
+  2. `modeling-actuator`: DB定義、API定義、IaC などを構造化。
+  3. `modeling-actuator` + `media-actuator`: インフラ構成を `architecture-adf` から図化。
+  4. `media-actuator`: 抽出情報を整理し、現状分析レポートを生成。
 
 ## 2. 要件定義からテスト設計までの品質パイプライン
 
 IPA/TIS標準に準拠した高品質なドキュメントとテスト設計をシームレスに生成します。
 
 - **ステップ**:
-  1. `requirements-wizard`: IPA標準で要件定義の抜け漏れをレビュー。
-  2. `nonfunctional-architect`: インフラコード（IaC）から非機能要求を自動判定。
-  3. `test-viewpoint-analyst`: TISカタログに基づき、要件に紐付いたテスト観点を抽出。
-  4. `excel-artisan`: 抽出した観点をテストケース管理表（Excel）として出力。
+  1. `orchestrator-actuator`: 要件レビューの execution brief と plan を構成。
+  2. `modeling-actuator`: 構造化入力から UI flow / test inventory を抽出。
+  3. `wisdom-actuator`: テスト観点や review 知識を inject して補強。
+  4. `media-actuator`: テストケース管理表や報告資料を出力。
 
 ## 3. 自動UI監査とビジュアル・レポート
 
 Webサイトの主要動線を自動確認し、エビデンス付きの報告書を作成します。
 
 - **ステップ**:
-  1. `browser-navigator`: Playwrightでサイトを自動巡回し証跡（SS）を撮影。
-  2. `doc-to-text`: 撮影したSSをOCR解析し、期待値との整合性を検証。
-  3. `ppt-artisan`: 証跡画像とテスト結果を統合したプレゼン資料を作成。
+  1. `browser-actuator`: Playwright でサイトを自動巡回し証跡を取得。
+  2. `vision-actuator` または `media-generation-actuator`: 画像内容の解釈や OCR を補助。
+  3. `media-actuator`: 証跡画像と結果を統合した資料を作成。
 
 ## 4. プリコミット・セキュリティ・ヘルスチェック
 
 コードをコミットする前に、多角的な品質・安全性の監査を自動実行します。
 
 - **ステップ**:
-  1. `local-reviewer`: Git差分（Staged）をAIがコードレビュー。
-  2. `security-scanner`: Trivy等を用いて脆弱性とシークレット漏洩をスキャン。
-  3. `project-health-check`: CI/CD、テスト、Lintの設定状況からプロジェクトの健全性を採点。
-  4. `log-analyst`: 直近のビルド/実行ログからエラーの兆候を特定。
+  1. `code-actuator`: Git 差分やコードベースを解析。
+  2. `system-actuator`: 既存の scanner / lint / test command を governed shell として実行。
+  3. `orchestrator-actuator`: 結果を要約し remediation plan へ落とす。
+  4. `artifact-actuator`: 実行結果や evidence を governed artifact として保存。
 
 ---
 

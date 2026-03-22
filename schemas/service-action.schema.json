@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Service Actuator Request",
+  "description": "Single service request or service pipeline envelope.",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": ["service_id", "mode", "action", "params"],
+      "properties": {
+        "service_id": { "type": "string" },
+        "mode": { "enum": ["API", "CLI", "RECONCILE", "PRESET", "OAUTH"] },
+        "action": { "type": "string" },
+        "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+        "params": { "type": "object" },
+        "auth": { "enum": ["none", "secret-guard", "session"] }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "context": { "type": "object" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["op", "params"],
+            "properties": {
+              "op": { "enum": ["api", "cli", "reconcile", "preset", "oauth"] },
+              "params": {
+                "type": "object",
+                "required": ["service_id", "action", "params"],
+                "properties": {
+                  "service_id": { "type": "string" },
+                  "action": { "type": "string" },
+                  "params": { "type": "object" },
+                  "auth": { "enum": ["none", "secret-guard", "session"] },
+                  "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+                  "export_as": { "type": "string" },
+                  "retry": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

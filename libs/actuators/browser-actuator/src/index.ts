@@ -83,6 +83,9 @@ interface BrowserSessionMetadata {
   tabs: BrowserTabSummary[];
   updated_at: string;
   last_trace_path?: string;
+  last_video_paths?: string[];
+  video_output_dir?: string;
+  video_recording_pending?: boolean;
   lease_expires_at?: string;
   lease_status: 'active' | 'released' | 'expired';
   retained: boolean;
@@ -134,6 +137,7 @@ interface BrowserRuntimeLease {
   runtime: BrowserRuntime;
   userDataDir: string;
   sessionMetadataPath: string;
+  videoDir?: string;
   leaseExpiresAt?: number;
   browser?: Browser;
   externalConnection?: boolean;
@@ -169,9 +173,10 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
 
   const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
-  if (options.record_video && !safeExistsSync(videoDir)) safeMkdir(videoDir, { recursive: true });
+  const resolvedVideoDir = path.resolve(process.cwd(), options.video_artifact_dir || videoDir);
+  if (options.record_video && !safeExistsSync(resolvedVideoDir)) safeMkdir(resolvedVideoDir, { recursive: true });
 
-  const browserContext = await getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, videoDir);
+  const browserContext = await getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, resolvedVideoDir);
 
   // Start Tracing if requested
   if (options.record_trace) {
@@ -250,6 +255,8 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       }
     }
   } finally {
+    const videoRecordingEnabled = options.record_video === true;
+    let finalizedVideoPaths: string[] | undefined;
     if (options.record_trace) {
       if (!safeExistsSync(EVIDENCE_DIR)) safeMkdir(EVIDENCE_DIR, { recursive: true });
       await browserContext.tracing.stop({ path: tracePath });
@@ -269,6 +276,9 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       tabs: ctx.browser_tabs,
       updated_at: new Date().toISOString(),
       last_trace_path: ctx.last_trace_path,
+      last_video_paths: undefined,
+      video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
+      video_recording_pending: videoRecordingEnabled ? !shouldClose : undefined,
       lease_expires_at: leaseExpiresAt ? new Date(leaseExpiresAt).toISOString() : undefined,
       lease_status: shouldClose ? 'released' : 'active',
       retained: !shouldClose,
@@ -276,11 +286,37 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       recent_actions: summarizeRecentActions(ctx.action_trail),
     });
     if (shouldClose) {
+      finalizedVideoPaths = videoRecordingEnabled ? await collectRecordedVideoPaths(runtime) : undefined;
+      ctx.recorded_videos = finalizedVideoPaths || [];
+      ctx.video_output_dir = videoRecordingEnabled ? resolvedVideoDir : undefined;
+      ctx.video_recording_pending = false;
+      saveBrowserSessionMetadata(sessionMetadataPath, {
+        session_id: sessionId,
+        user_data_dir: userDataDir,
+        active_tab_id: runtime.activeTabId,
+        tab_count: runtime.tabs.size,
+        tabs: ctx.browser_tabs,
+        updated_at: new Date().toISOString(),
+        last_trace_path: ctx.last_trace_path,
+        last_video_paths: finalizedVideoPaths,
+        video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
+        video_recording_pending: false,
+        lease_status: 'released',
+        retained: false,
+        action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
+        recent_actions: summarizeRecentActions(ctx.action_trail),
+      });
       browserRuntimeLeases.delete(sessionId);
       await browserContext.close();
     } else {
       const lease = browserRuntimeLeases.get(sessionId);
-      if (lease) lease.leaseExpiresAt = leaseExpiresAt;
+      if (lease) {
+        lease.leaseExpiresAt = leaseExpiresAt;
+        lease.videoDir = videoRecordingEnabled ? resolvedVideoDir : undefined;
+      }
+      ctx.recorded_videos = [];
+      ctx.video_output_dir = videoRecordingEnabled ? resolvedVideoDir : undefined;
+      ctx.video_recording_pending = videoRecordingEnabled;
     }
   }
 
@@ -1137,6 +1173,7 @@ async function getOrCreateBrowserContext(
       runtime: createBrowserRuntime(context),
       userDataDir,
       sessionMetadataPath,
+      videoDir,
       browser,
       externalConnection: true,
     });
@@ -1160,6 +1197,7 @@ async function getOrCreateBrowserContext(
     runtime: createBrowserRuntime(context),
     userDataDir,
     sessionMetadataPath,
+    videoDir,
     externalConnection: false,
   });
   return context;
@@ -1194,6 +1232,8 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       tab_count: lease.runtime.tabs.size,
       tabs: [],
       updated_at: new Date().toISOString(),
+      video_output_dir: lease.videoDir,
+      video_recording_pending: false,
       lease_status: 'expired',
       retained: false,
       lease_expires_at: new Date(lease.leaseExpiresAt).toISOString(),
@@ -1219,6 +1259,21 @@ function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_acti
     selector: action.selector,
     ts: action.ts,
   }));
+}
+
+async function collectRecordedVideoPaths(runtime: BrowserRuntime): Promise<string[]> {
+  const collected = new Set<string>();
+  for (const page of runtime.tabs.values()) {
+    const videoHandle = typeof (page as any).video === 'function' ? (page as any).video() : null;
+    if (!videoHandle || typeof videoHandle.path !== 'function') continue;
+    try {
+      const videoPath = await videoHandle.path();
+      if (videoPath) collected.add(String(videoPath));
+    } catch (_) {
+      // Ignore pages without finalized video artifacts.
+    }
+  }
+  return [...collected];
 }
 
 async function resetBrowserRuntimeLeasesForTest(): Promise<void> {

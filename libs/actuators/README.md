@@ -5,7 +5,8 @@ Actuators are the generic, high-fidelity execution engines of the Kyberion ecosy
 
 ## 2. Design Principles
 - **Agnostic Logic**: Actuators only know *how* to execute a specific class of physical actions based on ADF (Agentic Data Format).
-- **Capability Manifest**: Each Actuator self-declares its supported operations, platforms, and binary requirements via `manifest.json`.
+- **Capability Manifest**: Each Actuator self-declares its canonical public operations, platforms, and binary requirements via `manifest.json`.
+- **Canonical Contract First**: Compatibility handlers may remain in code during migration, but `manifest.json` should expose only the recommended public `op` surface.
 - **High Fidelity**: Provides immutable evidence (hashes, signatures) for every action taken.
 
 ## 3. The Actuators (Core Nine)

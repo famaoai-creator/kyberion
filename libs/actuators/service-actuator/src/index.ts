@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -21,7 +21,7 @@ function assertUnsafeCliAllowed() {
 
 interface ServiceAction {
   service_id: string; 
-  mode: 'API' | 'CLI' | 'SDK' | 'STREAM' | 'RECONCILE' | 'PRESET';
+  mode: 'API' | 'CLI' | 'SDK' | 'STREAM' | 'RECONCILE' | 'PRESET' | 'OAUTH';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
@@ -191,6 +191,18 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
   switch (input.mode) {
     case 'PRESET':
       return await executeServicePreset(input.service_id, input.action, input.params, input.auth === 'secret-guard' ? 'secret-guard' : 'none');
+
+    case 'OAUTH':
+      if (input.action === 'begin') {
+        return beginServiceOAuth(input.service_id, input.params || {});
+      }
+      if (input.action === 'exchange') {
+        return await exchangeServiceOAuthCode(input.service_id, input.params || {});
+      }
+      if (input.action === 'refresh') {
+        return await refreshServiceOAuthToken(input.service_id, input.params || {});
+      }
+      throw new Error(`Unsupported OAuth action: ${input.action}`);
 
     case 'RECONCILE':
       const manifestPath = path.resolve(process.cwd(), input.params.manifest_path);

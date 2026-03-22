@@ -19,6 +19,8 @@ node dist/libs/actuators/browser-actuator/src/index.js --input libs/actuators/br
   複数タブ、network capture、screenshot
 - `operator-pause-template.json`:
   手動介入ありの headed browser テンプレート
+- `test-session-recording.json`:
+  Web アプリ試験を trace + video 付きで実行し、試験後に artifact を確認するテンプレート
 - `passkey-webauthn-io.json`:
   passkey の register / authenticate / delete
 - `webview-session-handoff-import.json`:

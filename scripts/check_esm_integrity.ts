@@ -10,7 +10,6 @@ const ROOT = process.cwd();
 const ALLOWED_CJS_FILES = new Set([
   'presence/displays/chronos-mirror-v2/postcss.config.cjs',
   'presence/displays/chronos-mirror-v2/tailwind.config.cjs',
-  'presence/displays/knowledge-portal/scripts/launch.cjs',
   'scripts/refactor/standardize-yargs.js',
   'templates/skill-template-cjs/scripts/main.cjs',
 ]);
