@@ -224,6 +224,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
                 style: { fill: 'F1F5F9', color: '64748B', fontSize: 12, italic: true, align: 'center', valign: 'middle' },
               });
             }
+            // Allow native elements array
+            if (Array.isArray(data.elements)) {
+              elements.push(...data.elements);
+            }
             return { id: `slide${idx + 1}`, elements };
           }),
         };

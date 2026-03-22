@@ -7,6 +7,7 @@
 | カテゴリ | パターン ID | 対象 | エンジン |
 | :--- | :--- | :--- | :--- |
 | **Presentation** | `KYBERION-MARKETING-DECK` | クライアント・投資家 | pptx |
+| **Presentation** | `PPTX-ROADMAP-01` | ステークホルダー・チーム | pptx |
 | **Presentation** | `STRAT-EXE-01` | 経営層 | puppeteer |
 | **Presentation** | `REL-PROP-01` | クライアント | puppeteer |
 | **Presentation** | `STRAT-ROAD-01` | ボードメンバー | mermaid |
