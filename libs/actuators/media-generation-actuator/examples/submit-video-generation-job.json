@@ -14,23 +14,10 @@
           "fps": 24,
           "aspect_ratio": "16:9"
         },
-        "engine": {
-          "provider": "comfyui",
-          "workflow_template": "embedded",
-          "base_workflow": {
-            "1": {
-              "class_type": "TextNode",
-              "inputs": {
-                "prompt": "{{prompt}}",
-                "negative_prompt": "{{negative_prompt}}",
-                "duration": "{{duration_sec}}",
-                "fps": "{{fps}}",
-                "seed": "{{seed}}",
-                "filename_prefix": "{{filename_prefix}}"
-              }
-            }
-          }
-        },
+      "engine": {
+        "provider": "comfyui",
+        "workflow_template": "basic_text_clip"
+      },
         "output": {
           "format": "mp4",
           "filename_prefix": "KyberionDriveClip",
