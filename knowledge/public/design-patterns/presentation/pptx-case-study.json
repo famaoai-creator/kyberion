@@ -1,0 +1,196 @@
+{
+  "pattern_id": "PPTX-CASE-STUDY-01",
+  "category": "relational",
+  "target_audience": "Clients, sales teams, customer success, executives",
+  "description": "A case-study presentation template covering challenge, approach, outcomes, and testimonial proof.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Cover",
+      "Challenge",
+      "Approach",
+      "Outcomes",
+      "Testimonial"
+    ],
+    "color_palette": "sunrise-report"
+  },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "FFFBEB",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 6.8, "y": 0.95, "w": 2.4, "h": 3.35 },
+          "style": { "fill": "FEF3C7", "line": "FDE68A" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 4.78, "w": 10, "h": 0.85 },
+          "style": { "fill": "F59E0B", "line": "F59E0B" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 0.85, "y": 0.86, "w": 1.65, "h": 0.42 },
+          "text": "CASE STUDY",
+          "style": { "fill": "FED7AA", "color": "9A3412", "fontSize": 10, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 7.1, "y": 1.35, "w": 1.2, "h": 0.22 },
+          "text": "Before /\nAfter",
+          "style": { "fontSize": 13, "bold": true, "color": "9A3412", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.9, "y": 1.45, "w": 5.6, "h": 0.85 },
+          "style": { "fontSize": 29, "align": "left", "color": "431407" }
+        },
+        "body": {
+          "pos": { "x": 0.95, "y": 2.62, "w": 5.2, "h": 1.1 },
+          "style": { "fontSize": 17, "color": "7C2D12" }
+        },
+        "visual": false
+      }
+    },
+    "content": {
+      "backgroundFill": "FFFEFB",
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 0.82, "y": 0.42, "w": 1.8, "h": 0.22 },
+          "text": "Customer Story",
+          "style": { "fontSize": 10, "bold": true, "color": "C2410C", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.82, "y": 1.14, "w": 8.1, "h": 0 },
+          "style": { "line": "FDE68A", "lineWidth": 1.0 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.52, "y": 1.32, "w": 3.18, "h": 2.72 },
+          "style": { "fill": "FFFBEB", "line": "FCD34D", "lineWidth": 1.0 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.82, "y": 0.7, "w": 5.2, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "7C2D12" }
+        },
+        "body": {
+          "pos": { "x": 0.95, "y": 1.58, "w": 4.0, "h": 2.45 },
+          "style": { "fontSize": 17, "color": "9A3412" }
+        },
+        "visual": false
+      }
+    }
+  },
+  "content_data": [
+    {
+      "page_layout": "cover",
+      "title": "Case Study",
+      "subtitle": "A reusable story arc for before, during, and after transformation",
+      "body": "Optimized for customer proof points and business outcomes."
+    },
+    {
+      "page_layout": "content",
+      "title": "Challenge",
+      "body": [
+        "The client faced delivery delay across multiple handoff points.",
+        "Decision makers lacked a shared view of progress and blockers.",
+        "Teams were over-relying on manual status assembly."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 5.8, "y": 1.5, "w": 2.8, "h": 2.0 },
+          "text": "Before:\nslow, manual,\nhigh friction",
+          "style": { "fill": "FEE2E2", "color": "9A3412", "fontSize": 18, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Approach",
+      "body": [
+        "Built a governed mission flow around repeatable work types.",
+        "Introduced template-based outputs for leadership and operations.",
+        "Reduced review loops with clearer contracts and validation."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.8, "y": 1.6, "w": 2.8, "h": 1.8 },
+          "text": "Standardize\nAutomate\nVerify",
+          "style": { "fill": "FEF3C7", "color": "92400E", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Outcomes",
+      "body": [
+        "Cycle time reduced by 62%",
+        "Leadership reporting became same-day instead of weekly",
+        "Team satisfaction improved with less status admin"
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.7, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "62%",
+          "style": { "fill": "FED7AA", "color": "9A3412", "fontSize": 22, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 7.1, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "1 day",
+          "style": { "fill": "FDE68A", "color": "92400E", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.5, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "+22",
+          "style": { "fill": "FFEDD5", "color": "7C2D12", "fontSize": 22, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Testimonial",
+      "body": [
+        "\"We stopped rebuilding status decks from scratch and started running the business with shared templates.\""
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.5, "y": 1.4, "w": 3.2, "h": 2.1 },
+          "style": { "fill": "FFFBEB", "line": "F59E0B", "lineWidth": 1.0 }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 5.8, "y": 2.0, "w": 2.6, "h": 0.8 },
+          "text": "Director, Operations",
+          "style": { "fontSize": 18, "bold": true, "align": "center", "valign": "middle", "color": "92400E" }
+        }
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-case-study",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "sunrise-report"
+  }
+}

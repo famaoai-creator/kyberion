@@ -1,0 +1,19 @@
+{
+  "pattern_id": "XLSX-OPS-TRACKER-01",
+  "category": "operational",
+  "target_audience": "Operators, PMs, delivery leads",
+  "description": "An operator-focused tracker workbook with governed statuses, priorities, and weekly review structure.",
+  "layout_strategy": {
+    "visual_weight": "dense",
+    "structure": [
+      "Tracker sheet with frozen header",
+      "Legend and review notes",
+      "Status validation"
+    ],
+    "sheet_theme": "operator-tracker"
+  },
+  "template_profile": {
+    "builder_id": "ops-tracker",
+    "output_format": "xlsx"
+  }
+}

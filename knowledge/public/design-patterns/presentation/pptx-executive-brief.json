@@ -1,0 +1,247 @@
+{
+  "pattern_id": "PPTX-EXEC-BRIEF-01",
+  "category": "strategic",
+  "target_audience": "Executive team, board members, investors",
+  "description": "A concise decision-oriented executive brief with KPI cards, risk framing, and a final ask.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Cover",
+      "Priority Snapshot",
+      "KPI Scorecard",
+      "Risk and Mitigation",
+      "Decision Required"
+    ],
+    "color_palette": "executive-neutral"
+  },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "F8FAFC",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 10, "h": 0.22 },
+          "style": { "fill": "111827", "line": "111827" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0.7, "y": 0.8, "w": 0.18, "h": 3.1 },
+          "style": { "fill": "2563EB", "line": "2563EB" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 7.3, "y": 0.9, "w": 1.6, "h": 0.46 },
+          "text": "BOARD UPDATE",
+          "style": { "fill": "E0E7FF", "color": "1E3A8A", "fontSize": 11, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.9, "y": 4.55, "w": 8.1, "h": 0 },
+          "style": { "line": "CBD5E1", "lineWidth": 1.0 }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.9, "y": 4.72, "w": 3.2, "h": 0.28 },
+          "text": "Quarterly direction, risk posture, and decision asks",
+          "style": { "fontSize": 10, "color": "64748B", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 1.1, "y": 1.15, "w": 7.2, "h": 0.95 },
+          "style": { "fontSize": 30, "align": "left", "color": "111827" }
+        },
+        "body": {
+          "pos": { "x": 1.1, "y": 2.35, "w": 5.7, "h": 1.35 },
+          "style": { "fontSize": 17, "color": "475569" }
+        },
+        "visual": false
+      }
+    },
+    "summary": {
+      "backgroundFill": "FCFCFD",
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 0.8, "y": 0.42, "w": 2.2, "h": 0.24 },
+          "text": "EXECUTIVE BRIEF",
+          "style": { "fontSize": 10, "bold": true, "color": "2563EB", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.8, "y": 1.15, "w": 8.2, "h": 0 },
+          "style": { "line": "E2E8F0", "lineWidth": 1.0 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.55, "y": 1.35, "w": 3.05, "h": 2.55 },
+          "style": { "fill": "F8FAFC", "line": "CBD5E1", "lineWidth": 1.0 }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 5.9, "y": 1.58, "w": 1.6, "h": 0.24 },
+          "text": "At A Glance",
+          "style": { "fontSize": 11, "bold": true, "color": "475569", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.8, "y": 0.68, "w": 5.0, "h": 0.52 },
+          "style": { "fontSize": 24, "align": "left", "color": "111827" }
+        },
+        "body": {
+          "pos": { "x": 0.9, "y": 1.55, "w": 4.15, "h": 2.45 },
+          "style": { "fontSize": 17, "color": "334155" }
+        },
+        "visual": false
+      }
+    },
+    "decision": {
+      "backgroundFill": "F8FAFC",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 2.5, "h": 5.625 },
+          "style": { "fill": "0F172A", "line": "0F172A" }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.62, "y": 1.15, "w": 1.1, "h": 0.24 },
+          "text": "DECISION",
+          "style": { "fontSize": 11, "bold": true, "color": "93C5FD", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.62, "y": 1.55, "w": 1.4, "h": 1.1 },
+          "text": "Approve\nor adjust\nlaunch plan",
+          "style": { "fontSize": 22, "bold": true, "color": "F8FAFC", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 3.0, "y": 1.2, "w": 5.9, "h": 2.55 },
+          "style": { "fill": "FFFFFF", "line": "BFDBFE", "lineWidth": 1.2 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 3.2, "y": 0.62, "w": 5.3, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "111827" }
+        },
+        "body": {
+          "pos": { "x": 3.35, "y": 1.62, "w": 5.0, "h": 1.25 },
+          "style": { "fontSize": 19, "color": "1E3A8A", "align": "left", "valign": "middle" }
+        },
+        "visual": false
+      }
+    }
+  },
+  "content_data": [
+    {
+      "page_layout": "cover",
+      "title": "Executive Brief",
+      "subtitle": "Quarterly direction, delivery confidence, and decision asks",
+      "body": "A reusable board-ready structure for leadership updates."
+    },
+    {
+      "page_layout": "summary",
+      "title": "Priority Snapshot",
+      "body": [
+        "Revenue plan remains on track with two pipeline accelerators.",
+        "Delivery risk is concentrated in one dependency cluster.",
+        "Leadership attention is required on staffing and launch timing."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.5, "y": 1.4, "w": 1.1, "h": 0.8 },
+          "text": "On Track",
+          "style": { "fill": "DCFCE7", "color": "166534", "fontSize": 16, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 6.9, "y": 1.4, "w": 1.1, "h": 0.8 },
+          "text": "Watch",
+          "style": { "fill": "FEF3C7", "color": "92400E", "fontSize": 16, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.3, "y": 1.4, "w": 1.1, "h": 0.8 },
+          "text": "Act",
+          "style": { "fill": "FEE2E2", "color": "991B1B", "fontSize": 16, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "summary",
+      "title": "KPI Scorecard",
+      "body": [
+        "ARR growth +18% YoY",
+        "Gross retention 96%",
+        "Release reliability 99.2%"
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.4, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "18%",
+          "style": { "fill": "DBEAFE", "color": "1D4ED8", "fontSize": 22, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 6.8, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "96%",
+          "style": { "fill": "DCFCE7", "color": "15803D", "fontSize": 22, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.2, "y": 1.5, "w": 1.1, "h": 1.1 },
+          "text": "99.2",
+          "style": { "fill": "EDE9FE", "color": "6D28D9", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "summary",
+      "title": "Risk and Mitigation",
+      "body": [
+        "Platform vendor dependency affects one high-value launch.",
+        "Mitigation: stage rollout, qualify alternate provider, reserve contingency budget.",
+        "Owner: COO and Platform Lead."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 5.5, "y": 1.5, "w": 3.3, "h": 2.0 },
+          "text": "Risk Heat\nHigh impact\nMedium probability",
+          "style": { "fill": "FEE2E2", "color": "991B1B", "fontSize": 18, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "decision",
+      "title": "Decision Required",
+      "body": [
+        "Approve phased launch on April 15, 2026 with a capped contingency reserve and temporary contractor support."
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-executive-brief",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "executive-neutral"
+  }
+}

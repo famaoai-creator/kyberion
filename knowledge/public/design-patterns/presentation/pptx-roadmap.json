@@ -15,15 +15,57 @@
     ],
     "color_palette": "corporate-standard"
   },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "F8FAFC",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 10, "h": 0.35 },
+          "style": { "fill": "1D4ED8", "line": "1D4ED8" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.7, "y": 0.95, "w": 8.6, "h": 0.9 },
+          "style": { "fontSize": 30, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 0.7, "y": 2.15, "w": 6.2, "h": 1.6 },
+          "style": { "fontSize": 18, "color": "334155" }
+        }
+      }
+    },
+    "content": {
+      "backgroundFill": "FFFFFF",
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.6, "y": 0.45, "w": 8.8, "h": 0.6 },
+          "style": { "fontSize": 24, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 0.8, "y": 1.45, "w": 8.1, "h": 2.4 },
+          "style": { "fontSize": 18, "color": "334155" }
+        },
+        "visual": {
+          "pos": { "x": 0.8, "y": 4.5, "w": 8.1, "h": 0.45 },
+          "style": { "fill": "E2E8F0", "color": "475569", "fontSize": 11 }
+        }
+      }
+    }
+  },
   "content_data": [
     {
       "slide": 1,
+      "page_layout": "cover",
       "title": "Project Roadmap",
       "subtitle": "Strategic Vision and Milestones",
       "body": "Presented by Kyberion Autonomous Agent"
     },
     {
       "slide": 2,
+      "page_layout": "content",
       "title": "Executive Summary",
       "subtitle": "High-Level Goals",
       "body": [
@@ -34,6 +76,7 @@
     },
     {
       "slide": 3,
+      "page_layout": "content",
       "title": "H1 Roadmap (Q1-Q2)",
       "subtitle": "Foundation and Core Features",
       "body": [
@@ -44,6 +87,7 @@
     },
     {
       "slide": 4,
+      "page_layout": "content",
       "title": "H2 Roadmap (Q3-Q4)",
       "subtitle": "Scaling and Ecosystem",
       "body": [

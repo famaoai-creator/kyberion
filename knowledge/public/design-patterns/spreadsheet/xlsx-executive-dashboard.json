@@ -1,0 +1,19 @@
+{
+  "pattern_id": "XLSX-EXEC-DASHBOARD-01",
+  "category": "strategic",
+  "target_audience": "Executives, board members, business leads",
+  "description": "A compact executive dashboard workbook with KPI cards, portfolio review, and decision notes.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Summary sheet with KPI cards",
+      "Portfolio review table",
+      "Decision notes sheet"
+    ],
+    "sheet_theme": "executive-sheet"
+  },
+  "template_profile": {
+    "builder_id": "executive-dashboard",
+    "output_format": "xlsx"
+  }
+}

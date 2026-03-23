@@ -45,6 +45,122 @@ interface MediaAction {
   };
 }
 
+function cloneJsonValue<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function mergePptxShape(base: any, overrides: any): any {
+  return {
+    ...base,
+    ...(overrides || {}),
+    pos: {
+      ...(base?.pos || {}),
+      ...(overrides?.pos || {}),
+    },
+    style: {
+      ...(base?.style || {}),
+      ...(overrides?.style || {}),
+    },
+  };
+}
+
+function resolveSlideTemplate(template: any, slideData: any, fallback = ''): string {
+  if (typeof template !== 'string') return fallback;
+  return template
+    .replace(/{{\s*title\s*}}/g, slideData?.title || '')
+    .replace(/{{\s*subtitle\s*}}/g, slideData?.subtitle || '')
+    .replace(/{{\s*body\s*}}/g, Array.isArray(slideData?.body) ? slideData.body.join('\n') : (slideData?.body || ''))
+    .replace(/{{\s*visual\s*}}/g, slideData?.visual || '');
+}
+
+function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
+  const themeColors = theme?.colors || {};
+  const pageLayouts = pattern?.page_layouts || {};
+  const pageLayoutId = data.page_layout || data.page_layout_id || data.layout_id;
+  const pageLayout = pageLayoutId ? pageLayouts[pageLayoutId] : undefined;
+  const placeholderConfig = pageLayout?.placeholders || {};
+  const bodyText = Array.isArray(data.body) ? data.body.join('\n') : (data.subtitle || data.body || '');
+  const elements: any[] = [];
+
+  if (Array.isArray(pageLayout?.elements)) {
+    elements.push(...cloneJsonValue(pageLayout.elements));
+  }
+
+  if (data.title && placeholderConfig.title !== false) {
+    const titleElement = mergePptxShape({
+      type: 'text',
+      placeholderType: 'title',
+      pos: { x: 0.5, y: 0.5, w: 9, h: 1 },
+      text: data.title,
+      style: {
+        fontSize: 32,
+        bold: true,
+        color: (themeColors.text || '#000000').replace('#', ''),
+        fontFamily: theme?.fonts?.heading?.split(',')[0] || 'Inter',
+        align: 'center',
+      },
+    }, placeholderConfig.title);
+    titleElement.text = resolveSlideTemplate(titleElement.text, data, data.title);
+    elements.push(titleElement);
+  }
+
+  if (bodyText && placeholderConfig.body !== false) {
+    const bodyElement = mergePptxShape({
+      type: 'text',
+      placeholderType: 'body',
+      pos: { x: 1, y: 1.8, w: 8, h: 2.8 },
+      text: bodyText,
+      style: {
+        fontSize: 18,
+        color: (themeColors.secondary || '#334155').replace('#', ''),
+        fontFamily: theme?.fonts?.body?.split(',')[0] || 'System-ui',
+        align: 'left',
+        valign: 'top',
+      },
+    }, placeholderConfig.body);
+    bodyElement.text = resolveSlideTemplate(bodyElement.text, data, bodyText);
+    elements.push(bodyElement);
+  }
+
+  if (data.visual && placeholderConfig.visual !== false) {
+    const visualElement = mergePptxShape({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: 1, y: 4.6, w: 8, h: 0.5 },
+      text: `[Visual: ${data.visual}]`,
+      style: {
+        fill: 'F1F5F9',
+        color: '64748B',
+        fontSize: 12,
+        italic: true,
+        align: 'center',
+        valign: 'middle',
+      },
+    }, placeholderConfig.visual);
+    visualElement.text = resolveSlideTemplate(visualElement.text, data, `[Visual: ${data.visual}]`);
+    elements.push(visualElement);
+  }
+
+  if (Array.isArray(data.elements)) {
+    elements.push(...cloneJsonValue(data.elements));
+  }
+
+  return {
+    id: data.id || `slide${idx + 1}`,
+    elements,
+    backgroundFill: data.backgroundFill || pageLayout?.backgroundFill,
+    bgXml: data.bgXml || pageLayout?.bgXml,
+    transitionXml: data.transitionXml || pageLayout?.transitionXml,
+    notesXml: data.notesXml,
+    extensions: data.extensions || pageLayout?.extensions,
+    metadata: {
+      pageLayoutId,
+      canvas,
+      hasMaster: Boolean(activeMaster),
+    },
+  };
+}
+
 async function handleAction(input: MediaAction) {
   if (input.action !== 'pipeline') throw new Error('Unsupported action');
   return await executePipeline(input.steps || [], input.context || {}, input.options);
@@ -182,54 +298,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             extensions: activeMaster?.extensions,
             bgXml: activeMaster?.bgXml,
           },
-          slides: contentData.map((data: any, idx: number) => {
-            const elements: any[] = [];
-            // Title
-            if (data.title) {
-              elements.push({
-                type: 'text',
-                placeholderType: 'title',
-                pos: { x: 0.5, y: 0.5, w: 9, h: 1 },
-                text: data.title,
-                style: {
-                  fontSize: 32, bold: true,
-                  color: (themeColors.text || '#000000').replace('#', ''),
-                  fontFamily: theme?.fonts?.heading?.split(',')[0] || 'Inter',
-                  align: 'center',
-                },
-              });
-            }
-            // Body / Subtitle
-            const bodyText = Array.isArray(data.body) ? data.body.join('\n') : (data.subtitle || data.body || '');
-            if (bodyText) {
-              elements.push({
-                type: 'text',
-                placeholderType: 'body',
-                pos: { x: 1, y: 1.8, w: 8, h: 2.8 },
-                text: bodyText,
-                style: {
-                  fontSize: 18,
-                  color: (themeColors.secondary || '#334155').replace('#', ''),
-                  fontFamily: theme?.fonts?.body?.split(',')[0] || 'System-ui',
-                  align: 'left', valign: 'top',
-                },
-              });
-            }
-            // Visual placeholder
-            if (data.visual) {
-              elements.push({
-                type: 'shape', shapeType: 'rect',
-                pos: { x: 1, y: 4.6, w: 8, h: 0.5 },
-                text: `[Visual: ${data.visual}]`,
-                style: { fill: 'F1F5F9', color: '64748B', fontSize: 12, italic: true, align: 'center', valign: 'middle' },
-              });
-            }
-            // Allow native elements array
-            if (Array.isArray(data.elements)) {
-              elements.push(...data.elements);
-            }
-            return { id: `slide${idx + 1}`, elements };
-          }),
+          slides: contentData.map((data: any, idx: number) => buildPptxSlideFromPattern(data, idx, theme, pattern, activeMaster, canvas)),
         };
         return { ...ctx, last_pptx_design: protocol, merged_output_format: 'pptx' };
       }
