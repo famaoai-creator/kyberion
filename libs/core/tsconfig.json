@@ -19,5 +19,11 @@
     "src/types/system-status-report.ts",
     "types/**/*.ts"
   ],
-  "exclude": ["node_modules", "*.test.ts", "./dist"]
+  "exclude": [
+    "node_modules",
+    "./dist",
+    "*.test.ts",
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ]
 }

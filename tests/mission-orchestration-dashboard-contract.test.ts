@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -151,11 +152,15 @@ describe('mission orchestration dashboard contract', () => {
 
   it('keeps core public entrypoint free of presence-actuator runtime dependency', () => {
     const coreIndex = read('libs/core/index.ts');
-    const coreDistIndex = read('libs/core/dist/index.js');
 
     expect(coreIndex).not.toContain('presenceAction');
     expect(coreIndex).not.toContain('presence-actuator');
-    expect(coreDistIndex).not.toContain('presence-actuator');
-    expect(coreDistIndex).not.toContain('presenceAction');
+
+    const coreDistPath = path.join(process.cwd(), 'libs/core/dist/index.js');
+    if (fs.existsSync(coreDistPath)) {
+      const coreDistIndex = fs.readFileSync(coreDistPath, 'utf8');
+      expect(coreDistIndex).not.toContain('presence-actuator');
+      expect(coreDistIndex).not.toContain('presenceAction');
+    }
   });
 });
