@@ -1,0 +1,30 @@
+{
+  "library_id": "XLSX-TEMPLATE-LIBRARY-2026-03",
+  "description": "Curated workbook-ready design patterns for leadership, operations, and planning workflows.",
+  "templates": [
+    {
+      "pattern_id": "XLSX-EXEC-DASHBOARD-01",
+      "title": "Executive Dashboard",
+      "pattern_path": "knowledge/public/design-patterns/spreadsheet/xlsx-executive-dashboard.json",
+      "output": "active/shared/exports/xlsx-template-library/XLSX-EXEC-DASHBOARD-01.xlsx"
+    },
+    {
+      "pattern_id": "XLSX-OPS-TRACKER-01",
+      "title": "Operations Tracker",
+      "pattern_path": "knowledge/public/design-patterns/spreadsheet/xlsx-ops-tracker.json",
+      "output": "active/shared/exports/xlsx-template-library/XLSX-OPS-TRACKER-01.xlsx"
+    },
+    {
+      "pattern_id": "XLSX-QBR-WORKBOOK-01",
+      "title": "QBR Workbook",
+      "pattern_path": "knowledge/public/design-patterns/spreadsheet/xlsx-qbr-workbook.json",
+      "output": "active/shared/exports/xlsx-template-library/XLSX-QBR-WORKBOOK-01.xlsx"
+    },
+    {
+      "pattern_id": "XLSX-BUDGET-ACTUAL-01",
+      "title": "Budget vs Actual",
+      "pattern_path": "knowledge/public/design-patterns/spreadsheet/xlsx-budget-vs-actual.json",
+      "output": "active/shared/exports/xlsx-template-library/XLSX-BUDGET-ACTUAL-01.xlsx"
+    }
+  ]
+}

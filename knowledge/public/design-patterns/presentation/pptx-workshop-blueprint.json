@@ -1,0 +1,204 @@
+{
+  "pattern_id": "PPTX-WORKSHOP-01",
+  "category": "operational",
+  "target_audience": "Facilitators, operators, project teams",
+  "description": "A workshop deck template with agenda, session map, breakout guidance, and action capture.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Cover",
+      "Agenda",
+      "Session Map",
+      "Breakout Instructions",
+      "Action Plan"
+    ],
+    "color_palette": "kyberion-standard"
+  },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "F8FAFC",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 10, "h": 1.1 },
+          "style": { "fill": "0F172A", "line": "0F172A" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 7.15, "y": 0.28, "w": 0.9, "h": 0.34 },
+          "text": "01",
+          "style": { "fill": "0EA5E9", "color": "FFFFFF", "fontSize": 11, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.15, "y": 0.28, "w": 0.9, "h": 0.34 },
+          "text": "02",
+          "style": { "fill": "1D4ED8", "color": "FFFFFF", "fontSize": 11, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 9.15, "y": 0.28, "w": 0.65, "h": 0.34 },
+          "text": "03",
+          "style": { "fill": "16A34A", "color": "FFFFFF", "fontSize": 11, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.82, "y": 1.18, "w": 1.8, "h": 0.22 },
+          "text": "WORKSHOP DECK",
+          "style": { "fontSize": 10, "bold": true, "color": "0284C7", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.82, "y": 1.65, "w": 6.3, "h": 0.85 },
+          "style": { "fontSize": 29, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 0.88, "y": 2.85, "w": 5.4, "h": 1.1 },
+          "style": { "fontSize": 17, "color": "334155" }
+        },
+        "visual": false
+      }
+    },
+    "content": {
+      "backgroundFill": "FCFCFD",
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 0.82, "y": 0.42, "w": 2.0, "h": 0.22 },
+          "text": "Facilitation Blueprint",
+          "style": { "fontSize": 10, "bold": true, "color": "0284C7", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.82, "y": 1.14, "w": 8.1, "h": 0 },
+          "style": { "line": "E2E8F0", "lineWidth": 1.0 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.55, "y": 1.34, "w": 3.1, "h": 2.72 },
+          "style": { "fill": "F8FAFC", "line": "BAE6FD", "lineWidth": 1.0 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.82, "y": 0.7, "w": 5.1, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 0.94, "y": 1.58, "w": 4.05, "h": 2.5 },
+          "style": { "fontSize": 17, "color": "334155" }
+        },
+        "visual": false
+      }
+    }
+  },
+  "content_data": [
+    {
+      "page_layout": "cover",
+      "title": "Workshop Blueprint",
+      "subtitle": "A facilitation-ready slide structure for focused working sessions",
+      "body": "Built for kickoff workshops, planning sessions, and alignment meetings."
+    },
+    {
+      "page_layout": "content",
+      "title": "Agenda",
+      "body": [
+        "Context and success criteria",
+        "Review of current state",
+        "Breakout work by theme",
+        "Decision capture and next steps"
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.8, "y": 1.5, "w": 2.8, "h": 1.8 },
+          "text": "90 minutes\n4 segments",
+          "style": { "fill": "DBEAFE", "color": "1D4ED8", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Session Map",
+      "body": [
+        "Start with shared context to anchor decision quality.",
+        "Use timed breakout prompts to generate options.",
+        "End with explicit ownership and due dates."
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "pos": { "x": 5.8, "y": 2.0, "w": 3.0, "h": 0.0 },
+          "style": { "line": "38BDF8", "lineWidth": 1.5 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 5.8, "y": 1.8, "w": 0.35, "h": 0.35 },
+          "style": { "fill": "0EA5E9", "line": "0EA5E9" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 7.1, "y": 1.8, "w": 0.35, "h": 0.35 },
+          "style": { "fill": "0284C7", "line": "0284C7" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 8.4, "y": 1.8, "w": 0.35, "h": 0.35 },
+          "style": { "fill": "0369A1", "line": "0369A1" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Breakout Instructions",
+      "body": [
+        "Assign one owner per group and one scribe.",
+        "Work from prompts, not open discussion.",
+        "Return with one recommendation and one risk."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 5.8, "y": 1.4, "w": 2.8, "h": 2.1 },
+          "text": "Prompt\nEvidence\nRecommendation",
+          "style": { "fill": "E0F2FE", "color": "075985", "fontSize": 18, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Action Plan",
+      "body": [
+        "Capture decisions while the group is present.",
+        "Name owners and due dates before close.",
+        "Schedule the follow-up checkpoint immediately."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.7, "y": 1.5, "w": 3.0, "h": 1.9 },
+          "text": "Owner\nDue date\nCheckpoint",
+          "style": { "fill": "DCFCE7", "color": "166534", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-workshop-blueprint",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "kyberion-standard"
+  }
+}

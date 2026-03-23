@@ -1,0 +1,19 @@
+{
+  "pattern_id": "XLSX-BUDGET-ACTUAL-01",
+  "category": "financial",
+  "target_audience": "Finance, operations, leadership",
+  "description": "A budget-versus-actual workbook with variance review, account detail, and assumptions log.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Variance summary sheet",
+      "Account detail sheet",
+      "Assumptions sheet"
+    ],
+    "sheet_theme": "print-layout-sheet"
+  },
+  "template_profile": {
+    "builder_id": "budget-vs-actual",
+    "output_format": "xlsx"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "library_id": "PPTX-TEMPLATE-LIBRARY-2026-03",
+  "description": "Curated PowerPoint-ready template patterns aligned to common business presentation structures.",
+  "templates": [
+    {
+      "pattern_id": "PPTX-EXEC-BRIEF-01",
+      "title": "Executive Brief",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-executive-brief.json",
+      "theme": "executive-neutral",
+      "output": "active/shared/exports/pptx-template-library/PPTX-EXEC-BRIEF-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-INVESTOR-PITCH-01",
+      "title": "Investor Pitch",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-investor-pitch.json",
+      "theme": "kyberion-sovereign",
+      "output": "active/shared/exports/pptx-template-library/PPTX-INVESTOR-PITCH-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-QBR-01",
+      "title": "Quarterly Business Review",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-quarterly-business-review.json",
+      "theme": "forest-briefing",
+      "output": "active/shared/exports/pptx-template-library/PPTX-QBR-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-CLIENT-PROPOSAL-01",
+      "title": "Client Proposal",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-client-proposal.json",
+      "theme": "kyberion-standard",
+      "output": "active/shared/exports/pptx-template-library/PPTX-CLIENT-PROPOSAL-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-CASE-STUDY-01",
+      "title": "Case Study",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-case-study.json",
+      "theme": "sunrise-report",
+      "output": "active/shared/exports/pptx-template-library/PPTX-CASE-STUDY-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-WORKSHOP-01",
+      "title": "Workshop Blueprint",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-workshop-blueprint.json",
+      "theme": "kyberion-standard",
+      "output": "active/shared/exports/pptx-template-library/PPTX-WORKSHOP-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-ROADMAP-01",
+      "title": "Roadmap Deck",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-roadmap.json",
+      "theme": "executive-neutral",
+      "output": "active/shared/exports/pptx-template-library/PPTX-ROADMAP-01.pptx"
+    },
+    {
+      "pattern_id": "PPTX-VISUAL-ROADMAP-02",
+      "title": "Visual Roadmap",
+      "pattern_path": "knowledge/public/design-patterns/presentation/pptx-visual-roadmap.json",
+      "theme": "executive-neutral",
+      "output": "active/shared/exports/pptx-template-library/PPTX-VISUAL-ROADMAP-02.pptx"
+    }
+  ]
+}

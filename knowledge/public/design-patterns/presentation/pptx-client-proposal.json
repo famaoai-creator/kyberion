@@ -1,0 +1,218 @@
+{
+  "pattern_id": "PPTX-CLIENT-PROPOSAL-01",
+  "category": "relational",
+  "target_audience": "Clients, sponsors, procurement reviewers",
+  "description": "A proposal template focused on challenge framing, solution fit, phased delivery, and commercial next steps.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Cover",
+      "Agenda",
+      "Challenge",
+      "Proposed Solution",
+      "Workplan",
+      "Commercial Next Steps"
+    ],
+    "color_palette": "kyberion-standard"
+  },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 3.2, "h": 5.625 },
+          "style": { "fill": "0F172A", "line": "0F172A" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 3.2, "y": 0, "w": 0.18, "h": 5.625 },
+          "style": { "fill": "38BDF8", "line": "38BDF8" }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.62, "y": 1.02, "w": 1.55, "h": 0.24 },
+          "text": "CLIENT PROPOSAL",
+          "style": { "fontSize": 10, "bold": true, "color": "7DD3FC", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 3.65, "y": 4.5, "w": 5.1, "h": 0 },
+          "style": { "line": "CBD5E1", "lineWidth": 1.0 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 3.65, "y": 1.35, "w": 5.0, "h": 0.9 },
+          "style": { "fontSize": 29, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 3.7, "y": 2.72, "w": 4.55, "h": 1.1 },
+          "style": { "fontSize": 17, "color": "475569" }
+        },
+        "visual": false
+      }
+    },
+    "content": {
+      "backgroundFill": "FCFCFD",
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 0.85, "y": 0.42, "w": 2.0, "h": 0.22 },
+          "text": "Proposal Structure",
+          "style": { "fontSize": 10, "bold": true, "color": "0EA5E9", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.85, "y": 1.14, "w": 8.0, "h": 0 },
+          "style": { "line": "E2E8F0", "lineWidth": 1.0 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.55, "y": 1.35, "w": 3.05, "h": 2.7 },
+          "style": { "fill": "F8FAFC", "line": "BAE6FD", "lineWidth": 1.0 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.85, "y": 0.7, "w": 5.0, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "0F172A" }
+        },
+        "body": {
+          "pos": { "x": 0.98, "y": 1.56, "w": 4.05, "h": 2.5 },
+          "style": { "fontSize": 17, "color": "334155" }
+        },
+        "visual": false
+      }
+    }
+  },
+  "content_data": [
+    {
+      "page_layout": "cover",
+      "title": "Client Proposal",
+      "subtitle": "A practical structure for discovery, scope alignment, and delivery confidence",
+      "body": "Designed for consultative sales and implementation planning."
+    },
+    {
+      "page_layout": "content",
+      "title": "Agenda",
+      "body": [
+        "1. Current challenge and context",
+        "2. Recommended solution shape",
+        "3. Delivery plan and governance",
+        "4. Commercial structure and next steps"
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.8, "y": 1.6, "w": 2.8, "h": 1.8 },
+          "text": "Discovery -> Plan -> Deliver",
+          "style": { "fill": "DBEAFE", "color": "1D4ED8", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Challenge",
+      "body": [
+        "Mission-critical work is delayed by context fragmentation.",
+        "Teams lack a repeatable operating pattern for complex requests.",
+        "Visibility is inconsistent across planning, execution, and review."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 5.8, "y": 1.5, "w": 2.8, "h": 2.0 },
+          "text": "Latency\nInconsistency\nLow visibility",
+          "style": { "fill": "FEE2E2", "color": "991B1B", "fontSize": 18, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Proposed Solution",
+      "body": [
+        "Introduce a mission-driven operating model with governed execution.",
+        "Standardize request intake, pattern-driven outputs, and review loops.",
+        "Create reusable templates for leadership and delivery artifacts."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.7, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "Intake",
+          "style": { "fill": "E0F2FE", "color": "075985", "fontSize": 15, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 7.0, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "Build",
+          "style": { "fill": "DBEAFE", "color": "1D4ED8", "fontSize": 15, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.3, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "Review",
+          "style": { "fill": "DCFCE7", "color": "15803D", "fontSize": 15, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Workplan",
+      "body": [
+        "Week 1-2: discovery and artifact baseline",
+        "Week 3-4: pilot patterns and validation",
+        "Week 5-6: rollout, training, and success tracking"
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "pos": { "x": 5.8, "y": 2.0, "w": 3.0, "h": 0.0 },
+          "style": { "line": "38BDF8", "lineWidth": 1.4 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 5.8, "y": 1.82, "w": 0.32, "h": 0.32 },
+          "style": { "fill": "0EA5E9", "line": "0EA5E9" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 7.2, "y": 1.82, "w": 0.32, "h": 0.32 },
+          "style": { "fill": "0284C7", "line": "0284C7" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": { "x": 8.6, "y": 1.82, "w": 0.32, "h": 0.32 },
+          "style": { "fill": "0369A1", "line": "0369A1" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Commercial Next Steps",
+      "body": [
+        "Confirm pilot scope, stakeholders, and commercial assumptions.",
+        "Align success metrics before kickoff.",
+        "Move to a phased statement of work."
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-client-proposal",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "kyberion-standard"
+  }
+}

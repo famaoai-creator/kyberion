@@ -1,0 +1,19 @@
+{
+  "pattern_id": "XLSX-QBR-WORKBOOK-01",
+  "category": "operational",
+  "target_audience": "Leadership teams, customer sponsors, department heads",
+  "description": "A quarterly business review workbook with summary, KPI detail, and risk follow-up sheets.",
+  "layout_strategy": {
+    "visual_weight": "balanced",
+    "structure": [
+      "Summary sheet",
+      "KPI detail sheet",
+      "Risks and asks sheet"
+    ],
+    "sheet_theme": "executive-sheet"
+  },
+  "template_profile": {
+    "builder_id": "qbr-workbook",
+    "output_format": "xlsx"
+  }
+}

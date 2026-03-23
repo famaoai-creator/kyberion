@@ -1,0 +1,262 @@
+{
+  "pattern_id": "PPTX-INVESTOR-PITCH-01",
+  "category": "relational",
+  "target_audience": "Investors, partners, strategic advisors",
+  "description": "A clean PowerPoint pitch deck with problem, solution, traction, market, and raise slides.",
+  "layout_strategy": {
+    "visual_weight": "visual_heavy",
+    "structure": [
+      "Cover",
+      "Problem",
+      "Solution",
+      "Market Opportunity",
+      "Traction",
+      "Raise"
+    ],
+    "color_palette": "kyberion-sovereign"
+  },
+  "page_layouts": {
+    "cover": {
+      "backgroundFill": "0F172A",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 6.9, "y": 0, "w": 3.1, "h": 5.625 },
+          "style": { "fill": "172554", "line": "172554" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0.0, "y": 4.95, "w": 10.0, "h": 0.68 },
+          "style": { "fill": "1E293B", "line": "1E293B" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 0.9, "y": 0.82, "w": 1.55, "h": 0.42 },
+          "text": "PITCH DECK",
+          "style": { "fill": "1E3A8A", "color": "DBEAFE", "fontSize": 10, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.9, "y": 4.45, "w": 5.7, "h": 0 },
+          "style": { "line": "334155", "lineWidth": 1.0 }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 7.3, "y": 1.15, "w": 1.7, "h": 0.22 },
+          "text": "Seed to Series A",
+          "style": { "fontSize": 10, "bold": true, "color": "93C5FD", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.9, "y": 1.45, "w": 5.6, "h": 0.95 },
+          "style": { "fontSize": 30, "align": "left", "color": "F8FAFC" }
+        },
+        "body": {
+          "pos": { "x": 0.95, "y": 2.72, "w": 4.9, "h": 1.25 },
+          "style": { "fontSize": 17, "color": "CBD5E1" }
+        },
+        "visual": false
+      }
+    },
+    "content": {
+      "backgroundFill": "FCFCFD",
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 0.8, "y": 0.42, "w": 2.2, "h": 0.22 },
+          "text": "INVESTOR NARRATIVE",
+          "style": { "fontSize": 10, "bold": true, "color": "1D4ED8", "align": "left", "valign": "middle" }
+        },
+        {
+          "type": "line",
+          "pos": { "x": 0.8, "y": 1.12, "w": 8.1, "h": 0 },
+          "style": { "line": "E2E8F0", "lineWidth": 1.0 }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.55, "y": 1.3, "w": 3.15, "h": 2.7 },
+          "style": { "fill": "F8FAFC", "line": "DBEAFE", "lineWidth": 1.0 }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 0.8, "y": 0.68, "w": 5.0, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "111827" }
+        },
+        "body": {
+          "pos": { "x": 0.92, "y": 1.52, "w": 4.15, "h": 2.55 },
+          "style": { "fontSize": 17, "color": "334155" }
+        },
+        "visual": false
+      }
+    },
+    "ask": {
+      "backgroundFill": "F8FAFC",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 2.6, "h": 5.625 },
+          "style": { "fill": "0F172A", "line": "0F172A" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 3.35, "y": 1.2, "w": 5.2, "h": 2.45 },
+          "style": { "fill": "FFFFFF", "line": "BFDBFE", "lineWidth": 1.2 }
+        },
+        {
+          "type": "text",
+          "pos": { "x": 0.72, "y": 1.18, "w": 1.0, "h": 0.22 },
+          "text": "THE ASK",
+          "style": { "fontSize": 10, "bold": true, "color": "93C5FD", "align": "left", "valign": "middle" }
+        }
+      ],
+      "placeholders": {
+        "title": {
+          "pos": { "x": 3.35, "y": 0.66, "w": 4.8, "h": 0.55 },
+          "style": { "fontSize": 24, "align": "left", "color": "111827" }
+        },
+        "body": {
+          "pos": { "x": 3.6, "y": 1.62, "w": 3.5, "h": 1.35 },
+          "style": { "fontSize": 18, "color": "1F2937" }
+        },
+        "visual": false
+      }
+    }
+  },
+  "content_data": [
+    {
+      "page_layout": "cover",
+      "title": "Investor Pitch",
+      "subtitle": "A reusable fundraising narrative with modern product storytelling",
+      "body": "Designed for seed to Series A conversations and partner briefings."
+    },
+    {
+      "page_layout": "content",
+      "title": "Problem",
+      "body": [
+        "Teams rely on fragmented AI workflows that break at handoff points.",
+        "High-value work still depends on manual translation from intent to execution.",
+        "Operational trust declines when auditability is weak."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 5.7, "y": 1.5, "w": 3.0, "h": 2.2 },
+          "text": "Fragmentation\nLatency\nLow trust",
+          "style": { "fill": "FEE2E2", "color": "991B1B", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Solution",
+      "body": [
+        "One operating layer for reasoning, execution, and memory.",
+        "Mission-based workflows align strategy, change control, and validation.",
+        "Actuators convert approved intent into digital output."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.6, "y": 1.4, "w": 3.2, "h": 2.4 },
+          "text": "Intent -> Contract -> Execution",
+          "style": { "fill": "DCFCE7", "color": "166534", "fontSize": 20, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Market Opportunity",
+      "body": [
+        "Cross-functional AI operations spans delivery, analytics, and knowledge work.",
+        "Buyers prioritize reliability, governance, and measurable throughput gains.",
+        "Entry wedge: high-complexity teams with repeatable mission volume."
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.8, "y": 1.6, "w": 1.0, "h": 1.0 },
+          "text": "TAM",
+          "style": { "fill": "E0E7FF", "color": "3730A3", "fontSize": 16, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 7.0, "y": 2.0, "w": 1.0, "h": 1.0 },
+          "text": "SAM",
+          "style": { "fill": "C7D2FE", "color": "3730A3", "fontSize": 16, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.0, "y": 2.5, "w": 0.9, "h": 0.9 },
+          "text": "SOM",
+          "style": { "fill": "A5B4FC", "color": "312E81", "fontSize": 14, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "content",
+      "title": "Traction",
+      "body": [
+        "Pilot retention above 90%",
+        "Median turnaround improved 4x",
+        "Expansion demand from internal champions"
+      ],
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 5.6, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "4x",
+          "style": { "fill": "DBEAFE", "color": "1D4ED8", "fontSize": 24, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 6.9, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "90%",
+          "style": { "fill": "DCFCE7", "color": "15803D", "fontSize": 24, "bold": true, "align": "center", "valign": "middle" }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": { "x": 8.2, "y": 1.5, "w": 1.0, "h": 1.0 },
+          "text": "12",
+          "style": { "fill": "FDE68A", "color": "92400E", "fontSize": 24, "bold": true, "align": "center", "valign": "middle" }
+        }
+      ]
+    },
+    {
+      "page_layout": "ask",
+      "title": "Raise",
+      "body": [
+        "Seeking $2.5M to expand go-to-market, deepen enterprise controls, and scale template-driven delivery."
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "pos": { "x": 6.2, "y": 1.95, "w": 2.3, "h": 0.7 },
+          "text": "$2.5M\n18 months runway",
+          "style": { "fontSize": 20, "bold": true, "align": "center", "valign": "middle", "color": "1E3A8A" }
+        }
+      ]
+    }
+  ],
+  "media_actuator_config": {
+    "template_id": "pptx-investor-pitch",
+    "engine": "pptx",
+    "output_format": "pptx",
+    "theme": "kyberion-sovereign"
+  }
+}
