@@ -6,6 +6,7 @@ import type {
   XlsxConditionalFormat,
   XlsxDataValidation,
   XlsxDesignProtocol,
+  XlsxDxfStyle,
   XlsxMergeCell,
   XlsxWorksheet,
 } from '../libs/core/src/types/xlsx-protocol.js';
@@ -127,7 +128,7 @@ function createStyles(palette: Palette) {
     { font: { name: 'Aptos', size: 10, bold: true, color: rgb(palette.text) }, fill: { patternType: 'solid', fgColor: rgb('#EEF2FF') }, border, alignment: { horizontal: 'left', vertical: 'center' } },
     { font: { name: 'Aptos', size: 10, bold: true, color: rgb(palette.text) }, fill: { patternType: 'solid', fgColor: rgb('#ECFEFF') }, border, alignment: { horizontal: 'left', vertical: 'center' } },
   ];
-  const dxfs = [
+  const dxfs: XlsxDxfStyle[] = [
     { font: { name: 'Aptos', size: 10, bold: true, color: rgb('#166534') }, fill: { patternType: 'solid', fgColor: rgb(palette.success), bgColor: rgb(palette.success) } },
     { font: { name: 'Aptos', size: 10, bold: true, color: rgb('#1D4ED8') }, fill: { patternType: 'solid', fgColor: rgb(palette.accentSoft), bgColor: rgb(palette.accentSoft) } },
     { font: { name: 'Aptos', size: 10, bold: true, color: rgb('#92400E') }, fill: { patternType: 'solid', fgColor: rgb(palette.warning), bgColor: rgb(palette.warning) } },
@@ -140,19 +141,19 @@ function createStyles(palette: Palette) {
       { name: 'Aptos', size: 10, color: rgb('#E2E8F0') },
     ],
     fills: [
-      { patternType: 'none' },
-      { patternType: 'gray125' },
-      { patternType: 'solid', fgColor: rgb(palette.primary) },
-      { patternType: 'solid', fgColor: rgb(palette.accentSoft) },
-      { patternType: 'solid', fgColor: rgb(palette.success) },
-      { patternType: 'solid', fgColor: rgb(palette.warning) },
-      { patternType: 'solid', fgColor: rgb(palette.danger) },
-      { patternType: 'solid', fgColor: rgb(palette.muted) },
+      { patternType: 'none' as const },
+      { patternType: 'gray125' as const },
+      { patternType: 'solid' as const, fgColor: rgb(palette.primary) },
+      { patternType: 'solid' as const, fgColor: rgb(palette.accentSoft) },
+      { patternType: 'solid' as const, fgColor: rgb(palette.success) },
+      { patternType: 'solid' as const, fgColor: rgb(palette.warning) },
+      { patternType: 'solid' as const, fgColor: rgb(palette.danger) },
+      { patternType: 'solid' as const, fgColor: rgb(palette.muted) },
     ],
     borders: [{}, border],
     numFmts: [],
     cellXfs,
-    namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0 }],
+    namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0, style: cellXfs[0] }],
     dxfs,
     map: {
       base: 0,

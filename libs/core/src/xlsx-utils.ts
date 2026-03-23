@@ -39,8 +39,15 @@ function getTagFull(xml: string, tag: string): string | undefined {
 }
 
 function getAllTags(xml: string, tag: string): string[] {
-  const re = new RegExp(`<${tag}(?:\\s[^>]*)?\\/?>(?:[\\s\\S]*?<\\/${tag}>)?`, 'gi');
-  return xml.match(re) || [];
+  // Match both self-closing (<tag ... />) and open-close (<tag ...>...</tag>) forms
+  // Using two separate patterns to avoid the self-closing form consuming siblings
+  const results: string[] = [];
+  const re = new RegExp(`<${tag}(?:\\s[^>]*)?\\/>|<${tag}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${tag}>`, 'gi');
+  let match;
+  while ((match = re.exec(xml)) !== null) {
+    results.push(match[0]);
+  }
+  return results;
 }
 
 function emuToNum(emu: string | undefined): number {
@@ -388,10 +395,11 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
   const sheetPr = getTagFull(xml, 'sheetPr') || getTagFull(xml, 'x:sheetPr');
   if (sheetPr) ws.sheetPrXml = sheetPr;
 
-  // Sheet view
+  // Sheet view — preserve full <sheetViews> wrapper for faithful round-trip
+  const svWrap = getTagFull(xml, 'sheetViews') || getTagFull(xml, 'x:sheetViews');
   const svTag = getTagFull(xml, 'sheetView') || getTagFull(xml, 'x:sheetView');
   if (svTag) {
-    ws.sheetView = { rawXml: svTag };
+    ws.sheetView = { rawXml: svWrap || svTag };
     if (getAttr(svTag, 'tabSelected') === '1') ws.sheetView.tabSelected = true;
     if (getAttr(svTag, 'showGridLines') === '0') ws.sheetView.showGridLines = false;
     const zoom = getAttr(svTag, 'zoomScale');
@@ -467,14 +475,27 @@ async function extractWorksheet(zip: JSZip, sheetPath: string, sheetName: string
     });
   }
 
-  // Page setup
+  // Page setup and margins
   const psTag = getTagFull(xml, 'pageSetup') || getTagFull(xml, 'x:pageSetup');
-  if (psTag) {
+  const pmTag = getTagFull(xml, 'pageMargins') || getTagFull(xml, 'x:pageMargins');
+  if (psTag || pmTag) {
+    // Combine pageMargins + pageSetup into a single rawXml block
+    const rawParts = [pmTag, psTag].filter(Boolean).join('');
     ws.pageSetup = {
-      paperSize: parseInt(getAttr(psTag, 'paperSize') || '0') || undefined,
-      orientation: getAttr(psTag, 'orientation') as any,
-      rawXml: psTag
+      paperSize: psTag ? parseInt(getAttr(psTag, 'paperSize') || '0') || undefined : undefined,
+      orientation: psTag ? getAttr(psTag, 'orientation') as any : undefined,
+      rawXml: rawParts || undefined,
     };
+    if (pmTag) {
+      ws.pageSetup.margins = {
+        left: parseFloat(getAttr(pmTag, 'left') || '0.7'),
+        right: parseFloat(getAttr(pmTag, 'right') || '0.7'),
+        top: parseFloat(getAttr(pmTag, 'top') || '0.75'),
+        bottom: parseFloat(getAttr(pmTag, 'bottom') || '0.75'),
+        header: parseFloat(getAttr(pmTag, 'header') || '0.3'),
+        footer: parseFloat(getAttr(pmTag, 'footer') || '0.3'),
+      };
+    }
   }
 
   // Drawing reference (extracted separately)
@@ -922,6 +943,21 @@ export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignPro
     sheets.push(ws);
   }
 
+  // Capture all non-worksheet ZIP entries for faithful round-trip
+  const rawParts: { [entryName: string]: string } = {};
+  const skipPatterns = [
+    /^xl\/worksheets\/sheet\d+\.xml$/,
+    /^xl\/drawings\/drawing\d+\.xml$/, /^xl\/drawings\/_rels\//, /^xl\/media\//, /^xl\/styles\.xml$/, /^xl\/sharedStrings\.xml$/,
+    /^xl\/theme\//, /^xl\/workbook\.xml$/, /^xl\/_rels\/workbook\.xml\.rels$/,
+    /^\[Content_Types\]\.xml$/, /^_rels\/\.rels$/, /^docProps\//, /^xl\/tables\//
+  ];
+  for (const [name, file] of Object.entries(zip.files)) {
+    if (file.dir) continue;
+    if (skipPatterns.some(p => p.test(name))) continue;
+    const data = await file.async('base64');
+    rawParts[name] = data;
+  }
+
   return {
     version: '1.0.0',
     generatedAt: new Date().toISOString(),
@@ -930,6 +966,7 @@ export async function distillXlsxDesign(filePath: string): Promise<XlsxDesignPro
     sharedStrings,
     sharedStringsRich,
     definedNames: wb.definedNames,
-    sheets
+    sheets,
+    rawParts: Object.keys(rawParts).length > 0 ? rawParts : undefined,
   };
 }
