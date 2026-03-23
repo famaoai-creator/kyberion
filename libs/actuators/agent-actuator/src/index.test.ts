@@ -7,6 +7,19 @@ const mocks = vi.hoisted(() => {
   const enqueueMissionTeamPrewarmRequest = vi.fn();
   const startAgentRuntimeSupervisorForRequest = vi.fn();
   const askAgentRuntime = vi.fn();
+  const ensureAgentRuntime = vi.fn();
+  const ensureAgentRuntimeViaDaemon = vi.fn();
+  const askAgentRuntimeViaDaemon = vi.fn();
+  const getAgentRuntimeStatusViaDaemon = vi.fn();
+  const listAgentRuntimesViaDaemon = vi.fn();
+  const shutdownAgentRuntimeViaDaemon = vi.fn();
+  const refreshAgentRuntimeViaDaemon = vi.fn();
+  const restartAgentRuntimeViaDaemon = vi.fn();
+  const stopAgentRuntime = vi.fn();
+  const listAgentRuntimeSnapshots = vi.fn();
+  const getAgentRuntimeSnapshot = vi.fn();
+  const refreshAgentRuntime = vi.fn();
+  const restartAgentRuntime = vi.fn();
 
   return {
     resolveMissionTeamPlan,
@@ -15,6 +28,19 @@ const mocks = vi.hoisted(() => {
     enqueueMissionTeamPrewarmRequest,
     startAgentRuntimeSupervisorForRequest,
     askAgentRuntime,
+    ensureAgentRuntime,
+    ensureAgentRuntimeViaDaemon,
+    askAgentRuntimeViaDaemon,
+    getAgentRuntimeStatusViaDaemon,
+    listAgentRuntimesViaDaemon,
+    shutdownAgentRuntimeViaDaemon,
+    refreshAgentRuntimeViaDaemon,
+    restartAgentRuntimeViaDaemon,
+    stopAgentRuntime,
+    listAgentRuntimeSnapshots,
+    getAgentRuntimeSnapshot,
+    refreshAgentRuntime,
+    restartAgentRuntime,
   };
 });
 
@@ -44,6 +70,20 @@ vi.mock('@agent/core', () => ({
   enqueueMissionTeamPrewarmRequest: mocks.enqueueMissionTeamPrewarmRequest,
   startAgentRuntimeSupervisorForRequest: mocks.startAgentRuntimeSupervisorForRequest,
   askAgentRuntime: mocks.askAgentRuntime,
+  ensureAgentRuntime: mocks.ensureAgentRuntime,
+  ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
+  askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
+  getAgentRuntimeStatusViaDaemon: mocks.getAgentRuntimeStatusViaDaemon,
+  listAgentRuntimesViaDaemon: mocks.listAgentRuntimesViaDaemon,
+  shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
+  refreshAgentRuntimeViaDaemon: mocks.refreshAgentRuntimeViaDaemon,
+  restartAgentRuntimeViaDaemon: mocks.restartAgentRuntimeViaDaemon,
+  stopAgentRuntime: mocks.stopAgentRuntime,
+  listAgentRuntimeSnapshots: mocks.listAgentRuntimeSnapshots,
+  getAgentRuntimeSnapshot: mocks.getAgentRuntimeSnapshot,
+  refreshAgentRuntime: mocks.refreshAgentRuntime,
+  restartAgentRuntime: mocks.restartAgentRuntime,
+  shutdownAllAgentRuntimes: vi.fn(),
   safeReadFile: vi.fn(),
 }));
 
@@ -51,6 +91,13 @@ describe('agent-actuator team composition actions', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.listAgentRuntimesViaDaemon.mockResolvedValue([]);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.getAgentRuntimeStatusViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.shutdownAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.refreshAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.restartAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
   });
 
   it('returns a mission team plan for team_plan', async () => {
@@ -171,5 +218,43 @@ describe('agent-actuator team composition actions', () => {
       requestId: 'AR-1',
       teamRoles: ['planner'],
     });
+  });
+
+  it('prefers supervisor daemon for spawn and ask when available', async () => {
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+      agent_id: 'agent-x',
+      provider: 'gemini',
+      model_id: 'gemini-2.5-flash',
+      status: 'ready',
+    });
+    mocks.askAgentRuntimeViaDaemon.mockResolvedValue({ text: 'daemon response' });
+    const agentRegistry = (await import('@agent/core')).agentRegistry as any;
+    agentRegistry.get.mockReturnValue({ status: 'ready' });
+
+    const { handleAction } = await import('./index.js');
+    const spawned = await handleAction({
+      action: 'spawn',
+      params: {
+        agentId: 'agent-x',
+        provider: 'gemini',
+      },
+    } as any);
+    const asked = await handleAction({
+      action: 'ask',
+      params: {
+        agentId: 'agent-x',
+        query: 'hello',
+      },
+    } as any);
+
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    expect(spawned).toEqual({ status: 'spawned', agent: expect.objectContaining({ agent_id: 'agent-x' }) });
+    expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledWith({
+      agentId: 'agent-x',
+      prompt: 'hello',
+      requestedBy: 'agent_actuator',
+    });
+    expect(asked).toEqual({ status: 'ok', agentId: 'agent-x', response: 'daemon response' });
   });
 });

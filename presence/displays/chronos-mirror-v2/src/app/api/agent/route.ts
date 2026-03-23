@@ -12,6 +12,7 @@ async function loadChronosCore() {
     secureIo,
     channelSurface,
     runtimeSupervisor,
+    runtimeSupervisorClient,
     pipelineContract,
     agentManifest,
     orchestrationEvents,
@@ -21,6 +22,7 @@ async function loadChronosCore() {
     import("@agent/core/secure-io"),
     import("@agent/core/channel-surface"),
     import("@agent/core/agent-runtime-supervisor"),
+    import("@agent/core/agent-runtime-supervisor-client"),
     import("@agent/core/pipeline-contract"),
     import("@agent/core/agent-manifest"),
     import("@agent/core/mission-orchestration-events"),
@@ -44,6 +46,9 @@ async function loadChronosCore() {
     getAgentRuntimeHandle: runtimeSupervisor.getAgentRuntimeHandle,
     listAgentRuntimeSnapshots: runtimeSupervisor.listAgentRuntimeSnapshots,
     stopAgentRuntime: runtimeSupervisor.stopAgentRuntime,
+    ensureAgentRuntimeViaDaemon: runtimeSupervisorClient.ensureAgentRuntimeViaDaemon,
+    createSupervisorBackedAgentHandle: runtimeSupervisorClient.createSupervisorBackedAgentHandle,
+    toSupervisorEnsurePayload: runtimeSupervisorClient.toSupervisorEnsurePayload,
     validatePipelineAdf: pipelineContract.validatePipelineAdf,
     getAgentManifest: agentManifest.getAgentManifest,
     loadAgentManifests: agentManifest.loadAgentManifests,
@@ -99,14 +104,21 @@ function scheduleChronosShutdown() {
 }
 
 async function ensureChronosAgent(context?: { missionId?: string; teamRole?: string; requesterId?: string }) {
-  const { ensureAgentRuntime, getAgentManifest, getAgentRuntimeHandle } = await loadChronosCore();
+  const {
+    ensureAgentRuntime,
+    ensureAgentRuntimeViaDaemon,
+    createSupervisorBackedAgentHandle,
+    getAgentManifest,
+    getAgentRuntimeHandle,
+    toSupervisorEnsurePayload,
+  } = await loadChronosCore();
   const cachedHandle = g.__kyberionChronosHandle;
-  const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
-  if (cachedHandle && runtimeHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
+  if (cachedHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
     scheduleChronosShutdown();
     return cachedHandle;
   }
+  const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
   if (!runtimeHandle || cachedStatus === "shutdown" || cachedStatus === "error") {
     clearChronosCache();
   }
@@ -115,7 +127,7 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
   if (!g.__kyberionChronosReady) {
     g.__kyberionChronosReady = (async () => {
       const manifest = getAgentManifest(CHRONOS_AGENT_ID, PROJECT_ROOT);
-      const handle = await ensureAgentRuntime({
+      const spawnOptions = {
         agentId: CHRONOS_AGENT_ID,
         provider: manifest?.provider || "gemini",
         modelId: manifest?.modelId || "gemini-2.5-flash",
@@ -131,7 +143,14 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
           team_role: context?.teamRole,
           requester_id: context?.requesterId || "chronos-ui",
         },
-      });
+      } as const;
+      let handle;
+      try {
+        const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
+        handle = createSupervisorBackedAgentHandle(CHRONOS_AGENT_ID, "chronos_api", snapshot);
+      } catch (_) {
+        handle = await ensureAgentRuntime(spawnOptions);
+      }
       g.__kyberionChronosHandle = handle;
       scheduleChronosShutdown();
       return handle;

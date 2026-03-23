@@ -4,6 +4,11 @@ import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } from './mission-orchestration-events.js';
 import { ensureAgentRuntime, getAgentRuntimeHandle } from './agent-runtime-supervisor.js';
+import {
+  createSupervisorBackedAgentHandle,
+  ensureAgentRuntimeViaDaemon,
+  toSupervisorEnsurePayload,
+} from './agent-runtime-supervisor-client.js';
 import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest, type ApprovalRequestRecord, type ApprovalRequestDraft } from './approval-store.js';
 import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
 import { a2aBridge } from './a2a-bridge.js';
@@ -442,7 +447,7 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
     throw new Error(`Surface agent manifest not found: ${agentId}`);
   }
 
-  return ensureAgentRuntime({
+  const spawnOptions = {
     agentId,
     provider: manifest.provider,
     modelId: manifest.modelId,
@@ -456,7 +461,20 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
       lease_kind: 'surface',
       surface_agent_id: agentId,
     },
-  });
+  } as const;
+
+  if (process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON === '1') {
+    return ensureAgentRuntime(spawnOptions);
+  }
+
+  try {
+    const snapshot = await ensureAgentRuntimeViaDaemon(
+      toSupervisorEnsurePayload(spawnOptions),
+    );
+    return createSupervisorBackedAgentHandle(agentId, spawnOptions.requestedBy, snapshot);
+  } catch (_) {
+    return ensureAgentRuntime(spawnOptions);
+  }
 }
 
 function buildDelegationFallbackText(query: string): string {

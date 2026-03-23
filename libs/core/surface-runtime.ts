@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
@@ -48,6 +49,11 @@ export interface SurfaceRuntimeState {
 export interface SurfaceHealthStatus {
   status: 'healthy' | 'unhealthy' | 'unknown';
   detail: string;
+}
+
+export interface SurfacePortStatus {
+  occupied: boolean;
+  detail: 'open' | 'closed' | 'timeout' | 'error';
 }
 
 export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
@@ -136,4 +142,24 @@ export async function probeSurfaceHealth(definition: SurfaceRuntimeDefinition): 
   } catch (error: any) {
     return { status: 'unhealthy', detail: error?.name === 'AbortError' ? 'timeout' : 'connect_failed' };
   }
+}
+
+export async function probeSurfacePort(port: number, host = '127.0.0.1'): Promise<SurfacePortStatus> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+
+    const finish = (result: SurfacePortStatus) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+
+    socket.setTimeout(750);
+    socket.once('connect', () => finish({ occupied: true, detail: 'open' }));
+    socket.once('timeout', () => finish({ occupied: false, detail: 'timeout' }));
+    socket.once('error', () => finish({ occupied: false, detail: 'closed' }));
+    socket.connect(port, host);
+  });
 }

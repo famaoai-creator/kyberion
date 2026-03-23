@@ -212,11 +212,13 @@
       "allow_read": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
+        "presence/bridge/runtime/",
         "active/audit/"
       ],
       "allow_write": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
+        "presence/bridge/runtime/",
         "active/audit/"
       ]
     }
