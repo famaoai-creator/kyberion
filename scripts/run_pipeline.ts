@@ -3,18 +3,32 @@ import { rootResolve } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { derivePipelineStatus, type PipelineAdfStep, validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
+export function normalizePipelineOp(op: string): string {
+  if (op.includes(':')) return op;
+  if (op === 'if') return 'core:if';
+  return `system:${op}`;
+}
+
+function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, unknown>): string {
+  const template = params.message ?? params.template ?? params.text ?? '';
+  return String(resolveVars(template, ctx));
+}
+
+export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
   let ctx: Record<string, unknown> = { ...initialCtx };
   const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
 
   for (const step of steps) {
     try {
-      const [domain, action] = step.op.split(':');
+      const normalizedOp = normalizePipelineOp(step.op);
+      const [domain, action] = normalizedOp.split(':');
       const params = (step.params || {}) as Record<string, unknown>;
 
       if (domain === 'system' && action === 'log') {
-        logger.info(String(resolveVars(params.message || '', ctx)));
+        logger.info(resolveLogMessage(params, ctx));
       } else if (domain === 'system' && action === 'shell') {
         const cmd = String(resolveVars(params.cmd || '', ctx));
         const output = safeExec('zsh', ['-lc', cmd], { cwd: process.cwd() }).trim();
@@ -32,9 +46,9 @@ async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unk
         throw new Error(`Unsupported pipeline op: ${step.op}`);
       }
 
-      results.push({ op: step.op, status: 'success' });
+      results.push({ op: normalizedOp, status: 'success' });
     } catch (err: any) {
-      results.push({ op: step.op, status: 'failed', error: err.message });
+      results.push({ op: normalizePipelineOp(step.op), status: 'failed', error: err.message });
       return { status: derivePipelineStatus(results), results, context: ctx };
     }
   }
@@ -42,7 +56,7 @@ async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unk
   return { status: derivePipelineStatus(results), results, context: ctx };
 }
 
-async function main() {
+export async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
@@ -70,4 +84,11 @@ async function main() {
   }
 }
 
-main();
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main().catch(err => {
+    logger.error(err.message);
+    process.exit(1);
+  });
+}
