@@ -356,4 +356,8 @@ export interface XlsxDesignProtocol {
   definedNames: XlsxDefinedName[];
   sheets: XlsxWorksheet[];
   extensions?: string;
+
+  // Complete passthrough: all non-worksheet ZIP entries (base64 encoded)
+  // When present, the engine injects these directly for parts it doesn't generate.
+  rawParts?: { [entryName: string]: string };
 }

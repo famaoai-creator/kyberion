@@ -12,6 +12,7 @@ import {
   docxUtils,
   distillPdfDesign,
   generateNativePptx,
+  patchPptxText,
   generateNativeXlsx,
   generateNativeDocx,
   generateNativePdf,
@@ -583,6 +584,19 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = fs.statSync(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
+      break;
+    }
+    case 'pptx_patch': {
+      const sourcePath = path.resolve(rootDir, resolve(params.source));
+      const outPath = path.resolve(rootDir, resolve(params.path));
+      const replacements = params.replacements || ctx[params.replacements_from || 'last_replacements'] || {};
+
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+
+      patchPptxText(sourcePath, outPath, replacements);
+
+      const stats = fs.statSync(outPath);
+      logger.info(`✅ [MEDIA] PPTX patched at: ${outPath} (${stats.size} bytes).`);
       break;
     }
     case 'xlsx_render': {

@@ -16,11 +16,94 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
   if (!fs.existsSync(dir)) {
     throw new Error(`generateNativePptx: output directory does not exist: ${dir}`);
   }
+
+  // === RAWPARTS MODE: inject all original parts and patch slide text ===
+  // When rawParts is present, we rebuild from the original ZIP structure,
+  // only replacing slide XMLs with patched versions based on semantic element changes.
+  if (protocol.rawParts && Object.keys(protocol.rawParts).length > 0) {
+    const zip = new AdmZip();
+
+    // 1. Inject all raw parts (everything except slide XMLs)
+    for (const [entryName, base64Data] of Object.entries(protocol.rawParts)) {
+      zip.addFile(entryName, Buffer.from(base64Data, 'base64'));
+    }
+
+    // 2. For each slide, apply text changes from semantic elements onto raw XML
+    for (const slide of protocol.slides) {
+      const slideNumber = parseInt(slide.id.match(/\d+/)?.[0] || '0');
+      if (!slideNumber) continue;
+
+      let slideXml = slide.rawSlideXml || '';
+      if (!slideXml) continue;
+
+      // Extract original text from raw XML for comparison
+      const origTexts = extractTextFromSlideXml(slide.rawSlideXml || '');
+      const newTexts = slide.elements
+        .filter(el => el.type === 'text' && el.text)
+        .map(el => el.text!);
+
+      // Build replacement map: original text → new text (for changed entries)
+      const textReplacements: { [key: string]: string } = {};
+      for (let i = 0; i < Math.min(origTexts.length, newTexts.length); i++) {
+        if (origTexts[i] !== newTexts[i]) {
+          textReplacements[origTexts[i]] = newTexts[i];
+        }
+      }
+
+      // Apply text replacements to raw XML using proven <a:t> patching
+      if (Object.keys(textReplacements).length > 0) {
+        for (const [orig, repl] of Object.entries(textReplacements)) {
+          const escapedOrig = escapeXml(orig);
+          const escapedRepl = escapeXml(repl);
+
+          // Strategy 1: Direct <a:t> replacement
+          const pattern = `<a:t>${escapedOrig}</a:t>`;
+          if (slideXml.includes(pattern)) {
+            slideXml = slideXml.split(pattern).join(`<a:t>${escapedRepl}</a:t>`);
+            continue;
+          }
+
+          // Strategy 2: Multi-run concatenated text within paragraphs
+          const paragraphs = slideXml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+          for (const para of paragraphs) {
+            const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
+            if (!textParts) continue;
+            const combined = textParts.map(t => t.replace(/<\/?a:t>/g, '')).join('');
+            if (combined === escapedOrig) {
+              let newPara = para;
+              let firstRun = true;
+              newPara = newPara.replace(/<a:t>[^<]*<\/a:t>/g, () => {
+                if (firstRun) {
+                  firstRun = false;
+                  return `<a:t>${escapedRepl}</a:t>`;
+                }
+                return '<a:t></a:t>';
+              });
+              slideXml = slideXml.replace(para, newPara);
+            }
+          }
+        }
+      }
+
+      // Write slide XML (original or patched)
+      zip.addFile(`ppt/slides/slide${slideNumber}.xml`, Buffer.from(slideXml, 'utf8'));
+
+      // Write slide rels
+      if (slide.rawSlideRelsXml) {
+        zip.addFile(`ppt/slides/_rels/slide${slideNumber}.xml.rels`, Buffer.from(slide.rawSlideRelsXml, 'utf8'));
+      }
+    }
+
+    zip.writeZip(outputPath);
+    return;
+  }
+
+  // === SEMANTIC RECONSTRUCTION MODE (original behavior) ===
   const zip = new AdmZip();
 
   const slideCount = protocol.slides.length;
-  const masterCount = 1;
-  const layoutCount = 2; // 1: Title Layout, 2: Standard Layout
+  const masterCount = protocol.rawMasters?.length || 1;
+  const layoutCount = protocol.rawLayouts?.length || 2;
 
   // Pre-count diagrams, charts, and notes for Content_Types
   let totalDiagrams = 0;
@@ -47,57 +130,106 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
   zip.addFile('ppt/viewProps.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr><p:slideViewPr><p:cSldViewPr><p:cViewPr><p:scale><a:sx n="102" d="100"/><a:sy n="102" d="100"/></p:scale><p:origin x="-108" y="-120"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr><p:notesTextViewPr><p:cViewPr><p:scale><a:sx n="100" d="100"/><a:sy n="100" d="100"/></p:scale><p:origin x="0" y="0"/></p:cViewPr></p:notesTextViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>`, 'utf8'));
   zip.addFile('ppt/tableStyles.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`, 'utf8'));
   
-  // 3. Theme
-  zip.addFile('ppt/theme/theme1.xml', Buffer.from(generateTheme(protocol.theme), 'utf8'));
+  // 3. Theme (use raw XML if available for faithful round-trip)
+  const themeXml = protocol.rawThemeXml || generateTheme(protocol.theme);
+  zip.addFile('ppt/theme/theme1.xml', Buffer.from(themeXml, 'utf8'));
 
   // 4. Slide Master & Layouts
   let imageCounter = 1;
-  let masterSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
-  let titleLayoutSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
-  let standardLayoutSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
-  let masterIdCounter = 2;
-  
-  protocol.master.elements.forEach((el, idx) => {
-    if (el.type === 'shape' || el.type === 'text') {
-      const shapeXml = buildShape(el, masterIdCounter++);
-      if (!el.placeholderType) {
-        masterSpTree += shapeXml;
-      } else {
-        masterSpTree += shapeXml;
-        standardLayoutSpTree += shapeXml;
-        if (el.placeholderType === 'ctrTitle' || el.placeholderType === 'title' || el.placeholderType === 'subTitle') {
-          titleLayoutSpTree += shapeXml;
-        }
-      }
-    } else if (el.type === 'line') {
-      masterSpTree += buildConnector(el, masterIdCounter++);
-    } else if (el.type === 'raw' && el.rawXml) {
-      let finalXml = el.rawXml;
-      if (el.rawRels) {
-        for (const [oldRId, imgPath] of Object.entries(el.rawRels) as [string, any][]) {
-          const ext = path.extname(imgPath).toLowerCase() || '.png';
-          const targetName = `image${imageCounter}${ext}`;
-          const newRId = `rId${masterIdCounter++}`; // We should technically add these to master rels if needed, but usually images in masters are rare in groups. If needed, this logic might be incomplete for master rels, but works for slide rels.
-          finalXml = finalXml.replace(new RegExp(`r:embed="${oldRId}"`, 'g'), `r:embed="${newRId}"`);
-        }
-      }
-      masterSpTree += finalXml;
-    }
-  });
-  masterSpTree += `</p:spTree>`;
-  titleLayoutSpTree += `</p:spTree>`;
-  standardLayoutSpTree += `</p:spTree>`;
 
-  const masterBg = protocol.master.bgXml || `<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>`;
-  const masterXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld>${masterBg}${masterSpTree}</p:cSld>
-  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
-  <p:sldLayoutIdLst>
-    <p:sldLayoutId id="2147483650" r:id="rId1"/>
-    <p:sldLayoutId id="2147483651" r:id="rId2"/>
-  </p:sldLayoutIdLst>
-  <p:txStyles>
+  if ((protocol.rawMasters?.length || protocol.rawMasterXml) && protocol.rawLayouts) {
+    // === RAW PASSTHROUGH MODE: inject original masters/layouts/themes/media ===
+
+    // Inject all slide masters and their themes
+    if (protocol.rawMasters && protocol.rawMasters.length > 0) {
+      protocol.rawMasters.forEach((master, i) => {
+        const num = i + 1;
+        zip.addFile(`ppt/slideMasters/slideMaster${num}.xml`, Buffer.from(master.xml, 'utf8'));
+        if (master.relsXml) {
+          zip.addFile(`ppt/slideMasters/_rels/slideMaster${num}.xml.rels`, Buffer.from(master.relsXml, 'utf8'));
+        }
+        // Inject associated themes (theme2.xml, theme3.xml, etc. for masters beyond the first)
+        if (master.themeXml && num > 1) {
+          zip.addFile(`ppt/theme/theme${num}.xml`, Buffer.from(master.themeXml, 'utf8'));
+        }
+      });
+    } else if (protocol.rawMasterXml) {
+      // Legacy single-master fallback
+      zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(protocol.rawMasterXml, 'utf8'));
+      if (protocol.rawMasterRelsXml) {
+        zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(protocol.rawMasterRelsXml, 'utf8'));
+      } else {
+        zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(generateMasterRels(layoutCount), 'utf8'));
+      }
+    }
+
+    protocol.rawLayouts.forEach((layout, i) => {
+      const num = i + 1;
+      zip.addFile(`ppt/slideLayouts/slideLayout${num}.xml`, Buffer.from(layout.xml, 'utf8'));
+      if (layout.relsXml) {
+        zip.addFile(`ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`, Buffer.from(layout.relsXml, 'utf8'));
+      } else {
+        zip.addFile(`ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`, Buffer.from(generateLayoutRels(1), 'utf8'));
+      }
+    });
+
+    // Inject master/layout media files
+    if (protocol.masterMedia) {
+      for (const media of protocol.masterMedia) {
+        zip.addFile(`ppt/media/${media.fileName}`, Buffer.from(media.data, 'base64'));
+      }
+      // Advance imageCounter past master media to avoid filename collisions with slide images
+      const maxMasterIdx = protocol.masterMedia.reduce((max, m) => {
+        const numMatch = m.fileName.match(/image(\d+)/);
+        return numMatch ? Math.max(max, parseInt(numMatch[1])) : max;
+      }, 0);
+      if (maxMasterIdx >= imageCounter) imageCounter = maxMasterIdx + 1;
+    }
+  } else {
+    // === SEMANTIC RECONSTRUCTION MODE (default) ===
+    let masterSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
+    let titleLayoutSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
+    let standardLayoutSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
+    let masterIdCounter = 2;
+
+    const masterOnlyCount = protocol.master.masterOnlyCount ?? protocol.master.elements.length;
+    protocol.master.elements.forEach((el, idx) => {
+      const isMasterOnly = idx < masterOnlyCount;
+
+      if (el.type === 'shape' || el.type === 'text') {
+        const shapeXml = buildShape(el, masterIdCounter++);
+        if (isMasterOnly) {
+          // Master-only elements go to master spTree only
+          masterSpTree += shapeXml;
+        } else {
+          // Layout-derived placeholder elements go to layouts, not master
+          standardLayoutSpTree += shapeXml;
+          if (el.placeholderType === 'ctrTitle' || el.placeholderType === 'title' || el.placeholderType === 'subTitle') {
+            titleLayoutSpTree += shapeXml;
+          }
+        }
+      } else if (el.type === 'line') {
+        if (isMasterOnly) masterSpTree += buildConnector(el, masterIdCounter++);
+      } else if (el.type === 'raw' && el.rawXml) {
+        let finalXml = el.rawXml;
+        if (el.rawRels) {
+          for (const [oldRId, imgPath] of Object.entries(el.rawRels) as [string, any][]) {
+            const ext = path.extname(imgPath).toLowerCase() || '.png';
+            const targetName = `image${imageCounter}${ext}`;
+            const newRId = `rId${masterIdCounter++}`;
+            finalXml = finalXml.replace(new RegExp(`r:embed="${oldRId}"`, 'g'), `r:embed="${newRId}"`);
+          }
+        }
+        if (isMasterOnly) masterSpTree += finalXml;
+      }
+    });
+    masterSpTree += `</p:spTree>`;
+    titleLayoutSpTree += `</p:spTree>`;
+    standardLayoutSpTree += `</p:spTree>`;
+
+    const masterBg = protocol.master.bgXml || `<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>`;
+    const masterClrMap = protocol.master.clrMapXml || `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
+    const masterTxStyles = protocol.master.txStylesXml || `<p:txStyles>
     <p:titleStyle>
       <a:lvl1pPr algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1">
         <a:lnSpc><a:spcPct val="90000"/></a:lnSpc>
@@ -126,29 +258,44 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
         <a:defRPr lang="ja-JP"/>
       </a:defPPr>
     </p:otherStyle>
-  </p:txStyles>
+  </p:txStyles>`;
+
+    // Build sldLayoutIdLst dynamically for all layouts
+    let sldLayoutIdLst = '<p:sldLayoutIdLst>';
+    for (let i = 0; i < layoutCount; i++) {
+      sldLayoutIdLst += `<p:sldLayoutId id="${2147483650 + i}" r:id="rId${i + 1}"/>`;
+    }
+    sldLayoutIdLst += '</p:sldLayoutIdLst>';
+
+    const masterXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>${masterBg}${masterSpTree}</p:cSld>
+  ${masterClrMap}
+  ${sldLayoutIdLst}
+  ${masterTxStyles}
   ${protocol.master.extensions || ''}
 </p:sldMaster>`;
 
-  // showMasterSp="0" removes the black sidebar from the title slide
-  const titleLayoutXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    // showMasterSp="0" removes the black sidebar from the title slide
+    const titleLayoutXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="title" showMasterSp="0" preserve="1">
   <p:cSld name="Title Layout">${titleLayoutSpTree}</p:cSld>
   <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
 </p:sldLayout>`;
 
-  const standardLayoutXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    const standardLayoutXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="obj" preserve="1">
   <p:cSld name="Standard Layout">${standardLayoutSpTree}</p:cSld>
   <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
 </p:sldLayout>`;
 
-  zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(masterXml, 'utf8'));
-  zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(generateMasterRels(layoutCount), 'utf8'));
-  zip.addFile('ppt/slideLayouts/slideLayout1.xml', Buffer.from(titleLayoutXml, 'utf8'));
-  zip.addFile('ppt/slideLayouts/_rels/slideLayout1.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
-  zip.addFile('ppt/slideLayouts/slideLayout2.xml', Buffer.from(standardLayoutXml, 'utf8'));
-  zip.addFile('ppt/slideLayouts/_rels/slideLayout2.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
+    zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(masterXml, 'utf8'));
+    zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(generateMasterRels(layoutCount), 'utf8'));
+    zip.addFile('ppt/slideLayouts/slideLayout1.xml', Buffer.from(titleLayoutXml, 'utf8'));
+    zip.addFile('ppt/slideLayouts/_rels/slideLayout1.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
+    zip.addFile('ppt/slideLayouts/slideLayout2.xml', Buffer.from(standardLayoutXml, 'utf8'));
+    zip.addFile('ppt/slideLayouts/_rels/slideLayout2.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
+  }
 
   // 5. Slides (imageCounter declared here, also used by master raw elements above via hoisting)
   let diagramCounter = 1;
@@ -271,11 +418,11 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
       bgXml = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${slide.backgroundFill.replace('#','')}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
     }
 
-    const layoutId = slideNumber === 1 ? 1 : 2;
+    const layoutId = slide.layoutIndex ?? (slideNumber === 1 ? 1 : 2);
 
     const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld name="${slide.id}">${bgXml}${slideSpTree}</p:cSld>
+  <p:cSld>${bgXml}${slideSpTree}</p:cSld>
   <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
   ${slide.transitionXml || ''}
   ${slide.extensions || ''}
@@ -292,4 +439,125 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
   });
 
   zip.writeZip(outputPath);
+}
+
+/**
+ * Patch text content in an existing PPTX without reconstruction.
+ * Clones the original ZIP and only modifies <a:t> text nodes in slide XMLs.
+ * This preserves all masters, layouts, themes, media, fonts, and structure perfectly.
+ */
+export function patchPptxText(
+  sourcePath: string,
+  outputPath: string,
+  textReplacements: { [original: string]: string },
+): void {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`patchPptxText: source file does not exist: ${sourcePath}`);
+  }
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    throw new Error(`patchPptxText: output directory does not exist: ${dir}`);
+  }
+
+  const zip = new AdmZip(sourcePath);
+
+  // Build a mapping of escaped XML text for safe replacement
+  const xmlReplacements: { original: string, replacement: string }[] = [];
+  for (const [orig, repl] of Object.entries(textReplacements)) {
+    xmlReplacements.push({ original: escapeXml(orig), replacement: escapeXml(repl) });
+  }
+
+  // Process each slide XML
+  const slideEntries = zip.getEntries().filter(e =>
+    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml')
+  );
+
+  for (const entry of slideEntries) {
+    let xml = entry.getData().toString('utf8');
+    let modified = false;
+
+    // Strategy 1: Replace full <a:t> content matches
+    for (const { original, replacement } of xmlReplacements) {
+      const pattern = `<a:t>${original}</a:t>`;
+      if (xml.includes(pattern)) {
+        xml = xml.split(pattern).join(`<a:t>${replacement}</a:t>`);
+        modified = true;
+      }
+    }
+
+    // Strategy 2: For multi-run text, try to find and replace concatenated text
+    // across adjacent <a:t> tags within the same <a:p> paragraph
+    for (const [orig, repl] of Object.entries(textReplacements)) {
+      if (modified && !xml.includes(escapeXml(orig))) continue;
+      // Find paragraphs containing the text spread across runs
+      const escapedOrig = escapeXml(orig);
+      const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+      for (const para of paragraphs) {
+        const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
+        if (!textParts) continue;
+        const combined = textParts.map(t => t.replace(/<\/?a:t>/g, '')).join('');
+        if (combined === escapedOrig) {
+          // Replace: keep the first run's formatting, put all text there, empty others
+          const escapedRepl = escapeXml(repl);
+          let newPara = para;
+          let firstRun = true;
+          newPara = newPara.replace(/<a:t>[^<]*<\/a:t>/g, (match) => {
+            if (firstRun) {
+              firstRun = false;
+              return `<a:t>${escapedRepl}</a:t>`;
+            }
+            return '<a:t></a:t>';
+          });
+          xml = xml.replace(para, newPara);
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      zip.updateFile(entry.entryName, Buffer.from(xml, 'utf8'));
+    }
+  }
+
+  zip.writeZip(outputPath);
+}
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function unescapeXml(str: string): string {
+  return str
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * Extract concatenated text per shape from raw slide XML.
+ * Groups <a:t> text by their parent <p:sp>/<p:grpSp> shape,
+ * returning one string per text-bearing shape (matching extractObjects order).
+ */
+function extractTextFromSlideXml(xml: string): string[] {
+  const results: string[] = [];
+  // Match each shape's <p:txBody> and concatenate its <a:t> nodes
+  const shapes = xml.match(/<p:sp[ >][\s\S]*?<\/p:sp>/g) || [];
+  for (const shape of shapes) {
+    const txBody = shape.match(/<p:txBody>[\s\S]*?<\/p:txBody>/);
+    if (!txBody) continue;
+    const textParts = txBody[0].match(/<a:t>([^<]*)<\/a:t>/g);
+    if (!textParts || textParts.length === 0) continue;
+    const combined = textParts
+      .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')))
+      .join('');
+    if (combined.trim()) results.push(combined);
+  }
+  return results;
 }

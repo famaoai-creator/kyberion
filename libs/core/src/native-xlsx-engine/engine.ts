@@ -119,10 +119,12 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
     zip.addFile(`xl/worksheets/sheet${sheetNum}.xml`,
       Buffer.from(generateWorksheet(sheet, drawingRId, sstMap), 'utf8'));
 
-    // Sheet rels (only if there are relationships)
-    if (sheetExtras.length > 0) {
-      zip.addFile(`xl/worksheets/_rels/sheet${sheetNum}.xml.rels`,
-        Buffer.from(generateSheetRels(sheetExtras), 'utf8'));
+    // Sheet rels: prefer rawParts version (preserves VML/comment/printerSettings refs)
+    const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetNum}.xml.rels`;
+    if (protocol.rawParts?.[sheetRelsPath]) {
+      zip.addFile(sheetRelsPath, Buffer.from(protocol.rawParts[sheetRelsPath], 'base64'));
+    } else if (sheetExtras.length > 0) {
+      zip.addFile(sheetRelsPath, Buffer.from(generateSheetRels(sheetExtras), 'utf8'));
     }
 
     // Drawing XML
@@ -138,6 +140,16 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
         Buffer.from(generateTable(table), 'utf8'));
     });
   });
+
+  // 7. Inject rawParts (VML drawings, comments, printerSettings, calcChain, etc.)
+  if (protocol.rawParts) {
+    for (const [entryName, base64Data] of Object.entries(protocol.rawParts)) {
+      // Skip entries we already generated
+      if (!zip.getEntry(entryName)) {
+        zip.addFile(entryName, Buffer.from(base64Data, 'base64'));
+      }
+    }
+  }
 
   // Write ZIP to output
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

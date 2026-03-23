@@ -32,38 +32,42 @@ function cellXml(cell: XlsxCell, sstMap?: Map<string, number>): string {
   let xml = `<c r="${cell.ref}"`;
   if (cell.styleIndex !== undefined) xml += ` s="${cell.styleIndex}"`;
   if (effectiveType && effectiveType !== 'n') xml += ` t="${effectiveType}"`;
-  xml += '>';
 
+  // Build inner content
+  let inner = '';
   if (cell.formula) {
-    xml += `<f>${escXml(cell.formula)}</f>`;
-    if (cell.value !== undefined) xml += `<v>${escXml(String(cell.value))}</v>`;
+    inner += `<f>${escXml(cell.formula)}</f>`;
+    if (cell.value !== undefined) inner += `<v>${escXml(String(cell.value))}</v>`;
   } else if (effectiveType === 'inlineStr') {
-    // Inline string: use <is><t> format
-    xml += `<is><t xml:space="preserve">${escXml(String(cell.value ?? ''))}</t></is>`;
+    inner += `<is><t xml:space="preserve">${escXml(String(cell.value ?? ''))}</t></is>`;
   } else if (cell.richText && cell.richText.length > 0) {
-    xml += '<is>';
+    inner += '<is>';
     for (const run of cell.richText) {
-      xml += '<r>';
+      inner += '<r>';
       if (run.font) {
-        xml += '<rPr>';
-        if (run.font.bold) xml += '<b/>';
-        if (run.font.italic) xml += '<i/>';
-        if (run.font.size) xml += `<sz val="${run.font.size}"/>`;
-        if (run.font.name) xml += `<name val="${escXml(run.font.name)}"/>`;
-        xml += '</rPr>';
+        inner += '<rPr>';
+        if (run.font.bold) inner += '<b/>';
+        if (run.font.italic) inner += '<i/>';
+        if (run.font.size) inner += `<sz val="${run.font.size}"/>`;
+        if (run.font.name) inner += `<name val="${escXml(run.font.name)}"/>`;
+        inner += '</rPr>';
       }
-      xml += `<t xml:space="preserve">${escXml(run.text)}</t>`;
-      xml += '</r>';
+      inner += `<t xml:space="preserve">${escXml(run.text)}</t>`;
+      inner += '</r>';
     }
-    xml += '</is>';
+    inner += '</is>';
   } else if (cell.type === 's' && sstIndex !== undefined) {
-    // Shared string reference
-    xml += `<v>${sstIndex}</v>`;
+    inner += `<v>${sstIndex}</v>`;
   } else if (cell.value !== undefined) {
-    xml += `<v>${escXml(String(cell.value))}</v>`;
+    inner += `<v>${escXml(String(cell.value))}</v>`;
   }
 
-  xml += '</c>';
+  // Self-close if no inner content (preserves original format for empty styled cells)
+  if (inner) {
+    xml += `>${inner}</c>`;
+  } else {
+    xml += '/>';
+  }
   return xml;
 }
 
