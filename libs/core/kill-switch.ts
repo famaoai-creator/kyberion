@@ -1,6 +1,7 @@
 import { logger } from './core.js';
 import { agentRegistry } from './agent-registry.js';
 import { stopAgentRuntime } from './agent-runtime-supervisor.js';
+import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
 import { trustEngine } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
 
@@ -115,7 +116,11 @@ class KillSwitchImpl {
     if (severity >= 3) {
       // Kill
       logger.error(`[KILL_SWITCH] Terminating ${agentId}: ${anomalies.join(', ')}`);
-      await stopAgentRuntime(agentId, 'kill_switch');
+      try {
+        await shutdownAgentRuntimeViaDaemon(agentId, 'kill_switch');
+      } catch (_) {
+        await stopAgentRuntime(agentId, 'kill_switch');
+      }
       auditChain.recordLifecycle(agentId, 'shutdown');
       return 'killed';
     }

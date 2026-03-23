@@ -127,7 +127,7 @@ export * as docxUtils from './src/docx-utils.js';
 // export * as mcpClient from './mcp-client-engine.js';
 
 // Voice & Presentation
-export { say } from './voice-synth.js';
+export { say, speak } from './voice-synth.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal } from './reflex-terminal.js';
@@ -164,11 +164,13 @@ export * from './managed-process.js';
 export * from './mission-team-composer.js';
 export * from './mission-team-orchestrator.js';
 export * from './agent-runtime-supervisor.js';
+export * from './agent-runtime-supervisor-client.js';
 export * from './mission-orchestration-events.js';
 export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
 export * from './channel-surface.js';
+export * from './presence-surface.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
 export * from './generation-scheduler.js';
