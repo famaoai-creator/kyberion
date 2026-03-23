@@ -16,6 +16,13 @@ import {
   refreshAgentRuntime,
   restartAgentRuntime,
   askAgentRuntime,
+  ensureAgentRuntimeViaDaemon,
+  askAgentRuntimeViaDaemon,
+  getAgentRuntimeStatusViaDaemon,
+  listAgentRuntimesViaDaemon,
+  shutdownAgentRuntimeViaDaemon,
+  refreshAgentRuntimeViaDaemon,
+  restartAgentRuntimeViaDaemon,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -65,8 +72,7 @@ export async function handleAction(input: AgentAction) {
   switch (action) {
     case 'spawn': {
       if (!params.provider) throw new Error('provider is required for spawn');
-
-      const handle = await ensureAgentRuntime({
+      const spawnPayload = {
         agentId: params.agentId,
         provider: params.provider,
         modelId: params.modelId,
@@ -77,11 +83,17 @@ export async function handleAction(input: AgentAction) {
         missionId: params.missionId,
         trustRequired: params.trustRequired,
         requestedBy: 'agent_actuator',
-      });
-
-      const record = handle.getRecord();
-      logger.info(`[AGENT_ACTUATOR] Spawned: ${record?.agentId} (${record?.provider}/${record?.modelId})`);
-      return { status: 'spawned', agent: record };
+      };
+      try {
+        const snapshot = await ensureAgentRuntimeViaDaemon(spawnPayload);
+        logger.info(`[AGENT_ACTUATOR] Spawned via daemon: ${snapshot.agent_id} (${snapshot.provider}/${snapshot.model_id})`);
+        return { status: 'spawned', agent: snapshot };
+      } catch (_) {
+        const handle = await ensureAgentRuntime(spawnPayload);
+        const record = handle.getRecord();
+        logger.info(`[AGENT_ACTUATOR] Spawned: ${record?.agentId} (${record?.provider}/${record?.modelId})`);
+        return { status: 'spawned', agent: record };
+      }
     }
 
     case 'ask': {
@@ -98,7 +110,17 @@ export async function handleAction(input: AgentAction) {
       agentRegistry.touch(params.agentId);
 
       try {
-        const response = await askAgentRuntime(params.agentId, params.query, 'agent_actuator');
+        let response: string;
+        try {
+          const result = await askAgentRuntimeViaDaemon({
+            agentId: params.agentId,
+            prompt: params.query,
+            requestedBy: 'agent_actuator',
+          });
+          response = result.text;
+        } catch (_) {
+          response = await askAgentRuntime(params.agentId, params.query, 'agent_actuator');
+        }
         agentRegistry.updateStatus(params.agentId, 'ready');
         return { status: 'ok', agentId: params.agentId, response };
       } catch (e: any) {
@@ -109,7 +131,11 @@ export async function handleAction(input: AgentAction) {
 
     case 'shutdown': {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
-      await stopAgentRuntime(params.agentId, 'agent_actuator');
+      try {
+        await shutdownAgentRuntimeViaDaemon(params.agentId, 'agent_actuator');
+      } catch (_) {
+        await stopAgentRuntime(params.agentId, 'agent_actuator');
+      }
       return { status: 'shutdown', agentId: params.agentId };
     }
 
@@ -125,40 +151,88 @@ export async function handleAction(input: AgentAction) {
 
     case 'health': {
       const snapshot = agentRegistry.getHealthSnapshot();
-      const agents = listAgentRuntimeSnapshots().map(entry => ({
-        agentId: entry.agent.agentId,
-        provider: entry.agent.provider,
-        modelId: entry.agent.modelId,
-        status: entry.agent.status,
-        capabilities: entry.agent.capabilities,
-        trustScore: entry.agent.trustScore,
-        uptimeMs: Date.now() - entry.agent.spawnedAt,
-        idleMs: Date.now() - entry.agent.lastActivity,
-        runtime: entry.runtime,
-        metrics: entry.metrics,
-        process: entry.process,
-        supportsSoftRefresh: entry.supportsSoftRefresh,
-      }));
+      let agents;
+      try {
+        const daemonAgents = await listAgentRuntimesViaDaemon();
+        agents = daemonAgents.map(entry => ({
+          agentId: entry.agent_id,
+          provider: entry.provider,
+          modelId: entry.model_id,
+          status: entry.status,
+          capabilities: [],
+          trustScore: null,
+          uptimeMs: null,
+          idleMs: null,
+          runtime: entry.pid ? {
+            kind: 'agent',
+            state: 'running',
+            pid: entry.pid,
+            idleForMs: null,
+            shutdownPolicy: 'manual',
+          } : null,
+          metrics: null,
+          process: null,
+          supportsSoftRefresh: true,
+        }));
+      } catch (_) {
+        agents = listAgentRuntimeSnapshots().map(entry => ({
+          agentId: entry.agent.agentId,
+          provider: entry.agent.provider,
+          modelId: entry.agent.modelId,
+          status: entry.agent.status,
+          capabilities: entry.agent.capabilities,
+          trustScore: entry.agent.trustScore,
+          uptimeMs: Date.now() - entry.agent.spawnedAt,
+          idleMs: Date.now() - entry.agent.lastActivity,
+          runtime: entry.runtime,
+          metrics: entry.metrics,
+          process: entry.process,
+          supportsSoftRefresh: entry.supportsSoftRefresh,
+        }));
+      }
       return { status: 'ok', ...snapshot, agents };
     }
 
     case 'snapshot': {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
-      const snapshot = getAgentRuntimeSnapshot(params.agentId);
-      if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
-      return { status: 'ok', snapshot };
+      try {
+        const snapshot = await getAgentRuntimeStatusViaDaemon(params.agentId);
+        if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
+        return { status: 'ok', snapshot };
+      } catch (_) {
+        const snapshot = getAgentRuntimeSnapshot(params.agentId);
+        if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
+        return { status: 'ok', snapshot };
+      }
     }
 
     case 'refresh': {
       if (!params.agentId) throw new Error('agentId is required for refresh');
-      const result = await refreshAgentRuntime(params.agentId, 'agent_actuator');
-      return { status: 'ok', agentId: params.agentId, ...result };
+      try {
+        const result = await refreshAgentRuntimeViaDaemon(params.agentId, 'agent_actuator');
+        return { status: 'ok', agentId: params.agentId, ...result };
+      } catch (_) {
+        const result = await refreshAgentRuntime(params.agentId, 'agent_actuator');
+        return { status: 'ok', agentId: params.agentId, ...result };
+      }
     }
 
     case 'restart': {
       if (!params.agentId) throw new Error('agentId is required for restart');
-      const handle = await restartAgentRuntime(params.agentId, 'agent_actuator');
-      return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
+      try {
+        const snapshot = await restartAgentRuntimeViaDaemon({
+          agentId: params.agentId,
+          provider: params.provider || 'gemini',
+          modelId: params.modelId,
+          systemPrompt: params.systemPrompt,
+          capabilities: params.capabilities,
+          requestedBy: 'agent_actuator',
+        });
+        return { status: 'ok', agentId: params.agentId, snapshot };
+      } catch (_) {
+        const handle = await restartAgentRuntime(params.agentId, 'agent_actuator');
+        return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
+      }
     }
 
     case 'a2a': {

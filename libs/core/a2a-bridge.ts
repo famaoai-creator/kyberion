@@ -8,6 +8,13 @@ import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { ensureAgentRuntimeRoot } from './agent-runtime-root.js';
 import { askAgentRuntime, ensureAgentRuntime, getAgentRuntimeHandle, stopAgentRuntime } from './agent-runtime-supervisor.js';
+import {
+  askAgentRuntimeViaDaemon,
+  createSupervisorBackedAgentHandle,
+  ensureAgentRuntimeViaDaemon,
+  shutdownAgentRuntimeViaDaemon,
+  toSupervisorEnsurePayload,
+} from './agent-runtime-supervisor-client.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]
@@ -140,7 +147,13 @@ class A2ABridgeImpl {
     });
 
     // Ask the agent
-    const responseText = await askAgentRuntime(agentId, prompt, 'a2a_bridge');
+    let responseText: string;
+    try {
+      const result = await askAgentRuntimeViaDaemon({ agentId, prompt, requestedBy: 'a2a_bridge' });
+      responseText = result.text;
+    } catch (_) {
+      responseText = await askAgentRuntime(agentId, prompt, 'a2a_bridge');
+    }
 
     // Build signed response envelope
     const response: A2AMessage = {
@@ -191,7 +204,11 @@ class A2ABridgeImpl {
 
     if (existing && this.runtimeContexts.get(agentId) !== runtimeContextKey) {
       logger.info(`[A2A_BRIDGE] Recreating ${agentId} for runtime context ${runtimeContextKey}`);
-      await stopAgentRuntime(agentId, 'a2a_bridge');
+      try {
+        await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
+      } catch (_) {
+        await stopAgentRuntime(agentId, 'a2a_bridge');
+      }
       this.handles.delete(agentId);
       this.runtimeContexts.delete(agentId);
     }
@@ -204,7 +221,7 @@ class A2ABridgeImpl {
 
     const cwd = this.resolveSpawnCwd(agentId, manifest.provider || provider || 'gemini', manifest.systemPrompt, payload, runtimeContextKey);
 
-    const handle = await ensureAgentRuntime({
+    const spawnOptions = {
       agentId,
       provider: manifest.provider || provider || 'gemini',
       modelId: manifest.modelId,
@@ -225,7 +242,14 @@ class A2ABridgeImpl {
         thread: typeof (payload as any)?.context?.thread === 'string' ? String((payload as any).context.thread) : undefined,
         intent: typeof (payload as any)?.intent === 'string' ? String((payload as any).intent) : undefined,
       },
-    });
+    } as const;
+    let handle: AgentHandle;
+    try {
+      const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
+      handle = createSupervisorBackedAgentHandle(agentId, 'a2a_bridge', snapshot);
+    } catch (_) {
+      handle = await ensureAgentRuntime(spawnOptions);
+    }
     this.handles.set(agentId, handle);
     this.runtimeContexts.set(agentId, runtimeContextKey);
     logger.info(`[A2A_BRIDGE] Auto-spawned agent: ${agentId} (manifest-verified)`);

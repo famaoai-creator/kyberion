@@ -144,7 +144,7 @@ export const a2uiDispatcher = new A2UIDispatcher();
 /**
  * Bridge HTTP transport: forwards A2UI messages to the Bridge SSE relay.
  */
-function createBridgeTransport(bridgeUrl = 'http://localhost:3031'): A2UITransport {
+function createBridgeTransport(bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031'): A2UITransport {
   return (message: A2UIMessage) => {
     fetch(`${bridgeUrl}/a2ui/dispatch`, {
       method: 'POST',

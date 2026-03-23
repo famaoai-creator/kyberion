@@ -4,7 +4,7 @@
   "type": "object",
   "required": ["action"],
   "properties": {
-    "action": { "enum": ["dispatch", "status", "receive_event"] },
+    "action": { "enum": ["dispatch", "status", "receive_event", "dispatch_timeline"] },
     "params": { "type": "object" }
   }
 }

@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Presence Studio</title>
+    <style>
+      :root {
+        --bg: #091018;
+        --panel: rgba(17, 27, 39, 0.86);
+        --panel-border: rgba(143, 197, 255, 0.14);
+        --accent: #7dd3fc;
+        --accent-strong: #22d3ee;
+        --text: #edf6ff;
+        --muted: #8aa3bd;
+        --warm: #fde68a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(34,211,238,0.18), transparent 32%),
+          radial-gradient(circle at 80% 20%, rgba(253,230,138,0.12), transparent 22%),
+          linear-gradient(180deg, #0a1220 0%, #071019 100%);
+        color: var(--text);
+      }
+      .shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: baseline;
+        margin-bottom: 20px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--warm);
+      }
+      h1 {
+        margin: 6px 0 0;
+        font-size: clamp(32px, 5vw, 56px);
+        line-height: 0.94;
+      }
+      .sub {
+        color: var(--muted);
+        max-width: 680px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 18px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        padding: 20px;
+        backdrop-filter: blur(20px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      }
+      .avatar {
+        min-height: 420px;
+        display: grid;
+        place-items: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .avatar::before {
+        content: "";
+        position: absolute;
+        inset: 30px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(125,211,252,0.18), transparent 65%);
+        filter: blur(8px);
+      }
+      .orb {
+        position: relative;
+        width: 230px;
+        height: 230px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #fef3c7 0%, #7dd3fc 30%, #0f172a 70%);
+        box-shadow: 0 0 80px rgba(34, 211, 238, 0.25);
+        display: grid;
+        place-items: center;
+        animation: float 4.5s ease-in-out infinite;
+      }
+      .expression {
+        position: absolute;
+        bottom: 22px;
+        left: 22px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.34);
+        color: var(--warm);
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(125,211,252,0.1);
+        color: var(--accent);
+        font-size: 14px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 16px currentColor;
+      }
+      .subtitle {
+        margin-top: 18px;
+        font-size: clamp(20px, 3vw, 34px);
+        line-height: 1.18;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .item {
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+      .label {
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .footer {
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+      .button {
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        background: rgba(125, 211, 252, 0.1);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 10px 16px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .button[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .button.active {
+        background: rgba(253, 230, 138, 0.14);
+        border-color: rgba(253, 230, 138, 0.42);
+        color: var(--warm);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .select {
+        border: 1px solid rgba(125, 211, 252, 0.2);
+        background: rgba(9, 16, 24, 0.8);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        min-width: 240px;
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-12px); }
+      }
+      @media (max-width: 860px) {
+        .grid { grid-template-columns: 1fr; }
+        .avatar { min-height: 320px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="header">
+        <div>
+          <div class="eyebrow">Expressive Surface MVP</div>
+          <h1 id="title">Presence Studio</h1>
+        </div>
+        <div class="mono" id="updated">waiting for state</div>
+      </div>
+      <div class="sub">A governed realtime surface for subtitles, expression state, transcript, and voice-channel stimuli.</div>
+      <div class="grid" style="margin-top: 22px;">
+        <section class="panel avatar">
+          <div class="orb"></div>
+          <div class="expression" id="expression">neutral</div>
+        </section>
+        <section class="panel">
+          <div class="status"><span class="dot"></span><span id="status">ready</span></div>
+          <div class="subtitle" id="subtitle">Surface ready. Send A2UI or voice stimuli.</div>
+          <div class="controls">
+            <button class="button" id="native-mic-toggle" type="button">Start Native STT</button>
+            <button class="button" id="mic-toggle" type="button">Start Browser STT</button>
+            <select class="select" id="native-device"></select>
+            <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
+          </div>
+          <div class="footer">This MVP uses the existing A2UI transport and the governed `voice` channel stimuli path.</div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Transcript</div>
+          <div class="list" id="transcript"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Recent Voice Stimuli</div>
+          <div class="list" id="stimuli"></div>
+        </section>
+      </div>
+    </div>
+    <script>
+      const titleEl = document.getElementById("title");
+      const updatedEl = document.getElementById("updated");
+      const expressionEl = document.getElementById("expression");
+      const statusEl = document.getElementById("status");
+      const subtitleEl = document.getElementById("subtitle");
+      const transcriptEl = document.getElementById("transcript");
+      const stimuliEl = document.getElementById("stimuli");
+      const nativeMicToggleEl = document.getElementById("native-mic-toggle");
+      const micToggleEl = document.getElementById("mic-toggle");
+      const nativeDeviceEl = document.getElementById("native-device");
+      const micHintEl = document.getElementById("mic-hint");
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let isListening = false;
+      let isNativeListening = false;
+
+      function makeRequestId() {
+        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+        return `browser-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function setMicState(nextListening, hint) {
+        isListening = nextListening;
+        micToggleEl.textContent = nextListening ? "Stop Mic STT" : "Start Mic STT";
+        micToggleEl.classList.toggle("active", nextListening);
+        micHintEl.textContent = hint;
+      }
+
+      function setNativeMicState(nextListening, hint) {
+        isNativeListening = nextListening;
+        nativeMicToggleEl.textContent = nextListening ? "Listening Natively..." : "Start Native STT";
+        nativeMicToggleEl.classList.toggle("active", nextListening);
+        micHintEl.textContent = hint;
+      }
+
+      function selectedNativeDeviceLabel() {
+        const option = nativeDeviceEl.options[nativeDeviceEl.selectedIndex];
+        return option ? option.textContent : "default input";
+      }
+
+      async function postVoiceIngress(text) {
+        const response = await fetch("/api/voice/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            request_id: makeRequestId(),
+            text,
+            intent: "conversation",
+            source_id: "browser-mic",
+            speaker: "User"
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`voice ingest failed: HTTP ${response.status}`);
+        }
+        return response.json();
+      }
+
+      async function startNativeStt() {
+        const deviceLabel = selectedNativeDeviceLabel();
+        setNativeMicState(true, `Native STT is listening on ${deviceLabel}...`);
+        try {
+          const response = await fetch("/api/voice/native-listen", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              request_id: makeRequestId(),
+              locale: navigator.language || "ja-JP",
+              device_id: nativeDeviceEl.value || undefined,
+              timeout_seconds: 8
+            })
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(`${body.error || `HTTP ${response.status}`} (${deviceLabel}, ${body.elapsed_ms || "?"}ms)`);
+          }
+          setNativeMicState(false, `Native STT heard on ${deviceLabel}: ${body.stt?.text || body.replyText || "ok"} (${body.stt?.elapsed_ms || "?"}ms)`);
+        } catch (error) {
+          setNativeMicState(false, `Native STT failed on ${deviceLabel}: ${error.message || error}`);
+        }
+      }
+
+      async function loadNativeInputDevices() {
+        nativeDeviceEl.innerHTML = "";
+        try {
+          const response = await fetch("/api/voice/input-devices");
+          const body = await response.json();
+          if (!response.ok || !body.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          for (const device of body.devices || []) {
+            const option = document.createElement("option");
+            option.value = device.uid;
+            option.textContent = device.isDefault ? `${device.name} (Default)` : device.name;
+            if (device.isDefault) option.selected = true;
+            nativeDeviceEl.appendChild(option);
+          }
+          nativeDeviceEl.disabled = false;
+          if (!nativeDeviceEl.options.length) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "No input devices found";
+            nativeDeviceEl.appendChild(option);
+            nativeDeviceEl.disabled = true;
+          }
+        } catch (error) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = `Device list failed: ${error.message || error}`;
+          nativeDeviceEl.appendChild(option);
+          nativeDeviceEl.disabled = true;
+        }
+      }
+
+      function renderList(root, items, mapper) {
+        root.innerHTML = "";
+        if (!items || items.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "item";
+          empty.textContent = "No data yet.";
+          root.appendChild(empty);
+          return;
+        }
+        for (const item of items) {
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = mapper(item);
+          root.appendChild(node);
+        }
+      }
+
+      function render(state) {
+        const surface = state.surfaces["presence-studio"] || { data: {} };
+        const data = surface.data || {};
+        titleEl.textContent = data.title || "Presence Studio";
+        updatedEl.textContent = data.updatedAt || state.lastUpdatedAt || "waiting for state";
+        expressionEl.textContent = data.expression || "neutral";
+        statusEl.textContent = data.status || "idle";
+        subtitleEl.textContent = data.subtitle || "Surface ready. Send A2UI or voice stimuli.";
+
+        renderList(transcriptEl, data.transcript || [], (item) =>
+          `<div class="row"><strong>${item.speaker || "speaker"}</strong><span class="mono">${(item.text || "").replace(/</g, "&lt;")}</span></div>`
+        );
+
+        renderList(stimuliEl, state.recentStimuli || [], (item) =>
+          `<div class="label">${item.origin?.source_id || "voice"}</div><div>${item.signal?.payload || ""}</div><div class="mono">${item.ts || ""}</div>`
+        );
+      }
+
+      function setupMic() {
+        nativeMicToggleEl.addEventListener("click", () => {
+          if (isNativeListening) return;
+          startNativeStt();
+        });
+
+        if (!SpeechRecognition) {
+          micToggleEl.disabled = true;
+          setMicState(false, "Web Speech API is not available in this browser.");
+        } else {
+          micToggleEl.addEventListener("click", () => {
+            if (isListening) {
+              recognition?.stop();
+              setMicState(false, "Stopping microphone...");
+              return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = navigator.language || "ja-JP";
+            recognition.interimResults = true;
+            recognition.continuous = false;
+
+            recognition.onstart = () => {
+              setMicState(true, "Listening...");
+            };
+
+            recognition.onresult = async (event) => {
+              const transcript = Array.from(event.results)
+                .map((result) => result[0]?.transcript || "")
+                .join("")
+                .trim();
+              if (!transcript) return;
+              const last = event.results[event.results.length - 1];
+              if (!last?.isFinal) {
+                setMicState(true, `Listening... ${transcript}`);
+                return;
+              }
+              setMicState(false, `Recognized: ${transcript}`);
+              try {
+                await postVoiceIngress(transcript);
+                micHintEl.textContent = `Sent: ${transcript}`;
+              } catch (error) {
+                micHintEl.textContent = `STT send failed: ${error.message || error}`;
+              }
+            };
+
+            recognition.onerror = (event) => {
+              setMicState(false, `Speech recognition error: ${event.error || "unknown"}`);
+            };
+
+            recognition.onend = () => {
+              if (isListening) {
+                setMicState(false, "Speech recognition ended.");
+              }
+            };
+
+            recognition.start();
+          });
+        }
+      }
+
+      fetch("/api/state").then((res) => res.json()).then(render);
+      const source = new EventSource("/api/stream");
+      source.addEventListener("state", (event) => {
+        render(JSON.parse(event.data));
+      });
+      loadNativeInputDevices();
+      setupMic();
+    </script>
+  </body>
+  </html>

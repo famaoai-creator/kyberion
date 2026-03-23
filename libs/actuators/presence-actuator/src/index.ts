@@ -1,4 +1,4 @@
-import { logger, resolveServiceBinding, safeReadFile } from '@agent/core';
+import { logger, resolveServiceBinding, safeReadFile, validatePresenceTimeline } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
@@ -19,7 +19,7 @@ const getPtyEngine = () => {
 export type MessagingMode = 'emitter' | 'listener' | 'conversational';
 
 interface PresenceAction {
-  action: 'dispatch' | 'status' | 'receive_event';
+  action: 'dispatch' | 'status' | 'receive_event' | 'dispatch_timeline';
   params: {
     channel: string; 
     mode?: MessagingMode;
@@ -31,6 +31,7 @@ interface PresenceAction {
       from?: string;
       event_type?: string;
       event_data?: any;
+      timeline?: any;
     };
   };
 }
@@ -109,6 +110,21 @@ export async function handleAction(input: PresenceAction) {
         logger.error(`❌ [PRESENCE_SLACK] Failed to send message: ${err.message}`);
         throw err;
       }
+    }
+
+    case 'dispatch_timeline': {
+      const timeline = validatePresenceTimeline(params.payload.timeline);
+      const bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031';
+      const response = await fetch(`${bridgeUrl}/api/timeline/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(timeline),
+      });
+      if (!response.ok) {
+        throw new Error(`Presence timeline dispatch failed: HTTP ${response.status}`);
+      }
+      const body = await response.json();
+      return { status: 'timeline_dispatched', ...body };
     }
 
     default:

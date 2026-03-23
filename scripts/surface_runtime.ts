@@ -6,6 +6,7 @@ import {
   loadSurfaceState,
   logger,
   normalizeSurfaceDefinition,
+  probeSurfacePort,
   pathResolver,
   probeSurfaceHealth,
   runtimeSupervisor,
@@ -69,7 +70,7 @@ function stopByPid(pid: number | undefined): void {
   } catch (_) {}
 }
 
-function startSurfaceById(surfaceId: string, manifestPath: string) {
+async function startSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
   const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
   if (!definition) {
@@ -79,6 +80,37 @@ function startSurfaceById(surfaceId: string, manifestPath: string) {
   const normalized = normalizeSurfaceDefinition(definition);
   if (!normalized.enabled) {
     throw new Error(`Surface "${surfaceId}" is disabled in manifest ${manifestPath}`);
+  }
+
+  const state = loadSurfaceState();
+  const existing = state.surfaces[surfaceId];
+  if (existing && isRunning(existing.pid)) {
+    registerRunningSurfaceFromState(existing);
+    return {
+      status: 'running',
+      id: surfaceId,
+      pid: existing.pid,
+      resourceId: existing.resourceId,
+      logPath: existing.logPath,
+    };
+  }
+
+  const health = await probeSurfaceHealth(normalized);
+  if (health.status === 'healthy') {
+    return {
+      status: 'already_healthy',
+      id: surfaceId,
+      detail: health.detail,
+      port: normalized.port,
+      healthPath: normalized.healthPath,
+    };
+  }
+
+  if (normalized.port) {
+    const portStatus = await probeSurfacePort(normalized.port);
+    if (portStatus.occupied) {
+      throw new Error(`Surface "${surfaceId}" port ${normalized.port} is already in use`);
+    }
   }
 
   const cwd = normalized.cwd!;
@@ -114,7 +146,6 @@ function startSurfaceById(surfaceId: string, manifestPath: string) {
     managed.child.unref();
   }
 
-  const state = loadSurfaceState();
   state.surfaces[surfaceId] = {
     id: surfaceId,
     pid: managed.child.pid || -1,
@@ -158,7 +189,7 @@ function stopSurfaceById(surfaceId: string) {
   return { status: 'stopped', id: surfaceId, pid: record.pid };
 }
 
-function reconcileSurfaces(manifestPath: string, cleanup = false) {
+async function reconcileSurfaces(manifestPath: string, cleanup = false) {
   const manifest = loadSurfaceManifest(manifestPath);
   const state = loadSurfaceState();
 
@@ -179,7 +210,7 @@ function reconcileSurfaces(manifestPath: string, cleanup = false) {
       results.push({ id: definition.id, status: 'running', pid: existing.pid });
       continue;
     }
-    const started = startSurfaceById(definition.id, manifestPath);
+    const started = await startSurfaceById(definition.id, manifestPath);
     results.push(started);
   }
 
@@ -251,7 +282,7 @@ async function reconcileHealth(manifestPath: string) {
     const health = await probeSurfaceHealth(definition);
     if (health.status === 'unhealthy') {
       stopSurfaceById(definition.id);
-      startSurfaceById(definition.id, manifestPath);
+      await startSurfaceById(definition.id, manifestPath);
       restarted.push(definition.id);
     }
   }
@@ -275,12 +306,12 @@ const main = async () => {
   let result: unknown;
   switch (action) {
     case 'reconcile':
-      result = reconcileSurfaces(manifestPath, Boolean(argv.cleanup));
+      result = await reconcileSurfaces(manifestPath, Boolean(argv.cleanup));
       Object.assign(result as object, { restartedUnhealthy: await reconcileHealth(manifestPath) });
       break;
     case 'start':
       if (!argv.surface) throw new Error('--surface is required for start');
-      result = startSurfaceById(argv.surface as string, manifestPath);
+      result = await startSurfaceById(argv.surface as string, manifestPath);
       break;
     case 'stop':
       if (!argv.surface) throw new Error('--surface is required for stop');

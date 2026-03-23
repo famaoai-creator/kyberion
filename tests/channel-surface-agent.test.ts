@@ -63,6 +63,7 @@ describe('Channel surface agents', () => {
     () => (safeExistsSync(agentIdentityPath) ? (safeReadFile(agentIdentityPath, { encoding: 'utf8' }) as string) : null),
     'sovereign'
   );
+  const baselineDisableSupervisorDaemon = process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
 
   afterEach(() => {
     const slackDir = pathResolver.rootResolve('active/shared/coordination/channels/slack');
@@ -86,6 +87,8 @@ describe('Channel surface agents', () => {
     else if (safeExistsSync(visionPath)) safeRmSync(visionPath);
     if (baselineAgentIdentity !== null) core.safeWriteFile(agentIdentityPath, baselineAgentIdentity);
     else if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);
+    if (baselineDisableSupervisorDaemon === undefined) delete process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
+    else process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = baselineDisableSupervisorDaemon;
   });
 
   it('creates Slack handoff artifacts and events through the Slack surface agent role', () => {
@@ -357,6 +360,7 @@ describe('Channel surface agents', () => {
   });
 
   it('includes delegated response context when building the summary prompt', async () => {
+    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
     const ask = vi.fn()
       .mockResolvedValueOnce('```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}\n```')
       .mockResolvedValueOnce('final slack reply');
@@ -393,6 +397,7 @@ describe('Channel surface agents', () => {
   });
 
   it('fills missing slack a2a payload text from the original surface prompt', async () => {
+    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
     const ask = vi.fn()
       .mockResolvedValueOnce(
         '```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"intent":"slack_request","text":"original request and relevant Slack context"}}\n```'
@@ -486,6 +491,7 @@ describe('Channel surface agents', () => {
   });
 
   it('routes delegation through mission team composition when missionId and teamRole are provided', async () => {
+    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
     const missionId = 'MSN-TEAM-ROUTING';
     const missionPath = core.missionDir(missionId, 'public');
     const ask = vi.fn()

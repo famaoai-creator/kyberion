@@ -5,6 +5,7 @@
   "contract_schema": "schemas/presence-action.schema.json",
   "capabilities": [
     { "op": "dispatch", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "receive_event", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "receive_event", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "dispatch_timeline", "platforms": ["darwin", "linux", "win32"] }
   ]
 }
