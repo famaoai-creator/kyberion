@@ -36,6 +36,13 @@
       "modelId": "gemini-2.5-flash",
       "capabilities": ["a2ui", "dashboard", "commands", "gateway"]
     },
+    "presence-surface-agent": {
+      "authority_roles": ["surface_runtime", "chronos_operator"],
+      "team_roles": ["surface_liaison"],
+      "provider": "gemini",
+      "modelId": "gemini-2.5-flash",
+      "capabilities": ["presence", "surface", "conversation", "realtime"]
+    },
     "onboarding-surface-agent": {
       "authority_roles": ["sovereign_concierge"],
       "team_roles": ["surface_liaison"],

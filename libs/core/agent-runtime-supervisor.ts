@@ -53,7 +53,7 @@ function ensureEventDir(): void {
   safeMkdir(EVENTS_DIR);
 }
 
-function appendSupervisorEvent(event: Record<string, unknown>): void {
+export function appendSupervisorEvent(event: Record<string, unknown>): void {
   try {
     ensureEventDir();
     safeAppendFileSync(EVENTS_PATH, `${JSON.stringify({

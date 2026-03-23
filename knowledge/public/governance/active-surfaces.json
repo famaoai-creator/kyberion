@@ -2,6 +2,34 @@
   "version": 1,
   "surfaces": [
     {
+      "id": "presence-studio",
+      "kind": "ui",
+      "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
+      "command": "node",
+      "args": ["dist/presence/displays/presence-studio/server.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3031,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
+      "id": "voice-hub",
+      "kind": "service",
+      "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
+      "command": "node",
+      "args": ["dist/satellites/voice-hub/server.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3032,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
       "id": "slack-bridge",
       "kind": "gateway",
       "description": "Slack Socket Mode ingress gateway and surface-agent host",

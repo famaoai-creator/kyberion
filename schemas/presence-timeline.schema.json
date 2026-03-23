@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Presence Timeline ADF",
+  "type": "object",
+  "required": ["action", "events"],
+  "properties": {
+    "action": { "const": "presence_timeline" },
+    "surface_id": { "type": "string" },
+    "title": { "type": "string" },
+    "interrupt_policy": { "enum": ["replace", "ignore"] },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["at_ms", "op"],
+        "properties": {
+          "at_ms": { "type": "number", "minimum": 0 },
+          "op": {
+            "enum": [
+              "set_status",
+              "set_expression",
+              "set_subtitle",
+              "clear_subtitle",
+              "append_transcript",
+              "clear_transcript"
+            ]
+          },
+          "params": { "type": "object" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
