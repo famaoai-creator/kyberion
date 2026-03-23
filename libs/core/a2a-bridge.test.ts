@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => {
   const getAgentRuntimeHandle = vi.fn();
   const askAgentRuntime = vi.fn();
   const stopAgentRuntime = vi.fn();
+  const ensureAgentRuntimeViaDaemon = vi.fn();
+  const createSupervisorBackedAgentHandle = vi.fn();
+  const askAgentRuntimeViaDaemon = vi.fn();
+  const shutdownAgentRuntimeViaDaemon = vi.fn();
+  const toSupervisorEnsurePayload = vi.fn();
   const getAgentManifest = vi.fn();
   return {
     warn,
@@ -19,6 +24,11 @@ const mocks = vi.hoisted(() => {
     getAgentRuntimeHandle,
     askAgentRuntime,
     stopAgentRuntime,
+    ensureAgentRuntimeViaDaemon,
+    createSupervisorBackedAgentHandle,
+    askAgentRuntimeViaDaemon,
+    shutdownAgentRuntimeViaDaemon,
+    toSupervisorEnsurePayload,
     getAgentManifest,
   };
 });
@@ -43,6 +53,14 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
   stopAgentRuntime: mocks.stopAgentRuntime,
 }));
 
+vi.mock('./agent-runtime-supervisor-client.js', () => ({
+  ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
+  createSupervisorBackedAgentHandle: mocks.createSupervisorBackedAgentHandle,
+  askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
+  shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
+  toSupervisorEnsurePayload: mocks.toSupervisorEnsurePayload,
+}));
+
 vi.mock('./agent-manifest', () => ({
   getAgentManifest: mocks.getAgentManifest,
   loadAgentManifests: vi.fn(),
@@ -59,6 +77,7 @@ describe('a2a-bridge', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
+    mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
   });
 
   it('signs and verifies messages', async () => {
@@ -120,8 +139,10 @@ describe('a2a-bridge', () => {
     );
     const handle = { ask: vi.fn(async (prompt: string) => `echo:${prompt}`) };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'codex-nerve' ? handle : null);
     mocks.askAgentRuntime.mockImplementation(async (_agentId: string, prompt: string) => `echo:${prompt}`);
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x') return { status: 'ready' };
       if (agentId === 'codex-nerve') return { status: 'ready' };
@@ -168,8 +189,10 @@ describe('a2a-bridge', () => {
       capabilities: ['delegate'],
     });
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
     mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x' || agentId === 'nerve-agent') return { status: 'ready' };
       return undefined;
@@ -219,8 +242,10 @@ describe('a2a-bridge', () => {
     });
     const handle = { ask: vi.fn(async () => 'ok') };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
     mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockReturnValue(undefined);
 
     await a2aBridge.route({
@@ -257,8 +282,10 @@ describe('a2a-bridge', () => {
     });
     const handle = { ask: vi.fn(async () => 'ok') };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'agent-y' ? handle : null);
     mocks.askAgentRuntime.mockResolvedValue('ok');
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
 
     await expect(
       a2aBridge.route({
@@ -288,5 +315,50 @@ describe('a2a-bridge', () => {
     ).resolves.toMatchObject({
       payload: { text: 'ok' },
     });
+  });
+
+  it('prefers supervisor daemon for ensure and ask when available', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    const daemonHandle = { ask: vi.fn(async () => 'unused') };
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+      agent_id: 'nerve-agent',
+      provider: 'gemini',
+      model_id: 'gemini-2.5-pro',
+      status: 'ready',
+      session_id: 'sess-1',
+    });
+    mocks.createSupervisorBackedAgentHandle.mockReturnValue(daemonHandle);
+    mocks.askAgentRuntimeViaDaemon.mockResolvedValue({ text: 'daemon-ok' });
+    mocks.get.mockImplementation((agentId: string) => {
+      if (agentId === 'sender-x' || agentId === 'nerve-agent') return { status: 'ready' };
+      return undefined;
+    });
+
+    const result = await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'MSG-DAEMON-1',
+        sender: 'sender-x',
+        receiver: 'nerve-agent',
+        performative: 'request',
+      },
+      payload: { text: 'delegate this through daemon' },
+    });
+
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+    expect(mocks.createSupervisorBackedAgentHandle).toHaveBeenCalled();
+    expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledWith({
+      agentId: 'nerve-agent',
+      prompt: 'delegate this through daemon',
+      requestedBy: 'a2a_bridge',
+    });
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+    expect(result.payload).toEqual({ text: 'daemon-ok' });
   });
 });

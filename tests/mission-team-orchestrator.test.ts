@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => {
   const loadAgentProfileIndex = vi.fn();
   const get = vi.fn();
   const ensureAgentRuntime = vi.fn();
+  const ensureAgentRuntimeViaDaemon = vi.fn();
 
   return {
     loadMissionTeamPlan,
     loadAgentProfileIndex,
     get,
     ensureAgentRuntime,
+    ensureAgentRuntimeViaDaemon,
   };
 });
 
@@ -29,10 +31,15 @@ vi.mock('@agent/core/agent-runtime-supervisor', () => ({
   ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
+vi.mock('@agent/core/agent-runtime-supervisor-client', () => ({
+  ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
+}));
+
 describe('mission-team-orchestrator', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
   });
 
   it('spawns assigned agents that are not already ready', async () => {
@@ -61,16 +68,17 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.ensureAgentRuntime.mockResolvedValue({});
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
-    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledWith(expect.objectContaining({
       agentId: 'nerve-agent',
       provider: 'gemini',
       missionId: 'MSN-TEAM',
     }));
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments.find((entry: any) => entry.team_role === 'owner')?.runtime_status).toBe('spawned');
     expect(result.assignments.find((entry: any) => entry.team_role === 'reviewer')?.runtime_status).toBe('unfilled');
   });
@@ -129,12 +137,13 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.ensureAgentRuntime.mockResolvedValue({});
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime('MSN-TEAM');
 
-    expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments.map((entry: any) => entry.runtime_status)).toEqual(['spawned', 'spawned', 'spawned']);
   });
 
@@ -175,7 +184,7 @@ describe('mission-team-orchestrator', () => {
       },
     });
     mocks.get.mockReturnValue(undefined);
-    mocks.ensureAgentRuntime.mockResolvedValue({});
+    mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({});
 
     const { ensureMissionTeamRuntime } = await import('@agent/core/mission-team-orchestrator');
     const result = await ensureMissionTeamRuntime({
@@ -183,10 +192,11 @@ describe('mission-team-orchestrator', () => {
       teamRoles: ['planner'],
     });
 
-    expect(mocks.ensureAgentRuntime).toHaveBeenCalledTimes(1);
-    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAgentRuntimeViaDaemon).toHaveBeenCalledWith(expect.objectContaining({
       agentId: 'nerve-agent',
     }));
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.assignments).toHaveLength(1);
     expect(result.assignments[0].team_role).toBe('planner');
   });
