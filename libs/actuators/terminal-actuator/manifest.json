@@ -7,6 +7,7 @@
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "poll", "platforms": ["darwin", "linux", "win32"] },
     { "op": "write", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "kill", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "kill", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

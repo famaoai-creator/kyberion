@@ -16,6 +16,20 @@
       "enabled": true
     },
     {
+      "id": "computer-surface",
+      "kind": "ui",
+      "description": "Live computer interaction surface for governed browser and terminal sessions.",
+      "command": "node",
+      "args": ["dist/presence/displays/computer-surface/server.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3040,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
       "id": "voice-hub",
       "kind": "service",
       "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
