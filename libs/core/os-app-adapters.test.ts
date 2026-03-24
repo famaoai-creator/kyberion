@@ -28,4 +28,26 @@ describe('os-app-adapters', () => {
       { index: 2, title: 'Docs', url: 'https://docs.example' },
     ]);
   });
+
+  it('activates a Chrome tab by URL fragment', async () => {
+    const secureIo = await import('./secure-io.js');
+    vi.mocked(secureIo.safeExec).mockReturnValueOnce('matched');
+    const adapters = await import('./os-app-adapters.js');
+    expect(adapters.activateChromeTabByUrl('docs.example')).toEqual({ matched: true });
+  });
+
+  it('marks iTerm2 as preferred when it owns the idle session', async () => {
+    vi.resetModules();
+    vi.doMock('./terminal-bridge.js', () => ({
+      terminalBridge: {
+        listTargets: () => [
+          { application: 'Terminal', adapter: 'terminal', sessions: [], idleSession: null },
+          { application: 'iTerm2', adapter: 'iterm2', sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }], idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' } },
+        ],
+      },
+    }));
+    const adapters = await import('./os-app-adapters.js');
+    const targets = adapters.listTerminalTargets();
+    expect(targets.find((entry) => entry.application === 'iTerm2')?.preferred).toBe(true);
+  });
 });

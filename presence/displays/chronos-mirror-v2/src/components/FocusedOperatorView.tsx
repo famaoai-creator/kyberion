@@ -57,6 +57,7 @@ interface Payload {
     riskLevel: "low" | "medium" | "high" | "critical";
     requiresStrongAuth: boolean;
     pendingRoles: string[];
+    kind?: "secret_mutation" | "computer_action";
   }>;
   a2aHandoffs: Array<{
     ts: string;
@@ -99,6 +100,7 @@ interface Payload {
     target?: string;
     detail?: string;
     actionCount?: number;
+    metadata?: Record<string, unknown>;
   }>;
   runtimeTopology: {
     surfaces: Array<{
@@ -566,6 +568,12 @@ export function FocusedOperatorView({
               {session.detail ? (
                 <div className="mt-2 text-[10px] leading-5 text-white/62">{session.detail}</div>
               ) : null}
+              {session.metadata && Object.keys(session.metadata).length > 0 ? (
+                <div className="mt-3 rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">metadata</div>
+                  <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 text-white/58">{JSON.stringify(session.metadata, null, 2)}</pre>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -818,6 +826,7 @@ export function FocusedOperatorView({
                 <div>requested by <span className="font-mono text-white/78">{request.requestedBy}</span></div>
                 <div>requested at <span className="font-mono text-white/78">{formatTimestamp(request.requestedAt)}</span></div>
                 <div>strong auth <span className="font-mono text-white/78">{request.requiresStrongAuth ? "required" : "not required"}</span></div>
+                <div>kind <span className="font-mono text-white/78">{request.kind || "secret_mutation"}</span></div>
               </div>
               <div className="mt-3 rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">pending roles</div>
