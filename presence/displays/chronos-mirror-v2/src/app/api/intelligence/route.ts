@@ -6,6 +6,7 @@ import { collectBrowserSessions, type BrowserSessionSummary } from "../../../lib
 import { extractMissionDependencies, normalizeMissionAssets, parseTaskBoard, summarizeNextTasks } from "../../../lib/mission-progress";
 import { applyBrowserSessionControl } from "../../../lib/browser-session-control";
 import { buildRuntimeTopology } from "../../../lib/runtime-topology";
+import { collectComputerSessions, type ComputerSessionSummary } from "../../../lib/computer-sessions";
 import {
   clearSurfaceOutboxMessage,
   emitChannelSurfaceEvent,
@@ -134,6 +135,7 @@ interface SecretApprovalSummary {
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
+interface ComputerSessionView extends ComputerSessionSummary {}
 
 interface A2AHandoffView extends A2AHandoffSummary {}
 
@@ -871,6 +873,7 @@ export async function GET(req: NextRequest) {
       controlActionDetails: collectControlActionDetails(),
       ownerSummaries: collectOwnerSummaries(),
       browserSessions: collectBrowserSessions(),
+      computerSessions: collectComputerSessions(),
       surfaceOutbox: {
         slack: listSurfaceOutboxMessages("slack").length,
         chronos: listSurfaceOutboxMessages("chronos").length,

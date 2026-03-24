@@ -167,6 +167,51 @@ describe('browser-actuator v3 contract', () => {
     });
   });
 
+  it('accepts computer_interaction snapshot requests and enriches them with observation outputs', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'computer-session',
+      observation: {
+        mode: 'mixed',
+        include_screenshot: true,
+        include_console: true,
+        include_network: true,
+      },
+      action: {
+        type: 'snapshot',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.last_snapshot).toMatchObject({
+      session_id: 'computer-session',
+      title: 'Test Page',
+    });
+    expect(result.context.last_screenshot).toBeDefined();
+    expect(result.context.console_events).toEqual([]);
+    expect(result.context.network_events).toEqual([]);
+  });
+
+  it('accepts computer_interaction ref actions through the browser executor', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'computer-session',
+      action: {
+        type: 'click_ref',
+        ref: '@e1',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+  });
+
   it('fails fast when a ref action is used before snapshot capture', async () => {
     const { handleAction } = await import('./index');
 

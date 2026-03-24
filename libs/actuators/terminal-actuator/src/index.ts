@@ -1,4 +1,4 @@
-import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile } from '@agent/core';
+import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile, emitComputerSurfacePatch } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,7 +39,36 @@ interface TerminalResult {
   [key: string]: any;
 }
 
+interface ComputerInteractionAction {
+  version: '0.1';
+  kind: 'computer_interaction';
+  session_id?: string;
+  target?: {
+    executor?: 'browser' | 'terminal' | 'system';
+    terminal_session_id?: string;
+  };
+  action: {
+    type:
+      | 'spawn_terminal'
+      | 'poll_terminal'
+      | 'write_terminal'
+      | 'kill_terminal'
+      | 'list_terminal_sessions'
+      | 'shell_command';
+    shell?: string;
+    args?: string[];
+    cwd?: string;
+    thread_id?: string;
+    text?: string;
+    key?: string;
+    timeout_ms?: number;
+  };
+}
+
 export async function handleAction(input: TerminalAction): Promise<TerminalResult> {
+  if ((input as any).kind === 'computer_interaction') {
+    return await handleComputerInteraction(input as unknown as ComputerInteractionAction);
+  }
   const { action, params } = input;
   const rootDir = process.cwd();
 
@@ -108,6 +137,128 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
 
     default:
       throw new Error(`Unsupported terminal action: ${action}`);
+  }
+}
+
+async function handleComputerInteraction(input: ComputerInteractionAction): Promise<TerminalResult> {
+  const action = input.action;
+  const sessionId = input.target?.terminal_session_id || input.session_id;
+
+  switch (action.type) {
+    case 'spawn_terminal':
+      return await handleAction({
+        action: 'spawn',
+        params: {
+          sessionId,
+          threadId: action.thread_id,
+          shell: action.shell,
+          args: action.args,
+          cwd: action.cwd,
+        },
+      } as TerminalAction).then((result) => {
+        emitComputerSurfacePatch({
+          sessionId: result.sessionId || sessionId || 'terminal-session',
+          executor: 'terminal',
+          status: String(result.status || 'created'),
+          latestAction: action.type,
+          detail: action.cwd || action.text || '',
+        });
+        return result;
+      });
+    case 'poll_terminal':
+      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for poll_terminal');
+      return await handleAction({
+        action: 'poll',
+        params: {
+          sessionId,
+          limit: 4000,
+        },
+      } as TerminalAction).then((result) => {
+        emitComputerSurfacePatch({
+          sessionId,
+          executor: 'terminal',
+          status: String(result.status || 'unknown'),
+          latestAction: action.type,
+          detail: typeof result.output === 'string' ? result.output.slice(0, 160) : '',
+        });
+        return result;
+      });
+    case 'write_terminal':
+      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for write_terminal');
+      return await handleAction({
+        action: 'write',
+        params: {
+          sessionId,
+          data: action.text,
+          keys: action.key ? [action.key] : undefined,
+        },
+      } as TerminalAction).then((result) => {
+        emitComputerSurfacePatch({
+          sessionId,
+          executor: 'terminal',
+          status: result.success ? 'running' : 'error',
+          latestAction: action.type,
+          detail: action.text || action.key || '',
+        });
+        return result;
+      });
+    case 'kill_terminal':
+      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for kill_terminal');
+      return await handleAction({
+        action: 'kill',
+        params: {
+          sessionId,
+        },
+      } as TerminalAction).then((result) => {
+        emitComputerSurfacePatch({
+          sessionId,
+          executor: 'terminal',
+          status: result.success ? 'killed' : 'unknown',
+          latestAction: action.type,
+        });
+        return result;
+      });
+    case 'list_terminal_sessions':
+      return {
+        status: 'listed',
+        sessions: ptyEngine.list().map((id) => {
+          const session = ptyEngine.get(id);
+          return {
+            sessionId: id,
+            status: session?.status || 'unknown',
+            exitCode: session?.exitCode,
+            pid: session?.adapter.pid,
+          };
+        }),
+      };
+    case 'shell_command': {
+      const shell = action.shell || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
+      const args = action.args && action.args.length > 0
+        ? action.args
+        : process.platform === 'win32'
+          ? ['-Command', action.text || '']
+          : ['-lc', action.text || ''];
+      return await handleAction({
+        action: 'spawn',
+        params: {
+          threadId: action.thread_id,
+          shell,
+          args,
+          cwd: action.cwd,
+        },
+      } as TerminalAction).then((result) => {
+        emitComputerSurfacePatch({
+          sessionId: result.sessionId || 'terminal-session',
+          executor: 'terminal',
+          status: String(result.status || 'created'),
+          latestAction: action.type,
+          detail: action.text || '',
+        });
+        return result;
+      });
+    }
+    default:
+      throw new Error(`Unsupported computer interaction action for terminal-actuator: ${action.type}`);
   }
 }
 

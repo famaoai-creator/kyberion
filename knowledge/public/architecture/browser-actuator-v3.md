@@ -18,6 +18,8 @@ Increase Browser Actuator performance and reliability without changing the core 
 - move agent interaction to a `snapshot + ref` contract
 - make browser work durable, observable, and exportable into tests
 
+This browser model is also the most natural execution substrate for Kyberion's broader `computer use` concept.
+
 ## Core Principle
 
 Browser Actuator v3 separates three layers.
@@ -33,8 +35,17 @@ Browser Actuator v3 separates three layers.
 3. **Export Layer**
    - recorded browser actions can be exported to:
      - ADF
-     - browser procedures
-     - generated Playwright test skeletons
+  - browser procedures
+  - generated Playwright test skeletons
+
+Above these layers, Kyberion should add a provider-independent **computer interaction loop**:
+
+- observe
+- decide
+- act
+- capture result
+
+See [`computer-use-runtime-model.md`](/Users/famao/kyberion/knowledge/public/architecture/computer-use-runtime-model.md).
 
 ## Why `snapshot + ref`
 
@@ -201,6 +212,8 @@ Recommended contract:
 
 This is similar to the `ask before acting` pattern in browser-native assistants.
 
+For future runtime convergence, risky browser steps should be representable with the same interaction contract used by higher-level computer-use runtimes.
+
 ## Prompt Injection and Site Safety
 
 Browser Actuator v3 must assume the browser is hostile.
@@ -238,6 +251,7 @@ Useful panels:
 - tabs
 - recent snapshots
 - console stream
+- computer interaction sessions and blocked high-risk steps
 - network stream
 - action trail
 - pending approvals

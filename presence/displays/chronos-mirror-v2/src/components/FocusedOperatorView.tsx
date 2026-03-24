@@ -10,6 +10,7 @@ import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 type FocusedViewId =
   | "needs-attention"
   | "mission-control-plane"
+  | "computer-sessions"
   | "runtime-topology-map"
   | "runtime-lease-doctor"
   | "recent-surface-outbox"
@@ -89,6 +90,16 @@ interface Payload {
     text: string;
     created_at: string;
   }>;
+  computerSessions: Array<{
+    id: string;
+    kind: "browser" | "terminal";
+    status: string;
+    updatedAt: string;
+    pid?: number;
+    target?: string;
+    detail?: string;
+    actionCount?: number;
+  }>;
   runtimeTopology: {
     surfaces: Array<{
       id: string;
@@ -146,6 +157,7 @@ interface Payload {
 const TITLES: Record<FocusedViewId, string> = {
   "needs-attention": "Needs Attention",
   "mission-control-plane": "Mission Control",
+  "computer-sessions": "Computer Sessions",
   "runtime-topology-map": "Runtime Topology",
   "runtime-lease-doctor": "Runtime Governance",
   "recent-surface-outbox": "Delivery Exceptions",
@@ -169,6 +181,7 @@ const EMPTY_PAYLOAD: Payload = {
   runtimeDoctor: [],
   surfaces: [],
   recentSurfaceOutbox: [],
+  computerSessions: [],
   runtimeTopology: {
     surfaces: [],
     owners: [],
@@ -196,6 +209,7 @@ function normalizePayload(input: Partial<Payload> | null | undefined): Payload {
     runtimeDoctor: Array.isArray(input?.runtimeDoctor) ? input.runtimeDoctor : EMPTY_PAYLOAD.runtimeDoctor,
     surfaces: Array.isArray(input?.surfaces) ? input.surfaces : EMPTY_PAYLOAD.surfaces,
     recentSurfaceOutbox: Array.isArray(input?.recentSurfaceOutbox) ? input.recentSurfaceOutbox : EMPTY_PAYLOAD.recentSurfaceOutbox,
+    computerSessions: Array.isArray(input?.computerSessions) ? input.computerSessions : EMPTY_PAYLOAD.computerSessions,
     runtimeTopology: {
       ...EMPTY_PAYLOAD.runtimeTopology,
       ...(input?.runtimeTopology || {}),
@@ -524,6 +538,35 @@ export function FocusedOperatorView({
                 </div>
               );
             })()
+          ))}
+        </div>
+      )}
+
+      {viewId === "computer-sessions" && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {data.computerSessions.length === 0 ? (
+            <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/50 lg:col-span-2">
+              No active browser or terminal sessions are currently registered.
+            </div>
+          ) : data.computerSessions.map((session) => (
+            <div key={`${session.kind}:${session.id}`} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] font-semibold text-white/90">{session.id}</div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">{session.kind}</div>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                <div>status <span className="font-mono text-white/82">{session.status}</span></div>
+                <div>updated <span className="font-mono text-white/82">{formatTimestamp(session.updatedAt)}</span></div>
+                <div>pid <span className="font-mono text-white/82">{session.pid ?? "—"}</span></div>
+                <div>actions <span className="font-mono text-white/82">{session.actionCount ?? 0}</span></div>
+              </div>
+              {session.target ? (
+                <div className="mt-3 text-[10px] text-white/48">target <span className="font-mono text-white/74">{session.target}</span></div>
+              ) : null}
+              {session.detail ? (
+                <div className="mt-2 text-[10px] leading-5 text-white/62">{session.detail}</div>
+              ) : null}
+            </div>
           ))}
         </div>
       )}
