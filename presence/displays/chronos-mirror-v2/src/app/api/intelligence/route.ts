@@ -12,6 +12,7 @@ import {
   emitMissionOrchestrationObservation,
   enqueueMissionOrchestrationEvent,
   ledger,
+  listApprovalRequests,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   listSurfaceOutboxMessages,
@@ -115,6 +116,21 @@ interface SurfaceSummary {
   controlSummary: string;
   controlTone: "stable" | "attention" | "offline" | "pending";
   controlRequestedBy?: string;
+}
+
+interface SecretApprovalSummary {
+  id: string;
+  title: string;
+  summary: string;
+  storageChannel: string;
+  requestedAt: string;
+  requestedBy: string;
+  serviceId: string;
+  secretKey: string;
+  mutation: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  requiresStrongAuth: boolean;
+  pendingRoles: string[];
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
@@ -617,6 +633,30 @@ function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
     .slice(0, 8);
 }
 
+function collectPendingSecretApprovals(): SecretApprovalSummary[] {
+  return listApprovalRequests({
+    kind: 'secret_mutation',
+    status: 'pending',
+  })
+    .map((request) => ({
+      id: request.id,
+      title: request.title,
+      summary: request.summary,
+      storageChannel: request.storageChannel,
+      requestedAt: request.requestedAt,
+      requestedBy: request.requestedBy,
+      serviceId: request.target?.serviceId || 'unknown',
+      secretKey: request.target?.secretKey || 'unknown',
+      mutation: request.target?.mutation || 'set',
+      riskLevel: request.risk?.level || 'medium',
+      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+      pendingRoles: request.workflow?.approvals
+        .filter((approval) => approval.status === 'pending')
+        .map((approval) => approval.role) || [],
+    }))
+    .slice(0, 20);
+}
+
 async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
   const manifest = loadSurfaceManifest();
   const state = loadSurfaceState();
@@ -815,9 +855,11 @@ export async function GET(req: NextRequest) {
     }
     const controlActionCatalog = collectControlActionCatalog(accessRole);
     const controlActionAvailability = collectControlActionAvailability(accessRole, activeMissions, surfaces);
+    const secretApprovals = collectPendingSecretApprovals();
     return NextResponse.json({
       activeMissions,
       missionProgress,
+      secretApprovals,
       surfaces,
       accessRole,
       recentEvents: collectRecentEvents(),

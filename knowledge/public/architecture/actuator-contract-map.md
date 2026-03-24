@@ -41,7 +41,7 @@ The schema is the real detailed contract.
 | --- | --- | --- | --- | --- |
 | `agent-actuator` | action | `spawn`, `ask`, `list`, `health`, `a2a`, `team_plan` | `schemas/agent-action.schema.json` | Agent lifecycle and delegation |
 | `android-actuator` | pipeline | `pipeline` | `schemas/mobile-device-pipeline.schema.json` | Shared mobile pipeline schema |
-| `approval-actuator` | action | `create`, `load`, `decide`, `list_pending` | `schemas/approval-action.schema.json` | Approval state machine |
+| `approval-actuator` | action | `create`, `load`, `decide`, `list_pending` | `schemas/approval-action.schema.json` | Approval transport; secret mutation requests should use `schemas/secret-mutation-approval.schema.json` as the canonical payload contract |
 | `artifact-actuator` | action | `write_json`, `read_json`, `append_event`, `write_delivery_pack` | `schemas/artifact-action.schema.json` | Governed runtime artifacts |
 | `blockchain-actuator` | action | `anchor_mission`, `anchor_trust` | `schemas/blockchain-action.schema.json` | Anchoring facade |
 | `browser-actuator` | pipeline | `pipeline` | `schemas/browser-pipeline.schema.json` | Pipeline-driven; schema holds step vocabulary |
@@ -55,7 +55,7 @@ The schema is the real detailed contract.
 | `orchestrator-actuator` | pipeline + control | `pipeline`, `reconcile` | `schemas/orchestrator-pipeline.schema.json` | Control-plane transformation layer |
 | `presence-actuator` | action | `dispatch`, `receive_event` | `schemas/presence-action.schema.json` | Human-facing delivery bridge |
 | `process-actuator` | action | `spawn`, `stop`, `list`, `status` | `schemas/process-action.schema.json` | Managed long-lived processes |
-| `secret-actuator` | action | `get`, `set`, `delete` | `schemas/secret-action.schema.json` | OS native secret bridge |
+| `secret-actuator` | action | `get`, `set`, `delete` | `schemas/secret-action.schema.json` | OS native secret bridge; approval and workflow state live outside the actuator |
 | `service-actuator` | hybrid | `pipeline` and direct service actions | `schemas/service-action.schema.json` | Most flexible contract; now explicitly modeled |
 | `system-actuator` | pipeline + control | `pipeline`, `reconcile` | `schemas/system-pipeline.schema.json` | OS execution and diagnostics |
 | `terminal-actuator` | action | `spawn`, `poll`, `write`, `kill` | `schemas/terminal-action.schema.json` | PTY contract |

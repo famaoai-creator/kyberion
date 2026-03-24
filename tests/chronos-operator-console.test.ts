@@ -35,6 +35,13 @@ describe("Chronos operator console helpers", () => {
     });
   });
 
+  it("exposes secret approvals in the operator view menu", () => {
+    expect(OPERATOR_VIEW_LINKS.map((entry) => entry.label)).toContain("Secret Approvals");
+    expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === "Secret Approvals")).toMatchObject({
+      targetId: "secret-approval-queue",
+    });
+  });
+
   it("prioritizes mission and runtime exceptions in the attention queue", () => {
     const items = buildAttentionItems({
       missions: [
