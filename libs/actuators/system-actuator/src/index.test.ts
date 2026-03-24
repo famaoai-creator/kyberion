@@ -1,15 +1,60 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', () => ({
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
-  safeReadFile: vi.fn(() => '{}'),
-  safeWriteFile: vi.fn(),
-  safeMkdir: vi.fn(),
-  safeExistsSync: vi.fn(() => false),
-  derivePipelineStatus: vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'),
-  safeExec: vi.fn(() => ''),
-  createStandardYargs: vi.fn(),
-}));
+vi.mock('@agent/core', () => {
+  const safeExec = vi.fn(() => '');
+  return {
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+    safeReadFile: vi.fn(() => '{}'),
+    safeWriteFile: vi.fn(),
+    safeMkdir: vi.fn(),
+    safeExistsSync: vi.fn(() => false),
+    derivePipelineStatus: vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'),
+    safeExec,
+    createStandardYargs: vi.fn(),
+    activateApplication: vi.fn((application: string) => safeExec('osascript', ['-e', `tell application "${application}" to activate`])),
+    detectFocusedInput: vi.fn(() => {
+      const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
+      const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
+      return {
+        application,
+        windowTitle,
+        role,
+        description,
+        editable: editableFlag.trim().toLowerCase() === 'true',
+      };
+    }),
+    keystrokeText: vi.fn((text: string) => safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${text}"`])),
+    pasteText: vi.fn((text: string) => safeExec('osascript', ['-e', `set the clipboard to "${text}"\ntell application "System Events" to keystroke "v" using command down`])),
+    pressKey: vi.fn((key: string) => {
+      const normalizedKey = key.trim().toLowerCase();
+      if (normalizedKey === 'enter' || normalizedKey === 'return') {
+        return safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
+      }
+      return safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${normalizedKey}"`]);
+    }),
+    clickAt: vi.fn((x: number, y: number, clickCount = 1) => {
+      for (let index = 0; index < clickCount; index += 1) {
+        safeExec('osascript', ['-e', `tell application "System Events" to click at {${x}, ${y}}`]);
+      }
+    }),
+    rightClickAt: vi.fn((x: number, y: number, clickCount = 1) => {
+      for (let index = 0; index < clickCount; index += 1) {
+        safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`]);
+      }
+    }),
+    moveMouse: vi.fn((x: number, y: number) => safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`])),
+    listKnownAppCapabilities: vi.fn(() => [
+      { application: 'Google Chrome', adapter: 'browser_tabs', capabilities: ['list_tabs', 'activate_tab_by_title'] },
+      { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
+    ]),
+    listChromeTabs: vi.fn(() => [
+      { index: 1, title: 'Inbox', url: 'https://mail.example' },
+      { index: 2, title: 'Docs', url: 'https://docs.example' },
+    ]),
+    activateChromeTabByTitle: vi.fn((title: string) => ({ matched: title === 'Docs' })),
+    emptyFinderTrash: vi.fn(),
+  };
+});
 
 vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),
@@ -99,9 +144,7 @@ describe('system-actuator computer_interaction adapter', () => {
   it('submits the focused input with enter', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec)
-      .mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue')
-      .mockReturnValueOnce('');
+    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
 
     const result = await handleAction({
       version: '0.1',
@@ -118,9 +161,7 @@ describe('system-actuator computer_interaction adapter', () => {
   it('uses paste strategy for focused input typing by default', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec)
-      .mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue')
-      .mockReturnValueOnce('');
+    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
 
     const result = await handleAction({
       version: '0.1',
@@ -270,5 +311,69 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
+  });
+
+  it('returns known app capabilities', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'list_known_app_capabilities',
+      },
+    } as any);
+
+    expect(result.context.known_app_capabilities).toHaveLength(2);
+  });
+
+  it('returns Chrome tabs through the app adapter', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'list_tabs',
+      },
+    } as any);
+
+    expect(result.context.browser_tabs[1].title).toBe('Docs');
+  });
+
+  it('activates a Chrome tab by title', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'activate_tab_by_title',
+        title: 'Docs',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.tab_activation.matched).toBe(true);
+  });
+
+  it('executes empty_trash through the Finder adapter', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'empty_trash',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.emptyFinderTrash).toHaveBeenCalled();
   });
 });

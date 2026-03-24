@@ -83,6 +83,10 @@
             "remember_focused_target",
             "type_into_focused_input",
             "submit_focused_input",
+            "list_known_app_capabilities",
+            "list_tabs",
+            "activate_tab_by_title",
+            "empty_trash",
             "left_mouse_down",
             "left_mouse_up",
             "drag",
@@ -132,6 +136,7 @@
         "ref": { "type": "string" },
         "url": { "type": "string" },
         "application": { "type": "string" },
+        "title": { "type": "string" },
         "focus_target_id": { "type": "string" },
         "input_strategy": {
           "type": "string",
