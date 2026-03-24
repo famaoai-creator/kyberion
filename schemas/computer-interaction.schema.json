@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Computer Interaction Contract v0.1",
+  "description": "Provider-independent contract for governed computer-use style observation and action loops.",
+  "type": "object",
+  "required": ["version", "kind", "action"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "computer_interaction"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "executor": {
+          "type": "string",
+          "enum": ["browser", "terminal", "system"]
+        },
+        "surface_id": { "type": "string" },
+        "runtime_id": { "type": "string" },
+        "tab_id": { "type": "string" },
+        "terminal_session_id": { "type": "string" },
+        "display_id": { "type": "string" },
+        "application": { "type": "string" },
+        "focus_target_id": { "type": "string" },
+        "focus_target_match_policy": {
+          "type": "string",
+          "enum": ["strict", "prefix", "contains"]
+        },
+        "domain": { "type": "string" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["screen", "dom_snapshot", "console", "network", "mixed"]
+        },
+        "include_screenshot": { "type": "boolean" },
+        "include_refs": { "type": "boolean" },
+        "include_console": { "type": "boolean" },
+        "include_network": { "type": "boolean" },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "scale": { "type": "number", "minimum": 0.1 }
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "snapshot",
+            "screenshot",
+            "open_tab",
+            "select_tab",
+            "left_click",
+            "double_click",
+            "right_click",
+            "mouse_move",
+            "activate_application",
+            "detect_focused_input",
+            "remember_focused_target",
+            "type_into_focused_input",
+            "submit_focused_input",
+            "left_mouse_down",
+            "left_mouse_up",
+            "drag",
+            "scroll",
+            "type",
+            "key",
+            "wait",
+            "click_ref",
+            "fill_ref",
+            "press_ref",
+            "wait_for_ref",
+            "extract_text_ref",
+            "capture_console",
+            "capture_network",
+            "spawn_terminal",
+            "poll_terminal",
+            "write_terminal",
+            "kill_terminal",
+            "list_terminal_sessions",
+            "shell_command"
+          ]
+        },
+        "coordinate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          },
+          "required": ["x", "y"]
+        },
+        "to_coordinate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          },
+          "required": ["x", "y"]
+        },
+        "button": {
+          "type": "string",
+          "enum": ["left", "right", "middle"]
+        },
+        "text": { "type": "string" },
+        "key": { "type": "string" },
+        "ref": { "type": "string" },
+        "url": { "type": "string" },
+        "application": { "type": "string" },
+        "focus_target_id": { "type": "string" },
+        "input_strategy": {
+          "type": "string",
+          "enum": ["keystroke", "paste"]
+        },
+        "shell": { "type": "string" },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "cwd": { "type": "string" },
+        "thread_id": { "type": "string" },
+        "timeout_ms": { "type": "integer", "minimum": 0 },
+        "scroll_delta": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "reason": { "type": "string" },
+        "requires_approval": { "type": "boolean" },
+        "approval_scope": {
+          "type": "string",
+          "enum": ["none", "operator", "sovereign", "workflow"]
+        }
+      }
+    },
+    "tool_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "error", "blocked"]
+        },
+        "message": { "type": "string" },
+        "screenshot_path": { "type": "string" },
+        "snapshot_path": { "type": "string" },
+        "console_excerpt": { "type": "array", "items": { "type": "string" } },
+        "network_excerpt": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

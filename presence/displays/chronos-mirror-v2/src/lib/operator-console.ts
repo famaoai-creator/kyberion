@@ -106,6 +106,11 @@ export const OPERATOR_VIEW_LINKS: OperatorViewLink[] = [
     detail: "Inspect active missions and interventions.",
   },
   {
+    label: "Computer Sessions",
+    targetId: "computer-sessions",
+    detail: "Inspect browser and terminal sessions in one control view.",
+  },
+  {
     label: "Runtime Topology",
     targetId: "runtime-topology-map",
     detail: "See owners, runtimes, and recent flow.",

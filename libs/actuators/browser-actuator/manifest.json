@@ -4,6 +4,7 @@
   "description": "Pipeline-driven Playwright browser execution and session artifact actuator",
   "contract_schema": "schemas/browser-pipeline.schema.json",
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/browser-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "pipeline", "schema_ref": "schemas/browser-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

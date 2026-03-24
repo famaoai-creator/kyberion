@@ -44,7 +44,7 @@ The schema is the real detailed contract.
 | `approval-actuator` | action | `create`, `load`, `decide`, `list_pending` | `schemas/approval-action.schema.json` | Approval transport; secret mutation requests should use `schemas/secret-mutation-approval.schema.json` as the canonical payload contract |
 | `artifact-actuator` | action | `write_json`, `read_json`, `append_event`, `write_delivery_pack` | `schemas/artifact-action.schema.json` | Governed runtime artifacts |
 | `blockchain-actuator` | action | `anchor_mission`, `anchor_trust` | `schemas/blockchain-action.schema.json` | Anchoring facade |
-| `browser-actuator` | pipeline | `pipeline` | `schemas/browser-pipeline.schema.json` | Pipeline-driven; schema holds step vocabulary |
+| `browser-actuator` | pipeline | `pipeline` | `schemas/browser-pipeline.schema.json` | Pipeline-driven executor today; future computer-use runtimes should layer `schemas/computer-interaction.schema.json` above it as the provider-facing interaction contract |
 | `code-actuator` | pipeline + control | `pipeline`, `reconcile` | `schemas/code-pipeline.schema.json` | Reconcile remains top-level control action |
 | `file-actuator` | pipeline | `pipeline` | `schemas/file-pipeline.schema.json` | File step vocabulary is in schema |
 | `ios-actuator` | pipeline | `pipeline` | `schemas/mobile-device-pipeline.schema.json` | Shared mobile pipeline schema |

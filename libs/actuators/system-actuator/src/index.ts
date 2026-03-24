@@ -13,6 +13,8 @@ import * as visionJudge from '@agent/shared-vision';
  */
 const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
 const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
+const COMPUTER_RUNTIME_DIR = path.resolve(process.cwd(), 'active/shared/runtime/computer');
+const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
@@ -43,14 +45,401 @@ interface SystemAction {
   };
 }
 
+interface ComputerInteractionAction {
+  version: '0.1';
+  kind: 'computer_interaction';
+  session_id?: string;
+  target?: {
+    executor?: 'browser' | 'terminal' | 'system';
+    display_id?: string;
+    application?: string;
+    focus_target_id?: string;
+    focus_target_match_policy?: 'strict' | 'prefix' | 'contains';
+  };
+  action: {
+    type:
+      | 'left_click'
+      | 'double_click'
+      | 'right_click'
+      | 'mouse_move'
+      | 'activate_application'
+      | 'detect_focused_input'
+      | 'remember_focused_target'
+      | 'type_into_focused_input'
+      | 'submit_focused_input'
+      | 'type'
+      | 'key'
+      | 'wait';
+    coordinate?: { x: number; y: number };
+    text?: string;
+    key?: string;
+    application?: string;
+    focus_target_id?: string;
+    input_strategy?: 'keystroke' | 'paste';
+    timeout_ms?: number;
+  };
+}
+
 /**
  * Main Entry Point
  */
 async function handleAction(input: SystemAction) {
+  if ((input as any).kind === 'computer_interaction') {
+    return await handleComputerInteraction(input as unknown as ComputerInteractionAction);
+  }
   if (input.action === 'reconcile') {
     return await performReconcile(input);
   }
   return await executePipeline(input.steps || [], input.context || {}, input.options);
+}
+
+async function handleComputerInteraction(input: ComputerInteractionAction) {
+  const interaction = input.action;
+  const focusTargetId = interaction.focus_target_id || input.target?.focus_target_id;
+  const focusTargetMatchPolicy = input.target?.focus_target_match_policy || 'strict';
+  const rememberedTarget = loadRememberedFocusTarget(focusTargetId);
+  const application = interaction.application || input.target?.application || rememberedTarget?.application;
+
+  if (interaction.type === 'detect_focused_input') {
+    if (application) {
+      activateApplication(application);
+    }
+    const focusedInput = detectFocusedInput();
+    return {
+      status: 'succeeded',
+      results: [{ op: 'detect_focused_input', status: 'success' }],
+      context: { focused_input: focusedInput },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'remember_focused_target') {
+    if (application) {
+      activateApplication(application);
+    }
+    const focusedInput = detectFocusedInput();
+    const targetId = rememberFocusedTarget(interaction.focus_target_id || input.target?.focus_target_id, focusedInput);
+    return {
+      status: 'succeeded',
+      results: [{ op: 'remember_focused_target', status: 'success' }],
+      context: {
+        focus_target_id: targetId,
+        focused_input: focusedInput,
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'type_into_focused_input') {
+    if (application) {
+      activateApplication(application);
+    }
+    const focusedInput = detectFocusedInputWithGuard(rememberedTarget, focusTargetId, focusTargetMatchPolicy);
+    if (!focusedInput.editable) {
+      throw new Error(`Focused element is not editable (${focusedInput.role || 'unknown'})`);
+    }
+    return executePipeline(
+      [{
+        type: 'apply',
+        op: interaction.input_strategy === 'keystroke' ? 'keyboard' : 'paste_text',
+        params: { text: interaction.text || '' },
+      }],
+      { focused_input: focusedInput },
+      { timeout_ms: interaction.timeout_ms || 60000 },
+    );
+  }
+
+  if (interaction.type === 'submit_focused_input') {
+    if (application) {
+      activateApplication(application);
+    }
+    const focusedInput = detectFocusedInputWithGuard(rememberedTarget, focusTargetId, focusTargetMatchPolicy);
+    if (!focusedInput.editable) {
+      throw new Error(`Focused element is not editable (${focusedInput.role || 'unknown'})`);
+    }
+    return executePipeline(
+      [{ type: 'apply', op: 'press_key', params: { key: 'enter' } }],
+      { focused_input: focusedInput },
+      { timeout_ms: interaction.timeout_ms || 60000 },
+    );
+  }
+
+  const steps: PipelineStep[] = [];
+  if (application && interaction.type !== 'wait' && interaction.type !== 'activate_application') {
+    steps.push({
+      type: 'apply',
+      op: 'activate_application',
+      params: { application },
+    });
+  }
+
+  switch (interaction.type) {
+    case 'activate_application':
+      steps.push({
+        type: 'apply',
+        op: 'activate_application',
+        params: { application: application || '' },
+      });
+      break;
+    case 'type':
+      steps.push({ type: 'apply', op: 'keyboard', params: { text: interaction.text || '' } });
+      break;
+    case 'key':
+      steps.push({ type: 'apply', op: 'keyboard', params: { text: interaction.key || '' } });
+      break;
+    case 'left_click':
+      steps.push({
+        type: 'apply',
+        op: 'mouse_click',
+        params: {
+          x: interaction.coordinate?.x || 0,
+          y: interaction.coordinate?.y || 0,
+          button: 'left',
+        },
+      });
+      break;
+    case 'double_click':
+      steps.push({
+        type: 'apply',
+        op: 'mouse_click',
+        params: {
+          x: interaction.coordinate?.x || 0,
+          y: interaction.coordinate?.y || 0,
+          button: 'left',
+          click_count: 2,
+        },
+      });
+      break;
+    case 'right_click':
+      steps.push({
+        type: 'apply',
+        op: 'mouse_click',
+        params: {
+          x: interaction.coordinate?.x || 0,
+          y: interaction.coordinate?.y || 0,
+          button: 'right',
+        },
+      });
+      break;
+    case 'mouse_move':
+      steps.push({
+        type: 'apply',
+        op: 'mouse_move',
+        params: {
+          x: interaction.coordinate?.x || 0,
+          y: interaction.coordinate?.y || 0,
+        },
+      });
+      break;
+    case 'wait':
+      steps.push({
+        type: 'apply',
+        op: 'wait',
+        params: {
+          duration_ms: interaction.timeout_ms || 1000,
+        },
+      });
+      break;
+    default:
+      throw new Error(`Unsupported computer interaction action for system-actuator: ${interaction.type}`);
+  }
+
+  return executePipeline(steps, {}, { timeout_ms: interaction.timeout_ms || 60000 });
+}
+
+function activateApplication(application: string) {
+  safeExec('osascript', ['-e', `tell application "${application.replace(/"/g, '\\"')}" to activate`]);
+}
+
+function ensureComputerRuntimeDir() {
+  if (!safeExistsSync(COMPUTER_RUNTIME_DIR)) {
+    safeMkdir(COMPUTER_RUNTIME_DIR, { recursive: true });
+  }
+}
+
+function loadFocusTargetStore(): Record<string, any> {
+  if (!safeExistsSync(FOCUS_TARGET_STORE_PATH)) {
+    return {};
+  }
+  try {
+    return JSON.parse(String(safeReadFile(FOCUS_TARGET_STORE_PATH, { encoding: 'utf8' }) || '{}'));
+  } catch {
+    return {};
+  }
+}
+
+function saveFocusTargetStore(store: Record<string, any>) {
+  ensureComputerRuntimeDir();
+  safeWriteFile(FOCUS_TARGET_STORE_PATH, JSON.stringify(store, null, 2));
+}
+
+function rememberFocusedTarget(explicitId: string | undefined, focusedInput: ReturnType<typeof detectFocusedInput>) {
+  const targetId = explicitId || `focus-${Date.now()}`;
+  const store = loadFocusTargetStore();
+  store[targetId] = {
+    id: targetId,
+    application: focusedInput.application,
+    windowTitle: focusedInput.windowTitle,
+    role: focusedInput.role,
+    description: focusedInput.description,
+    editable: focusedInput.editable,
+    updatedAt: new Date().toISOString(),
+  };
+  saveFocusTargetStore(store);
+  return targetId;
+}
+
+function loadRememberedFocusTarget(targetId?: string) {
+  if (!targetId) {
+    return null;
+  }
+  const store = loadFocusTargetStore();
+  return store[targetId] || null;
+}
+
+function detectFocusedInputWithGuard(
+  rememberedTarget: {
+    application?: string;
+    windowTitle?: string;
+    role?: string;
+  } | null,
+  targetId?: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+) {
+  let focusedInput = detectFocusedInput();
+  const initialMismatch = getFocusedTargetMismatches(rememberedTarget, focusedInput, matchPolicy);
+  if (initialMismatch.length === 0) {
+    return focusedInput;
+  }
+
+  if (rememberedTarget?.application) {
+    activateApplication(rememberedTarget.application);
+    focusedInput = detectFocusedInput();
+  }
+
+  assertFocusedTargetMatches(rememberedTarget, focusedInput, targetId, matchPolicy);
+  return focusedInput;
+}
+
+function assertFocusedTargetMatches(
+  rememberedTarget: {
+    application?: string;
+    windowTitle?: string;
+    role?: string;
+  } | null,
+  focusedInput: {
+    application?: string;
+    windowTitle?: string;
+    role?: string;
+  },
+  targetId?: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+) {
+  if (!rememberedTarget || !targetId) {
+    return;
+  }
+
+  const mismatches = getFocusedTargetMismatches(rememberedTarget, focusedInput, matchPolicy);
+
+  if (mismatches.length > 0) {
+    throw new Error(`Focused target guard failed for ${targetId}: ${mismatches.join(', ')}`);
+  }
+}
+
+function getFocusedTargetMismatches(
+  rememberedTarget: {
+    application?: string;
+    windowTitle?: string;
+    role?: string;
+  } | null,
+  focusedInput: {
+    application?: string;
+    windowTitle?: string;
+    role?: string;
+  },
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+) {
+  if (!rememberedTarget) {
+    return [];
+  }
+
+  const mismatches: string[] = [];
+  if (rememberedTarget.application && focusedInput.application !== rememberedTarget.application) {
+    mismatches.push(`application expected "${rememberedTarget.application}" got "${focusedInput.application || ''}"`);
+  }
+  if (rememberedTarget.windowTitle && !windowTitleMatches(rememberedTarget.windowTitle, focusedInput.windowTitle || '', matchPolicy)) {
+    mismatches.push(`windowTitle expected "${rememberedTarget.windowTitle}" got "${focusedInput.windowTitle || ''}"`);
+  }
+  if (rememberedTarget.role && focusedInput.role && focusedInput.role !== rememberedTarget.role) {
+    mismatches.push(`role expected "${rememberedTarget.role}" got "${focusedInput.role}"`);
+  }
+  return mismatches;
+}
+
+function windowTitleMatches(expected: string, actual: string, matchPolicy: 'strict' | 'prefix' | 'contains') {
+  switch (matchPolicy) {
+    case 'prefix':
+      return actual.startsWith(expected);
+    case 'contains':
+      return actual.includes(expected);
+    case 'strict':
+    default:
+      return actual === expected;
+  }
+}
+
+function toAppleScriptString(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function detectFocusedInput() {
+  if (process.platform !== 'darwin') {
+    return {
+      application: '',
+      windowTitle: '',
+      role: '',
+      description: '',
+      editable: false,
+    };
+  }
+
+  const script = [
+    'tell application "System Events"',
+    'set frontApp to name of first application process whose frontmost is true',
+    'set windowTitle to ""',
+    'set focusedRole to ""',
+    'set focusedDescription to ""',
+    'set editableFlag to "false"',
+    'tell application process frontApp',
+    'try',
+    'set windowTitle to name of front window',
+    'end try',
+    'try',
+    'set focusedElement to value of attribute "AXFocusedUIElement"',
+    'try',
+    'set focusedRole to value of attribute "AXRole" of focusedElement',
+    'end try',
+    'try',
+    'set focusedDescription to value of attribute "AXDescription" of focusedElement',
+    'end try',
+    'if focusedRole is in {"AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"} then',
+    'set editableFlag to "true"',
+    'end if',
+    'end try',
+    'end tell',
+    'return frontApp & linefeed & windowTitle & linefeed & focusedRole & linefeed & focusedDescription & linefeed & editableFlag',
+    'end tell',
+  ].join('\n');
+
+  const output = String(safeExec('osascript', ['-e', script])).trimEnd();
+  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
+  return {
+    application,
+    windowTitle,
+    role,
+    description,
+    editable: editableFlag.trim().toLowerCase() === 'true',
+  };
 }
 
 /**
@@ -231,8 +620,61 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'keyboard':
       if (process.platform === 'darwin') safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${resolve(params.text || '{{last_capture}}').replace(/"/g, '\\"')}"`]);
       break;
+    case 'paste_text': {
+      const text = String(resolve(params.text || '{{last_capture}}'));
+      if (process.platform === 'darwin') {
+        const script = [
+          'set oldClipboard to the clipboard',
+          `set the clipboard to "${toAppleScriptString(text)}"`,
+          'tell application "System Events" to keystroke "v" using command down',
+          'delay 0.1',
+          'set the clipboard to oldClipboard',
+        ].join('\n');
+        safeExec('osascript', ['-e', script]);
+      }
+      break;
+    }
+    case 'press_key': {
+      const key = String(resolve(params.key || '')).trim().toLowerCase();
+      if (process.platform === 'darwin') {
+        if (key === 'enter' || key === 'return') {
+          safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
+        } else {
+          safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${key.replace(/"/g, '\\"')}"`]);
+        }
+      }
+      break;
+    }
+    case 'activate_application': {
+      const application = String(resolve(params.application || '')).trim();
+      if (!application) {
+        throw new Error('Application name is required for activate_application');
+      }
+      if (process.platform === 'darwin') {
+        activateApplication(application);
+      }
+      break;
+    }
     case 'mouse_click':
-      if (process.platform === 'darwin') safeExec('osascript', ['-e', `tell application "System Events" to click at {${params.x}, ${params.y}}`]);
+      if (process.platform === 'darwin') {
+        const button = params.button === 'right' ? 'right' : 'left';
+        const clickCount = Number(params.click_count || 1);
+        if (button === 'right') {
+          for (let index = 0; index < clickCount; index++) {
+            safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${params.x},${params.y}"`]);
+          }
+        } else {
+          for (let index = 0; index < clickCount; index++) {
+            safeExec('osascript', ['-e', `tell application "System Events" to click at {${params.x}, ${params.y}}`]);
+          }
+        }
+      }
+      break;
+    case 'mouse_move':
+      if (process.platform === 'darwin') safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${params.x},${params.y}"`]);
+      break;
+    case 'wait':
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, Number(params.duration_ms || 1000)));
       break;
     case 'voice':
       const { say } = await import('@agent/core');
