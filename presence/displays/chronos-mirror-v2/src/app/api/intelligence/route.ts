@@ -132,6 +132,7 @@ interface SecretApprovalSummary {
   riskLevel: "low" | "medium" | "high" | "critical";
   requiresStrongAuth: boolean;
   pendingRoles: string[];
+  kind?: "secret_mutation" | "computer_action";
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
@@ -636,7 +637,7 @@ function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
 }
 
 function collectPendingSecretApprovals(): SecretApprovalSummary[] {
-  return listApprovalRequests({
+  const secretApprovals = listApprovalRequests({
     kind: 'secret_mutation',
     status: 'pending',
   })
@@ -655,7 +656,33 @@ function collectPendingSecretApprovals(): SecretApprovalSummary[] {
       pendingRoles: request.workflow?.approvals
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.role) || [],
-    }))
+      kind: 'secret_mutation' as const,
+    }));
+
+  const computerApprovals = listApprovalRequests({
+    storageChannels: ['computer'],
+    kind: 'channel-approval',
+    status: 'pending',
+  }).map((request) => ({
+    id: request.id,
+    title: request.title,
+    summary: request.summary,
+    storageChannel: request.storageChannel,
+    requestedAt: request.requestedAt,
+    requestedBy: request.requestedBy,
+    serviceId: 'computer',
+    secretKey: 'n/a',
+    mutation: request.justification?.requestedEffects?.[0] || 'computer_action',
+    riskLevel: request.risk?.level || 'medium',
+    requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+    pendingRoles: request.workflow?.approvals
+      .filter((approval) => approval.status === 'pending')
+      .map((approval) => approval.role) || [],
+    kind: 'computer_action' as const,
+  }));
+
+  return [...secretApprovals, ...computerApprovals]
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 20);
 }
 
