@@ -28,6 +28,8 @@
           "ownerType": { "type": "string" },
           "port": { "type": "integer", "minimum": 1 },
           "healthPath": { "type": "string" },
+          "service_id": { "type": "string" },
+          "preset_path": { "type": "string" },
           "enabled": { "type": "boolean" }
         },
         "additionalProperties": false

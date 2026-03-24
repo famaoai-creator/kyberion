@@ -22,6 +22,8 @@ const allowedCoreFsImports = [
   'libs/core/src/native-pptx-engine/engine.ts',
   'libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts',
   'libs/core/src/native-xlsx-engine/engine.ts',
+  'libs/core/src/pfc/PfcController.test.ts',
+  'libs/core/src/pfc/SovereignSentinel.test.ts',
   'libs/core/trust-engine.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 

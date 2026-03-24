@@ -1,4 +1,4 @@
-import * as fs from 'node:fs';
+import { rawExistsSync, rawMkdirp, rawReadTextFile, rawWriteTextFile } from '../../fs-primitives.js';
 import * as path from 'node:path';
 
 export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
@@ -41,9 +41,9 @@ export class PfcController {
   }
 
   private loadState(): PfcState {
-    if (fs.existsSync(this.stateFilePath)) {
+    if (rawExistsSync(this.stateFilePath)) {
       try {
-        const raw = fs.readFileSync(this.stateFilePath, 'utf-8');
+        const raw = rawReadTextFile(this.stateFilePath);
         return JSON.parse(raw) as PfcState;
       } catch (err) {
         return this.getDefaultState();
@@ -54,10 +54,10 @@ export class PfcController {
 
   private saveState(): void {
     const dir = path.dirname(this.stateFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (!rawExistsSync(dir)) {
+      rawMkdirp(dir);
     }
-    fs.writeFileSync(this.stateFilePath, JSON.stringify(this.state, null, 2), 'utf-8');
+    rawWriteTextFile(this.stateFilePath, JSON.stringify(this.state, null, 2));
   }
 
   public getState(): PfcState {
