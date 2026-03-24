@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
   "t": 23,
-  "u": "2026-03-22T21:41:58.712Z",
+  "u": "2026-03-24T21:07:52.452Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -54,7 +54,7 @@
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 1,
+      "capability_count": 2,
       "contract_schema": "schemas/browser-pipeline.schema.json"
     },
     {
@@ -135,7 +135,7 @@
       "d": "Human Presence and Messaging Bridge",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 2,
+      "capability_count": 3,
       "contract_schema": "schemas/presence-action.schema.json"
     },
     {
@@ -171,7 +171,7 @@
       "d": "OS-level control, diagnostics, and short-lived local execution",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 2,
+      "capability_count": 3,
       "contract_schema": "schemas/system-pipeline.schema.json"
     },
     {
@@ -180,7 +180,7 @@
       "d": "PTY-driven Terminal Actuator",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 4,
+      "capability_count": 5,
       "contract_schema": "schemas/terminal-action.schema.json"
     },
     {
