@@ -110,6 +110,16 @@ Interventions should be:
 - minimal
 - attributable
 
+Sensitive mutations are a special case of intervention.
+
+For secret and credential changes, Kyberion should follow this rule:
+
+- requests are proposed in-context
+- approvals are granted through a governed workflow
+- the richest review surface is preferred, but not required
+
+This means Slack, terminal, and Chronos may all surface the same approval request in different ways, while the durable approval state remains shared and auditable.
+
 ### 3.6 Inspection
 
 After execution, the system must remain inspectable.

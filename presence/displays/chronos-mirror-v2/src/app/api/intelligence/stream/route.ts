@@ -9,7 +9,7 @@ import {
   collectRecentEvents,
 } from "../../../../lib/intelligence-observations";
 import { getChronosAccessRoleOrThrow, guardRequest, roleToMissionRole } from "../../../../lib/api-guard";
-import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, loadSurfaceManifest, loadSurfaceState, normalizeSurfaceDefinition } from "@agent/core";
+import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, listApprovalRequests, loadSurfaceManifest, loadSurfaceState, normalizeSurfaceDefinition } from "@agent/core";
 
 export const runtime = "nodejs";
 
@@ -112,6 +112,20 @@ export async function GET(req: NextRequest) {
           recentEvents: collectRecentEvents(),
           agentMessages,
           a2aHandoffs,
+          secretApprovals: listApprovalRequests({ kind: "secret_mutation", status: "pending" }).slice(0, 20).map((request) => ({
+            id: request.id,
+            title: request.title,
+            summary: request.summary,
+            storageChannel: request.storageChannel,
+            requestedAt: request.requestedAt,
+            requestedBy: request.requestedBy,
+            serviceId: request.target?.serviceId || "unknown",
+            secretKey: request.target?.secretKey || "unknown",
+            mutation: request.target?.mutation || "set",
+            riskLevel: request.risk?.level || "medium",
+            requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+            pendingRoles: request.workflow?.approvals.filter((approval) => approval.status === "pending").map((approval) => approval.role) || [],
+          })),
           controlActions: collectControlActions(),
           controlActionDetails: collectControlActionDetails(),
           ownerSummaries: collectOwnerSummaries(),
