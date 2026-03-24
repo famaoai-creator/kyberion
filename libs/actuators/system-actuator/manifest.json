@@ -5,6 +5,7 @@
   "contract_schema": "schemas/system-pipeline.schema.json",
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/system-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]
 }
