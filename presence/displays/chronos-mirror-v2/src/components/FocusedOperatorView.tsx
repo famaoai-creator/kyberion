@@ -13,6 +13,7 @@ type FocusedViewId =
   | "runtime-topology-map"
   | "runtime-lease-doctor"
   | "recent-surface-outbox"
+  | "secret-approval-queue"
   | "owner-summaries";
 
 interface Payload {
@@ -41,6 +42,20 @@ interface Payload {
       sizeBytes: number;
       updatedAt: string;
     }>;
+  }>;
+  secretApprovals: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    storageChannel: string;
+    requestedAt: string;
+    requestedBy: string;
+    serviceId: string;
+    secretKey: string;
+    mutation: string;
+    riskLevel: "low" | "medium" | "high" | "critical";
+    requiresStrongAuth: boolean;
+    pendingRoles: string[];
   }>;
   a2aHandoffs: Array<{
     ts: string;
@@ -134,6 +149,7 @@ const TITLES: Record<FocusedViewId, string> = {
   "runtime-topology-map": "Runtime Topology",
   "runtime-lease-doctor": "Runtime Governance",
   "recent-surface-outbox": "Delivery Exceptions",
+  "secret-approval-queue": "Secret Approvals",
   "owner-summaries": "Audit Trail",
 };
 
@@ -148,6 +164,7 @@ const ASSET_FILTERS: Array<{ id: "all" | MissionAssetCategory; label: string }> 
 const EMPTY_PAYLOAD: Payload = {
   activeMissions: [],
   missionProgress: [],
+  secretApprovals: [],
   a2aHandoffs: [],
   runtimeDoctor: [],
   surfaces: [],
@@ -174,6 +191,7 @@ function normalizePayload(input: Partial<Payload> | null | undefined): Payload {
     ...input,
     activeMissions: Array.isArray(input?.activeMissions) ? input.activeMissions : EMPTY_PAYLOAD.activeMissions,
     missionProgress: Array.isArray(input?.missionProgress) ? input.missionProgress : EMPTY_PAYLOAD.missionProgress,
+    secretApprovals: Array.isArray(input?.secretApprovals) ? input.secretApprovals : EMPTY_PAYLOAD.secretApprovals,
     a2aHandoffs: Array.isArray(input?.a2aHandoffs) ? input.a2aHandoffs : EMPTY_PAYLOAD.a2aHandoffs,
     runtimeDoctor: Array.isArray(input?.runtimeDoctor) ? input.runtimeDoctor : EMPTY_PAYLOAD.runtimeDoctor,
     surfaces: Array.isArray(input?.surfaces) ? input.surfaces : EMPTY_PAYLOAD.surfaces,
@@ -263,6 +281,7 @@ export function FocusedOperatorView({
           recentEvents: Array.isArray(payload.recentEvents) ? payload.recentEvents : current.recentEvents,
           a2aHandoffs: Array.isArray(payload.a2aHandoffs) ? payload.a2aHandoffs : current.a2aHandoffs,
           ownerSummaries: Array.isArray(payload.ownerSummaries) ? payload.ownerSummaries : current.ownerSummaries,
+          secretApprovals: Array.isArray(payload.secretApprovals) ? payload.secretApprovals : current.secretApprovals,
           runtimeTopology: payload.runtimeTopology || current.runtimeTopology,
           runtime: payload.runtime || current.runtime,
         }) : current);
@@ -290,6 +309,13 @@ export function FocusedOperatorView({
         message_id: entry.message_id,
         surface: entry.surface,
         text: entry.text,
+      })),
+      secretApprovals: data.secretApprovals.map((request) => ({
+        id: request.id,
+        title: request.title,
+        serviceId: request.serviceId,
+        secretKey: request.secretKey,
+        riskLevel: request.riskLevel,
       })),
     });
   }, [data]);
@@ -719,6 +745,50 @@ export function FocusedOperatorView({
                 <div className="text-[9px] text-white/35">{new Date(message.created_at).toLocaleString()}</div>
               </div>
               <div className="mt-2 text-sm text-white/82">{message.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {viewId === "secret-approval-queue" && (
+        <div className="grid gap-3">
+          {data.secretApprovals.length === 0 ? (
+            <div className="rounded-2xl border border-emerald-300/10 bg-emerald-400/[0.04] px-4 py-4 text-[11px] text-emerald-100/70">
+              No pending secret mutation approvals are waiting for review.
+            </div>
+          ) : data.secretApprovals.map((request) => (
+            <div key={request.id} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold text-white/90">{request.title}</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-white/38">
+                    {request.serviceId} · {request.secretKey} · {request.mutation}
+                  </div>
+                </div>
+                <div className="rounded-full border border-amber-200/12 bg-amber-300/8 px-2 py-1 text-[9px] uppercase tracking-[0.14em] text-amber-100/75">
+                  {request.riskLevel}
+                </div>
+              </div>
+              <div className="mt-3 text-[11px] leading-5 text-white/64">{request.summary}</div>
+              <div className="mt-3 grid gap-2 text-[10px] text-white/52 lg:grid-cols-2">
+                <div>storage channel <span className="font-mono text-white/78">{request.storageChannel}</span></div>
+                <div>requested by <span className="font-mono text-white/78">{request.requestedBy}</span></div>
+                <div>requested at <span className="font-mono text-white/78">{formatTimestamp(request.requestedAt)}</span></div>
+                <div>strong auth <span className="font-mono text-white/78">{request.requiresStrongAuth ? "required" : "not required"}</span></div>
+              </div>
+              <div className="mt-3 rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">pending roles</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(request.pendingRoles.length ? request.pendingRoles : ["none"]).map((role) => (
+                    <span key={role} className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[9px] font-mono text-white/62">
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-3 text-[10px] leading-5 text-white/42">
+                Terminal approval: <span className="font-mono text-white/68">npm run cli -- approve {request.id}</span>
+              </div>
             </div>
           ))}
         </div>

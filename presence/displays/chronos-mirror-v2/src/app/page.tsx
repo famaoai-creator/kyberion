@@ -376,6 +376,7 @@ export default function ChronosMirrorV2() {
                       | "runtime-topology-map"
                       | "runtime-lease-doctor"
                       | "recent-surface-outbox"
+                      | "secret-approval-queue"
                       | "owner-summaries"}
                     onBack={() => setFocusedOperatorView(null)}
                   />
