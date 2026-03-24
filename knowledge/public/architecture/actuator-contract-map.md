@@ -44,7 +44,7 @@ The schema is the real detailed contract.
 | `approval-actuator` | action | `create`, `load`, `decide`, `list_pending` | `schemas/approval-action.schema.json` | Approval transport; secret mutation requests should use `schemas/secret-mutation-approval.schema.json` as the canonical payload contract |
 | `artifact-actuator` | action | `write_json`, `read_json`, `append_event`, `write_delivery_pack` | `schemas/artifact-action.schema.json` | Governed runtime artifacts |
 | `blockchain-actuator` | action | `anchor_mission`, `anchor_trust` | `schemas/blockchain-action.schema.json` | Anchoring facade |
-| `browser-actuator` | pipeline | `pipeline` | `schemas/browser-pipeline.schema.json` | Pipeline-driven executor today; future computer-use runtimes should layer `schemas/computer-interaction.schema.json` above it as the provider-facing interaction contract |
+| `browser-actuator` | pipeline + computer interaction | `pipeline`, `computer_interaction` | `schemas/browser-pipeline.schema.json`, `schemas/computer-interaction.schema.json` | Browser executor for ref/snapshot interaction loops |
 | `code-actuator` | pipeline + control | `pipeline`, `reconcile` | `schemas/code-pipeline.schema.json` | Reconcile remains top-level control action |
 | `file-actuator` | pipeline | `pipeline` | `schemas/file-pipeline.schema.json` | File step vocabulary is in schema |
 | `ios-actuator` | pipeline | `pipeline` | `schemas/mobile-device-pipeline.schema.json` | Shared mobile pipeline schema |
@@ -57,8 +57,8 @@ The schema is the real detailed contract.
 | `process-actuator` | action | `spawn`, `stop`, `list`, `status` | `schemas/process-action.schema.json` | Managed long-lived processes |
 | `secret-actuator` | action | `get`, `set`, `delete` | `schemas/secret-action.schema.json` | OS native secret bridge; approval and workflow state live outside the actuator |
 | `service-actuator` | hybrid | `pipeline` and direct service actions | `schemas/service-action.schema.json` | Most flexible contract; now explicitly modeled |
-| `system-actuator` | pipeline + control | `pipeline`, `reconcile` | `schemas/system-pipeline.schema.json` | OS execution and diagnostics |
-| `terminal-actuator` | action | `spawn`, `poll`, `write`, `kill` | `schemas/terminal-action.schema.json` | PTY contract |
+| `system-actuator` | pipeline + control + computer interaction | `pipeline`, `reconcile`, `computer_interaction` | `schemas/system-pipeline.schema.json`, `schemas/computer-interaction.schema.json` | OS execution, diagnostics, focused-input and system input bridge |
+| `terminal-actuator` | action + computer interaction | `spawn`, `poll`, `write`, `kill`, `computer_interaction` | `schemas/terminal-action.schema.json`, `schemas/computer-interaction.schema.json` | PTY contract plus terminal session interaction loop |
 | `vision-actuator` | action + compatibility | `inspect_image`, `ocr_image` | `schemas/vision-action.schema.json` | Perception-first, legacy routes still described in schema |
 | `voice-actuator` | action + lightweight pipeline | `speak_local`, `list_voices`, `pipeline` | `schemas/voice-action.schema.json` | Mixed contract explicitly documented |
 | `wisdom-actuator` | action | `knowledge_search`, `knowledge_inject`, `knowledge_export`, `knowledge_import` | `schemas/wisdom-action.schema.json` | Knowledge-tier operations |

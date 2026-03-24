@@ -92,7 +92,7 @@ interface Payload {
   }>;
   computerSessions: Array<{
     id: string;
-    kind: "browser" | "terminal";
+    kind: "browser" | "terminal" | "system";
     status: string;
     updatedAt: string;
     pid?: number;
