@@ -101,6 +101,7 @@
           <div class="metric"><div class="label">Action Count</div><div class="value" id="actionCount">0</div></div>
         </div>
         <div class="path" id="detail">No interaction detail yet.</div>
+        <div class="path" id="metadata"></div>
         <div class="path" id="screenshotPath"></div>
       </section>
     </main>
@@ -113,6 +114,7 @@
         target: document.getElementById("target"),
         actionCount: document.getElementById("actionCount"),
         detail: document.getElementById("detail"),
+        metadata: document.getElementById("metadata"),
         screenshotPath: document.getElementById("screenshotPath"),
       };
 
@@ -126,6 +128,7 @@
         ids.target.textContent = data.target || "—";
         ids.actionCount.textContent = String(data.actionCount || 0);
         ids.detail.textContent = data.detail || "No interaction detail yet.";
+        ids.metadata.textContent = data.metadata && Object.keys(data.metadata).length ? `metadata: ${JSON.stringify(data.metadata)}` : "";
         ids.screenshotPath.textContent = data.screenshotPath ? `screenshot: ${data.screenshotPath}` : "";
       }
 
