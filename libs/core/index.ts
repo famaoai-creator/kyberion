@@ -90,6 +90,17 @@ export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
+export type {
+  XlsxCell,
+  XlsxCellStyle,
+  XlsxColor,
+  XlsxConditionalFormat,
+  XlsxDataValidation,
+  XlsxDesignProtocol,
+  XlsxDxfStyle,
+  XlsxMergeCell,
+  XlsxWorksheet,
+} from './src/types/xlsx-protocol.js';
 
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';

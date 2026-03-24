@@ -151,6 +151,7 @@
       "allow_read": [
         "presence/bridge/runtime/",
         "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/channels/chronos/outbox/",
         "active/shared/coordination/orchestration/",
         "active/shared/observability/channels/slack/",
         "active/shared/observability/mission-control/",
@@ -159,6 +160,7 @@
       "allow_write": [
         "presence/bridge/runtime/",
         "active/shared/coordination/channels/slack/",
+        "active/shared/coordination/channels/chronos/outbox/",
         "active/shared/coordination/orchestration/",
         "active/shared/observability/channels/slack/",
         "active/shared/observability/mission-control/",

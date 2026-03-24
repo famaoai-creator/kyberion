@@ -2,6 +2,7 @@ import { App, LogLevel } from '@slack/bolt';
 import * as path from 'node:path';
 import {
   logger,
+  emitChannelSurfaceEvent,
   resolveServiceBinding,
   safeAppendFileSync,
   prepareSlackSurfaceArtifact,
@@ -11,7 +12,7 @@ import {
   recordSlackDelivery,
   listSlackOutboxMessages,
   clearSlackOutboxMessage,
-  shouldForceSlackDelegation,
+  deriveSlackDelegationReceiver,
   isEnvironmentInitialized,
   getSlackMissionProposalState,
   saveSlackMissionProposalState,
@@ -35,6 +36,33 @@ import {
 
 const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
 const SLACK_SURFACE_AGENT_ID = 'slack-surface-agent';
+
+function recordSlackConversationOutcome(params: {
+  correlationId: string;
+  channel: string;
+  threadTs: string;
+  sourceText: string;
+  route: 'surface' | 'nerve';
+  outcome: 'approval_request' | 'mission_proposal' | 'plain_reply' | 'empty_reply';
+  approvalCount?: number;
+  missionProposalCount?: number;
+}) {
+  emitChannelSurfaceEvent('slack_bridge', 'slack', 'events', {
+    correlation_id: params.correlationId,
+    decision: 'conversation_outcome_recorded',
+    why: 'Slack bridge recorded the post-conversation outcome so operator surfaces can distinguish proposal, approval, and plain reply paths.',
+    policy_used: 'slack_surface_agent_v1',
+    agent_id: params.route === 'nerve' ? 'nerve-agent' : SLACK_SURFACE_AGENT_ID,
+    resource_id: params.threadTs,
+    slack_channel: params.channel,
+    thread_ts: params.threadTs,
+    route: params.route,
+    outcome: params.outcome,
+    approval_count: params.approvalCount || 0,
+    mission_proposal_count: params.missionProposalCount || 0,
+    source_text: params.sourceText.slice(0, 240),
+  });
+}
 
 async function postOnboardingReply(client: any, channel: string, threadTs: string, text: string, completed: boolean) {
   const blocks = completed ? undefined : buildSlackOnboardingBlocks(channel, threadTs);
@@ -194,6 +222,7 @@ async function start() {
         return;
       }
 
+      const forcedReceiver = deriveSlackDelegationReceiver(message.text);
       const conversation = await runSurfaceConversation({
         agentId: SLACK_SURFACE_AGENT_ID,
         query: buildSlackSurfacePrompt({
@@ -206,12 +235,23 @@ async function start() {
           channelType,
         }),
         senderAgentId: 'kyberion:slack-bridge',
-        forcedReceiver: shouldForceSlackDelegation(message.text) ? 'nerve-agent' : undefined,
+        forcedReceiver,
         delegationSummaryInstruction:
           'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
       });
+      const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
 
       if (conversation.approvalRequests.length > 0) {
+        recordSlackConversationOutcome({
+          correlationId: artifact.correlationId,
+          channel: message.channel,
+          threadTs,
+          sourceText: message.text,
+          route,
+          outcome: 'approval_request',
+          approvalCount: conversation.approvalRequests.length,
+          missionProposalCount: conversation.missionProposals?.length || 0,
+        });
         for (const approval of conversation.approvalRequests) {
           await postApprovalRequest(client, {
             channel: message.channel,
@@ -227,6 +267,16 @@ async function start() {
 
       if (conversation.missionProposals && conversation.missionProposals.length > 0) {
         const proposal = conversation.missionProposals[0];
+        recordSlackConversationOutcome({
+          correlationId: artifact.correlationId,
+          channel: message.channel,
+          threadTs,
+          sourceText: message.text,
+          route,
+          outcome: 'mission_proposal',
+          approvalCount: conversation.approvalRequests.length,
+          missionProposalCount: conversation.missionProposals.length,
+        });
         saveSlackMissionProposalState({
           channel: message.channel,
           threadTs,
@@ -247,12 +297,22 @@ async function start() {
           message.channel,
           threadTs,
           response.ts,
-          shouldForceSlackDelegation(message.text) ? 'nerve' : 'surface',
+          route,
         );
         return;
       }
 
       if (conversation.text) {
+        recordSlackConversationOutcome({
+          correlationId: artifact.correlationId,
+          channel: message.channel,
+          threadTs,
+          sourceText: message.text,
+          route,
+          outcome: 'plain_reply',
+          approvalCount: conversation.approvalRequests.length,
+          missionProposalCount: conversation.missionProposals?.length || 0,
+        });
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
@@ -263,9 +323,21 @@ async function start() {
           message.channel,
           threadTs,
           response.ts,
-          shouldForceSlackDelegation(message.text) ? 'nerve' : 'surface',
+          route,
         );
+        return;
       }
+
+      recordSlackConversationOutcome({
+        correlationId: artifact.correlationId,
+        channel: message.channel,
+        threadTs,
+        sourceText: message.text,
+        route,
+        outcome: 'empty_reply',
+        approvalCount: conversation.approvalRequests.length,
+        missionProposalCount: conversation.missionProposals?.length || 0,
+      });
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);
     }

@@ -739,7 +739,7 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
     case "policies": {
       const securityPolicyPath = core.pathResolver.knowledge("public/governance/security-policy.json");
       const securityPolicy = readJson(securityPolicyPath);
-      const chronosPolicy = securityPolicy.role_permissions?.chronos_operator || {};
+      const chronosPolicy = securityPolicy.authority_role_permissions?.chronos_operator || {};
       return {
         status: "ok",
         response: l(locale, "Chronos operator policy loaded.", "Chronos operator policy を読み込みました。"),

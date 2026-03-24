@@ -13,7 +13,7 @@
       "description": "Breaks mission intent into an execution strategy and task graph.",
       "required_capabilities": ["reasoning", "strategy", "planning"],
       "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
-      "preferred_agents": ["nerve-agent", "implementation-architect", "sovereign-brain"],
+      "preferred_agents": ["planner-agent", "implementation-architect", "sovereign-brain", "nerve-agent"],
       "preferred_models": ["auto-gemini-3"],
       "autonomy_level": "high"
     },
