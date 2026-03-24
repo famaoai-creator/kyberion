@@ -18,6 +18,7 @@ import {
   surfaceManifestPath,
   surfaceResourceId,
   surfaceStatePath,
+  validateServiceAuth,
 } from '@agent/core';
 
 type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status';
@@ -70,7 +71,7 @@ function stopByPid(pid: number | undefined): void {
   } catch (_) {}
 }
 
-async function startSurfaceById(surfaceId: string, manifestPath: string) {
+export async function startSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
   const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
   if (!definition) {
@@ -81,6 +82,22 @@ async function startSurfaceById(surfaceId: string, manifestPath: string) {
   if (!normalized.enabled) {
     throw new Error(`Surface "${surfaceId}" is disabled in manifest ${manifestPath}`);
   }
+
+  // --- AUTH VALIDATION ---
+  const serviceId = (definition as any).service_id || surfaceId;
+  const presetPath = (definition as any).preset_path;
+  if (presetPath) {
+    const authRes = await validateServiceAuth(serviceId, presetPath);
+    if (!authRes.valid) {
+      logger.error(`⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. Skipping start.`);
+      return {
+        status: 'skipped_auth_required',
+        id: surfaceId,
+        reason: authRes.reason
+      };
+    }
+  }
+  // ------------------------
 
   const state = loadSurfaceState();
   const existing = state.surfaces[surfaceId];
@@ -129,6 +146,8 @@ async function startSurfaceById(surfaceId: string, manifestPath: string) {
       env: {
         ...process.env,
         ...(normalized.env || {}),
+        AUTHORIZED_SCOPE: serviceId, // Inject scoped identity for TIBA
+        SYSTEM_ROLE: surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
       },
       detached: normalized.shutdownPolicy === 'detached',
       stdio: ['ignore', out, out],
@@ -327,7 +346,15 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-main().catch((err: any) => {
-  logger.error(err.message);
-  process.exit(1);
-});
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith('surface_runtime.ts') || 
+  process.argv[1].endsWith('surface_runtime.js') ||
+  process.argv[1].endsWith('surface_runtime.mts')
+);
+
+if (isMain) {
+  main().catch((err: any) => {
+    logger.error(err.message);
+    process.exit(1);
+  });
+}

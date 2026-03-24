@@ -1,28 +1,48 @@
 # Phase Protocol: ② Recovery & Resilience
 
 ## Goal
-Autonomous return from interruptions and self-healing.
+Autonomous return from interruptions, infrastructure self-healing, and state restoration.
+This phase ensures the agent has a solid physical foundation before attempting any high-level tasks or interactions.
 
-## Trigger Condition
-This phase is automatically triggered by the **Phase Detection Protocol** when the `.kyberion.lock` file is found in the workspace root at the start of a session, indicating a previous mission was abruptly halted.
-
-## Directives
-1. **Lock-Based Recovery Priority**: Read `.kyberion.lock` to instantly identify the interrupted `mission_id`.
-2. **Context Reconstruction**: Restore the exact prior state by reading the `mission-state.json` and the Flight Recorder (`LATEST_TASK.json`).
-3. **Stale Lock Purging**: Rely on the mission controller to automatically verify if the locking PID is dead and safely purge the lock if it is stale.
-4. **Resilience**: Unexpected interruptions are opportunities for evolution. Auto-stash dirty state and resume precisely from the point of suspension.
-
-## Constraints
-- **Recovery Logic**: Restore the exact prior state. Do not invent a new path until the prior state is stable.
-- **State Freshness**: 1-hour freshness for active mission states must be strictly enforced.
-
-## Physical Enforcement
-The agent MUST use the mission controller to resume, which handles auto-stashing uncommitted debris, clearing stale locks, and checking out the correct branch safely.
-
-- **Command**: `node dist/scripts/mission_controller.js resume` (It will automatically detect the target ID from the lock file or registry)
-- **Validation**:
-  - Verification of `mission-state.json` freshness via `validateFileFreshness`.
-  - Automatic git branch verification to match the mission context.
+## Trigger Conditions
+This phase is triggered by the **Phase Detection Protocol** under two distinct circumstances:
+1. **Infrastructure Damage**: The `baseline-check` pipeline returns `status: "needs_recovery"` (failure in L0, L1, or L2).
+2. **Stale Lock Detection**: The `baseline-check` pipeline detects an interrupted mission lock (e.g., `.kyberion.lock` or `active/shared/runtime/locks/`).
 
 ---
-*Status: Mandated by AGENTS.md*
+
+## Directive A: Infrastructure Self-Healing (L0 - L2)
+If the physical or neural base of the ecosystem is broken or uninitialized, the agent MUST auto-fix it before proceeding.
+
+### 1. Neural Layer (L1) Recovery
+- **Condition**: Missing or incomplete `node_modules`.
+- **Action**: Run `pnpm install`
+- **Goal**: Re-establish internal links and SDK availability.
+
+### 2. Skeletal Layer (L2) Recovery
+- **Condition**: Missing build artifacts (`dist/` directories).
+- **Action**: Run `pnpm build`
+- **Goal**: Compile TypeScript and package the runtime.
+
+### 3. Circuit Breaker Constraint
+- If the `baseline-check` reports `circuit_broken: true`, the agent **MUST NOT** attempt further automated recovery. It must stop and ask the Sovereign for manual intervention (e.g., "Dependency resolution failed 3 times. Please check package.json").
+
+---
+
+## Directive B: Mission Recovery & Stale Locks
+Once the infrastructure (L0-L2) is stable, the agent handles aborted missions.
+
+### 1. Lock-Based Recovery Priority
+- Read `.kyberion.lock` (or runtime lock files) to instantly identify the interrupted `mission_id`.
+- **Action**: `node dist/scripts/mission_controller.js resume`
+
+### 2. Context Reconstruction
+- Restore the exact prior state by reading the `mission-state.json` and the Flight Recorder (`LATEST_TASK.json`).
+- Stale locks will be automatically purged by the mission controller if the locking PID is dead.
+
+### 3. Constraints
+- **Recovery Logic**: Restore the exact prior state. Do not invent a new path until the prior state is stable.
+- **State Freshness**: 1-hour freshness for active mission states must be strictly enforced via `validateFileFreshness`.
+
+---
+*Status: Mandated by AGENTS.md (Sentinel Architecture)*

@@ -29,10 +29,13 @@ In any phase, we must never violate the following "Sacred Sanctuaries":
 Our activities are autonomously recognized through the following **Phase Detection Protocol**, applying their respective dedicated protocols.
 
 ### Phase Detection Protocol (Auto-Boot Trigger)
-Immediately upon session initialization, the agent MUST determine its active phase in the following order:
-1.  **Recovery Priority**: Check for the existence of `.kyberion.lock` in the workspace root. If found, read the active `mission_id`, transition immediately to **② Recovery & Resilience**, and execute the stale lock recovery protocol to resume the interruption point.
-2.  **Onboarding Second**: If no lock file exists AND the environment is uninitialized (e.g., missing `my-identity.json`), transition to **① Onboarding**.
-3.  **Alignment Default**: In all other cases, transition to **③ Alignment** and await the Sovereign's intent.
+Immediately upon session initialization, before responding to the user, you MUST run the baseline check pipeline to determine the ecosystem state:
+`pnpm pipeline --input pipelines/baseline-check.json`
+
+Read the output JSON and transition based on the `status`:
+1.  **If `status: "needs_recovery"`**: The physical/neural base (L0-L2) is broken or stale lock exists. Transition to **② Recovery & Resilience**, and attempt to auto-fix (e.g., `pnpm install` or `pnpm build`).
+2.  **If `status: "needs_onboarding"`**: L3 (Identity) is missing. Transition to **① Onboarding**.
+3.  **If `status: "all_clear"` (or other non-critical)**: Transition to **③ Alignment** and await the Sovereign's intent.
 
 ### ① Onboarding
 *   **Goal**: Environment safety verification and identity synchronization.

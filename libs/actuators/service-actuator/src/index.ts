@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -222,6 +222,14 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
       for (const [id, service] of Object.entries(manifest)) {
         if (!pids[id] || !isRunning(pids[id])) {
+          // --- AUTH VALIDATION ---
+          const authRes = await validateServiceAuth(id, (service as any).preset_path);
+          if (!authRes.valid) {
+            logger.error(`⚠️ [RECONCILE] Auth validation failed for ${id}: ${authRes.reason}. Skipping start.`);
+            continue;
+          }
+          // ------------------------
+
           await startService(id, service, pids);
           if (pids[id]) emitRecoveryStimulus(id);
           changed = true;

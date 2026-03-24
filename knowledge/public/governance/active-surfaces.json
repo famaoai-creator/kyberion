@@ -33,6 +33,8 @@
       "id": "slack-bridge",
       "kind": "gateway",
       "description": "Slack Socket Mode ingress gateway and surface-agent host",
+      "service_id": "slack",
+      "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
       "command": "node",
       "args": ["dist/satellites/slack-bridge/src/index.js"],
       "env": {

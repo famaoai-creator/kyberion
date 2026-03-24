@@ -3,6 +3,7 @@ import { resolveServiceBinding } from './service-binding.js';
 
 describe('service-binding', () => {
   const originalMissionId = process.env.MISSION_ID;
+  const originalAuthorizedScope = process.env.AUTHORIZED_SCOPE;
   const originalSlackBotToken = process.env.SLACK_BOT_TOKEN;
   const originalSlackAppToken = process.env.SLACK_APP_TOKEN;
   const originalCanvaAccessToken = process.env.CANVA_ACCESS_TOKEN;
@@ -13,6 +14,9 @@ describe('service-binding', () => {
   afterEach(() => {
     if (originalMissionId === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = originalMissionId;
+
+    if (originalAuthorizedScope === undefined) delete process.env.AUTHORIZED_SCOPE;
+    else process.env.AUTHORIZED_SCOPE = originalAuthorizedScope;
 
     if (originalSlackBotToken === undefined) delete process.env.SLACK_BOT_TOKEN;
     else process.env.SLACK_BOT_TOKEN = originalSlackBotToken;
@@ -48,6 +52,7 @@ describe('service-binding', () => {
 
   it('resolves service tokens from environment for secret-guard mode', () => {
     process.env.MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
+    process.env.AUTHORIZED_SCOPE = 'slack';
     process.env.SLACK_BOT_TOKEN = 'xoxb-test-token';
     process.env.SLACK_APP_TOKEN = 'xapp-test-token';
 
@@ -67,6 +72,7 @@ describe('service-binding', () => {
 
   it('resolves oauth-style service credentials for secret-guard mode', () => {
     process.env.MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
+    process.env.AUTHORIZED_SCOPE = 'canva';
     process.env.CANVA_ACCESS_TOKEN = 'canva-access-token';
     process.env.CANVA_REFRESH_TOKEN = 'canva-refresh-token';
     process.env.CANVA_CLIENT_ID = 'client-id';
@@ -91,6 +97,7 @@ describe('service-binding', () => {
 
   it('throws when secret-guard binding has no secrets', () => {
     process.env.MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
+    process.env.AUTHORIZED_SCOPE = 'slack';
     delete process.env.SLACK_BOT_TOKEN;
     delete process.env.SLACK_APP_TOKEN;
 
