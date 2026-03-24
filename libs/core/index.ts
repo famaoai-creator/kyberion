@@ -183,6 +183,8 @@ export * from './pipeline-contract.js';
 export * from './channel-surface.js';
 export * from './presence-surface.js';
 export * from './computer-surface.js';
+export * from './apple-event-bridge.js';
+export * from './os-app-adapters.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
 export * from './generation-scheduler.js';
