@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-22
+last_updated: 2026-03-24
 ---
 
 # Component Lifecycle Inventory
@@ -22,7 +22,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `approval-actuator`: Human approval request state transitions and decision handling (4 ops, v1.0.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Immutable Ledger Anchoring System (2 ops, v1.0.0, schema schemas/blockchain-action.schema.json)
-- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (1 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
+- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (2 ops, v2.1.0, schema schemas/code-pipeline.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.0.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.0.0, schema schemas/mobile-device-pipeline.schema.json)
@@ -31,12 +31,12 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema schemas/modeling-pipeline.schema.json)
 - `network-actuator`: ADF-driven secure fetch and A2A transport pipeline engine (1 ops, v2.2.0, schema schemas/network-pipeline.schema.json)
 - `orchestrator-actuator`: Mission/control-plane transformation and execution-plan orchestration actuator (2 ops, v1.0.0, schema schemas/orchestrator-pipeline.schema.json)
-- `presence-actuator`: Human Presence and Messaging Bridge (2 ops, v1.0.0, schema schemas/presence-action.schema.json)
+- `presence-actuator`: Human Presence and Messaging Bridge (3 ops, v1.0.0, schema schemas/presence-action.schema.json)
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema schemas/process-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge (3 ops, v1.0.0, schema schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API Reachability Layer (6 ops, v1.0.0, schema schemas/service-action.schema.json)
-- `system-actuator`: OS-level control, diagnostics, and short-lived local execution (2 ops, v1.0.0, schema schemas/system-pipeline.schema.json)
-- `terminal-actuator`: PTY-driven Terminal Actuator (4 ops, v1.0.0, schema schemas/terminal-action.schema.json)
+- `system-actuator`: OS-level control, diagnostics, and short-lived local execution (3 ops, v1.0.0, schema schemas/system-pipeline.schema.json)
+- `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema schemas/terminal-action.schema.json)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
 - `voice-actuator`: Local Generative TTS Actuator (Style-Bert-VITS2) (2 ops, v1.0.0, schema schemas/voice-action.schema.json)
 - `wisdom-actuator`: Knowledge-tier search, injection, import, and export actuator (4 ops, v1.0.0, schema schemas/wisdom-action.schema.json)

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "description": "Domain-specific utilities for Visual context and Browser interaction.",
-  "main": "../../dist/libs/shared-vision/src/index.js",
-  "types": "../../dist/libs/shared-vision/src/index.d.ts",
+  "main": "../../../dist/libs/shared-vision/src/index.js",
+  "types": "../../../dist/libs/shared-vision/src/index.d.ts",
   "scripts": {
     "build": "tsc"
   },
