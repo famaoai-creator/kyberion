@@ -1,4 +1,25 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExec,
+  safeExistsSync,
+  derivePipelineStatus,
+  activateApplication,
+  detectFocusedInput,
+  keystrokeText,
+  pasteText,
+  pressKey,
+  clickAt,
+  rightClickAt,
+  moveMouse,
+  listKnownAppCapabilities,
+  listChromeTabs,
+  activateChromeTabByTitle,
+  emptyFinderTrash,
+  type FocusedInputState,
+} from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -67,6 +88,10 @@ interface ComputerInteractionAction {
       | 'remember_focused_target'
       | 'type_into_focused_input'
       | 'submit_focused_input'
+      | 'list_known_app_capabilities'
+      | 'list_tabs'
+      | 'activate_tab_by_title'
+      | 'empty_trash'
       | 'type'
       | 'key'
       | 'wait';
@@ -74,6 +99,7 @@ interface ComputerInteractionAction {
     text?: string;
     key?: string;
     application?: string;
+    title?: string;
     focus_target_id?: string;
     input_strategy?: 'keystroke' | 'paste';
     timeout_ms?: number;
@@ -164,6 +190,60 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     );
   }
 
+  if (interaction.type === 'list_known_app_capabilities') {
+    return {
+      status: 'succeeded',
+      results: [{ op: 'list_known_app_capabilities', status: 'success' }],
+      context: {
+        known_app_capabilities: listKnownAppCapabilities(),
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'list_tabs') {
+    const tabs = listChromeTabs(application || 'Google Chrome');
+    return {
+      status: 'succeeded',
+      results: [{ op: 'list_tabs', status: 'success' }],
+      context: {
+        browser_tabs: tabs,
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'activate_tab_by_title') {
+    const result = activateChromeTabByTitle(interaction.title || '', application || 'Google Chrome');
+    return {
+      status: result.matched ? 'succeeded' : 'failed',
+      results: [{ op: 'activate_tab_by_title', status: result.matched ? 'success' : 'failed' }],
+      context: {
+        tab_activation: {
+          application: application || 'Google Chrome',
+          title: interaction.title || '',
+          matched: result.matched,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'empty_trash') {
+    emptyFinderTrash();
+    return {
+      status: 'succeeded',
+      results: [{ op: 'empty_trash', status: 'success' }],
+      context: {
+        file_manager_action: {
+          application: 'Finder',
+          action: 'empty_trash',
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
   const steps: PipelineStep[] = [];
   if (application && interaction.type !== 'wait' && interaction.type !== 'activate_application') {
     steps.push({
@@ -247,10 +327,6 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   return executePipeline(steps, {}, { timeout_ms: interaction.timeout_ms || 60000 });
 }
 
-function activateApplication(application: string) {
-  safeExec('osascript', ['-e', `tell application "${application.replace(/"/g, '\\"')}" to activate`]);
-}
-
 function ensureComputerRuntimeDir() {
   if (!safeExistsSync(COMPUTER_RUNTIME_DIR)) {
     safeMkdir(COMPUTER_RUNTIME_DIR, { recursive: true });
@@ -273,7 +349,7 @@ function saveFocusTargetStore(store: Record<string, any>) {
   safeWriteFile(FOCUS_TARGET_STORE_PATH, JSON.stringify(store, null, 2));
 }
 
-function rememberFocusedTarget(explicitId: string | undefined, focusedInput: ReturnType<typeof detectFocusedInput>) {
+function rememberFocusedTarget(explicitId: string | undefined, focusedInput: FocusedInputState) {
   const targetId = explicitId || `focus-${Date.now()}`;
   const store = loadFocusTargetStore();
   store[targetId] = {
@@ -386,60 +462,6 @@ function windowTitleMatches(expected: string, actual: string, matchPolicy: 'stri
     default:
       return actual === expected;
   }
-}
-
-function toAppleScriptString(value: string) {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function detectFocusedInput() {
-  if (process.platform !== 'darwin') {
-    return {
-      application: '',
-      windowTitle: '',
-      role: '',
-      description: '',
-      editable: false,
-    };
-  }
-
-  const script = [
-    'tell application "System Events"',
-    'set frontApp to name of first application process whose frontmost is true',
-    'set windowTitle to ""',
-    'set focusedRole to ""',
-    'set focusedDescription to ""',
-    'set editableFlag to "false"',
-    'tell application process frontApp',
-    'try',
-    'set windowTitle to name of front window',
-    'end try',
-    'try',
-    'set focusedElement to value of attribute "AXFocusedUIElement"',
-    'try',
-    'set focusedRole to value of attribute "AXRole" of focusedElement',
-    'end try',
-    'try',
-    'set focusedDescription to value of attribute "AXDescription" of focusedElement',
-    'end try',
-    'if focusedRole is in {"AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"} then',
-    'set editableFlag to "true"',
-    'end if',
-    'end try',
-    'end tell',
-    'return frontApp & linefeed & windowTitle & linefeed & focusedRole & linefeed & focusedDescription & linefeed & editableFlag',
-    'end tell',
-  ].join('\n');
-
-  const output = String(safeExec('osascript', ['-e', script])).trimEnd();
-  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
-  return {
-    application,
-    windowTitle,
-    role,
-    description,
-    editable: editableFlag.trim().toLowerCase() === 'true',
-  };
 }
 
 /**
@@ -618,31 +640,16 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
     case 'keyboard':
-      if (process.platform === 'darwin') safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${resolve(params.text || '{{last_capture}}').replace(/"/g, '\\"')}"`]);
+      keystrokeText(String(resolve(params.text || '{{last_capture}}')));
       break;
     case 'paste_text': {
       const text = String(resolve(params.text || '{{last_capture}}'));
-      if (process.platform === 'darwin') {
-        const script = [
-          'set oldClipboard to the clipboard',
-          `set the clipboard to "${toAppleScriptString(text)}"`,
-          'tell application "System Events" to keystroke "v" using command down',
-          'delay 0.1',
-          'set the clipboard to oldClipboard',
-        ].join('\n');
-        safeExec('osascript', ['-e', script]);
-      }
+      pasteText(text);
       break;
     }
     case 'press_key': {
       const key = String(resolve(params.key || '')).trim().toLowerCase();
-      if (process.platform === 'darwin') {
-        if (key === 'enter' || key === 'return') {
-          safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
-        } else {
-          safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${key.replace(/"/g, '\\"')}"`]);
-        }
-      }
+      pressKey(key);
       break;
     }
     case 'activate_application': {
@@ -656,22 +663,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'mouse_click':
-      if (process.platform === 'darwin') {
-        const button = params.button === 'right' ? 'right' : 'left';
-        const clickCount = Number(params.click_count || 1);
-        if (button === 'right') {
-          for (let index = 0; index < clickCount; index++) {
-            safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${params.x},${params.y}"`]);
-          }
-        } else {
-          for (let index = 0; index < clickCount; index++) {
-            safeExec('osascript', ['-e', `tell application "System Events" to click at {${params.x}, ${params.y}}`]);
-          }
-        }
+      if (params.button === 'right') {
+        rightClickAt(Number(params.x || 0), Number(params.y || 0), Number(params.click_count || 1));
+      } else {
+        clickAt(Number(params.x || 0), Number(params.y || 0), Number(params.click_count || 1));
       }
       break;
     case 'mouse_move':
-      if (process.platform === 'darwin') safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${params.x},${params.y}"`]);
+      moveMouse(Number(params.x || 0), Number(params.y || 0));
       break;
     case 'wait':
       await new Promise((resolveDelay) => setTimeout(resolveDelay, Number(params.duration_ms || 1000)));
