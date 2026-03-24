@@ -31,6 +31,10 @@ vi.mock("@agent/core", () => ({
         detail: "focused input",
         updatedAt: "2026-03-25T00:00:02.000Z",
         actionCount: 3,
+        metadata: {
+          application: "Google Chrome",
+          sessionCount: 1,
+        },
       });
     }
     return JSON.stringify({
@@ -54,6 +58,7 @@ describe("Chronos computer sessions", () => {
       kind: "system",
       status: "succeeded",
       target: "Codex",
+      metadata: { application: "Google Chrome", sessionCount: 1 },
     });
     expect(sessions.find((session) => session.id === "browser-1")).toMatchObject({
       kind: "browser",

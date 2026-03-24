@@ -47,12 +47,24 @@ vi.mock('@agent/core', () => {
       { application: 'Google Chrome', adapter: 'browser_tabs', capabilities: ['list_tabs', 'activate_tab_by_title'] },
       { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
     ]),
+    listTerminalTargets: vi.fn(() => [
+      { application: 'Terminal', supported: true, preferred: false, adapter: 'terminal', canInject: true, sessionCount: 0, sessions: [], idleSession: null },
+      { application: 'iTerm2', supported: true, preferred: true, adapter: 'iterm2', canInject: true, sessionCount: 1, sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }], idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' } },
+    ]),
     listChromeTabs: vi.fn(() => [
       { index: 1, title: 'Inbox', url: 'https://mail.example' },
       { index: 2, title: 'Docs', url: 'https://docs.example' },
     ]),
     activateChromeTabByTitle: vi.fn((title: string) => ({ matched: title === 'Docs' })),
+    activateChromeTabByUrl: vi.fn((url: string) => ({ matched: url === 'docs.example' })),
+    closeChromeTabByTitle: vi.fn((title: string) => ({ matched: title === 'Docs' })),
+    closeChromeTabByUrl: vi.fn((url: string) => ({ matched: url === 'docs.example' })),
     emptyFinderTrash: vi.fn(),
+    revealFinderPath: vi.fn(),
+    openFinderPath: vi.fn(),
+    emitComputerSurfacePatch: vi.fn(),
+    createApprovalRequest: vi.fn(() => ({ id: 'approval-123', status: 'pending' })),
+    loadApprovalRequest: vi.fn(() => null),
   };
 });
 
@@ -343,6 +355,20 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.context.browser_tabs[1].title).toBe('Docs');
   });
 
+  it('returns terminal targets through the app adapter', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'list_terminal_targets',
+      },
+    } as any);
+
+    expect(result.context.terminal_targets[1].application).toBe('iTerm2');
+    expect(result.context.terminal_targets[1].preferred).toBe(true);
+  });
+
   it('activates a Chrome tab by title', async () => {
     const { handleAction } = await import('./index');
     const result = await handleAction({
@@ -362,18 +388,188 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.context.tab_activation.matched).toBe(true);
   });
 
+  it('activates a Chrome tab by url fragment', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'activate_tab_by_url',
+        url: 'docs.example',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.tab_activation.matched).toBe(true);
+  });
+
+  it('blocks close_tab_by_url and creates an approval request when none is supplied', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.closeChromeTabByUrl).mockClear();
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'computer-session-1',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'close_tab_by_url',
+        url: 'docs.example',
+      },
+    } as any);
+
+    expect(result.status).toBe('blocked');
+    expect(result.context.approval_request_id).toBe('approval-123');
+    expect(core.closeChromeTabByUrl).not.toHaveBeenCalled();
+  });
+
+  it('closes a Chrome tab by url when approval is present', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'close_tab_by_url',
+        url: 'docs.example',
+        approval_request_id: 'approved-req',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.closeChromeTabByUrl).toHaveBeenCalledWith('docs.example', 'Google Chrome');
+  });
+
   it('executes empty_trash through the Finder adapter', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
+    vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
     const result = await handleAction({
       version: '0.1',
       kind: 'computer_interaction',
       action: {
         type: 'empty_trash',
+        approval_request_id: 'approved-req',
       },
     } as any);
 
     expect(result.status).toBe('succeeded');
     expect(core.emptyFinderTrash).toHaveBeenCalled();
+  });
+
+  it('blocks empty_trash and creates an approval request when none is supplied', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.emptyFinderTrash).mockClear();
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'computer-session-1',
+      action: {
+        type: 'empty_trash',
+      },
+    } as any);
+
+    expect(result.status).toBe('blocked');
+    expect(result.context.approval_request_id).toBe('approval-123');
+    expect(core.createApprovalRequest).toHaveBeenCalled();
+    expect(core.emptyFinderTrash).not.toHaveBeenCalled();
+  });
+
+  it('blocks close_tab_by_title and creates an approval request when none is supplied', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.closeChromeTabByTitle).mockClear();
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'computer-session-1',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'close_tab_by_title',
+        title: 'Docs',
+      },
+    } as any);
+
+    expect(result.status).toBe('blocked');
+    expect(result.context.approval_request_id).toBe('approval-123');
+    expect(core.createApprovalRequest).toHaveBeenCalled();
+    expect(core.closeChromeTabByTitle).not.toHaveBeenCalled();
+  });
+
+  it('closes a Chrome tab by title when approval is present', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.loadApprovalRequest).mockReturnValue({ status: 'approved' } as any);
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      target: {
+        executor: 'system',
+        application: 'Google Chrome',
+      },
+      action: {
+        type: 'close_tab_by_title',
+        title: 'Docs',
+        approval_request_id: 'approved-req',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.closeChromeTabByTitle).toHaveBeenCalledWith('Docs', 'Google Chrome');
+  });
+
+  it('reveals a path through Finder', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'reveal_path',
+        path: '/tmp/demo.txt',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.revealFinderPath).toHaveBeenCalledWith('/tmp/demo.txt');
+  });
+
+  it('opens a path through Finder', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'open_path',
+        path: '/tmp/demo-folder',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.openFinderPath).toHaveBeenCalledWith('/tmp/demo-folder');
   });
 });
