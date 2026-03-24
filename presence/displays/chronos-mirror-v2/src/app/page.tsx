@@ -1,11 +1,13 @@
 "use client";
 
-import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench } from "lucide-react";
+import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
+import { FocusedOperatorView } from "../components/FocusedOperatorView";
 import { SovereignChat } from "../components/SovereignChat";
 import { AgentPanel } from "../components/AgentPanel";
 import { MissionIntelligence } from "../components/MissionIntelligence";
+import { MISSION_CYCLE, OPERATOR_VIEW_LINKS, SURFACE_ROLES } from "../lib/operator-console";
 import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 type QuickAction = {
@@ -33,10 +35,11 @@ type StatusCard = {
   targetId: string;
 };
 
+
 const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
   {
     title: "Observe",
-    hint: "Read current system state without mutating runtime.",
+    hint: "Open governed readouts before you intervene.",
     icon: Radar,
     accent: "from-cyan-400/16 via-cyan-300/8 to-transparent",
     accentText: "text-cyan-200/85",
@@ -49,7 +52,7 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
   },
   {
     title: "Verify",
-    hint: "Run deterministic health and capability checks.",
+    hint: "Run deterministic checks when the control plane needs proof.",
     icon: ActivitySquare,
     accent: "from-amber-300/18 via-amber-200/8 to-transparent",
     accentText: "text-amber-200/85",
@@ -62,7 +65,7 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
   },
   {
     title: "Operate",
-    hint: "Use heavier actions when you need intervention or delivery work.",
+    hint: "Escalate only when mission flow, runtime health, or delivery is blocked.",
     icon: Wrench,
     accent: "from-rose-400/16 via-orange-300/8 to-transparent",
     accentText: "text-orange-200/85",
@@ -77,25 +80,25 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
 
 const STATUS_CARDS: StatusCard[] = [
   {
-    label: "Control Plane",
-    value: "Mission-first",
-    detail: "Event-driven orchestration and deterministic reconciliation.",
+    label: "Needs Attention",
+    value: "Exceptions",
+    detail: "Start with mission blockers, runtime incidents, and delivery exceptions.",
     icon: Shield,
     accent: "border-amber-200/16 bg-amber-300/8 text-amber-100",
     targetId: "mission-control-plane",
   },
   {
-    label: "Runtime",
+    label: "Runtime Governance",
     value: "Supervisor",
-    detail: "Agent reuse, lease metadata, runtime doctor remediation.",
+    detail: "Managed runtimes, lease ownership, and remediation live here.",
     icon: Bot,
     accent: "border-cyan-200/16 bg-cyan-300/8 text-cyan-100",
     targetId: "runtime-lease-doctor",
   },
   {
-    label: "Surface",
+    label: "Delivery",
     value: "Outbox",
-    detail: "Slack and Chronos share a single delivery contract.",
+    detail: "Slack and Chronos share one operator-visible delivery queue.",
     icon: Radar,
     accent: "border-rose-200/16 bg-rose-300/8 text-rose-100",
     targetId: "recent-surface-outbox",
@@ -106,6 +109,7 @@ export default function ChronosMirrorV2() {
   const locale = resolveChronosLocale();
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [focusedOperatorView, setFocusedOperatorView] = useState<string | null>(null);
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
 
   const handleReady = useCallback((fn: (q: string) => void) => {
@@ -146,41 +150,49 @@ export default function ChronosMirrorV2() {
     element.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const handleOperatorViewOpen = useCallback((targetId: string) => {
+    setFocusedOperatorView(targetId);
+    if (surface) {
+      setSurface(null);
+    }
+  }, [surface]);
+
   const activeSurfaceTitle = useMemo(
     () => surface?.title || uxText("chronos_mission_intelligence", "Mission Intelligence", locale),
     [surface?.title, locale],
   );
 
   return (
-    <main className="min-h-screen w-screen overflow-hidden bg-[#081019] text-kyberion-gold">
+    <main className="min-h-screen w-screen overflow-hidden bg-[#0e1419] text-kyberion-gold">
       <div className="absolute inset-0 pointer-events-none opacity-60">
-        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-amber-300/12 blur-[140px]" />
-        <div className="absolute top-[28%] right-[18%] h-[18rem] w-[18rem] rounded-full bg-cyan-400/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] h-[28rem] w-[28rem] rounded-full bg-rose-500/10 blur-[170px]" />
+        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-amber-200/10 blur-[160px]" />
+        <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-sky-200/7 blur-[150px]" />
+        <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-stone-200/5 blur-[160px]" />
       </div>
-      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:72px_72px] opacity-[0.08]" />
+      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
+      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
 
       <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
-        <header className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] px-5 py-4 md:px-6">
+        <header className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(247,240,223,0.08),rgba(255,255,255,0.02))] px-5 py-4 md:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-200/30 bg-black/25 shadow-[0_0_40px_rgba(251,191,36,0.12)]">
                 <Shield className="h-5 w-5 text-amber-200" />
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.35em] text-cyan-100/55">Chronos Mirror</div>
+                <div className="text-[10px] uppercase tracking-[0.35em] text-stone-200/60">Chronos Mirror</div>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-                  {uxText("chronos_header_title", "Clear operator view for mission state, runtime health, and delivery flow.", locale)}
+                  {uxText("chronos_header_title", "Operator console for mission risk, runtime governance, and delivery recovery.", locale)}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200/70">
-                  {uxText("chronos_header_description", "Read left to right: choose an intent, inspect the active surface, then intervene only when the control plane or runtime doctor tells you to.", locale)}
+                  {uxText("chronos_header_description", "Chronos is not a general workspace. Read exceptions first, open an A2UI surface when you need drill-down, and intervene only where the control plane needs help.", locale)}
                 </p>
               </div>
             </div>
 
             <button
               onClick={() => setAgentPanelOpen(true)}
-              className="flex items-center gap-2 self-start rounded-xl border border-cyan-200/15 bg-cyan-300/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-50 transition hover:border-cyan-200/35 hover:bg-cyan-300/16"
+              className="flex items-center gap-2 self-start rounded-xl border border-stone-200/12 bg-stone-100/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-50 transition hover:border-stone-200/28 hover:bg-stone-100/10"
             >
               <Cpu size={14} />
               <span>{uxText("chronos_agent_runtimes", "Agent Runtimes", locale)}</span>
@@ -193,9 +205,9 @@ export default function ChronosMirrorV2() {
             <div className="flex flex-col gap-6">
               <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">{uxText("chronos_quick_actions", "Quick Actions", locale)}</div>
-                    <div className="mt-1 text-sm text-slate-200/65">{uxText("chronos_grouped_by_operator_intent", "Grouped by operator intent.", locale)}</div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">{uxText("chronos_quick_actions", "Quick Actions", locale)}</div>
+                    <div className="mt-1 text-sm text-slate-200/65">{uxText("chronos_grouped_by_operator_intent", "These drive the active A2UI surface on the right.", locale)}</div>
                   </div>
                 </div>
 
@@ -265,23 +277,111 @@ export default function ChronosMirrorV2() {
                   );
                 })}
               </section>
+
+              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Operator Views</div>
+                <div className="mt-2 text-sm text-slate-200/68">
+                  Use this menu to switch the main console into a single focused operator view, including the runtime map.
+                </div>
+                <div className="mt-4 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFocusedOperatorView(null)}
+                    className={`rounded-2xl border px-3 py-3 text-left transition ${
+                      focusedOperatorView === null
+                        ? "border-amber-200/20 bg-amber-200/8"
+                        : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">Full Console</div>
+                    <div className="mt-2 text-[11px] leading-5 text-slate-200/56">Show the complete control surface with all operator sections.</div>
+                  </button>
+                  {OPERATOR_VIEW_LINKS.map((view) => (
+                    <button
+                      key={view.targetId}
+                      type="button"
+                      onClick={() => handleOperatorViewOpen(view.targetId)}
+                      className={`rounded-2xl border px-3 py-3 text-left transition ${
+                        focusedOperatorView === view.targetId
+                          ? "border-cyan-200/22 bg-cyan-300/10"
+                          : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">{view.label}</div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-200/56">{view.detail}</div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Surface Taxonomy</div>
+                <div className="mt-2 text-sm text-slate-200/68">
+                  Every surface connects people and agent execution in a different mode. Chronos is the control surface, while A2UI provides drill-down work surfaces.
+                </div>
+                <div className="mt-4 space-y-3">
+                  {SURFACE_ROLES.map((role) => (
+                    <div key={role.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">{role.label}</div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">{role.value}</div>
+                      </div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{role.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Mission Cycle</div>
+                <div className="mt-2 text-sm text-slate-200/68">
+                  Kyberion should always make this loop legible: a request becomes a mission, execution stays explainable, and the result remains inspectable and reusable.
+                </div>
+                <div className="mt-4 grid gap-2">
+                  {MISSION_CYCLE.map((step, index) => (
+                    <div key={step.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-200/18 bg-amber-300/8 text-[10px] font-semibold text-amber-100/84">
+                          {index + 1}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">{step.label}</div>
+                      </div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{step.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           </aside>
 
-          <section className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]">
+          <section className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]">
             <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.34em] text-cyan-100/40">Active Surface</div>
+                <div className="text-[10px] uppercase tracking-[0.34em] text-stone-200/42">Active Surface</div>
                 <div className="mt-1 text-lg font-semibold tracking-tight text-white/92">{activeSurfaceTitle}</div>
               </div>
-              <div className="rounded-full border border-white/8 bg-slate-950/50 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
-                {surface ? "interactive display" : "default intelligence"}
+              <div className="flex items-center gap-2 rounded-full border border-white/8 bg-black/25 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
+                <PanelsTopLeft size={12} />
+                <span>{surface ? "a2ui drill-down" : focusedOperatorView ? "focused operator view" : "default operator view"}</span>
               </div>
             </div>
 
             <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
               {!surface ? (
-                <MissionIntelligence />
+                focusedOperatorView ? (
+                  <FocusedOperatorView
+                    viewId={focusedOperatorView as
+                      | "needs-attention"
+                      | "mission-control-plane"
+                      | "runtime-topology-map"
+                      | "runtime-lease-doctor"
+                      | "recent-surface-outbox"
+                      | "owner-summaries"}
+                    onBack={() => setFocusedOperatorView(null)}
+                  />
+                ) : (
+                  <MissionIntelligence />
+                )
               ) : (
                 <div className="flex flex-col gap-6">
                   {surface.components?.map((component: any, index: number) => (

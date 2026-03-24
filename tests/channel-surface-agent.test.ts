@@ -6,6 +6,8 @@ import {
   buildSlackOnboardingBlocks,
   buildSlackOnboardingModal,
   deriveSlackExecutionMode,
+  deriveSlackDelegationReceiver,
+  deriveSlackIntentLabel,
   createSlackApprovalRequest,
   saveSlackMissionProposalState,
   getSlackMissionProposalState,
@@ -140,9 +142,29 @@ describe('Channel surface agents', () => {
     })).toContain('Execution mode: conversation');
     expect(shouldForceSlackDelegation('deploy status please')).toBe(true);
     expect(shouldForceSlackDelegation('ping')).toBe(false);
+    expect(buildSlackSurfacePrompt({
+      user: 'U123',
+      text: '今の状態は？',
+      channel: 'C123',
+      ts: '1710000000.000100',
+      channelType: 'im',
+    })).toContain('Derived intent: request_deeper_reasoning');
     expect(deriveSlackExecutionMode('Kyberionの資料を作って欲しいんだけど可能かな？')).toBe('conversation');
     expect(deriveSlackExecutionMode('Kyberionの資料を作成して保存してください')).toBe('task');
     expect(deriveSlackExecutionMode('Kyberionの資料を作ってください')).toBe('conversation');
+  });
+
+  it('classifies mission-follow-up style Slack turns as mission work', () => {
+    expect(deriveSlackIntentLabel('今の状態は？')).toBe('request_mission_work');
+    expect(deriveSlackIntentLabel('あ、もう修正済み')).toBe('request_mission_work');
+    expect(deriveSlackIntentLabel('deploy status please')).toBe('request_mission_work');
+  });
+
+  it('routes maintenance-style Slack turns to chronos and deeper work to nerve', () => {
+    expect(deriveSlackDelegationReceiver('今のミッション一覧を見せて')).toBe('chronos-mirror');
+    expect(deriveSlackDelegationReceiver('runtime health を教えて')).toBe('chronos-mirror');
+    expect(deriveSlackDelegationReceiver('Kyberionの設計を整理して')).toBe('nerve-agent');
+    expect(deriveSlackDelegationReceiver('ping')).toBeUndefined();
   });
 
   it('records Chronos control-plane requests and delegation summaries', () => {
@@ -203,6 +225,17 @@ describe('Channel surface agents', () => {
     expect(parsed.text).toBe('I can escalate this into durable work.');
     expect(parsed.missionProposals).toHaveLength(1);
     expect(parsed.missionProposals?.[0].mission_type).toBe('product_development');
+  });
+
+  it('extracts planning packet blocks from a planner response', () => {
+    const parsed = extractSurfaceBlocks([
+      '```planning_packet',
+      '{"mission_id":"MSN-PLAN-1","summary":"Plan summary","plan_markdown":"# PLAN\\n\\n## Objective\\nInspect active missions","next_tasks":[{"task_id":"task-1","team_role":"operator","description":"Collect current mission registry","deliverable":"artifacts/mission-list.md"}]}',
+      '```',
+    ].join('\n'));
+
+    expect(parsed.planningPackets).toHaveLength(1);
+    expect(parsed.planningPackets?.[0].next_tasks[0].team_role).toBe('operator');
   });
 
   it('routes uninitialized Slack threads into onboarding and persists identity artifacts', () => {

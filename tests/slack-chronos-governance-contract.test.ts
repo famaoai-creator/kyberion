@@ -29,6 +29,7 @@ describe('Slack and Chronos governance contract', () => {
     expect(securityPolicy.authority_role_permissions.slack_bridge.allow_write).toEqual([
       'presence/bridge/runtime/',
       'active/shared/coordination/channels/slack/',
+      'active/shared/coordination/channels/chronos/outbox/',
       'active/shared/coordination/orchestration/',
       'active/shared/observability/channels/slack/',
       'active/shared/observability/mission-control/',
@@ -49,6 +50,7 @@ describe('Slack and Chronos governance contract', () => {
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/runtime/');
 
     expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/channels/slack/');
+    expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/channels/chronos/outbox/');
     expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/orchestration/');
     expect(roleAccess.roles.chronos_gateway.allow).toContain('active/shared/coordination/chronos/');
     expect(roleAccess.roles.chronos_gateway.allow).toContain('active/shared/coordination/orchestration/');
