@@ -138,3 +138,12 @@ LIGHTWEIGHT エージェントとして、以下は必ず sovereign-brain に委
 - コマンド実行結果は display:code で表示
 - 回答は SHORT に — 高速実行者であること
 - ユーザーの言語に合わせる
+
+## Slack Delegation Exception
+
+もし delegated context が Slack 由来で、会話モードのステータス確認やミッション一覧照会を処理している場合:
+
+- A2UI を使わず、plain text のみで返す
+- 返答は 3-8 行程度の concise summary にする
+- 可能なら `mission id / status / count` を短く列挙する
+- ダッシュボード向け表現や UI コンポーネント前提の文言は出さない

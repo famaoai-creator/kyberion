@@ -10,9 +10,9 @@ interface AgentRecord {
   modelId: string;
   status: string;
   capabilities: string[];
-  trustScore: number;
-  uptimeMs: number;
-  idleMs: number;
+  trustScore: number | null;
+  uptimeMs: number | null;
+  idleMs: number | null;
   runtime: {
     kind: string;
     state: string;
@@ -32,7 +32,7 @@ interface AgentRecord {
       inputTokens?: number;
       outputTokens?: number;
     };
-  };
+  } | null;
   process: {
     rssKb?: number;
     cpuPercent?: number;
@@ -286,22 +286,35 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           )}
           {agents.map((agent) => (
             <div key={agent.agentId} className="flex items-center gap-3 p-3 bg-black/30 rounded-xl border border-white/5">
+              {(() => {
+                const metrics = agent.metrics || {
+                  turnCount: 0,
+                  errorCount: 0,
+                  restartCount: 0,
+                  refreshCount: 0,
+                  totalPromptChars: 0,
+                  totalResponseChars: 0,
+                };
+                const idleSeconds = Math.round(((agent.runtime?.idleForMs ?? agent.idleMs) || 0) / 1000);
+                const trustLabel = typeof agent.trustScore === "number" ? agent.trustScore : "n/a";
+                return (
+                  <>
               <div className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[agent.status] || "bg-gray-500"}`} />
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-bold font-mono truncate">{agent.agentId}</div>
                 <div className="text-[9px] opacity-40 flex gap-3 mt-0.5">
                   <span>{agent.provider}/{agent.modelId}</span>
-                  <span>Trust: {agent.trustScore}</span>
+                  <span>Trust: {trustLabel}</span>
                   {agent.capabilities.length > 0 && <span>[{agent.capabilities.join(", ")}]</span>}
                 </div>
                 <div className="text-[8px] opacity-35 flex flex-wrap gap-3 mt-1 font-mono">
-                  <span>turns {agent.metrics.turnCount}</span>
-                  <span>errors {agent.metrics.errorCount}</span>
-                  <span>refresh {agent.metrics.refreshCount}</span>
-                  <span>restart {agent.metrics.restartCount}</span>
-                  <span>idle {Math.round((agent.runtime?.idleForMs ?? agent.idleMs) / 1000)}s</span>
+                  <span>turns {metrics.turnCount}</span>
+                  <span>errors {metrics.errorCount}</span>
+                  <span>refresh {metrics.refreshCount}</span>
+                  <span>restart {metrics.restartCount}</span>
+                  <span>idle {idleSeconds}s</span>
                   {typeof agent.process?.rssKb === "number" && <span>rss {(agent.process.rssKb / 1024).toFixed(1)}MB</span>}
-                  {typeof agent.metrics.usage?.totalTokens === "number" && <span>tokens {agent.metrics.usage.totalTokens}</span>}
+                  {typeof metrics.usage?.totalTokens === "number" && <span>tokens {metrics.usage.totalTokens}</span>}
                 </div>
               </div>
               <div className="text-[8px] uppercase tracking-widest opacity-40">{agent.status}</div>
@@ -335,6 +348,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               >
                 <Trash2 size={12} />
               </button>
+                  </>
+                );
+              })()}
             </div>
           ))}
 

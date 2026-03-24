@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Activity, Bot, GitBranch, Radar } from "lucide-react";
+import { Activity, AlertTriangle, Bot, GitBranch, Radar, Send, ShieldAlert } from "lucide-react";
+import { buildAttentionItems, type AttentionItem } from "../lib/operator-console";
+import type { RuntimeTopologySnapshot } from "../lib/runtime-topology";
 import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
 
 interface MissionSummary {
@@ -369,6 +371,7 @@ interface IntelligencePayload {
   runtime: RuntimeSummary;
   runtimeLeases: RuntimeLease[];
   runtimeDoctor: RuntimeDoctorFinding[];
+  runtimeTopology: RuntimeTopologySnapshot;
 }
 
 function getActionsByRisk(
@@ -414,9 +417,16 @@ interface SurfaceSummary {
   controlRequestedBy?: string;
 }
 
-export function MissionIntelligence() {
+export function MissionIntelligence({
+  focusedView = null,
+  onClearFocus,
+}: {
+  focusedView?: string | null;
+  onClearFocus?: () => void;
+}) {
   const locale = resolveChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<IntelligencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remediationTarget, setRemediationTarget] = useState<string | null>(null);
@@ -431,6 +441,10 @@ export function MissionIntelligence() {
   const [expandedGlobalSurfaceActionId, setExpandedGlobalSurfaceActionId] = useState<string | null>(null);
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>("all");
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -498,6 +512,13 @@ export function MissionIntelligence() {
           controlActionDetails?: Record<string, ControlActionDetail[]>;
           ownerSummaries?: OwnerSummary[];
           browserSessions?: BrowserSessionSummary[];
+          runtime?: {
+            total: number;
+            ready: number;
+            busy: number;
+            error: number;
+          };
+          runtimeTopology?: MissionIntelligenceProps["data"]["runtimeTopology"];
         };
         setData((current) => current ? {
           ...current,
@@ -508,6 +529,8 @@ export function MissionIntelligence() {
           controlActionDetails: payload.controlActionDetails || current.controlActionDetails,
           ownerSummaries: Array.isArray(payload.ownerSummaries) ? payload.ownerSummaries : current.ownerSummaries,
           browserSessions: Array.isArray(payload.browserSessions) ? payload.browserSessions : current.browserSessions,
+          runtime: payload.runtime || current.runtime,
+          runtimeTopology: payload.runtimeTopology || current.runtimeTopology,
         } : current);
       } catch {
         // Ignore malformed SSE payloads and keep polling fallback.
@@ -664,6 +687,14 @@ export function MissionIntelligence() {
     );
   }
 
+  if (!mounted) {
+    return (
+      <div className="rounded-[24px] border border-white/8 bg-black/20 px-5 py-5 text-[11px] uppercase tracking-[0.22em] text-white/40">
+        Loading mission intelligence...
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -682,35 +713,96 @@ export function MissionIntelligence() {
   const missionThread = effectiveMissionId
     ? buildMissionThread(effectiveMissionId, data.agentMessages, data.a2aHandoffs)
     : [];
+  const missionExceptions = data.activeMissions.filter((mission) => mission.controlTone === "attention" || mission.controlTone === "pending");
+  const surfaceExceptions = data.surfaces.filter((surface) => surface.controlTone === "attention" || surface.health === "unhealthy");
+  const deliveryExceptions = data.recentSurfaceOutbox;
+  const attentionItems = buildAttentionItems({
+    missions: data.activeMissions,
+    runtimeDoctor: data.runtimeDoctor,
+    surfaces: data.surfaces,
+    outbox: data.recentSurfaceOutbox,
+  });
+
+  const runAttentionAction = (item: AttentionItem) => {
+    if (item.targetType === "mission") {
+      setSelectedMissionId(item.targetId);
+      setMessageMissionFilter(item.targetId);
+      document.getElementById(toDomId("mission", item.targetId))?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (item.targetType === "runtime" && item.remediationAction) {
+      remediateLease(item.targetId, item.remediationAction);
+      return;
+    }
+    if (item.targetType === "surface") {
+      document.getElementById(toDomId("surface", item.targetId))?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    document.getElementById("recent-surface-outbox")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  const showAllViews = focusedView == null;
+  const isVisible = (sectionId: string) => showAllViews || focusedView === sectionId;
+  const focusTitle = focusedView
+    ? ({
+        "needs-attention": "Needs Attention",
+        "mission-control-plane": "Mission Control",
+        "runtime-topology-map": "Runtime Topology",
+        "runtime-lease-doctor": "Runtime Governance",
+        "recent-surface-outbox": "Delivery Exceptions",
+        "owner-summaries": "Audit Trail",
+      } as Record<string, string>)[focusedView] || "Focused View"
+    : null;
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
+      {focusedView && (
+        <section className="rounded-[24px] border border-cyan-300/12 bg-cyan-400/[0.06] px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/58">Focused Operator View</div>
+              <div className="mt-2 text-lg font-semibold tracking-tight text-white/90">{focusTitle}</div>
+              <div className="mt-1 text-[11px] leading-5 text-white/58">
+                The main console is showing one operator view at full width.
+              </div>
+            </div>
+            {onClearFocus && (
+              <button
+                type="button"
+                onClick={onClearFocus}
+                className="self-start rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-white/75 transition hover:bg-white/10"
+              >
+                Show Full Console
+              </button>
+            )}
+          </div>
+        </section>
+      )}
       <section className="rounded-[26px] border border-kyberion-gold/15 bg-gradient-to-br from-kyberion-gold/10 via-black/10 to-cyan-950/20 px-5 py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">{mt("chronos_mission_intelligence", "Mission Intelligence")}</div>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">{mt("chronos_operator_console", "Operator Console")}</div>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-white/90">
-              {mt("chronos_mission_hero_title", "Read mission health first, then act on runtime or delivery issues.")}
+              {mt("chronos_mission_hero_title", "Start with exceptions, then intervene only where mission flow or runtime governance needs help.")}
             </h2>
             <p className="mt-2 max-w-3xl text-[12px] leading-6 text-white/52">
-              {mt("chronos_mission_hero_description", "This view is structured for operators: confirm active mission progress, inspect recent orchestration transitions, then handle stale runtimes or pending delivery messages only if the control plane needs intervention.")}
+              {mt("chronos_mission_hero_description", "Chronos is the operational mirror for Kyberion. Confirm what is active, identify what is blocked, open A2UI drill-downs when you need detail, and keep control actions deliberate and minimal.")}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] text-white/48 sm:grid-cols-4">
+            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
+              <div>needs attention</div>
+              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">{attentionItems.length}</div>
+            </div>
             <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
               <div>missions</div>
               <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">{data.activeMissions.length}</div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
-              <div>runtime</div>
-              <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">{data.runtime.ready}/{data.runtime.total}</div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
-              <div>doctor</div>
+              <div>runtime incidents</div>
               <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">{data.runtimeDoctor.length}</div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-black/25 px-3 py-3">
-              <div>outbox</div>
+              <div>delivery queue</div>
               <div className="mt-2 text-lg font-semibold tracking-tight text-white/88">
                 {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
               </div>
@@ -728,81 +820,88 @@ export function MissionIntelligence() {
             ? mt("chronos_control_actions_disabled", " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.")
             : mt("chronos_control_actions_enabled", " · control actions enabled.")}
         </div>
+        <div className="mt-3 rounded-xl border border-amber-200/10 bg-stone-100/[0.035] px-3 py-3 text-[11px] leading-5 text-stone-100/68">
+          Surfaces are the explainable boundary between people and agent execution. Chronos is the control surface: it should clarify mission flow, runtime risk, and intervention points before it offers controls.
+        </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
-          icon={<GitBranch size={14} />}
-          label={mt("chronos_active_missions", "Active Missions")}
-          value={String(data.activeMissions.length)}
-          detail={mt("chronos_durable_contracts_in_execution", "Durable contracts in execution")}
+          icon={<ShieldAlert size={14} />}
+          label={mt("chronos_attention_queue", "Needs Attention")}
+          value={String(attentionItems.length)}
+          detail={mt("chronos_attention_queue_detail", "Mission blockers, runtime incidents, and delivery exceptions")}
         />
         <MetricCard
           icon={<Bot size={14} />}
-          label="Agent Runtime"
-          value={`${data.runtime.ready}/${data.runtime.total}`}
-          detail={`busy=${data.runtime.busy} error=${data.runtime.error}`}
+          label="Runtime Governance"
+          value={`${data.runtimeDoctor.length}/${data.runtimeLeases.length}`}
+          detail={`ready=${data.runtime.ready} busy=${data.runtime.busy} error=${data.runtime.error}`}
         />
         <MetricCard
-          icon={<Radar size={14} />}
-          label={mt("chronos_recent_events", "Recent Events")}
-          value={String(data.recentEvents.length)}
-          detail={mt("chronos_latest_orchestration_transitions", "Latest orchestration transitions")}
+          icon={<Send size={14} />}
+          label={mt("chronos_delivery_exceptions", "Delivery Exceptions")}
+          value={String(data.surfaceOutbox.slack + data.surfaceOutbox.chronos)}
+          detail={mt("chronos_delivery_exceptions_detail", "Outbox entries awaiting operator attention")}
         />
       </div>
 
       <section className="grid gap-4">
-        <Panel title="Control Action Queue">
-          <div className="space-y-3">
-            {data.controlActions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No recent mission or surface control actions.</div>
-            ) : data.controlActions.map((action, index) => (
-              <div key={`${action.event_id || action.ts}-${index}`} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                    {action.kind} · {action.operation}
+        <Panel id="needs-attention" title="Needs Attention">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Start here. These are the items most likely to block mission progress or degrade operator trust. Use the action only when the control plane does not self-heal.
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[1.15fr,0.85fr]">
+            <div className="space-y-3">
+              {attentionItems.length === 0 ? (
+                <div className="rounded-xl border border-emerald-300/10 bg-emerald-400/[0.04] px-4 py-3 text-[11px] text-emerald-100/70">
+                  No immediate operator intervention is recommended. Stay in observe mode and use A2UI drill-downs for detail.
+                </div>
+              ) : attentionItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`rounded-xl border px-4 py-3 ${
+                    item.tone === "critical"
+                      ? "border-red-400/20 bg-red-950/12"
+                      : item.tone === "warning"
+                        ? "border-amber-300/18 bg-amber-400/[0.06]"
+                        : "border-cyan-300/16 bg-cyan-400/[0.06]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                      {item.tone === "critical" ? "critical" : item.tone === "warning" ? "warning" : "info"}
+                    </div>
+                    <div className="text-[10px] font-mono text-white/40">{item.title}</div>
                   </div>
-                  <ActionStatusBadge action={action} />
-                </div>
-                <div className="mt-2 text-[11px] text-white/80">{action.target}</div>
-                <div className="mt-1 text-[10px] text-white/45">
-                  requested_by: <span className="font-mono text-white/70">{action.requested_by}</span>
-                </div>
-                {action.event_id && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedActionId((current) => current === action.event_id ? null : action.event_id || null)}
-                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10"
-                    >
-                      {expandedActionId === action.event_id ? "hide details" : "show details"}
-                    </button>
-                    {action.target !== "surface-runtime" && (
+                  <div className="mt-2 text-[11px] text-white/78">{item.reason}</div>
+                    {item.actionLabel && (
                       <button
                         type="button"
-                        onClick={() => jumpToTarget(action)}
-                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        onClick={() => runAttentionAction(item)}
+                        className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10"
                       >
-                        jump to target
-                      </button>
-                    )}
-                  </div>
-                )}
-                {action.event_id && expandedActionId === action.event_id && (
-                  <ActionDetailList actionId={action.event_id} details={data.controlActionDetails} />
-                )}
-                {action.error && (
-                  <div className="mt-2 text-[10px] text-red-200/70">{action.error}</div>
-                )}
-                <div className="mt-2 text-[9px] font-mono text-white/25">{new Date(action.ts).toLocaleString()}</div>
-              </div>
-            ))}
+                        {item.actionLabel}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <MiniSummaryCard icon={<GitBranch size={13} />} label="Mission blockers" value={missionExceptions.length} detail="Missions needing operator attention" />
+              <MiniSummaryCard icon={<Bot size={13} />} label="Runtime incidents" value={data.runtimeDoctor.length} detail="Leases or runtimes flagged by doctor" />
+              <MiniSummaryCard icon={<Radar size={13} />} label="Surface incidents" value={surfaceExceptions.length} detail="Managed surfaces needing review" />
+              <MiniSummaryCard icon={<Send size={13} />} label="Delivery exceptions" value={deliveryExceptions.length} detail="Outbox entries or delivery residue" />
+            </div>
           </div>
         </Panel>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.25fr,1fr,1fr]">
-        <Panel id="mission-control-plane" title="Mission Control Plane">
+        <Panel id="mission-control-plane" title="Mission Control">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Confirm which missions are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.
+          </div>
           <div className="space-y-3">
             {data.activeMissions.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">No active missions.</div>
@@ -957,25 +1056,97 @@ export function MissionIntelligence() {
           </div>
         </Panel>
 
-        <Panel title="Recent Orchestration Events">
-          <div className="space-y-3">
-            {data.recentEvents.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No orchestration events yet.</div>
-            ) : data.recentEvents.map((event, index) => (
-              <div key={`${event.ts}-${index}`} className="border-l border-kyberion-gold/20 pl-3">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/45">
-                  <Activity size={10} />
-                  <span>{event.decision}</span>
+        <Panel id="runtime-topology-map" title="Runtime Topology Map">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            This map shows what the supervisor daemon is currently holding: who owns each runtime, which runtimes are active, and which agent-to-agent or owner-to-agent flows were seen recently.
+          </div>
+          <div className="grid gap-3">
+            <div className="grid gap-3 lg:grid-cols-[0.9fr,1.1fr]">
+              <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">owners</div>
+                <div className="space-y-2">
+                  {data.runtimeTopology.owners.length === 0 ? (
+                    <div className="text-[10px] text-white/35">No managed owners discovered.</div>
+                  ) : data.runtimeTopology.owners.map((owner) => (
+                    <div key={`${owner.type}:${owner.id}`} className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      <div className="text-[10px] font-mono text-white/78">{owner.id}</div>
+                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-white/38">
+                        {owner.type} · runtimes {owner.runtimeCount}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {owner.runtimeIds.map((runtimeId) => (
+                          <span key={runtimeId} className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[9px] font-mono text-white/58">
+                            {runtimeId}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-1 text-[11px] text-white/80">{event.mission_id || "system"}</div>
-                {event.why && <div className="mt-1 text-[10px] text-white/45">{event.why}</div>}
-                <div className="mt-1 text-[9px] font-mono text-white/25">{new Date(event.ts).toLocaleString()}</div>
               </div>
-            ))}
+              <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">managed runtimes</div>
+                <div className="space-y-2">
+                  {data.runtimeTopology.runtimes.length === 0 ? (
+                    <div className="text-[10px] text-white/35">No managed runtimes discovered.</div>
+                  ) : data.runtimeTopology.runtimes.map((runtime) => (
+                    <div key={runtime.agentId} className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[10px] font-mono text-white/82">{runtime.agentId}</div>
+                        <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${
+                          runtime.status === "ready"
+                            ? "bg-green-500/15 text-green-300"
+                            : runtime.status === "busy"
+                              ? "bg-amber-400/12 text-amber-100"
+                              : runtime.status === "error"
+                                ? "bg-red-500/15 text-red-300"
+                                : "bg-white/10 text-white/65"
+                        }`}>
+                          {runtime.status}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-white/38">
+                        {runtime.provider}{runtime.modelId ? `/${runtime.modelId}` : ""} · {runtime.ownerType}:{runtime.ownerId}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[9px] text-white/42">
+                        {runtime.leaseKind && <span>lease {runtime.leaseKind}</span>}
+                        {runtime.requestedBy && <span>requested by {runtime.requestedBy}</span>}
+                        {typeof runtime.pid === "number" && <span>pid {runtime.pid}</span>}
+                        <span>activity {runtime.recentActivityCount}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">recent flow</div>
+              <div className="space-y-2">
+                {data.runtimeTopology.flows.length === 0 ? (
+                  <div className="text-[10px] text-white/35">No recent A2A or agent-message flow observed.</div>
+                ) : data.runtimeTopology.flows.map((flow) => (
+                  <div key={flow.id} className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[10px] font-mono text-white/80">{flow.from} → {flow.to}</div>
+                      <div className="text-[9px] uppercase tracking-[0.16em] text-white/38">{flow.kind}</div>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[9px] text-white/42">
+                      <span>count {flow.count}</span>
+                      {flow.channel && <span>channel {flow.channel}</span>}
+                      {flow.thread && <span>thread {flow.thread}</span>}
+                      <span>{new Date(flow.latestAt).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Panel>
 
-        <Panel id="runtime-lease-doctor" title="Runtime Lease Doctor">
+        <Panel id="runtime-lease-doctor" title="Runtime Governance">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Managed runtimes are part of operations, not a separate playground. Use this section to resolve stale leases, errored runtimes, and ownership drift without over-restarting healthy agents.
+          </div>
           <div className="space-y-3">
             {data.runtimeDoctor.length === 0 ? (
               <div className="text-[11px] italic text-emerald-300/40">No stale or orphaned runtime leases detected.</div>
@@ -1012,7 +1183,7 @@ export function MissionIntelligence() {
             ))}
 
             <div className="border-t border-white/5 pt-3">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/35">Active Runtime Leases</div>
+              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/35">Managed Runtime Leases</div>
               <div className="space-y-2">
                 {data.runtimeLeases.slice(0, 6).map((lease) => (
                   <div key={`${lease.agent_id}-${lease.owner_id}`} className="rounded-xl border border-white/5 bg-black/20 px-3 py-2">
@@ -1029,9 +1200,107 @@ export function MissionIntelligence() {
             </div>
           </div>
         </Panel>
+
+        <Panel id="recent-surface-outbox" title="Delivery Exceptions">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Outbox items are operator-facing delivery residue. Resolve them here only when the autonomous path has already stalled or a human-visible queue needs cleanup.
+          </div>
+          <div className="space-y-3">
+            {data.recentSurfaceOutbox.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_recent_surface_outbox", "No pending or recent surface outbox messages.")}</div>
+            ) : data.recentSurfaceOutbox.map((message) => (
+              <div key={message.message_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    {message.surface} · {message.source} · {message.channel}
+                  </div>
+                  <div className="text-[9px] font-mono text-white/30">{new Date(message.created_at).toLocaleString()}</div>
+                </div>
+                <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/28">
+                  {mt("chronos_correlation", "correlation")}: {message.correlation_id}
+                </div>
+                <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
+                <button
+                  type="button"
+                  onClick={() => clearOutboxMessage(message.surface, message.message_id)}
+                  disabled={outboxTarget === message.message_id}
+                  className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {outboxTarget === message.message_id ? mt("chronos_clearing", "clearing") : mt("chronos_clear_outbox", "clear outbox")}
+                </button>
+              </div>
+            ))}
+          </div>
+        </Panel>
       </section>
 
+      <section className="grid gap-4">
+        <Panel title="Recent Control Actions">
+          <div className="space-y-3">
+            {data.controlActions.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No recent mission or surface control actions.</div>
+            ) : data.controlActions.map((action, index) => (
+              <div key={`${action.event_id || action.ts}-${index}`} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    {action.kind} · {action.operation}
+                  </div>
+                  <ActionStatusBadge action={action} />
+                </div>
+                <div className="mt-2 text-[11px] text-white/80">{action.target}</div>
+                <div className="mt-1 text-[10px] text-white/45">
+                  requested_by: <span className="font-mono text-white/70">{action.requested_by}</span>
+                </div>
+                {action.event_id && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedActionId((current) => current === action.event_id ? null : action.event_id || null)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10"
+                    >
+                      {expandedActionId === action.event_id ? "hide details" : "show details"}
+                    </button>
+                    {action.target !== "surface-runtime" && (
+                      <button
+                        type="button"
+                        onClick={() => jumpToTarget(action)}
+                        className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                      >
+                        jump to target
+                      </button>
+                    )}
+                  </div>
+                )}
+                {action.event_id && expandedActionId === action.event_id && (
+                  <ActionDetailList actionId={action.event_id} details={data.controlActionDetails} />
+                )}
+                {action.error && (
+                  <div className="mt-2 text-[10px] text-red-200/70">{action.error}</div>
+                )}
+                <div className="mt-2 text-[9px] font-mono text-white/25">{new Date(action.ts).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </section>
       <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+        <Panel title="Orchestration Audit">
+          <div className="space-y-3">
+            {data.recentEvents.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No orchestration events yet.</div>
+            ) : data.recentEvents.map((event, index) => (
+              <div key={`${event.ts}-${index}`} className="border-l border-kyberion-gold/20 pl-3">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/45">
+                  <Activity size={10} />
+                  <span>{event.decision}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-white/80">{event.mission_id || "system"}</div>
+                {event.why && <div className="mt-1 text-[10px] text-white/45">{event.why}</div>}
+                <div className="mt-1 text-[9px] font-mono text-white/25">{new Date(event.ts).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
         <Panel id="owner-summaries" title="Owner Summaries">
           <div className="space-y-3">
             {data.ownerSummaries.length === 0 ? (
@@ -1053,9 +1322,9 @@ export function MissionIntelligence() {
           </div>
         </Panel>
 
-        <Panel id="runtime-summary" title="Runtime Summary">
+        <Panel id="runtime-summary" title="Operator Summary">
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/48">
-            Runtime health is split from operator backlog. If doctor findings are empty, focus on owner summaries or pending outbox instead of restarting agents unnecessarily.
+            Keep the operator loop narrow: look at exceptions first, then mission readiness, then runtime and delivery counters. When these stay green, use quick actions to open governed A2UI drill-downs rather than adding more controls here.
           </div>
           <div className="grid grid-cols-2 gap-3">
             <RuntimeCell label="ready" value={data.runtime.ready} accent="emerald" />
@@ -1069,7 +1338,7 @@ export function MissionIntelligence() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
-        <Panel id="browser-sessions" title="Browser Sessions">
+        <Panel id="browser-sessions" title="Browser Session Oversight">
           <div className="space-y-3">
             {data.browserSessions.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">No browser sessions recorded yet.</div>
@@ -1370,7 +1639,7 @@ export function MissionIntelligence() {
       </section>
 
       <section className="grid gap-4">
-        <Panel title={mt("chronos_live_agent_conversation", "Live Agent Conversation")}>
+        <Panel title={mt("chronos_live_agent_conversation", "Agent Traffic")}>
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1503,34 +1772,6 @@ export function MissionIntelligence() {
           </div>
         </Panel>
 
-        <Panel id="recent-surface-outbox" title={mt("chronos_recent_surface_outbox", "Recent Surface Outbox")}>
-          <div className="space-y-3">
-            {data.recentSurfaceOutbox.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_recent_surface_outbox", "No pending or recent surface outbox messages.")}</div>
-            ) : data.recentSurfaceOutbox.map((message) => (
-              <div key={message.message_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                    {message.surface} · {message.source} · {message.channel}
-                  </div>
-                  <div className="text-[9px] font-mono text-white/30">{new Date(message.created_at).toLocaleString()}</div>
-                </div>
-                <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/28">
-                  {mt("chronos_correlation", "correlation")}: {message.correlation_id}
-                </div>
-                <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
-                <button
-                  type="button"
-                  onClick={() => clearOutboxMessage(message.surface, message.message_id)}
-                  disabled={outboxTarget === message.message_id}
-                  className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {outboxTarget === message.message_id ? mt("chronos_clearing", "clearing") : mt("chronos_clear_outbox", "clear outbox")}
-                </button>
-              </div>
-            ))}
-          </div>
-        </Panel>
       </section>
     </div>
   );
@@ -1550,6 +1791,29 @@ function MetricCard({ icon, label, value, detail }: {
       </div>
       <div className="mt-3 text-3xl font-semibold tracking-tight text-white/90">{value}</div>
       <div className="mt-1 text-[10px] text-white/35">{detail}</div>
+    </div>
+  );
+}
+
+function MiniSummaryCard({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/42">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-white/88">{value}</div>
+      <div className="mt-1 text-[10px] text-white/38">{detail}</div>
     </div>
   );
 }

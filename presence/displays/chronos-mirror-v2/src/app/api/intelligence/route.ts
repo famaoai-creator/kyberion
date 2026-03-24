@@ -3,7 +3,9 @@ import path from "node:path";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
 import { collectBrowserSessions, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
+import { extractMissionDependencies, normalizeMissionAssets, parseTaskBoard, summarizeNextTasks } from "../../../lib/mission-progress";
 import { applyBrowserSessionControl } from "../../../lib/browser-session-control";
+import { buildRuntimeTopology } from "../../../lib/runtime-topology";
 import {
   clearSurfaceOutboxMessage,
   emitChannelSurfaceEvent,
@@ -19,12 +21,21 @@ import {
   pathResolver,
   probeSurfaceHealth,
   restartAgentRuntime,
+  safeStat,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
   startMissionOrchestrationWorker,
   stopAgentRuntime,
 } from "@agent/core";
+
+interface RuntimeTopologySurfaceInput {
+  id: string;
+  kind: string;
+  running: boolean;
+  startupMode?: string;
+  pid?: number;
+}
 
 interface MissionSummary {
   missionId: string;
@@ -36,6 +47,25 @@ interface MissionSummary {
   controlSummary: string;
   controlTone: "planning" | "ready" | "attention" | "pending";
   controlRequestedBy?: string;
+}
+
+interface MissionProgressSummary {
+  missionId: string;
+  boardStatus: string;
+  boardStepsTotal: number;
+  boardStepsDone: number;
+  boardStepsActive: number;
+  boardStepsPending: number;
+  nextTasksTotal: number;
+  nextTasksPending: number;
+  nextTasksCompleted: number;
+  dependencies: string[];
+  generatedAssets: Array<{
+    path: string;
+    category: "deliverables" | "artifacts" | "outputs" | "evidence";
+    sizeBytes: number;
+    updatedAt: string;
+  }>;
 }
 
 interface RuntimeLeaseSummary {
@@ -183,6 +213,63 @@ function collectActiveMissions(): MissionSummary[] {
   }
 
   return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
+}
+
+function collectMissionProgress(activeMissions: MissionSummary[]): MissionProgressSummary[] {
+  const missionRoots = [
+    pathResolver.active("missions/public"),
+    pathResolver.active("missions/confidential"),
+  ];
+  const summaries: MissionProgressSummary[] = [];
+
+  for (const mission of activeMissions) {
+    const missionPath = missionRoots
+      .map((root) => path.join(root, mission.missionId))
+      .find((candidate) => safeExistsSync(candidate));
+    if (!missionPath) continue;
+
+    const taskBoardPath = path.join(missionPath, "TASK_BOARD.md");
+    const nextTasksPath = path.join(missionPath, "NEXT_TASKS.json");
+    const statePath = path.join(missionPath, "mission-state.json");
+    const taskBoard = safeExistsSync(taskBoardPath)
+      ? String(safeReadFile(taskBoardPath, { encoding: "utf8" }) || "")
+      : "";
+    const nextTasks = readJson<Array<{ status?: string }>>(nextTasksPath) || [];
+    const missionState = readJson<Record<string, unknown>>(statePath) || {};
+    const board = parseTaskBoard(taskBoard);
+    const nextTaskSummary = summarizeNextTasks(nextTasks);
+    const generatedAssets: MissionProgressSummary["generatedAssets"] = [];
+    for (const dirName of ["deliverables", "artifacts", "outputs", "evidence"] as const) {
+      const dirPath = path.join(missionPath, dirName);
+      if (!safeExistsSync(dirPath)) continue;
+      for (const entry of safeReaddir(dirPath)) {
+        const fullPath = path.join(dirPath, entry);
+        try {
+          const stats = safeStat(fullPath);
+          if (stats.isFile()) {
+            generatedAssets.push({
+              path: `${dirName}/${entry}`,
+              category: dirName,
+              sizeBytes: stats.size,
+              updatedAt: stats.mtime.toISOString(),
+            });
+          }
+        } catch {
+          // Ignore unreadable entries.
+        }
+      }
+    }
+
+    summaries.push({
+      missionId: mission.missionId,
+      ...board,
+      ...nextTaskSummary,
+      dependencies: extractMissionDependencies(missionState.relationships as Record<string, unknown> | undefined),
+      generatedAssets: normalizeMissionAssets(generatedAssets),
+    });
+  }
+
+  return summaries.sort((a, b) => a.missionId.localeCompare(b.missionId));
 }
 
 function collectRecentEvents() {
@@ -567,6 +654,18 @@ async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
   return summaries;
 }
 
+function collectRuntimeTopologySurfaces(surfaces: SurfaceSummary[]): RuntimeTopologySurfaceInput[] {
+  return surfaces
+    .filter((surface) => surface.enabled)
+    .map((surface) => ({
+      id: surface.id,
+      kind: surface.kind,
+      running: surface.running,
+      startupMode: surface.startupMode,
+      pid: surface.pid,
+    }));
+}
+
 function buildRuntimeDoctor(
   runtimeLeases: RuntimeLeaseSummary[],
   activeMissions: MissionSummary[],
@@ -661,21 +760,69 @@ export async function GET(req: NextRequest) {
     if (denied) return denied;
     const accessRole = getChronosAccessRoleOrThrow(req);
     process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const runtimeSupervisorClient = await import("@agent/core/agent-runtime-supervisor-client");
     const runtime = listAgentRuntimeSnapshots();
     const rawActiveMissions = collectActiveMissions();
     const runtimeLeases = listAgentRuntimeLeaseSummaries().slice(0, 12);
     const rawSurfaces = await collectSurfaceSummaries();
     const controlActions = collectControlActions();
     const { activeMissions, surfaces } = applyPendingActionSummaries(rawActiveMissions, rawSurfaces, controlActions);
+    const missionProgress = collectMissionProgress(activeMissions);
+    const agentMessages = collectAgentMessages();
+    const a2aHandoffs = collectA2AHandoffs();
+    let managedRuntimes: Array<{
+      agentId: string;
+      provider: string;
+      modelId?: string;
+      status: string;
+      ownerId: string;
+      ownerType: string;
+      requestedBy?: string;
+      leaseKind?: string;
+      pid?: number;
+      metadata?: Record<string, unknown>;
+    }> = [];
+    try {
+      const daemonRuntimes = await runtimeSupervisorClient.listAgentRuntimesViaDaemon();
+      managedRuntimes = daemonRuntimes.map((entry) => ({
+        agentId: entry.agent_id,
+        provider: entry.provider || "unknown",
+        modelId: entry.model_id || undefined,
+        status: entry.status || "unknown",
+        ownerId: entry.owner_id || "unowned",
+        ownerType: entry.owner_type || "unknown",
+        requestedBy: typeof entry.metadata?.requestedBy === "string" ? entry.metadata.requestedBy : undefined,
+        leaseKind: typeof entry.metadata?.lease_kind === "string" ? entry.metadata.lease_kind : undefined,
+        pid: entry.pid,
+        metadata: entry.metadata || undefined,
+      }));
+    } catch {
+      managedRuntimes = runtimeLeases.map((lease) => {
+        const snapshot = runtime.find((entry) => entry.agent.agentId === lease.agent_id);
+        return {
+          agentId: lease.agent_id,
+          provider: snapshot?.agent.provider || "unknown",
+          modelId: snapshot?.agent.modelId,
+          status: snapshot?.agent.status || "unknown",
+          ownerId: lease.owner_id,
+          ownerType: lease.owner_type,
+          requestedBy: typeof lease.metadata?.requestedBy === "string" ? lease.metadata.requestedBy : undefined,
+          leaseKind: typeof lease.metadata?.execution_mode === "string" ? lease.metadata.execution_mode : undefined,
+          pid: snapshot?.runtime?.pid,
+          metadata: lease.metadata,
+        };
+      });
+    }
     const controlActionCatalog = collectControlActionCatalog(accessRole);
     const controlActionAvailability = collectControlActionAvailability(accessRole, activeMissions, surfaces);
     return NextResponse.json({
       activeMissions,
+      missionProgress,
       surfaces,
       accessRole,
       recentEvents: collectRecentEvents(),
-      agentMessages: collectAgentMessages(),
-      a2aHandoffs: collectA2AHandoffs(),
+      agentMessages,
+      a2aHandoffs,
       controlActionCatalog,
       controlActionAvailability,
       controlActions,
@@ -695,6 +842,12 @@ export async function GET(req: NextRequest) {
       },
       runtimeLeases,
       runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, runtime),
+      runtimeTopology: buildRuntimeTopology({
+        surfaces: collectRuntimeTopologySurfaces(surfaces),
+        runtimes: managedRuntimes,
+        handoffs: a2aHandoffs,
+        messages: agentMessages,
+      }),
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {

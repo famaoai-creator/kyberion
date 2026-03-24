@@ -26,6 +26,7 @@ export interface SurfaceConversationResult {
   approvalRequests: SlackApprovalRequestDraft[];
   routingProposals?: NerveRoutingProposal[];
   missionProposals?: MissionProposal[];
+  planningPackets?: PlanningPacket[];
 }
 
 interface SurfaceEvent {
@@ -154,6 +155,20 @@ export interface MissionProposal {
   tier?: 'personal' | 'confidential' | 'public';
   vision_ref?: string;
   why?: string;
+}
+
+export interface PlanningPacketTask {
+  task_id: string;
+  team_role: string;
+  description: string;
+  deliverable?: string;
+}
+
+export interface PlanningPacket {
+  mission_id?: string;
+  summary?: string;
+  plan_markdown: string;
+  next_tasks: PlanningPacketTask[];
 }
 
 interface SlackMissionProposalState {
@@ -371,6 +386,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
   const approvalRequests: SlackApprovalRequestDraft[] = [];
   const routingProposals: NerveRoutingProposal[] = [];
   const missionProposals: MissionProposal[] = [];
+  const planningPackets: PlanningPacket[] = [];
 
   let text = raw;
 
@@ -404,6 +420,11 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
+  text = text.replace(/```planning_packet\s*\n([\s\S]*?)```/g, (_match, json) => {
+    try { planningPackets.push(JSON.parse(json.trim()) as PlanningPacket); } catch (_) {}
+    return '';
+  });
+
   text = text.replace(/>>A2A(\{[\s\S]*?\})<</g, (_match, json) => {
     try { a2aMessages.push(JSON.parse(json.trim())); } catch (_) {}
     return '';
@@ -417,6 +438,7 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     approvalRequests,
     routingProposals,
     missionProposals,
+    planningPackets,
   };
 }
 
@@ -508,15 +530,32 @@ function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt | null
   };
 }
 
-function deriveSlackIntentLabel(text: string): string {
+export function deriveSlackIntentLabel(text: string): string {
   const normalized = text.trim();
   if (!normalized) return 'general_request';
   if (/マーケティング|資料|pitch|marketing/i.test(normalized)) return 'request_marketing_material';
   if (/レビュー|review/i.test(normalized)) return 'request_review';
   if (/設計|architecture|design/i.test(normalized)) return 'request_design_analysis';
   if (/デバッグ|bug|error|調査/i.test(normalized)) return 'request_debug_investigation';
-  if (/ミッション|mission/i.test(normalized)) return 'request_mission_work';
+  if (
+    /ミッション|mission|進捗|状況|状態|ステータス|status|進んで|進めて|対応|修正|直した|完了|done|fixed|resolved|deploy|release/i.test(normalized)
+  ) {
+    return 'request_mission_work';
+  }
   return 'request_deeper_reasoning';
+}
+
+export function deriveSlackDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
+  const normalized = text.trim();
+  if (!normalized) return undefined;
+
+  if (
+    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime|ランタイム|health|ヘルス|surface|outbox|chronos/i.test(normalized)
+  ) {
+    return 'chronos-mirror';
+  }
+
+  return shouldForceSlackDelegation(normalized) ? 'nerve-agent' : undefined;
 }
 
 function normalizeDelegationPayload(payload: any, fallbackText: string): any {
@@ -719,6 +758,7 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
       approvalRequests: [],
       routingProposals: [],
       missionProposals: extractSurfaceBlocks(successful[0]?.response || '').missionProposals || [],
+      planningPackets: extractSurfaceBlocks(successful[0]?.response || '').planningPackets || [],
     };
   }
 
@@ -767,6 +807,7 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
       approvalRequests: firstBlocks.approvalRequests,
       routingProposals,
       missionProposals: firstBlocks.missionProposals,
+      planningPackets: firstBlocks.planningPackets,
     };
   }
 
@@ -792,6 +833,7 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
     routingProposals,
     missionProposals: [...(firstBlocks.missionProposals || []), ...(followUpBlocks.missionProposals || [])],
+    planningPackets: [...(firstBlocks.planningPackets || []), ...(followUpBlocks.planningPackets || [])],
   };
 }
 
