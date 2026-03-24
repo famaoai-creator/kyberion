@@ -7,7 +7,15 @@ import {
   logger,
   safeReadFile,
 } from '@agent/core';
-import type { ApprovalRequestDraft, GovernedArtifactRole } from '@agent/core';
+import type {
+  ApprovalJustification,
+  ApprovalRequesterContext,
+  ApprovalRequestDraft,
+  ApprovalRiskProfile,
+  ApprovalTargetDescriptor,
+  ApprovalWorkflowState,
+  GovernedArtifactRole,
+} from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +33,16 @@ interface ApprovalAction {
     requestId?: string;
     decision?: 'approved' | 'rejected';
     decidedBy?: string;
+    decidedByRole?: string;
+    authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual';
+    note?: string;
+    requestKind?: 'channel-approval' | 'secret_mutation';
+    expiresAt?: string;
+    requestedByContext?: ApprovalRequesterContext;
+    target?: ApprovalTargetDescriptor;
+    justification?: ApprovalJustification;
+    risk?: ApprovalRiskProfile;
+    workflow?: ApprovalWorkflowState;
   };
 }
 
@@ -45,6 +63,13 @@ export async function handleAction(input: ApprovalAction) {
           requestedBy: input.params.requestedBy,
           draft: input.params.draft,
           sourceText: input.params.sourceText,
+          kind: input.params.requestKind,
+          expiresAt: input.params.expiresAt,
+          requestedByContext: input.params.requestedByContext,
+          target: input.params.target,
+          justification: input.params.justification,
+          risk: input.params.risk,
+          workflow: input.params.workflow,
         }),
       };
     case 'load':
@@ -65,6 +90,9 @@ export async function handleAction(input: ApprovalAction) {
           requestId: input.params.requestId,
           decision: input.params.decision,
           decidedBy: input.params.decidedBy,
+          decidedByRole: input.params.decidedByRole,
+          authMethod: input.params.authMethod,
+          note: input.params.note,
         }),
       };
     case 'list_pending': {

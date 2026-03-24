@@ -26,13 +26,21 @@ export interface OperatorOutboxMessage {
   text: string;
 }
 
+export interface OperatorSecretApprovalSummary {
+  id: string;
+  title: string;
+  serviceId: string;
+  secretKey: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+}
+
 export interface AttentionItem {
   id: string;
   title: string;
   reason: string;
   tone: "critical" | "warning" | "info";
   actionLabel?: string;
-  targetType: "mission" | "runtime" | "surface" | "delivery";
+  targetType: "mission" | "runtime" | "surface" | "delivery" | "approval";
   targetId: string;
   remediationAction?: "cleanup_runtime_lease" | "restart_runtime_lease";
 }
@@ -113,6 +121,11 @@ export const OPERATOR_VIEW_LINKS: OperatorViewLink[] = [
     detail: "Check outbox and operator-visible delivery residue.",
   },
   {
+    label: "Secret Approvals",
+    targetId: "secret-approval-queue",
+    detail: "Review pending governed secret changes.",
+  },
+  {
     label: "Audit Trail",
     targetId: "owner-summaries",
     detail: "Review recent control and ownership history.",
@@ -124,6 +137,7 @@ export function buildAttentionItems(input: {
   runtimeDoctor: OperatorRuntimeDoctorFinding[];
   surfaces: OperatorSurfaceSummary[];
   outbox: OperatorOutboxMessage[];
+  secretApprovals?: OperatorSecretApprovalSummary[];
 }): AttentionItem[] {
   const missionExceptions = input.missions
     .filter((mission) => mission.controlTone === "attention" || mission.controlTone === "pending")
@@ -176,10 +190,23 @@ export function buildAttentionItems(input: {
       targetId: message.message_id,
     }));
 
+  const secretApprovals = (input.secretApprovals || [])
+    .slice(0, 1)
+    .map((request): AttentionItem => ({
+      id: `secret-${request.id}`,
+      title: `${request.serviceId} secret approval`,
+      reason: `${request.title} · ${request.secretKey} · ${request.riskLevel}`,
+      tone: request.riskLevel === "critical" || request.riskLevel === "high" ? "warning" : "info",
+      actionLabel: "review approval",
+      targetType: "approval",
+      targetId: request.id,
+    }));
+
   return [
     ...missionExceptions,
     ...runtimeExceptions,
     ...surfaceExceptions,
     ...deliveryExceptions,
+    ...secretApprovals,
   ].slice(0, 6);
 }

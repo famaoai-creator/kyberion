@@ -6,6 +6,8 @@ import {
   writeGovernedArtifactJson,
   type GovernedArtifactRole,
 } from './artifact-store.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeReaddir } from './secure-io.js';
 
 export interface ApprovalRequestDraft {
   title: string;
@@ -14,9 +16,71 @@ export interface ApprovalRequestDraft {
   severity?: 'low' | 'medium' | 'high';
 }
 
+export interface ApprovalRequesterContext {
+  surface: 'slack' | 'chronos' | 'terminal' | 'presence' | 'api' | 'system';
+  actorId: string;
+  actorRole: string;
+  missionId?: string;
+  runtimeId?: string;
+}
+
+export interface ApprovalTargetDescriptor {
+  serviceId: string;
+  secretKey: string;
+  mutation: 'set' | 'rotate' | 'delete' | 'refresh' | 'metadata_update';
+  store?: 'os_keychain' | 'connection_document' | 'vault';
+  newValueFingerprint?: string;
+  existingValuePresent?: boolean;
+}
+
+export interface ApprovalJustification {
+  reason: string;
+  impactSummary?: string;
+  evidence?: string[];
+  requestedEffects?: string[];
+}
+
+export interface ApprovalRiskProfile {
+  level: 'low' | 'medium' | 'high' | 'critical';
+  restartScope: 'none' | 'runtime' | 'surface' | 'service' | 'manual';
+  requiresStrongAuth: boolean;
+  policyId?: string;
+}
+
+export interface ApprovalStage {
+  stageId: string;
+  requiredRoles: string[];
+  description?: string;
+}
+
+export interface ApprovalRecord {
+  role: string;
+  status: 'pending' | 'approved' | 'rejected' | 'skipped';
+  approvedBy?: string;
+  approvedAt?: string;
+  authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual';
+  note?: string;
+}
+
+export interface ApprovalWorkflowState {
+  workflowId: string;
+  mode: 'all_required' | 'any_of' | 'staged';
+  requiredRoles: string[];
+  currentStage?: string;
+  stages: ApprovalStage[];
+  approvals: ApprovalRecord[];
+}
+
+export interface ApprovalApplyResult {
+  appliedAt?: string;
+  appliedBy?: string;
+  result?: 'success' | 'failed' | 'rolled_back';
+  auditRef?: string;
+}
+
 export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   id: string;
-  kind: 'channel-approval';
+  kind: 'channel-approval' | 'secret_mutation';
   storageChannel: string;
   channel: string;
   threadTs: string;
@@ -25,8 +89,15 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'applied' | 'failed';
   sourceText?: string;
+  expiresAt?: string;
+  requestedByContext?: ApprovalRequesterContext;
+  target?: ApprovalTargetDescriptor;
+  justification?: ApprovalJustification;
+  risk?: ApprovalRiskProfile;
+  workflow?: ApprovalWorkflowState;
+  applyResult?: ApprovalApplyResult;
 }
 
 export interface ApprovalDecisionPayload {
@@ -52,6 +123,13 @@ export function createApprovalRequest(
     requestedBy: string;
     draft: ApprovalRequestDraft;
     sourceText?: string;
+    kind?: ApprovalRequestRecord['kind'];
+    expiresAt?: string;
+    requestedByContext?: ApprovalRequesterContext;
+    target?: ApprovalTargetDescriptor;
+    justification?: ApprovalJustification;
+    risk?: ApprovalRiskProfile;
+    workflow?: ApprovalWorkflowState;
   },
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
@@ -59,7 +137,7 @@ export function createApprovalRequest(
 
   const record: ApprovalRequestRecord = {
     id: randomUUID(),
-    kind: 'channel-approval',
+    kind: params.kind || 'channel-approval',
     storageChannel,
     channel: params.channel,
     threadTs: params.threadTs,
@@ -72,6 +150,12 @@ export function createApprovalRequest(
     details: params.draft.details,
     severity: params.draft.severity || 'medium',
     sourceText: params.sourceText,
+    expiresAt: params.expiresAt,
+    requestedByContext: params.requestedByContext,
+    target: params.target,
+    justification: params.justification,
+    risk: params.risk,
+    workflow: params.workflow,
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
@@ -91,6 +175,41 @@ export function loadApprovalRequest(storageChannel: string, id: string): Approva
   return readGovernedArtifactJson<ApprovalRequestRecord>(approvalRequestLogicalPath(storageChannel, id));
 }
 
+export function listApprovalRequests(params?: {
+  storageChannels?: string[];
+  status?: ApprovalRequestRecord['status'] | ApprovalRequestRecord['status'][];
+  kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][];
+}): ApprovalRequestRecord[] {
+  const channelsRoot = pathResolver.shared('coordination/channels');
+  if (!safeExistsSync(channelsRoot)) return [];
+
+  const statuses = params?.status
+    ? new Set(Array.isArray(params.status) ? params.status : [params.status])
+    : null;
+  const kinds = params?.kind
+    ? new Set(Array.isArray(params.kind) ? params.kind : [params.kind])
+    : null;
+  const storageChannels = params?.storageChannels?.length
+    ? params.storageChannels
+    : safeReaddir(channelsRoot)
+        .filter((entry) => safeExistsSync(pathResolver.shared(`coordination/channels/${entry}/approvals/requests`)));
+
+  const records: ApprovalRequestRecord[] = [];
+  for (const storageChannel of storageChannels) {
+    const requestsDir = pathResolver.shared(`coordination/channels/${storageChannel}/approvals/requests`);
+    if (!safeExistsSync(requestsDir)) continue;
+    for (const entry of safeReaddir(requestsDir).filter((item) => item.endsWith('.json'))) {
+      const record = loadApprovalRequest(storageChannel, entry.replace(/\.json$/, ''));
+      if (!record) continue;
+      if (statuses && !statuses.has(record.status)) continue;
+      if (kinds && !kinds.has(record.kind)) continue;
+      records.push(record);
+    }
+  }
+
+  return records.sort((left, right) => right.requestedAt.localeCompare(left.requestedAt));
+}
+
 export function decideApprovalRequest(
   role: GovernedArtifactRole,
   params: {
@@ -99,17 +218,44 @@ export function decideApprovalRequest(
     requestId: string;
     decision: 'approved' | 'rejected';
     decidedBy: string;
+    decidedByRole?: string;
+    authMethod?: ApprovalRecord['authMethod'];
+    note?: string;
   },
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(storageChannel, params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
 
+  const decidedAt = new Date().toISOString();
+  const workflow = record.workflow
+    ? {
+        ...record.workflow,
+        approvals: record.workflow.approvals.map((approval) => {
+          if (params.decidedByRole && approval.role !== params.decidedByRole) {
+            return approval;
+          }
+          if (!params.decidedByRole && approval.status !== 'pending') {
+            return approval;
+          }
+          return {
+            ...approval,
+            status: params.decision,
+            approvedBy: params.decidedBy,
+            approvedAt: decidedAt,
+            authMethod: params.authMethod,
+            note: params.note,
+          };
+        }),
+      }
+    : undefined;
+
   const updated: ApprovalRequestRecord = {
     ...record,
     status: params.decision,
-    decidedAt: new Date().toISOString(),
+    decidedAt,
     decidedBy: params.decidedBy,
+    workflow,
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
@@ -119,6 +265,8 @@ export function decideApprovalRequest(
     request_id: updated.id,
     correlation_id: updated.correlationId,
     decided_by: params.decidedBy,
+    decided_by_role: params.decidedByRole,
+    auth_method: params.authMethod,
     channel: updated.channel,
     thread_ts: updated.threadTs,
   });

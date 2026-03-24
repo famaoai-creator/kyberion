@@ -1,4 +1,6 @@
 import {
+  decideApprovalRequest,
+  listApprovalRequests,
   logger,
   pathResolver,
   safeExistsSync,
@@ -292,6 +294,9 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  open-artifact <path> Open a generated artifact with the local viewer');
   console.log('  packet <path>        Render an operator packet, status report, or response preview');
   console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
+  console.log('  approvals [channel]  List pending approval requests, including secret mutations');
+  console.log('  approve <id> [channel]  Approve a pending request as the current sovereign');
+  console.log('  reject <id> [channel]   Reject a pending request as the current sovereign');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
   console.log('');
   console.log('Examples:');
@@ -305,6 +310,8 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx');
   console.log('  npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json');
   console.log('  npm run cli -- accept-next-action active/shared/tmp/orchestrator/status-operator-interaction-packet.json review-target-mission-artifacts');
+  console.log('  npm run cli -- approvals');
+  console.log('  npm run cli -- approve <request-id>');
   console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
@@ -846,6 +853,83 @@ function acceptNextAction(packetPath: string, actionId: string) {
   }
 }
 
+function printApprovalRequests(channelArg?: string) {
+  printHeader();
+  const storageChannels = channelArg ? [channelArg] : undefined;
+  const requests = listApprovalRequests({
+    storageChannels,
+    status: 'pending',
+  });
+
+  if (requests.length === 0) {
+    console.log('No pending approval requests found.');
+    return;
+  }
+
+  console.log(`Pending approvals: ${requests.length}\n`);
+  for (const request of requests) {
+    console.log(`- ${chalk.bold(request.id)} [${request.kind}]`);
+    console.log(`  ${request.title}`);
+    console.log(`  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}`);
+    if (request.target) {
+      console.log(`  target: ${request.target.serviceId}/${request.target.secretKey} (${request.target.mutation})`);
+    }
+    if (request.risk) {
+      console.log(`  risk: ${request.risk.level} · restart: ${request.risk.restartScope} · strong auth: ${request.risk.requiresStrongAuth ? 'yes' : 'no'}`);
+    }
+    if (request.justification?.reason) {
+      console.log(`  reason: ${request.justification.reason}`);
+    }
+    if (request.workflow) {
+      const pendingRoles = request.workflow.approvals
+        .filter((approval) => approval.status === 'pending')
+        .map((approval) => approval.role);
+      console.log(`  workflow: ${request.workflow.workflowId} · pending roles: ${pendingRoles.join(', ') || 'none'}`);
+    }
+  }
+}
+
+function applyApprovalDecision(command: 'approve' | 'reject', requestId: string | undefined, channelArg?: string) {
+  if (!requestId) {
+    throw new Error(`Usage: npm run cli -- ${command} <request-id> [storage-channel]`);
+  }
+
+  const requests = listApprovalRequests({
+    storageChannels: channelArg ? [channelArg] : undefined,
+    status: 'pending',
+  });
+  const request = requests.find((entry) => entry.id === requestId);
+  if (!request) {
+    throw new Error(`Pending approval request "${requestId}" not found.`);
+  }
+
+  const decision = command === 'approve' ? 'approved' : 'rejected';
+  const decided = decideApprovalRequest('mission_controller', {
+    channel: request.channel,
+    storageChannel: request.storageChannel,
+    requestId: request.id,
+    decision,
+    decidedBy: 'sovereign-user',
+    decidedByRole: 'sovereign',
+    authMethod: 'manual',
+    note: `decision submitted from terminal via npm run cli -- ${command}`,
+  });
+
+  printHeader();
+  console.log(`${chalk.bold(decided.id)} ${decision}`);
+  console.log(`${decided.title}`);
+  console.log(`storage channel: ${decided.storageChannel}`);
+  if (decided.target) {
+    console.log(`target: ${decided.target.serviceId}/${decided.target.secretKey} (${decided.target.mutation})`);
+  }
+  if (decided.workflow) {
+    const completedRoles = decided.workflow.approvals
+      .filter((approval) => approval.status === decision)
+      .map((approval) => approval.role);
+    console.log(`workflow roles updated: ${completedRoles.join(', ') || 'none'}`);
+  }
+}
+
 
 export function resolveActuatorPath(actuatorPath: string): string | null {
   const candidates = [
@@ -1018,6 +1102,16 @@ export async function main(args = process.argv.slice(2)) {
     }
 
     acceptNextAction(firstArg, restArgs[0]);
+    return;
+  }
+
+  if (command === 'approvals') {
+    printApprovalRequests(firstArg);
+    return;
+  }
+
+  if (command === 'approve' || command === 'reject') {
+    applyApprovalDecision(command, firstArg, restArgs[0]);
     return;
   }
 
