@@ -3,27 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --background: #081019;
-  --foreground: #f5e7b8;
+  --background: #0f151a;
+  --foreground: #efe3bc;
 }
 
 body {
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 15% 10%, rgba(251, 191, 36, 0.12), transparent 24%),
-    radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.12), transparent 26%),
-    radial-gradient(circle at 80% 80%, rgba(244, 63, 94, 0.08), transparent 24%),
-    linear-gradient(180deg, #081019 0%, #09131f 48%, #050910 100%);
+    radial-gradient(circle at 14% 8%, rgba(216, 180, 88, 0.11), transparent 22%),
+    radial-gradient(circle at 84% 18%, rgba(194, 214, 227, 0.08), transparent 24%),
+    radial-gradient(circle at 58% 82%, rgba(188, 161, 112, 0.06), transparent 20%),
+    linear-gradient(180deg, #0f151a 0%, #131b20 46%, #0a1014 100%);
   color: var(--foreground);
+  letter-spacing: 0.002em;
 }
 
 .kyberion-glass {
-  background: rgba(8, 16, 25, 0.68);
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 21, 26, 0.72);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(245, 240, 230, 0.08);
   box-shadow:
-    0 20px 80px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 24px 90px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 248, 225, 0.04);
 }
 
 .gold-glow {

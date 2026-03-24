@@ -17,6 +17,10 @@
       "required_roles": ["owner", "planner", "operator", "reviewer"],
       "optional_roles": ["tester", "surface_liaison"]
     },
+    "system_query": {
+      "required_roles": ["owner", "planner", "operator"],
+      "optional_roles": ["reviewer", "surface_liaison"]
+    },
     "incident": {
       "required_roles": ["owner", "operator", "reviewer", "surface_liaison"],
       "optional_roles": ["planner", "tester"]

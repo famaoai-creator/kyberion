@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
 
     const snapshot = agentRegistry.getHealthSnapshot();
     let agents;
+    let healthOverride: { total: number; ready: number; busy: number; error: number } | null = null;
     try {
       const runtimes = await runtimeSupervisorClient.listAgentRuntimesViaDaemon();
       agents = runtimes.map((entry) => ({
@@ -52,21 +53,34 @@ export async function GET(req: NextRequest) {
         modelId: entry.model_id,
         status: entry.status,
         capabilities: [],
-        trustScore: null,
-        uptimeMs: null,
-        idleMs: null,
+        trustScore: 0,
+        uptimeMs: 0,
+        idleMs: 0,
         runtime: entry.pid ? {
           kind: "agent",
           state: "running",
           pid: entry.pid,
-          idleForMs: null,
+          idleForMs: 0,
           shutdownPolicy: "manual",
         } : null,
-        metrics: null,
+        metrics: {
+          turnCount: 0,
+          errorCount: 0,
+          restartCount: 0,
+          refreshCount: 0,
+          totalPromptChars: 0,
+          totalResponseChars: 0,
+        },
         process: null,
         supportsSoftRefresh: true,
         providerRuntime: entry.metadata || {},
       }));
+      healthOverride = {
+        total: agents.length,
+        ready: agents.filter((entry) => entry.status === "ready").length,
+        busy: agents.filter((entry) => entry.status === "busy").length,
+        error: agents.filter((entry) => entry.status === "error").length,
+      };
     } catch (_) {
       agents = runtimeSupervisor.listAgentRuntimeSnapshots().map((entry) => ({
         agentId: entry.agent.agentId,
@@ -90,7 +104,7 @@ export async function GET(req: NextRequest) {
         providerRuntime: entry.providerRuntime || {},
       }));
     }
-    return NextResponse.json({ status: "ok", accessRole, ...snapshot, agents });
+    return NextResponse.json({ status: "ok", accessRole, ...(healthOverride || snapshot), agents });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

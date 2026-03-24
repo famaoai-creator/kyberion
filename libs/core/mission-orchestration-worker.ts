@@ -1,6 +1,12 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { buildMissionTeamView, resolveMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
-import { emitChannelSurfaceEvent, enqueueChronosOutboxMessage, enqueueSlackOutboxMessage } from './channel-surface.js';
+import {
+  emitChannelSurfaceEvent,
+  enqueueChronosOutboxMessage,
+  enqueueSlackOutboxMessage,
+  extractSurfaceBlocks,
+  type PlanningPacket,
+} from './channel-surface.js';
 import { ensureMissionTeamRuntimeViaSupervisor, shutdownAllAgentRuntimes } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
@@ -131,6 +137,34 @@ function syncPlanningArtifacts(missionId: string): void {
       completion: 'planning_artifacts_ready',
     },
   });
+}
+
+function validatePlanningPacket(packet: PlanningPacket, missionId: string): asserts packet is PlanningPacket {
+  if (!packet || typeof packet !== 'object') {
+    throw new Error(`Planner did not return a planning packet for ${missionId}`);
+  }
+  if (typeof packet.plan_markdown !== 'string' || !packet.plan_markdown.trim()) {
+    throw new Error(`Planner returned an invalid plan_markdown for ${missionId}`);
+  }
+  if (!Array.isArray(packet.next_tasks) || packet.next_tasks.length === 0) {
+    throw new Error(`Planner returned no next_tasks for ${missionId}`);
+  }
+}
+
+export function persistPlanningPacket(missionId: string, packet: PlanningPacket): void {
+  validatePlanningPacket(packet, missionId);
+  const missionPath = missionDir(missionId, 'public');
+  safeWriteFile(`${missionPath}/PLAN.md`, packet.plan_markdown.trimEnd() + '\n');
+  const nextTasks = packet.next_tasks.map((task, index) => ({
+    task_id: typeof task.task_id === 'string' && task.task_id.trim() ? task.task_id : `task-${index + 1}`,
+    status: 'planned',
+    assigned_to: {
+      role: task.team_role,
+    },
+    description: task.description,
+    deliverable: task.deliverable,
+  }));
+  safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(nextTasks, null, 2));
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
@@ -513,11 +547,19 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
     },
   });
 
-  logger.info(`[MISSION_ORCHESTRATION] Planner kickoff complete for ${missionId}: ${String(kickoff.payload?.text || '').slice(0, 240)}`);
+  const kickoffText = String(kickoff.payload?.text || '');
+  logger.info(`[MISSION_ORCHESTRATION] Planner kickoff complete for ${missionId}: ${kickoffText.slice(0, 240)}`);
+  const kickoffBlocks = extractSurfaceBlocks(kickoffText);
+  const planningPacket = kickoffBlocks.planningPackets?.[0];
+  if (!planningPacket) {
+    throw new Error(`Planner response for ${missionId} did not include a planning_packet block`);
+  }
+  persistPlanningPacket(missionId, planningPacket);
   syncPlanningArtifacts(missionId);
   reconcileMissionProgress(missionId);
   emitSlackMissionEvent(payload, missionId, 'mission_kickoff_completed', 'Planner kickoff request was delivered.', {
     planner_agent_id: plannerAssignment.agent_id,
+    planned_task_count: planningPacket.next_tasks.length,
   });
   const nextEvent = enqueueMissionOrchestrationEvent({
     eventType: 'mission_followup_requested',

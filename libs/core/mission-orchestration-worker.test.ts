@@ -168,4 +168,39 @@ describe('mission-orchestration-worker', () => {
       accepted_count: 1,
     }));
   });
+
+  it('persists planner packets into PLAN.md and NEXT_TASKS.json', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeReadFile } = await import('./secure-io.js');
+    const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    persistPlanningPacket('MSN-FOLLOWUP', {
+      mission_id: 'MSN-FOLLOWUP',
+      summary: 'Collect active mission state',
+      plan_markdown: '# PLAN\n\n## Objective\nCollect active mission state\n',
+      next_tasks: [
+        {
+          task_id: 'task-1',
+          team_role: 'operator',
+          description: 'Collect current mission registry',
+          deliverable: 'artifacts/current-missions.md',
+        },
+      ],
+    });
+
+    const plan = safeReadFile(`${missionPath}/PLAN.md`, { encoding: 'utf8' }) as string;
+    const nextTasks = JSON.parse(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string);
+
+    expect(plan).toContain('# PLAN');
+    expect(nextTasks).toEqual([
+      {
+        task_id: 'task-1',
+        status: 'planned',
+        assigned_to: { role: 'operator' },
+        description: 'Collect current mission registry',
+        deliverable: 'artifacts/current-missions.md',
+      },
+    ]);
+  });
 });

@@ -3,10 +3,17 @@
   "agents": {
     "nerve-agent": {
       "authority_roles": ["mission_controller", "ecosystem_architect"],
-      "team_roles": ["owner", "planner", "tester", "operator"],
+      "team_roles": ["owner", "tester", "operator"],
       "provider": "gemini",
       "modelId": "auto-gemini-3",
       "capabilities": ["reasoning", "coordination", "routing", "analysis"]
+    },
+    "planner-agent": {
+      "authority_roles": ["mission_controller", "ecosystem_architect"],
+      "team_roles": ["planner"],
+      "provider": "gemini",
+      "modelId": "auto-gemini-3",
+      "capabilities": ["planning", "strategy", "decomposition", "coordination"]
     },
     "implementation-architect": {
       "authority_roles": ["ecosystem_architect", "software_developer"],

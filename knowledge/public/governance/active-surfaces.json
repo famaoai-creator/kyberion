@@ -37,6 +37,11 @@
       "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
       "command": "node",
       "args": ["dist/satellites/slack-bridge/src/index.js"],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "slack_bridge"
+      },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
@@ -72,7 +77,7 @@
       "kind": "ui",
       "description": "Interactive Chronos control surface served as a workspace application",
       "command": "pnpm",
-      "args": ["--dir", "presence/displays/chronos-mirror-v2", "start", "--", "-H", "127.0.0.1", "-p", "3000"],
+      "args": ["--dir", "presence/displays/chronos-mirror-v2", "start", "-H", "127.0.0.1", "-p", "3000"],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
