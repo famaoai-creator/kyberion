@@ -1,4 +1,7 @@
+import path from 'node:path';
 import { dispatchA2UI, type A2UIMessage } from './a2ui.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface ComputerSurfacePatch {
   sessionId: string;
@@ -13,6 +16,7 @@ export interface ComputerSurfacePatch {
 }
 
 const COMPUTER_SURFACE_ID = 'computer-surface';
+const COMPUTER_SESSION_DIR = pathResolver.shared('runtime/computer/sessions');
 let computerSurfaceCreated = false;
 
 export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIMessage[] {
@@ -49,7 +53,34 @@ export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIM
 }
 
 export function emitComputerSurfacePatch(patch: ComputerSurfacePatch): void {
+  persistComputerSession(patch);
   for (const message of buildComputerSurfaceMessages(patch)) {
     dispatchA2UI(message);
   }
+}
+
+function persistComputerSession(patch: ComputerSurfacePatch): void {
+  if (!safeExistsSync(COMPUTER_SESSION_DIR)) {
+    safeMkdir(COMPUTER_SESSION_DIR, { recursive: true });
+  }
+
+  const sessionPath = path.join(COMPUTER_SESSION_DIR, `${patch.sessionId}.json`);
+  safeWriteFile(
+    sessionPath,
+    JSON.stringify(
+      {
+        id: patch.sessionId,
+        executor: patch.executor,
+        status: patch.status,
+        latestAction: patch.latestAction,
+        target: patch.target || '',
+        detail: patch.detail || '',
+        screenshotPath: patch.screenshotPath || '',
+        actionCount: patch.actionCount || 0,
+        updatedAt: patch.updatedAt || new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+  );
 }

@@ -3,7 +3,7 @@ import path from "node:path";
 
 export interface ComputerSessionSummary {
   id: string;
-  kind: "browser" | "terminal";
+  kind: "browser" | "terminal" | "system";
   status: string;
   updatedAt: string;
   pid?: number;
@@ -13,7 +13,30 @@ export interface ComputerSessionSummary {
 }
 
 export function collectComputerSessions(): ComputerSessionSummary[] {
-  const sessions: ComputerSessionSummary[] = [];
+  const sessions = new Map<string, ComputerSessionSummary>();
+
+  const governedSessionDir = pathResolver.resolve("active/shared/runtime/computer/sessions");
+  if (safeExistsSync(governedSessionDir)) {
+    for (const file of safeReaddir(governedSessionDir)) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const raw = safeReadFile(path.join(governedSessionDir, file), { encoding: "utf8" }) as string;
+        const parsed = JSON.parse(raw) as any;
+        const id = parsed.id || file.replace(/\.json$/, "");
+        sessions.set(id, {
+          id,
+          kind: parsed.executor || "system",
+          status: parsed.status || "unknown",
+          updatedAt: parsed.updatedAt || new Date(0).toISOString(),
+          target: parsed.target,
+          detail: parsed.detail || parsed.latestAction || "",
+          actionCount: parsed.actionCount || 0,
+        });
+      } catch {
+        // ignore malformed computer session metadata
+      }
+    }
+  }
 
   const browserSessionDir = pathResolver.resolve("active/shared/runtime/browser/sessions");
   if (safeExistsSync(browserSessionDir)) {
@@ -22,8 +45,10 @@ export function collectComputerSessions(): ComputerSessionSummary[] {
       try {
         const raw = safeReadFile(path.join(browserSessionDir, file), { encoding: "utf8" }) as string;
         const parsed = JSON.parse(raw) as any;
-        sessions.push({
-          id: parsed.session_id || file.replace(/\.json$/, ""),
+        const id = parsed.session_id || file.replace(/\.json$/, "");
+        if (sessions.has(id)) continue;
+        sessions.set(id, {
+          id,
           kind: "browser",
           status: parsed.lease_status || "unknown",
           updatedAt: parsed.updated_at || new Date(0).toISOString(),
@@ -39,8 +64,9 @@ export function collectComputerSessions(): ComputerSessionSummary[] {
   }
 
   for (const sessionId of ptyEngine.list()) {
+    if (sessions.has(sessionId)) continue;
     const session = ptyEngine.get(sessionId);
-    sessions.push({
+    sessions.set(sessionId, {
       id: sessionId,
       kind: "terminal",
       status: session?.status || "unknown",
@@ -50,5 +76,5 @@ export function collectComputerSessions(): ComputerSessionSummary[] {
     });
   }
 
-  return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return Array.from(sessions.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
