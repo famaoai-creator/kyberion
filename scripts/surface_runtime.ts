@@ -146,6 +146,8 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
       env: {
         ...process.env,
         ...(normalized.env || {}),
+        AUTHORIZED_SCOPE: serviceId, // Inject scoped identity for TIBA
+        SYSTEM_ROLE: surfaceId.replace(/-/g, '_'), // Inject role for secure-io (e.g., slack_bridge)
       },
       detached: normalized.shutdownPolicy === 'detached',
       stdio: ['ignore', out, out],

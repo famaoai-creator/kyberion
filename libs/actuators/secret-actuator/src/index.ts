@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver, ledger } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,13 +17,62 @@ interface SecretAction {
   };
 }
 
+async function withGovernedMutation(
+  actionType: 'set' | 'delete',
+  params: any,
+  platform: string,
+  logic: () => Promise<any>
+) {
+  const existingMissionId = process.env.MISSION_ID;
+  const isEphemeral = !existingMissionId;
+  const missionId = existingMissionId || `MSN-SEC-${Date.now().toString(36).toUpperCase()}`;
+
+  if (isEphemeral) {
+    logger.info(`🛡️ [SECRET-GUARD] No active mission found. Auto-wrapping mutation in ephemeral mission: ${missionId}`);
+    try {
+      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'create', missionId, 'personal', 'kyberion', 'governance', '"Ephemeral Secret Mutation"', 'Unknown', '--is-ephemeral']);
+      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'start', missionId, 'personal']);
+    } catch (err) {
+      logger.warn(`Failed to create ephemeral mission: ${err}`);
+    }
+  }
+
+  // Execute actual secret logic
+  const result = await logic();
+
+  if (result.status === 'success') {
+    // Record to ledger
+    ledger.record('CONFIG_CHANGE', {
+      mission_id: missionId,
+      role: process.env.MISSION_ROLE || 'secret_guard',
+      service_id: params.service,
+      config_target: 'os-keychain',
+      action: actionType,
+      changed_keys: [params.account]
+    });
+    result.mission_id = missionId;
+  }
+
+  if (isEphemeral) {
+    try {
+      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'finish', missionId]);
+    } catch (err) {
+      logger.warn(`Failed to finish ephemeral mission: ${err}`);
+    }
+  }
+
+  return result;
+}
+
 async function handleAction(input: SecretAction) {
   const platform = process.platform;
 
   switch (input.action) {
     case 'get': return await getSecret(input.params, platform);
-    case 'set': return await setSecret(input.params, platform);
-    case 'delete': return await deleteSecret(input.params, platform);
+    case 'set': 
+      return await withGovernedMutation('set', input.params, platform, () => setSecret(input.params, platform));
+    case 'delete': 
+      return await withGovernedMutation('delete', input.params, platform, () => deleteSecret(input.params, platform));
     default: throw new Error(`Unsupported secret action: ${input.action}`);
   }
 }
