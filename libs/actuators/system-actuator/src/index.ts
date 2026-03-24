@@ -6,6 +6,7 @@ import {
   safeExec,
   safeExistsSync,
   derivePipelineStatus,
+  emitComputerSurfacePatch,
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -15,11 +16,20 @@ import {
   rightClickAt,
   moveMouse,
   listKnownAppCapabilities,
+  listTerminalTargets,
   listChromeTabs,
   activateChromeTabByTitle,
+  activateChromeTabByUrl,
+  closeChromeTabByTitle,
+  closeChromeTabByUrl,
   emptyFinderTrash,
+  revealFinderPath,
+  openFinderPath,
+  createApprovalRequest,
+  loadApprovalRequest,
   type FocusedInputState,
 } from '@agent/core';
+import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -89,8 +99,14 @@ interface ComputerInteractionAction {
       | 'type_into_focused_input'
       | 'submit_focused_input'
       | 'list_known_app_capabilities'
+      | 'list_terminal_targets'
       | 'list_tabs'
       | 'activate_tab_by_title'
+      | 'activate_tab_by_url'
+      | 'close_tab_by_title'
+      | 'close_tab_by_url'
+      | 'reveal_path'
+      | 'open_path'
       | 'empty_trash'
       | 'type'
       | 'key'
@@ -98,8 +114,11 @@ interface ComputerInteractionAction {
     coordinate?: { x: number; y: number };
     text?: string;
     key?: string;
+    path?: string;
+    url?: string;
     application?: string;
     title?: string;
+    approval_request_id?: string;
     focus_target_id?: string;
     input_strategy?: 'keystroke' | 'paste';
     timeout_ms?: number;
@@ -125,6 +144,25 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   const focusTargetMatchPolicy = input.target?.focus_target_match_policy || 'strict';
   const rememberedTarget = loadRememberedFocusTarget(focusTargetId);
   const application = interaction.application || input.target?.application || rememberedTarget?.application;
+  const sessionId = input.session_id || 'computer-system';
+
+  const emitPatch = (
+    status: string,
+    latestAction: string,
+    detail?: string,
+    target?: string,
+    metadata?: Record<string, unknown>,
+  ) => {
+    emitComputerSurfacePatch({
+      sessionId,
+      executor: 'system',
+      status,
+      latestAction,
+      target,
+      detail,
+      metadata,
+    });
+  };
 
   if (interaction.type === 'detect_focused_input') {
     if (application) {
@@ -191,11 +229,36 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
   }
 
   if (interaction.type === 'list_known_app_capabilities') {
+    const capabilities = listKnownAppCapabilities();
+    emitPatch('succeeded', interaction.type, 'known app capability listing', undefined, {
+      capabilityCount: capabilities.length,
+    });
     return {
       status: 'succeeded',
       results: [{ op: 'list_known_app_capabilities', status: 'success' }],
       context: {
-        known_app_capabilities: listKnownAppCapabilities(),
+        known_app_capabilities: capabilities,
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'list_terminal_targets') {
+    const terminalTargets = listTerminalTargets();
+    emitPatch('succeeded', interaction.type, 'terminal target listing', undefined, {
+      targetCount: terminalTargets.length,
+      targets: terminalTargets.map((target) => ({
+        application: target.application,
+        preferred: target.preferred,
+        sessionCount: target.sessionCount,
+        canInject: target.canInject,
+      })),
+    });
+    return {
+      status: 'succeeded',
+      results: [{ op: 'list_terminal_targets', status: 'success' }],
+      context: {
+        terminal_targets: terminalTargets,
       },
       total_steps: 1,
     };
@@ -203,6 +266,9 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
 
   if (interaction.type === 'list_tabs') {
     const tabs = listChromeTabs(application || 'Google Chrome');
+    emitPatch('succeeded', interaction.type, `${tabs.length} tabs`, application || 'Google Chrome', {
+      tabCount: tabs.length,
+    });
     return {
       status: 'succeeded',
       results: [{ op: 'list_tabs', status: 'success' }],
@@ -215,6 +281,10 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
 
   if (interaction.type === 'activate_tab_by_title') {
     const result = activateChromeTabByTitle(interaction.title || '', application || 'Google Chrome');
+    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.title || '', application || 'Google Chrome', {
+      title: interaction.title || '',
+      matched: result.matched,
+    });
     return {
       status: result.matched ? 'succeeded' : 'failed',
       results: [{ op: 'activate_tab_by_title', status: result.matched ? 'success' : 'failed' }],
@@ -229,8 +299,369 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     };
   }
 
+  if (interaction.type === 'activate_tab_by_url') {
+    const result = activateChromeTabByUrl(interaction.url || interaction.title || '', application || 'Google Chrome');
+    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.url || interaction.title || '', application || 'Google Chrome', {
+      url: interaction.url || interaction.title || '',
+      matched: result.matched,
+    });
+    return {
+      status: result.matched ? 'succeeded' : 'failed',
+      results: [{ op: 'activate_tab_by_url', status: result.matched ? 'success' : 'failed' }],
+      context: {
+        tab_activation: {
+          application: application || 'Google Chrome',
+          url: interaction.url || interaction.title || '',
+          matched: result.matched,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'close_tab_by_title') {
+    const approvalRequestId = interaction.approval_request_id;
+    if (!approvalRequestId) {
+      const request = createApprovalRequest('sovereign_concierge', {
+        channel: 'computer',
+        storageChannel: 'computer',
+        threadTs: input.session_id || 'computer',
+        correlationId: randomUUID(),
+        requestedBy: 'system-actuator',
+        kind: 'channel-approval',
+        draft: {
+          title: 'Approval required: close Chrome tab',
+          summary: 'A computer interaction requested a destructive browser tab close operation.',
+          details: 'Approve this request before running close_tab_by_title.',
+          severity: 'medium',
+        },
+        requestedByContext: {
+          surface: 'system',
+          actorId: 'system-actuator',
+          actorRole: 'sovereign_concierge',
+          runtimeId: input.session_id,
+        },
+        justification: {
+          reason: 'Potentially destructive desktop operation requested through computer_interaction.',
+          impactSummary: 'The first matching Chrome tab will be closed.',
+          requestedEffects: ['close_chrome_tab'],
+        },
+        risk: {
+          level: 'medium',
+          restartScope: 'none',
+          requiresStrongAuth: false,
+          policyId: 'wf_computer_destructive_v1',
+        },
+        workflow: {
+          workflowId: 'wf_computer_destructive_v1',
+          mode: 'all_required',
+          requiredRoles: ['sovereign'],
+          currentStage: 'review',
+          stages: [
+            {
+              stageId: 'review',
+              requiredRoles: ['sovereign'],
+              description: 'Approve destructive computer action',
+            },
+          ],
+          approvals: [
+            {
+              role: 'sovereign',
+              status: 'pending',
+            },
+          ],
+        },
+      });
+      emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
+        title: interaction.title || '',
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'close_tab_by_title', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: request.id,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
+    const request = loadApprovalRequest('computer', approvalRequestId);
+    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+      emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
+        title: interaction.title || '',
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'close_tab_by_title', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: approvalRequestId,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
+    const result = closeChromeTabByTitle(interaction.title || '', application || 'Google Chrome');
+    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.title || '', application || 'Google Chrome', {
+      title: interaction.title || '',
+      matched: result.matched,
+    });
+    return {
+      status: result.matched ? 'succeeded' : 'failed',
+      results: [{ op: 'close_tab_by_title', status: result.matched ? 'success' : 'failed' }],
+      context: {
+        tab_close: {
+          application: application || 'Google Chrome',
+          title: interaction.title || '',
+          matched: result.matched,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'close_tab_by_url') {
+    const approvalRequestId = interaction.approval_request_id;
+    if (!approvalRequestId) {
+      const request = createApprovalRequest('sovereign_concierge', {
+        channel: 'computer',
+        storageChannel: 'computer',
+        threadTs: sessionId,
+        correlationId: randomUUID(),
+        requestedBy: 'system-actuator',
+        kind: 'channel-approval',
+        draft: {
+          title: 'Approval required: close Chrome tab by URL',
+          summary: 'A computer interaction requested a destructive browser tab close operation.',
+          details: 'Approve this request before running close_tab_by_url.',
+          severity: 'medium',
+        },
+        requestedByContext: {
+          surface: 'system',
+          actorId: 'system-actuator',
+          actorRole: 'sovereign_concierge',
+          runtimeId: sessionId,
+        },
+        justification: {
+          reason: 'Potentially destructive desktop operation requested through computer_interaction.',
+          impactSummary: 'The first matching Chrome tab URL will be closed.',
+          requestedEffects: ['close_chrome_tab'],
+        },
+        risk: {
+          level: 'medium',
+          restartScope: 'none',
+          requiresStrongAuth: false,
+          policyId: 'wf_computer_destructive_v1',
+        },
+        workflow: {
+          workflowId: 'wf_computer_destructive_v1',
+          mode: 'all_required',
+          requiredRoles: ['sovereign'],
+          currentStage: 'review',
+          stages: [
+            {
+              stageId: 'review',
+              requiredRoles: ['sovereign'],
+              description: 'Approve destructive computer action',
+            },
+          ],
+          approvals: [
+            {
+              role: 'sovereign',
+              status: 'pending',
+            },
+          ],
+        },
+      });
+      emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
+        url: interaction.url || interaction.title || '',
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'close_tab_by_url', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: request.id,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
+    const request = loadApprovalRequest('computer', approvalRequestId);
+    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+      emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
+        url: interaction.url || interaction.title || '',
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'close_tab_by_url', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: approvalRequestId,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
+    const result = closeChromeTabByUrl(interaction.url || interaction.title || '', application || 'Google Chrome');
+    emitPatch(result.matched ? 'succeeded' : 'failed', interaction.type, interaction.url || interaction.title || '', application || 'Google Chrome', {
+      url: interaction.url || interaction.title || '',
+      matched: result.matched,
+    });
+    return {
+      status: result.matched ? 'succeeded' : 'failed',
+      results: [{ op: 'close_tab_by_url', status: result.matched ? 'success' : 'failed' }],
+      context: {
+        tab_close: {
+          application: application || 'Google Chrome',
+          url: interaction.url || interaction.title || '',
+          matched: result.matched,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'reveal_path') {
+    const targetPath = interaction.path || interaction.text || '';
+    if (!targetPath) {
+      throw new Error('Path is required for reveal_path');
+    }
+    revealFinderPath(targetPath);
+    emitPatch('succeeded', interaction.type, targetPath, 'Finder', { path: targetPath });
+    return {
+      status: 'succeeded',
+      results: [{ op: 'reveal_path', status: 'success' }],
+      context: {
+        file_manager_action: {
+          application: 'Finder',
+          action: 'reveal_path',
+          path: targetPath,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
+  if (interaction.type === 'open_path') {
+    const targetPath = interaction.path || interaction.text || '';
+    if (!targetPath) {
+      throw new Error('Path is required for open_path');
+    }
+    openFinderPath(targetPath);
+    emitPatch('succeeded', interaction.type, targetPath, 'Finder', { path: targetPath });
+    return {
+      status: 'succeeded',
+      results: [{ op: 'open_path', status: 'success' }],
+      context: {
+        file_manager_action: {
+          application: 'Finder',
+          action: 'open_path',
+          path: targetPath,
+        },
+      },
+      total_steps: 1,
+    };
+  }
+
   if (interaction.type === 'empty_trash') {
+    const approvalRequestId = interaction.approval_request_id;
+    if (!approvalRequestId) {
+      const request = createApprovalRequest('sovereign_concierge', {
+        channel: 'computer',
+        storageChannel: 'computer',
+        threadTs: input.session_id || 'computer',
+        correlationId: randomUUID(),
+        requestedBy: 'system-actuator',
+        kind: 'channel-approval',
+        draft: {
+          title: 'Approval required: empty Finder trash',
+          summary: 'A computer interaction requested a destructive Finder operation.',
+          details: 'Approve this request before running empty_trash.',
+          severity: 'high',
+        },
+        requestedByContext: {
+          surface: 'system',
+          actorId: 'system-actuator',
+          actorRole: 'sovereign_concierge',
+          runtimeId: input.session_id,
+        },
+        justification: {
+          reason: 'Destructive desktop operation requested through computer_interaction.',
+          impactSummary: 'All items currently in Finder trash will be permanently removed.',
+          requestedEffects: ['empty_finder_trash'],
+        },
+        risk: {
+          level: 'high',
+          restartScope: 'none',
+          requiresStrongAuth: false,
+          policyId: 'wf_computer_destructive_v1',
+        },
+        workflow: {
+          workflowId: 'wf_computer_destructive_v1',
+          mode: 'all_required',
+          requiredRoles: ['sovereign'],
+          currentStage: 'review',
+          stages: [
+            {
+              stageId: 'review',
+              requiredRoles: ['sovereign'],
+              description: 'Approve destructive computer action',
+            },
+          ],
+          approvals: [
+            {
+              role: 'sovereign',
+              status: 'pending',
+            },
+          ],
+        },
+      });
+      emitPatch('blocked', interaction.type, 'approval required', 'Finder', {
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'empty_trash', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: request.id,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
+    const request = loadApprovalRequest('computer', approvalRequestId);
+    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+      emitPatch('blocked', interaction.type, 'approval required', 'Finder', {
+        approvalRequired: true,
+      });
+      return {
+        status: 'blocked',
+        results: [{ op: 'empty_trash', status: 'blocked' }],
+        context: {
+          approval_required: true,
+          approval_request_id: approvalRequestId,
+          approval_channel: 'computer',
+        },
+        total_steps: 1,
+      };
+    }
+
     emptyFinderTrash();
+    emitPatch('succeeded', interaction.type, 'trash emptied', 'Finder', {
+      destructive: true,
+    });
     return {
       status: 'succeeded',
       results: [{ op: 'empty_trash', status: 'success' }],

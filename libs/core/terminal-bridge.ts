@@ -9,6 +9,29 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } f
 
 const RUNTIME_BASE = path.join(process.cwd(), 'active/shared/runtime/terminal');
 
+function listReflexTerminalSessions() {
+  if (!safeExistsSync(RUNTIME_BASE)) return [];
+  const sessions: Array<{ winId: string; sessionId: string; type: string; status?: string; pid?: number }> = [];
+  for (const id of safeReaddir(RUNTIME_BASE)) {
+    const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
+    if (!safeExistsSync(stateFile)) continue;
+    try {
+      const state = JSON.parse(safeReadFile(stateFile, { encoding: 'utf8' }) as string);
+      process.kill(state.pid, 0);
+      sessions.push({
+        winId: 'rt-main',
+        sessionId: id,
+        type: 'ReflexTerminal',
+        status: state.status || 'running',
+        pid: state.pid,
+      });
+    } catch (_) {
+      // ignore dead or malformed sessions
+    }
+  }
+  return sessions;
+}
+
 const STRATEGIES: Record<string, any> = {
   ReflexTerminal: {
     findIdle: () => {
@@ -135,6 +158,24 @@ export const terminalBridge = {
     const iterm = STRATEGIES.iTerm2.findIdle();
     if (iterm) return iterm;
     return null;
+  },
+  listTargets: () => {
+    const reflexSessions = listReflexTerminalSessions();
+    const iTermIdle = STRATEGIES.iTerm2.findIdle();
+    return [
+      {
+        application: 'Terminal',
+        adapter: 'terminal',
+        sessions: reflexSessions,
+        idleSession: reflexSessions[0] || null,
+      },
+      {
+        application: 'iTerm2',
+        adapter: 'iterm2',
+        sessions: iTermIdle ? [iTermIdle] : [],
+        idleSession: iTermIdle,
+      },
+    ];
   },
   injectAndExecute: async (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {
     const strategy = STRATEGIES[terminalType];

@@ -10,6 +10,7 @@ export interface ComputerSessionSummary {
   target?: string;
   detail?: string;
   actionCount?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export function collectComputerSessions(): ComputerSessionSummary[] {
@@ -31,6 +32,7 @@ export function collectComputerSessions(): ComputerSessionSummary[] {
           target: parsed.target,
           detail: parsed.detail || parsed.latestAction || "",
           actionCount: parsed.actionCount || 0,
+          metadata: parsed.metadata || {},
         });
       } catch {
         // ignore malformed computer session metadata

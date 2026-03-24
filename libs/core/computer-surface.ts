@@ -10,6 +10,7 @@ export interface ComputerSurfacePatch {
   latestAction: string;
   target?: string;
   detail?: string;
+  metadata?: Record<string, unknown>;
   screenshotPath?: string;
   actionCount?: number;
   updatedAt?: string;
@@ -42,6 +43,7 @@ export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIM
         latestAction: patch.latestAction,
         target: patch.target || '',
         detail: patch.detail || '',
+        metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
         updatedAt: patch.updatedAt || new Date().toISOString(),
@@ -75,6 +77,7 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
         latestAction: patch.latestAction,
         target: patch.target || '',
         detail: patch.detail || '',
+        metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
         updatedAt: patch.updatedAt || new Date().toISOString(),
