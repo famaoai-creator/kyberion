@@ -1,4 +1,9 @@
-import { generateNativeXlsx, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import {
+  generateNativeXlsx,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+} from '@agent/core';
 import type {
   XlsxCell,
   XlsxCellStyle,
@@ -9,7 +14,7 @@ import type {
   XlsxDxfStyle,
   XlsxMergeCell,
   XlsxWorksheet,
-} from '../libs/core/src/types/xlsx-protocol.js';
+} from '@agent/core';
 import * as path from 'node:path';
 
 interface TemplateSpec {
