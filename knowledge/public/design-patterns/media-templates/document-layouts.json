@@ -167,7 +167,43 @@
             "section_font_size": 26,
             "title_spacing_after": 160,
             "section_spacing_before": 120,
-            "section_spacing_after": 80
+            "section_spacing_after": 80,
+            "layout_profile": {
+              "fonts": {
+                "bodyJa": "Aptos",
+                "bodyEn": "Aptos",
+                "headingJa": "Aptos",
+                "headingEn": "Aptos"
+              },
+              "sizes": {
+                "body": 11,
+                "heading1": 16,
+                "heading2": 13
+              },
+              "bullet": {
+                "level0": "•"
+              }
+            },
+            "numbering_policy": {
+              "headings": {
+                "enabled": false,
+                "preserveExisting": true
+              },
+              "figures": {
+                "enabled": true,
+                "format": "chapter",
+                "prefix": "Figure",
+                "chapterLevel": 1,
+                "resetOnHeadingLevel": 1
+              },
+              "tables": {
+                "enabled": true,
+                "format": "chapter",
+                "prefix": "Table",
+                "chapterLevel": 1,
+                "resetOnHeadingLevel": 1
+              }
+            }
           },
           "pdf": {
             "margin_left": 48,

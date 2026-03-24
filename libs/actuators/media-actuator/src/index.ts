@@ -848,6 +848,8 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
     layout_template_id: brief.layout_template_id,
   });
   const docxLayout = template?.docx || {};
+  const layoutProfileTemplate = docxLayout.layout_profile || {};
+  const numberingPolicyTemplate = docxLayout.numbering_policy || {};
   const headingFont = normalizeFontFamily(
     brief.locale?.startsWith('ja')
       ? template?.fonts?.heading || 'Meiryo'
@@ -1026,10 +1028,81 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
   return {
     version: '1.0.0',
     generatedAt: new Date().toISOString(),
+    source: {
+      format: 'markdown',
+      title: brief.payload.title || 'Report',
+      body: [
+        brief.payload.summary || '',
+        '',
+        ...(Array.isArray(brief.payload.sections)
+          ? brief.payload.sections.flatMap((section: any) => [
+              section.heading || 'Section',
+              ...(Array.isArray(section.body) ? section.body.map((paragraph: any) => String(paragraph)) : []),
+              ...(Array.isArray(section.bullets) ? section.bullets.map((bullet: string) => `- ${bullet}`) : []),
+              '',
+            ])
+          : []),
+      ].join('\n').trim(),
+    },
     theme: {
       colors: { dk1: '111827', lt1: 'FFFFFF', accent1: '2563EB' },
       majorFont: headingFont,
       minorFont: headingFont,
+    },
+    layoutProfile: {
+      fonts: {
+        bodyJa: normalizeFontFamily(layoutProfileTemplate.fonts?.bodyJa || bodyFont),
+        bodyEn: normalizeFontFamily(layoutProfileTemplate.fonts?.bodyEn || bodyFont),
+        headingJa: normalizeFontFamily(layoutProfileTemplate.fonts?.headingJa || headingFont),
+        headingEn: normalizeFontFamily(layoutProfileTemplate.fonts?.headingEn || headingFont),
+      },
+      sizes: {
+        body: layoutProfileTemplate.sizes?.body || 11,
+        heading1: layoutProfileTemplate.sizes?.heading1 || (docxLayout.title_font_size || 32) / 2,
+        heading2: layoutProfileTemplate.sizes?.heading2 || (docxLayout.section_font_size || 26) / 2,
+        heading3: layoutProfileTemplate.sizes?.heading3,
+        heading4: layoutProfileTemplate.sizes?.heading4,
+        heading5: layoutProfileTemplate.sizes?.heading5,
+        code: layoutProfileTemplate.sizes?.code,
+      },
+      page: {
+        width: layoutProfileTemplate.page?.width || docxLayout.page?.width || 11906,
+        height: layoutProfileTemplate.page?.height || docxLayout.page?.height || 16838,
+        marginTop: layoutProfileTemplate.page?.marginTop || docxLayout.page?.margin_top || 1440,
+        marginRight: layoutProfileTemplate.page?.marginRight || docxLayout.page?.margin_right || 1440,
+        marginBottom: layoutProfileTemplate.page?.marginBottom || docxLayout.page?.margin_bottom || 1440,
+        marginLeft: layoutProfileTemplate.page?.marginLeft || docxLayout.page?.margin_left || 1440,
+        marginHeader: layoutProfileTemplate.page?.marginHeader || docxLayout.page?.header || 720,
+        marginFooter: layoutProfileTemplate.page?.marginFooter || docxLayout.page?.footer || 720,
+        marginGutter: layoutProfileTemplate.page?.marginGutter,
+      },
+      indent: layoutProfileTemplate.indent,
+      bullet: {
+        level0: layoutProfileTemplate.bullet?.level0 || '•',
+        level1: layoutProfileTemplate.bullet?.level1,
+        level2: layoutProfileTemplate.bullet?.level2,
+      },
+    },
+    numberingPolicy: {
+      headings: {
+        enabled: numberingPolicyTemplate.headings?.enabled ?? false,
+        preserveExisting: numberingPolicyTemplate.headings?.preserveExisting ?? true,
+        levelFormats: numberingPolicyTemplate.headings?.levelFormats,
+      },
+      figures: {
+        enabled: numberingPolicyTemplate.figures?.enabled ?? true,
+        format: numberingPolicyTemplate.figures?.format || 'chapter',
+        prefix: numberingPolicyTemplate.figures?.prefix || 'Figure',
+        chapterLevel: numberingPolicyTemplate.figures?.chapterLevel || 1,
+        resetOnHeadingLevel: numberingPolicyTemplate.figures?.resetOnHeadingLevel || 1,
+      },
+      tables: {
+        enabled: numberingPolicyTemplate.tables?.enabled ?? true,
+        format: numberingPolicyTemplate.tables?.format || 'chapter',
+        prefix: numberingPolicyTemplate.tables?.prefix || 'Table',
+        chapterLevel: numberingPolicyTemplate.tables?.chapterLevel || 1,
+        resetOnHeadingLevel: numberingPolicyTemplate.tables?.resetOnHeadingLevel || 1,
+      },
     },
     styles: {
       docDefaults: {

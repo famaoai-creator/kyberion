@@ -332,12 +332,89 @@ export interface DocxTheme {
   rawXml?: string;
 }
 
+// ─── Source / Layout / Numbering Semantics ─────────────────
+
+export interface DocxSourceDescriptor {
+  format: 'markdown' | 'html' | 'text' | 'docx';
+  body?: string;
+  title?: string;
+  path?: string;
+  basePath?: string;
+}
+
+export interface DocxLayoutProfile {
+  fonts?: {
+    bodyJa?: string;
+    bodyEn?: string;
+    headingJa?: string;
+    headingEn?: string;
+  };
+  sizes?: {
+    body?: number;       // pt
+    heading1?: number;   // pt
+    heading2?: number;
+    heading3?: number;
+    heading4?: number;
+    heading5?: number;
+    code?: number;
+  };
+  page?: {
+    width?: number;      // twips
+    height?: number;     // twips
+    marginTop?: number;
+    marginRight?: number;
+    marginBottom?: number;
+    marginLeft?: number;
+    marginHeader?: number;
+    marginFooter?: number;
+    marginGutter?: number;
+  };
+  indent?: {
+    bodyLeft?: number;         // twips
+    bodyFirstLine?: number;    // twips
+    bodyRight?: number;        // twips
+    bodyLeftChars?: number;    // Word char unit x100
+    heading4Left?: number;     // twips
+    heading4Hanging?: number;  // twips
+  };
+  bullet?: {
+    level0?: string;
+    level1?: string;
+    level2?: string;
+  };
+}
+
+export interface DocxNumberingPolicy {
+  headings?: {
+    enabled?: boolean;
+    preserveExisting?: boolean;
+    levelFormats?: Array<'decimal' | 'decimal-dot' | 'paren-decimal' | 'circled-decimal'>;
+  };
+  figures?: {
+    enabled?: boolean;
+    format?: 'sequential' | 'chapter';
+    prefix?: string;
+    chapterLevel?: number;
+    resetOnHeadingLevel?: number;
+  };
+  tables?: {
+    enabled?: boolean;
+    format?: 'sequential' | 'chapter';
+    prefix?: string;
+    chapterLevel?: number;
+    resetOnHeadingLevel?: number;
+  };
+}
+
 // ─── Root Protocol ──────────────────────────────────────────
 
 export interface DocxDesignProtocol {
   version: string;
   generatedAt: string;
+  source?: DocxSourceDescriptor;
   theme: DocxTheme;
+  layoutProfile?: DocxLayoutProfile;
+  numberingPolicy?: DocxNumberingPolicy;
   styles: {
     docDefaults?: {
       rPrDefault?: DocxRunProperties;
