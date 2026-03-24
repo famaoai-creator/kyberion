@@ -45,7 +45,7 @@ function normalizePersona(value: string | undefined): Persona {
 }
 
 function resolveRole(): string | undefined {
-  const envRole = process.env.MISSION_ROLE;
+  const envRole = process.env.SYSTEM_ROLE || process.env.MISSION_ROLE;
   if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
 
   const argv1 = process.argv[1] || '';

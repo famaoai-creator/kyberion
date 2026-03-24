@@ -1,0 +1,16 @@
+{
+  "pipeline_id": "baseline-check",
+  "version": "1.0.0",
+  "description": "Unified Pre-Flight Check (L0-L5) for system awakening",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "run-sentinel",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "pnpm tsx scripts/run_baseline_check.ts"
+      }
+    }
+  ]
+}

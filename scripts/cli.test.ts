@@ -103,8 +103,8 @@ describe('Kyberion CLI helpers', () => {
   });
 
   it('allows only approved packet and pipeline paths', () => {
-    expect(() => assertPacketPathAllowed('/Users/famao/kyberion/active/shared/tmp/orchestrator/test-packet.json')).not.toThrow();
-    expect(() => assertPacketPathAllowed('/Users/famao/kyberion/tmp/evil.json')).toThrow('Packet path must stay within');
+    expect(() => assertPacketPathAllowed(`${process.cwd()}/active/shared/tmp/orchestrator/test-packet.json`)).not.toThrow();
+    expect(() => assertPacketPathAllowed(`${process.cwd()}/tmp/evil.json`)).toThrow('Packet path must stay within');
     expect(() => assertApprovedPipelinePath('pipelines/web-session-handoff-runner.json')).not.toThrow();
     expect(() => assertApprovedPipelinePath('active/shared/tmp/orchestrator/status-packet.json')).not.toThrow();
     expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow('Pipeline path is not approved');

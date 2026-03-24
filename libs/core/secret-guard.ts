@@ -132,24 +132,26 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
  */
 export const getSecret = (key: string, scope?: string): string | null => {
   const currentMission = process.env.MISSION_ID;
+  const authorizedScope = process.env.AUTHORIZED_SCOPE;
 
   if (scope) {
+    // 1. Check Scoped Identity (For Daemons/Surfaces)
+    const hasScopeIdentity = authorizedScope?.toLowerCase() === scope.toLowerCase();
+
+    // 2. Check Temporal Mission Grants (For dynamic tasks)
     const grants = _loadGrants(); 
-    const isPrivileged = currentMission === 'MSN-SYSTEM-NEXUS-DISPATCH' || 
-                        currentMission === 'MSN-SYSTEM-SENSORY-HUB';
-    
     const activeGrant = grants.find(g => 
       g.missionId === currentMission && 
       g.serviceId?.toLowerCase() === scope.toLowerCase() && 
       g.expiresAt > Date.now()
     );
 
-    if (!activeGrant && !isPrivileged) {
-      throw new Error(`TIBA_VIOLATION: No active temporal grant for service "${scope}" in mission "${currentMission}". Access Denied.`);
+    if (!activeGrant && !hasScopeIdentity) {
+      throw new Error(`TIBA_VIOLATION: No active temporal grant or authorized scope for service "${scope}". Access Denied.`);
     }
   }
 
-  if (scope && !key.toUpperCase().startsWith(scope.toUpperCase())) {
+  if (scope && !key.toUpperCase().startsWith(scope.toUpperCase() + '_')) {
     throw new Error(`SHIELD_VIOLATION: Key "${key}" does not match authorized scope "${scope}".`);
   }
 

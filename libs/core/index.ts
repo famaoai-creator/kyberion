@@ -198,3 +198,9 @@ export * from './kill-switch.js';
 export * from './shared-business-types.js';
 export * from './types.js';
 // export * as visionJudge from './vision-judge.js';
+
+// Pre-Flight Check (Sovereign Sentinel)
+export * from './src/pfc/PfcController.js';
+export * from './src/pfc/PhysicalLayer.js';
+export * from './src/pfc/ServiceValidator.js';
+export * from './src/pfc/SovereignSentinel.js';

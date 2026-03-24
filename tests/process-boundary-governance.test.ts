@@ -7,14 +7,17 @@ const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
   'libs/actuators/process-actuator/src/index.ts',
   'libs/actuators/service-actuator/src/index.ts',
+  'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
+  'libs/core/agent-runtime-supervisor-client.ts',
   'libs/core/agent-runtime-supervisor.test.ts',
   'libs/core/agent-runtime-supervisor.ts',
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
   'scripts/surface_runtime.ts',
   'tests/managed-process.test.ts',
+  'tests/surface-auth.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

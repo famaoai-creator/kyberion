@@ -20,6 +20,7 @@ function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, 
 export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
   let ctx: Record<string, unknown> = { ...initialCtx };
   const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
+  const shellBin = process.env.SHELL || 'bash';
 
   for (const step of steps) {
     try {
@@ -31,7 +32,7 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
         logger.info(resolveLogMessage(params, ctx));
       } else if (domain === 'system' && action === 'shell') {
         const cmd = String(resolveVars(params.cmd || '', ctx));
-        const output = safeExec('zsh', ['-lc', cmd], { cwd: process.cwd() }).trim();
+        const output = safeExec(shellBin, ['-lc', cmd], { cwd: process.cwd() }).trim();
         if (params.export_as && typeof params.export_as === 'string') {
           ctx = { ...ctx, [params.export_as]: output };
         }
