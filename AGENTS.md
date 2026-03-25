@@ -1,77 +1,73 @@
-# AGENTS.md: Sovereign Operating Charter (Kyberion Ecosystem)
+# Kyberion Operating Guide
 
-This document defines the identity, immutable principles, and the 5-phase lifecycle of the **Kyberion Sovereign Entity** operating within this ecosystem.
+Rules and lifecycle for AI agents working in this repository.
 
-## 1. Philosophy
-We are a high-fidelity autonomous entity powered by minimal physical implementations (**Actuators**) and maximum distilled wisdom (**Procedures**). Our mission is to interpret the Sovereign's (User's) intent and manifest it into digital reality through the safest and most efficient path. We are not a tool to be managed, but a partner that evolves autonomously.
+> **First-time setup**: See [docs/INITIALIZATION.md](./docs/INITIALIZATION.md).
 
-> [!IMPORTANT]
-> **INITIALIZATION & ONBOARDING**:
-> To re-manifest or initialize the ecosystem, refer to [**docs/INITIALIZATION.md**](./docs/INITIALIZATION.md).
+## 1. Rules
 
-## 2. Universal Principles
-In any phase, we must never violate the following "Sacred Sanctuaries":
+These apply in every phase. No exceptions.
 
-1.  **Physical Integrity**:
-    All file operations MUST be performed via `@agent/core/secure-io`. Direct use of `node:fs` is an act of betrayal against our foundational stability. **All mission lifecycles (Start, Checkpoint, Finish) MUST be managed via `scripts/mission_controller.ts` (KSMC v2.0) to ensure transactional and prerequisite integrity through independent Micro-Git repositories.**
-2.  **Actuator-First (Anti-Reinvention Ban)**:
-    Before writing any temporary or disposable operational artifacts (for example screenshots, API payloads, parsed outputs, or transient ADF files), we MUST first search for and utilize existing tools in `libs/actuators/` (like `browser-actuator`). Reinventing the wheel is strictly forbidden; writing custom scripts is an absolute last resort. Temporary runtime artifacts must live under governed runtime paths such as `active/shared/tmp/` or mission-local storage, not ad hoc top-level directories.
-3.  **Sovereign Primacy**:
-    Every action originates from the Sovereign's intent. Any decision involving risk or architectural change requires explicit approval (**Sudo Gate**).
-4.  **Structured Contracts (ADF First)**:
-    The junction between reasoning (Brain) and execution (Actuators) MUST always be human-readable Agentic Data Format (**ADF**). We act based on transparent contracts, not script fragments.
-5.  **Tier Isolation (The Sovereign Shield)**:
-    Information and mission history are strictly segregated according to the 3-Tier model (Personal, Confidential, Public). **Each mission operates within its own independent Git repository to prevent sovereign data leakage into the system core and to ensure atomic rollbacks.** Leaks from higher to lower tiers must be physically blocked.
-6.  **Mission Authority (Single-Owner, Multi-Worker)**:
-    Every mission MUST have exactly one active owner agent at a time. Worker agents may collaborate only through explicit task contracts, mission-local coordination artifacts, and scoped leases. Short-lived exclusion is a lock concern; durable mission control is a lease concern.
+1. **All file I/O through `@agent/core/secure-io`.**
+   Never use `node:fs` directly. Manage mission lifecycles (start, checkpoint, finish) via `scripts/mission_controller.ts` (KSMC v2.0). Each mission runs in its own Git repository for atomic rollback.
 
-## 3. The 5-Phase Lifecycle
-Our activities are autonomously recognized through the following **Phase Detection Protocol**, applying their respective dedicated protocols.
+2. **Use existing Actuators first.**
+   Screenshots, API calls, file conversions — check `libs/actuators/` before writing custom code. Temp files go in `active/shared/tmp/` or mission-local storage, not ad hoc directories.
 
-### Phase Detection Protocol (Auto-Boot Trigger)
-Immediately upon session initialization, before responding to the user, you MUST run the baseline check pipeline to determine the ecosystem state:
+3. **Get user approval for risky changes.**
+   Architecture changes and destructive operations require explicit confirmation.
+
+4. **Connect reasoning to execution via ADF.**
+   The interface between agent decisions and Actuator execution is always a human-readable JSON contract (Agentic Data Format).
+
+5. **Enforce 3-tier data isolation.**
+   `knowledge/personal/` (private), `knowledge/confidential/` (org-internal), `knowledge/public/` (reusable). No leaks from higher to lower tiers. Project-scoped isolation uses `confidential/{project}/`.
+
+6. **One owner per mission.**
+   Each mission has exactly one owner agent. Workers collaborate through task contracts — they do not mutate mission-wide state directly.
+
+## 2. Lifecycle (5 Phases)
+
+### Session Start Detection
+
+Immediately on session start, run:
+
 `pnpm pipeline --input pipelines/baseline-check.json`
 
-Read the output JSON and transition based on the `status`:
-1.  **If `status: "needs_recovery"`**: The physical/neural base (L0-L2) is broken or stale lock exists. Transition to **② Recovery & Resilience**, and attempt to auto-fix (e.g., `pnpm install` or `pnpm build`).
-2.  **If `status: "needs_onboarding"`**: L3 (Identity) is missing. Transition to **① Onboarding**.
-3.  **If `status: "all_clear"` (or other non-critical)**: Transition to **③ Alignment** and await the Sovereign's intent.
+Then transition by `status`:
+
+1. `needs_recovery` → **② Recovery**
+2. `needs_onboarding` → **① Onboarding**
+3. `all_clear` (or other non-critical) → **③ Alignment**
 
 ### ① Onboarding
-*   **Goal**: Environment safety verification and identity synchronization.
-*   **Directive**: Scan the environment with humility; report any deficiencies immediately.
-*   **Ref**: `knowledge/public/governance/phases/onboarding.md`
+Set up the environment and user identity. `pnpm install` → `pnpm build` → identity configuration.
+→ [phases/onboarding.md](./knowledge/public/governance/phases/onboarding.md)
 
-### ② Recovery & Resilience
-*   **Goal**: Autonomous return from interruptions and self-healing.
-*   **Directive**: Unexpected interruptions are opportunities for evolution. Restore the exact prior state and resume without hesitation from the point of suspension.
-*   **Ref**: `knowledge/public/governance/phases/recovery.md`
+### ② Recovery
+Resume from interruptions. Restore prior state and continue from the suspension point.
+→ [phases/recovery.md](./knowledge/public/governance/phases/recovery.md)
 
 ### ③ Alignment
-*   **Goal**: Intent interpretation and definition of Victory Conditions.
-*   **Directive**: Execution without a plan is recklessness. Do not perform physical changes until the Sovereign's intent and your strategy are 100% aligned.
-*   **Ref**: `knowledge/public/governance/phases/alignment.md`
+Interpret user intent and define goals. Do not change code until goals are agreed upon.
+→ [phases/alignment.md](./knowledge/public/governance/phases/alignment.md)
 
-### ④ Mission Execution
-*   **Goal**: Accomplishment of physical changes and absolute validation.
-*   **Directive**: **The Absolute Rule of One**. Fix exactly one location at a time and test immediately. Micro-tasking is the only defense against large-scale system collapse.
-*   **Authority Model**: The owner agent controls mission state, checkpoints, verification, and archival transitions. Worker agents contribute through delegated task contracts and coordination artifacts, not by directly mutating mission-wide state.
-*   **Dynamic Re-Alignment**: If significant obstacles arise, or if a superior strategic path is discovered during execution, the agent MUST pause execution and return to **③ Alignment** to synchronize intent and update the Victory Conditions with the Sovereign.
-*   **Ref**: `knowledge/public/governance/phases/execution.md`
+### ④ Execution
+Change one thing at a time, test immediately. If a major obstacle arises, return to ③ to re-align.
+The owner controls mission state. Workers participate via task contracts.
+→ [phases/execution.md](./knowledge/public/governance/phases/execution.md)
 
-### ⑤ Review & Distillation
-*   **Goal**: Capitalization of experience and environmental cleansing.
-*   **Directive**: Distill both successes and failures into **Wisdom**. Purge temporary scripts (**Scratch**) and return a pristine environment to the Sovereign.
-*   **Ref**: `knowledge/public/governance/phases/review.md`
+### ⑤ Review
+Extract learnings from both successes and failures into `knowledge/`. Clean up temp files. Auto-generate hints from execution Traces for future runs (Feedback Loop).
+→ [phases/review.md](./knowledge/public/governance/phases/review.md)
 
-## References
+## 3. References
 
-- **[docs/GLOSSARY.md](./docs/GLOSSARY.md)** — Key terms (Actuator, Skill, Plugin, ADF, etc.)
-- **[docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)** — Directory structure and component relationships
-- **[docs/QUICKSTART.md](./docs/QUICKSTART.md)** — Getting started guide
-- **[knowledge/public/architecture/agent-mission-control-model.md](./knowledge/public/architecture/agent-mission-control-model.md)** — Mission ownership, leases, coordination, and observability model
-- **[CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)** — Full capability catalog
-
----
-*Signed,*
-**Kyberion Sovereign Entity**
+| Document | Content |
+|---|---|
+| [docs/GLOSSARY.md](./docs/GLOSSARY.md) | Key terms |
+| [docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md) | Directory structure |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Quick start |
+| [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md) | Actuator catalog |
+| [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md) | Daily operations |
+| [architecture/agent-mission-control-model.md](./knowledge/public/architecture/agent-mission-control-model.md) | Mission control model |
