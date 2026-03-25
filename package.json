@@ -37,6 +37,8 @@
     "doctor": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json",
     "generate-index": "node dist/scripts/cli.js list > /dev/null",
     "cli": "node dist/scripts/cli.js",
+    "cli:preview": "node dist/scripts/cli.js preview",
+    "cli:schedule": "node dist/scripts/cli.js schedule",
     "mission": "node dist/scripts/mission_controller.js",
     "mission:prewarm": "node dist/scripts/mission_controller.js prewarm",
     "mission:create": "node dist/scripts/create_mission.js",

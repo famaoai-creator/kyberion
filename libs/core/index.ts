@@ -79,6 +79,8 @@ export * from './mobile-profile-validators.js';
 // Classification & Knowledge
 export * as classifier from './classifier.js';
 export * from './knowledge-provider.js';
+export { buildKnowledgeIndex, queryKnowledge, KnowledgeHintIndex } from './src/knowledge-index.js';
+export type { KnowledgeHint, KnowledgeQueryOptions } from './src/knowledge-index.js';
 
 // Networking
 export { secureFetch } from './network.js';
@@ -101,6 +103,32 @@ export type {
   XlsxMergeCell,
   XlsxWorksheet,
 } from './src/types/xlsx-protocol.js';
+
+// Document Design Protocol (Generic Base)
+export type {
+  DocumentDesignProtocol,
+  DocumentProvenance,
+  TransformStep,
+  DesignDelta,
+  SemanticOf,
+} from './src/types/document-protocol.js';
+export {
+  diffDesign,
+  wrapAsPptxDocument,
+  wrapAsXlsxDocument,
+} from './src/types/document-protocol.js';
+
+// Evidence Chain (Query & Summary)
+export { queryEvidence, summarizeEvidence, evidenceChain } from './evidence-chain.js';
+export type { EvidenceQuery, EvidenceEntry } from './evidence-chain.js';
+
+// Cron Utilities
+export { matchCronField, getZonedDateParts, matchesCron } from './src/cron-utils.js';
+export type { ZonedDateParts } from './src/cron-utils.js';
+
+// Intent Compiler
+export { compileIntent, buildPipelineGenerationPrompt, resolveIntentToSteps } from './src/intent-compiler.js';
+export type { CompiledIntent } from './src/intent-compiler.js';
 
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';
@@ -181,6 +209,8 @@ export * from './mission-orchestration-events.js';
 export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
+export { resolveRef, handleStepError } from './src/pipeline-engine.js';
+export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
 export * from './channel-surface.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 export type * from './channel-surface-types.js';
@@ -192,6 +222,8 @@ export * from './os-app-adapters.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
 export * from './generation-scheduler.js';
+export * from './src/pipeline-scheduler.js';
+export * from './src/pipeline-preview.js';
 
 // Governance (Agent Governance Toolkit inspired)
 export * from './policy-engine.js';
@@ -206,8 +238,17 @@ export * from './shared-business-types.js';
 export * from './types.js';
 // export * as visionJudge from './vision-judge.js';
 
+// Actuator Capability Contracts (Dynamic Runtime Detection)
+export { ActuatorCapability, ActuatorStatus, checkActuatorCapabilities, checkAllActuatorCapabilities, registerCapabilityProbe } from './src/actuator-capability.js';
+
 // Pre-Flight Check (Sovereign Sentinel)
 export * from './src/pfc/PfcController.js';
 export * from './src/pfc/PhysicalLayer.js';
 export * from './src/pfc/ServiceValidator.js';
 export * from './src/pfc/SovereignSentinel.js';
+
+// Observability (Unified Trace Model)
+export { Trace, TraceSpan, TraceEvent, TraceArtifact, TraceContext } from './src/trace.js';
+
+// Feedback Loop (Closed-Loop Automation)
+export { extractHintsFromTrace, persistHints, checkScheduleHealth, recordPipelineResult, runFeedbackLoop } from './src/feedback-loop.js';
