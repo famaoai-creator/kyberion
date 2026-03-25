@@ -425,96 +425,55 @@ function loadMobileAppProfiles(): MobileAppProfileRecord[] {
   return parsed.profiles;
 }
 
-function printMobileAppProfilesSummary() {
-  printHeader();
-  const profiles = loadMobileAppProfiles();
-  console.log('Mobile app profiles\n');
-
-  if (profiles.length === 0) {
-    console.log('No shared mobile app profiles found.');
-    return;
-  }
-
-  profiles.forEach(profile => {
-    console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
-    console.log(`  ${profile.title}`);
-    console.log(`  ${profile.description}`);
-    console.log(`  ${chalk.gray(profile.path)}`);
-    if (profile.tags?.length) {
-      console.log(`  tags: ${profile.tags.join(', ')}`);
-    }
-  });
-}
-
-function printMobileAppProfile(profileId: string) {
-  const profiles = loadMobileAppProfiles();
-  const profile = profiles.find(entry => entry.id === profileId);
-  if (!profile) {
-    throw new Error(`Mobile app profile "${profileId}" not found.`);
-  }
-
-  printHeader();
-  console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
-  console.log(profile.title);
-  console.log(profile.description);
-  console.log(`Path: ${profile.path}`);
-  if (profile.tags?.length) {
-    console.log(`Tags: ${profile.tags.join(', ')}`);
-  }
-}
-
 function resolveWebAppProfileIndexPath(): string {
   return pathResolver.knowledge('public/orchestration/web-app-profiles/index.json');
 }
 
 function loadWebAppProfiles(): WebAppProfileIndexRecord[] {
   const indexPath = resolveWebAppProfileIndexPath();
-  if (!safeExistsSync(indexPath)) {
-    return [];
-  }
+  if (!safeExistsSync(indexPath)) return [];
   const content = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(content) as { profiles: WebAppProfileIndexRecord[] };
   assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
   return parsed.profiles;
 }
 
-function printWebAppProfilesSummary() {
-  printHeader();
-  const profiles = loadWebAppProfiles();
-  console.log('Web app profiles\n');
+// ─── Generic profile printer (shared by mobile + web) ──────────────────────────
+type AppProfileRecord = { id: string; platform: string; title: string; description: string; path: string; tags?: string[] };
 
+function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): void {
+  printHeader();
+  console.log(`${kind} profiles\n`);
   if (profiles.length === 0) {
-    console.log('No shared web app profiles found.');
+    console.log(`No shared ${kind.toLowerCase()} profiles found.`);
     return;
   }
-
   profiles.forEach(profile => {
     console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
     console.log(`  ${profile.title}`);
     console.log(`  ${profile.description}`);
     console.log(`  ${chalk.gray(profile.path)}`);
-    if (profile.tags?.length) {
-      console.log(`  tags: ${profile.tags.join(', ')}`);
-    }
+    if (profile.tags?.length) console.log(`  tags: ${profile.tags.join(', ')}`);
   });
 }
 
-function printWebAppProfile(profileId: string) {
-  const profiles = loadWebAppProfiles();
+function printAppProfile(profiles: AppProfileRecord[], profileId: string, kind: string): void {
   const profile = profiles.find(entry => entry.id === profileId);
-  if (!profile) {
-    throw new Error(`Web app profile "${profileId}" not found.`);
-  }
-
+  if (!profile) throw new Error(`${kind} profile "${profileId}" not found.`);
   printHeader();
   console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
   console.log(profile.title);
   console.log(profile.description);
   console.log(`Path: ${profile.path}`);
-  if (profile.tags?.length) {
-    console.log(`Tags: ${profile.tags.join(', ')}`);
-  }
+  if (profile.tags?.length) console.log(`Tags: ${profile.tags.join(', ')}`);
 }
+
+function printMobileAppProfilesSummary() { printAppProfilesSummary(loadMobileAppProfiles(), 'Mobile app'); }
+function printMobileAppProfile(profileId: string) { printAppProfile(loadMobileAppProfiles(), profileId, 'Mobile app'); }
+function printWebAppProfilesSummary() { printAppProfilesSummary(loadWebAppProfiles(), 'Web app'); }
+function printWebAppProfile(profileId: string) { printAppProfile(loadWebAppProfiles(), profileId, 'Web app'); }
+
+
 
 function printArtifactInfo(targetPath: string) {
   const resolvedPath = path.resolve(rootDir, targetPath);

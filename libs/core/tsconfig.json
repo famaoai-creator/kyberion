@@ -17,7 +17,8 @@
     "src/types/actuator-pipeline-bundle.ts",
     "src/types/system-status-brief.ts",
     "src/types/system-status-report.ts",
-    "types/**/*.ts"
+    "types/**/*.ts",
+    "adapters/**/*.ts"
   ],
   "exclude": [
     "node_modules",
