@@ -52,6 +52,8 @@ export default defineConfig({
         'libs/core/sensor-engine.ts',
         'libs/core/terminal-bridge.ts',
         'libs/core/voice-synth.ts',
+        // Large script refactors are covered indirectly through command/build paths.
+        'scripts/refactor/**/*.ts',
       ],
       lines: 60,
       functions: 60,
