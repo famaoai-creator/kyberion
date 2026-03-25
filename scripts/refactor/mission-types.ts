@@ -47,6 +47,12 @@ export type MissionRelationships = NonNullable<MissionState['relationships']>;
 
 export const BOOLEAN_FLAGS = new Set(['--ephemeral', '--refresh', '--seal', '--force', '--execute']);
 export const VALUE_FLAGS = new Set([
+  '--persona',
+  '--tenant',
+  '--tenant-id',
+  '--mission-type',
+  '--vision',
+  '--vision-ref',
   '--project-id',
   '--project-path',
   '--project-relationship',

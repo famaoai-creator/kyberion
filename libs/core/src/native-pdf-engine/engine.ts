@@ -576,7 +576,7 @@ function buildAestheticContent(
 ): string {
   let s = 'BT\n';
   for (const el of elements) {
-    if (el.type === 'text' && el.text) {
+    if ((el.type === 'text' || el.type === 'heading') && el.text) {
       const fontSize = el.fontSize || 12;
       s += `/F1 ${fontSize} Tf\n1 0 0 1 ${el.x} ${pageHeight - el.y} Tm\n`;
       s += unicode && hasNonAscii(el.text)
@@ -597,7 +597,7 @@ function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
     if (hasNonAscii(page.text || '')) return true;
   }
   for (const element of protocol.aesthetic?.elements ?? []) {
-    if (element.type === 'text' && hasNonAscii((element as any).text || '')) return true;
+    if ((element.type === 'text' || element.type === 'heading') && hasNonAscii((element as any).text || '')) return true;
   }
   return false;
 }

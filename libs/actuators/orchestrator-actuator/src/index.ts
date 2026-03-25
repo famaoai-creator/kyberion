@@ -926,11 +926,16 @@ function executeExecutionPlanSet(planSet: any) {
       } catch {
         // leave as raw string
       }
+      const reportedStatus = typeof parsed === 'object' && parsed && 'status' in (parsed as Record<string, unknown>)
+        ? String((parsed as Record<string, unknown>).status)
+        : null;
+      const succeeded = reportedStatus ? ['ok', 'success', 'succeeded', 'ready'].includes(reportedStatus) : true;
       results.push({
         id: String(job.id || 'unknown'),
         actuator,
         input_path: inputPath,
-        status: 'succeeded',
+        status: succeeded ? 'succeeded' : 'failed',
+        ...(succeeded ? {} : { error: `Actuator reported status=${reportedStatus}` }),
         output: parsed,
       });
     } catch (error: any) {

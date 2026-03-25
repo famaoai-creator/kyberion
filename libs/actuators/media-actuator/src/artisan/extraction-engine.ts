@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import * as pdfParseModule from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
@@ -92,10 +92,19 @@ export async function extract(filePath: string, mode: ExtractionMode = 'all'): P
 async function processPDF(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   // Delegate to shared pdf-utils for content/metadata extraction
   if (mode === 'content' || mode === 'metadata' || mode === 'all') {
-    const pdf = (pdfParseModule as any).default ?? (pdfParseModule as any);
-    const data = await (typeof pdf === 'function' ? pdf(buffer) : pdf.default(buffer));
-    if (mode === 'content' || mode === 'all') result.layers.content = data.text;
-    if (mode === 'metadata' || mode === 'all') result.layers.metadata = data.info;
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const data = await parser.getText();
+      if (mode === 'content' || mode === 'all') result.layers.content = data.text;
+      if (mode === 'metadata' || mode === 'all') {
+        result.layers.metadata = {
+          total: data.total,
+          pages: Array.isArray(data.pages) ? data.pages.length : undefined,
+        };
+      }
+    } finally {
+      await parser.destroy();
+    }
   }
 
   // Aesthetic uses shared pdf-utils layout analysis (via pdfjs-dist)

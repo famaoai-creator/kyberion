@@ -99,10 +99,11 @@ export async function createMission(
   }
 
   if (!isEphemeral) {
-    initMissionRepo(missionDir);
+    initMissionRepo(missionDir, upperId);
   }
 
   const missionGitHash = !isEphemeral ? getGitHash(missionDir) : 'ephemeral';
+  const missionBranch = !isEphemeral ? getCurrentBranch(missionDir) : 'ephemeral';
   const initialState: MissionState & { is_ephemeral?: boolean } = {
     mission_id: upperId,
     mission_type: missionType,
@@ -115,7 +116,7 @@ export async function createMission(
     assigned_persona: persona,
     confidence_score: 1.0,
     git: {
-      branch: 'main',
+      branch: missionBranch,
       start_commit: missionGitHash,
       latest_commit: missionGitHash,
       checkpoints: [],

@@ -472,6 +472,17 @@ describe('Native PPTX Engine', () => {
         expect(xml).not.toContain('<a:t>A < B');
       });
 
+      it('should strip invalid XML control characters from text', () => {
+        const el: PptxElement = {
+          type: 'text', pos: { x: 0, y: 0, w: 3, h: 1 },
+          text: 'A\u000fB\u001cC',
+        };
+        const xml = buildShape(el, 5);
+        expect(xml).toContain('<a:t>ABC</a:t>');
+        expect(xml).not.toContain('\u000f');
+        expect(xml).not.toContain('\u001c');
+      });
+
       it('should split newlines into multiple <a:p> paragraphs', () => {
         const el: PptxElement = {
           type: 'text', pos: { x: 0, y: 0, w: 5, h: 2 },
