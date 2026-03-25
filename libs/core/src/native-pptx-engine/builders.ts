@@ -4,6 +4,14 @@ function inToEmu(inches: number): number {
   return Math.round(inches * 914400);
 }
 
+function sanitizeXmlText(input: string): string {
+  return String(input || '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function ptToEmu(pt: number): number {
   return Math.round(pt * 12700);
 }
@@ -174,7 +182,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
         if (idx > 0) {
           pContent += `</a:p><a:p>${basePPr}`;
         }
-        const safeText = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeText = sanitizeXmlText(line);
         let textNode = `<a:t>${safeText}</a:t>`;
         if (el.placeholderType === 'sldNum') {
           textNode = `<a:fld id="{849679D9-8B75-4876-8543-01C446C42E61}" type="slidenum">${rPr}<a:pPr/><a:t>‹#›</a:t></a:fld>`;
@@ -420,7 +428,7 @@ export function buildTable(el: PptxElement, id: number): string {
       const lines = cellText.split('\n');
       let cellParagraphs = '';
       for (const ln of lines) {
-        const safeLine = ln.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLine = sanitizeXmlText(ln);
         cellParagraphs += `<a:p><a:r>${rPrXml}<a:t>${safeLine}</a:t></a:r><a:endParaRPr lang="ja-JP"/></a:p>`;
       }
 

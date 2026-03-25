@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateNativePdf } from '../engine.js';
+import { distillPdfDesign } from '../../pdf-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { pathResolver } from '../../../path-resolver.js';
@@ -73,6 +74,40 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     const t = fs.readFileSync(OUT, 'binary');
     expect(t).toContain('1 0 0 1 123 44 Tm');
     expect(t).toContain('(PrecisePosition) Tj');
+  });
+
+  it('should distill positioned text elements back into the aesthetic layer', async () => {
+    ensureDir(OUT);
+    await generateNativePdf({
+      version: '1.0.0',
+      generatedAt: new Date().toISOString(),
+      source: { format: 'markdown', body: '' },
+      content: { pages: [{ pageNumber: 1, width: 500, height: 500, text: '' }] },
+      aesthetic: {
+        elements: [
+          { type: 'heading', x: 72, y: 88, text: 'Document Title', fontSize: 24, fontName: 'Helvetica' },
+          { type: 'text', x: 72, y: 132, text: 'Executive summary line', fontSize: 12, fontName: 'Helvetica' },
+        ],
+      },
+    } as any, OUT, { compress: false });
+
+    const design = await distillPdfDesign(OUT, { aesthetic: true });
+    expect(design.aesthetic?.elements?.length).toBeGreaterThanOrEqual(2);
+    expect(design.aesthetic?.fonts).toContain('F1');
+    expect(design.aesthetic?.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'heading',
+          text: 'Document Title',
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
+        expect.objectContaining({
+          type: 'text',
+          text: 'Executive summary line',
+        }),
+      ]),
+    );
   });
 
   // ── P1-1: XMP Metadata Stream ────────────────────────────
@@ -149,6 +184,19 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('/Type /ObjStm');
     expect(t).toContain('/W [1 4 2]');
     expect(t).toContain('%%EOF');
+  });
+
+  it('should distill text from PDFs that use object streams', async () => {
+    ensureDir(OUT);
+    await generateNativePdf({
+      version: '1.0.0',
+      generatedAt: new Date().toISOString(),
+      source: { format: 'markdown', body: 'Object stream extraction test', title: 'ObjStm Extract' },
+    } as any, OUT, { compress: true, objectStreams: true });
+
+    const design = await distillPdfDesign(OUT, { aesthetic: true });
+    expect(design.content?.text).toContain('Object stream extraction test');
+    expect(design.metadata?.pageCount).toBeGreaterThanOrEqual(1);
   });
 
   // ── P1-5: Page Labels ────────────────────────────────────
