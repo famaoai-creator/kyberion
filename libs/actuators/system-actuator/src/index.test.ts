@@ -76,6 +76,22 @@ vi.mock('@agent/shared-vision', () => ({
   consultVision: vi.fn(async () => ({ decision: 'ok' })),
 }));
 
+const originalPlatform = process.platform;
+
+function mockDarwinPlatform() {
+  Object.defineProperty(process, 'platform', {
+    value: 'darwin',
+    configurable: true,
+  });
+}
+
+function restorePlatform() {
+  Object.defineProperty(process, 'platform', {
+    value: originalPlatform,
+    configurable: true,
+  });
+}
+
 describe('system-actuator computer_interaction adapter', () => {
   it('detects the currently focused input element', async () => {
     const { handleAction } = await import('./index');
@@ -118,6 +134,7 @@ describe('system-actuator computer_interaction adapter', () => {
   });
 
   it('activates an application before keyboard input when target.application is present', async () => {
+    mockDarwinPlatform();
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
 
@@ -135,9 +152,12 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Safari" to activate']);
+
+    restorePlatform();
   });
 
   it('supports explicit activate_application actions', async () => {
+    mockDarwinPlatform();
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
 
@@ -151,6 +171,8 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Finder" to activate']);
+
+    restorePlatform();
   });
 
   it('submits the focused input with enter', async () => {
