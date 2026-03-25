@@ -161,6 +161,7 @@ export * from './agent-mediator.js';
 export * from './acp-mediator.js';
 export * from './agent-adapter.js';
 
+
 // Agent Registry & Lifecycle
 export * from './agent-registry.js';
 export * from './agent-lifecycle.js';
@@ -181,6 +182,9 @@ export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './pipeline-contract.js';
 export * from './channel-surface.js';
+// Surface-level type definitions (importable without pulling in channel-surface implementation)
+export type * from './channel-surface-types.js';
+
 export * from './presence-surface.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
