@@ -17,6 +17,12 @@ export type TierLevel = 'personal' | 'confidential' | 'public';
 /** Alias kept for backward compatibility with earlier type exports. */
 export type KnowledgeTier = TierLevel;
 
+/** Scoped tier with optional project isolation (multi-tenant). */
+export interface TierScope {
+  tier: TierLevel;
+  project?: string;   // e.g. 'canton-node', 'client-a'
+}
+
 /** Numeric weight map for tier comparison (higher = more sensitive). */
 export type TierWeightMap = Record<TierLevel, number>;
 

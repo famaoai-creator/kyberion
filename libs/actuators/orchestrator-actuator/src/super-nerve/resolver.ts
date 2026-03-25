@@ -1,25 +1,17 @@
-import { logger, safeReadFile } from '@agent/core';
-import * as path from 'node:path';
+import { compileIntent, logger } from '@agent/core';
 import { executeSuperPipeline } from './index.js';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
+ * Delegates to the canonical intent-compiler in @agent/core.
  */
 
 export async function resolveIntentToSteps(intentId: string): Promise<any[]> {
-  const dictionaryPath = path.resolve(process.cwd(), 'knowledge/governance/standard-intents.json');
-  const dictionary = JSON.parse(safeReadFile(dictionaryPath, { encoding: 'utf8' }) as string);
-
-  const intent = dictionary.intents.find((i: any) => i.id === intentId);
-  if (!intent) {
-    const fuzzyMatch = dictionary.intents.find((i: any) => i.trigger_keywords?.some((k: string) => intentId.toLowerCase().includes(k.toLowerCase())));
-    if (!fuzzyMatch) throw new Error(`Intent not recognized: ${intentId}`);
-    logger.info(`🔍 [RESOLVER] Fuzzy matched intent: ${fuzzyMatch.id}`);
-    return fuzzyMatch.pipeline;
+  const result = compileIntent(intentId);
+  if (!result || result.steps.length === 0) {
+    throw new Error(`Intent not resolved: ${intentId}`);
   }
-
-  logger.info(`🎯 [RESOLVER] Resolved intent: ${intent.id}`);
-  return intent.pipeline;
+  return result.steps;
 }
 
 export async function resolveAndExecuteIntent(intentId: string, initialContext: any = {}, options: any = {}) {

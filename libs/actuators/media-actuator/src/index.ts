@@ -16,6 +16,8 @@ import {
   generateNativeXlsx,
   generateNativeDocx,
   generateNativePdf,
+  resolveRef,
+  handleStepError,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -197,12 +199,43 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
         case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
         case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
         case 'apply': ctx = await opApply(step.op, step.params, ctx, resolve); break;
+        case 'control': {
+          if (step.op === 'ref') {
+            const refPath = resolve(step.params.path);
+            const bindResolved: Record<string, any> = {};
+            if (step.params.bind) {
+              for (const [k, v] of Object.entries(step.params.bind as Record<string, any>)) {
+                bindResolved[k] = resolve(v);
+              }
+            }
+            const refResult = await resolveRef(refPath, bindResolved, ctx, resolve);
+            const subResult = await executePipeline(refResult.steps, { ...ctx, ...refResult.mergedCtx }, options, state);
+            const { _refDepth, ...subCtxClean } = subResult.context || {};
+            ctx = { ...ctx, ...subCtxClean };
+          }
+          break;
+        }
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
+      const stepOnError = (step as any).on_error;
+      if (stepOnError) {
+        try {
+          const recovery = await handleStepError(err, step, stepOnError, ctx,
+            async (fallbackSteps: any[], errCtx: any) => {
+              const res = await executePipeline(fallbackSteps, errCtx, options, state);
+              return res.context;
+            }, resolve);
+          if (recovery.recovered) {
+            ctx = recovery.ctx;
+            results.push({ op: step.op, status: 'recovered' as any });
+            continue;
+          }
+        } catch (_) { /* fallthrough to default error handling */ }
+      }
       logger.error(`  [MEDIA_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
-      break; 
+      break;
     }
   }
 

@@ -172,7 +172,7 @@ Suggested policy direction:
 
 Canonical schema:
 
-- [`secret-mutation-approval.schema.json`](/Users/famao/kyberion/schemas/secret-mutation-approval.schema.json)
+- [`secret-mutation-approval.schema.json`](../../../schemas/secret-mutation-approval.schema.json)
 
 This schema is the durable contract for:
 
