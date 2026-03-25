@@ -12,6 +12,22 @@ vi.mock('./apple-event-bridge.js', async () => {
   };
 });
 
+const originalPlatform = process.platform;
+
+function mockDarwinPlatform() {
+  Object.defineProperty(process, 'platform', {
+    value: 'darwin',
+    configurable: true,
+  });
+}
+
+function restorePlatform() {
+  Object.defineProperty(process, 'platform', {
+    value: originalPlatform,
+    configurable: true,
+  });
+}
+
 describe('os-app-adapters', () => {
   it('lists known app capabilities', async () => {
     const adapters = await import('./os-app-adapters.js');
@@ -19,6 +35,7 @@ describe('os-app-adapters', () => {
   });
 
   it('parses Chrome tab listings into structured rows', async () => {
+    mockDarwinPlatform();
     const secureIo = await import('./secure-io.js');
     vi.mocked(secureIo.safeExec).mockReturnValueOnce('1\nInbox\nhttps://mail.example\n2\nDocs\nhttps://docs.example');
     const adapters = await import('./os-app-adapters.js');
@@ -27,13 +44,18 @@ describe('os-app-adapters', () => {
       { index: 1, title: 'Inbox', url: 'https://mail.example' },
       { index: 2, title: 'Docs', url: 'https://docs.example' },
     ]);
+
+    restorePlatform();
   });
 
   it('activates a Chrome tab by URL fragment', async () => {
+    mockDarwinPlatform();
     const secureIo = await import('./secure-io.js');
     vi.mocked(secureIo.safeExec).mockReturnValueOnce('matched');
     const adapters = await import('./os-app-adapters.js');
     expect(adapters.activateChromeTabByUrl('docs.example')).toEqual({ matched: true });
+
+    restorePlatform();
   });
 
   it('marks iTerm2 as preferred when it owns the idle session', async () => {
