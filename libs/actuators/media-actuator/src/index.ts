@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs'; // Only for fs.statSync in render operations
 import * as excelUtils from '@agent/shared-media';
+import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol.js';
+import { PDFParse } from 'pdf-parse';
 
 /**
  * Media-Actuator v2.1.3 [SECURE-IO REINFORCED]
@@ -272,7 +274,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'pdf_extract': {
       const pdfPath = path.resolve(rootDir, resolve(params.path));
-      const pdfDesign = await distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
+      let pdfDesign = await distillPdfDesign(pdfPath, { aesthetic: params.aesthetic !== false });
+      try {
+        const extractedText = await extractCleanerPdfText(pdfPath);
+        pdfDesign = mergeCleanerPdfText(pdfDesign, extractedText);
+      } catch (error: any) {
+        logger.warn(`[MEDIA_CAPTURE] pdf_extract cleaner text fallback unavailable: ${error.message}`);
+      }
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
     }
     default: return ctx;
@@ -282,6 +290,17 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = process.cwd();
   switch (op) {
+    case 'pdf_to_pptx_design': {
+      const pdfDesign = ctx[params.from || 'last_pdf_design'];
+      if (!pdfDesign || typeof pdfDesign !== 'object') {
+        throw new Error(`pdf_to_pptx_design could not find context key: ${params.from || 'last_pdf_design'}`);
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_pptx_design']: buildPptxProtocolFromPdfDesign(pdfDesign as PdfDesignProtocol),
+        merged_output_format: 'pptx',
+      };
+    }
     case 'apply_theme': {
       const themesPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json');
       if (!safeExistsSync(themesPath)) {
@@ -609,7 +628,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'pptx_render': {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
 
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
 
@@ -634,7 +653,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'xlsx_render': {
       const xlsxProtocol = ctx[params.design_from || 'last_xlsx_design'];
-      const xlsxOutPath = path.resolve(rootDir, resolve(params.path));
+      const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
       await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
       const xlsxStats = fs.statSync(xlsxOutPath);
@@ -643,7 +662,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'docx_render': {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
-      const docxOutPath = path.resolve(rootDir, resolve(params.path));
+      const docxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
       await generateNativeDocx(docxProtocol, docxOutPath);
       const docxStats = fs.statSync(docxOutPath);
@@ -652,7 +671,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'pdf_render': {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
-      const pdfOutPath = path.resolve(rootDir, resolve(params.path));
+      const pdfOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
       await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
       const pdfStats = fs.statSync(pdfOutPath);
@@ -1185,6 +1204,438 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
     }],
     headersFooters: [],
     relationships: [],
+  };
+}
+
+function chunkTextToBullets(input: string, maxItems = 5): string[] {
+  return String(input || '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .replace(/\/(?:Span|P|Lbl|LBody|TT\d*|C\d+_\d+)\s*<<.*?>>BDC/gs, ' ')
+    .replace(/\b(?:BDC|EMC|BT|ET|TJ|Tj|Tf|Td|Tm)\b/g, ' ')
+    .replace(/<[\dA-Fa-f]{4,}>/g, ' ')
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function splitCleanPdfTextIntoPages(input: string): Array<{ pageNumber: number; text: string }> {
+  const lines = String(input || '').split(/\n/);
+  const pages: Array<{ pageNumber: number; text: string }> = [];
+  let currentPage = 1;
+  let buffer: string[] = [];
+
+  const flush = () => {
+    const text = buffer.join('\n').trim();
+    if (text) {
+      pages.push({ pageNumber: currentPage, text });
+    }
+    buffer = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const marker = line.match(/^--\s*(\d+)\s+of\s+\d+\s*--$/);
+    if (marker) {
+      flush();
+      currentPage = Number(marker[1]) + 1;
+      continue;
+    }
+    buffer.push(rawLine);
+  }
+
+  flush();
+  return pages;
+}
+
+function buildGridPageSummary(pageText: string, maxItems = 8): string[] {
+  const rawLines = String(pageText || '')
+    .split(/\n+/)
+    .map((line) => line.replace(/\r/g, '').trim())
+    .filter(Boolean);
+
+  const skipExact = new Set([
+    'カテゴリ',
+    '選択肢',
+    '回答方法',
+    '質問文',
+    'タイミング',
+    '（1/2）',
+    '（2/2）',
+    '(参考)プログラム内容や運営への学び・改善点 各セッション メンティー向け',
+    '(参考)プログラム内容や運営への学び・改善点 各セッション 人事担当者向け',
+    '(参考)プログラム内容や運営への学び・改善点 全体 人事担当者向け',
+  ]);
+
+  const transientPattern = /^(?:\d+|✓|自由回答|1~[256]|1~5|\+|\/|Skill-?|input|Ment|oring|#\d+|キック|オフ後|クロー|ジン|グ後|タイミング|カテゴリ|選択肢|回答方法|質問文|後)$/;
+  const continuationPattern = /^(?:どの|程度|ですか|すか|そう答えた理由|ください|ない|役立つ|感じた|感じなかった|自由回答|✓|1~[256]|1~5|\+|\/|次の|本日の|また、|（|大変満足|かなり達成)/;
+
+  const mergedLines: string[] = [];
+  for (const raw of rawLines) {
+    const line = raw.replace(/\t+/g, '\t').replace(/[ ]{2,}/g, ' ').trim();
+    if (!line) continue;
+
+    const prev = mergedLines[mergedLines.length - 1];
+    const isContinuation =
+      prev &&
+      (
+        !prev.includes('。') &&
+        !prev.includes('？') &&
+        !prev.includes('?') &&
+        (line.length <= 14 || continuationPattern.test(line))
+      );
+
+    if (isContinuation) {
+      mergedLines[mergedLines.length - 1] = `${prev} ${line}`.replace(/\s+/g, ' ').trim();
+    } else {
+      mergedLines.push(line);
+    }
+  }
+
+  const summaries: string[] = [];
+  for (const raw of mergedLines) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line || skipExact.has(line)) continue;
+    if (line.includes('G=G') || line.includes('FúFÔ')) continue;
+    if (!/[\u3040-\u30ff\u3400-\u9fff]/.test(line)) continue;
+    if (transientPattern.test(line)) continue;
+
+    const cols = raw
+      .split('\t')
+      .map((part) => part.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .filter((part) => !skipExact.has(part))
+      .filter((part) => !transientPattern.test(part));
+
+    let summary = line;
+    if (cols.length >= 2) {
+      const question = cols.find((part) => /[。？?]|ですか|教えてください|ご記入ください|感じましたか|満足度/.test(part)) || cols[cols.length - 1];
+      const option = cols.find((part) => /(?:1~[256]|1~5|自由回答|役立つ\/特に役立たない|感じた\/感じなかった|大変満足)/.test(part));
+      const category = cols.find((part) => /(キックオフ|クロージング|メンタリング|スキルインプット|ラウンドテーブル|人事担当者|全体)/.test(part));
+      summary = [category, question, option].filter(Boolean).join(' / ');
+    }
+
+    summary = summary
+      .replace(/\s+\/\s+/g, ' / ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (summary.length < 12) continue;
+    summaries.push(summary);
+  }
+
+  return Array.from(new Set(summaries)).slice(0, maxItems);
+}
+
+function mergeCleanerPdfText(pdfDesign: PdfDesignProtocol, extractedText: string): PdfDesignProtocol {
+  const cleanText = String(extractedText || '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .replace(/\r/g, '')
+    .trim();
+  if (!cleanText) return pdfDesign;
+  const cleanedPages = splitCleanPdfTextIntoPages(cleanText).map((page, index) => {
+    const existing = pdfDesign.content?.pages?.[index];
+    return {
+      pageNumber: page.pageNumber,
+      width: existing?.width || 595,
+      height: existing?.height || 842,
+      text: page.text,
+      elements: existing?.elements,
+      images: existing?.images,
+      vectors: existing?.vectors,
+      annotations: existing?.annotations,
+      markedContent: existing?.markedContent,
+      layerName: existing?.layerName,
+    };
+  });
+  return {
+    ...pdfDesign,
+    source: {
+      ...pdfDesign.source,
+      body: cleanText,
+    },
+    content: pdfDesign.content
+      ? {
+          ...pdfDesign.content,
+          text: cleanText,
+          pages: cleanedPages.length > 0 ? cleanedPages : pdfDesign.content.pages,
+        }
+      : {
+          text: cleanText,
+          pages: cleanedPages,
+        },
+  };
+}
+
+async function extractCleanerPdfText(pdfPath: string): Promise<string> {
+  const data = safeReadFile(pdfPath, { encoding: null }) as Buffer;
+  const parser = new PDFParse({ data });
+  try {
+    const result = await parser.getText();
+    return String(result.text || '');
+  } finally {
+    await parser.destroy();
+  }
+}
+
+function isRenderablePdfElementText(text: string | undefined): boolean {
+  if (!text) return false;
+  const normalized = normalizePdfElementText(text);
+  if (!normalized) return false;
+  if (/[\u0000-\u001F]/.test(normalized)) return false;
+  if (looksLikeGarbledAscii(normalized)) return false;
+  let weirdCount = 0;
+  for (const ch of normalized) {
+    const code = ch.charCodeAt(0);
+    if ((code >= 0x80 && code <= 0x9f) || code === 0xfffd) weirdCount++;
+  }
+  return weirdCount / normalized.length < 0.15;
+}
+
+function looksLikeGarbledAscii(text: string): boolean {
+  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(text)) return false;
+  if (/\s/.test(text)) return false;
+  if (text.length < 5) return false;
+  if (/(?:G.{0,2}){3,}/.test(text)) return true;
+  if (/F[þûôóï]/.test(text)) return true;
+  return false;
+}
+
+function normalizePdfElementText(text: string | undefined): string {
+  if (!text) return '';
+  return String(text)
+    .replace(/\\([0-7]{1,3})/g, (_, octal: string) => {
+      const value = parseInt(octal, 8);
+      if (value === 0x95) return '•';
+      if (value === 0x96) return '–';
+      if (value === 0x97) return '—';
+      return String.fromCharCode(value);
+    })
+    .replace(/[\uF09F\u2022\u2023\u25E6\u2043]/g, '•')
+    .replace(/[‒–—]/g, '–')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function finalizePdfLineText(parts: string[]): string {
+  const repeatableOnce = new Set(['✓', '自由回答', '+', '/', '1~6', '1~5', '1~2', '後']);
+  const tokens: string[] = [];
+  const seenRepeatable = new Set<string>();
+  for (const raw of parts) {
+    const token = normalizePdfElementText(raw);
+    if (!token) continue;
+    if (tokens[tokens.length - 1] === token) continue;
+    if (repeatableOnce.has(token)) {
+      if (seenRepeatable.has(token)) continue;
+      seenRepeatable.add(token);
+    }
+    tokens.push(token);
+  }
+
+  return tokens
+    .join(' ')
+    .replace(/\s+([,.;:、。])/g, '$1')
+    .replace(/•\s+/g, '• ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isRenderablePdfLineText(text: string): boolean {
+  if (!text) return false;
+  if (looksLikeGarbledAscii(text)) return false;
+  if (/[F][þûôóï]/.test(text)) return false;
+  if (/G[=;Q9T][A-Za-z0-9ŠVGx]+/.test(text)) return false;
+  const japaneseCount = (text.match(/[\u3040-\u30ff\u3400-\u9fff]/g) || []).length;
+  const symbolCount = (text.match(/[✓•+\/]/g) || []).length;
+  if (japaneseCount === 0 && symbolCount >= 3) return false;
+  return true;
+}
+
+function buildRenderablePdfLines(page: any) {
+  const pageElements = Array.isArray(page?.elements) ? page.elements : [];
+  const sorted = pageElements
+    .filter((element: any) => (element.type === 'text' || element.type === 'heading') && isRenderablePdfElementText(element.text))
+    .map((element: any) => ({
+      ...element,
+      text: normalizePdfElementText(element.text),
+    }))
+    .filter((element: any) => element.text)
+    .sort((a: any, b: any) => (a.y - b.y) || (a.x - b.x));
+
+  const lines: any[] = [];
+  for (const element of sorted) {
+    const previous = lines[lines.length - 1];
+    const tolerance = Math.max(4, (element.fontSize || 12) * 0.45);
+    if (!previous || Math.abs(previous.y - element.y) > tolerance) {
+      lines.push({
+        y: element.y,
+        x: element.x,
+        width: element.width || 0,
+        height: element.height || 0,
+        fontSize: element.fontSize || 12,
+        type: element.type,
+        parts: [element],
+      });
+      continue;
+    }
+
+    previous.parts.push(element);
+    previous.y = Math.min(previous.y, element.y);
+    previous.x = Math.min(previous.x, element.x);
+    previous.width = Math.max(previous.width, (element.x + (element.width || 0)) - previous.x);
+    previous.height = Math.max(previous.height, element.height || 0);
+    previous.fontSize = Math.max(previous.fontSize, element.fontSize || 12);
+    if (element.type === 'heading') previous.type = 'heading';
+  }
+
+  return lines
+    .map((line) => {
+      const text = finalizePdfLineText(
+        line.parts
+        .sort((a: any, b: any) => a.x - b.x)
+        .map((part: any) => part.text),
+      );
+      return { ...line, text };
+    })
+    .filter((line) => line.text && line.text.length >= 2)
+    .filter((line) => isRenderablePdfLineText(line.text))
+    .filter((line) => {
+      const normalized = line.text.replace(/\s+/g, '');
+      return !/^[0-9]+$/.test(normalized) || line.type === 'heading';
+    });
+}
+
+function isGridLikePdfPage(page: any): boolean {
+  const pageElements = Array.isArray(page?.elements) ? page.elements : [];
+  if (pageElements.length < 60) return false;
+
+  const xBuckets = new Set(pageElements.map((element: any) => Math.round((element.x || 0) / 20)));
+  const undefinedFontCount = pageElements.filter((element: any) => !element.fontName).length;
+  const shortCount = pageElements.filter((element: any) => normalizePdfElementText(element.text).length <= 4).length;
+  const shortRatio = pageElements.length > 0 ? shortCount / pageElements.length : 0;
+  const undefinedFontRatio = pageElements.length > 0 ? undefinedFontCount / pageElements.length : 0;
+
+  return xBuckets.size >= 18 && (shortRatio > 0.35 || undefinedFontRatio > 0.2);
+}
+
+function buildPositionedSlideElementsFromPdfPage(page: any, canvas: { w: number; h: number }) {
+  const pageWidth = page?.width || 960;
+  const pageHeight = page?.height || 540;
+  if (isGridLikePdfPage(page)) return [];
+  const lines = buildRenderablePdfLines(page);
+  const noisyPage = lines.length > 0 && lines.filter((line) => line.text.length < 6).length / lines.length > 0.45;
+  if (noisyPage) return [];
+
+  return lines
+    .slice(0, 12)
+    .map((line: any, index: number) => {
+      const x = Number(((line.x / pageWidth) * canvas.w).toFixed(3));
+      const y = Number(((line.y / pageHeight) * canvas.h).toFixed(3));
+      const w = Number((Math.min(canvas.w - x - 0.2, Math.max(1.6, (line.width / pageWidth) * canvas.w))).toFixed(3));
+      const h = Number((Math.max(0.32, (line.height / pageHeight) * canvas.h)).toFixed(3));
+      const fontSize = Math.max(12, Math.min(24, Math.round((line.fontSize || 12) * 1.18)));
+      return {
+        type: 'text',
+        id: `pdf-line-${page.pageNumber || 0}-${index + 1}`,
+        pos: { x, y, w, h },
+        text: line.text,
+        style: {
+          fontSize,
+          bold: line.type === 'heading' || fontSize >= 18,
+          color: line.type === 'heading' ? '1F2937' : '334155',
+          fontFamily: 'Aptos',
+          align: 'left',
+          valign: 'top',
+        },
+      };
+    });
+}
+
+function buildPptxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol): any {
+  const title = pdfDesign.metadata?.title || pdfDesign.source?.title || 'PDF Conversion';
+  const pageTexts = Array.isArray(pdfDesign.content?.pages) ? pdfDesign.content!.pages : [];
+  const canvas = { w: 10, h: 5.625 };
+  const summaryBullets = chunkTextToBullets(
+    pageTexts.map((page) => page.text || '').join('\n').trim() || pdfDesign.content?.text || '',
+    4,
+  );
+
+  const slides = [
+    {
+      id: 'pdf-title',
+      elements: [
+        {
+          type: 'text',
+          placeholderType: 'title',
+          pos: { x: 0.7, y: 0.7, w: 8.8, h: 0.8 },
+          text: title,
+          style: { fontSize: 28, bold: true, color: '1F2937', fontFamily: 'Aptos', align: 'left' },
+        },
+        {
+          type: 'text',
+          placeholderType: 'body',
+          pos: { x: 0.9, y: 1.9, w: 8.2, h: 2.8 },
+          text: summaryBullets.length > 0 ? summaryBullets.map((item) => `• ${item}`).join('\n') : 'Converted from PDF design.',
+          style: { fontSize: 18, color: '475569', fontFamily: 'Aptos', align: 'left' },
+        },
+      ],
+    },
+    ...pageTexts.map((page, index) => {
+      const positionedElements = buildPositionedSlideElementsFromPdfPage(page, canvas);
+      const fallbackBullets = isGridLikePdfPage(page)
+        ? buildGridPageSummary(page.text || '', 8)
+        : chunkTextToBullets(page.text || '', 8);
+      return {
+        id: `pdf-page-${index + 1}`,
+        elements: positionedElements.length > 0
+          ? [
+              {
+                type: 'text',
+                placeholderType: 'title',
+                pos: { x: 0.35, y: 0.25, w: 9.1, h: 0.45 },
+                text: `Page ${page.pageNumber || index + 1}`,
+                style: { fontSize: 14, bold: true, color: '64748B', fontFamily: 'Aptos', align: 'right' },
+              },
+              ...positionedElements,
+            ]
+          : [
+              {
+                type: 'text',
+                placeholderType: 'title',
+                pos: { x: 0.7, y: 0.6, w: 8.8, h: 0.7 },
+                text: `Page ${page.pageNumber || index + 1}`,
+                style: { fontSize: 24, bold: true, color: '1F2937', fontFamily: 'Aptos', align: 'left' },
+              },
+              {
+                type: 'text',
+                placeholderType: 'body',
+                pos: { x: 0.8, y: 1.5, w: 8.4, h: 3.6 },
+                text: fallbackBullets.join('\n') || '(No extractable page text)',
+                style: { fontSize: 16, color: '334155', fontFamily: 'Aptos', align: 'left' },
+              },
+            ],
+      };
+    }),
+  ];
+
+  return {
+    version: '3.0.0',
+    generatedAt: new Date().toISOString(),
+    canvas,
+    theme: {
+      dk1: '111827',
+      dk2: '475569',
+      lt1: 'FFFFFF',
+      lt2: 'F8FAFC',
+      accent1: '2563EB',
+      accent2: '0F172A',
+    },
+    master: {
+      elements: [],
+    },
+    slides,
   };
 }
 
