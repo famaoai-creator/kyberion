@@ -1,0 +1,49 @@
+{
+  "pipeline_id": "pdf-to-pptx-conversion",
+  "version": "1.0.0",
+  "description": "Download a complex PDF and convert it to PPTX",
+  "action": "pipeline",
+  "context": {
+    "mission_id": "PDF-TO-PPTX-CONVERSION",
+    "pdf_url": "https://raw.githubusercontent.com/py-pdf/sample-files/main/complex-layout.pdf",
+    "temp_pdf": "active/shared/tmp/input.pdf",
+    "output_pptx": "active/missions/confidential/PDF-TO-PPTX-CONVERSION/evidence/output.pptx"
+  },
+  "steps": [
+    {
+      "id": "step-fetch",
+      "type": "capture",
+      "op": "network:fetch",
+      "params": {
+        "url": "{{pdf_url}}",
+        "output_path": "{{temp_pdf}}"
+      }
+    },
+    {
+      "id": "step-extract",
+      "type": "transform",
+      "op": "media:pdf_extract",
+      "params": {
+        "input_path": "{{temp_pdf}}",
+        "export_as": "pdf_content"
+      }
+    },
+    {
+      "id": "step-render",
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "content": "{{pdf_content}}",
+        "output_path": "{{output_pptx}}"
+      }
+    },
+    {
+      "id": "step-cleanup",
+      "type": "apply",
+      "op": "file:delete",
+      "params": {
+        "path": "{{temp_pdf}}"
+      }
+    }
+  ]
+}
