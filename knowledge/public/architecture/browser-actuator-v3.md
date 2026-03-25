@@ -45,7 +45,7 @@ Above these layers, Kyberion should add a provider-independent **computer intera
 - act
 - capture result
 
-See [`computer-use-runtime-model.md`](/Users/famao/kyberion/knowledge/public/architecture/computer-use-runtime-model.md).
+See [`computer-use-runtime-model.md`](computer-use-runtime-model.md).
 
 ## Why `snapshot + ref`
 

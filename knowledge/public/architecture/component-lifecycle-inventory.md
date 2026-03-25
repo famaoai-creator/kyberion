@@ -13,7 +13,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 ## Current Runtime Surface
 
-- Source of truth: [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
+- Source of truth: [global_actuator_index.json](../orchestration/global_actuator_index.json)
 - Count: 23
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
@@ -43,7 +43,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 ## Legacy Review Queue
 
-- Source of truth: [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
+- Source of truth: [legacy_component_index.json](../orchestration/legacy_component_index.json)
 - Count: 2
 
 - `daemon-actuator`: Launchd-era runtime management overlaps with surface-runtime and managed process supervision.

@@ -13,6 +13,12 @@ export interface PipelineAdfStep {
   params: Record<string, unknown>;
   id?: string;
   type?: 'capture' | 'transform' | 'apply' | 'control';
+  on_error?: {
+    strategy: 'skip' | 'abort' | 'fallback';
+    fallback?: PipelineAdfStep[];
+    ref?: string;
+    bind?: Record<string, unknown>;
+  };
 }
 
 export interface PipelineAdf {
