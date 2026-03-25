@@ -319,4 +319,49 @@ describe('orchestrator-actuator', () => {
       }),
     }));
   });
+
+  it('marks actuator jobs as failed when the actuator reports failed status in JSON', async () => {
+    mocks.safeExec.mockImplementation((command: string, args?: string[]) => {
+      if (command === 'node' && Array.isArray(args) && args[0]?.includes('media-actuator')) {
+        return JSON.stringify({ status: 'failed', results: [{ status: 'failed', error: 'SAFE_IO_VIOLATION' }] });
+      }
+      return '';
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'transform',
+          op: 'run_execution_plan_set',
+          params: {
+            from: 'execution_plan_set',
+            export_as: 'run_report',
+          },
+        },
+      ],
+      context: {
+        execution_plan_set: {
+          jobs: [
+            {
+              id: 'job-1',
+              actuator: 'media-actuator',
+              output_path: 'active/shared/tmp/failing-job.json',
+            },
+          ],
+        },
+      },
+    } as any);
+
+    expect(result.context.run_report).toEqual(expect.objectContaining({
+      status: 'partial',
+      results: [
+        expect.objectContaining({
+          status: 'failed',
+          error: 'Actuator reported status=failed',
+        }),
+      ],
+    }));
+  });
 });
