@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import type { GenerationSchedule } from './src/types/generation-schedule.js';
+import { matchesCron, getZonedDateParts } from './src/cron-utils.js';
 
 export const GENERATION_SCHEDULE_DIR = 'active/shared/runtime/media-generation/schedules';
 
@@ -44,82 +45,6 @@ export function listGenerationSchedules(): GenerationSchedule[] {
     .sort((a, b) => a.schedule_id.localeCompare(b.schedule_id));
 }
 
-function matchCronField(field: string, value: number): boolean {
-  if (field === '*') return true;
-  return field.split(',').some((token) => {
-    const trimmed = token.trim();
-    if (!trimmed) return false;
-    if (trimmed.includes('/')) {
-      const [base, stepRaw] = trimmed.split('/');
-      const step = Number(stepRaw);
-      if (!Number.isFinite(step) || step <= 0) return false;
-      if (base === '*') return value % step === 0;
-      if (base.includes('-')) {
-        const [start, end] = base.split('-').map(Number);
-        return value >= start && value <= end && (value - start) % step === 0;
-      }
-      return value === Number(base);
-    }
-    if (trimmed.includes('-')) {
-      const [start, end] = trimmed.split('-').map(Number);
-      return value >= start && value <= end;
-    }
-    return value === Number(trimmed);
-  });
-}
-
-type ZonedDateParts = {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  weekday: number;
-};
-
-function getZonedDateParts(date: Date, timezone?: string): ZonedDateParts {
-  if (!timezone) {
-    return {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-      weekday: date.getDay(),
-    };
-  }
-
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    weekday: 'short',
-  });
-  const parts = formatter.formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || '';
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  return {
-    year: Number(get('year')),
-    month: Number(get('month')),
-    day: Number(get('day')),
-    hour: Number(get('hour')),
-    minute: Number(get('minute')),
-    weekday: weekdayMap[get('weekday')] ?? date.getDay(),
-  };
-}
-
 export function isGenerationScheduleDue(schedule: GenerationSchedule, now = new Date()): boolean {
   if (!schedule.enabled) return false;
   const lastRunAt = (schedule as any).last_submitted_at || schedule.created_at;
@@ -133,19 +58,12 @@ export function isGenerationScheduleDue(schedule: GenerationSchedule, now = new 
   }
 
   if (schedule.trigger.type === 'cron') {
-    const fields = String(schedule.trigger.cron || '').trim().split(/\s+/);
-    if (fields.length !== 5) return false;
-    const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
-    const nowParts = getZonedDateParts(now, schedule.trigger.timezone);
-    const matches =
-      matchCronField(minute, nowParts.minute) &&
-      matchCronField(hour, nowParts.hour) &&
-      matchCronField(dayOfMonth, nowParts.day) &&
-      matchCronField(month, nowParts.month) &&
-      matchCronField(dayOfWeek, nowParts.weekday);
-    if (!matches) return false;
+    const cronExpr = String(schedule.trigger.cron || '');
+    if (!matchesCron(cronExpr, now, schedule.trigger.timezone)) return false;
     if (!lastRun) return true;
+    // Avoid re-triggering within the same minute
     const lastRunParts = getZonedDateParts(lastRun, schedule.trigger.timezone);
+    const nowParts = getZonedDateParts(now, schedule.trigger.timezone);
     return (
       lastRunParts.year !== nowParts.year ||
       lastRunParts.month !== nowParts.month ||

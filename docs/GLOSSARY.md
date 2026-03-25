@@ -92,6 +92,10 @@ The operational governance layer where missions, projects, phases, gates, leases
 
 The reusable layer for procedures, schemas, templates, policies, catalogs, and profiles.
 
+### KnowledgeHint
+
+Structured hint stored in `knowledge/public/procedures/hints/`. Contains topic, hint text, source, confidence score, and tags. Queryable at runtime by actuators.
+
 ### Spinal Cord
 
 The actuator layer that performs the physical work chosen by the reasoning layer.
@@ -99,6 +103,10 @@ The actuator layer that performs the physical work chosen by the reasoning layer
 ### Execution Layer
 
 The deterministic layer where actuators, pipelines, generated plans, and governed artifact output run.
+
+### Feedback Loop
+
+Automated mechanism that connects execution results (Traces) back into the knowledge layer (Hints) and schedule management. Implements closed-loop between Phase 4 (Execution) and Phase 5 (Review).
 
 ### Memory Layer
 
@@ -145,6 +153,10 @@ The mission-local and global storage model for task claims, handoffs, reviews, m
 
 The layer that decides which mission, agent, or session should handle an external request. It is distinct from raw channel ingestion and from channel feedback delivery.
 
+### OnErrorConfig
+
+Pipeline step error handling configuration. Supports `skip` (continue), `abort` (stop), and `fallback` (execute recovery steps) strategies.
+
 ### Orchestration Worker
 
 The deterministic event worker that reacts to mission control-plane events, prewarms agent runtimes, emits A2A task requests, and reconciles mission artifacts back into durable state.
@@ -164,6 +176,10 @@ A governed authenticated access contract for an external service. Service bindin
 ### Delivery Actuator
 
 An actuator that sends approved responses or UI events back to external channels. In the current model, `presence-actuator` is the primary delivery actuator for Slack-style channel feedback.
+
+### DocumentDesignProtocol
+
+Generic base type for document format design protocols. Implements a dual-layer model: semantic (editable) + raw (lossless preservation). Parameterized by format-specific semantic type.
 
 ### Artifact Actuator
 
@@ -211,9 +227,25 @@ The actuator class for local short-lived shell, OS, and file-control operations.
 
 ## Governance and storage terms
 
+### Trace / Span / Event
+
+Unified observability model inspired by OpenTelemetry. A Trace contains a tree of Spans (timed operations), each with Events (point-in-time occurrences) and Artifacts (screenshots, files).
+
+### TraceContext
+
+Mutable context for building structured execution traces during pipeline execution. Produces Trace objects with spans, events, artifacts, and knowledge references.
+
 ### Tier Isolation
 
 The rule that Personal, Confidential, and Public data must stay physically separated.
+
+### Pipeline Composability
+
+The ability to reference sub-pipelines from within a pipeline using `ref` ops, with variable binding via `bind` and error handling via `on_error`.
+
+### PipelineRef
+
+A reference to an external pipeline JSON file that can be loaded and executed as a sub-pipeline within a parent pipeline.
 
 ### Personal Tier
 

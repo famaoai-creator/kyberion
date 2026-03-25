@@ -35,7 +35,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 
 See also:
 
-- [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
-- [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
-- [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/public/architecture/component-lifecycle-inventory.md)
+- [global_actuator_index.json](knowledge/public/orchestration/global_actuator_index.json)
+- [legacy_component_index.json](knowledge/public/orchestration/legacy_component_index.json)
+- [component-lifecycle-inventory.md](knowledge/public/architecture/component-lifecycle-inventory.md)
 

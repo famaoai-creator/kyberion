@@ -284,7 +284,7 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('');
   console.log('Commands:');
   console.log('  help                 Show this help');
-  console.log('  list                 List available actuators in the global actuator index');
+  console.log('  list [--check]       List available actuators in the global actuator index (--check: runtime capability detection)');
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
   console.log('  examples <name>      List actuator-owned examples for a specific actuator');
@@ -298,6 +298,11 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  approve <id> [channel]  Approve a pending request as the current sovereign');
   console.log('  reject <id> [channel]   Reject a pending request as the current sovereign');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
+  console.log('  preview <file>       Preview a pipeline JSON and validate its steps');
+  console.log('  schedule list        List all scheduled pipelines');
+  console.log('  schedule register <id> <pipeline> <actuator> "<cron>"');
+  console.log('                       Register a new scheduled pipeline');
+  console.log('  schedule remove <id> Remove a scheduled pipeline');
   console.log('');
   console.log('Examples:');
   console.log('  npm run cli -- list');
@@ -970,6 +975,24 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'list') {
     printActuatorList(actuators);
+    const hasCheck = normalizedArgs.includes('--check');
+    if (hasCheck) {
+      const { checkAllActuatorCapabilities } = await import('@agent/core');
+      const statuses = await checkAllActuatorCapabilities();
+      console.log('\n=== Runtime Capability Check ===');
+      for (const status of statuses) {
+        const available = status.capabilities.filter(c => c.available).length;
+        const total = status.capabilities.length;
+        const icon = available === total ? '\u2705' : available > 0 ? '\u26A0\uFE0F' : '\u274C';
+        console.log(`${icon} ${status.actuatorId} (v${status.version}): ${available}/${total} ops available`);
+        for (const cap of status.capabilities) {
+          if (!cap.available) {
+            console.log(`   \u274C ${cap.op}: ${cap.reason}`);
+            if (cap.prerequisites) console.log(`      Fix: ${cap.prerequisites.join(', ')}`);
+          }
+        }
+      }
+    }
     return;
   }
 
@@ -1077,6 +1100,77 @@ export async function main(args = process.argv.slice(2)) {
   if (command === 'run') {
     runActuator(actuators, firstArg, restArgs, missionId);
     return;
+  }
+
+  if (command === 'preview') {
+    const { previewPipeline } = await import('@agent/core');
+    const filePath = firstArg;
+    if (!filePath) { console.error('Usage: pnpm cli preview <pipeline.json>'); process.exit(1); }
+    const content = safeReadFile(path.resolve(process.cwd(), filePath), { encoding: 'utf8' }) as string;
+    const pipeline = JSON.parse(content);
+    const preview = previewPipeline(pipeline);
+
+    console.log(`\n=== Pipeline Preview ===`);
+    console.log(`Valid: ${preview.valid ? '\u2705' : '\u274C'}`);
+    console.log(`Total steps: ${preview.totalSteps}`);
+    if (preview.errors.length > 0) {
+      console.log(`\nErrors:`);
+      preview.errors.forEach((e: string) => console.log(`  \u274C ${e}`));
+    }
+    if (preview.warnings.length > 0) {
+      console.log(`\nWarnings:`);
+      preview.warnings.forEach((w: string) => console.log(`  \u26A0\uFE0F  ${w}`));
+    }
+    console.log(`\nSteps:`);
+    const printStep = (step: any, indent: number = 0) => {
+      const pad = '  '.repeat(indent);
+      const warn = step.warnings?.length ? ` \u26A0\uFE0F ${step.warnings.length}` : '';
+      console.log(`${pad}${step.index + 1}. [${step.type}:${step.op}] ${step.description}${warn}`);
+      if (step.children) step.children.forEach((c: any) => printStep(c, indent + 1));
+    };
+    preview.steps.forEach((s: any) => printStep(s));
+    process.exit(preview.valid ? 0 : 1);
+  }
+
+  if (command === 'schedule') {
+    const subAction = firstArg; // register, list, remove
+    const { registerScheduledPipeline, unregisterScheduledPipeline, listScheduledPipelines } = await import('@agent/core');
+
+    if (subAction === 'list') {
+      const schedules = listScheduledPipelines();
+      if (schedules.length === 0) { console.log('No scheduled pipelines.'); }
+      else {
+        console.log(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
+        for (const s of schedules) {
+          const status = s.enabled ? '\u2705' : '\u23F8\uFE0F';
+          const trigger = s.trigger.type === 'cron' ? `cron: ${s.trigger.cron}` : `interval: ${s.trigger.intervalMs}ms`;
+          const last = s.lastRun ? ` | last: ${s.lastRun} (${s.lastStatus})` : '';
+          console.log(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
+          console.log(`   pipeline: ${s.pipelinePath}`);
+        }
+      }
+    } else if (subAction === 'register') {
+      // pnpm cli schedule register <id> <pipeline-path> <actuator> <cron>
+      const [id, pipelinePath, actuator, cron] = restArgs;
+      if (!id || !pipelinePath || !actuator || !cron) {
+        console.error('Usage: pnpm cli schedule register <id> <pipeline-path> <actuator> "<cron>"');
+        process.exit(1);
+      }
+      registerScheduledPipeline({
+        id, name: id, pipelinePath, actuator,
+        trigger: { type: 'cron', cron },
+        enabled: true,
+      });
+      console.log(`Registered: ${id} \u2192 ${pipelinePath} [${actuator}] cron: ${cron}`);
+    } else if (subAction === 'remove') {
+      const id = restArgs[0];
+      if (!id) { console.error('Usage: pnpm cli schedule remove <id>'); process.exit(1); }
+      unregisterScheduledPipeline(id);
+      console.log(`Removed: ${id}`);
+    } else {
+      console.log('Usage: pnpm cli schedule [list|register|remove]');
+    }
+    process.exit(0);
   }
 
   throw new Error(`Unknown command "${command}". Try \`npm run cli -- help\`.`);

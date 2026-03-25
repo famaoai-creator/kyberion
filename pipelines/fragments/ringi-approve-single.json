@@ -1,0 +1,13 @@
+{
+  "steps": [
+    { "id": "click-first-item", "type": "apply", "op": "click", "params": { "selector": "{{item_selector}}" } },
+    { "id": "wait-after-open", "type": "apply", "op": "wait", "params": { "duration": 5000 } },
+    { "id": "click-approve", "type": "apply", "op": "click", "params": { "selector": "{{approve_button_selector}}" } },
+    { "id": "wait-after-approve", "type": "apply", "op": "wait", "params": { "duration": 5000 } },
+    { "id": "click-ok", "type": "apply", "op": "click", "params": { "selector": "{{ok_button_selector}}" } },
+    { "id": "wait-after-ok", "type": "apply", "op": "wait", "params": { "duration": 5000 } },
+    { "id": "navigate-back", "type": "apply", "op": "navigate", "params": { "url": "{{list_url}}" } },
+    { "id": "wait-after-navigate", "type": "apply", "op": "wait", "params": { "duration": 5000 } },
+    { "id": "check-remaining", "type": "capture", "op": "evaluate", "params": { "script": "(() => document.querySelectorAll('{{item_selector}}').length)()", "export_as": "remaining_items" } }
+  ]
+}

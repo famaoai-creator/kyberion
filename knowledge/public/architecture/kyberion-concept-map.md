@@ -167,7 +167,7 @@ Internally, the system may still use:
 
 The recommended path for understanding the overall model is:
 
-1. [`docs/USER_EXPERIENCE_CONTRACT.md`](/Users/famaoai/k/a/kyberion/docs/USER_EXPERIENCE_CONTRACT.md)
-2. [`docs/COMPONENT_MAP.md`](/Users/famaoai/k/a/kyberion/docs/COMPONENT_MAP.md)
-3. [`llm-execution-boundary.md`](/Users/famaoai/k/a/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
-4. [`project-operating-system.md`](/Users/famaoai/k/a/kyberion/knowledge/public/orchestration/project-operating-system.md)
+1. [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+2. [`docs/COMPONENT_MAP.md`](../../../docs/COMPONENT_MAP.md)
+3. [`llm-execution-boundary.md`](llm-execution-boundary.md)
+4. [`project-operating-system.md`](../orchestration/project-operating-system.md)
