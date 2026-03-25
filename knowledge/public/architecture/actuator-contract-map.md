@@ -20,8 +20,8 @@ Use it when you want to answer:
 
 Read this together with:
 
-- [`actuator-op-taxonomy.md`](/Users/famao/kyberion/knowledge/public/architecture/actuator-op-taxonomy.md)
-- [`global_actuator_index.json`](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
+- [`actuator-op-taxonomy.md`](actuator-op-taxonomy.md)
+- [`global_actuator_index.json`](../orchestration/global_actuator_index.json)
 
 ## Reading Rule
 

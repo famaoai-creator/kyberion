@@ -7,9 +7,9 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveIdentityContext } from './authority.js';
-import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult, Authority } from './types.js';
+import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult, Authority, TierScope } from './types.js';
 
-export { TierLevel, TierWeightMap, TierValidation, MarkerScanResult };
+export { TierLevel, TierScope, TierWeightMap, TierValidation, MarkerScanResult };
 
 /** Numeric weight for each tier (higher = more sensitive). */
 export const TIERS: TierWeightMap = {
@@ -43,6 +43,40 @@ function loadPolicy(): any | null {
       return JSON.parse(rawReadTextFile(POLICY_PATH));
     }
   } catch (_) {}
+  return null;
+}
+
+/**
+ * Checks project-level access within the confidential tier.
+ * Returns null if no project scope restriction applies (pass-through),
+ * or a rejection result if access is denied.
+ */
+function checkProjectScope(
+  relativePath: string,
+  policy: any,
+  currentPersona: string,
+  authorities: Authority[],
+): { allowed: false; reason: string } | null {
+  if (!pathStartsWith(relativePath, 'knowledge/confidential/')) return null;
+
+  const projectMatch = relativePath.match(/^knowledge\/confidential\/([^/]+)\//);
+  if (!projectMatch) return null;
+
+  const project = projectMatch[1];
+  if (project === '_default') return null;
+
+  const projectPerms = policy.project_permissions?.[project];
+  if (!projectPerms) return null; // No project-specific rules; fall through to default tier check
+
+  const allowed =
+    projectPerms.allowed_personas?.includes(currentPersona) ||
+    projectPerms.allowed_roles?.some((r: string) => authorities.includes(r as Authority));
+  if (!allowed) {
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] Persona '${currentPersona}' is not authorized for project '${project}'.`,
+    };
+  }
   return null;
 }
 
@@ -97,6 +131,10 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, currentMission)))) {
     return { allowed: true };
   }
+
+  // Project scope check for confidential tier (before generic tier restrictions)
+  const projectDenial = checkProjectScope(relativePath, policy, currentPersona, authorities);
+  if (projectDenial) return projectDenial;
 
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
@@ -159,6 +197,10 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (['ecosystem_architect', 'sovereign'].includes(currentPersona)) {
     return { allowed: true };
   }
+
+  // Project scope check for confidential tier (before generic tier restrictions)
+  const projectDenial = checkProjectScope(relativePath, policy, currentPersona, authorities);
+  if (projectDenial) return projectDenial;
 
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };

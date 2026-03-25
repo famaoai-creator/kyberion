@@ -273,6 +273,18 @@
       "allow_write": ["active/shared/tmp/", "active/shared/exports/"]
     }
   },
+  "project_permissions": {
+    "canton-node": {
+      "description": "Canton SV Node project data",
+      "allowed_personas": ["ecosystem_architect"],
+      "allowed_roles": ["SUDO", "canton-admin"]
+    },
+    "_default": {
+      "description": "Default confidential access",
+      "allowed_personas": ["ecosystem_architect"],
+      "allowed_roles": ["SUDO"]
+    }
+  },
   "quality_requirements": {
     "require_test_success": true,
     "require_seal": false,

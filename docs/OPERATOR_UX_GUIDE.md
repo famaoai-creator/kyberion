@@ -201,6 +201,21 @@ pnpm run cli -- search browser
 pnpm run cli -- info browser-actuator
 ```
 
+### Pipeline Management
+
+```bash
+# Preview a pipeline without executing (dry-run validation)
+pnpm cli preview <pipeline.json>
+
+# Manage scheduled pipelines
+pnpm cli schedule list                              # List all scheduled pipelines
+pnpm cli schedule register <id> <path> <actuator> "<cron>"  # Register a schedule
+pnpm cli schedule remove <id>                       # Remove a schedule
+
+# Check runtime actuator capabilities
+pnpm cli list --check                               # Show which actuators are available
+```
+
 ### Mission lifecycle
 
 ```bash

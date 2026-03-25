@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus, emitComputerSurfacePatch } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -400,7 +400,13 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     action_trail: Array.isArray(initialCtx?.action_trail) ? initialCtx.action_trail : [],
     timestamp: new Date().toISOString(),
   };
-  
+
+  // Structured observability via TraceContext (additive to action_trail)
+  const traceCtx = new TraceContext(`browser-pipeline:${sessionId}`, {
+    actuator: 'browser-actuator',
+    pipelineId: sessionId,
+  });
+
   const resolveKey = (key: string): any => {
     // {{env.VAR_NAME}} → process.env.VAR_NAME
     if (key.startsWith('env.')) {
@@ -430,15 +436,21 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   };
 
   const results = [];
+  let stepIndex = 0;
   try {
     for (const step of steps) {
       state.stepCount++;
+      stepIndex++;
       if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
       if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
 
+      const spanId = traceCtx.startSpan(`${step.type}:${step.op}`, {
+        stepId: (step as any).id || `step-${stepIndex}`,
+      });
+
       try {
         logger.info(`  [BROWSER_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-        
+
         if (step.type === 'control') {
           ctx = await opControl(step.op, step.params, runtime, ctx, options, state, resolve);
         } else if (step.type === 'capture') {
@@ -450,11 +462,39 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
         } else {
           throw new Error(`Unknown step type: ${step.type}`);
         }
+
+        // Track screenshot artifacts in the trace
+        if (step.op === 'screenshot') {
+          const screenshotPath = ctx.last_screenshot || ctx[step.params?.export_as || 'last_screenshot'];
+          if (screenshotPath) {
+            traceCtx.addArtifact('screenshot', screenshotPath, (step as any).id || 'screenshot');
+          }
+        }
+
+        traceCtx.endSpan('ok');
         results.push({ op: step.op, status: 'success' });
       } catch (err: any) {
+        traceCtx.endSpan('error', err.message);
+
+        const stepOnError = (step as any).on_error;
+        if (stepOnError) {
+          try {
+            const { handleStepError } = await import('@agent/core');
+            const recovery = await handleStepError(err, step, stepOnError, ctx,
+              async (fallbackSteps: any[], errCtx: any) => {
+                const res = await executePipelineInternal(fallbackSteps, runtime, errCtx, options, state, resolve);
+                return res.context;
+              }, resolve as (val: any) => any);
+            if (recovery.recovered) {
+              ctx = recovery.ctx;
+              results.push({ op: step.op, status: 'recovered' as any });
+              continue;
+            }
+          } catch (_) { /* fallthrough to default error handling */ }
+        }
         logger.error(`  [BROWSER_PIPELINE] Step failed (${step.op}): ${err.message}`);
         results.push({ op: step.op, status: 'failed', error: err.message });
-        break; 
+        break;
       }
     }
   } finally {
@@ -522,6 +562,11 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       ctx.video_recording_pending = videoRecordingEnabled;
     }
   }
+
+  // Finalize structured trace and attach to result context
+  const trace = traceCtx.finalize();
+  ctx.trace = trace;
+  ctx.trace_summary = traceCtx.summary();
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
@@ -639,7 +684,31 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
       });
     }
 
-    default: 
+    case 'ref': {
+      const { resolveRef } = await import('@agent/core');
+      const refPath = resolve(params.path);
+      const bindResolved: Record<string, any> = {};
+      if (params.bind) {
+        for (const [k, v] of Object.entries(params.bind as Record<string, any>)) {
+          bindResolved[k] = resolve(v);
+        }
+      }
+      const refResult = await resolveRef(refPath, bindResolved, ctx, resolve as (val: any) => any);
+      const subResult = await executePipelineInternal(refResult.steps, runtime, { ...ctx, ...refResult.mergedCtx }, options, state, resolve);
+      if (params.export_as) {
+        ctx = { ...ctx, [params.export_as]: subResult.context };
+      } else {
+        const { _refDepth, ...subCtxClean } = subResult.context || {};
+        ctx = { ...ctx, ...subCtxClean };
+      }
+      return recordBrowserAction(ctx, {
+        kind: 'control',
+        op: 'ref',
+        tab_id: runtime.activeTabId,
+      });
+    }
+
+    default:
       throw new Error(`Unsupported control operator in Browser-Actuator: ${op}`);
   }
 }
@@ -665,6 +734,22 @@ async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRu
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
+      const stepOnError = (step as any).on_error;
+      if (stepOnError) {
+        try {
+          const { handleStepError } = await import('@agent/core');
+          const recovery = await handleStepError(err, step, stepOnError, ctx,
+            async (fallbackSteps: any[], errCtx: any) => {
+              const res = await executePipelineInternal(fallbackSteps, runtime, errCtx, options, state, resolve);
+              return res.context;
+            }, resolve as (val: any) => any);
+          if (recovery.recovered) {
+            ctx = recovery.ctx;
+            results.push({ op: step.op, status: 'recovered' as any });
+            continue;
+          }
+        } catch (_) { /* fallthrough to default error handling */ }
+      }
       results.push({ op: step.op, status: 'failed', error: err.message });
       break;
     }

@@ -1,0 +1,14 @@
+{
+  "steps": [
+    { "id": "check-login", "type": "capture", "op": "evaluate", "params": { "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()", "export_as": "login_status" } },
+    { "id": "login-if-needed", "type": "control", "op": "if", "params": {
+      "condition": { "from": "login_status", "operator": "eq", "value": "need_login" },
+      "then": [
+        { "type": "apply", "op": "fill", "params": { "selector": "input[name='_account']", "text": "{{login_user}}" } },
+        { "type": "apply", "op": "fill", "params": { "selector": "input[name='_password']", "text": "{{login_password}}" } },
+        { "type": "apply", "op": "click", "params": { "selector": "input.login-button, input[type='submit']" } },
+        { "type": "apply", "op": "wait", "params": { "duration": 3000 } }
+      ]
+    }}
+  ]
+}
