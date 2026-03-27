@@ -47,6 +47,14 @@
       "types": "./dist/agent-runtime-supervisor-client.d.ts",
       "default": "./dist/agent-runtime-supervisor-client.js"
     },
+    "./app-profiles": {
+      "types": "./dist/app-profiles.d.ts",
+      "default": "./dist/app-profiles.js"
+    },
+    "./artifacts": {
+      "types": "./dist/artifacts.d.ts",
+      "default": "./dist/artifacts.js"
+    },
     "./channel-surface": {
       "types": "./dist/channel-surface.d.ts",
       "default": "./dist/channel-surface.js"
