@@ -92,6 +92,22 @@
         place-items: center;
         animation: float 4.5s ease-in-out infinite;
       }
+      .avatar-media {
+        position: relative;
+        width: min(320px, 78%);
+        aspect-ratio: 1;
+        border-radius: 28px;
+        object-fit: cover;
+        border: 1px solid rgba(125, 211, 252, 0.26);
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+        z-index: 1;
+      }
+      .avatar-media.hidden {
+        display: none;
+      }
+      .avatar-media:not(.hidden) + .orb {
+        display: none;
+      }
       .expression {
         position: absolute;
         bottom: 22px;
@@ -143,6 +159,28 @@
         color: var(--muted);
         text-transform: uppercase;
         margin-bottom: 8px;
+      }
+      .chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(125,211,252,0.1);
+        border: 1px solid rgba(125,211,252,0.18);
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .capability-card {
+        display: grid;
+        gap: 12px;
+      }
+      .small {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
       }
       .row {
         display: flex;
@@ -220,6 +258,7 @@
       <div class="sub">A governed realtime surface for subtitles, expression state, transcript, and voice-channel stimuli.</div>
       <div class="grid" style="margin-top: 22px;">
         <section class="panel avatar">
+          <img class="avatar-media hidden" id="avatar-image" alt="Kyberion avatar" />
           <div class="orb"></div>
           <div class="expression" id="expression">neutral</div>
         </section>
@@ -227,12 +266,24 @@
           <div class="status"><span class="dot"></span><span id="status">ready</span></div>
           <div class="subtitle" id="subtitle">Surface ready. Send A2UI or voice stimuli.</div>
           <div class="controls">
+            <button class="button" id="ptt-toggle" type="button">Hold To Talk</button>
             <button class="button" id="native-mic-toggle" type="button">Start Native STT</button>
             <button class="button" id="mic-toggle" type="button">Start Browser STT</button>
             <select class="select" id="native-device"></select>
+            <select class="select" id="stt-backend"></select>
             <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
           </div>
           <div class="footer">This MVP uses the existing A2UI transport and the governed `voice` channel stimuli path.</div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Current Surface Agent</div>
+          <div class="capability-card" id="current-agent"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Surface Agent Catalog</div>
+          <div class="list" id="agent-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
@@ -245,23 +296,48 @@
           <div class="list" id="stimuli"></div>
         </section>
       </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Async Requests</div>
+          <div class="list" id="async-requests"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Notifications</div>
+          <div class="list" id="notifications"></div>
+        </section>
+      </div>
     </div>
     <script>
       const titleEl = document.getElementById("title");
       const updatedEl = document.getElementById("updated");
       const expressionEl = document.getElementById("expression");
+      const avatarImageEl = document.getElementById("avatar-image");
       const statusEl = document.getElementById("status");
       const subtitleEl = document.getElementById("subtitle");
       const transcriptEl = document.getElementById("transcript");
       const stimuliEl = document.getElementById("stimuli");
+      const asyncRequestsEl = document.getElementById("async-requests");
+      const notificationsEl = document.getElementById("notifications");
+      const currentAgentEl = document.getElementById("current-agent");
+      const agentCatalogEl = document.getElementById("agent-catalog");
+      const pttToggleEl = document.getElementById("ptt-toggle");
       const nativeMicToggleEl = document.getElementById("native-mic-toggle");
       const micToggleEl = document.getElementById("mic-toggle");
       const nativeDeviceEl = document.getElementById("native-device");
+      const sttBackendEl = document.getElementById("stt-backend");
       const micHintEl = document.getElementById("mic-hint");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
+      let isPushToTalkActive = false;
+      let isSpeechPlaying = false;
+      let browserFinalTranscript = "";
+      let browserInterimTranscript = "";
+      let surfaceAgentCatalog = { currentAgentId: "presence-surface-agent", current: null, agents: [] };
+      let asyncRequests = [];
+      let notifications = [];
+      let latestState = null;
 
       function makeRequestId() {
         if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -280,6 +356,30 @@
         nativeMicToggleEl.textContent = nextListening ? "Listening Natively..." : "Start Native STT";
         nativeMicToggleEl.classList.toggle("active", nextListening);
         micHintEl.textContent = hint;
+      }
+
+      function setPushToTalkState(nextActive, hint) {
+        isPushToTalkActive = nextActive;
+        pttToggleEl.textContent = nextActive ? "Release To Send" : "Hold To Talk";
+        pttToggleEl.classList.toggle("active", nextActive);
+        if (hint) micHintEl.textContent = hint;
+      }
+
+      function selectedBackend() {
+        return sttBackendEl.value || "auto";
+      }
+
+      async function stopSpeaking(reason) {
+        try {
+          await fetch("/api/voice/stop-speaking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason })
+          });
+          isSpeechPlaying = false;
+        } catch (_) {
+          // Best effort only.
+        }
       }
 
       function selectedNativeDeviceLabel() {
@@ -302,11 +402,15 @@
         if (!response.ok) {
           throw new Error(`voice ingest failed: HTTP ${response.status}`);
         }
-        return response.json();
+        const body = await response.json();
+        await loadAsyncState();
+        if (latestState) render(latestState);
+        return body;
       }
 
       async function startNativeStt() {
         const deviceLabel = selectedNativeDeviceLabel();
+        await stopSpeaking("native_ptt_barge_in");
         setNativeMicState(true, `Native STT is listening on ${deviceLabel}...`);
         try {
           const response = await fetch("/api/voice/native-listen", {
@@ -316,6 +420,7 @@
               request_id: makeRequestId(),
               locale: navigator.language || "ja-JP",
               device_id: nativeDeviceEl.value || undefined,
+              backend: selectedBackend(),
               timeout_seconds: 8
             })
           });
@@ -326,6 +431,35 @@
           setNativeMicState(false, `Native STT heard on ${deviceLabel}: ${body.stt?.text || body.replyText || "ok"} (${body.stt?.elapsed_ms || "?"}ms)`);
         } catch (error) {
           setNativeMicState(false, `Native STT failed on ${deviceLabel}: ${error.message || error}`);
+        }
+      }
+
+      async function loadSttBackends() {
+        sttBackendEl.innerHTML = "";
+        try {
+          const response = await fetch("/api/voice/stt-backends");
+          const body = await response.json();
+          if (!response.ok || !body.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          const options = [
+            { value: "auto", label: `Auto (${(body.selected || []).join(" -> ") || "none"})` },
+            { value: "server", label: `Server${body.available?.server ? "" : " (Unavailable)"}` },
+            { value: "whisper_cpp", label: `whisper.cpp${body.available?.whisperCpp ? "" : " (Unavailable)"}` },
+            { value: "native_speech", label: `Native Speech${body.available?.nativeSpeech ? "" : " (Unavailable)"}` }
+          ];
+          for (const item of options) {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            sttBackendEl.appendChild(option);
+          }
+        } catch (error) {
+          const option = document.createElement("option");
+          option.value = "auto";
+          option.textContent = `Backend load failed: ${error.message || error}`;
+          sttBackendEl.appendChild(option);
+          sttBackendEl.disabled = true;
         }
       }
 
@@ -378,7 +512,84 @@
         }
       }
 
+      function renderChips(items) {
+        if (!items || items.length === 0) return `<div class="small">None</div>`;
+        return `<div class="chips">${items.map((item) => `<span class="chip">${String(item).replace(/</g, "&lt;")}</span>`).join("")}</div>`;
+      }
+
+      function renderCurrentAgent(agentId) {
+        const current = surfaceAgentCatalog.current && surfaceAgentCatalog.current.agentId === agentId
+          ? surfaceAgentCatalog.current
+          : (surfaceAgentCatalog.agents || []).find((agent) => agent.agentId === agentId);
+        if (!current) {
+          currentAgentEl.innerHTML = `<div class="small">No surface-agent profile found for <span class="mono">${agentId || "unknown"}</span>.</div>`;
+          return;
+        }
+        currentAgentEl.innerHTML = `
+          <div>
+            <div class="row"><strong>${current.displayName}</strong><span class="mono">${current.agentId}</span></div>
+            <div class="small">${current.summary || "No summary available."}</div>
+          </div>
+          <div>
+            <div class="label">Can Do</div>
+            ${renderChips(current.capabilities || [])}
+          </div>
+          <div>
+            <div class="label">Authority Roles</div>
+            ${renderChips(current.authorityRoles || [])}
+          </div>
+          <div>
+            <div class="label">Delegates To</div>
+            ${renderChips(current.delegationTargets || [])}
+          </div>
+          <div>
+            <div class="label">Will Not Do</div>
+            ${renderChips(current.deniedActuators || [])}
+          </div>
+        `;
+      }
+
+      async function loadSurfaceAgents() {
+        try {
+          const response = await fetch("/api/surface-agents");
+          const body = await response.json();
+          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          surfaceAgentCatalog = body;
+        } catch (error) {
+          surfaceAgentCatalog = {
+            currentAgentId: "presence-surface-agent",
+            current: null,
+            agents: [{
+              agentId: "error",
+              displayName: "Catalog unavailable",
+              summary: error.message || String(error),
+              capabilities: [],
+              authorityRoles: [],
+              delegationTargets: [],
+              deniedActuators: []
+            }]
+          };
+        }
+      }
+
+      async function loadAsyncState() {
+        try {
+          const [requestsResponse, notificationsResponse] = await Promise.all([
+            fetch("/api/async-requests"),
+            fetch("/api/notifications"),
+          ]);
+          const requestsBody = await requestsResponse.json();
+          const notificationsBody = await notificationsResponse.json();
+          asyncRequests = requestsBody.items || [];
+          notifications = notificationsBody.items || [];
+        } catch (_) {
+          asyncRequests = [];
+          notifications = [];
+        }
+      }
+
       function render(state) {
+        latestState = state;
         const surface = state.surfaces["presence-studio"] || { data: {} };
         const data = surface.data || {};
         titleEl.textContent = data.title || "Presence Studio";
@@ -387,12 +598,42 @@
         statusEl.textContent = data.status || "idle";
         subtitleEl.textContent = data.subtitle || "Surface ready. Send A2UI or voice stimuli.";
 
+        const expressionKey = String(data.expression || "neutral");
+        const expressionAvatarMap = data.expressionAvatarMap && typeof data.expressionAvatarMap === "object"
+          ? data.expressionAvatarMap
+          : {};
+        const avatarPath = expressionAvatarMap[expressionKey] || data.avatarAssetPath || "";
+        if (avatarPath) {
+          avatarImageEl.src = avatarPath;
+          avatarImageEl.classList.remove("hidden");
+        } else {
+          avatarImageEl.removeAttribute("src");
+          avatarImageEl.classList.add("hidden");
+        }
+
         renderList(transcriptEl, data.transcript || [], (item) =>
           `<div class="row"><strong>${item.speaker || "speaker"}</strong><span class="mono">${(item.text || "").replace(/</g, "&lt;")}</span></div>`
         );
 
         renderList(stimuliEl, state.recentStimuli || [], (item) =>
           `<div class="label">${item.origin?.source_id || "voice"}</div><div>${item.signal?.payload || ""}</div><div class="mono">${item.ts || ""}</div>`
+        );
+
+        renderCurrentAgent(data.agentId || surfaceAgentCatalog.currentAgentId);
+        renderList(agentCatalogEl, surfaceAgentCatalog.agents || [], (agent) =>
+          `<div class="row"><strong>${agent.displayName || agent.agentId}</strong><span class="mono">${agent.agentId}</span></div>
+           <div class="small">${agent.summary || ""}</div>
+           <div style="margin-top:8px;">${renderChips(agent.capabilities || [])}</div>`
+        );
+
+        renderList(asyncRequestsEl, asyncRequests || [], (item) =>
+          `<div class="row"><strong>${item.request_id}</strong><span class="mono">${item.status}</span></div>
+           <div class="small">${item.receiver_agent_id} · ${(item.query || "").replace(/</g, "&lt;")}</div>`
+        );
+
+        renderList(notificationsEl, notifications || [], (item) =>
+          `<div class="row"><strong>${item.title || item.notification_id}</strong><span class="mono">${item.status}</span></div>
+           <div class="small">${(item.text || "").replace(/</g, "&lt;")}</div>`
         );
       }
 
@@ -404,15 +645,79 @@
 
         if (!SpeechRecognition) {
           micToggleEl.disabled = true;
+          pttToggleEl.disabled = true;
           setMicState(false, "Web Speech API is not available in this browser.");
         } else {
+          const stopBrowserRecognition = () => {
+            recognition?.stop();
+          };
+
+          const flushBrowserTranscript = async () => {
+            const transcript = `${browserFinalTranscript} ${browserInterimTranscript}`.trim();
+            browserFinalTranscript = "";
+            browserInterimTranscript = "";
+            if (!transcript) {
+              setPushToTalkState(false, "No speech detected.");
+              return;
+            }
+            setPushToTalkState(false, `Sending: ${transcript}`);
+            try {
+              await postVoiceIngress(transcript);
+              micHintEl.textContent = `Sent: ${transcript}`;
+            } catch (error) {
+              micHintEl.textContent = `STT send failed: ${error.message || error}`;
+            }
+          };
+
+          const startPushToTalk = async () => {
+            if (isPushToTalkActive || isListening) return;
+            await stopSpeaking("browser_ptt_barge_in");
+            browserFinalTranscript = "";
+            browserInterimTranscript = "";
+            recognition = new SpeechRecognition();
+            recognition.lang = navigator.language || "ja-JP";
+            recognition.interimResults = true;
+            recognition.continuous = true;
+
+            recognition.onstart = () => {
+              setPushToTalkState(true, "Hold to talk...");
+            };
+
+            recognition.onresult = (event) => {
+              let finals = "";
+              let interim = "";
+              for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                const part = event.results[index][0]?.transcript || "";
+                if (event.results[index].isFinal) finals += part;
+                else interim += part;
+              }
+              browserFinalTranscript = `${browserFinalTranscript} ${finals}`.trim();
+              browserInterimTranscript = interim.trim();
+              const preview = `${browserFinalTranscript} ${browserInterimTranscript}`.trim();
+              setPushToTalkState(true, preview ? `Listening... ${preview}` : "Listening...");
+            };
+
+            recognition.onerror = (event) => {
+              setPushToTalkState(false, `Speech recognition error: ${event.error || "unknown"}`);
+            };
+
+            recognition.onend = () => {
+              if (isPushToTalkActive) {
+                flushBrowserTranscript();
+              }
+            };
+
+            recognition.start();
+          };
+
           micToggleEl.addEventListener("click", () => {
             if (isListening) {
-              recognition?.stop();
+              stopBrowserRecognition();
               setMicState(false, "Stopping microphone...");
               return;
             }
 
+            stopSpeaking("browser_mic_barge_in");
             recognition = new SpeechRecognition();
             recognition.lang = navigator.language || "ja-JP";
             recognition.interimResults = true;
@@ -454,15 +759,60 @@
 
             recognition.start();
           });
+
+          const releasePushToTalk = () => {
+            if (!isPushToTalkActive) return;
+            stopBrowserRecognition();
+          };
+
+          pttToggleEl.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            startPushToTalk();
+          });
+          pttToggleEl.addEventListener("mouseup", releasePushToTalk);
+          pttToggleEl.addEventListener("mouseleave", releasePushToTalk);
+          pttToggleEl.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            startPushToTalk();
+          }, { passive: false });
+          pttToggleEl.addEventListener("touchend", (event) => {
+            event.preventDefault();
+            releasePushToTalk();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.code !== "Space") return;
+            if (event.repeat) return;
+            if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+            event.preventDefault();
+            startPushToTalk();
+          });
+          document.addEventListener("keyup", (event) => {
+            if (event.code !== "Space") return;
+            event.preventDefault();
+            releasePushToTalk();
+          });
         }
       }
 
-      fetch("/api/state").then((res) => res.json()).then(render);
+      Promise.all([
+        loadSurfaceAgents(),
+        loadAsyncState(),
+      ]).then(() => fetch("/api/state").then((res) => res.json()).then(render));
       const source = new EventSource("/api/stream");
       source.addEventListener("state", (event) => {
-        render(JSON.parse(event.data));
+        loadAsyncState().then(() => render(JSON.parse(event.data)));
       });
+      setInterval(() => {
+        const statePromise = latestState
+          ? Promise.resolve(latestState)
+          : fetch("/api/state").then((res) => res.json());
+        Promise.all([loadAsyncState(), statePromise])
+          .then(([, state]) => render(state))
+          .catch(() => {});
+      }, 2000);
       loadNativeInputDevices();
+      loadSttBackends();
       setupMic();
     </script>
   </body>
