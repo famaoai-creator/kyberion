@@ -4,11 +4,7 @@ import addFormats from 'ajv-formats';
 import * as path from 'node:path';
 import {
   appendGovernedArtifactJsonl,
-  createApprovalRequest,
-  decideApprovalRequest,
-  listApprovalRequests,
   listGovernedArtifacts,
-  loadApprovalRequest,
   pathResolver,
   readGovernedArtifactJson,
   safeExistsSync,
@@ -16,6 +12,7 @@ import {
   safeRmSync,
   writeGovernedArtifactJson,
 } from '@agent/core';
+import { createApprovalRequest, decideApprovalRequest, listApprovalRequests, loadApprovalRequest } from '@agent/core/governance';
 
 const rootDir = process.cwd();
 

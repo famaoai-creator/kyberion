@@ -103,6 +103,7 @@ export type {
   XlsxMergeCell,
   XlsxWorksheet,
 } from './src/types/xlsx-protocol.js';
+export type { PdfDesignProtocol, PdfAesthetic, PdfLayoutElement, PdfPage } from './src/types/pdf-protocol.js';
 
 // Document Design Protocol (Generic Base)
 export type {

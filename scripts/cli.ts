@@ -1,6 +1,4 @@
 import {
-  decideApprovalRequest,
-  listApprovalRequests,
   logger,
   pathResolver,
   safeExistsSync,
@@ -12,6 +10,7 @@ import {
   assertValidMobileAppProfileIndex,
   assertValidWebAppProfileIndex,
 } from '@agent/core';
+import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import type { MobileAppProfileIndex } from '@agent/core';
 import * as path from 'node:path';
 import * as os from 'node:os';

@@ -88,6 +88,11 @@ function matchesAny(relativePath: string, patterns: string[] = [], missionId?: s
   return patterns.some((p) => pathStartsWith(relativePath, expandMissionPath(p, missionId)));
 }
 
+function hasScopedSudoAccess(relativePath: string, sudoScope?: string[]): boolean {
+  if (!sudoScope || sudoScope.length === 0) return true;
+  return sudoScope.some((scope) => pathStartsWith(relativePath, scope));
+}
+
 function hasAuthorityAccess(
   policy: any,
   authorities: Authority[],
@@ -112,14 +117,14 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const { persona: currentPersona, role: currentRole, authorities } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope } = resolveIdentityContext();
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
   const defaultAllow = (policy.default_allow || []).map((p: string) => expandMissionPath(p, currentMission));
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
-  if (authorities.includes('SUDO')) return { allowed: true };
+  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write')) return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
@@ -180,9 +185,9 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
-  const { persona: currentPersona, role: currentRole, authorities } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope } = resolveIdentityContext();
 
-  if (authorities.includes('SUDO')) return { allowed: true };
+  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read')) return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write')) return { allowed: true };
 
@@ -193,10 +198,6 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const personaRules = policy.persona_permissions?.[currentPersona];
   if (personaRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
   if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
-
-  if (['ecosystem_architect', 'sovereign'].includes(currentPersona)) {
-    return { allowed: true };
-  }
 
   // Project scope check for confidential tier (before generic tier restrictions)
   const projectDenial = checkProjectScope(relativePath, policy, currentPersona, authorities);

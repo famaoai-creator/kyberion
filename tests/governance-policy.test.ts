@@ -1,5 +1,6 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { validateWritePermission, validateReadPermission, safeWriteFile, safeUnlinkSync, safeExistsSync, pathResolver } from '@agent/core';
+import { describe, it, expect, afterAll, afterEach } from 'vitest';
+import { safeWriteFile, safeUnlinkSync, safeExistsSync, pathResolver } from '@agent/core';
+import { validateWritePermission, validateReadPermission } from '@agent/core/governance';
 import * as path from 'node:path';
 
 describe('Governance Policy-as-Code Enforcement', () => {
@@ -144,5 +145,36 @@ describe('Read Permission Control (validateReadPermission)', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const result = validateReadPermission(file);
     expect(result.allowed).toBe(true);
+  });
+});
+
+describe('Scoped SUDO enforcement', () => {
+  const originalPersona = process.env.KYBERION_PERSONA;
+  const originalRole = process.env.MISSION_ROLE;
+  const originalSudo = process.env.KYBERION_SUDO;
+  const originalSudoScope = process.env.KYBERION_SUDO_SCOPE;
+
+  afterEach(() => {
+    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = originalPersona;
+    if (originalRole === undefined) delete process.env.MISSION_ROLE;
+    else process.env.MISSION_ROLE = originalRole;
+    if (originalSudo === undefined) delete process.env.KYBERION_SUDO;
+    else process.env.KYBERION_SUDO = originalSudo;
+    if (originalSudoScope === undefined) delete process.env.KYBERION_SUDO_SCOPE;
+    else process.env.KYBERION_SUDO_SCOPE = originalSudoScope;
+  });
+
+  it('limits SUDO writes to configured scope when scope is present', () => {
+    process.env.KYBERION_PERSONA = 'unknown';
+    process.env.MISSION_ROLE = 'unknown_intruder';
+    process.env.KYBERION_SUDO = 'true';
+    process.env.KYBERION_SUDO_SCOPE = 'active/shared/tmp/';
+
+    const allowed = validateWritePermission(pathResolver.sharedTmp('scoped-sudo.txt'));
+    const blocked = validateWritePermission(pathResolver.knowledge('public/scoped-sudo-blocked.md'));
+
+    expect(allowed.allowed).toBe(true);
+    expect(blocked.allowed).toBe(false);
   });
 });
