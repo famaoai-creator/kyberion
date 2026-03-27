@@ -5,9 +5,7 @@
 
 import * as path from 'node:path';
 import {
-  detectTier,
   findMissionPath,
-  hasAuthority,
   logger,
   missionDir as resolveMissionDir,
   pathResolver,
@@ -17,6 +15,7 @@ import {
   safeWriteFile,
   withLock,
 } from '@agent/core';
+import { hasAuthority, detectTier } from '@agent/core/governance';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 
 export function assertCanGrantMissionAuthority(): void {

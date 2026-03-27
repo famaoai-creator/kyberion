@@ -1,12 +1,10 @@
 import {
-  createApprovalRequest,
   createStandardYargs,
-  decideApprovalRequest,
   listGovernedArtifacts,
-  loadApprovalRequest,
   logger,
   safeReadFile,
 } from '@agent/core';
+import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import type {
   ApprovalJustification,
   ApprovalRequesterContext,
