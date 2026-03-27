@@ -5,13 +5,13 @@ import {
   missionDir, 
   missionEvidenceDir, 
   findMissionPath,
-  detectTier,
   ledger,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync
 } from '@agent/core';
+import { detectTier } from '@agent/core/governance';
 
 describe('Tiered Mission Architecture', () => {
   const TEST_MISSION_ID = 'TEST-MSN-TIER-999';

@@ -22,8 +22,56 @@
   },
   "persona_permissions": {
     "sovereign": {
-      "allow_read": ["/"],
-      "allow_write": ["/"]
+      "allow_read": [
+        ".git/",
+        "active/",
+        "docs/",
+        "knowledge/",
+        "libs/",
+        "pipelines/",
+        "plugins/",
+        "presence/",
+        "satellites/",
+        "schemas/",
+        "scripts/",
+        "tests/",
+        "vault/",
+        "work/",
+        "README.md",
+        "CAPABILITIES_GUIDE.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "tsconfig.actuators.json",
+        "vitest.config.mts"
+      ],
+      "allow_write": [
+        ".git/",
+        "active/",
+        "docs/",
+        "knowledge/",
+        "libs/",
+        "pipelines/",
+        "plugins/",
+        "presence/",
+        "satellites/",
+        "schemas/",
+        "scripts/",
+        "tests/",
+        "vault/",
+        "work/",
+        "README.md",
+        "CAPABILITIES_GUIDE.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "tsconfig.actuators.json",
+        "vitest.config.mts"
+      ]
     },
     "ecosystem_architect": {
       "allow_read": [

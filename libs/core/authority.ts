@@ -97,6 +97,16 @@ export function withExecutionContext<T>(role: string, fn: () => T, persona?: Per
   }
 }
 
+function resolveSudoScope(): string[] | undefined {
+  const raw = process.env.KYBERION_SUDO_SCOPE;
+  if (!raw) return undefined;
+  const scopes = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return scopes.length > 0 ? scopes : undefined;
+}
+
 export function resolveIdentityContext(): IdentityContext {
   const missionId = process.env.MISSION_ID;
   const envPersona = process.env.KYBERION_PERSONA;
@@ -131,7 +141,7 @@ export function resolveIdentityContext(): IdentityContext {
   
   // A. Persona-based intrinsic authorities
   if (persona === 'sovereign' || persona === 'ecosystem_architect') {
-    authorities.push('SUDO', 'GIT_WRITE', 'SECRET_READ', 'NETWORK_FETCH', 'SYSTEM_EXEC', 'KNOWLEDGE_WRITE');
+    authorities.push('GIT_WRITE', 'SECRET_READ', 'NETWORK_FETCH', 'SYSTEM_EXEC', 'KNOWLEDGE_WRITE');
   }
 
   // B. Temporal Grants (Role-based)
@@ -159,7 +169,8 @@ export function resolveIdentityContext(): IdentityContext {
     persona,
     authorities: Array.from(new Set(authorities)),
     missionId,
-    role: envRole
+    role: envRole,
+    sudoScope: resolveSudoScope(),
   };
 }
 

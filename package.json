@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "test": "vitest run tests/smoke.test.ts",
-    "test:unit": "vitest run libs/core/",
+    "test:unit": "vitest run libs/core/ libs/actuators/",
     "test:core": "vitest run libs/core/",
     "test:integration": "vitest run tests/smoke.test.ts",
     "test:coverage": "vitest run --coverage",

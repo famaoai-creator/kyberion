@@ -5,6 +5,8 @@ describe('resolveIdentityContext', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
   const originalRole = process.env.MISSION_ROLE;
   const originalMissionId = process.env.MISSION_ID;
+  const originalSudo = process.env.KYBERION_SUDO;
+  const originalSudoScope = process.env.KYBERION_SUDO_SCOPE;
 
   afterEach(() => {
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -13,6 +15,10 @@ describe('resolveIdentityContext', () => {
     else process.env.MISSION_ROLE = originalRole;
     if (originalMissionId === undefined) delete process.env.MISSION_ID;
     else process.env.MISSION_ID = originalMissionId;
+    if (originalSudo === undefined) delete process.env.KYBERION_SUDO;
+    else process.env.KYBERION_SUDO = originalSudo;
+    if (originalSudoScope === undefined) delete process.env.KYBERION_SUDO_SCOPE;
+    else process.env.KYBERION_SUDO_SCOPE = originalSudoScope;
   });
 
   it('keeps persona and authority role separate', () => {
@@ -48,6 +54,32 @@ describe('resolveIdentityContext', () => {
     expect(env.MISSION_ROLE).toBe('sovereign_concierge');
     expect(env.KYBERION_PERSONA).toBe('sovereign');
     expect(inferPersonaFromRole('ruthless_auditor')).toBe('analyst');
+  });
+
+  it('does not grant SUDO intrinsically to ecosystem_architect', () => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    delete process.env.KYBERION_SUDO;
+
+    const result = resolveIdentityContext();
+    expect(result.authorities).not.toContain('SUDO');
+    expect(result.authorities).toContain('SYSTEM_EXEC');
+  });
+
+  it('grants SUDO only when explicitly requested', () => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_SUDO = 'true';
+
+    const result = resolveIdentityContext();
+    expect(result.authorities).toContain('SUDO');
+  });
+
+  it('records sudo scope when explicitly provided', () => {
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.KYBERION_SUDO = 'true';
+    process.env.KYBERION_SUDO_SCOPE = 'active/shared/tmp/,knowledge/public/';
+
+    const result = resolveIdentityContext();
+    expect(result.sudoScope).toEqual(['active/shared/tmp/', 'knowledge/public/']);
   });
 
   it('applies execution context and restores previous env', () => {

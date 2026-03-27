@@ -7,8 +7,8 @@ import {
   safeMkdir,
   safeWriteFile,
   safeExistsSync,
-  withExecutionContext,
 } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
 import * as path from 'node:path';
 
 const app = express();

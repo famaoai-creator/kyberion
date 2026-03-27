@@ -9,7 +9,7 @@ import { safeWriteFile, safeReadFile } from '@agent/core';
 import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { distillPdfDesign } from '@agent/core';
+import { distillPdfDesign } from '@agent/core/media-contracts';
 
 /**
  * doc-to-text Reborn (Digital Archaeologist)

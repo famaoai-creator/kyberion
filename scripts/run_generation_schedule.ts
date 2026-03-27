@@ -3,8 +3,6 @@ import {
   safeExistsSync,
   safeCopyFileSync,
   safeMkdir,
-  buildExecutionEnv,
-  withExecutionContext,
   listGenerationSchedules,
   registerGenerationSchedule,
   readGenerationSchedule,
@@ -12,6 +10,7 @@ import {
   markGenerationScheduleReconciled,
   isGenerationScheduleDue,
 } from '@agent/core';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { handleAction as handleMediaGenerationAction } from '../libs/actuators/media-generation-actuator/src/index.js';

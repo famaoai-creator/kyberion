@@ -1,72 +1,122 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', () => {
-  const safeExec = vi.fn(() => '');
+const safeExec = vi.fn(() => '');
+const safeReadFile = vi.fn(() => '{}');
+const safeWriteFile = vi.fn();
+const safeMkdir = vi.fn();
+const safeExistsSync = vi.fn(() => false);
+const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed');
+const activateApplication = vi.fn((application: string) => safeExec('osascript', ['-e', `tell application "${application}" to activate`]));
+const detectFocusedInput = vi.fn(() => {
+  const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
+  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
   return {
-    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
-    safeReadFile: vi.fn(() => '{}'),
-    safeWriteFile: vi.fn(),
-    safeMkdir: vi.fn(),
-    safeExistsSync: vi.fn(() => false),
-    derivePipelineStatus: vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'),
-    safeExec,
-    createStandardYargs: vi.fn(),
-    activateApplication: vi.fn((application: string) => safeExec('osascript', ['-e', `tell application "${application}" to activate`])),
-    detectFocusedInput: vi.fn(() => {
-      const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
-      const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
-      return {
-        application,
-        windowTitle,
-        role,
-        description,
-        editable: editableFlag.trim().toLowerCase() === 'true',
-      };
-    }),
-    keystrokeText: vi.fn((text: string) => safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${text}"`])),
-    pasteText: vi.fn((text: string) => safeExec('osascript', ['-e', `set the clipboard to "${text}"\ntell application "System Events" to keystroke "v" using command down`])),
-    pressKey: vi.fn((key: string) => {
-      const normalizedKey = key.trim().toLowerCase();
-      if (normalizedKey === 'enter' || normalizedKey === 'return') {
-        return safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
-      }
-      return safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${normalizedKey}"`]);
-    }),
-    clickAt: vi.fn((x: number, y: number, clickCount = 1) => {
-      for (let index = 0; index < clickCount; index += 1) {
-        safeExec('osascript', ['-e', `tell application "System Events" to click at {${x}, ${y}}`]);
-      }
-    }),
-    rightClickAt: vi.fn((x: number, y: number, clickCount = 1) => {
-      for (let index = 0; index < clickCount; index += 1) {
-        safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`]);
-      }
-    }),
-    moveMouse: vi.fn((x: number, y: number) => safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`])),
-    listKnownAppCapabilities: vi.fn(() => [
-      { application: 'Google Chrome', adapter: 'browser_tabs', capabilities: ['list_tabs', 'activate_tab_by_title'] },
-      { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
-    ]),
-    listTerminalTargets: vi.fn(() => [
-      { application: 'Terminal', supported: true, preferred: false, adapter: 'terminal', canInject: true, sessionCount: 0, sessions: [], idleSession: null },
-      { application: 'iTerm2', supported: true, preferred: true, adapter: 'iterm2', canInject: true, sessionCount: 1, sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }], idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' } },
-    ]),
-    listChromeTabs: vi.fn(() => [
-      { index: 1, title: 'Inbox', url: 'https://mail.example' },
-      { index: 2, title: 'Docs', url: 'https://docs.example' },
-    ]),
-    activateChromeTabByTitle: vi.fn((title: string) => ({ matched: title === 'Docs' })),
-    activateChromeTabByUrl: vi.fn((url: string) => ({ matched: url === 'docs.example' })),
-    closeChromeTabByTitle: vi.fn((title: string) => ({ matched: title === 'Docs' })),
-    closeChromeTabByUrl: vi.fn((url: string) => ({ matched: url === 'docs.example' })),
-    emptyFinderTrash: vi.fn(),
-    revealFinderPath: vi.fn(),
-    openFinderPath: vi.fn(),
-    emitComputerSurfacePatch: vi.fn(),
-    createApprovalRequest: vi.fn(() => ({ id: 'approval-123', status: 'pending' })),
-    loadApprovalRequest: vi.fn(() => null),
+    application,
+    windowTitle,
+    role,
+    description,
+    editable: editableFlag.trim().toLowerCase() === 'true',
   };
 });
+const keystrokeText = vi.fn((text: string) => safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${text}"`]));
+const pasteText = vi.fn((text: string) => safeExec('osascript', ['-e', `set the clipboard to "${text}"\ntell application "System Events" to keystroke "v" using command down`]));
+const pressKey = vi.fn((key: string) => {
+  const normalizedKey = key.trim().toLowerCase();
+  if (normalizedKey === 'enter' || normalizedKey === 'return') {
+    return safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
+  }
+  return safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${normalizedKey}"`]);
+});
+const clickAt = vi.fn((x: number, y: number, clickCount = 1) => {
+  for (let index = 0; index < clickCount; index += 1) {
+    safeExec('osascript', ['-e', `tell application "System Events" to click at {${x}, ${y}}`]);
+  }
+});
+const rightClickAt = vi.fn((x: number, y: number, clickCount = 1) => {
+  for (let index = 0; index < clickCount; index += 1) {
+    safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`]);
+  }
+});
+const moveMouse = vi.fn((x: number, y: number) => safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`]));
+const listKnownAppCapabilities = vi.fn(() => [
+  { application: 'Google Chrome', adapter: 'browser_tabs', capabilities: ['list_tabs', 'activate_tab_by_title'] },
+  { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
+]);
+const listTerminalTargets = vi.fn(() => [
+  { application: 'Terminal', supported: true, preferred: false, adapter: 'terminal', canInject: true, sessionCount: 0, sessions: [], idleSession: null },
+  { application: 'iTerm2', supported: true, preferred: true, adapter: 'iterm2', canInject: true, sessionCount: 1, sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }], idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' } },
+]);
+const listChromeTabs = vi.fn(() => [
+  { index: 1, title: 'Inbox', url: 'https://mail.example' },
+  { index: 2, title: 'Docs', url: 'https://docs.example' },
+]);
+const activateChromeTabByTitle = vi.fn((title: string) => ({ matched: title === 'Docs' }));
+const activateChromeTabByUrl = vi.fn((url: string) => ({ matched: url === 'docs.example' }));
+const closeChromeTabByTitle = vi.fn((title: string) => ({ matched: title === 'Docs' }));
+const closeChromeTabByUrl = vi.fn((url: string) => ({ matched: url === 'docs.example' }));
+const emptyFinderTrash = vi.fn();
+const revealFinderPath = vi.fn();
+const openFinderPath = vi.fn();
+const emitComputerSurfacePatch = vi.fn();
+const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
+const loadApprovalRequest = vi.fn(() => null);
+
+vi.mock('@agent/core', () => ({
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  derivePipelineStatus,
+  safeExec,
+  emitComputerSurfacePatch,
+  activateApplication,
+  detectFocusedInput,
+  keystrokeText,
+  pasteText,
+  pressKey,
+  clickAt,
+  rightClickAt,
+  moveMouse,
+  listKnownAppCapabilities,
+  listTerminalTargets,
+  listChromeTabs,
+  activateChromeTabByTitle,
+  activateChromeTabByUrl,
+  closeChromeTabByTitle,
+  closeChromeTabByUrl,
+  emptyFinderTrash,
+  revealFinderPath,
+  openFinderPath,
+  createApprovalRequest,
+  loadApprovalRequest,
+}));
+
+vi.mock('@agent/core/os-automation', () => ({
+  activateApplication,
+  detectFocusedInput,
+  keystrokeText,
+  pasteText,
+  pressKey,
+  clickAt,
+  rightClickAt,
+  moveMouse,
+  listKnownAppCapabilities,
+  listTerminalTargets,
+  listChromeTabs,
+  activateChromeTabByTitle,
+  activateChromeTabByUrl,
+  closeChromeTabByTitle,
+  closeChromeTabByUrl,
+  emptyFinderTrash,
+  revealFinderPath,
+  openFinderPath,
+}));
+
+vi.mock('@agent/core/governance', () => ({
+  createApprovalRequest,
+  loadApprovalRequest,
+}));
 
 vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),

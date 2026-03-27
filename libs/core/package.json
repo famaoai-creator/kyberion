@@ -59,6 +59,14 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
+    "./governance": {
+      "types": "./dist/governance.d.ts",
+      "default": "./dist/governance.js"
+    },
+    "./media-contracts": {
+      "types": "./dist/media-contracts.d.ts",
+      "default": "./dist/media-contracts.js"
+    },
     "./entropy-gate": {
       "types": "./dist/entropy-gate.d.ts",
       "default": "./dist/entropy-gate.js"
@@ -91,9 +99,17 @@
       "types": "./dist/network.d.ts",
       "default": "./dist/network.js"
     },
+    "./os-automation": {
+      "types": "./dist/os-automation.d.ts",
+      "default": "./dist/os-automation.js"
+    },
     "./path-resolver": {
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
+    },
+    "./pdf-protocol": {
+      "types": "./dist/src/types/pdf-protocol.d.ts",
+      "default": "./dist/src/types/pdf-protocol.js"
     },
     "./pipeline-contract": {
       "types": "./dist/pipeline-contract.d.ts",

@@ -7,6 +7,11 @@ import {
   safeExistsSync,
   derivePipelineStatus,
   emitComputerSurfacePatch,
+} from '@agent/core';
+import { randomUUID } from 'node:crypto';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import {
   activateApplication,
   detectFocusedInput,
   keystrokeText,
@@ -25,16 +30,11 @@ import {
   emptyFinderTrash,
   revealFinderPath,
   openFinderPath,
-  createApprovalRequest,
-  loadApprovalRequest,
   type FocusedInputState,
-} from '@agent/core';
-import { randomUUID } from 'node:crypto';
-import { getAllFiles } from '@agent/core/fs-utils';
-import { createStandardYargs } from '@agent/core/cli-utils';
+} from '@agent/core/os-automation';
+import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
 import * as visionJudge from '@agent/shared-vision';
 
 /**
@@ -1016,7 +1016,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   switch (op) {
     case 'shell':
       assertUnsafeShellAllowed();
-      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: safeExec(
+          process.env.SHELL || '/bin/zsh',
+          ['-lc', resolve(params.cmd)],
+          { cwd: rootDir },
+        ).trim(),
+      };
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
     case 'read_json':
