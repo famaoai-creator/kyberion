@@ -1,12 +1,13 @@
 import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding } from './index.js';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Shared Service Execution Engine v1.0
  * Allows any Actuator to leverage Adaptive Presets (API/CLI).
  */
 
-const SERVICE_ENDPOINTS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json');
+const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 
 function resolveVars(input: string, vars: Record<string, any>): string {
   return input.replace(/{{(.*?)}}/g, (_, key) => {
@@ -120,7 +121,7 @@ export async function executeServicePreset(serviceId: string, action: string, pa
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }
   
-  const preset = JSON.parse(safeReadFile(path.resolve(process.cwd(), serviceConfig.preset_path), { encoding: 'utf8' }) as string);
+  const preset = JSON.parse(safeReadFile(pathResolver.rootResolve(serviceConfig.preset_path), { encoding: 'utf8' }) as string);
   const op = preset.operations[action];
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 

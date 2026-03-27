@@ -17,6 +17,8 @@ const IGNORED_DIRS = new Set([
 const RUNTIME_ROOTS = ["scripts", "libs/actuators", "presence/displays", "satellites"];
 const TEST_ROOTS = ["tests"];
 const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>();
+const ALLOWED_SCRIPT_CANONICAL_ROOT_CWD = new Set<string>([]);
+const ALLOWED_PLUGIN_SATELLITE_CANONICAL_ROOT_CWD = new Set<string>([]);
 
 function walk(relDir: string): string[] {
   const absDir = path.join(rootDir, relDir);
@@ -104,6 +106,29 @@ function collectCorePackageSpecifiers(roots: string[]): string[] {
   return [...matches].sort((a, b) => a.localeCompare(b));
 }
 
+function findCanonicalRootAssembly(roots: string[], allowlist: Set<string>): string[] {
+  const matches: string[] = [];
+  const directAnchorPattern = /path\.(?:join|resolve)\(\s*process\.cwd\(\)\s*,\s*["'](?:active(?:\/|["'])|knowledge(?:\/|["'])|vault(?:\/|["'])|scripts(?:\/|["'])|vision(?:\/|["'])|dist\/scripts\/|work(?:\/|["'])|presence(?:\/|["']))/;
+  const rootVarPattern = /const\s+ROOT\s*=\s*process\.cwd\(\)/;
+  const canonicalLiteralPattern = /["'](?:active(?:\/|["'])|knowledge(?:\/|["'])|vault(?:\/|["'])|scripts(?:\/|["'])|vision(?:\/|["'])|dist\/scripts\/|work(?:\/|["'])|presence(?:\/|["']))/;
+
+  for (const relRoot of roots) {
+    for (const relPath of walk(relRoot)) {
+      const content = safeReadFile(path.join(rootDir, relPath), { encoding: "utf8" }) as string;
+      if (allowlist.has(relPath)) continue;
+      if (directAnchorPattern.test(content)) {
+        matches.push(relPath);
+        continue;
+      }
+      if (rootVarPattern.test(content) && canonicalLiteralPattern.test(content)) {
+        matches.push(relPath);
+      }
+    }
+  }
+
+  return matches.sort((a, b) => a.localeCompare(b));
+}
+
 describe("Package boundary contract", () => {
   it("forbids runtime imports from @agent/core/src and @agent/core/dist", () => {
     const matches = findMatches(/@agent\/core\/(?:src|dist)\//);
@@ -152,5 +177,15 @@ describe("Package boundary contract", () => {
       .filter((specifier) => specifier !== "./src" && specifier !== "./dist")
       .filter((specifier) => !exportKeys.includes(specifier));
     expect(missing).toEqual([]);
+  });
+
+  it("forbids scripts from anchoring canonical repo roots with process.cwd()", () => {
+    const matches = findCanonicalRootAssembly(["scripts"], ALLOWED_SCRIPT_CANONICAL_ROOT_CWD);
+    expect(matches).toEqual([]);
+  });
+
+  it("forbids plugins/satellites from anchoring canonical repo roots with process.cwd()", () => {
+    const matches = findCanonicalRootAssembly(["plugins", "satellites"], ALLOWED_PLUGIN_SATELLITE_CANONICAL_ROOT_CWD);
+    expect(matches).toEqual([]);
   });
 });

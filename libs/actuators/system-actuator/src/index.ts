@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   derivePipelineStatus,
   emitComputerSurfacePatch,
+  pathResolver,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -44,7 +45,7 @@ import * as visionJudge from '@agent/shared-vision';
  */
 const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
 const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
-const COMPUTER_RUNTIME_DIR = path.resolve(process.cwd(), 'active/shared/runtime/computer');
+const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
 
 function assertUnsafeShellAllowed() {
@@ -899,7 +900,7 @@ function windowTitleMatches(expected: string, actual: string, matchPolicy: 'stri
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
@@ -1012,7 +1013,7 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'shell':
       assertUnsafeShellAllowed();
@@ -1075,7 +1076,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'keyboard':
       keystrokeText(String(resolve(params.text || '{{last_capture}}')));
@@ -1137,7 +1138,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
  * Strategic Reconciliation
  */
 async function performReconcile(input: SystemAction) {
-  const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/system-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/system-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -1153,7 +1154,7 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

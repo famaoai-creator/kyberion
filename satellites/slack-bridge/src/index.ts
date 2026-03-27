@@ -1,7 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
-import * as path from 'node:path';
 import {
   logger,
+  pathResolver,
   emitChannelSurfaceEvent,
   resolveServiceBinding,
   safeAppendFileSync,
@@ -34,7 +34,7 @@ import {
  * Ingests Slack messages as GUSP v2.0 Stimuli.
  */
 
-const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
+const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const SLACK_SURFACE_AGENT_ID = 'slack-surface-agent';
 
 function recordSlackConversationOutcome(params: {
