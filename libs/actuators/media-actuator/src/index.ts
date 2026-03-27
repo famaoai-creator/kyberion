@@ -10,17 +10,19 @@ import {
   pptxUtils,
   xlsxUtils,
   docxUtils,
-  distillPdfDesign,
-  generateNativePptx,
-  patchPptxText,
-  generateNativeXlsx,
-  generateNativeDocx,
-  generateNativePdf,
   resolveRef,
   handleStepError,
-  type PdfDesignProtocol,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  distillPdfDesign,
+  generateNativeDocx,
+  generateNativePdf,
+  generateNativePptx,
+  generateNativeXlsx,
+  patchPptxText,
+  type PdfDesignProtocol,
+} from '@agent/core/media-contracts';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';

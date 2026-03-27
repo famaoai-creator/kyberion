@@ -240,7 +240,8 @@ export * from './types.js';
 // export * as visionJudge from './vision-judge.js';
 
 // Actuator Capability Contracts (Dynamic Runtime Detection)
-export { ActuatorCapability, ActuatorStatus, checkActuatorCapabilities, checkAllActuatorCapabilities, registerCapabilityProbe } from './src/actuator-capability.js';
+export { checkActuatorCapabilities, checkAllActuatorCapabilities, registerCapabilityProbe } from './src/actuator-capability.js';
+export type { ActuatorCapability, ActuatorStatus } from './src/actuator-capability.js';
 
 // Pre-Flight Check (Sovereign Sentinel)
 export * from './src/pfc/PfcController.js';
@@ -249,7 +250,8 @@ export * from './src/pfc/ServiceValidator.js';
 export * from './src/pfc/SovereignSentinel.js';
 
 // Observability (Unified Trace Model)
-export { Trace, TraceSpan, TraceEvent, TraceArtifact, TraceContext } from './src/trace.js';
+export { TraceContext } from './src/trace.js';
+export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js';
 
 // Feedback Loop (Closed-Loop Automation)
 export { extractHintsFromTrace, persistHints, checkScheduleHealth, recordPipelineResult, runFeedbackLoop } from './src/feedback-loop.js';

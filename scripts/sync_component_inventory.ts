@@ -7,8 +7,8 @@ import {
   safeReadFile,
   safeReaddir,
   safeWriteFile,
-  withExecutionContext,
 } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
 
 interface CapabilityManifest {
   actuator_id: string;

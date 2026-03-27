@@ -1,19 +1,23 @@
 import {
   createStandardYargs,
-  listGovernedArtifacts,
   logger,
   safeReadFile,
 } from '@agent/core';
-import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
+import { listGovernedArtifacts } from '@agent/core/artifacts';
+import {
+  createApprovalRequest,
+  decideApprovalRequest,
+  loadApprovalRequest,
+  type ApprovalJustification,
+  type ApprovalRequesterContext,
+  type ApprovalRequestDraft,
+  type ApprovalRiskProfile,
+  type ApprovalTargetDescriptor,
+  type ApprovalWorkflowState,
+} from '@agent/core/governance';
 import type {
-  ApprovalJustification,
-  ApprovalRequesterContext,
-  ApprovalRequestDraft,
-  ApprovalRiskProfile,
-  ApprovalTargetDescriptor,
-  ApprovalWorkflowState,
   GovernedArtifactRole,
-} from '@agent/core';
+} from '@agent/core/artifacts';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

@@ -21,6 +21,10 @@ The init wizard asks who you are. Based on your answer, it configures the ecosys
 
 ## Step 1: Setup and Build
 
+Prerequisites:
+- Node.js `22+`
+- `pnpm`
+
 ```bash
 # Clone the repository
 git clone https://github.com/famaoai-creator/kyberion.git

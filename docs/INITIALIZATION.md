@@ -6,6 +6,10 @@
 
 システムをゼロから立ち上げるための標準的なコマンド列です：
 
+前提:
+- Node.js `22+`
+- `pnpm`
+
 ```bash
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
@@ -30,6 +34,9 @@ pnpm onboard
 - **物理的変化**:
     - `node_modules/` が生成されます。
     - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
+- **前提ランタイム**:
+    - Node.js `22+` を使用してください。
+    - `.nvmrc` を使う場合は `nvm use` で repo 推奨バージョンに合わせてください。
 
 ### Stage 2: システムの具現化 (System Manifestation)
 - **実行コマンド**: `pnpm build`

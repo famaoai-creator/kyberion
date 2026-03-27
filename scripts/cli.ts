@@ -7,11 +7,10 @@ import {
   safeWriteFile,
   safeReaddir,
   safeStat,
-  assertValidMobileAppProfileIndex,
-  assertValidWebAppProfileIndex,
 } from '@agent/core';
+import { assertValidMobileAppProfileIndex, assertValidWebAppProfileIndex } from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
-import type { MobileAppProfileIndex } from '@agent/core';
+import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';

@@ -13,4 +13,17 @@ export {
   validateSovereignBoundary,
 } from './tier-guard.js';
 export { createApprovalRequest, loadApprovalRequest, decideApprovalRequest, listApprovalRequests } from './approval-store.js';
+export type {
+  ApprovalApplyResult,
+  ApprovalDecisionPayload,
+  ApprovalJustification,
+  ApprovalRecord,
+  ApprovalRequestDraft,
+  ApprovalRequestRecord,
+  ApprovalRequesterContext,
+  ApprovalRiskProfile,
+  ApprovalStage,
+  ApprovalTargetDescriptor,
+  ApprovalWorkflowState,
+} from './approval-store.js';
 export type { IdentityContext, Persona, Authority } from './types.js';
