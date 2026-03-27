@@ -14,14 +14,12 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/provider-discovery.ts',
   'libs/core/agent-lifecycle.ts',
   'libs/core/orchestrator.ts',
-  'libs/core/terminal-bridge.ts',
   'libs/core/doctor_core.ts',
   'libs/core/src/pfc/PhysicalLayer.ts',
   'libs/actuators/browser-actuator/src/index.ts',
   'libs/actuators/code-actuator/src/index.ts',
   'libs/actuators/modeling-actuator/src/index.ts',
   'libs/actuators/orchestrator-actuator/src/index.ts',
-  'libs/actuators/system-actuator/src/index.ts',
   'satellites/voice-hub/server.ts',
 ].sort((a, b) => a.localeCompare(b));
 
