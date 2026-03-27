@@ -1,6 +1,5 @@
-import { execSync } from 'node:child_process';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 
 /**
  * Terminal Bridge v4.0 (Isolated Session Protocol)
@@ -113,7 +112,7 @@ const STRATEGIES: Record<string, any> = {
         end tell
       `;
       try {
-        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
+        const result = safeExec('osascript', ['-e', script]).trim();
         if (result === 'NOT_FOUND' || !result.includes(':')) return null;
         const [winId, sessionId] = result.split(':');
         return { winId, sessionId, type: 'iTerm2' };
@@ -144,7 +143,7 @@ const STRATEGIES: Record<string, any> = {
         end tell
       `;
       try {
-        const result = execSync("osascript -e '" + script.replace(/'/g, "'\\''") + "'", { encoding: 'utf8' }).trim();
+        const result = safeExec('osascript', ['-e', script]).trim();
         return result === 'SUCCESS';
       } catch (_) { return false; }
     }
