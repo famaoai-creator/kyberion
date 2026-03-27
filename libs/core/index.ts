@@ -168,6 +168,8 @@ export * as docxUtils from './src/docx-utils.js';
 
 // Voice & Presentation
 export { say, speak } from './voice-synth.js';
+export * from './voice-stt.js';
+export * from './voice-tts-config.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal } from './reflex-terminal.js';
@@ -217,6 +219,9 @@ export * from './channel-surface.js';
 export type * from './channel-surface-types.js';
 
 export * from './presence-surface.js';
+export * from './presence-avatar.js';
+export * from './presence-bridge.js';
+export * from './surface-agent-catalog.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
 export * from './os-app-adapters.js';

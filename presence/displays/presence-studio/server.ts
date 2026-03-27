@@ -5,6 +5,11 @@ import * as path from 'node:path';
 import {
   buildPresenceSurfaceFrame,
   createPresenceVoiceStimulus,
+  getPresenceAvatarProfile,
+  getSurfaceAgentCatalogEntry,
+  listSurfaceAsyncRequests,
+  listSurfaceNotifications,
+  listSurfaceAgentCatalog,
   logger,
   pathResolver,
   safeAppendFileSync,
@@ -104,12 +109,18 @@ function getSurfaceData(surfaceId: string): Record<string, unknown> {
 
 function rebuildPresenceSurface(surfaceId: string): void {
   const data = getSurfaceData(surfaceId);
+  const avatarProfile = getPresenceAvatarProfile(typeof data.agentId === 'string' ? data.agentId : undefined);
   const messages = buildPresenceSurfaceFrame({
     surfaceId,
+    agentId: typeof data.agentId === 'string' ? data.agentId : avatarProfile.agentId,
     title: typeof data.title === 'string' ? data.title : 'Presence Studio',
     status: typeof data.status === 'string' ? data.status : 'ready',
     expression: typeof data.expression === 'string' ? data.expression : 'neutral',
     subtitle: typeof data.subtitle === 'string' ? data.subtitle : '',
+    avatarAssetPath: typeof data.avatarAssetPath === 'string' ? data.avatarAssetPath : avatarProfile.defaultAvatarAssetPath,
+    expressionAvatarMap: data.expressionAvatarMap && typeof data.expressionAvatarMap === 'object'
+      ? data.expressionAvatarMap as Record<string, string>
+      : avatarProfile.expressionAvatarMap,
     transcript: Array.isArray(data.transcript) ? data.transcript as Array<{ speaker: string; text: string }> : [],
   });
   for (const message of messages) applyA2UIMessage(message);
@@ -136,6 +147,17 @@ function clearTimeline(surfaceId: string): void {
 function applyTimelineEvent(surfaceId: string, timeline: PresenceTimelineAdf, event: PresenceTimelineAdf['events'][number]): void {
   const current = getSurfaceData(surfaceId);
   switch (event.op) {
+    case 'set_agent': {
+      const agentId = String(event.params?.agentId || 'presence-surface-agent');
+      const profile = getPresenceAvatarProfile(agentId);
+      updatePresenceSurface(surfaceId, {
+        agentId,
+        displayName: profile.displayName,
+        avatarAssetPath: profile.defaultAvatarAssetPath,
+        expressionAvatarMap: profile.expressionAvatarMap,
+      });
+      break;
+    }
     case 'set_status':
       updatePresenceSurface(surfaceId, { status: String(event.params?.value || event.params?.status || 'ready') });
       break;
@@ -196,6 +218,7 @@ function emitState(): void {
 
 function bootstrapState(): void {
   const messages = buildPresenceSurfaceFrame({
+    agentId: 'presence-surface-agent',
     title: 'Presence Studio',
     status: 'ready',
     expression: 'neutral',
@@ -222,6 +245,32 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/state', (_req, res) => {
   res.json(state);
+});
+
+app.get('/api/surface-agents', (_req, res) => {
+  const currentAgentId = typeof state.surfaces['presence-studio']?.data?.agentId === 'string'
+    ? state.surfaces['presence-studio']?.data?.agentId as string
+    : 'presence-surface-agent';
+  res.json({
+    ok: true,
+    currentAgentId,
+    current: getSurfaceAgentCatalogEntry(currentAgentId),
+    agents: listSurfaceAgentCatalog(),
+  });
+});
+
+app.get('/api/async-requests', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listSurfaceAsyncRequests('presence'),
+  });
+});
+
+app.get('/api/notifications', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listSurfaceNotifications('presence'),
+  });
 });
 
 app.get('/api/stream', (req, res) => {
@@ -308,6 +357,7 @@ app.post('/api/voice/native-listen', async (req, res) => {
       request_id: requestId,
       locale: typeof req.body?.locale === 'string' ? req.body.locale : 'ja-JP',
       device_id: typeof req.body?.device_id === 'string' ? req.body.device_id : undefined,
+      backend: typeof req.body?.backend === 'string' ? req.body.backend : undefined,
       timeout_seconds: Number.isFinite(req.body?.timeout_seconds) ? Number(req.body.timeout_seconds) : 8,
       intent: typeof req.body?.intent === 'string' ? req.body.intent : 'conversation',
       speaker: typeof req.body?.speaker === 'string' ? req.body.speaker : 'User',
@@ -326,9 +376,34 @@ app.get('/api/voice/input-devices', async (_req, res) => {
   res.status(response.status).type('application/json').send(payload);
 });
 
+app.get('/api/voice/stt-backends', async (_req, res) => {
+  const response = await fetch(`${VOICE_HUB_URL}/api/stt/backends`);
+  const payload = await response.text();
+  res.status(response.status).type('application/json').send(payload);
+});
+
+app.get('/api/voice/speech-state', async (_req, res) => {
+  const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
+  const payload = await response.text();
+  res.status(response.status).type('application/json').send(payload);
+});
+
+app.post('/api/voice/stop-speaking', async (req, res) => {
+  const response = await fetch(`${VOICE_HUB_URL}/api/stop-speaking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      reason: typeof req.body?.reason === 'string' ? req.body.reason : 'manual_stop',
+    }),
+  });
+  const payload = await response.text();
+  res.status(response.status).type('application/json').send(payload);
+});
+
 app.post('/api/demo/frame', (req, res) => {
   const messages = buildPresenceSurfaceFrame({
     surfaceId: typeof req.body?.surfaceId === 'string' ? req.body.surfaceId : 'presence-studio',
+    agentId: typeof req.body?.agentId === 'string' ? req.body.agentId : 'presence-surface-agent',
     title: typeof req.body?.title === 'string' ? req.body.title : 'Presence Studio',
     status: typeof req.body?.status === 'string' ? req.body.status : 'speaking',
     expression: typeof req.body?.expression === 'string' ? req.body.expression : 'joy',

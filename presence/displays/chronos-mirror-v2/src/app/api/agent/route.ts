@@ -40,6 +40,8 @@ async function loadChronosCore() {
     recordChronosDelegationSummary: channelSurface.recordChronosDelegationSummary,
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
     runSurfaceConversation: channelSurface.runSurfaceConversation,
+    reflectPresenceAgentReply: core.reflectPresenceAgentReply,
+    dispatchPresenceFrame: core.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
     isSlackMissionConfirmation: channelSurface.isSlackMissionConfirmation,
     ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
@@ -821,6 +823,8 @@ export async function POST(req: NextRequest) {
     const core = await loadChronosCore();
     const {
       isSlackMissionConfirmation,
+      dispatchPresenceFrame,
+      reflectPresenceAgentReply,
       recordChronosDelegationSummary,
       recordChronosSurfaceRequest,
       runSurfaceConversation,
@@ -905,6 +909,14 @@ export async function POST(req: NextRequest) {
       teamRole,
       requesterId: body.requesterId || "chronos-ui",
     });
+    await dispatchPresenceFrame({
+      agentId: CHRONOS_AGENT_ID,
+      title: "Presence Studio",
+      status: "thinking",
+      expression: "thinking",
+      subtitle: "Chronos is preparing a response.",
+      transcript: [{ speaker: "User", text: query }],
+    });
     const conversation = await runSurfaceConversation({
       agentId: CHRONOS_AGENT_ID,
       query,
@@ -928,6 +940,14 @@ export async function POST(req: NextRequest) {
 
     if (conversation.missionProposals && conversation.missionProposals.length > 0) {
       const proposal = conversation.missionProposals[0];
+      await dispatchPresenceFrame({
+        agentId: CHRONOS_AGENT_ID,
+        title: "Presence Studio",
+        status: "speaking",
+        expression: "thinking",
+        subtitle: conversation.text || "Chronos prepared a mission proposal.",
+        transcript: [{ speaker: "Chronos", text: conversation.text || "I can turn this into a mission." }],
+      });
       saveChronosMissionProposalState({
         sessionId,
         proposal,
@@ -983,6 +1003,14 @@ export async function POST(req: NextRequest) {
         ],
         delegations: delegationResults.length > 0 ? delegationResults : undefined,
         timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (conversation.text) {
+      await reflectPresenceAgentReply({
+        agentId: CHRONOS_AGENT_ID,
+        speaker: "Chronos",
+        text: conversation.text,
       });
     }
 

@@ -2,6 +2,7 @@ import { buildPresenceSurfaceFrame, dispatchA2UI } from '@agent/core';
 
 async function main() {
   const messages = buildPresenceSurfaceFrame({
+    agentId: 'presence-surface-agent',
     title: 'Presence Studio',
     status: 'speaking',
     expression: 'joy',
