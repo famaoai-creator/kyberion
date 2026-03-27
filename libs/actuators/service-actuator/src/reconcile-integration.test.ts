@@ -24,7 +24,13 @@ vi.mock('@agent/core', () => ({
   validateServiceAuth: mocks.validateServiceAuth,
   logger: mocks.logger,
   runtimeSupervisor: mocks.runtimeSupervisor,
-  pathResolver: { rootResolve: (p: string) => p },
+  pathResolver: {
+    rootDir: () => '/tmp/kyberion',
+    rootResolve: (p: string) => p,
+    shared: (p = '') => `active/shared/${p}`,
+    resolve: (p = '') => p,
+    knowledge: (p = '') => `knowledge/${p}`,
+  },
   capabilityEntry: (id: string) => `dist/${id}.js`
 }));
 

@@ -60,6 +60,14 @@ const openFinderPath = vi.fn();
 const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
+const pathResolver = {
+  rootDir: vi.fn(() => '/tmp/kyberion'),
+  rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+  shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
+  knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
+  active: vi.fn((p = '') => `/tmp/kyberion/active/${String(p).replace(/^\/+/, '')}`),
+  resolve: vi.fn((p = '') => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+};
 
 vi.mock('@agent/core', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -90,6 +98,7 @@ vi.mock('@agent/core', () => ({
   openFinderPath,
   createApprovalRequest,
   loadApprovalRequest,
+  pathResolver,
 }));
 
 vi.mock('@agent/core/os-automation', () => ({
