@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus, pathResolver } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -55,7 +55,7 @@ interface OrchestratorAction {
   };
 }
 
-const ACTUATOR_ARCHETYPES_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/actuator-request-archetypes.json');
+const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge('public/orchestration/actuator-request-archetypes.json');
 
 /**
  * Main Entry Point
@@ -71,7 +71,7 @@ async function handleAction(input: OrchestratorAction) {
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
@@ -148,7 +148,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
  * CAPTURE Operators
  */
 async function opCapture(op: string, params: any, ctx: any) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
       return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) as string) };
@@ -344,7 +344,7 @@ async function opTransform(op: string, params: any, ctx: any) {
       const brief = ctx[params.from || 'status_brief'];
       if (!brief || typeof brief !== 'object') throw new Error('collect_system_status_snapshot requires system-status-brief');
       const surfaceStatus = parseJsonCommandOutput(safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'status'], {
-        cwd: process.cwd(),
+        cwd: pathResolver.rootDir(),
         timeoutMs: 120000,
       }));
       const esmIntegrity = collectCommandHealth('pnpm', ['run', 'check:esm']);
@@ -881,7 +881,7 @@ function renderPipelineBundleJob(job: PipelineBundleJob, variables: Record<strin
     };
   }
 
-  const templateFullPath = path.resolve(process.cwd(), job.template_path);
+  const templateFullPath = pathResolver.rootResolve(job.template_path);
   if (!safeExistsSync(templateFullPath)) {
     return {
       ...job,
@@ -919,7 +919,7 @@ function executeExecutionPlanSet(planSet: any) {
       const actuator = String(job.actuator || '');
       const inputPath = String(job.output_path || '');
       const entryPath = resolveActuatorEntryPath(actuator);
-      const rawOutput = safeExec('node', [entryPath, '--input', inputPath], { cwd: process.cwd(), timeoutMs: 120000 });
+      const rawOutput = safeExec('node', [entryPath, '--input', inputPath], { cwd: pathResolver.rootDir(), timeoutMs: 120000 });
       let parsed: unknown = rawOutput.trim();
       try {
         parsed = JSON.parse(rawOutput);
@@ -959,7 +959,7 @@ function executeExecutionPlanSet(planSet: any) {
 
 function collectCommandHealth(command: string, args: string[]) {
   try {
-    const output = safeExec(command, args, { cwd: process.cwd(), timeoutMs: 120000 });
+    const output = safeExec(command, args, { cwd: pathResolver.rootDir(), timeoutMs: 120000 });
     return { ok: true, detail: output.trim() };
   } catch (error: any) {
     return { ok: false, detail: error.message };
@@ -1121,14 +1121,14 @@ function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; se
 }
 
 function collectMissionStatusSnapshot(targetId?: string) {
-  const missionRoot = path.resolve(process.cwd(), 'active/missions');
+  const missionRoot = pathResolver.active('missions');
   if (!safeExistsSync(missionRoot)) {
     return { metrics: { total: 0, active: 0, completed: 0 }, missions: [] };
   }
   const missionFiles = getAllFiles(missionRoot, { maxDepth: 4 })
     .filter((filePath) => filePath.endsWith('mission-state.json'));
   const missions = missionFiles.map((filePath) => {
-    const logicalPath = path.relative(process.cwd(), filePath);
+    const logicalPath = path.relative(pathResolver.rootDir(), filePath);
     const state = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<string, any>;
     return {
       mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
@@ -1158,8 +1158,8 @@ function collectMissionStatusSnapshot(targetId?: string) {
 
 function collectProjectStatusSnapshot(targetProjectId?: string) {
   const candidateRoots = [
-    path.resolve(process.cwd(), 'active/projects'),
-    path.resolve(process.cwd(), 'active/shared/tmp/project-os'),
+    pathResolver.active('projects'),
+    pathResolver.sharedTmp('project-os'),
   ];
   const projectEntries: Array<Record<string, any>> = [];
   for (const root of candidateRoots) {
@@ -1178,7 +1178,7 @@ function collectProjectStatusSnapshot(targetProjectId?: string) {
       projectEntries.push({
         project_id: ledger.project_id || null,
         project_name: titleLine.replace(/^#\s+/, '').trim(),
-        path: path.relative(process.cwd(), projectRoot),
+        path: path.relative(pathResolver.rootDir(), projectRoot),
         linked_missions: entries.length,
         active_missions: entries.filter((entry: any) => entry.status === 'active').length,
       });
@@ -1212,7 +1212,7 @@ function collectProjectStatusSnapshot(targetProjectId?: string) {
 
 function resolveActuatorEntryPath(actuator: string): string {
   const relativePath = `dist/libs/actuators/${actuator}/src/index.js`;
-  const fullPath = path.resolve(process.cwd(), relativePath);
+  const fullPath = pathResolver.rootResolve(relativePath);
   if (!safeExistsSync(fullPath)) {
     throw new Error(`Actuator entry not found for ${actuator}: ${relativePath}`);
   }
@@ -1275,7 +1275,7 @@ function setByPath(target: Record<string, unknown>, overridePath: string, value:
  * APPLY Operators
  */
 async function opApply(op: string, params: any, ctx: any) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write_file':
       const out = path.resolve(rootDir, resolveVars(params.path, ctx));
@@ -1319,7 +1319,7 @@ async function opApply(op: string, params: any, ctx: any) {
  * Strategic Reconciliation
  */
 async function performReconcile(input: OrchestratorAction) {
-  const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/orchestration-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/orchestration-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -1333,7 +1333,7 @@ async function performReconcile(input: OrchestratorAction) {
  */
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

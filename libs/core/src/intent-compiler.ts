@@ -5,7 +5,7 @@
  */
 import { logger } from '../core.js';
 import { safeReadFile, safeExistsSync } from '../secure-io.js';
-import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
 
 export interface CompiledIntent {
   intentId: string;
@@ -29,7 +29,7 @@ export function compileIntent(
   intent: string,
   options?: { knowledgeHints?: any[]; standardIntents?: any[] }
 ): CompiledIntent | null {
-  const intentsPath = path.resolve(process.cwd(), 'knowledge/public/governance/standard-intents.json');
+  const intentsPath = pathResolver.knowledge('public/governance/standard-intents.json');
   let standardIntents: any[] = options?.standardIntents || [];
 
   if (standardIntents.length === 0 && safeExistsSync(intentsPath)) {

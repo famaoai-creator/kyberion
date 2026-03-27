@@ -1,12 +1,13 @@
 import * as path from 'node:path';
 import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Terminal Bridge v4.0 (Isolated Session Protocol)
  * Uses file-based I/O at active/shared/runtime/terminal/{sessionId}/
  */
 
-const RUNTIME_BASE = path.join(process.cwd(), 'active/shared/runtime/terminal');
+const RUNTIME_BASE = pathResolver.shared('runtime/terminal');
 
 function listReflexTerminalSessions() {
   if (!safeExistsSync(RUNTIME_BASE)) return [];

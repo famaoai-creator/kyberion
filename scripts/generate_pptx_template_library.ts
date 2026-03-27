@@ -1,4 +1,4 @@
-import { logger, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { logger, pathResolver, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
 import * as path from 'node:path';
 import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
 
@@ -16,7 +16,7 @@ interface TemplateLibrary {
 }
 
 async function generateTemplate(template: TemplateSpec) {
-  const outputDir = path.dirname(path.resolve(process.cwd(), template.output));
+  const outputDir = path.dirname(pathResolver.rootResolve(template.output));
   if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });
   }
@@ -55,10 +55,7 @@ async function generateTemplate(template: TemplateSpec) {
 }
 
 async function main() {
-  const manifestPath = path.resolve(
-    process.cwd(),
-    'knowledge/public/design-patterns/presentation/pptx-template-library.json'
-  );
+  const manifestPath = pathResolver.rootResolve('knowledge/public/design-patterns/presentation/pptx-template-library.json');
   const manifest = JSON.parse(
     safeReadFile(manifestPath, { encoding: 'utf8' }) as string
   ) as TemplateLibrary;

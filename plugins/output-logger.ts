@@ -1,11 +1,12 @@
 import { safeAppendFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
 /**
  * Plugin: Output Logger
  */
 
-const logFile = path.join(process.cwd(), 'work', 'plugin-output.log');
+const logFile = pathResolver.resolve('work/plugin-output.log');
 
 export const afterSkill = (skillName: string, output: any) => {
   try {

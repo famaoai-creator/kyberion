@@ -1,10 +1,8 @@
-import * as path from 'node:path';
 import * as AjvModule from 'ajv';
-import { safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
-const ROOT = process.cwd();
 
 type CatalogCheck = {
   id: string;
@@ -56,7 +54,7 @@ const CHECKS: CatalogCheck[] = [
 ];
 
 function readJson<T>(relativePath: string): T {
-  const fullPath = path.resolve(ROOT, relativePath);
+  const fullPath = pathResolver.rootResolve(relativePath);
   return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string) as T;
 }
 
@@ -106,7 +104,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
     for (const profile of typed.profiles || []) {
       const profilePath = String(profile.path || '');
       if (!profilePath) continue;
-      if (!safeExistsSync(path.resolve(ROOT, profilePath))) {
+      if (!safeExistsSync(pathResolver.rootResolve(profilePath))) {
         violations.push(`${check.id}: referenced profile not found (${profilePath})`);
       }
     }
