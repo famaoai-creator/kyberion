@@ -1,11 +1,11 @@
-import * as path from 'node:path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * User Preference Adapter v1.0
  */
 
-const PREF_PATH = path.join(process.cwd(), 'knowledge/personal/user-preferences.json');
+const PREF_PATH = pathResolver.knowledge('personal/user-preferences.json');
 
 export const preferenceAdapter = {
   get: (key: string, defaultValue: any = null) => {

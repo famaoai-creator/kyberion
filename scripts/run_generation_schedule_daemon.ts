@@ -1,16 +1,17 @@
-import { logger } from '@agent/core';
+import { logger, pathResolver } from '@agent/core';
 import { spawn } from 'node:child_process';
-import * as path from 'node:path';
 
 const DEFAULT_INTERVAL_MS = Number(process.env.KYBERION_GENERATION_SCHEDULE_INTERVAL_MS || 60_000);
+const ROOT_DIR = pathResolver.rootDir();
+const SCHEDULE_TICK_ENTRY = pathResolver.rootResolve('dist/scripts/run_generation_schedule.js');
 
 async function main() {
   while (true) {
     const child = spawn(
       process.execPath,
-      [path.resolve(process.cwd(), 'dist/scripts/run_generation_schedule.js'), '--action', 'tick'],
+      [SCHEDULE_TICK_ENTRY, '--action', 'tick'],
       {
-        cwd: process.cwd(),
+        cwd: ROOT_DIR,
         env: process.env,
         stdio: 'inherit',
       },

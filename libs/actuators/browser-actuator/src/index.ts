@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -202,11 +202,11 @@ interface BrowserRuntimeLease {
   externalConnection?: boolean;
 }
 
-const BROWSER_RUNTIME_DIR = path.join(process.cwd(), 'active/shared/runtime/browser');
+const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
-const EVIDENCE_DIR = path.join(process.cwd(), 'evidence/browser');
+const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
-const PASSKEY_PROVIDER_CATALOG_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/browser-passkey-providers.json');
+const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge('public/orchestration/browser-passkey-providers.json');
 
 /**
  * Main Entry Point
@@ -369,14 +369,14 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 300000;
 
-  const userDataDir = path.resolve(process.cwd(), options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId));
+  const userDataDir = pathResolver.rootResolve(options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId));
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
   if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
   const sessionMetadataPath = path.join(BROWSER_SESSION_DIR, `${sessionId}.json`);
 
   const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
-  const resolvedVideoDir = path.resolve(process.cwd(), options.video_artifact_dir || videoDir);
+  const resolvedVideoDir = pathResolver.rootResolve(options.video_artifact_dir || videoDir);
   if (options.record_video && !safeExistsSync(resolvedVideoDir)) safeMkdir(resolvedVideoDir, { recursive: true });
 
   const browserContext = await getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, resolvedVideoDir);
@@ -623,7 +623,7 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
       await waitForOperatorContinue({
         sessionId: ctx.session_id || 'default',
         message,
-        continueFile: params.continue_file ? path.resolve(process.cwd(), resolve(params.continue_file)) : undefined,
+        continueFile: params.continue_file ? pathResolver.rootResolve(resolve(params.continue_file)) : undefined,
         pollMs: Number(params.poll_ms || 250),
         timeoutMs: params.timeout_ms ? Number(params.timeout_ms) : undefined,
       });
@@ -839,7 +839,7 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         tab_id: runtime.activeTabId,
       });
     case 'screenshot':
-      const outPath = path.resolve(process.cwd(), resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
+      const outPath = pathResolver.rootResolve(resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
@@ -895,7 +895,7 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         browserSessionId: resolve(params.browser_session_id || ctx.session_id || 'default'),
         preferPersistentContext: params.prefer_persistent_context !== false,
       });
-      const outPath = params.path ? path.resolve(process.cwd(), resolve(params.path)) : undefined;
+      const outPath = params.path ? pathResolver.rootResolve(resolve(params.path)) : undefined;
       if (outPath) {
         if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
         safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
@@ -933,7 +933,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_playwright': {
       const trail = readRecordedActions(ctx, params.from);
-      const outPath = path.resolve(process.cwd(), resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`));
+      const outPath = pathResolver.rootResolve(resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`));
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       const content = renderPlaywrightSkeleton(trail, {
         assertions: params.assertions === 'hint' ? 'hint' : 'strict',
@@ -943,7 +943,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_adf': {
       const trail = readRecordedActions(ctx, params.from);
-      const outPath = path.resolve(process.cwd(), resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`));
+      const outPath = pathResolver.rootResolve(resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`));
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       const adf = renderBrowserAdf(trail, ctx.session_id || 'default');
       safeWriteFile(outPath, JSON.stringify(adf, null, 2));
@@ -1174,7 +1174,7 @@ async function resolveSessionHandoff(params: any, ctx: any, resolve: Function): 
   }
 
   if (params.path) {
-    const filePath = path.resolve(process.cwd(), resolve(params.path));
+    const filePath = pathResolver.rootResolve(resolve(params.path));
     const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
     return JSON.parse(content);
   }
@@ -2092,7 +2092,7 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };
