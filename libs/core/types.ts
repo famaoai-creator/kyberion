@@ -240,6 +240,7 @@ export interface IdentityContext {
   authorities: Authority[];
   missionId?: string;
   role?: string; // Functional role within a specific mission
+  sudoScope?: string[];
 }
 
 // ---------------------------------------------------------------------------

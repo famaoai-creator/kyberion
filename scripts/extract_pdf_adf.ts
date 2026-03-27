@@ -1,4 +1,5 @@
-import { distillPdfDesign, logger, pathResolver, safeWriteFile } from '@agent/core';
+import { logger, pathResolver, safeWriteFile } from '@agent/core';
+import { distillPdfDesign } from '@agent/core/media-contracts';
 import * as path from 'node:path';
 
 async function main() {

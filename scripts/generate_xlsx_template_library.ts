@@ -1,9 +1,9 @@
 import {
-  generateNativeXlsx,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
 } from '@agent/core';
+import { generateNativeXlsx } from '@agent/core/media-contracts';
 import type {
   XlsxCell,
   XlsxCellStyle,
@@ -14,7 +14,7 @@ import type {
   XlsxDxfStyle,
   XlsxMergeCell,
   XlsxWorksheet,
-} from '@agent/core';
+} from '@agent/core/media-contracts';
 import * as path from 'node:path';
 
 interface TemplateSpec {

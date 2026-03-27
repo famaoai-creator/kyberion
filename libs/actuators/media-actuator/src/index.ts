@@ -18,6 +18,7 @@ import {
   generateNativePdf,
   resolveRef,
   handleStepError,
+  type PdfDesignProtocol,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -25,7 +26,6 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs'; // Only for fs.statSync in render operations
 import * as excelUtils from '@agent/shared-media';
-import type { PdfDesignProtocol } from '@agent/core/src/types/pdf-protocol.js';
 import { PDFParse } from 'pdf-parse';
 
 /**
