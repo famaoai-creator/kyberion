@@ -5,11 +5,16 @@ import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedCoreFsImports = [
+  'libs/core/evidence-chain.test.ts',
   'libs/core/fs-primitives.ts',
   'libs/core/ledger.test.ts',
   'libs/core/metrics.test.ts',
+  'libs/core/secure-io.branch.test.ts',
   'libs/core/secure-io.test.ts',
   'libs/core/secure-io.ts',
+  'libs/core/src/actuator-capability.test.ts',
+  'libs/core/src/feedback-loop.test.ts',
+  'libs/core/src/knowledge-index.test.ts',
   'libs/core/validators.test.ts',
   'libs/core/src/lock-utils.ts',
   'libs/core/src/native-docx-engine/__tests__/docx-engine.test.ts',
@@ -24,6 +29,8 @@ const allowedCoreFsImports = [
   'libs/core/src/native-xlsx-engine/engine.ts',
   'libs/core/src/pfc/PfcController.test.ts',
   'libs/core/src/pfc/SovereignSentinel.test.ts',
+  'libs/core/src/pipeline-engine.test.ts',
+  'libs/core/src/pipeline-preview.test.ts',
   'libs/core/trust-engine.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
