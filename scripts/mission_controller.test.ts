@@ -113,7 +113,7 @@ describe('mission_controller argument parsing', () => {
   it('allows grant flows when the caller has sudo authority', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
-    delete process.env.KYBERION_SUDO;
+    process.env.KYBERION_SUDO = 'true';
 
     expect(() => assertCanGrantMissionAuthority()).not.toThrow();
   });

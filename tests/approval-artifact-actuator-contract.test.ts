@@ -8,13 +8,14 @@ import {
   safeExistsSync,
   safeReadFile,
   safeRmSync,
+  safeUnlinkSync,
 } from '@agent/core';
 import {
   listGovernedArtifacts,
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
 } from '@agent/core/artifacts';
-import { createApprovalRequest, decideApprovalRequest, listApprovalRequests, loadApprovalRequest } from '@agent/core/governance';
+import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 
 const rootDir = process.cwd();
 
@@ -26,16 +27,16 @@ describe('Approval and artifact actuator contracts', () => {
   const contractChannel = 'contract-test';
   const contractCoordination = pathResolver.rootResolve(`active/shared/coordination/channels/${contractChannel}`);
   const contractObservability = pathResolver.rootResolve(`active/shared/observability/channels/${contractChannel}`);
-  const slackCoordination = pathResolver.rootResolve('active/shared/coordination/channels/slack');
-  const slackObservability = pathResolver.rootResolve('active/shared/observability/channels/slack');
+  const createdSlackRequestPaths = new Set<string>();
 
   afterEach(() => {
     process.env.MISSION_ROLE = 'infrastructure_sentinel';
     if (safeExistsSync(contractCoordination)) safeRmSync(contractCoordination);
     if (safeExistsSync(contractObservability)) safeRmSync(contractObservability);
-    process.env.MISSION_ROLE = 'slack_bridge';
-    if (safeExistsSync(slackCoordination)) safeRmSync(slackCoordination);
-    if (safeExistsSync(slackObservability)) safeRmSync(slackObservability);
+    for (const logicalPath of createdSlackRequestPaths) {
+      if (safeExistsSync(logicalPath)) safeUnlinkSync(logicalPath);
+    }
+    createdSlackRequestPaths.clear();
   });
 
   it('writes governed artifacts only inside coordination/observability paths', () => {
@@ -71,6 +72,7 @@ describe('Approval and artifact actuator contracts', () => {
       sourceText: 'deploy please',
     });
 
+    createdSlackRequestPaths.add(`active/shared/coordination/channels/slack/approvals/requests/${request.id}.json`);
     expect(loadApprovalRequest('slack', request.id)?.status).toBe('pending');
 
     const decided = decideApprovalRequest('slack_bridge', {
@@ -216,11 +218,7 @@ describe('Approval and artifact actuator contracts', () => {
       note: 'approved from terminal',
     });
 
-    const pendingSecretRequests = listApprovalRequests({
-      storageChannels: ['slack'],
-      kind: 'secret_mutation',
-      status: 'pending',
-    });
-    expect(pendingSecretRequests).toHaveLength(0);
+    createdSlackRequestPaths.add(`active/shared/coordination/channels/slack/approvals/requests/${request.id}.json`);
+    expect(loadApprovalRequest('slack', request.id)?.status).toBe('approved');
   });
 });
