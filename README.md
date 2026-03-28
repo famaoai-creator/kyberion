@@ -4,295 +4,316 @@
 [![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
 [![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
 
-Kyberion is a **mission-first autonomous agent operating system**. It is a TypeScript monorepo that gives an AI agent:
+Kyberion is an intent-driven agent operating system.
 
-- a structured execution body through `libs/actuators/`
-- a tiered memory and governance layer through `knowledge/`
-- a durable mission lifecycle through `mission_controller`
-- a multi-agent orchestration model through events, A2A, and the runtime supervisor
-- operator-facing control surfaces through Slack and Chronos Mirror
+The intended user experience is simple:
 
-It is designed to be the runtime environment for an AI agent that performs real work: writing code, generating documents, calling APIs, and managing its own knowledge — all under a policy-driven governance layer.
+1. Tell Kyberion what you want.
+2. Kyberion decides how to do it.
+3. Kyberion asks only when approval is required.
+4. Kyberion returns a result, an artifact, or a clear next step.
 
-For the practical operator view of Slack, Chronos, directory usage, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md).
+Internally, Kyberion uses missions, task sessions, actuators, ADF pipelines, runtime supervision, and governed knowledge. Those are implementation details of a durable execution model, not the interface you should have to think about first.
 
-## Key Concepts
+For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md).
 
-| Concept | What it does |
-|---|---|
-| **Mission** | A unit of work with its own git repo, status lifecycle, and evidence trail |
-| **Actuator** | An execution module (file I/O, browser automation, network, code generation, etc.) |
-| **ADF** | Declarative JSON workflow that chains actuator operations — the primary interface for LLM agents |
-| **A2A** | Agent-to-Agent messaging protocol for inter-agent communication |
-| **Knowledge Tier** | Three-level information classification: `public`, `confidential`, `personal` |
-| **Role** | An identity that determines permissions, procedures, and trust boundaries |
-| **Distillation** | Extracting reusable knowledge from completed missions via LLM |
+## The Product Model
+
+Kyberion should feel like this:
+
+```text
+Intent -> Plan -> Result
+```
+
+Examples:
+
+- `このPDFをパワポにして`
+- `日経新聞を開いて`
+- `今週の進捗レポートを作って`
+- `voice-hub の状態を見て`
+
+What Kyberion does next:
+
+- interprets the request as an intent
+- resolves the right execution path
+- proposes or applies a short plan
+- runs the work through governed execution
+- returns a result, artifact, or approval request
+
+## What The User Should See
+
+Kyberion should expose four things clearly:
+
+- `Intent`
+  - what the user asked for
+- `Plan`
+  - what the system is about to do in human terms
+- `State`
+  - running, waiting for input, waiting for approval, completed, failed
+- `Result`
+  - artifact, answer, or concrete next action
+
+Kyberion should not require the user to think in terms of:
+
+- actuator names
+- raw ADF JSON
+- runtime supervisors
+- internal mission events
+
+Those remain important, but they belong behind the user-facing interface.
+
+## Surfaces
+
+Kyberion can be used through multiple surfaces, but they should all present the same mental model.
+
+### Terminal
+
+Best for:
+
+- coding work
+- debugging
+- test-driven development
+- precise review and iteration
+
+### Slack
+
+Best for:
+
+- lightweight remote requests
+- approvals and follow-ups
+- receiving results back in-thread
+
+### Chronos Mirror
+
+Best for:
+
+- observing what the system is doing
+- inspecting runtime state and mission state
+- intervening when something needs operator attention
+
+### Presence Studio
+
+Best for:
+
+- conversational interaction
+- voice interaction
+- live browser and task assistance
+
+## Intent, Plan, and Result
+
+The central design rule is:
+
+```text
+Natural language request
+  -> intent resolution
+  -> execution plan
+  -> governed execution
+  -> observable result
+```
+
+In practice:
+
+- simple questions may return a direct answer
+- operational requests may create a task session
+- broader durable work may become a mission
+- risky changes may pause for approval
+
+The user should not need to choose between these paths explicitly.
+
+## Internal Model
+
+Kyberion stays reliable by separating the user-facing model from the execution model.
+
+### Intent
+
+The human request.
+
+Examples:
+
+- `このPDFをパワポにして`
+- `Chrome で日経新聞を開いて`
+- `今のミッション一覧を教えて`
+
+### Resolution
+
+The structured interpretation of what the user means.
+
+Examples:
+
+- direct answer
+- browser operation
+- knowledge query
+- task session
+- durable mission
+
+### Plan
+
+A short execution plan in human terms, usually rendered as a few steps.
+
+Examples:
+
+- `PDF を解析 -> スライド構成を復元 -> PPTX を生成`
+- `検索 -> サイトを開く`
+- `状態を取得 -> 要点を返す`
+
+### Execution
+
+The internal layer where Kyberion uses missions, sessions, actuators, and ADF.
+
+This layer exists for durability, governance, replayability, and safety.
+
+## Missions and Task Sessions
+
+Kyberion has two important durable work shapes.
+
+### Task Session
+
+A lightweight execution contract for conversational work.
+
+Use cases:
+
+- create a PowerPoint
+- create a report
+- inspect a service
+- capture a photo
+- operate the browser interactively
+
+Task sessions are good when the work should feel conversational and return quickly with artifacts or follow-up prompts.
+
+### Mission
+
+A larger durable unit of work with its own evidence trail and lifecycle.
+
+Use cases:
+
+- multi-step engineering work
+- long-running delivery work
+- auditable cross-agent execution
+- reusable evidence and distillation
+
+Mission lifecycle:
+
+```text
+planned -> active -> validating -> distilling -> completed -> archived
+```
+
+Rule of thumb:
+
+- `simple request` -> direct answer or task session
+- `durable work` -> mission
+
+## Why Missions Still Matter
+
+Kyberion is not trying to expose missions because users love lifecycle state machines.
+It uses missions because they provide:
+
+- durable ownership
+- replayable evidence
+- explicit validation
+- safe delegation
+- knowledge distillation after completion
+
+The UX goal is not to remove the mission model.
+It is to make the mission model feel invisible until the user needs it.
+
+## Actuators and ADF
+
+Actuators are Kyberion's execution body.
+ADF is the structured contract used to connect reasoning and execution.
+
+Examples of actuator families:
+
+- browser
+- media
+- system
+- service
+- file
+- terminal
+- wisdom
+
+Examples of ADF-backed work:
+
+- PDF to PPTX conversion
+- browser navigation and page interaction
+- report generation
+- service inspection
+- controlled secret mutation
+
+Users should usually ask for outcomes.
+Kyberion decides which actuators and ADF contracts to use.
 
 ## Architecture
 
-```
-Sovereign intent
-  -> surface ingress (Slack / Chronos / CLI)
-  -> mission proposal or direct reply
-  -> mission_controller (durable mission authority)
-  -> mission-orchestration-worker (event-driven control plane)
-  -> agent-runtime-supervisor (runtime authority)
-  -> a2a-bridge (agent work delegation)
-  -> libs/actuators/* (execution body)
-  -> artifacts, events, and outbox delivery
+```text
+Intent
+  -> surface ingress (Terminal / Slack / Presence / Chronos)
+  -> intent resolution
+  -> short plan / confirmation
+  -> task session or mission
+  -> runtime supervisor / orchestration
+  -> actuators and ADF pipelines
+  -> artifacts, answers, and notifications
 ```
 
+Core locations:
+
 | Path | Role |
-|---|---|
-| `libs/core/` | Shared kernel — secure I/O, path resolution, mission orchestration events, runtime supervisor, A2A bridge |
-| `libs/actuators/` | Execution capabilities (file, browser, code, network, system, wisdom, media, etc.) |
-| `knowledge/` | Tiered memory — `public/` (governance), `confidential/` (org-internal), `personal/` (gitignored) |
-| `scripts/` | Entry points — mission controller, orchestration worker, runtime supervisor, dashboards, runtime surfaces |
-| `pipelines/` | ADF workflow definitions |
-| `active/` | Runtime workspace for missions, queues, and shared state (gitignored) |
-| `satellites/` | External bridges such as Slack |
-| `presence/displays/chronos-mirror-v2/` | Chronos operator control surface |
+| --- | --- |
+| `libs/core/` | shared kernel: secure I/O, resolution, routing, runtime state, governance helpers |
+| `libs/actuators/` | execution capabilities |
+| `knowledge/` | reusable governed knowledge |
+| `scripts/` | operational entry points |
+| `pipelines/` | declarative execution plans |
+| `active/` | runtime state, missions, artifacts, and logs |
+| `satellites/` | channel bridges such as Slack |
+| `presence/displays/` | operator and conversational displays |
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/famaoai-creator/kyberion.git && cd kyberion
+git clone https://github.com/famaoai-creator/kyberion.git
+cd kyberion
 pnpm install
 pnpm build
-pnpm onboard                    # set up identity
-pnpm run cli -- list            # explore actuators
+pnpm onboard
+pnpm surfaces:reconcile
 ```
 
-If you want the shortest path to "how do I actually use this day to day?", read:
+Fastest daily-use docs:
 
-- [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md)
+- [docs/QUICKSTART.md](/Users/famao/kyberion/docs/QUICKSTART.md)
+- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
 
-To boot the local control plane:
+## Local Control Plane
 
 ```bash
 pnpm agent-runtime:supervisor
 pnpm mission:orchestrator
-KYBERION_LOCALHOST_AUTOADMIN=true pnpm chronos:dev
-```
-
-## Missions
-
-Missions are the primary unit of work. Each mission gets its own git micro-repo, status lifecycle, and evidence chain.
-
-```
-start → checkpoint (repeat) → verify → distill → finish
-```
-
-```bash
-MC="node dist/scripts/mission_controller.js"
-$MC help                                        # all commands
-$MC start MY-FEATURE confidential               # create mission
-$MC checkpoint task-1 "Implemented auth module"  # record progress
-$MC verify MY-FEATURE verified "All tests pass"  # mark verified
-$MC distill MY-FEATURE                           # extract knowledge via LLM
-$MC finish MY-FEATURE                            # archive (--seal to encrypt)
-$MC list active                                  # filter by status
-$MC status MY-FEATURE                            # detailed view
-```
-
-**Status transitions** — invalid transitions are rejected at runtime:
-
-```
-planned ──► active ──► validating ──► distilling ──► completed ──► archived
-              │                          ▲
-              ├──► paused ──► active      │
-              └──► failed ──► active      │
-                                          │
-              active ──► distilling ───────┘
-```
-
-### Orchestration Shape
-
-Kyberion keeps the mission model simple and pushes flexibility into the control plane:
-
-- `mission_controller`
-  - the only durable mission authority
-- `mission-orchestration-worker`
-  - reacts to events and performs deterministic control-plane actions
-- `agent-runtime-supervisor`
-  - the only runtime spawn/reuse/stop authority
-- `a2a-bridge`
-  - routes work requests between agents
-
-This gives a `single-owner, multi-worker` mission model:
-
-- one mission
-- one active owner
-- many delegated workers
-- event-driven retries and reconciliation
-
-### Knowledge Distillation
-
-The `distill` phase sends mission context (git log, evidence ledger, checkpoints) to an LLM, which extracts reusable knowledge as Markdown files with frontmatter.
-
-LLM profiles are configurable per purpose (`heavy`/`standard`/`light`) in `wisdom-policy.json`, and per user in `my-identity.json`. Falls back to structural extraction when no LLM is available. See `knowledge/public/governance/` for configuration.
-
-## ADF Pipelines & A2A
-
-**ADF (Agentic Data Format)** is Kyberion's declarative workflow contract. An ADF pipeline chains actuator operations into a repeatable sequence and is validated as a JSON contract before execution.
-
-```jsonc
-// pipelines/vital-check.json
-{
-  "action": "pipeline",
-  "name": "Ecosystem Vital Check",
-  "steps": [
-    { "op": "system:shell", "params": { "cmd": "...", "export_as": "status" } },
-    { "op": "system:log",   "params": { "message": "Result: {{status}}" } }
-  ]
-}
-```
-
-Each `op` maps to an actuator capability (`system:shell`, `service:cli`, `file:read`, etc.). Steps export results via `export_as` and reference them with `{{variable}}` interpolation.
-
-```bash
-node dist/scripts/run_intent.js <intent_id>                               # resolve intent → ADF → execute
-node dist/scripts/run_super_pipeline.js --input path/to/pipeline.json     # execute ADF directly
-```
-
-**A2A (Agent-to-Agent)** wraps ADF payloads in a messaging envelope with routing (`sender`, `receiver`, `performative`) and conversation tracking (`conversation_id`, `parent_id`). This enables external agents to request work from Kyberion and receive structured results.
-
-```bash
-node dist/scripts/run_a2a.js --input message.json
-```
-
-Schemas: `schemas/a2a-envelope.schema.json`, `schemas/super-nerve-pipeline.schema.json`, etc.
-
-## Mission Control Model
-
-Kyberion missions now follow a **single-owner, multi-worker** model.
-
-- A mission is the durable contract and audit boundary.
-- One owner agent holds mission write authority.
-- Worker agents may collaborate through explicit task contracts and leases.
-- Short-lived file exclusion uses resource locks; durable authority uses leases.
-
-See `knowledge/public/architecture/agent-mission-control-model.md` for the authoritative model.
-
-## Control Surfaces
-
-### Slack
-
-Slack acts as a governed ingress surface. It can:
-
-- gather sovereign intent
-- carry `mission_proposal -> confirmation -> mission issue`
-- receive deterministic mission status updates from the shared outbox model
-
-Operational setup and usage are summarized in [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md) and connection material belongs in [`knowledge/personal/connections/`](./knowledge/personal/connections/).
-
-### Chronos Mirror
-
-Chronos Mirror v2 is the operator-facing control surface. It provides:
-
-- mission intelligence and recent orchestration events
-- runtime lease doctor and remediation
-- surface outbox visibility
-- mission and surface control actions
-- live mission-scoped agent conversation and A2A handoff trails
-
-Access is intentionally split:
-
-- `readonly`
-  - inspect only
-- `localadmin`
-  - deterministic operator actions through backend controllers
-
-For localhost development:
-
-```bash
 export KYBERION_LOCALHOST_AUTOADMIN=true
 pnpm chronos:dev
 ```
 
-See [`docs/OPERATOR_UX_GUIDE.md`](./docs/OPERATOR_UX_GUIDE.md) for the operator interpretation of each Chronos area.
+## Working With Missions Directly
 
-See `knowledge/public/architecture/mission-orchestration-control-plane.md` for the control-plane model.
-
-## Build and Packaging
-
-Kyberion now separates package build from operational validation.
-
-- `pnpm build`
-  - builds package-local workspace artifacts first
-  - then builds repo-level `dist/`
-- operational validation and CI runtime checks execute built scripts under `dist/scripts/`
-- runtime code must import shared kernel modules through `@agent/core` public entrypoints only
-
-Examples:
-
-```ts
-import { safeReadFile } from "@agent/core/secure-io";
-import { pathResolver } from "@agent/core/path-resolver";
-```
-
-Do not import from:
-
-- `@agent/core/src/*`
-- `@agent/core/dist/*`
-- `../libs/core/*`
-
-See [docs/PACKAGING_CONTRACT.md](./docs/PACKAGING_CONTRACT.md).
-
-## Governance
-
-### Three-Tier Knowledge
-
-| Tier | Path | Access | Git |
-|---|---|---|---|
-| **Public** | `knowledge/public/` | All roles | Tracked |
-| **Confidential** | `knowledge/confidential/` | Authorized roles | Gitignored |
-| **Personal** | `knowledge/personal/` | Owner + privileged roles | Gitignored |
-
-### Roles
-
-A **role** (set via `MISSION_ROLE` env var) determines what the current agent can read/write, which procedures are loaded, and how trust boundaries are enforced. Each role has a procedure at `knowledge/public/roles/<role>/PROCEDURE.md`.
-
-| Role | Scope |
-|---|---|
-| `ecosystem_architect` | Broad write across all tiers — system-level changes |
-| `mission_controller` | Mission lifecycle — privileged read across all tiers |
-| `sovereign_concierge` | User-facing — privileged read for context hydration |
-| `software_developer` | Code and project files — scoped to `active/projects/` |
-| `pmo_governance` | Mission governance and oversight |
-| `qa_lead` | Testing and quality validation |
-| ... | 27 roles total — see `knowledge/public/roles/` |
-
-Permissions are defined in `knowledge/public/governance/security-policy.json` and enforced at runtime by `tier-guard`.
-
-## Development
+If you need direct mission control, use the mission controller.
 
 ```bash
-pnpm run typecheck             # type check
-pnpm run test:unit             # unit tests
-pnpm run test:coverage         # with coverage
-pnpm run lint                  # lint
-pnpm chronos:lint              # Chronos app lint
-pnpm chronos:build             # Chronos production build
-pnpm vital                     # ecosystem health check
+MC="node dist/scripts/mission_controller.js"
+$MC start MY-FEATURE confidential
+$MC checkpoint task-1 "Implemented auth module"
+$MC verify MY-FEATURE verified "All tests pass"
+$MC finish MY-FEATURE
 ```
 
-## Repository Structure
+Direct mission commands are for operators and internal control.
+They are not the primary user-facing interface.
 
-| Path | Purpose |
-|---|---|
-| `AGENTS.md` | Operating charter and governance rules |
-| `docs/` | Guides: HOWTO, QUICKSTART, COMPONENT_MAP, GLOSSARY |
-| `libs/core/` | Shared runtime kernel (in-place compiled) |
-| `libs/actuators/` | Execution modules (file, browser, code, network, etc.) |
-| `knowledge/` | Tiered knowledge store with governance policies |
-| `scripts/` | Entry points — mission controller, intent/A2A runners, CLI |
-| `pipelines/` | Declarative ADF workflow definitions |
-| `schemas/` | JSON schema contracts (ADF, A2A, missions, etc.) |
-| `tests/` | Unit, integration, and smoke tests |
-| `satellites/` | External platform bridges (Slack, etc.) |
-| `presence/` | Background sensors and display dashboards |
+## Documents Worth Reading
 
-## License
-
-MIT
+- [docs/QUICKSTART.md](/Users/famao/kyberion/docs/QUICKSTART.md)
+- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
+- [docs/GLOSSARY.md](/Users/famao/kyberion/docs/GLOSSARY.md)
+- [docs/COMPONENT_MAP.md](/Users/famao/kyberion/docs/COMPONENT_MAP.md)
+- [CAPABILITIES_GUIDE.md](/Users/famao/kyberion/CAPABILITIES_GUIDE.md)
+- [knowledge/public/architecture/kyberion-surface-ux-architecture.md](/Users/famao/kyberion/knowledge/public/architecture/kyberion-surface-ux-architecture.md)
+- [knowledge/public/architecture/agent-mission-control-model.md](/Users/famao/kyberion/knowledge/public/architecture/agent-mission-control-model.md)

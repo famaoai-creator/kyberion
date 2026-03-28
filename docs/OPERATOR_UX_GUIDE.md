@@ -1,172 +1,193 @@
 # Operator UX Guide
 
-Kyberion has a rich internal model, but daily usage should feel simple.
-This guide explains:
+Kyberion has a rich internal model, but the operator UX should still be easy to explain:
 
-- where to talk to Kyberion
-- how to observe it
-- which directories matter to you
-- which commands you actually need day to day
+```text
+Intent -> Plan -> State -> Result
+```
 
-Read this after:
+This guide explains how to operate Kyberion without forcing people to think in raw pipelines, runtime registries, or actuator contracts first.
 
-- `docs/INITIALIZATION.md`
-- `docs/QUICKSTART.md`
+## 1. The Core UX Contract
 
-## 1. Choose Your Surface
+Every surface should make these four things visible:
 
-There are three practical ways to interact with Kyberion.
+- `Intent`
+  - what the user asked for
+- `Plan`
+  - what Kyberion decided to do
+- `State`
+  - what is happening now
+- `Result`
+  - answer, artifact, approval, or next step
 
-### A. Local terminal or editor chat
+Internally, Kyberion may use:
 
-Use this when you want:
+- missions
+- task sessions
+- browser conversation sessions
+- actuators
+- ADF pipelines
+- runtime supervision
 
-- fast iteration
+Those are execution details behind the contract above.
+
+## 2. Choosing A Surface
+
+### Terminal
+
+Use when you want:
+
 - code changes
-- direct review of files and tests
-- alignment on a technical task
+- tests and diffs
+- close technical iteration
+- direct debugging
 
-This is the best default surface for development work.
+### Slack
 
-### B. Slack
+Use when you want:
 
-Use Slack when you want:
+- remote requests
+- approvals in-thread
+- short follow-ups
+- result delivery back into the same thread
 
-- lightweight conversation away from the terminal
-- mission proposals from a shared channel or thread
-- approvals and confirmations in-thread
-- deterministic status delivery back into the original thread
+Slack is a governed ingress and delivery surface.
+It is not the durable mission owner.
 
-Slack is an ingress and delivery surface.
-It is not the mission owner.
+### Chronos Mirror
 
-Current runtime entrypoint:
+Use when you want:
 
-- `satellites/slack-bridge/`
+- operator visibility
+- runtime and mission state
+- intervention points
+- delivery inspection
 
-Slack connection material belongs in:
+Chronos is the control surface.
+It explains and intervenes, but it does not replace the durable control plane.
 
-- `knowledge/personal/connections/slack.json`
+### Presence Studio
 
-Minimum practical fields:
+Use when you want:
 
-```json
-{
-  "bot_token": "xoxb-...",
-  "app_token": "xapp-...",
-  "default_channel": "#general"
-}
-```
+- conversational interaction
+- hands-free or voice interaction
+- browser assistance
+- live task detail and artifact access
 
-To start the managed Slack surface:
+## 3. What The User Says vs What Kyberion Does
 
-```bash
-pnpm surfaces:reconcile
-pnpm surfaces:status
-```
+Examples:
 
-The canonical manifest is:
+- `このPDFをパワポにして`
+  - Kyberion resolves this to a document-generation path
+- `日経新聞を開いて`
+  - Kyberion resolves this to browser navigation
+- `voice-hub の状態を見て`
+  - Kyberion resolves this to a service inspection path
+- `今週の進捗レポートを作って`
+  - Kyberion resolves this to a task session or mission-backed document flow
 
-- `knowledge/public/governance/active-surfaces.json`
+The user should ask for outcomes.
+Kyberion should choose the machinery.
 
-### C. Chronos Mirror
+## 4. How To Explain The Backend Model
 
-Use Chronos when you want:
+When you do need to explain the internal model, use this hierarchy:
 
-- a local operator dashboard
-- mission and runtime visibility
-- outbox and delivery visibility
-- deterministic control actions
-- a live view of agent conversation and A2A handoffs
+### Direct reply
 
-Chronos is a control surface, not the durable mission authority.
-It renders and triggers backend control actions, but mission truth still lives in the control plane.
+For lightweight questions.
 
-Local boot:
+Examples:
 
-```bash
-export KYBERION_LOCALHOST_AUTOADMIN=true
-pnpm chronos:dev
-```
+- weather
+- location
+- knowledge lookup
+- simple system status
 
-Default local URL:
+### Task session
 
-- `http://127.0.0.1:3000`
+For conversational work that still needs structure and progress.
 
-Access modes:
+Examples:
 
-- `readonly`: inspect only
-- `localadmin`: can issue deterministic control actions
+- generate a PowerPoint
+- generate a report
+- inspect a service
+- capture a photo
+- interactive browser work
 
-## 2. How To Read Chronos
+### Mission
 
-Chronos is easiest to understand as four operator panels.
+For larger durable work that needs evidence, validation, ownership, or distillation.
 
-### A. Mission intelligence
+Examples:
 
-Use this to answer:
+- engineering implementation
+- multi-step delivery
+- cross-agent work
+- auditable workflows
 
-- what missions are active
-- what just changed
-- which mission needs attention next
+## 5. Chronos Mental Model
 
-### B. Agent and runtime health
+Chronos is easiest to understand as a control tower.
 
-Use this to answer:
+It helps answer:
 
-- which managed agents or surfaces are running
-- whether runtime leases are healthy
-- whether a retry or restart is needed
+1. What did the user ask for?
+2. What plan is running?
+3. What is blocked or waiting?
+4. What needs approval or intervention?
+5. What artifact or result came out?
 
-### C. Surface outbox and delivery
+Chronos is not a general chat app and not a raw process monitor.
 
-Use this to answer:
+## 6. Presence Studio Mental Model
 
-- what Slack or other surfaces are about to deliver
-- what has already been delivered
-- whether a delivery is stuck
+Presence Studio should feel like the conversational front desk.
 
-### D. Live conversation and delegation
+It is responsible for:
 
-Use this to answer:
+- receiving live human intent
+- keeping the conversation smooth
+- surfacing short plans
+- showing active browser and task detail
+- returning artifacts and results
 
-- what the current surface conversation is doing
-- which delegated responses came back
-- how a mission-related exchange evolved over time
+It should not force the user to manually think in:
 
-If you only remember one rule, remember this:
+- task IDs
+- pipeline steps
+- runtime names
 
-Chronos explains and intervenes.
-It does not replace `mission_controller`, `surface_runtime`, or the runtime supervisor.
+Those may be inspectable, but they should not be the default conversation burden.
 
-## 3. What Lives Where
+## 7. Directory Model
 
-Most confusion disappears once the main directories are treated by purpose.
+The most useful directory model for operators is by purpose.
 
-| Path | What it is for | You usually put here |
-| --- | --- | --- |
-| `knowledge/personal/` | Private local configuration | identity, API tokens, private preferences |
-| `knowledge/confidential/` | Sensitive organization knowledge | internal standards, private project context |
-| `knowledge/public/` | Shared reusable knowledge | procedures, governance, schemas, architecture docs |
-| `active/missions/` | Mission-specific runtime state | evidence, checkpoints, coordination, outputs |
-| `active/shared/` | Global runtime coordination and observability | logs, outboxes, queues, surface state, tmp artifacts |
-| `libs/actuators/` | Physical execution capabilities | browser, file, service, modeling, media, code |
-| `scripts/` | Operational entrypoints | mission control, supervisors, onboarding, diagnostics |
-| `satellites/` | External channel gateways | Slack bridge and similar integrations |
-| `presence/displays/` | Human-facing displays | Chronos Mirror |
-| `presence/bridge/` | Shared ingress/runtime bus | stimuli bus and terminal bridge runtime |
+| Path | Purpose |
+| --- | --- |
+| `knowledge/personal/` | private local identity, tokens, preferences |
+| `knowledge/confidential/` | sensitive org knowledge |
+| `knowledge/public/` | shared reusable knowledge and governance |
+| `active/missions/` | mission-specific durable state |
+| `active/shared/` | shared runtime state, logs, tmp artifacts, queues |
+| `libs/actuators/` | execution capabilities |
+| `scripts/` | control-plane and operational entry points |
+| `satellites/` | external bridges such as Slack |
+| `presence/displays/` | control and conversational displays |
 
-Practical placement rules:
+Practical rules:
 
-- personal secrets go to `knowledge/personal/connections/`
-- mission evidence goes to `active/missions/<tier>/<mission_id>/`
-- global observability goes to `active/shared/observability/`
-- transient generated artifacts go to `active/shared/tmp/`
-- reusable knowledge belongs in `knowledge/public/`
+- personal connection material goes in `knowledge/personal/connections/`
+- durable mission evidence goes in `active/missions/`
+- shared logs and tmp artifacts go in `active/shared/`
+- reusable policies, schemas, and procedures belong in `knowledge/public/`
 
-## 4. Daily Operator Commands
-
-These are the commands most people actually need.
+## 8. Daily Commands
 
 ### Setup and health
 
@@ -201,26 +222,10 @@ pnpm run cli -- search browser
 pnpm run cli -- info browser-actuator
 ```
 
-### Pipeline Management
-
-```bash
-# Preview a pipeline without executing (dry-run validation)
-pnpm cli preview <pipeline.json>
-
-# Manage scheduled pipelines
-pnpm cli schedule list                              # List all scheduled pipelines
-pnpm cli schedule register <id> <path> <actuator> "<cron>"  # Register a schedule
-pnpm cli schedule remove <id>                       # Remove a schedule
-
-# Check runtime actuator capabilities
-pnpm cli list --check                               # Show which actuators are available
-```
-
-### Mission lifecycle
+### Direct mission control
 
 ```bash
 MC="node dist/scripts/mission_controller.js"
-$MC help
 $MC start MY-TASK confidential
 $MC status MY-TASK
 $MC checkpoint step-1 "Progress note"
@@ -228,43 +233,15 @@ $MC verify MY-TASK verified "Verification summary"
 $MC finish MY-TASK
 ```
 
-## 5. Recommended Usage Patterns
+Direct mission commands are for operators.
+They are not the primary UX you should teach first.
 
-Use the terminal when:
+## 9. The Smallest Teaching Version
 
-- you are editing code
-- you need tests, diffs, or refactors
-- you are driving a mission deeply
+If you have to explain Kyberion quickly, explain it like this:
 
-Use Slack when:
-
-- you want to start or continue a conversation remotely
-- you want thread-scoped approvals or confirmations
-- you want the response to land back in the same team channel
-
-Use Chronos when:
-
-- you want to inspect what is happening
-- you want to see mission and surface state together
-- you need to perform a deterministic operator action
-
-## 6. The Smallest Mental Model
-
-If the full architecture is too much, use this model:
-
-1. Talk to Kyberion through terminal, Slack, or Chronos.
-2. Missions are the durable unit of work.
-3. Actuators are the things that physically do work.
-4. `knowledge/` stores governed memory.
-5. `active/` stores live runtime state.
-
-That model is enough for most day-to-day operation.
-
-## 7. Related References
-
-- `README.md`
-- `docs/QUICKSTART.md`
-- `docs/COMPONENT_MAP.md`
-- `docs/USER_EXPERIENCE_CONTRACT.md`
-- `knowledge/public/architecture/slack-chronos-control-model.md`
-- `knowledge/public/connections/setup_guide.md`
+1. You tell it what you want.
+2. It figures out the plan.
+3. It asks only when approval is needed.
+4. It shows what is happening.
+5. It returns the result and keeps the work inspectable.

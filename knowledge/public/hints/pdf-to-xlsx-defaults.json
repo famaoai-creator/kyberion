@@ -1,0 +1,47 @@
+{
+  "topic": "PDF-to-XLSX conversion default hints",
+  "description": "Generic defaults for PDF-to-XLSX conversion. Override per-document type via specific hint files.",
+  "tags": ["pdf", "xlsx", "conversion", "defaults"],
+  "confidence": 0.8,
+  "hints": {
+    "grid": {
+      "clusterTolerance": 3,
+      "bgAreaThreshold": 0.25,
+      "rectMergeTolerance": 3,
+      "textCellTolerance": 2,
+      "borderSnapTolerance": 2,
+      "textLineTolerance": 2
+    },
+    "desk": {
+      "_comment": "Set columnsPerUnit to match the repeating cell group width of the source Excel. 3 is common for Japanese seating charts (name/title/ID per column).",
+      "columnsPerUnit": 3,
+      "smallGapRange": [5, 15],
+      "minSmallGapCount": 3,
+      "maxFillMergeExtraCols": 1
+    },
+    "columnWidths": {
+      "_comment": "breakpoints map PDF point widths to Excel character units. Adjust for different source column widths.",
+      "breakpoints": [
+        { "maxPt": 5, "chars": 1.9 },
+        { "maxPt": 10, "chars": 3.1 },
+        { "maxPt": 15, "chars": 4.4 }
+      ],
+      "defaultRatio": 7
+    },
+    "view": {
+      "showGridLines": false,
+      "zoomScale": 85
+    },
+    "pageSetup": {
+      "orientation": "landscape",
+      "paperSize": 9,
+      "scale": 35
+    },
+    "fonts": {
+      "_comment": "Match the original Excel's default font. Common: Meiryo UI (JP), Calibri (EN), Arial",
+      "defaultName": "Meiryo UI",
+      "defaultSize": 9,
+      "defaultColor": "#111827"
+    }
+  }
+}
