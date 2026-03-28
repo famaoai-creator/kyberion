@@ -3,7 +3,19 @@
 Total Actuators: 23
 Last updated: 2026-03-24
 
-This guide is generated from manifest-backed actuators. It is the human-readable counterpart to `knowledge/public/orchestration/global_actuator_index.json`.
+This is the catalog of Kyberion's execution body.
+
+Users should normally ask Kyberion for outcomes such as:
+
+- `このPDFをパワポにして`
+- `日経新聞を開いて`
+- `今週の進捗レポートを作って`
+
+Kyberion then chooses the appropriate actuators internally.
+
+This guide is therefore an operator and contributor reference, not the primary end-user interface.
+
+It is generated from manifest-backed actuators and is the human-readable counterpart to `knowledge/public/orchestration/global_actuator_index.json`.
 
 Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.
 
@@ -38,4 +50,3 @@ See also:
 - [global_actuator_index.json](knowledge/public/orchestration/global_actuator_index.json)
 - [legacy_component_index.json](knowledge/public/orchestration/legacy_component_index.json)
 - [component-lifecycle-inventory.md](knowledge/public/architecture/component-lifecycle-inventory.md)
-

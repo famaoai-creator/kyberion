@@ -1,0 +1,78 @@
+{
+  "topic": "PDF-to-PPTX conversion default hints",
+  "description": "Configurable parameters for PDF-to-PPTX conversion. Override per-document type for better results.",
+  "tags": ["pdf", "pptx", "conversion", "defaults"],
+  "confidence": 0.8,
+  "hints": {
+    "canvas": {
+      "_comment": "Default PDF page dimensions and PPTX fallback canvas (16:9 widescreen)",
+      "defaultWidth": 960,
+      "defaultHeight": 540,
+      "fallbackW": 13.333,
+      "fallbackH": 7.5
+    },
+    "features": {
+      "_comment": "Optional PDF-to-PPTX reconstruction features",
+      "fullPageImageOverlay": false
+    },
+    "garble": {
+      "_comment": "Thresholds for detecting garbled CMap text from PDF extraction",
+      "minLength": 3,
+      "entropyThreshold": 0.3,
+      "gridTextCountMin": 20,
+      "gridGarbleRatio": 0.2
+    },
+    "text": {
+      "_comment": "Text grouping and font size clamping for slide elements",
+      "lineGroupTolerance": 3,
+      "fontSizeMin": 8,
+      "fontSizeMax": 22,
+      "xGapThreshold": 50,
+      "clusterPadX": 2,
+      "clusterPadY": 1
+    },
+    "grid": {
+      "_comment": "Detection of grid-like pages (PPTX-exported PDFs with tabular data)",
+      "minElements": 60,
+      "xBucketSize": 20,
+      "shortTextMax": 4,
+      "minXBuckets": 18,
+      "shortRatio": 0.35,
+      "undefinedFontRatio": 0.2
+    },
+    "style": {
+      "_comment": "Default fonts, colors, and sizes for generated slides",
+      "fontFamily": "Meiryo UI",
+      "titleFontSize": 32,
+      "pageTitleFontSize": 24,
+      "bodyFontSize": 16,
+      "defaultTextColor": "1F2937",
+      "bodyTextColor": "334155",
+      "darkBgTextColor": "FFFFFF",
+      "darkLuminanceThreshold": 0.5,
+      "blackFillReplacement": "1F497D"
+    },
+    "layout": {
+      "_comment": "Slide element positions in inches",
+      "titlePos": { "x": 0.7, "y": 2.5, "w": 8.8, "h": 1.2 },
+      "pageTitlePos": { "x": 0.7, "y": 0.6, "w": 8.8, "h": 0.7 },
+      "bodyPos": { "x": 0.8, "y": 1.5, "w": 8.4, "h": 3.6 }
+    },
+    "theme": {
+      "dk1": "111827",
+      "dk2": "475569",
+      "lt1": "FFFFFF",
+      "lt2": "F8FAFC",
+      "accent1": "2563EB",
+      "accent2": "0F172A"
+    },
+    "lines": {
+      "_comment": "Line/connector rendering defaults",
+      "widthScale": 0.75,
+      "minWidth": 0.25,
+      "defaultWidth": 0.5,
+      "defaultColor": "94A3B8"
+    },
+    "repeatableOnceTokens": ["✓", "自由回答", "+", "/", "1~6", "1~5", "1~2", "後"]
+  }
+}
