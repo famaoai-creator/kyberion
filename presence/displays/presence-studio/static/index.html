@@ -92,6 +92,22 @@
         place-items: center;
         animation: float 4.5s ease-in-out infinite;
       }
+      .avatar-media {
+        position: relative;
+        width: min(320px, 78%);
+        aspect-ratio: 1;
+        border-radius: 28px;
+        object-fit: cover;
+        border: 1px solid rgba(125, 211, 252, 0.26);
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+        z-index: 1;
+      }
+      .avatar-media.hidden {
+        display: none;
+      }
+      .avatar-media:not(.hidden) + .orb {
+        display: none;
+      }
       .expression {
         position: absolute;
         bottom: 22px;
@@ -143,6 +159,62 @@
         color: var(--muted);
         text-transform: uppercase;
         margin-bottom: 8px;
+      }
+      .chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(125,211,252,0.1);
+        border: 1px solid rgba(125,211,252,0.18);
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .candidate-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: rgba(253, 230, 138, 0.12);
+        border: 1px solid rgba(253, 230, 138, 0.28);
+        color: var(--warm);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+      }
+      .capability-card {
+        display: grid;
+        gap: 12px;
+      }
+      .small {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        text-decoration: none;
+      }
+      .task-session-entry {
+        cursor: pointer;
+      }
+      .task-session-entry.selected {
+        border-color: rgba(253, 230, 138, 0.32);
+        background: rgba(253, 230, 138, 0.06);
+      }
+      .history-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
       }
       .row {
         display: flex;
@@ -220,6 +292,7 @@
       <div class="sub">A governed realtime surface for subtitles, expression state, transcript, and voice-channel stimuli.</div>
       <div class="grid" style="margin-top: 22px;">
         <section class="panel avatar">
+          <img class="avatar-media hidden" id="avatar-image" alt="Kyberion avatar" />
           <div class="orb"></div>
           <div class="expression" id="expression">neutral</div>
         </section>
@@ -227,12 +300,31 @@
           <div class="status"><span class="dot"></span><span id="status">ready</span></div>
           <div class="subtitle" id="subtitle">Surface ready. Send A2UI or voice stimuli.</div>
           <div class="controls">
+            <button class="button" id="ptt-toggle" type="button">Hold To Talk</button>
             <button class="button" id="native-mic-toggle" type="button">Start Native STT</button>
             <button class="button" id="mic-toggle" type="button">Start Browser STT</button>
+            <button class="button" id="hands-free-toggle" type="button">Enable Hands-Free</button>
+            <select class="select" id="conversation-mode">
+              <option value="conversation">Conversation Mode</option>
+              <option value="operator">Operator Mode</option>
+              <option value="private">Private Mode</option>
+            </select>
             <select class="select" id="native-device"></select>
+            <select class="select" id="stt-backend"></select>
             <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
           </div>
+          <div class="footer" id="voice-presence-state">Voice state: idle</div>
           <div class="footer">This MVP uses the existing A2UI transport and the governed `voice` channel stimuli path.</div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Current Surface Agent</div>
+          <div class="capability-card" id="current-agent"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Surface Agent Catalog</div>
+          <div class="list" id="agent-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
@@ -245,23 +337,93 @@
           <div class="list" id="stimuli"></div>
         </section>
       </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Async Requests</div>
+          <div class="list" id="async-requests"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Notifications</div>
+          <div class="list" id="notifications"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Task Sessions</div>
+          <div class="list" id="task-session-active"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Browser Conversation</div>
+          <div class="controls" style="margin-top: 0; margin-bottom: 14px;">
+            <select class="select" id="browser-session"></select>
+            <button class="button" id="browser-session-bootstrap" type="button">Bootstrap Browser Session</button>
+          </div>
+          <div class="list" id="browser-conversation-active"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Browser Candidates</div>
+          <div class="list" id="browser-conversation-candidates"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Task Detail</div>
+          <div class="list" id="task-session-detail"></div>
+        </section>
+      </div>
     </div>
     <script>
       const titleEl = document.getElementById("title");
       const updatedEl = document.getElementById("updated");
       const expressionEl = document.getElementById("expression");
+      const avatarImageEl = document.getElementById("avatar-image");
       const statusEl = document.getElementById("status");
       const subtitleEl = document.getElementById("subtitle");
       const transcriptEl = document.getElementById("transcript");
       const stimuliEl = document.getElementById("stimuli");
+      const asyncRequestsEl = document.getElementById("async-requests");
+      const notificationsEl = document.getElementById("notifications");
+      const taskSessionActiveEl = document.getElementById("task-session-active");
+      const taskSessionDetailEl = document.getElementById("task-session-detail");
+      const browserConversationActiveEl = document.getElementById("browser-conversation-active");
+      const browserConversationCandidatesEl = document.getElementById("browser-conversation-candidates");
+      const browserSessionSelectEl = document.getElementById("browser-session");
+      const browserSessionBootstrapEl = document.getElementById("browser-session-bootstrap");
+      const currentAgentEl = document.getElementById("current-agent");
+      const agentCatalogEl = document.getElementById("agent-catalog");
+      const pttToggleEl = document.getElementById("ptt-toggle");
       const nativeMicToggleEl = document.getElementById("native-mic-toggle");
       const micToggleEl = document.getElementById("mic-toggle");
+      const handsFreeToggleEl = document.getElementById("hands-free-toggle");
+      const conversationModeEl = document.getElementById("conversation-mode");
       const nativeDeviceEl = document.getElementById("native-device");
+      const sttBackendEl = document.getElementById("stt-backend");
       const micHintEl = document.getElementById("mic-hint");
+      const voicePresenceStateEl = document.getElementById("voice-presence-state");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
+      let isPushToTalkActive = false;
+      let isSpeechPlaying = false;
+      let isHandsFreeActive = false;
+      let isRecognitionStarting = false;
+      let browserSendInFlight = false;
+      let suppressRecognitionRestart = false;
+      let handsFreeRestartTimer = null;
+      let browserFinalTranscript = "";
+      let browserInterimTranscript = "";
+      let surfaceAgentCatalog = { currentAgentId: "presence-surface-agent", current: null, agents: [] };
+      let asyncRequests = [];
+      let notifications = [];
+      let taskSessionState = { active: null, items: [] };
+      let selectedTaskSessionId = null;
+      let browserConversationState = { active: null, items: [] };
+      let browserSessions = [];
+      let latestState = null;
+      let latestSpeechState = { status: "idle" };
+      let previousSpeechStatus = "idle";
+      let triggerHandsFreeRecognition = async () => {};
 
       function makeRequestId() {
         if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -282,12 +444,103 @@
         micHintEl.textContent = hint;
       }
 
+      function setPushToTalkState(nextActive, hint) {
+        isPushToTalkActive = nextActive;
+        pttToggleEl.textContent = nextActive ? "Release To Send" : "Hold To Talk";
+        pttToggleEl.classList.toggle("active", nextActive);
+        if (hint) micHintEl.textContent = hint;
+      }
+
+      function selectedConversationMode() {
+        return conversationModeEl.value || "conversation";
+      }
+
+      function setHandsFreeState(nextActive, hint) {
+        isHandsFreeActive = nextActive;
+        handsFreeToggleEl.textContent = nextActive ? "Disable Hands-Free" : "Enable Hands-Free";
+        handsFreeToggleEl.classList.toggle("active", nextActive);
+        if (hint) micHintEl.textContent = hint;
+      }
+
+      function selectedBackend() {
+        return sttBackendEl.value || "auto";
+      }
+
+      async function syncBrowserLocationContext() {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          try {
+            await fetch("/api/context/location", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: new Date(position.timestamp || Date.now()).toISOString(),
+              }),
+            });
+          } catch (_) {
+            // Best effort only.
+          }
+        }, () => {
+          // Permission denied or unavailable.
+        }, {
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 10 * 60 * 1000,
+        });
+      }
+
+      function handsFreeRestartDelayMs() {
+        const mode = selectedConversationMode();
+        if (mode === "operator") return 250;
+        if (mode === "private") return 0;
+        return 550;
+      }
+
+      function applySpeechState(nextSpeechState) {
+        previousSpeechStatus = latestSpeechState?.status || "idle";
+        latestSpeechState = nextSpeechState || { status: "idle" };
+        isSpeechPlaying = latestSpeechState.status === "speaking";
+        const speechJustFinished = previousSpeechStatus === "speaking" && latestSpeechState.status !== "speaking";
+        if (speechJustFinished && isHandsFreeActive && !isPushToTalkActive && !recognition && !browserSendInFlight) {
+          micHintEl.textContent = `Hands-free ready in ${selectedConversationMode()} mode.`;
+          window.setTimeout(() => {
+            if (!isHandsFreeActive || isSpeechPlaying || recognition || browserSendInFlight) return;
+            triggerHandsFreeRecognition();
+          }, handsFreeRestartDelayMs());
+        }
+        renderVoicePresenceState();
+      }
+
+      async function stopSpeaking(reason) {
+        try {
+          await fetch("/api/voice/stop-speaking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason })
+          });
+          isSpeechPlaying = false;
+        } catch (_) {
+          // Best effort only.
+        }
+      }
+
+      function renderVoicePresenceState() {
+        const mode = selectedConversationMode();
+        const status = latestSpeechState?.status || "idle";
+        const handsFreeLabel = isHandsFreeActive ? "hands-free on" : "hands-free off";
+        voicePresenceStateEl.textContent = `Voice state: ${status} · mode: ${mode} · ${handsFreeLabel}`;
+      }
+
       function selectedNativeDeviceLabel() {
         const option = nativeDeviceEl.options[nativeDeviceEl.selectedIndex];
         return option ? option.textContent : "default input";
       }
 
       async function postVoiceIngress(text) {
+        const mode = selectedConversationMode();
         const response = await fetch("/api/voice/ingest", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -295,18 +548,22 @@
             request_id: makeRequestId(),
             text,
             intent: "conversation",
-            source_id: "browser-mic",
+            source_id: mode === "operator" ? "presence-operator" : "browser-mic",
             speaker: "User"
           })
         });
         if (!response.ok) {
           throw new Error(`voice ingest failed: HTTP ${response.status}`);
         }
-        return response.json();
+        const body = await response.json();
+        await loadAsyncState();
+        if (latestState) render(latestState);
+        return body;
       }
 
       async function startNativeStt() {
         const deviceLabel = selectedNativeDeviceLabel();
+        await stopSpeaking("native_ptt_barge_in");
         setNativeMicState(true, `Native STT is listening on ${deviceLabel}...`);
         try {
           const response = await fetch("/api/voice/native-listen", {
@@ -316,6 +573,7 @@
               request_id: makeRequestId(),
               locale: navigator.language || "ja-JP",
               device_id: nativeDeviceEl.value || undefined,
+              backend: selectedBackend(),
               timeout_seconds: 8
             })
           });
@@ -326,6 +584,35 @@
           setNativeMicState(false, `Native STT heard on ${deviceLabel}: ${body.stt?.text || body.replyText || "ok"} (${body.stt?.elapsed_ms || "?"}ms)`);
         } catch (error) {
           setNativeMicState(false, `Native STT failed on ${deviceLabel}: ${error.message || error}`);
+        }
+      }
+
+      async function loadSttBackends() {
+        sttBackendEl.innerHTML = "";
+        try {
+          const response = await fetch("/api/voice/stt-backends");
+          const body = await response.json();
+          if (!response.ok || !body.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          const options = [
+            { value: "auto", label: `Auto (${(body.selected || []).join(" -> ") || "none"})` },
+            { value: "server", label: `Server${body.available?.server ? "" : " (Unavailable)"}` },
+            { value: "whisper_cpp", label: `whisper.cpp${body.available?.whisperCpp ? "" : " (Unavailable)"}` },
+            { value: "native_speech", label: `Native Speech${body.available?.nativeSpeech ? "" : " (Unavailable)"}` }
+          ];
+          for (const item of options) {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            sttBackendEl.appendChild(option);
+          }
+        } catch (error) {
+          const option = document.createElement("option");
+          option.value = "auto";
+          option.textContent = `Backend load failed: ${error.message || error}`;
+          sttBackendEl.appendChild(option);
+          sttBackendEl.disabled = true;
         }
       }
 
@@ -378,14 +665,205 @@
         }
       }
 
+      function renderChips(items) {
+        if (!items || items.length === 0) return `<div class="small">None</div>`;
+        return `<div class="chips">${items.map((item) => `<span class="chip">${String(item).replace(/</g, "&lt;")}</span>`).join("")}</div>`;
+      }
+
+      function renderCurrentAgent(agentId) {
+        const current = surfaceAgentCatalog.current && surfaceAgentCatalog.current.agentId === agentId
+          ? surfaceAgentCatalog.current
+          : (surfaceAgentCatalog.agents || []).find((agent) => agent.agentId === agentId);
+        if (!current) {
+          currentAgentEl.innerHTML = `<div class="small">No surface-agent profile found for <span class="mono">${agentId || "unknown"}</span>.</div>`;
+          return;
+        }
+        currentAgentEl.innerHTML = `
+          <div>
+            <div class="row"><strong>${current.displayName}</strong><span class="mono">${current.agentId}</span></div>
+            <div class="small">${current.summary || "No summary available."}</div>
+          </div>
+          <div>
+            <div class="label">Can Do</div>
+            ${renderChips(current.capabilities || [])}
+          </div>
+          <div>
+            <div class="label">Authority Roles</div>
+            ${renderChips(current.authorityRoles || [])}
+          </div>
+          <div>
+            <div class="label">Delegates To</div>
+            ${renderChips(current.delegationTargets || [])}
+          </div>
+          <div>
+            <div class="label">Will Not Do</div>
+            ${renderChips(current.deniedActuators || [])}
+          </div>
+        `;
+      }
+
+      async function loadSurfaceAgents() {
+        try {
+          const response = await fetch("/api/surface-agents");
+          const body = await response.json();
+          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          surfaceAgentCatalog = body;
+        } catch (error) {
+          surfaceAgentCatalog = {
+            currentAgentId: "presence-surface-agent",
+            current: null,
+            agents: [{
+              agentId: "error",
+              displayName: "Catalog unavailable",
+              summary: error.message || String(error),
+              capabilities: [],
+              authorityRoles: [],
+              delegationTargets: [],
+              deniedActuators: []
+            }]
+          };
+        }
+      }
+
+      async function loadAsyncState() {
+        try {
+          const [requestsResponse, notificationsResponse, taskSessionsResponse, browserConversationResponse, browserSessionsResponse] = await Promise.all([
+            fetch("/api/async-requests"),
+            fetch("/api/notifications"),
+            fetch("/api/task-sessions"),
+            fetch("/api/browser-conversation-sessions"),
+            fetch("/api/browser-sessions"),
+          ]);
+          const requestsBody = await requestsResponse.json();
+          const notificationsBody = await notificationsResponse.json();
+          const taskSessionsBody = await taskSessionsResponse.json();
+          const browserConversationBody = await browserConversationResponse.json();
+          const browserSessionsBody = await browserSessionsResponse.json();
+          asyncRequests = requestsBody.items || [];
+          notifications = notificationsBody.items || [];
+          taskSessionState = taskSessionsBody || { active: null, items: [] };
+          browserConversationState = browserConversationBody || { active: null, items: [] };
+          browserSessions = browserSessionsBody.items || [];
+        } catch (_) {
+          asyncRequests = [];
+          notifications = [];
+          taskSessionState = { active: null, items: [] };
+          browserConversationState = { active: null, items: [] };
+          browserSessions = [];
+        }
+      }
+
+      async function loadSpeechState() {
+        try {
+          const response = await fetch("/api/voice/speech-state");
+          const body = await response.json();
+          applySpeechState(body?.speech || body || { status: "idle" });
+        } catch (_) {
+          applySpeechState({ status: "unknown" });
+        }
+      }
+
+      function renderBrowserSessionSelect() {
+        browserSessionSelectEl.innerHTML = "";
+        if (!browserSessions.length) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No browser sessions";
+          browserSessionSelectEl.appendChild(option);
+          browserSessionSelectEl.disabled = true;
+          browserSessionBootstrapEl.disabled = true;
+          return;
+        }
+        browserSessionSelectEl.disabled = false;
+        browserSessionBootstrapEl.disabled = false;
+        for (const session of browserSessions) {
+          const option = document.createElement("option");
+          option.value = session.session_id;
+          const tab = Array.isArray(session.tabs) ? session.tabs.find((item) => item.active) || session.tabs[0] : null;
+          option.textContent = `${session.session_id} · ${session.lease_status || "unknown"} · ${(tab?.title || tab?.url || "browser session").slice(0, 60)}`;
+          browserSessionSelectEl.appendChild(option);
+        }
+      }
+
+      function deriveVoiceUiState(surfaceData) {
+        const mode = selectedConversationMode();
+        const speechStatus = String(latestSpeechState?.status || "idle");
+        const hasBrowserFocus = Boolean(browserConversationState?.active);
+        const operatorMode = mode === "operator";
+
+        if (isSpeechPlaying || speechStatus === "speaking") {
+          return {
+            status: operatorMode ? "speaking/operator" : "speaking",
+            expression: "joy",
+            subtitle: operatorMode
+              ? "Operator response in progress. You can interrupt with a follow-up instruction."
+              : "Responding now. You can interrupt if needed.",
+          };
+        }
+        if (isPushToTalkActive || isListening || isNativeListening || isRecognitionStarting) {
+          return {
+            status: operatorMode ? "listening/operator" : "listening",
+            expression: "listening",
+            subtitle: operatorMode
+              ? "Operator mode is listening for the next browser instruction."
+              : "Listening for your next turn.",
+          };
+        }
+        if (browserSendInFlight) {
+          return {
+            status: operatorMode ? "thinking/operator" : "thinking",
+            expression: "thinking",
+            subtitle: operatorMode
+              ? "Working through the browser step now."
+              : "Processing what you said.",
+          };
+        }
+        if (operatorMode && hasBrowserFocus) {
+          return {
+            status: "operator-ready",
+            expression: "thinking",
+            subtitle: "Operator mode is armed. Say the next browser step naturally.",
+          };
+        }
+        if (isHandsFreeActive) {
+          return {
+            status: "hands-free",
+            expression: "neutral",
+            subtitle: mode === "conversation"
+              ? "Hands-free conversation is on."
+              : `Hands-free ${mode} mode is on.`,
+          };
+        }
+        return {
+          status: null,
+          expression: null,
+          subtitle: null,
+        };
+      }
+
       function render(state) {
+        latestState = state;
         const surface = state.surfaces["presence-studio"] || { data: {} };
         const data = surface.data || {};
+        const derivedVoiceUiState = deriveVoiceUiState(data);
         titleEl.textContent = data.title || "Presence Studio";
         updatedEl.textContent = data.updatedAt || state.lastUpdatedAt || "waiting for state";
-        expressionEl.textContent = data.expression || "neutral";
-        statusEl.textContent = data.status || "idle";
-        subtitleEl.textContent = data.subtitle || "Surface ready. Send A2UI or voice stimuli.";
+        expressionEl.textContent = derivedVoiceUiState.expression || data.expression || "neutral";
+        statusEl.textContent = derivedVoiceUiState.status || data.status || "idle";
+        subtitleEl.textContent = derivedVoiceUiState.subtitle || data.subtitle || "Surface ready. Send A2UI or voice stimuli.";
+
+        const expressionKey = String(derivedVoiceUiState.expression || data.expression || "neutral");
+        const expressionAvatarMap = data.expressionAvatarMap && typeof data.expressionAvatarMap === "object"
+          ? data.expressionAvatarMap
+          : {};
+        const avatarPath = expressionAvatarMap[expressionKey] || data.avatarAssetPath || "";
+        if (avatarPath) {
+          avatarImageEl.src = avatarPath;
+          avatarImageEl.classList.remove("hidden");
+        } else {
+          avatarImageEl.removeAttribute("src");
+          avatarImageEl.classList.add("hidden");
+        }
 
         renderList(transcriptEl, data.transcript || [], (item) =>
           `<div class="row"><strong>${item.speaker || "speaker"}</strong><span class="mono">${(item.text || "").replace(/</g, "&lt;")}</span></div>`
@@ -394,6 +872,127 @@
         renderList(stimuliEl, state.recentStimuli || [], (item) =>
           `<div class="label">${item.origin?.source_id || "voice"}</div><div>${item.signal?.payload || ""}</div><div class="mono">${item.ts || ""}</div>`
         );
+
+        renderCurrentAgent(data.agentId || surfaceAgentCatalog.currentAgentId);
+        renderList(agentCatalogEl, surfaceAgentCatalog.agents || [], (agent) =>
+          `<div class="row"><strong>${agent.displayName || agent.agentId}</strong><span class="mono">${agent.agentId}</span></div>
+           <div class="small">${agent.summary || ""}</div>
+           <div style="margin-top:8px;">${renderChips(agent.capabilities || [])}</div>`
+        );
+
+        renderList(asyncRequestsEl, asyncRequests || [], (item) =>
+          `<div class="row"><strong>${item.request_id}</strong><span class="mono">${item.status}</span></div>
+           <div class="small">${item.receiver_agent_id} · ${(item.query || "").replace(/</g, "&lt;")}</div>`
+        );
+
+        renderList(notificationsEl, notifications || [], (item) =>
+          `<div class="row"><strong>${item.title || item.notification_id}</strong><span class="mono">${item.status}</span></div>
+           <div class="small">${(item.text || "").replace(/</g, "&lt;")}</div>`
+        );
+
+        renderTaskSessions();
+
+        const activeBrowserConversation = browserConversationState.active;
+        renderList(browserConversationActiveEl, activeBrowserConversation ? [activeBrowserConversation] : [], (item) =>
+          `<div class="row"><strong>${item.session_id}</strong><span class="mono">${item.status}</span></div>
+           <div class="small">${(item.goal?.summary || item.goal_summary || "").replace(/</g, "&lt;")}</div>
+           <div class="small">step: ${(item.active_step?.description || item.active_step || "n/a").replace(/</g, "&lt;")}</div>
+           <div class="small">awaiting confirmation: <span class="mono">${String(item.conversation_context?.pending_confirmation ?? item.pending_confirmation ?? false)}</span></div>`
+        );
+
+        const candidates = Array.isArray(activeBrowserConversation?.candidate_targets)
+          ? activeBrowserConversation.candidate_targets
+          : [];
+        renderList(browserConversationCandidatesEl, candidates.map((item, index) => ({ ...item, candidateIndex: index + 1 })), (item) =>
+          `<div class="row"><div style="display:flex;align-items:center;gap:10px;"><span class="candidate-index">${item.candidateIndex}</span><strong>${(item.label || item.text || item.element_id || "candidate").replace(/</g, "&lt;")}</strong></div><span class="mono">${item.region_hint || "unknown"}</span></div>
+           <div class="small">say: <span class="mono">${item.candidateIndex}つ目</span> · ref: <span class="mono">${(item.element_id || "").replace(/</g, "&lt;")}</span> · confidence: <span class="mono">${item.confidence ?? "n/a"}</span></div>`
+        );
+        renderBrowserSessionSelect();
+        renderVoicePresenceState();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "").replace(/</g, "&lt;");
+      }
+
+      function currentTaskSessionItems() {
+        const active = taskSessionState?.active ? [taskSessionState.active] : [];
+        const rest = Array.isArray(taskSessionState?.items) ? taskSessionState.items : [];
+        const seen = new Set();
+        return [...active, ...rest].filter((item) => {
+          if (!item?.session_id || seen.has(item.session_id)) return false;
+          seen.add(item.session_id);
+          return true;
+        });
+      }
+
+      function ensureSelectedTaskSession() {
+        const items = currentTaskSessionItems();
+        if (!items.length) {
+          selectedTaskSessionId = null;
+          return null;
+        }
+        if (selectedTaskSessionId && items.some((item) => item.session_id === selectedTaskSessionId)) {
+          return items.find((item) => item.session_id === selectedTaskSessionId) || null;
+        }
+        selectedTaskSessionId = (taskSessionState.active?.session_id || items[0].session_id);
+        return items.find((item) => item.session_id === selectedTaskSessionId) || null;
+      }
+
+      function renderTaskSessions() {
+        const items = currentTaskSessionItems();
+        const selected = ensureSelectedTaskSession();
+        taskSessionActiveEl.innerHTML = "";
+        if (!items.length) {
+          taskSessionActiveEl.innerHTML = `<div class="item small">No task sessions yet.</div>`;
+          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          return;
+        }
+        for (const item of items) {
+          const node = document.createElement("button");
+          node.type = "button";
+          node.className = `item task-session-entry${selected?.session_id === item.session_id ? " selected" : ""}`;
+          node.innerHTML = `<div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
+            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
+            <div class="small">artifact: <span class="mono">${escapeHtml(item.artifact?.kind || "none")}</span></div>`;
+          node.addEventListener("click", () => {
+            selectedTaskSessionId = item.session_id;
+            renderTaskSessions();
+          });
+          taskSessionActiveEl.appendChild(node);
+        }
+        renderTaskSessionDetail(selected);
+      }
+
+      function renderTaskSessionDetail(item) {
+        if (!item) {
+          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          return;
+        }
+        const history = Array.isArray(item.history) ? item.history.slice(-6).reverse() : [];
+        const artifact = item.artifact || null;
+        const artifactLink = artifact?.output_path
+          ? `<a class="button button-link" href="/api/task-sessions/${encodeURIComponent(item.session_id)}/artifact">Download ${escapeHtml(artifact.kind || "artifact")}</a>`
+          : "";
+        const fileName = artifact?.output_path
+          ? String(artifact.output_path).split("/").pop()
+          : "";
+        taskSessionDetailEl.innerHTML = `<div class="item">
+            <div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
+            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
+            <div class="small">missing: <span class="mono">${escapeHtml((item.requirements?.missing || []).join(", ") || "none")}</span></div>
+            <div class="small">preview: ${escapeHtml(artifact?.preview_text || "No artifact preview yet.")}</div>
+            ${fileName ? `<div class="small">file: <span class="mono">${escapeHtml(fileName)}</span></div>` : ""}
+            ${artifactLink}
+          </div>
+          <div class="item">
+            <div class="label">Recent History</div>
+            <div class="history-list">
+              ${history.length ? history.map((entry) => `<div class="small"><span class="mono">${escapeHtml(entry.ts || "")}</span> ${escapeHtml(entry.text || "")}</div>`).join("") : `<div class="small">No history yet.</div>`}
+            </div>
+          </div>`;
       }
 
       function setupMic() {
@@ -404,66 +1003,309 @@
 
         if (!SpeechRecognition) {
           micToggleEl.disabled = true;
+          pttToggleEl.disabled = true;
+          handsFreeToggleEl.disabled = true;
           setMicState(false, "Web Speech API is not available in this browser.");
         } else {
+          const clearHandsFreeRestart = () => {
+            if (handsFreeRestartTimer) {
+              clearTimeout(handsFreeRestartTimer);
+              handsFreeRestartTimer = null;
+            }
+          };
+
+          const scheduleHandsFreeRestart = (delayMs = handsFreeRestartDelayMs()) => {
+            clearHandsFreeRestart();
+            if (!isHandsFreeActive || suppressRecognitionRestart || browserSendInFlight || isSpeechPlaying) return;
+            handsFreeRestartTimer = setTimeout(() => {
+              handsFreeRestartTimer = null;
+              if (isSpeechPlaying) return;
+              startHandsFreeRecognition();
+            }, delayMs);
+          };
+
+          const stopBrowserRecognition = () => {
+            suppressRecognitionRestart = true;
+            clearHandsFreeRestart();
+            recognition?.stop();
+            recognition = null;
+            isRecognitionStarting = false;
+            isListening = false;
+          };
+
+          const flushBrowserTranscript = async () => {
+            const transcript = `${browserFinalTranscript} ${browserInterimTranscript}`.trim();
+            browserFinalTranscript = "";
+            browserInterimTranscript = "";
+            if (!transcript) {
+              if (isPushToTalkActive) {
+                setPushToTalkState(false, "No speech detected.");
+              } else if (isHandsFreeActive) {
+                micHintEl.textContent = `Hands-free is listening in ${selectedConversationMode()} mode.`;
+                scheduleHandsFreeRestart();
+              }
+              return;
+            }
+            if (isPushToTalkActive) {
+              setPushToTalkState(false, `Sending: ${transcript}`);
+            } else {
+              micHintEl.textContent = `Sending: ${transcript}`;
+            }
+            try {
+              browserSendInFlight = true;
+              await postVoiceIngress(transcript);
+              micHintEl.textContent = isHandsFreeActive
+                ? `Heard: ${transcript} · hands-free ready`
+                : `Sent: ${transcript}`;
+            } catch (error) {
+              micHintEl.textContent = `STT send failed: ${error.message || error}`;
+            } finally {
+              browserSendInFlight = false;
+              if (isHandsFreeActive && !isPushToTalkActive) {
+                scheduleHandsFreeRestart(500);
+              }
+            }
+          };
+
+          const configureRecognition = (instance, options = {}) => {
+            instance.lang = navigator.language || "ja-JP";
+            instance.interimResults = true;
+            instance.continuous = options.continuous === true;
+
+            instance.onstart = () => {
+              isRecognitionStarting = false;
+              if (isPushToTalkActive) {
+                setPushToTalkState(true, "Hold to talk...");
+                return;
+              }
+              if (isHandsFreeActive) {
+                setMicState(true, `Hands-free listening · ${selectedConversationMode()} mode`);
+                return;
+              }
+              setMicState(true, "Listening...");
+            };
+
+            instance.onresult = (event) => {
+              let finals = "";
+              let interim = "";
+              for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                const part = event.results[index][0]?.transcript || "";
+                if (event.results[index].isFinal) finals += part;
+                else interim += part;
+              }
+              browserFinalTranscript = `${browserFinalTranscript} ${finals}`.trim();
+              browserInterimTranscript = interim.trim();
+              const preview = `${browserFinalTranscript} ${browserInterimTranscript}`.trim();
+              if (isPushToTalkActive) {
+                setPushToTalkState(true, preview ? `Listening... ${preview}` : "Listening...");
+              } else if (isHandsFreeActive) {
+                micHintEl.textContent = preview
+                  ? `Hands-free heard: ${preview}`
+                  : `Hands-free listening · ${selectedConversationMode()} mode`;
+              } else if (preview) {
+                setMicState(true, `Listening... ${preview}`);
+              }
+            };
+
+            instance.onerror = (event) => {
+              isRecognitionStarting = false;
+              isListening = false;
+              if (isPushToTalkActive) {
+                setPushToTalkState(false, `Speech recognition error: ${event.error || "unknown"}`);
+                return;
+              }
+              if (isHandsFreeActive) {
+                micHintEl.textContent = `Hands-free error: ${event.error || "unknown"}`;
+                scheduleHandsFreeRestart(1200);
+                return;
+              }
+              setMicState(false, `Speech recognition error: ${event.error || "unknown"}`);
+            };
+
+            instance.onend = () => {
+              recognition = null;
+              isRecognitionStarting = false;
+              isListening = false;
+              if (isPushToTalkActive) {
+                flushBrowserTranscript();
+                return;
+              }
+              if (isHandsFreeActive && !suppressRecognitionRestart) {
+                flushBrowserTranscript();
+                return;
+              }
+              if (browserFinalTranscript || browserInterimTranscript) {
+                flushBrowserTranscript();
+                return;
+              }
+              if (!isHandsFreeActive) {
+                setMicState(false, "Speech recognition ended.");
+              }
+            };
+          };
+
+          const startHandsFreeRecognition = async () => {
+            if (!isHandsFreeActive || isPushToTalkActive || isRecognitionStarting || recognition) return;
+            suppressRecognitionRestart = false;
+            browserFinalTranscript = "";
+            browserInterimTranscript = "";
+            isRecognitionStarting = true;
+            if (isSpeechPlaying) {
+              await stopSpeaking("hands_free_barge_in");
+            }
+            recognition = new SpeechRecognition();
+            configureRecognition(recognition, { continuous: false });
+            recognition.start();
+          };
+          triggerHandsFreeRecognition = startHandsFreeRecognition;
+
+          const startPushToTalk = async () => {
+            if (isPushToTalkActive || isListening) return;
+            clearHandsFreeRestart();
+            await stopSpeaking("browser_ptt_barge_in");
+            browserFinalTranscript = "";
+            browserInterimTranscript = "";
+            suppressRecognitionRestart = true;
+            recognition = new SpeechRecognition();
+            configureRecognition(recognition, { continuous: true });
+            recognition.start();
+          };
+
           micToggleEl.addEventListener("click", () => {
+            if (isHandsFreeActive) {
+              setHandsFreeState(false, "Hands-free disabled.");
+              stopBrowserRecognition();
+              setMicState(false, "Browser speech recognition is idle.");
+              return;
+            }
             if (isListening) {
-              recognition?.stop();
+              stopBrowserRecognition();
               setMicState(false, "Stopping microphone...");
               return;
             }
 
+            stopSpeaking("browser_mic_barge_in");
+            suppressRecognitionRestart = true;
             recognition = new SpeechRecognition();
-            recognition.lang = navigator.language || "ja-JP";
-            recognition.interimResults = true;
-            recognition.continuous = false;
-
-            recognition.onstart = () => {
-              setMicState(true, "Listening...");
-            };
-
-            recognition.onresult = async (event) => {
-              const transcript = Array.from(event.results)
-                .map((result) => result[0]?.transcript || "")
-                .join("")
-                .trim();
-              if (!transcript) return;
-              const last = event.results[event.results.length - 1];
-              if (!last?.isFinal) {
-                setMicState(true, `Listening... ${transcript}`);
-                return;
-              }
-              setMicState(false, `Recognized: ${transcript}`);
-              try {
-                await postVoiceIngress(transcript);
-                micHintEl.textContent = `Sent: ${transcript}`;
-              } catch (error) {
-                micHintEl.textContent = `STT send failed: ${error.message || error}`;
-              }
-            };
-
-            recognition.onerror = (event) => {
-              setMicState(false, `Speech recognition error: ${event.error || "unknown"}`);
-            };
-
-            recognition.onend = () => {
-              if (isListening) {
-                setMicState(false, "Speech recognition ended.");
-              }
-            };
-
+            configureRecognition(recognition, { continuous: false });
             recognition.start();
+          });
+
+          handsFreeToggleEl.addEventListener("click", async () => {
+            if (isHandsFreeActive) {
+              setHandsFreeState(false, "Hands-free disabled.");
+              stopBrowserRecognition();
+              setMicState(false, "Browser speech recognition is idle.");
+              return;
+            }
+            if (selectedConversationMode() === "private") {
+              micHintEl.textContent = "Private mode keeps microphone manual. Switch mode to enable hands-free.";
+              return;
+            }
+            setHandsFreeState(true, `Hands-free ready in ${selectedConversationMode()} mode.`);
+            await startHandsFreeRecognition();
+          });
+
+          conversationModeEl.addEventListener("change", () => {
+            const mode = selectedConversationMode();
+            if (isHandsFreeActive) {
+              micHintEl.textContent = `Hands-free listening · ${mode} mode`;
+            } else {
+              micHintEl.textContent = mode === "private"
+                ? "Private mode keeps microphone manual."
+                : `Mode set to ${mode}.`;
+            }
+            renderVoicePresenceState();
+          });
+
+          const releasePushToTalk = () => {
+            if (!isPushToTalkActive) return;
+            stopBrowserRecognition();
+            setPushToTalkState(false);
+          };
+
+          pttToggleEl.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            startPushToTalk();
+          });
+          pttToggleEl.addEventListener("mouseup", releasePushToTalk);
+          pttToggleEl.addEventListener("mouseleave", releasePushToTalk);
+          pttToggleEl.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            startPushToTalk();
+          }, { passive: false });
+          pttToggleEl.addEventListener("touchend", (event) => {
+            event.preventDefault();
+            releasePushToTalk();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.code !== "Space") return;
+            if (event.repeat) return;
+            if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+            event.preventDefault();
+            startPushToTalk();
+          });
+          document.addEventListener("keyup", (event) => {
+            if (event.code !== "Space") return;
+            event.preventDefault();
+            releasePushToTalk();
           });
         }
       }
 
-      fetch("/api/state").then((res) => res.json()).then(render);
+      Promise.all([
+        loadSurfaceAgents(),
+        loadAsyncState(),
+        loadSpeechState(),
+      ]).then(() => fetch("/api/state").then((res) => res.json()).then(render));
       const source = new EventSource("/api/stream");
       source.addEventListener("state", (event) => {
-        render(JSON.parse(event.data));
+        loadAsyncState().then(() => render(JSON.parse(event.data)));
       });
+      source.addEventListener("speech_state", (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          applySpeechState(payload?.speech || payload || { status: "idle" });
+          if (latestState) render(latestState);
+        } catch (_) {
+          // Ignore malformed speech-state events.
+        }
+      });
+      setInterval(() => {
+        const statePromise = latestState
+          ? Promise.resolve(latestState)
+          : fetch("/api/state").then((res) => res.json());
+        Promise.all([loadAsyncState(), loadSpeechState(), statePromise])
+          .then(([, state]) => render(state))
+          .catch(() => {});
+      }, 2000);
       loadNativeInputDevices();
+      loadSttBackends();
+      syncBrowserLocationContext();
+      setInterval(syncBrowserLocationContext, 10 * 60 * 1000);
       setupMic();
+      browserSessionBootstrapEl.addEventListener("click", async () => {
+        const browserSessionId = browserSessionSelectEl.value;
+        if (!browserSessionId) return;
+        browserSessionBootstrapEl.disabled = true;
+        try {
+          const response = await fetch("/api/browser-conversation-sessions/bootstrap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ browser_session_id: browserSessionId })
+          });
+          const body = await response.json();
+          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          await loadAsyncState();
+          if (latestState) render(latestState);
+          micHintEl.textContent = `Browser conversation session ready for ${browserSessionId}`;
+        } catch (error) {
+          micHintEl.textContent = `Bootstrap failed: ${error.message || error}`;
+        } finally {
+          browserSessionBootstrapEl.disabled = false;
+        }
+      });
     </script>
   </body>
   </html>

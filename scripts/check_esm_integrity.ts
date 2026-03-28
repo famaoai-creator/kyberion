@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core';
 import {
   safeExistsSync,
   safeLstat,
@@ -6,7 +7,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 
-const ROOT = process.cwd();
+const ROOT = pathResolver.rootDir();
 const ALLOWED_CJS_FILES = new Set([
   'presence/displays/chronos-mirror-v2/postcss.config.cjs',
   'presence/displays/chronos-mirror-v2/tailwind.config.cjs',

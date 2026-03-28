@@ -1,0 +1,36 @@
+{
+  "session_id": "TSK-WBS-001",
+  "surface": "presence",
+  "task_type": "workbook_wbs",
+  "status": "planning",
+  "mode": "interactive",
+  "goal": {
+    "summary": "Kyberion 改修の WBS を Excel で作る",
+    "success_condition": "XLSX の初版が governed path に保存される"
+  },
+  "requirements": {
+    "missing": [],
+    "collected": {
+      "project_name": "Kyberion 改修",
+      "granularity": "work_package"
+    }
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": false
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T18:22:00+09:00",
+      "type": "instruction",
+      "text": "プロジェクトのWBSをエクセルで作成して"
+    }
+  ],
+  "updated_at": "2026-03-28T18:22:00+09:00",
+  "payload": {
+    "project_name": "Kyberion 改修",
+    "granularity": "work_package",
+    "sheet_name": "WBS"
+  }
+}

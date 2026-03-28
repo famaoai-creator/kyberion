@@ -13,6 +13,7 @@ import {
 export type GovernedArtifactRole =
   | 'slack_bridge'
   | 'chronos_gateway'
+  | 'surface_runtime'
   | 'mission_controller'
   | 'infrastructure_sentinel'
   | 'sovereign_concierge';

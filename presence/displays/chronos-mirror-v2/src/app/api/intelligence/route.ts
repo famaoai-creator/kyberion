@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
-import { collectBrowserSessions, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
+import { collectBrowserConversationSessions, collectBrowserSessions, type BrowserConversationSessionSummary, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
 import { extractMissionDependencies, normalizeMissionAssets, parseTaskBoard, summarizeNextTasks } from "../../../lib/mission-progress";
 import { applyBrowserSessionControl } from "../../../lib/browser-session-control";
 import { buildRuntimeTopology } from "../../../lib/runtime-topology";
@@ -136,6 +136,7 @@ interface SecretApprovalSummary {
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
+interface BrowserConversationSessionView extends BrowserConversationSessionSummary {}
 interface ComputerSessionView extends ComputerSessionSummary {}
 
 interface A2AHandoffView extends A2AHandoffSummary {}
@@ -900,6 +901,7 @@ export async function GET(req: NextRequest) {
       controlActionDetails: collectControlActionDetails(),
       ownerSummaries: collectOwnerSummaries(),
       browserSessions: collectBrowserSessions(),
+      browserConversationSessions: collectBrowserConversationSessions(),
       computerSessions: collectComputerSessions(),
       surfaceOutbox: {
         slack: listSurfaceOutboxMessages("slack").length,

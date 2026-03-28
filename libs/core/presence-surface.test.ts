@@ -7,6 +7,7 @@ import {
   estimateSpeechDurationMs,
   validatePresenceTimeline,
 } from './presence-surface.js';
+import { getPresenceAvatarProfile } from './presence-avatar.js';
 
 describe('presence-surface helpers', () => {
   it('creates governed voice stimuli with expected defaults', () => {
@@ -21,6 +22,7 @@ describe('presence-surface helpers', () => {
 
   it('builds an expressive surface frame as A2UI messages', () => {
     const messages = buildPresenceSurfaceFrame({
+      agentId: 'chronos-agent',
       subtitle: 'hello',
       expression: 'joy',
       transcript: [{ speaker: 'AI', text: 'hello' }],
@@ -28,8 +30,10 @@ describe('presence-surface helpers', () => {
 
     expect(messages).toHaveLength(3);
     expect(messages[0].createSurface?.surfaceId).toBe('presence-studio');
-    expect(messages[1].updateComponents?.components).toHaveLength(3);
+    expect(messages[1].updateComponents?.components).toHaveLength(4);
     expect(messages[2].updateDataModel?.data.expression).toBe('joy');
+    expect(messages[2].updateDataModel?.data.agentId).toBe('chronos-agent');
+    expect(messages[2].updateDataModel?.data.avatarAssetPath).toBe('/assets/avatars/chronos-neutral.svg');
   });
 
   it('validates presence timelines and applies defaults', () => {
@@ -46,22 +50,33 @@ describe('presence-surface helpers', () => {
 
   it('builds a voice ingress timeline for the expressive surface', () => {
     const timeline = buildPresenceVoiceIngressTimeline({
+      agentId: 'presence-surface-agent',
       text: 'hello from voice',
       speaker: 'User',
     });
 
-    expect(timeline.events[0]).toEqual({ at_ms: 0, op: 'set_status', params: { value: 'listening' } });
-    expect(timeline.events[3]).toEqual({ at_ms: 0, op: 'append_transcript', params: { speaker: 'User', text: 'hello from voice' } });
+    expect(timeline.events[0]).toEqual({ at_ms: 0, op: 'set_agent', params: { agentId: 'presence-surface-agent' } });
+    expect(timeline.events[1]).toEqual({ at_ms: 0, op: 'set_status', params: { value: 'listening' } });
+    expect(timeline.events[4]).toEqual({ at_ms: 0, op: 'append_transcript', params: { speaker: 'User', text: 'hello from voice' } });
   });
 
   it('builds an assistant reply timeline with thinking and speaking phases', () => {
     const timeline = buildPresenceAssistantReplyTimeline({
+      agentId: 'slack-surface-agent',
       text: 'hello back',
     });
 
-    expect(timeline.events[0]).toEqual({ at_ms: 0, op: 'set_status', params: { value: 'thinking' } });
-    expect(timeline.events[3]).toEqual({ at_ms: 700, op: 'set_status', params: { value: 'speaking' } });
-    expect(timeline.events[6]).toEqual({ at_ms: 700, op: 'append_transcript', params: { speaker: 'Kyberion', text: 'hello back' } });
+    expect(timeline.events[0]).toEqual({ at_ms: 0, op: 'set_agent', params: { agentId: 'slack-surface-agent' } });
+    expect(timeline.events[1]).toEqual({ at_ms: 0, op: 'set_status', params: { value: 'thinking' } });
+    expect(timeline.events[4]).toEqual({ at_ms: 700, op: 'set_status', params: { value: 'speaking' } });
+    expect(timeline.events[7]).toEqual({ at_ms: 700, op: 'append_transcript', params: { speaker: 'Kyberion', text: 'hello back' } });
+  });
+
+  it('resolves an avatar profile per agent id', () => {
+    expect(getPresenceAvatarProfile('presence-surface-agent').displayName).toBe('Kyberion');
+    expect(getPresenceAvatarProfile('chronos-mirror').displayName).toBe('Chronos');
+    expect(getPresenceAvatarProfile('chronos-mirror').defaultAvatarAssetPath).toBe('/assets/avatars/chronos-neutral.svg');
+    expect(getPresenceAvatarProfile('unknown-agent').agentId).toBe('unknown-agent');
   });
 
   it('estimates speech duration with a sensible floor', () => {

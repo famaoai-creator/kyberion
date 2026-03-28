@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-conversation-command.schema.json",
+  "title": "Browser Conversation Command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "session_id", "command_type", "utterance", "issued_at"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "browser_session_command"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_type": {
+      "type": "string",
+      "enum": ["task_command", "step_command", "control_command"]
+    },
+    "utterance": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["click", "fill", "press", "scroll", "observe", "navigate", "confirm", "cancel", "resume", "pause"]
+        },
+        "input_text": {
+          "type": "string"
+        },
+        "target_hint": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string" },
+            "region": { "type": "string" },
+            "role": { "type": "string" },
+            "element_id": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

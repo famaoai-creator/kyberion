@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 import {
   safeReadFile,
   safeWriteFile,
@@ -13,8 +14,8 @@ import { resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
 
-const SERVICE_ENDPOINTS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json');
-const OAUTH_SESSION_ROOT = path.join(process.cwd(), 'active/shared/tmp/oauth');
+const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
+const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
 
 export interface ServiceOAuthProfile {
   authorize_url: string;
@@ -44,7 +45,7 @@ function loadServicePreset(serviceId: string): any {
   if (!serviceConfig?.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }
-  return JSON.parse(safeReadFile(path.resolve(process.cwd(), serviceConfig.preset_path), { encoding: 'utf8' }) as string);
+  return JSON.parse(safeReadFile(pathResolver.rootResolve(serviceConfig.preset_path), { encoding: 'utf8' }) as string);
 }
 
 function serviceSessionDir(serviceId: string): string {

@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
-const CACHE_DIR = path.join(process.cwd(), 'active/shared/entropy-cache');
+const CACHE_DIR = pathResolver.shared('entropy-cache');
 
 /**
  * Entropy Gate v1.0

@@ -6,12 +6,14 @@
 import { logger } from '../core.js';
 import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '../secure-io.js';
 import * as path from 'path';
+import { pathResolver } from '../path-resolver.js';
 
 // Import types
 import type { Trace, TraceSpan } from './trace.js';
 import type { KnowledgeHint } from './knowledge-index.js';
 
-const FEEDBACK_HINTS_DIR = path.join(process.cwd(), 'active/shared/runtime/feedback-loop/hints');
+const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
+const PIPELINE_SCHEDULE_REGISTRY_PATH = pathResolver.shared('runtime/pipeline-schedules.json');
 
 function sanitizeSpanName(name: string): string {
   return name.replace(/[^\w:-]+/g, ' ').trim();
@@ -106,7 +108,7 @@ export function checkScheduleHealth(scheduleId: string, maxConsecutiveFailures: 
   action?: 'disabled' | 'warning';
   message?: string;
 } {
-  const registryPath = path.join(process.cwd(), 'active/shared/runtime/pipeline-schedules.json');
+  const registryPath = PIPELINE_SCHEDULE_REGISTRY_PATH;
   if (!safeExistsSync(registryPath)) return { healthy: true };
 
   try {
@@ -154,7 +156,7 @@ export function recordPipelineResult(
   status: 'succeeded' | 'failed',
   trace?: Trace
 ): void {
-  const registryPath = path.join(process.cwd(), 'active/shared/runtime/pipeline-schedules.json');
+  const registryPath = PIPELINE_SCHEDULE_REGISTRY_PATH;
   if (!safeExistsSync(registryPath)) return;
 
   try {
