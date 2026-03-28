@@ -60,6 +60,14 @@ const openFinderPath = vi.fn();
 const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
+const pathResolver = {
+  rootDir: vi.fn(() => '/tmp/kyberion'),
+  rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+  shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
+  knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
+  active: vi.fn((p = '') => `/tmp/kyberion/active/${String(p).replace(/^\/+/, '')}`),
+  resolve: vi.fn((p = '') => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+};
 
 vi.mock('@agent/core', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -90,6 +98,7 @@ vi.mock('@agent/core', () => ({
   openFinderPath,
   createApprovalRequest,
   loadApprovalRequest,
+  pathResolver,
 }));
 
 vi.mock('@agent/core/os-automation', () => ({
@@ -180,7 +189,57 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.context.focus_target_id).toBe('chat-main');
-    expect(core.safeWriteFile).toHaveBeenCalled();
+    expect(core.safeWriteFile).toHaveBeenCalledWith(
+      '/tmp/kyberion/active/shared/runtime/computer/focused-targets.json',
+      expect.stringContaining('"chat-main"'),
+    );
+  });
+
+  it('fails typing when focused element is not editable', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\nfalse');
+
+    await expect(
+      handleAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: {
+          type: 'type_into_focused_input',
+          text: 'hello',
+        },
+      } as any),
+    ).rejects.toThrow('Focused element is not editable');
+  });
+
+  it('persists pipeline context to rootDir-based context_path', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.safeReadFile).mockReturnValueOnce('{"a":1}');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        context_path: 'active/shared/tmp/system-context.json',
+      },
+      steps: [
+        {
+          type: 'capture',
+          op: 'read_json',
+          params: {
+            path: 'active/shared/tmp/input.json',
+            export_as: 'parsed',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.parsed.a).toBe(1);
+    expect(core.safeWriteFile).toHaveBeenCalledWith(
+      '/tmp/kyberion/active/shared/tmp/system-context.json',
+      expect.stringContaining('"parsed"'),
+    );
   });
 
   it('activates an application before keyboard input when target.application is present', async () => {

@@ -137,6 +137,47 @@ describe('orchestrator-actuator', () => {
     );
   });
 
+  it('loads existing context and persists merged context to context_path', async () => {
+    const root = process.cwd();
+    const contextPath = 'active/shared/tmp/orchestrator-tests/context.json';
+    const inputPath = 'active/shared/tmp/orchestrator-tests/input.json';
+    const resolvedContextPath = `${root}/${contextPath}`;
+    const resolvedInputPath = `${root}/${inputPath}`;
+
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath === resolvedContextPath) return JSON.stringify({ existing: 'yes' });
+      if (filePath === resolvedInputPath) return JSON.stringify({ answer: 42 });
+      throw new Error(`unexpected read: ${filePath}`);
+    });
+    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath === resolvedContextPath);
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        context_path: contextPath,
+      },
+      steps: [
+        {
+          type: 'capture',
+          op: 'read_json',
+          params: {
+            path: inputPath,
+            export_as: 'payload',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.existing).toBe('yes');
+    expect(result.context.payload).toEqual({ answer: 42 });
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      resolvedContextPath,
+      expect.stringContaining('"payload"'),
+    );
+  });
+
   it('renders an image pipeline bundle into an execution plan set', async () => {
     const bundle = {
       kind: 'actuator-pipeline-bundle',

@@ -1,0 +1,58 @@
+{
+  "session_id": "BRS-20260328-001",
+  "surface": "presence",
+  "status": "awaiting_instruction",
+  "mode": "interactive",
+  "target": {
+    "app": "Google Chrome",
+    "window_title": "Approval Console",
+    "url": "https://example.com/review",
+    "browser_session_id": "browser-session-1",
+    "tab_id": "tab-3"
+  },
+  "goal": {
+    "summary": "承認フローを進める",
+    "success_condition": "対象申請を承認して完了画面に到達する"
+  },
+  "active_step": {
+    "step_id": "step-4",
+    "kind": "click",
+    "description": "承認ボタンを押す",
+    "status": "pending"
+  },
+  "observation": {
+    "captured_at": "2026-03-28T15:40:00+09:00",
+    "source": "dom+vision",
+    "page_summary": "確認ダイアログが開いている",
+    "focused_element_id": "el-17"
+  },
+  "candidate_targets": [
+    {
+      "element_id": "el-17",
+      "role": "button",
+      "label": "承認",
+      "text": "承認",
+      "region_hint": "bottom-left",
+      "confidence": 0.93,
+      "bounds": { "x": 84, "y": 702, "w": 120, "h": 36 }
+    }
+  ],
+  "conversation_context": {
+    "last_user_instruction": "左下の承認ボタンを押して",
+    "last_agent_ack": "左下の「承認」を押します",
+    "pending_confirmation": false
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": false
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T15:39:54+09:00",
+      "type": "instruction",
+      "text": "左下の承認ボタンを押して"
+    }
+  ],
+  "updated_at": "2026-03-28T15:40:00+09:00"
+}

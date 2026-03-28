@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applySlackApprovalDecision,
   buildSlackSurfacePrompt,
@@ -32,7 +32,7 @@ import {
 import { runSurfaceConversation } from '@agent/core';
 import * as core from '@agent/core';
 
-describe('Channel surface agents', () => {
+describe.sequential('Channel surface agents', () => {
   const identityPath = pathResolver.rootResolve('knowledge/personal/my-identity.json');
   const visionPath = pathResolver.rootResolve('knowledge/personal/my-vision.md');
   const agentIdentityPath = pathResolver.rootResolve('knowledge/personal/agent-identity.json');
@@ -67,13 +67,12 @@ describe('Channel surface agents', () => {
   );
   const baselineDisableSupervisorDaemon = process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
 
-  afterEach(() => {
+  const cleanupSurfaceState = () => {
     const slackDir = pathResolver.rootResolve('active/shared/coordination/channels/slack');
     const slackObsDir = pathResolver.rootResolve('active/shared/observability/channels/slack');
     const chronosDir = pathResolver.rootResolve('active/shared/coordination/chronos');
     const chronosObsDir = pathResolver.rootResolve('active/shared/observability/chronos');
     const onboardingDir = pathResolver.rootResolve('active/shared/coordination/channels/slack/onboarding');
-    const personalDir = pathResolver.rootResolve('knowledge/personal');
     process.env.MISSION_ROLE = 'slack_bridge';
     if (safeExistsSync(slackDir)) safeRmSync(slackDir);
     if (safeExistsSync(slackObsDir)) safeRmSync(slackObsDir);
@@ -81,6 +80,14 @@ describe('Channel surface agents', () => {
     process.env.MISSION_ROLE = 'chronos_gateway';
     if (safeExistsSync(chronosDir)) safeRmSync(chronosDir);
     if (safeExistsSync(chronosObsDir)) safeRmSync(chronosObsDir);
+  };
+
+  beforeEach(() => {
+    cleanupSurfaceState();
+  });
+
+  afterEach(() => {
+    cleanupSurfaceState();
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'sovereign';
     if (baselineIdentity !== null) core.safeWriteFile(identityPath, baselineIdentity);

@@ -1,7 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
-import * as path from 'node:path';
 import {
   logger,
+  pathResolver,
   emitChannelSurfaceEvent,
   resolveServiceBinding,
   safeAppendFileSync,
@@ -27,6 +27,7 @@ import {
   buildSlackApprovalBlocks,
   parseSlackApprovalAction,
   applySlackApprovalDecision,
+  dispatchPresenceFrame,
 } from '@agent/core';
 
 /**
@@ -34,7 +35,7 @@ import {
  * Ingests Slack messages as GUSP v2.0 Stimuli.
  */
 
-const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
+const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const SLACK_SURFACE_AGENT_ID = 'slack-surface-agent';
 
 function recordSlackConversationOutcome(params: {
@@ -94,6 +95,26 @@ async function postApprovalRequest(client: any, params: {
     text: `Approval required: ${record.title}`,
     blocks: buildSlackApprovalBlocks(record),
   });
+}
+
+async function reflectSlackPresence(params: {
+  status: string;
+  expression: string;
+  subtitle: string;
+  transcript?: Array<{ speaker: string; text: string }>;
+}) {
+  try {
+    await dispatchPresenceFrame({
+      agentId: SLACK_SURFACE_AGENT_ID,
+      title: 'Presence Studio',
+      status: params.status,
+      expression: params.expression,
+      subtitle: params.subtitle,
+      transcript: params.transcript || [],
+    });
+  } catch (error: any) {
+    logger.warn(`⚠️ [SlackBridge] Presence reflect failed: ${error?.message || error}`);
+  }
 }
 
 async function processSlackOutbox(client: any) {
@@ -223,6 +244,12 @@ async function start() {
       }
 
       const forcedReceiver = deriveSlackDelegationReceiver(message.text);
+      await reflectSlackPresence({
+        status: 'thinking',
+        expression: 'thinking',
+        subtitle: 'Slack Surface is preparing a reply.',
+        transcript: [{ speaker: 'Slack User', text: message.text }],
+      });
       const conversation = await runSurfaceConversation({
         agentId: SLACK_SURFACE_AGENT_ID,
         query: buildSlackSurfacePrompt({
@@ -242,6 +269,12 @@ async function start() {
       const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
 
       if (conversation.approvalRequests.length > 0) {
+        await reflectSlackPresence({
+          status: 'thinking',
+          expression: 'listening',
+          subtitle: 'Slack Surface is waiting for approval.',
+          transcript: [{ speaker: 'Slack Surface', text: conversation.text || 'Approval is required before continuing.' }],
+        });
         recordSlackConversationOutcome({
           correlationId: artifact.correlationId,
           channel: message.channel,
@@ -267,6 +300,12 @@ async function start() {
 
       if (conversation.missionProposals && conversation.missionProposals.length > 0) {
         const proposal = conversation.missionProposals[0];
+        await reflectSlackPresence({
+          status: 'speaking',
+          expression: 'thinking',
+          subtitle: conversation.text || 'Slack Surface prepared a mission proposal.',
+          transcript: [{ speaker: 'Slack Surface', text: conversation.text || 'I can turn this into a mission.' }],
+        });
         recordSlackConversationOutcome({
           correlationId: artifact.correlationId,
           channel: message.channel,
@@ -303,6 +342,12 @@ async function start() {
       }
 
       if (conversation.text) {
+        await reflectSlackPresence({
+          status: 'speaking',
+          expression: 'joy',
+          subtitle: conversation.text,
+          transcript: [{ speaker: 'Slack Surface', text: conversation.text }],
+        });
         recordSlackConversationOutcome({
           correlationId: artifact.correlationId,
           channel: message.channel,

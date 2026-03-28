@@ -1,0 +1,42 @@
+{
+  "defaultAgentId": "presence-surface-agent",
+  "aliases": {
+    "kyberion": "presence-surface-agent",
+    "chronos-mirror": "chronos-agent"
+  },
+  "profiles": [
+    {
+      "agentId": "presence-surface-agent",
+      "displayName": "Kyberion",
+      "defaultAvatarAssetPath": "/assets/avatars/kyberion-neutral.svg",
+      "expressionAvatarMap": {
+        "neutral": "/assets/avatars/kyberion-neutral.svg",
+        "joy": "/assets/avatars/kyberion-joy.svg",
+        "thinking": "/assets/avatars/kyberion-thinking.svg",
+        "listening": "/assets/avatars/kyberion-listening.svg"
+      }
+    },
+    {
+      "agentId": "chronos-agent",
+      "displayName": "Chronos",
+      "defaultAvatarAssetPath": "/assets/avatars/chronos-neutral.svg",
+      "expressionAvatarMap": {
+        "neutral": "/assets/avatars/chronos-neutral.svg",
+        "joy": "/assets/avatars/chronos-joy.svg",
+        "thinking": "/assets/avatars/chronos-thinking.svg",
+        "listening": "/assets/avatars/chronos-listening.svg"
+      }
+    },
+    {
+      "agentId": "slack-surface-agent",
+      "displayName": "Slack Surface",
+      "defaultAvatarAssetPath": "/assets/avatars/slack-neutral.svg",
+      "expressionAvatarMap": {
+        "neutral": "/assets/avatars/slack-neutral.svg",
+        "joy": "/assets/avatars/slack-joy.svg",
+        "thinking": "/assets/avatars/slack-thinking.svg",
+        "listening": "/assets/avatars/slack-listening.svg"
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import {
+  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -545,13 +546,14 @@ function buildProtocol(patternId: string): XlsxDesignProtocol {
 }
 
 async function main() {
-  const manifestPath = path.resolve(process.cwd(), 'knowledge/public/design-patterns/spreadsheet/xlsx-template-library.json');
+  const manifestPath = pathResolver.rootResolve('knowledge/public/design-patterns/spreadsheet/xlsx-template-library.json');
   const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as TemplateLibrary;
   for (const template of manifest.templates) {
-    const outputDir = path.dirname(path.resolve(process.cwd(), template.output));
+    const resolvedOutput = pathResolver.rootResolve(template.output);
+    const outputDir = path.dirname(resolvedOutput);
     if (!safeExistsSync(outputDir)) safeMkdir(outputDir, { recursive: true });
     const protocol = buildProtocol(template.pattern_id);
-    await generateNativeXlsx(protocol, path.resolve(process.cwd(), template.output));
+    await generateNativeXlsx(protocol, resolvedOutput);
   }
 }
 

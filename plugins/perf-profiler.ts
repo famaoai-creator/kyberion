@@ -1,11 +1,12 @@
 import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
 /**
  * Plugin: Performance Profiler
  */
 
-const PROFILE_FILE = path.join(process.cwd(), 'work', 'perf-profile.json');
+const PROFILE_FILE = pathResolver.resolve('work/perf-profile.json');
 const WINDOW_SIZE = 20;
 const REGRESSION_THRESHOLD = 2.0;
 

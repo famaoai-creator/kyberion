@@ -363,6 +363,17 @@ interface IntelligencePayload {
   controlActionDetails: Record<string, ControlActionDetail[]>;
   ownerSummaries: OwnerSummary[];
   browserSessions: BrowserSessionSummary[];
+  browserConversationSessions: Array<{
+    session_id: string;
+    surface: string;
+    status: string;
+    mode: string;
+    updated_at: string;
+    goal_summary: string;
+    active_step?: string;
+    pending_confirmation: boolean;
+    candidate_target_count: number;
+  }>;
   surfaceOutbox: {
     slack: number;
     chronos: number;
@@ -1426,6 +1437,42 @@ export function MissionIntelligence({
             <RuntimeCell label="active leases" value={data.browserSessions.filter((session) => session.lease_status === "active").length} accent="emerald" />
             <RuntimeCell label="retained" value={data.browserSessions.filter((session) => session.retained).length} accent="gold" />
             <RuntimeCell label="expired" value={data.browserSessions.filter((session) => session.lease_status === "expired").length} accent="red" />
+          </div>
+        </Panel>
+        <Panel id="browser-conversation-sessions" title="Browser Conversation Sessions">
+          <div className="space-y-3">
+            {data.browserConversationSessions.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No browser conversation sessions recorded yet.</div>
+            ) : data.browserConversationSessions.map((session) => (
+              <div key={session.session_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{session.session_id}</div>
+                    <div className="mt-1 text-[10px] text-white/45">
+                      surface: <span className="font-mono text-white/70">{session.surface}</span> · mode: <span className="font-mono text-white/70">{session.mode}</span>
+                    </div>
+                  </div>
+                  <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                    session.status === "completed"
+                      ? "bg-green-500/15 text-green-300"
+                      : session.status === "awaiting_confirmation"
+                        ? "bg-yellow-500/10 text-yellow-200"
+                        : session.status === "failed"
+                          ? "bg-red-500/15 text-red-200"
+                          : "bg-cyan-500/15 text-cyan-200"
+                  }`}>
+                    {session.status}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>goal: <span className="text-white/80">{session.goal_summary || "n/a"}</span></div>
+                  <div>step: <span className="text-white/80">{session.active_step || "n/a"}</span></div>
+                  <div>pending confirm: <span className="font-mono text-white/80">{String(session.pending_confirmation)}</span></div>
+                  <div>candidates: <span className="font-mono text-white/80">{session.candidate_target_count}</span></div>
+                  <div>updated: <span className="font-mono text-white/80">{new Date(session.updated_at).toLocaleTimeString()}</span></div>
+                </div>
+              </div>
+            ))}
           </div>
         </Panel>
       </section>

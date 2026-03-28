@@ -5,6 +5,42 @@ import { safeMkdir, safeWriteFile } from '@agent/core';
 import { handleAction } from './index.js';
 
 describe('modeling-actuator terraform_to_architecture_adf', () => {
+  it('loads and persists pipeline context via context_path', async () => {
+    const root = process.cwd();
+    const fixtureRoot = path.join(root, 'active/shared/tmp/modeling-actuator-tests/context-roundtrip');
+    safeMkdir(fixtureRoot, { recursive: true });
+    const contextPath = path.join(fixtureRoot, 'context.json');
+    const inputPath = path.join(fixtureRoot, 'input.json');
+
+    safeWriteFile(contextPath, JSON.stringify({ existing: 'kept' }, null, 2));
+    safeWriteFile(inputPath, JSON.stringify({ count: 2 }, null, 2));
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        context_path: path.relative(root, contextPath),
+      },
+      steps: [
+        {
+          type: 'capture',
+          op: 'read_json',
+          params: {
+            path: path.relative(root, inputPath),
+            export_as: 'payload',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.existing).toBe('kept');
+    expect(result.context.payload).toEqual({ count: 2 });
+
+    const persisted = JSON.parse(fs.readFileSync(contextPath, 'utf8'));
+    expect(persisted.existing).toBe('kept');
+    expect(persisted.payload).toEqual({ count: 2 });
+  });
+
   it('normalizes terraform into architecture-adf with boundaries and module expansion', async () => {
     const root = process.cwd();
     const fixtureRoot = path.join(root, 'active/shared/tmp/modeling-actuator-tests/terraform-arch');

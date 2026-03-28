@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { A2UIMessage } from './a2ui.js';
+import { getPresenceAvatarProfile } from './presence-avatar.js';
 
 export interface PresenceVoiceStimulus {
   id: string;
@@ -24,15 +25,19 @@ export interface PresenceVoiceStimulus {
 
 export interface PresenceSurfaceFrameInput {
   surfaceId?: string;
+  agentId?: string;
   title?: string;
   status?: string;
   expression?: string;
   subtitle?: string;
+  avatarAssetPath?: string;
+  expressionAvatarMap?: Record<string, string>;
   transcript?: Array<{ speaker: string; text: string }>;
 }
 
 export type PresenceTimelineOp =
   | 'set_status'
+  | 'set_agent'
   | 'set_expression'
   | 'set_subtitle'
   | 'clear_subtitle'
@@ -55,6 +60,7 @@ export interface PresenceTimelineAdf {
 
 export interface PresenceVoiceIngressOptions {
   surfaceId?: string;
+  agentId?: string;
   speaker?: string;
   text: string;
   listening_ms?: number;
@@ -62,6 +68,7 @@ export interface PresenceVoiceIngressOptions {
 
 export interface PresenceAssistantReplyOptions {
   surfaceId?: string;
+  agentId?: string;
   speaker?: string;
   text: string;
   thinking_ms?: number;
@@ -106,6 +113,9 @@ export function createPresenceVoiceStimulus(
 export function buildPresenceSurfaceFrame(input: PresenceSurfaceFrameInput): A2UIMessage[] {
   const surfaceId = input.surfaceId || 'presence-studio';
   const transcript = input.transcript || [];
+  const avatarProfile = getPresenceAvatarProfile(input.agentId);
+  const avatarAssetPath = input.avatarAssetPath || avatarProfile.defaultAvatarAssetPath;
+  const expressionAvatarMap = input.expressionAvatarMap || avatarProfile.expressionAvatarMap;
   return [
     {
       createSurface: {
@@ -140,6 +150,16 @@ export function buildPresenceSurfaceFrame(input: PresenceSurfaceFrameInput): A2U
               items: transcript,
             },
           },
+          {
+            id: 'presence-avatar',
+            type: 'presence.avatar',
+            props: {
+              agentId: input.agentId || avatarProfile.agentId,
+              avatarAssetPath,
+              expressionAvatarMap,
+              expression: input.expression || 'neutral',
+            },
+          },
         ],
       },
     },
@@ -147,10 +167,14 @@ export function buildPresenceSurfaceFrame(input: PresenceSurfaceFrameInput): A2U
       updateDataModel: {
         surfaceId,
         data: {
+          agentId: input.agentId || avatarProfile.agentId,
+          displayName: avatarProfile.displayName,
           title: input.title || 'Presence Studio',
           status: input.status || 'idle',
           expression: input.expression || 'neutral',
           subtitle: input.subtitle || '',
+          avatarAssetPath,
+          expressionAvatarMap,
           transcript,
           updatedAt: new Date().toISOString(),
         },
@@ -180,6 +204,7 @@ export function validatePresenceTimeline(input: unknown): PresenceTimelineAdf {
     }
     if (![
       'set_status',
+      'set_agent',
       'set_expression',
       'set_subtitle',
       'clear_subtitle',
@@ -205,6 +230,7 @@ export function buildPresenceVoiceIngressTimeline(input: PresenceVoiceIngressOpt
     surface_id: input.surfaceId || 'presence-studio',
     interrupt_policy: 'replace',
     events: [
+      { at_ms: 0, op: 'set_agent', params: { agentId: input.agentId || 'presence-surface-agent' } },
       { at_ms: 0, op: 'set_status', params: { value: 'listening' } },
       { at_ms: 0, op: 'set_expression', params: { value: 'neutral' } },
       { at_ms: 0, op: 'set_subtitle', params: { text: `Heard: ${input.text}` } },
@@ -224,6 +250,7 @@ export function buildPresenceAssistantReplyTimeline(input: PresenceAssistantRepl
     surface_id: input.surfaceId || 'presence-studio',
     interrupt_policy: 'replace',
     events: [
+      { at_ms: 0, op: 'set_agent', params: { agentId: input.agentId || 'presence-surface-agent' } },
       { at_ms: 0, op: 'set_status', params: { value: 'thinking' } },
       { at_ms: 0, op: 'set_expression', params: { value: 'neutral' } },
       { at_ms: 0, op: 'set_subtitle', params: { text: 'Thinking...' } },

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-conversation-feedback.schema.json",
+  "title": "Browser Conversation Feedback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "session_id", "status", "message", "ts"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "browser_session_feedback"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["progress", "awaiting_confirmation", "completed", "blocked", "failed"]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ts": {
+      "type": "string"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["element_id"],
+        "properties": {
+          "element_id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "region_hint": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

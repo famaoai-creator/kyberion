@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -28,9 +28,9 @@ interface ServiceAction {
   auth?: 'none' | 'secret-guard' | 'session';
 }
 
-const PID_FILE = path.join(process.cwd(), 'active/shared/services-pids.json');
-const STIMULI_PATH = path.join(process.cwd(), 'presence/bridge/runtime/stimuli.jsonl');
-const SERVICE_ENDPOINTS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json');
+const PID_FILE = pathResolver.shared('services-pids.json');
+const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
 }
@@ -122,7 +122,7 @@ function unregisterServiceRuntime(serviceId: string) {
 }
 
 async function startService(id: string, service: any, pids: any) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const scriptPath = path.join(rootDir, service.path);
   const builtEntry = capabilityEntry(id);
   const logFile = path.join(rootDir, `active/shared/logs/${id}.log`);
@@ -178,7 +178,7 @@ async function handleAction(input: any, onEvent?: (data: any) => void) {
       results.push({ op: step.op, status: 'success' });
     }
     if (input.context?.context_path) {
-      safeWriteFile(path.resolve(process.cwd(), input.context.context_path), JSON.stringify(ctx, null, 2));
+      safeWriteFile(pathResolver.rootResolve(input.context.context_path), JSON.stringify(ctx, null, 2));
     }
     return { status: derivePipelineStatus(results), results, ...ctx };
   }
@@ -205,7 +205,7 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       throw new Error(`Unsupported OAuth action: ${input.action}`);
 
     case 'RECONCILE':
-      const manifestPath = path.resolve(process.cwd(), input.params.manifest_path);
+      const manifestPath = pathResolver.rootResolve(input.params.manifest_path);
       const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
       const pids = loadPids();
       let changed = false;
@@ -292,7 +292,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputData = JSON.parse(safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string) as ServiceAction;
+  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string) as ServiceAction;
   const result = await handleAction(inputData);
   console.log(JSON.stringify(result, null, 2));
 };

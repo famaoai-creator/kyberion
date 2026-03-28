@@ -1,0 +1,174 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-conversation-session.schema.json",
+  "title": "Browser Conversation Session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "surface",
+    "status",
+    "mode",
+    "goal",
+    "conversation_context",
+    "control",
+    "history",
+    "updated_at"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "surface": {
+      "type": "string",
+      "enum": ["presence", "slack", "terminal", "chronos", "web"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "observing",
+        "awaiting_instruction",
+        "resolving_target",
+        "awaiting_confirmation",
+        "executing",
+        "verifying",
+        "completed",
+        "blocked",
+        "failed",
+        "paused",
+        "released"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["interactive", "delegated", "shadow"]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": { "type": "string" },
+        "window_title": { "type": "string" },
+        "url": { "type": "string" },
+        "tab_id": { "type": "string" },
+        "browser_session_id": { "type": "string" }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "success_condition"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "success_condition": { "type": "string", "minLength": 1 }
+      }
+    },
+    "active_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "kind", "description", "status"],
+      "properties": {
+        "step_id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["observe", "click", "fill", "press", "scroll", "select", "extract", "confirm", "navigate", "wait"]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "running", "completed", "blocked", "failed", "cancelled"]
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": { "type": "string" },
+        "source": {
+          "type": "string",
+          "enum": ["dom", "vision", "dom+vision", "browser_runtime", "desktop"]
+        },
+        "page_summary": { "type": "string" },
+        "focused_element_id": { "type": "string" }
+      }
+    },
+    "candidate_targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["element_id", "confidence"],
+        "properties": {
+          "element_id": { "type": "string", "minLength": 1 },
+          "role": { "type": "string" },
+          "label": { "type": "string" },
+          "text": { "type": "string" },
+          "region_hint": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "bounds": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "w", "h"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "w": { "type": "number" },
+              "h": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "conversation_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pending_confirmation"],
+      "properties": {
+        "last_user_instruction": { "type": "string" },
+        "last_agent_ack": { "type": "string" },
+        "pending_confirmation": { "type": "boolean" }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interruptible", "requires_approval", "awaiting_user_input"],
+      "properties": {
+        "interruptible": { "type": "boolean" },
+        "requires_approval": { "type": "boolean" },
+        "awaiting_user_input": { "type": "boolean" }
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ts", "type", "text"],
+        "properties": {
+          "ts": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "instruction",
+              "ack",
+              "observation",
+              "execution",
+              "verification",
+              "feedback",
+              "error",
+              "control"
+            ]
+          },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  }
+}

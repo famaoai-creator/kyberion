@@ -29,6 +29,8 @@ import type {
   MissionProposal,
   PlanningPacketTask,
   PlanningPacket,
+  SurfaceAsyncRequestRecord,
+  SurfaceNotificationRecord,
   SurfaceOutboxMessage,
   SlackMissionIssuanceResult,
   SlackApprovalActionPayload,
@@ -385,17 +387,31 @@ export function deriveSlackIntentLabel(text: string): string {
   return 'request_deeper_reasoning';
 }
 
-export function deriveSlackDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
+export function deriveSurfaceDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
   const normalized = text.trim();
   if (!normalized) return undefined;
 
+  if (/^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$/i.test(normalized)) {
+    return undefined;
+  }
+
   if (
-    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime|ランタイム|health|ヘルス|surface|outbox|chronos/i.test(normalized)
+    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime status|runtime health|runtime list|ランタイム状況|ランタイム一覧|health check|system health|ヘルスチェック|agent runtime|outbox status|chronos status/i.test(normalized)
   ) {
     return 'chronos-mirror';
   }
 
-  return shouldForceSlackDelegation(normalized) ? 'nerve-agent' : undefined;
+  if (
+    /レビュー|review|設計|architecture|design|デバッグ|bug|error|調査|investigate|分析|analysis|評価|evaluate|戦略|strategy|実装|implement|修正|fix|計画|plan|プラン|refactor|監査|audit/i.test(normalized)
+  ) {
+    return 'nerve-agent';
+  }
+
+  return undefined;
+}
+
+export function deriveSlackDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
+  return deriveSurfaceDelegationReceiver(text);
 }
 
 function normalizeDelegationPayload(payload: any, fallbackText: string): any {
@@ -602,6 +618,26 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     };
   }
 
+  if (input.agentId === 'presence-surface-agent' && input.forcedReceiver) {
+    const delegationResults = await routeForcedDelegation(
+      input.forcedReceiver,
+      input.query,
+      input.senderAgentId,
+      input.missionId,
+    );
+    const successful = delegationResults.filter((result) => !result.error);
+    return {
+      text: successful[0]?.response || '',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults,
+      approvalRequests: [],
+      routingProposals: [],
+      missionProposals: extractSurfaceBlocks(successful[0]?.response || '').missionProposals || [],
+      planningPackets: extractSurfaceBlocks(successful[0]?.response || '').planningPackets || [],
+    };
+  }
+
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
   const firstResponse = await handle.ask(input.query);
   const firstBlocks = extractSurfaceBlocks(firstResponse);
@@ -769,8 +805,141 @@ function missionProposalStateLogicalPath(surface: 'slack' | 'chronos', channel: 
   return `active/shared/coordination/channels/${surface}/mission-proposals/${channel}-${safeThread}.json`;
 }
 
+function surfaceCoordinationRole(surface: 'slack' | 'chronos' | 'presence'): SurfaceRole {
+  if (surface === 'chronos') return 'chronos_gateway';
+  if (surface === 'presence') return 'surface_runtime';
+  return 'slack_bridge';
+}
+
+function asyncRequestLogicalPath(surface: 'slack' | 'chronos' | 'presence', requestId: string): string {
+  if (surface === 'presence') {
+    return `active/shared/runtime/presence/requests/${requestId}.json`;
+  }
+  return `active/shared/coordination/channels/${surface}/requests/${requestId}.json`;
+}
+
+function surfaceNotificationLogicalPath(surface: 'slack' | 'chronos' | 'presence', notificationId: string): string {
+  if (surface === 'presence') {
+    return `active/shared/runtime/presence/notifications/${notificationId}.json`;
+  }
+  return `active/shared/coordination/channels/${surface}/notifications/${notificationId}.json`;
+}
+
 function surfaceOutboxLogicalPath(surface: 'slack' | 'chronos', messageId: string): string {
   return `active/shared/coordination/channels/${surface}/outbox/${messageId}.json`;
+}
+
+export function createSurfaceAsyncRequest(params: {
+  surface: 'slack' | 'chronos' | 'presence';
+  channel: string;
+  threadTs: string;
+  senderAgentId: string;
+  surfaceAgentId: string;
+  receiverAgentId: string;
+  query: string;
+  acceptedText: string;
+  requestId?: string;
+}): SurfaceAsyncRequestRecord {
+  const request: SurfaceAsyncRequestRecord = {
+    request_id: params.requestId || `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    surface: params.surface,
+    channel: params.channel,
+    thread_ts: params.threadTs,
+    sender_agent_id: params.senderAgentId,
+    surface_agent_id: params.surfaceAgentId,
+    receiver_agent_id: params.receiverAgentId,
+    query: params.query,
+    accepted_text: params.acceptedText,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  return withSurfaceRole(surfaceCoordinationRole(params.surface), () => {
+    writeJsonAs(surfaceCoordinationRole(params.surface), asyncRequestLogicalPath(params.surface, request.request_id), request);
+    return request;
+  });
+}
+
+export function getSurfaceAsyncRequest(surface: 'slack' | 'chronos' | 'presence', requestId: string): SurfaceAsyncRequestRecord | null {
+  const resolved = pathResolver.resolve(asyncRequestLogicalPath(surface, requestId));
+  if (!safeExistsSync(resolved)) return null;
+  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as SurfaceAsyncRequestRecord;
+}
+
+export function updateSurfaceAsyncRequest(
+  surface: 'slack' | 'chronos' | 'presence',
+  requestId: string,
+  patch: Partial<SurfaceAsyncRequestRecord>,
+): SurfaceAsyncRequestRecord | null {
+  const current = getSurfaceAsyncRequest(surface, requestId);
+  if (!current) return null;
+  const next: SurfaceAsyncRequestRecord = {
+    ...current,
+    ...patch,
+    request_id: current.request_id,
+    surface: current.surface,
+    updated_at: new Date().toISOString(),
+  };
+  return withSurfaceRole(surfaceCoordinationRole(surface), () => {
+    writeJsonAs(surfaceCoordinationRole(surface), asyncRequestLogicalPath(surface, requestId), next);
+    return next;
+  });
+}
+
+export function listSurfaceAsyncRequests(surface: 'slack' | 'chronos' | 'presence'): SurfaceAsyncRequestRecord[] {
+  const dir = pathResolver.resolve(
+    surface === 'presence'
+      ? 'active/shared/runtime/presence/requests'
+      : `active/shared/coordination/channels/${surface}/requests`,
+  );
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string) as SurfaceAsyncRequestRecord)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function enqueueSurfaceNotification(params: {
+  surface: 'slack' | 'chronos' | 'presence';
+  channel: string;
+  threadTs: string;
+  sourceAgentId: string;
+  title: string;
+  text: string;
+  status?: 'info' | 'success' | 'error';
+  requestId?: string;
+}): SurfaceNotificationRecord {
+  const notification: SurfaceNotificationRecord = {
+    notification_id: `NTF-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    request_id: params.requestId,
+    surface: params.surface,
+    channel: params.channel,
+    thread_ts: params.threadTs,
+    source_agent_id: params.sourceAgentId,
+    title: params.title,
+    text: params.text,
+    status: params.status || 'info',
+    created_at: new Date().toISOString(),
+  };
+  return withSurfaceRole(surfaceCoordinationRole(params.surface), () => {
+    writeJsonAs(surfaceCoordinationRole(params.surface), surfaceNotificationLogicalPath(params.surface, notification.notification_id), notification);
+    return notification;
+  });
+}
+
+export function listSurfaceNotifications(surface: 'slack' | 'chronos' | 'presence'): SurfaceNotificationRecord[] {
+  const dir = pathResolver.resolve(
+    surface === 'presence'
+      ? 'active/shared/runtime/presence/notifications'
+      : `active/shared/coordination/channels/${surface}/notifications`,
+  );
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string) as SurfaceNotificationRecord)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export function enqueueSurfaceOutboxMessage(params: {

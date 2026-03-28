@@ -1,11 +1,9 @@
 import chalk from 'chalk';
-import * as path from 'node:path';
 // chalk imported dynamically
-import { safeExistsSync, safeWriteFile, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeWriteFile, safeReadFile } from '@agent/core';
 
-const rootDir = process.cwd();
-const inboxPath = path.join(rootDir, 'active/shared/portal/inbox.json');
-const outboxPath = path.join(rootDir, 'active/shared/portal/outbox.json');
+const inboxPath = pathResolver.shared('portal/inbox.json');
+const outboxPath = pathResolver.shared('portal/outbox.json');
 
 interface PortalRequest {
   intent: string;

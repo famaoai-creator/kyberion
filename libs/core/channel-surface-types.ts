@@ -180,6 +180,39 @@ export interface SurfaceConversationResult {
   planningPackets?: PlanningPacket[];
 }
 
+export type SurfaceAsyncChannel = 'slack' | 'chronos' | 'presence';
+
+export interface SurfaceAsyncRequestRecord {
+  request_id: string;
+  surface: SurfaceAsyncChannel;
+  channel: string;
+  thread_ts: string;
+  sender_agent_id: string;
+  surface_agent_id: string;
+  receiver_agent_id: string;
+  query: string;
+  accepted_text: string;
+  status: 'pending' | 'completed' | 'failed';
+  result_text?: string;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+export interface SurfaceNotificationRecord {
+  notification_id: string;
+  request_id?: string;
+  surface: SurfaceAsyncChannel;
+  channel: string;
+  thread_ts: string;
+  source_agent_id: string;
+  title: string;
+  text: string;
+  status: 'info' | 'success' | 'error';
+  created_at: string;
+}
+
 export interface SurfaceOutboxMessage {
   message_id: string;
   surface: 'slack' | 'chronos';

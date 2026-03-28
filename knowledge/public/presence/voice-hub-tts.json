@@ -1,0 +1,17 @@
+{
+  "defaultLanguage": "ja",
+  "languages": {
+    "ja": {
+      "voice": "Eddy (日本語（日本）)",
+      "rate": 185,
+      "requestIdToken": "リクエストID",
+      "urlToken": "URL"
+    },
+    "en": {
+      "voice": "Samantha",
+      "rate": 195,
+      "requestIdToken": "request id",
+      "urlToken": "link"
+    }
+  }
+}
