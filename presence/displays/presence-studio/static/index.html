@@ -197,6 +197,25 @@
         font-size: 13px;
         line-height: 1.45;
       }
+      .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        text-decoration: none;
+      }
+      .task-session-entry {
+        cursor: pointer;
+      }
+      .task-session-entry.selected {
+        border-color: rgba(253, 230, 138, 0.32);
+        background: rgba(253, 230, 138, 0.06);
+      }
+      .history-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
       .row {
         display: flex;
         justify-content: space-between;
@@ -330,7 +349,7 @@
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Active Task Session</div>
+          <div class="label">Task Sessions</div>
           <div class="list" id="task-session-active"></div>
         </section>
         <section class="panel">
@@ -347,7 +366,10 @@
           <div class="label">Browser Candidates</div>
           <div class="list" id="browser-conversation-candidates"></div>
         </section>
-        <section class="panel"></section>
+        <section class="panel">
+          <div class="label">Task Detail</div>
+          <div class="list" id="task-session-detail"></div>
+        </section>
       </div>
     </div>
     <script>
@@ -362,6 +384,7 @@
       const asyncRequestsEl = document.getElementById("async-requests");
       const notificationsEl = document.getElementById("notifications");
       const taskSessionActiveEl = document.getElementById("task-session-active");
+      const taskSessionDetailEl = document.getElementById("task-session-detail");
       const browserConversationActiveEl = document.getElementById("browser-conversation-active");
       const browserConversationCandidatesEl = document.getElementById("browser-conversation-candidates");
       const browserSessionSelectEl = document.getElementById("browser-session");
@@ -394,6 +417,7 @@
       let asyncRequests = [];
       let notifications = [];
       let taskSessionState = { active: null, items: [] };
+      let selectedTaskSessionId = null;
       let browserConversationState = { active: null, items: [] };
       let browserSessions = [];
       let latestState = null;
@@ -866,13 +890,7 @@
            <div class="small">${(item.text || "").replace(/</g, "&lt;")}</div>`
         );
 
-        const activeTaskSession = taskSessionState.active;
-        renderList(taskSessionActiveEl, activeTaskSession ? [activeTaskSession] : [], (item) =>
-          `<div class="row"><strong>${item.session_id}</strong><span class="mono">${item.status}</span></div>
-           <div class="small">${(item.goal?.summary || "task session").replace(/</g, "&lt;")}</div>
-           <div class="small">type: <span class="mono">${(item.task_type || "unknown").replace(/</g, "&lt;")}</span></div>
-           <div class="small">missing: <span class="mono">${((item.requirements?.missing || []).join(", ") || "none").replace(/</g, "&lt;")}</span></div>`
-        );
+        renderTaskSessions();
 
         const activeBrowserConversation = browserConversationState.active;
         renderList(browserConversationActiveEl, activeBrowserConversation ? [activeBrowserConversation] : [], (item) =>
@@ -891,6 +909,90 @@
         );
         renderBrowserSessionSelect();
         renderVoicePresenceState();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "").replace(/</g, "&lt;");
+      }
+
+      function currentTaskSessionItems() {
+        const active = taskSessionState?.active ? [taskSessionState.active] : [];
+        const rest = Array.isArray(taskSessionState?.items) ? taskSessionState.items : [];
+        const seen = new Set();
+        return [...active, ...rest].filter((item) => {
+          if (!item?.session_id || seen.has(item.session_id)) return false;
+          seen.add(item.session_id);
+          return true;
+        });
+      }
+
+      function ensureSelectedTaskSession() {
+        const items = currentTaskSessionItems();
+        if (!items.length) {
+          selectedTaskSessionId = null;
+          return null;
+        }
+        if (selectedTaskSessionId && items.some((item) => item.session_id === selectedTaskSessionId)) {
+          return items.find((item) => item.session_id === selectedTaskSessionId) || null;
+        }
+        selectedTaskSessionId = (taskSessionState.active?.session_id || items[0].session_id);
+        return items.find((item) => item.session_id === selectedTaskSessionId) || null;
+      }
+
+      function renderTaskSessions() {
+        const items = currentTaskSessionItems();
+        const selected = ensureSelectedTaskSession();
+        taskSessionActiveEl.innerHTML = "";
+        if (!items.length) {
+          taskSessionActiveEl.innerHTML = `<div class="item small">No task sessions yet.</div>`;
+          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          return;
+        }
+        for (const item of items) {
+          const node = document.createElement("button");
+          node.type = "button";
+          node.className = `item task-session-entry${selected?.session_id === item.session_id ? " selected" : ""}`;
+          node.innerHTML = `<div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
+            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
+            <div class="small">artifact: <span class="mono">${escapeHtml(item.artifact?.kind || "none")}</span></div>`;
+          node.addEventListener("click", () => {
+            selectedTaskSessionId = item.session_id;
+            renderTaskSessions();
+          });
+          taskSessionActiveEl.appendChild(node);
+        }
+        renderTaskSessionDetail(selected);
+      }
+
+      function renderTaskSessionDetail(item) {
+        if (!item) {
+          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          return;
+        }
+        const history = Array.isArray(item.history) ? item.history.slice(-6).reverse() : [];
+        const artifact = item.artifact || null;
+        const artifactLink = artifact?.output_path
+          ? `<a class="button button-link" href="/api/task-sessions/${encodeURIComponent(item.session_id)}/artifact">Download ${escapeHtml(artifact.kind || "artifact")}</a>`
+          : "";
+        const fileName = artifact?.output_path
+          ? String(artifact.output_path).split("/").pop()
+          : "";
+        taskSessionDetailEl.innerHTML = `<div class="item">
+            <div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
+            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
+            <div class="small">missing: <span class="mono">${escapeHtml((item.requirements?.missing || []).join(", ") || "none")}</span></div>
+            <div class="small">preview: ${escapeHtml(artifact?.preview_text || "No artifact preview yet.")}</div>
+            ${fileName ? `<div class="small">file: <span class="mono">${escapeHtml(fileName)}</span></div>` : ""}
+            ${artifactLink}
+          </div>
+          <div class="item">
+            <div class="label">Recent History</div>
+            <div class="history-list">
+              ${history.length ? history.map((entry) => `<div class="small"><span class="mono">${escapeHtml(entry.ts || "")}</span> ${escapeHtml(entry.text || "")}</div>`).join("") : `<div class="small">No history yet.</div>`}
+            </div>
+          </div>`;
       }
 
       function setupMic() {

@@ -73,6 +73,10 @@ interface PresenceLocationContext {
   source: 'browser_geolocation';
 }
 
+interface TaskSessionArtifactShape {
+  output_path?: string;
+}
+
 const app = express();
 const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/presence-studio/static');
@@ -94,6 +98,16 @@ const state: PresenceStudioState = {
   lastUpdatedAt: null,
 };
 let latestLocationContext: PresenceLocationContext | null = null;
+
+function findTaskSession(sessionId: string) {
+  return listTaskSessions('presence').find((item) => item.session_id === sessionId) || null;
+}
+
+function isAllowedTaskArtifactPath(filePath: string): boolean {
+  const resolved = path.resolve(filePath);
+  const allowedRoot = path.resolve(pathResolver.sharedTmp('surface-task-sessions'));
+  return resolved.startsWith(`${allowedRoot}${path.sep}`) || resolved === allowedRoot;
+}
 
 function ensureStimuliDir(): void {
   const dir = path.dirname(STIMULI_PATH);
@@ -439,6 +453,32 @@ app.get('/api/task-sessions', (_req, res) => {
     active: getActiveTaskSession('presence'),
     items: listTaskSessions('presence').slice(0, 10),
   });
+});
+
+app.get('/api/task-sessions/:sessionId', (req, res) => {
+  const sessionId = String(req.params.sessionId || '').trim();
+  const session = findTaskSession(sessionId);
+  if (!session) {
+    return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
+  }
+  return res.json({ ok: true, item: session });
+});
+
+app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
+  const sessionId = String(req.params.sessionId || '').trim();
+  const session = findTaskSession(sessionId);
+  if (!session) {
+    return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
+  }
+  const artifact = (session.artifact || {}) as TaskSessionArtifactShape;
+  const outputPath = typeof artifact.output_path === 'string' ? artifact.output_path : '';
+  if (!outputPath) {
+    return res.status(404).json({ ok: false, error: `artifact not found for task session: ${sessionId}` });
+  }
+  if (!isAllowedTaskArtifactPath(outputPath) || !safeExistsSync(outputPath)) {
+    return res.status(403).json({ ok: false, error: `artifact path is not accessible: ${sessionId}` });
+  }
+  return res.download(outputPath, path.basename(outputPath));
 });
 
 app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
