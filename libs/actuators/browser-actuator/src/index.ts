@@ -148,6 +148,8 @@ interface BrowserSessionMetadata {
   lease_expires_at?: string;
   lease_status: 'active' | 'released' | 'expired';
   retained: boolean;
+  cdp_url?: string;
+  cdp_port?: number;
   action_trail_count: number;
   recent_actions: Array<{
     op: string;
@@ -198,12 +200,15 @@ interface BrowserRuntimeLease {
   sessionMetadataPath: string;
   videoDir?: string;
   leaseExpiresAt?: number;
+  cdpUrl?: string;
+  cdpPort?: number;
   browser?: Browser;
   externalConnection?: boolean;
 }
 
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
+const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge('public/orchestration/browser-passkey-providers.json');
@@ -380,6 +385,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
   if (options.record_video && !safeExistsSync(resolvedVideoDir)) safeMkdir(resolvedVideoDir, { recursive: true });
 
   const browserContext = await getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, resolvedVideoDir);
+  const activeLease = browserRuntimeLeases.get(sessionId);
 
   // Start Tracing if requested
   if (options.record_trace) {
@@ -525,6 +531,8 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
       lease_expires_at: leaseExpiresAt ? new Date(leaseExpiresAt).toISOString() : undefined,
       lease_status: shouldClose ? 'released' : 'active',
       retained: !shouldClose,
+      cdp_url: activeLease?.cdpUrl,
+      cdp_port: activeLease?.cdpPort,
       action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
       recent_actions: summarizeRecentActions(ctx.action_trail),
     });
@@ -546,6 +554,8 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
         video_recording_pending: false,
         lease_status: 'released',
         retained: false,
+        cdp_url: activeLease?.cdpUrl,
+        cdp_port: activeLease?.cdpPort,
         action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
         recent_actions: summarizeRecentActions(ctx.action_trail),
       });
@@ -806,6 +816,7 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         tabId: runtime.activeTabId,
         maxElements: Number(params.max_elements || 200),
       });
+      saveBrowserSessionSnapshot(ctx.session_id || 'default', snapshot);
       return recordBrowserAction({
         ...ctx,
         last_snapshot: snapshot,
@@ -1338,6 +1349,8 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     updated_at: new Date().toISOString(),
     lease_status: 'released',
     retained: false,
+    cdp_url: lease.cdpUrl,
+    cdp_port: lease.cdpPort,
     lease_expires_at: undefined,
     action_trail_count: 0,
     recent_actions: [],
@@ -1448,6 +1461,35 @@ async function getOrCreateBrowserContext(
     return existing.runtime.context;
   }
 
+  const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
+  const persistedCdpUrl = options.cdp_url || persistedMetadata?.cdp_url;
+  const persistedCdpPort = Number(options.cdp_port || persistedMetadata?.cdp_port || 0);
+
+  if (!options.connect_over_cdp && persistedCdpUrl && persistedMetadata?.retained && persistedMetadata.lease_status === 'active') {
+    try {
+      logger.info(`🔁 [BROWSER] Reattaching to persisted session via CDP: ${persistedCdpUrl}`);
+      const browser = await chromium.connectOverCDP(persistedCdpUrl);
+      const context = browser.contexts()[0];
+      if (!context) {
+        await browser.close();
+        throw new Error(`No browser context available via persisted CDP session at ${persistedCdpUrl}`);
+      }
+      browserRuntimeLeases.set(sessionId, {
+        runtime: createBrowserRuntime(context),
+        userDataDir,
+        sessionMetadataPath,
+        videoDir,
+        browser,
+        externalConnection: true,
+        cdpUrl: persistedCdpUrl,
+        cdpPort: persistedCdpPort || Number(new URL(persistedCdpUrl).port),
+      });
+      return context;
+    } catch (error: any) {
+      logger.warn(`⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${error?.message || String(error)}`);
+    }
+  }
+
   if (options.connect_over_cdp) {
     const cdpUrl = options.cdp_url || `http://127.0.0.1:${Number(options.cdp_port || 9222)}`;
     logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
@@ -1464,6 +1506,8 @@ async function getOrCreateBrowserContext(
       videoDir,
       browser,
       externalConnection: true,
+      cdpUrl,
+      cdpPort: Number(new URL(cdpUrl).port),
     });
     return context;
   }
@@ -1478,15 +1522,19 @@ async function getOrCreateBrowserContext(
     args: [
       ...(Array.isArray(options.launch_args) ? options.launch_args : []),
       ...(options.profile_directory ? [`--profile-directory=${options.profile_directory}`] : []),
+      '--remote-debugging-port=0',
     ],
   });
 
+  const cdpEndpoint = await waitForCdpEndpoint(userDataDir);
   browserRuntimeLeases.set(sessionId, {
     runtime: createBrowserRuntime(context),
     userDataDir,
     sessionMetadataPath,
     videoDir,
     externalConnection: false,
+    cdpUrl: cdpEndpoint?.cdpUrl,
+    cdpPort: cdpEndpoint?.cdpPort,
   });
   return context;
 }
@@ -1524,6 +1572,8 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       video_recording_pending: false,
       lease_status: 'expired',
       retained: false,
+      cdp_url: lease.cdpUrl,
+      cdp_port: lease.cdpPort,
       lease_expires_at: new Date(lease.leaseExpiresAt).toISOString(),
       action_trail_count: 0,
       recent_actions: [],
@@ -1547,6 +1597,40 @@ function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_acti
     selector: action.selector,
     ts: action.ts,
   }));
+}
+
+function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
+  if (!safeExistsSync(filePath)) return null;
+  try {
+    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as BrowserSessionMetadata;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForCdpEndpoint(userDataDir: string, timeoutMs = 5_000): Promise<{ cdpUrl: string; cdpPort: number } | null> {
+  if (process.env.VITEST) return null;
+  const filePath = path.join(userDataDir, 'DevToolsActivePort');
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (safeExistsSync(filePath)) {
+      try {
+        const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
+        const [portLine] = raw.split(/\r?\n/);
+        const cdpPort = Number(portLine);
+        if (Number.isFinite(cdpPort) && cdpPort > 0) {
+          return {
+            cdpPort,
+            cdpUrl: `http://127.0.0.1:${cdpPort}`,
+          };
+        }
+      } catch {
+        // Retry until timeout.
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return null;
 }
 
 async function collectRecordedVideoPaths(runtime: BrowserRuntime): Promise<string[]> {
@@ -2017,6 +2101,11 @@ async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary
 
 function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMetadata): void {
   safeWriteFile(filePath, JSON.stringify(metadata, null, 2));
+}
+
+function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot): void {
+  if (!safeExistsSync(BROWSER_SNAPSHOT_DIR)) safeMkdir(BROWSER_SNAPSHOT_DIR, { recursive: true });
+  safeWriteFile(path.join(BROWSER_SNAPSHOT_DIR, `${sessionId}.json`), JSON.stringify(snapshot, null, 2));
 }
 
 async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<BrowserSnapshot> {

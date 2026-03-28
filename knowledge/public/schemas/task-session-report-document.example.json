@@ -1,0 +1,35 @@
+{
+  "session_id": "TSK-REPORT-001",
+  "surface": "presence",
+  "task_type": "report_document",
+  "status": "planning",
+  "mode": "interactive",
+  "goal": {
+    "summary": "進捗レポートを docx で作る",
+    "success_condition": "docx の初版が governed path に保存される"
+  },
+  "requirements": {
+    "missing": [],
+    "collected": {
+      "report_kind": "status"
+    }
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": false
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T18:32:00+09:00",
+      "type": "instruction",
+      "text": "今週の進捗レポートを docx で作って"
+    }
+  ],
+  "updated_at": "2026-03-28T18:32:00+09:00",
+  "payload": {
+    "report_kind": "status",
+    "format": "docx",
+    "audience": "internal"
+  }
+}

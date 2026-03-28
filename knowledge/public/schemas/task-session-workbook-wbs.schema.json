@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/task-session-workbook-wbs.schema.json",
+  "title": "Task Session Workbook WBS Payload",
+  "type": "object",
+  "required": ["project_name"],
+  "properties": {
+    "project_name": { "type": "string", "minLength": 1 },
+    "time_horizon": { "type": "string" },
+    "granularity": {
+      "type": "string",
+      "enum": ["epic", "work_package", "task"]
+    },
+    "source_mission_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sheet_name": { "type": "string" },
+    "output_path": { "type": "string" }
+  },
+  "additionalProperties": false
+}

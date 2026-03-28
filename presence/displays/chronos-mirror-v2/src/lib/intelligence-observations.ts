@@ -58,6 +58,18 @@ export interface BrowserSessionSummary {
   }>;
 }
 
+export interface BrowserConversationSessionSummary {
+  session_id: string;
+  surface: string;
+  status: string;
+  mode: string;
+  updated_at: string;
+  goal_summary: string;
+  active_step?: string;
+  pending_confirmation: boolean;
+  candidate_target_count: number;
+}
+
 export function collectRecentEvents(): OrchestrationEventSummary[] {
   const files = [
     pathResolver.shared("observability/channels/slack/missions.jsonl"),
@@ -262,6 +274,36 @@ export function collectBrowserSessions(): BrowserSessionSummary[] {
       const parsed = JSON.parse(raw) as BrowserSessionSummary;
       if (!parsed?.session_id) continue;
       sessions.push(parsed);
+    } catch {
+      // Ignore malformed session files.
+    }
+  }
+
+  return sessions.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 12);
+}
+
+export function collectBrowserConversationSessions(): BrowserConversationSessionSummary[] {
+  const sessionDir = pathResolver.shared("runtime/browser/conversation-sessions");
+  if (!safeExistsSync(sessionDir)) return [];
+
+  const sessions: BrowserConversationSessionSummary[] = [];
+  for (const entry of safeReaddir(sessionDir)) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      const raw = safeReadFile(pathResolver.shared(`runtime/browser/conversation-sessions/${entry}`), { encoding: "utf8" }) as string;
+      const parsed = JSON.parse(raw) as any;
+      if (!parsed?.session_id) continue;
+      sessions.push({
+        session_id: parsed.session_id,
+        surface: parsed.surface || "unknown",
+        status: parsed.status || "unknown",
+        mode: parsed.mode || "interactive",
+        updated_at: parsed.updated_at || new Date(0).toISOString(),
+        goal_summary: parsed.goal?.summary || "",
+        active_step: parsed.active_step?.description,
+        pending_confirmation: parsed.conversation_context?.pending_confirmation === true,
+        candidate_target_count: Array.isArray(parsed.candidate_targets) ? parsed.candidate_targets.length : 0,
+      });
     } catch {
       // Ignore malformed session files.
     }

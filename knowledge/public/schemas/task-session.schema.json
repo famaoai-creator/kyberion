@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/task-session.schema.json",
+  "title": "Task Session",
+  "type": "object",
+  "required": [
+    "session_id",
+    "surface",
+    "task_type",
+    "status",
+    "mode",
+    "goal",
+    "control",
+    "history",
+    "updated_at"
+  ],
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "surface": {
+      "type": "string",
+      "enum": ["presence", "slack", "terminal", "chronos", "web"]
+    },
+    "task_type": {
+      "type": "string",
+      "enum": ["browser", "capture_photo", "workbook_wbs", "presentation_deck", "report_document", "service_operation", "document_generation", "analysis"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "awaiting_instruction",
+        "collecting_requirements",
+        "planning",
+        "awaiting_confirmation",
+        "executing",
+        "verifying",
+        "completed",
+        "blocked",
+        "failed",
+        "paused",
+        "released"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["interactive", "delegated", "shadow"]
+    },
+    "goal": {
+      "type": "object",
+      "required": ["summary", "success_condition"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "success_condition": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string" },
+        "output_path": { "type": "string" },
+        "preview_text": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "missing": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "collected": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "control": {
+      "type": "object",
+      "required": ["interruptible", "requires_approval", "awaiting_user_input"],
+      "properties": {
+        "interruptible": { "type": "boolean" },
+        "requires_approval": { "type": "boolean" },
+        "awaiting_user_input": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts", "type", "text"],
+        "properties": {
+          "ts": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["instruction", "ack", "plan", "execution", "verification", "feedback", "error", "control", "artifact"]
+          },
+          "text": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "task_type": { "const": "capture_photo" }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["camera_intent"],
+            "properties": {
+              "camera_intent": {
+                "type": "string",
+                "enum": ["record", "share", "reference", "ocr_source"]
+              },
+              "device_preference": { "type": "string" },
+              "save_path": { "type": "string" },
+              "post_process": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["crop", "compress", "annotate", "ocr", "share_link"]
+                }
+              },
+              "subject_hint": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task_type": { "const": "workbook_wbs" }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["project_name"],
+            "properties": {
+              "project_name": { "type": "string", "minLength": 1 },
+              "time_horizon": { "type": "string" },
+              "granularity": {
+                "type": "string",
+                "enum": ["epic", "work_package", "task"]
+              },
+              "source_mission_ids": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "sheet_name": { "type": "string" },
+              "output_path": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task_type": { "const": "presentation_deck" }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["deck_purpose"],
+            "properties": {
+              "deck_purpose": {
+                "type": "string",
+                "enum": ["proposal", "internal_share", "briefing", "marketing"]
+              },
+              "source_paths": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "slide_count_hint": { "type": "integer", "minimum": 1 },
+              "theme_hint": { "type": "string" },
+              "output_path": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task_type": { "const": "report_document" }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["report_kind"],
+            "properties": {
+              "report_kind": {
+                "type": "string",
+                "enum": ["status", "summary", "proposal", "spec"]
+              },
+              "format": {
+                "type": "string",
+                "enum": ["docx", "pdf", "markdown"]
+              },
+              "source_paths": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "audience": { "type": "string" },
+              "output_path": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task_type": { "const": "service_operation" }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["service_name", "operation"],
+            "properties": {
+              "service_name": { "type": "string", "minLength": 1 },
+              "operation": {
+                "type": "string",
+                "enum": ["start", "stop", "restart", "status", "logs"]
+              },
+              "approval_required": { "type": "boolean" },
+              "approval_confirmed": { "type": "boolean" },
+              "target_env": { "type": "string" },
+              "log_tail_lines": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

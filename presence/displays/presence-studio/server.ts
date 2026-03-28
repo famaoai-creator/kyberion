@@ -4,9 +4,14 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   buildPresenceSurfaceFrame,
+  createBrowserConversationSession,
   createPresenceVoiceStimulus,
+  getActiveBrowserConversationSession,
+  getActiveTaskSession,
   getPresenceAvatarProfile,
   getSurfaceAgentCatalogEntry,
+  listBrowserConversationSessions,
+  listTaskSessions,
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
   listSurfaceAgentCatalog,
@@ -16,6 +21,8 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
+  saveBrowserConversationSession,
   type A2UIMessage,
   type PresenceTimelineAdf,
   validatePresenceTimeline,
@@ -36,6 +43,36 @@ interface PresenceStudioState {
   lastUpdatedAt: string | null;
 }
 
+interface BrowserRuntimeSessionSummary {
+  session_id: string;
+  active_tab_id?: string;
+  tabs?: Array<{
+    tab_id: string;
+    url?: string;
+    title?: string;
+    active?: boolean;
+  }>;
+  updated_at?: string;
+  lease_status?: string;
+  retained?: boolean;
+}
+
+interface BrowserSnapshotSummary {
+  session_id: string;
+  tab_id?: string;
+  url?: string;
+  title?: string;
+  element_count?: number;
+}
+
+interface PresenceLocationContext {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  timestamp: string;
+  source: 'browser_geolocation';
+}
+
 const app = express();
 const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/presence-studio/static');
@@ -45,6 +82,9 @@ const HOST = process.env.PRESENCE_STUDIO_HOST || '127.0.0.1';
 const VOICE_HUB_URL = process.env.VOICE_HUB_URL || 'http://127.0.0.1:3032';
 const sseClients = new Set<Client>();
 const activeTimelineTimers = new Map<string, NodeJS.Timeout[]>();
+const SPEECH_STATE_POLL_MS = Number(process.env.PRESENCE_STUDIO_SPEECH_STATE_POLL_MS || 400);
+let latestSpeechSseState = 'idle';
+let speechStatePollInFlight = false;
 
 process.env.MISSION_ROLE ||= 'surface_runtime';
 
@@ -53,6 +93,7 @@ const state: PresenceStudioState = {
   recentStimuli: [],
   lastUpdatedAt: null,
 };
+let latestLocationContext: PresenceLocationContext | null = null;
 
 function ensureStimuliDir(): void {
   const dir = path.dirname(STIMULI_PATH);
@@ -216,6 +257,103 @@ function emitState(): void {
   broadcast('state', state);
 }
 
+async function pollVoiceHubSpeechStateForSse(): Promise<void> {
+  if (speechStatePollInFlight) return;
+  speechStatePollInFlight = true;
+  try {
+    const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
+    if (!response.ok) return;
+    const payload = await response.json() as { speech?: { status?: string } };
+    const nextState = String(payload?.speech?.status || 'idle');
+    if (nextState === latestSpeechSseState) return;
+    latestSpeechSseState = nextState;
+    broadcast('speech_state', {
+      ok: true,
+      speech: payload?.speech || { status: nextState },
+    });
+  } catch {
+    // Best effort only.
+  } finally {
+    speechStatePollInFlight = false;
+  }
+}
+
+function listBrowserRuntimeSessions(): BrowserRuntimeSessionSummary[] {
+  const dir = pathResolver.shared('runtime/browser/sessions');
+  return safeExistsSync(dir)
+    ? safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json'))
+      .map((entry) => JSON.parse(safeReadFile(path.join(dir, entry), { encoding: 'utf8' }) as string) as BrowserRuntimeSessionSummary)
+      .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
+    : [];
+}
+
+function loadBrowserSnapshotSummary(sessionId: string): BrowserSnapshotSummary | null {
+  const filePath = pathResolver.shared(`runtime/browser/snapshots/${sessionId}.json`);
+  if (!safeExistsSync(filePath)) return null;
+  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as BrowserSnapshotSummary;
+}
+
+function pickPresenceBrowserRuntimeSession(items: BrowserRuntimeSessionSummary[]): BrowserRuntimeSessionSummary | null {
+  const scored = items
+    .map((item) => {
+      const tabs = item.tabs || [];
+      const preferredTab = tabs.find((tab) => tab.active && tab.url && tab.url !== 'about:blank')
+        || tabs.find((tab) => tab.tab_id === item.active_tab_id && tab.url && tab.url !== 'about:blank')
+        || tabs.find((tab) => tab.url && tab.url !== 'about:blank');
+      const snapshot = loadBrowserSnapshotSummary(item.session_id);
+      const snapshotLooksUseful = Boolean(snapshot && snapshot.url && snapshot.url !== 'about:blank' && Number(snapshot.element_count || 0) > 0);
+      const hasReconnectPath = Boolean((item as any).cdp_url);
+      let score = 0;
+      if (preferredTab) score += 4;
+      if (snapshotLooksUseful) score += 3;
+      if (hasReconnectPath) score += 2;
+      if (item.lease_status === 'active') score += 1;
+      if (item.retained !== false) score += 1;
+      return { item, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || String(b.item.updated_at || '').localeCompare(String(a.item.updated_at || '')));
+
+  return scored[0]?.item || null;
+}
+
+function ensurePresenceBrowserConversationSession(): ReturnType<typeof getActiveBrowserConversationSession> {
+  const existing = getActiveBrowserConversationSession('presence');
+  const browserSession = pickPresenceBrowserRuntimeSession(listBrowserRuntimeSessions());
+  if (existing && (!browserSession || existing.target?.browser_session_id === browserSession.session_id)) {
+    return existing;
+  }
+  if (!browserSession) return null;
+
+  try {
+    const activeTab = (browserSession.tabs || []).find((tab) => tab.active && tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.find((tab) => tab.tab_id === browserSession.active_tab_id && tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.find((tab) => tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.[0];
+    const session = createBrowserConversationSession({
+      sessionId: `BCS-presence-${browserSession.session_id}`,
+      surface: 'presence',
+      goal: {
+        summary: activeTab?.title || browserSession.session_id,
+        success_condition: 'Complete the requested browser step safely.',
+      },
+      target: {
+        app: 'browser',
+        window_title: activeTab?.title,
+        url: activeTab?.url,
+        tab_id: activeTab?.tab_id || browserSession.active_tab_id,
+        browser_session_id: browserSession.session_id,
+      },
+    });
+    saveBrowserConversationSession(session);
+    return session;
+  } catch (error: any) {
+    logger.warn(`[presence-studio] failed to auto-bootstrap browser conversation session for ${browserSession.session_id}: ${error?.message || String(error)}`);
+    return null;
+  }
+}
+
 function bootstrapState(): void {
   const messages = buildPresenceSurfaceFrame({
     agentId: 'presence-surface-agent',
@@ -273,6 +411,65 @@ app.get('/api/notifications', (_req, res) => {
   });
 });
 
+app.get('/api/browser-conversation-sessions', (_req, res) => {
+  const active = ensurePresenceBrowserConversationSession();
+  res.json({
+    ok: true,
+    active,
+    items: listBrowserConversationSessions().filter((session) => session.surface === 'presence'),
+  });
+});
+
+app.get('/api/browser-sessions', (_req, res) => {
+  const items = listBrowserRuntimeSessions();
+  res.json({ ok: true, items });
+});
+
+app.get('/api/task-sessions', (_req, res) => {
+  res.json({
+    ok: true,
+    active: getActiveTaskSession('presence'),
+    items: listTaskSessions('presence').slice(0, 10),
+  });
+});
+
+app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
+  const browserSessionId = typeof req.body?.browser_session_id === 'string' ? req.body.browser_session_id.trim() : '';
+  if (!browserSessionId) {
+    return res.status(400).json({ ok: false, error: 'browser_session_id is required' });
+  }
+
+  try {
+    const browserSession = listBrowserRuntimeSessions().find((item) => item.session_id === browserSessionId);
+    if (!browserSession) {
+      return res.status(404).json({ ok: false, error: `browser session not found: ${browserSessionId}` });
+    }
+    const activeTab = (browserSession.tabs || []).find((tab) => tab.active && tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.find((tab) => tab.tab_id === browserSession.active_tab_id && tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.find((tab) => tab.url && tab.url !== 'about:blank')
+      || browserSession.tabs?.[0];
+    const session = createBrowserConversationSession({
+      sessionId: `BCS-presence-${browserSessionId}`,
+      surface: 'presence',
+      goal: {
+        summary: typeof req.body?.goal_summary === 'string' ? req.body.goal_summary : (activeTab?.title || browserSessionId),
+        success_condition: typeof req.body?.success_condition === 'string' ? req.body.success_condition : 'Complete the requested browser step safely.',
+      },
+      target: {
+        app: 'browser',
+        window_title: activeTab?.title,
+        url: activeTab?.url,
+        tab_id: activeTab?.tab_id || browserSession.active_tab_id,
+        browser_session_id: browserSessionId,
+      },
+    });
+    saveBrowserConversationSession(session);
+    return res.json({ ok: true, session });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
 app.get('/api/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -280,6 +477,7 @@ app.get('/api/stream', (req, res) => {
   res.flushHeaders?.();
   sseClients.add(res);
   res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
+  res.write(`event: speech_state\ndata: ${JSON.stringify({ ok: true, speech: { status: latestSpeechSseState } })}\n\n`);
   req.on('close', () => {
     sseClients.delete(res);
   });
@@ -388,6 +586,27 @@ app.get('/api/voice/speech-state', async (_req, res) => {
   res.status(response.status).type('application/json').send(payload);
 });
 
+app.get('/api/context/location', (_req, res) => {
+  res.json({ ok: true, location: latestLocationContext });
+});
+
+app.post('/api/context/location', (req, res) => {
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const accuracy = req.body?.accuracy == null ? undefined : Number(req.body.accuracy);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return res.status(400).json({ ok: false, error: 'latitude and longitude are required' });
+  }
+  latestLocationContext = {
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(accuracy) ? accuracy : undefined,
+    timestamp: typeof req.body?.timestamp === 'string' ? req.body.timestamp : new Date().toISOString(),
+    source: 'browser_geolocation',
+  };
+  return res.json({ ok: true, location: latestLocationContext });
+});
+
 app.post('/api/voice/stop-speaking', async (req, res) => {
   const response = await fetch(`${VOICE_HUB_URL}/api/stop-speaking`, {
     method: 'POST',
@@ -440,4 +659,11 @@ app.get('/api/stimuli/tail', (_req, res) => {
 
 server.listen(PORT, HOST, () => {
   logger.info(`[presence-studio] listening on http://${HOST}:${PORT}`);
+  setTimeout(() => {
+    ensurePresenceBrowserConversationSession();
+  }, 0);
 });
+
+setInterval(() => {
+  void pollVoiceHubSpeechStateForSse();
+}, SPEECH_STATE_POLL_MS);

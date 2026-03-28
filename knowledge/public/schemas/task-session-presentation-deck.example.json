@@ -1,0 +1,35 @@
+{
+  "session_id": "TSK-DECK-001",
+  "surface": "presence",
+  "task_type": "presentation_deck",
+  "status": "collecting_requirements",
+  "mode": "interactive",
+  "goal": {
+    "summary": "Kyberion 改修の提案資料を PowerPoint で作る",
+    "success_condition": "PPTX の初版が governed path に保存される"
+  },
+  "requirements": {
+    "missing": [],
+    "collected": {
+      "deck_purpose": "proposal"
+    }
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": false
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T18:30:00+09:00",
+      "type": "instruction",
+      "text": "パワーポイントの資料を書いて"
+    }
+  ],
+  "updated_at": "2026-03-28T18:30:00+09:00",
+  "payload": {
+    "deck_purpose": "proposal",
+    "slide_count_hint": 6,
+    "theme_hint": "executive concise"
+  }
+}

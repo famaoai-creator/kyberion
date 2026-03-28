@@ -218,10 +218,13 @@ export * from './channel-surface.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 export type * from './channel-surface-types.js';
 
+export * from './browser-conversation-session.js';
 export * from './presence-surface.js';
 export * from './presence-avatar.js';
 export * from './presence-bridge.js';
 export * from './surface-agent-catalog.js';
+export * from './surface-query.js';
+export * from './task-session.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
 export * from './os-app-adapters.js';
