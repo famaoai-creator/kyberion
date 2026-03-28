@@ -141,6 +141,7 @@ interface MissionSeedRecordSummary {
   outcome_id?: string;
   mission_type_hint?: string;
   locale?: string;
+  work_loop?: ArtifactRecordSummary["work_loop"];
   promoted_mission_id?: string;
 }
 
@@ -154,6 +155,15 @@ interface ArtifactRecordSummary {
   path?: string;
   external_ref?: string;
   preview_text?: string;
+  work_loop?: {
+    intent?: { label?: string };
+    context?: { project_id?: string; project_name?: string; tier?: string; locale?: string; service_bindings?: string[] };
+    resolution?: { execution_shape?: string; task_type?: string };
+    outcome_design?: { outcome_ids?: string[]; labels?: string[] };
+    teaming?: { specialist_id?: string; specialist_label?: string; conversation_agent?: string; team_roles?: string[] };
+    authority?: { requires_approval?: boolean };
+    learning?: { reusable_refs?: string[] };
+  };
 }
 
 interface PendingApprovalSummary {
@@ -169,6 +179,7 @@ interface PendingApprovalSummary {
   pendingRoles: string[];
   missionId?: string;
   serviceId?: string;
+  work_loop?: ArtifactRecordSummary["work_loop"];
 }
 
 interface DistillCandidateSummary {
@@ -185,6 +196,7 @@ interface DistillCandidateSummary {
   target_kind: "pattern" | "sop_candidate" | "knowledge_hint" | "report_template";
   specialist_id?: string;
   locale?: string;
+  work_loop?: ArtifactRecordSummary["work_loop"];
   promoted_ref?: string;
   evidence_refs?: string[];
 }
@@ -270,6 +282,111 @@ interface ControlActionAvailability {
   mission: Record<string, ControlActionDefinition[]>;
   surface: Record<string, ControlActionDefinition[]>;
   globalSurface: ControlActionDefinition[];
+}
+
+interface WorkLoopPreview {
+  intent: string;
+  context: string;
+  resolution: string;
+  outcome: string;
+  team: string;
+  authority: string;
+}
+
+function buildProjectWorkLoopPreview(project: ProjectRecordSummary): WorkLoopPreview {
+  const nextWork = project.bootstrap_work_items?.[0];
+  return {
+    intent: project.name || "project_bootstrap",
+    context: `${project.project_id} · ${project.tier}`,
+    resolution: project.active_missions?.length ? "project -> missions" : "project_bootstrap",
+    outcome: nextWork?.outcome_id || "project_created",
+    team: nextWork?.specialist_id || "project-lead",
+    authority: "governed progression",
+  };
+}
+
+function buildMissionSeedWorkLoopPreview(seed: MissionSeedRecordSummary): WorkLoopPreview {
+  if (seed.work_loop) {
+    return {
+      intent: seed.work_loop.intent?.label || seed.title || "mission_seed",
+      context: seed.work_loop.context?.project_name || seed.work_loop.context?.project_id || `${seed.project_id} · ${seed.locale || "default locale"}`,
+      resolution: seed.work_loop.resolution?.execution_shape || (seed.promoted_mission_id ? "mission" : "mission_seed"),
+      outcome: seed.work_loop.outcome_design?.labels?.join(" / ") || seed.outcome_id || seed.mission_type_hint || "durable_work",
+      team: seed.work_loop.teaming?.team_roles?.join(" -> ") || seed.specialist_id || "mission-lead",
+      authority: seed.work_loop.authority?.requires_approval ? "approval required" : seed.promoted_mission_id ? "already promoted" : "promotion required",
+    };
+  }
+  return {
+    intent: seed.title || "mission_seed",
+    context: `${seed.project_id} · ${seed.locale || "default locale"}`,
+    resolution: seed.promoted_mission_id ? "mission" : "mission_seed",
+    outcome: seed.outcome_id || seed.mission_type_hint || "durable_work",
+    team: seed.specialist_id || "mission-lead",
+    authority: seed.promoted_mission_id ? "already promoted" : "promotion required",
+  };
+}
+
+function buildDistillCandidateWorkLoopPreview(candidate: DistillCandidateSummary): WorkLoopPreview {
+  if (candidate.work_loop) {
+    return {
+      intent: candidate.work_loop.intent?.label || candidate.title,
+      context: candidate.work_loop.context?.project_name || candidate.work_loop.context?.project_id || candidate.project_id || "standalone",
+      resolution: candidate.work_loop.resolution?.execution_shape || candidate.source_type,
+      outcome: candidate.work_loop.outcome_design?.labels?.join(" / ") || candidate.target_kind,
+      team: candidate.work_loop.teaming?.team_roles?.join(" -> ") || candidate.specialist_id || "memory loop",
+      authority: candidate.work_loop.authority?.requires_approval ? "approval required" : candidate.status,
+    };
+  }
+  return {
+    intent: candidate.title,
+    context: candidate.project_id || "standalone",
+    resolution: candidate.source_type,
+    outcome: candidate.target_kind,
+    team: candidate.specialist_id || "memory loop",
+    authority: candidate.status,
+  };
+}
+
+function buildApprovalWorkLoopPreview(approval: PendingApprovalSummary): WorkLoopPreview {
+  if (approval.work_loop) {
+    return {
+      intent: approval.work_loop.intent?.label || approval.title || approval.kind,
+      context: approval.work_loop.context?.project_name || approval.work_loop.context?.project_id || `${approval.channel} · ${approval.storageChannel}`,
+      resolution: approval.work_loop.resolution?.execution_shape || "authority_gate",
+      outcome: approval.work_loop.outcome_design?.labels?.join(" / ") || approval.summary || "approved action can proceed",
+      team: approval.work_loop.teaming?.team_roles?.join(" -> ") || approval.pendingRoles.join(" -> ") || "approver",
+      authority: approval.work_loop.authority?.requires_approval ? "approval required" : approval.riskLevel,
+    };
+  }
+  return {
+    intent: approval.title || approval.kind,
+    context: `${approval.channel} · ${approval.storageChannel}`,
+    resolution: "authority_gate",
+    outcome: approval.summary || "approved action can proceed",
+    team: approval.pendingRoles.length ? approval.pendingRoles.join(" -> ") : "approver",
+    authority: approval.riskLevel,
+  };
+}
+
+function buildArtifactWorkLoopPreview(artifact: ArtifactRecordSummary): WorkLoopPreview {
+  if (artifact.work_loop) {
+    return {
+      intent: artifact.work_loop.intent?.label || artifact.preview_text || artifact.kind || "artifact",
+      context: artifact.work_loop.context?.project_name || artifact.work_loop.context?.project_id || `${artifact.project_id || "standalone"} · ${artifact.storage_class}`,
+      resolution: artifact.work_loop.resolution?.execution_shape || (artifact.mission_id ? "mission_outcome" : artifact.task_session_id ? "task_session_outcome" : "recorded_outcome"),
+      outcome: artifact.work_loop.outcome_design?.labels?.join(" / ") || artifact.kind,
+      team: artifact.work_loop.teaming?.team_roles?.join(" -> ") || (artifact.mission_id ? "mission team" : artifact.task_session_id ? "task session team" : "system"),
+      authority: artifact.work_loop.authority?.requires_approval ? "approval required" : "recorded evidence",
+    };
+  }
+  return {
+    intent: artifact.preview_text || artifact.kind || "artifact",
+    context: `${artifact.project_id || "standalone"} · ${artifact.storage_class}`,
+    resolution: artifact.mission_id ? "mission_outcome" : artifact.task_session_id ? "task_session_outcome" : "recorded_outcome",
+    outcome: artifact.kind,
+    team: artifact.mission_id ? "mission team" : artifact.task_session_id ? "task session team" : "system",
+    authority: "recorded evidence",
+  };
 }
 
 function getLatestMissionControlAction(
@@ -1532,6 +1649,7 @@ export function MissionIntelligence({
               <div key={project.project_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const learnedRefs = learnedProjectRefs(project.project_id);
+                  const workLoop = buildProjectWorkLoopPreview(project);
                   return (
                     <>
                 <div className="flex items-center justify-between gap-3">
@@ -1566,6 +1684,15 @@ export function MissionIntelligence({
                     {mt("chronos_kickoff", "kickoff")}: <span className="font-mono text-white/70">{project.kickoff_task_session_id}</span>
                   </div>
                 ) : null}
+                <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">work loop</div>
+                  <div className="mt-2">{mt("chronos_intent", "intent")}: <span className="text-white/80">{workLoop.intent}</span></div>
+                  <div className="mt-1">{mt("chronos_context", "context")}: <span className="text-white/80">{workLoop.context}</span></div>
+                  <div className="mt-1">{mt("chronos_resolution", "resolution")}: <span className="font-mono text-white/80">{workLoop.resolution}</span></div>
+                  <div className="mt-1">{mt("chronos_outcome", "outcome")}: <span className="text-white/80">{workLoop.outcome}</span></div>
+                  <div className="mt-1">{mt("chronos_team", "team")}: <span className="text-white/80">{workLoop.team}</span></div>
+                  <div className="mt-1">{mt("chronos_authority", "authority")}: <span className="text-white/80">{workLoop.authority}</span></div>
+                </div>
                 {learnedRefs.length ? (
                   <div className="mt-2 text-[10px] text-white/45">
                     {mt("chronos_learned", "learned")}: <span className="text-white/70">{learnedRefs.map((candidate) => candidate.title).join(", ")}</span>
@@ -1630,6 +1757,7 @@ export function MissionIntelligence({
               <div key={seed.seed_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const learnedRefs = learnedMissionSeedRefs(seed.seed_id, seed.project_id, seed.promoted_mission_id);
+                  const workLoop = buildMissionSeedWorkLoopPreview(seed);
                   return (
                     <>
                 <div className="flex items-center justify-between gap-3">
@@ -1650,6 +1778,15 @@ export function MissionIntelligence({
                     mission: <span className="font-mono text-white/75">{seed.promoted_mission_id}</span>
                   </div>
                 ) : null}
+                <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">work loop</div>
+                  <div className="mt-2">{mt("chronos_intent", "intent")}: <span className="text-white/80">{workLoop.intent}</span></div>
+                  <div className="mt-1">{mt("chronos_context", "context")}: <span className="text-white/80">{workLoop.context}</span></div>
+                  <div className="mt-1">{mt("chronos_resolution", "resolution")}: <span className="font-mono text-white/80">{workLoop.resolution}</span></div>
+                  <div className="mt-1">{mt("chronos_outcome", "outcome")}: <span className="text-white/80">{workLoop.outcome}</span></div>
+                  <div className="mt-1">{mt("chronos_team", "team")}: <span className="text-white/80">{workLoop.team}</span></div>
+                  <div className="mt-1">{mt("chronos_authority", "authority")}: <span className="text-white/80">{workLoop.authority}</span></div>
+                </div>
                 {learnedRefs.length ? (
                   <div className="mt-2 text-[10px] text-white/45">
                     {mt("chronos_learned", "learned")}: <span className="text-white/70">{learnedRefs.map((candidate) => candidate.title).join(", ")}</span>
@@ -1684,6 +1821,10 @@ export function MissionIntelligence({
               <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_pending_approvals", "No pending approvals.")}</div>
             ) : filteredPendingApprovals.map((approval) => (
               <div key={approval.id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const workLoop = buildApprovalWorkLoopPreview(approval);
+                  return (
+                    <>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{approval.title}</div>
                   <div className="rounded-full bg-red-500/12 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-red-200">
@@ -1702,6 +1843,15 @@ export function MissionIntelligence({
                     pending roles: <span className="text-white/70">{approval.pendingRoles.join(", ")}</span>
                   </div>
                 ) : null}
+                <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">work loop</div>
+                  <div className="mt-2">{mt("chronos_intent", "intent")}: <span className="text-white/80">{workLoop.intent}</span></div>
+                  <div className="mt-1">{mt("chronos_context", "context")}: <span className="text-white/80">{workLoop.context}</span></div>
+                  <div className="mt-1">{mt("chronos_resolution", "resolution")}: <span className="font-mono text-white/80">{workLoop.resolution}</span></div>
+                  <div className="mt-1">{mt("chronos_outcome", "outcome")}: <span className="text-white/80">{workLoop.outcome}</span></div>
+                  <div className="mt-1">{mt("chronos_team", "team")}: <span className="text-white/80">{workLoop.team}</span></div>
+                  <div className="mt-1">{mt("chronos_authority", "authority")}: <span className="text-white/80">{workLoop.authority}</span></div>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1720,6 +1870,9 @@ export function MissionIntelligence({
                     {approvalTarget === approval.id ? mt("chronos_processing", "processing") : mt("chronos_reject", "reject")}
                   </button>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -1734,6 +1887,10 @@ export function MissionIntelligence({
               <div className="text-[11px] italic text-kyberion-gold/30">No governed artifacts recorded yet.</div>
             ) : filteredRecentArtifacts.map((artifact) => (
               <div key={artifact.artifact_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const workLoop = buildArtifactWorkLoopPreview(artifact);
+                  return (
+                    <>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{artifact.artifact_id}</div>
                   <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
@@ -1751,6 +1908,18 @@ export function MissionIntelligence({
                     {artifact.preview_text || artifact.external_ref || artifact.path?.split("/").pop()}
                   </div>
                 )}
+                <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">work loop</div>
+                  <div className="mt-2">{mt("chronos_intent", "intent")}: <span className="text-white/80">{workLoop.intent}</span></div>
+                  <div className="mt-1">{mt("chronos_context", "context")}: <span className="text-white/80">{workLoop.context}</span></div>
+                  <div className="mt-1">{mt("chronos_resolution", "resolution")}: <span className="font-mono text-white/80">{workLoop.resolution}</span></div>
+                  <div className="mt-1">{mt("chronos_outcome", "outcome")}: <span className="text-white/80">{workLoop.outcome}</span></div>
+                  <div className="mt-1">{mt("chronos_team", "team")}: <span className="text-white/80">{workLoop.team}</span></div>
+                  <div className="mt-1">{mt("chronos_authority", "authority")}: <span className="text-white/80">{workLoop.authority}</span></div>
+                </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -1765,6 +1934,10 @@ export function MissionIntelligence({
               <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_distill_candidates", "No distill candidates recorded yet.")}</div>
             ) : filteredDistillCandidates.slice(0, 10).map((candidate) => (
               <div key={candidate.candidate_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const workLoop = buildDistillCandidateWorkLoopPreview(candidate);
+                  return (
+                    <>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{candidate.title}</div>
                   <div className="rounded-full bg-violet-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-violet-200">
@@ -1796,6 +1969,15 @@ export function MissionIntelligence({
                     promoted ref: <span className="font-mono text-white/70">{candidate.promoted_ref}</span>
                   </div>
                 ) : null}
+                <div className="mt-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3 text-[10px] text-white/55">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">work loop</div>
+                  <div className="mt-2">{mt("chronos_intent", "intent")}: <span className="text-white/80">{workLoop.intent}</span></div>
+                  <div className="mt-1">{mt("chronos_context", "context")}: <span className="text-white/80">{workLoop.context}</span></div>
+                  <div className="mt-1">{mt("chronos_resolution", "resolution")}: <span className="font-mono text-white/80">{workLoop.resolution}</span></div>
+                  <div className="mt-1">{mt("chronos_outcome", "outcome")}: <span className="text-white/80">{workLoop.outcome}</span></div>
+                  <div className="mt-1">{mt("chronos_team", "team")}: <span className="text-white/80">{workLoop.team}</span></div>
+                  <div className="mt-1">{mt("chronos_authority", "authority")}: <span className="text-white/80">{workLoop.authority}</span></div>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1814,6 +1996,9 @@ export function MissionIntelligence({
                     {distillCandidateTarget === candidate.candidate_id ? mt("chronos_processing", "processing") : mt("chronos_archive", "archive")}
                   </button>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { loadTaskSession, saveTaskSession, type TaskSession } from './task-session.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface ArtifactRecord {
   artifact_id: string;
@@ -14,6 +15,7 @@ export interface ArtifactRecord {
   path?: string;
   external_ref?: string;
   preview_text?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   delivered_to?: Array<{
     binding_id: string;
     status: 'pending' | 'delivered' | 'failed';
@@ -92,6 +94,9 @@ export function attachArtifactRecordToTaskSession(sessionId: string, record: Art
     storage_class: record.storage_class,
     external_ref: record.external_ref,
   };
+  if (record.work_loop) {
+    session.work_loop = record.work_loop;
+  }
   saveTaskSession(session);
   return session;
 }

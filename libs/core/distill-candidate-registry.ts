@@ -2,6 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface DistillCandidateRecord {
   candidate_id: string;
@@ -17,6 +18,7 @@ export interface DistillCandidateRecord {
   target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
   specialist_id?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   promoted_ref?: string;
   evidence_refs?: string[];
   created_at: string;

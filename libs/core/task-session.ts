@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type TaskSessionType =
@@ -51,6 +52,7 @@ export interface TaskSession {
     service_bindings?: string[];
     locale?: string;
   };
+  work_loop?: OrganizationWorkLoopSummary;
   artifact?: {
     kind?: string;
     output_path?: string;
@@ -73,6 +75,7 @@ export interface TaskSession {
 
 export interface TaskSessionIntent {
   taskType: TaskSessionType;
+  intentId?: string;
   goal: TaskSession['goal'];
   projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
@@ -116,10 +119,26 @@ export function createTaskSession(input: {
   requiresApproval?: boolean;
   goal: TaskSession['goal'];
   projectContext?: TaskSession['project_context'];
+  intentId?: string;
+  shape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+  outcomeIds?: string[];
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
+  workLoop?: OrganizationWorkLoopSummary;
 }): TaskSession {
   const now = new Date().toISOString();
+  const workLoop = input.workLoop || buildOrganizationWorkLoopSummary({
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape,
+    outcomeIds: input.outcomeIds,
+    projectId: input.projectContext?.project_id,
+    projectName: input.projectContext?.project_name,
+    tier: input.projectContext?.tier,
+    locale: input.projectContext?.locale,
+    serviceBindings: input.projectContext?.service_bindings,
+    requiresApproval: input.requiresApproval,
+  });
   return {
     session_id: input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     surface: input.surface,
@@ -128,6 +147,7 @@ export function createTaskSession(input: {
     mode: input.mode || 'interactive',
     goal: input.goal,
     project_context: input.projectContext,
+    work_loop: workLoop,
     requirements: input.requirements,
     control: {
       interruptible: true,
@@ -147,6 +167,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   if (/(写真|撮影|photo|picture|camera)/i.test(trimmed)) {
     return {
       taskType: 'capture_photo',
+      intentId: 'capture-photo',
       goal: {
         summary: 'Capture a photo for the requested purpose',
         success_condition: 'A photo artifact is captured and stored in a governed path.',
@@ -170,6 +191,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   if (/(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
     return {
       taskType: 'workbook_wbs',
+      intentId: 'generate-workbook',
       goal: {
         summary: 'Create a WBS workbook from the project context',
         success_condition: 'An XLSX workbook draft is generated in a governed path.',
@@ -187,6 +209,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   if (/(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
     return {
       taskType: 'presentation_deck',
+      intentId: 'generate-presentation',
       goal: {
         summary: 'Create a presentation deck from available project context',
         success_condition: 'A PPTX draft is generated in a governed path.',
@@ -211,6 +234,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   if (/(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
     return {
       taskType: 'report_document',
+      intentId: 'generate-report',
       goal: {
         summary: 'Create a document artifact for the requested audience',
         success_condition: 'A report document is generated in a governed path.',
@@ -248,6 +272,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     const requiresApproval = ['restart', 'start', 'stop'].includes(operation);
     return {
       taskType: 'service_operation',
+      intentId: 'inspect-service',
       goal: {
         summary: 'Operate or inspect a managed service',
         success_condition: 'The requested service operation completes and the result is reported back.',

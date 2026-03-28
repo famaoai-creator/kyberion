@@ -84,10 +84,12 @@ describe('project and artifact registries', () => {
       storage_class: 'artifact_store',
       path: 'active/shared/tmp/example.pptx',
       preview_text: 'Deck generated.',
+      work_loop: session.work_loop,
     });
     saveArtifactRecord(artifact);
     attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', artifact);
     expect(loadArtifactRecord('ART-TEST-DECK')?.project_id).toBe('PRJ-TEST-WEB');
+    expect(loadArtifactRecord('ART-TEST-DECK')?.work_loop?.resolution.execution_shape).toBe('task_session');
   });
 
   it('builds bootstrap work items for project creation flows', () => {

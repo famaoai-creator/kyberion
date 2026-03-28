@@ -168,6 +168,7 @@ interface PendingApprovalSummary {
   pendingRoles: string[];
   missionId?: string;
   serviceId?: string;
+  work_loop?: Record<string, unknown>;
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
@@ -870,6 +871,7 @@ function collectPendingApprovals(): PendingApprovalSummary[] {
         .map((approval) => approval.role) || [],
       missionId: request.requestedByContext?.missionId,
       serviceId: request.target?.serviceId,
+      work_loop: request.work_loop,
     }))
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 24);
@@ -1293,6 +1295,7 @@ export async function POST(req: NextRequest) {
         ...seed,
         status: "promoted",
         promoted_mission_id: missionId,
+        work_loop: seed.work_loop,
         updated_at: new Date().toISOString(),
         metadata: {
           ...(seed.metadata || {}),
@@ -1321,6 +1324,7 @@ export async function POST(req: NextRequest) {
         target_kind: inferMissionSeedPromotionTargetKind(seed),
         specialist_id: seed.specialist_id,
         locale: seed.locale || project.primary_locale,
+        work_loop: seed.work_loop,
         evidence_refs: [
           `project:${project.project_id}`,
           `mission_seed:${seed.seed_id}`,
