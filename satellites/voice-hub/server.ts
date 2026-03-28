@@ -34,6 +34,7 @@ import {
   loadSurfaceManifest,
   loadSurfaceState,
   logger,
+  parseSurfaceActionRoutingDecision,
   normalizeSurfaceDefinition,
   pathResolver,
   parseVoiceSttBackend,
@@ -53,6 +54,8 @@ import {
   updateTaskSession,
   saveTaskSession,
   recordTaskSessionHistory,
+  createBrowserConversationSession,
+  saveBrowserConversationSession,
 } from '@agent/core';
 
 interface VoiceHubRecord {
@@ -120,6 +123,15 @@ interface TaskSessionShape {
     text: string;
   }>;
   payload?: Record<string, unknown>;
+}
+
+interface SurfaceRouterContext {
+  sessionKey: string;
+}
+
+interface HeuristicSurfaceRoutingCandidate {
+  decision: ReturnType<typeof buildFallbackSurfaceRoutingDecision>;
+  reason: string;
 }
 
 const app = express();
@@ -191,6 +203,203 @@ function buildPresenceConversationPrompt(userText: string, sessionKey: string): 
     '',
     `User: ${userText}`,
   ].join('\n');
+}
+
+function buildSurfaceRoutingPrompt(
+  userText: string,
+  context: SurfaceRouterContext,
+  candidates: HeuristicSurfaceRoutingCandidate[],
+): string {
+  const browserSession = getActiveBrowserConversationSession('presence');
+  const taskSession = getActiveTaskSession('presence') as TaskSessionShape | null;
+  const browserContext = browserSession
+    ? `Active browser session: ${browserSession.target?.url || 'unknown url'} (${browserSession.goal.summary}).`
+    : 'Active browser session: none.';
+  const taskContext = taskSession
+    ? `Active task session: ${taskSession.task_type} (${taskSession.status}).`
+    : 'Active task session: none.';
+
+  return [
+    'You are the routing brain for a realtime surface.',
+    'Decide which operator should handle the user utterance.',
+    'Return JSON only. No prose. No markdown besides optional json fence.',
+    'Use this exact schema:',
+    '{"kind":"surface_action_routing","intent":"conversation|browser_open_site|browser_step|task_session|surface_query|async_delegate","confidence":0.0,"target_operator":"presence-surface-agent|browser-operator|task-session|surface-query|chronos-mirror|nerve-agent","browser":{"url":"optional","site_query":"optional"},"task":{"task_type":"optional"},"query":{"query_type":"location|weather|knowledge_search|web_search","text":"optional"},"delegate":{"receiver":"chronos-mirror|nerve-agent","reason":"optional"}}',
+    'Rules:',
+    '- browser_open_site: open a site, launch/open browser, navigate to a website, search and show a website.',
+    '- browser_step: click/fill/press/continue/that/first item style instructions for an already visible browser session.',
+    '- task_session: durable work like creating PowerPoint, report, WBS, photo capture, service operations.',
+    '- surface_query: weather, location, web search, knowledge search.',
+    '- async_delegate: deep mission/state work for chronos-mirror or nerve-agent.',
+    '- conversation: everything else.',
+    '- If the user mentions a site or publication name without a URL, prefer browser_open_site with browser.site_query.',
+    '- If there is an active browser session and the utterance sounds like a step on the current page, prefer browser_step.',
+    '- Prefer the heuristic top candidate unless conversation context strongly contradicts it.',
+    '',
+    browserContext,
+    taskContext,
+    'Heuristic candidates:',
+    candidates.length > 0
+      ? candidates.map((entry, index) => `${index + 1}. ${entry.decision?.intent} because ${entry.reason}`).join('\n')
+      : 'none',
+    'Recent conversation:',
+    formatConversationHistory(context.sessionKey),
+    '',
+    `User: ${userText}`,
+  ].join('\n');
+}
+
+async function routeSurfaceActionWithLlm(
+  userText: string,
+  context: SurfaceRouterContext,
+  candidates: HeuristicSurfaceRoutingCandidate[],
+) {
+  try {
+    const response = await Promise.race([
+      runSurfaceConversation({
+        agentId: 'sovereign-brain',
+        query: buildSurfaceRoutingPrompt(userText, context, candidates),
+        senderAgentId: 'kyberion:voice-hub',
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('surface_action_routing_timeout')), 3500);
+      }),
+    ]);
+    return parseSurfaceActionRoutingDecision(response.text || '');
+  } catch (error: any) {
+    logger.warn(`[voice-hub] surface action routing failed: ${error?.message || error}`);
+    return null;
+  }
+}
+
+function buildFallbackSurfaceRoutingDecision(userText: string) {
+  const trimmed = userText.trim();
+  const queryIntent = classifySurfaceQueryIntent(trimmed);
+  if (queryIntent) {
+    return {
+      kind: 'surface_action_routing' as const,
+      intent: 'surface_query' as const,
+      confidence: 0.55,
+      target_operator: 'surface-query' as const,
+      query: {
+        query_type: queryIntent,
+        text: trimmed,
+      },
+    };
+  }
+
+  const taskIntent = classifyTaskSessionIntent(trimmed);
+  if (taskIntent) {
+    return {
+      kind: 'surface_action_routing' as const,
+      intent: 'task_session' as const,
+      confidence: 0.6,
+      target_operator: 'task-session' as const,
+      task: {
+        task_type: taskIntent.taskType,
+      },
+    };
+  }
+
+  const activeBrowserSession = getActiveBrowserConversationSession('presence');
+  if (activeBrowserSession && /(クリック|押して|開いて|入力|入れて|選んで|1つ目|一つ目|それ|続けて|enter|click|press|fill|type|open that)/i.test(trimmed)) {
+    return {
+      kind: 'surface_action_routing' as const,
+      intent: 'browser_step' as const,
+      confidence: 0.55,
+      target_operator: 'browser-operator' as const,
+    };
+  }
+
+  if (/(ブラウザ|browser).*(開いて|立ち上げ|表示|見て)|サイトを見て|サイトを開いて|webサイト|website|open .*site|show .*site|go to/i.test(trimmed)) {
+    const urlMatch = trimmed.match(/https?:\/\/\S+/i)?.[0];
+    const siteQuery = trimmed
+      .replace(/https?:\/\/\S+/ig, '')
+      .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show)/ig, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return {
+      kind: 'surface_action_routing' as const,
+      intent: 'browser_open_site' as const,
+      confidence: 0.5,
+      target_operator: 'browser-operator' as const,
+      browser: {
+        url: urlMatch,
+        site_query: siteQuery || trimmed,
+      },
+    };
+  }
+
+  const receiver = deriveSurfaceDelegationReceiver(trimmed);
+  if (receiver) {
+    return {
+      kind: 'surface_action_routing' as const,
+      intent: 'async_delegate' as const,
+      confidence: 0.5,
+      target_operator: receiver,
+      delegate: {
+        receiver,
+      },
+    };
+  }
+
+  return null;
+}
+
+function buildHeuristicSurfaceRoutingCandidates(userText: string): HeuristicSurfaceRoutingCandidate[] {
+  const candidates: HeuristicSurfaceRoutingCandidate[] = [];
+  const fallback = buildFallbackSurfaceRoutingDecision(userText);
+  if (fallback) {
+    candidates.push({
+      decision: fallback,
+      reason: 'fast deterministic classification from current utterance and active sessions',
+    });
+  }
+
+  const trimmed = userText.trim();
+  if (/(新聞|nikkei|日経|サイト|website|webサイト)/i.test(trimmed)) {
+    const siteQuery = trimmed
+      .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show)/ig, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    candidates.unshift({
+      decision: {
+        kind: 'surface_action_routing',
+        intent: 'browser_open_site',
+        confidence: 0.72,
+        target_operator: 'browser-operator',
+        browser: {
+          url: undefined,
+          site_query: siteQuery || trimmed,
+        },
+      },
+      reason: 'site/publication mention implies browser navigation',
+    });
+  }
+
+  const activeBrowserSession = getActiveBrowserConversationSession('presence');
+  if (activeBrowserSession && /(押して|クリック|それ|1つ目|一つ目|入力|enter|click|press|type|fill)/i.test(trimmed)) {
+    candidates.unshift({
+      decision: {
+        kind: 'surface_action_routing',
+        intent: 'browser_step',
+        confidence: 0.75,
+        target_operator: 'browser-operator',
+      },
+      reason: 'active browser session plus step-like utterance',
+    });
+  }
+
+  const deduped: HeuristicSurfaceRoutingCandidate[] = [];
+  const seen = new Set<string>();
+  for (const entry of candidates) {
+    if (!entry.decision) continue;
+    const key = JSON.stringify(entry.decision);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(entry);
+  }
+  return deduped;
 }
 
 function pruneRecentResponses(now = Date.now()): void {
@@ -919,6 +1128,112 @@ async function tryBuildWebSearchReply(userText: string): Promise<string | null> 
       ? 'Web 検索に失敗しました。少し時間を置いて再試行してください。'
       : 'Web search failed. Try again in a moment.';
   }
+}
+
+function loadBrowserRuntimeSessionForVoiceHub(sessionId: string): Record<string, any> | null {
+  const filePath = pathResolver.shared(`runtime/browser/sessions/${sessionId}.json`);
+  if (!safeExistsSync(filePath)) return null;
+  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<string, any>;
+}
+
+async function executeBrowserOpenSite(params: {
+  userText: string;
+  url?: string;
+  siteQuery?: string;
+}): Promise<string | null> {
+  const activeConversation = getActiveBrowserConversationSession('presence');
+  const browserSessionId = activeConversation?.target?.browser_session_id || 'default';
+  let targetUrl = params.url?.trim();
+
+  if (!targetUrl && params.siteQuery?.trim()) {
+    const results = await searchWeb(params.siteQuery.trim());
+    targetUrl = results[0]?.url;
+  }
+  if (!targetUrl) return null;
+
+  const runtimeSession = loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
+  const tmpPath = pathResolver.sharedTmp(`browser-conversation/open-site-${Date.now().toString(36)}.json`);
+  const payload = {
+    action: 'pipeline',
+    session_id: browserSessionId,
+    options: {
+      headless: false,
+      keep_alive: true,
+      lease_ms: 5 * 60 * 1000,
+      connect_over_cdp: Boolean(runtimeSession?.cdp_url),
+      cdp_url: runtimeSession?.cdp_url,
+      cdp_port: runtimeSession?.cdp_port,
+    },
+    steps: [
+      {
+        type: 'capture',
+        op: 'goto',
+        params: {
+          url: targetUrl,
+          waitUntil: 'domcontentloaded',
+        },
+      },
+      {
+        type: 'capture',
+        op: 'tabs',
+        params: {},
+      },
+      {
+        type: 'capture',
+        op: 'snapshot',
+        params: {
+          export_as: 'last_snapshot',
+          max_elements: 200,
+        },
+      },
+    ],
+  };
+  safeWriteFile(tmpPath, JSON.stringify(payload, null, 2));
+  safeExec('node', [
+    'dist/libs/actuators/browser-actuator/src/index.js',
+    '--input',
+    tmpPath,
+  ], {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: 60_000,
+  });
+
+  const updatedRuntimeSession = loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
+  const activeTab = (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.active)
+    || (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.url === targetUrl)
+    || updatedRuntimeSession?.tabs?.[0];
+
+  const nextConversation = activeConversation || createBrowserConversationSession({
+    sessionId: `BCS-presence-${browserSessionId}`,
+    surface: 'presence',
+    goal: {
+      summary: activeTab?.title || params.siteQuery || 'Browser session',
+      success_condition: 'Complete the requested browser step safely.',
+    },
+    target: {
+      app: 'browser',
+      browser_session_id: browserSessionId,
+      tab_id: activeTab?.tab_id,
+      url: activeTab?.url || targetUrl,
+      window_title: activeTab?.title,
+    },
+  });
+  nextConversation.target = {
+    app: 'browser',
+    browser_session_id: browserSessionId,
+    tab_id: activeTab?.tab_id || nextConversation.target?.tab_id,
+    url: activeTab?.url || targetUrl,
+    window_title: activeTab?.title || nextConversation.target?.window_title,
+  };
+  nextConversation.goal.summary = activeTab?.title || params.siteQuery || nextConversation.goal.summary;
+  nextConversation.status = 'awaiting_instruction';
+  nextConversation.updated_at = new Date().toISOString();
+  saveBrowserConversationSession(nextConversation);
+
+  const label = activeTab?.title || params.siteQuery || targetUrl;
+  return detectReplyLanguage(params.userText) === 'ja'
+    ? `${label} をブラウザで開きました。`
+    : `Opened ${label} in the browser.`;
 }
 
 async function tryBuildKnowledgeReply(userText: string): Promise<string | null> {
@@ -1913,7 +2228,39 @@ async function generateReply(userText: string, context: { sessionKey: string }):
     const taskSessionReply = tryHandleTaskSession(userText);
     if (taskSessionReply) return taskSessionReply;
 
-    const queryIntent = classifySurfaceQueryIntent(userText);
+    const heuristicCandidates = buildHeuristicSurfaceRoutingCandidates(userText);
+    const topHeuristic = heuristicCandidates[0]?.decision || null;
+
+    if (topHeuristic?.intent === 'browser_open_site') {
+      const opened = await executeBrowserOpenSite({
+        userText,
+        url: topHeuristic.browser?.url,
+        siteQuery: topHeuristic.browser?.site_query,
+      });
+      if (opened) return opened;
+    }
+
+    const routed = await routeSurfaceActionWithLlm(userText, context, heuristicCandidates) || topHeuristic || buildFallbackSurfaceRoutingDecision(userText);
+    if (routed?.intent === 'browser_open_site') {
+      const opened = await executeBrowserOpenSite({
+        userText,
+        url: routed.browser?.url,
+        siteQuery: routed.browser?.site_query,
+      });
+      if (opened) return opened;
+    }
+    if (routed?.intent === 'browser_step') {
+      const browserReply = tryHandleBrowserConversation(userText);
+      if (browserReply) return browserReply;
+    }
+    if (routed?.intent === 'task_session') {
+      const taskReply = tryHandleTaskSession(userText);
+      if (taskReply) return taskReply;
+    }
+
+    const queryIntent = routed?.intent === 'surface_query'
+      ? routed.query?.query_type || classifySurfaceQueryIntent(userText)
+      : classifySurfaceQueryIntent(userText);
     if (queryIntent === 'location') {
       const locationReply = await tryBuildLocationReply(userText);
       if (locationReply) return locationReply;
@@ -1931,7 +2278,9 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       if (webReply) return webReply;
     }
 
-    const forcedReceiver = deriveSurfaceDelegationReceiver(userText);
+    const forcedReceiver = routed?.intent === 'async_delegate'
+      ? routed.delegate?.receiver || deriveSurfaceDelegationReceiver(userText)
+      : deriveSurfaceDelegationReceiver(userText);
     const statusReply = tryBuildAsyncStatusReply(userText);
     if (statusReply) return statusReply;
     const fastReply = tryBuildChronosFastReply(userText, forcedReceiver);

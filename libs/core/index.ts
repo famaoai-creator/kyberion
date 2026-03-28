@@ -170,6 +170,7 @@ export * as docxUtils from './src/docx-utils.js';
 export { say, speak } from './voice-synth.js';
 export * from './voice-stt.js';
 export * from './voice-tts-config.js';
+export * from './surface-action-routing.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
 export { ReflexTerminal } from './reflex-terminal.js';

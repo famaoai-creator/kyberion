@@ -295,6 +295,7 @@ function loadBrowserSnapshotSummary(sessionId: string): BrowserSnapshotSummary |
 }
 
 function pickPresenceBrowserRuntimeSession(items: BrowserRuntimeSessionSummary[]): BrowserRuntimeSessionSummary | null {
+  const now = Date.now();
   const scored = items
     .map((item) => {
       const tabs = item.tabs || [];
@@ -304,12 +305,19 @@ function pickPresenceBrowserRuntimeSession(items: BrowserRuntimeSessionSummary[]
       const snapshot = loadBrowserSnapshotSummary(item.session_id);
       const snapshotLooksUseful = Boolean(snapshot && snapshot.url && snapshot.url !== 'about:blank' && Number(snapshot.element_count || 0) > 0);
       const hasReconnectPath = Boolean((item as any).cdp_url);
+      const leaseExpiresAt = typeof (item as any).lease_expires_at === 'string'
+        ? Date.parse((item as any).lease_expires_at)
+        : Number.NaN;
+      const leaseIsFresh = !Number.isFinite(leaseExpiresAt) || leaseExpiresAt >= now;
+      const likelySyntheticSession = /^browser-(admin|cdp|cdp-reconnect|lease|pause|passkey|passkey-flow|profile|test|video|video-lease)$/.test(item.session_id);
       let score = 0;
       if (preferredTab) score += 4;
       if (snapshotLooksUseful) score += 3;
-      if (hasReconnectPath) score += 2;
-      if (item.lease_status === 'active') score += 1;
-      if (item.retained !== false) score += 1;
+      if (hasReconnectPath && leaseIsFresh) score += 2;
+      if (item.lease_status === 'active' && leaseIsFresh) score += 1;
+      if (item.retained !== false && leaseIsFresh) score += 1;
+      if (!leaseIsFresh) score -= 3;
+      if (likelySyntheticSession && !snapshotLooksUseful) score -= 2;
       return { item, score };
     })
     .filter(({ score }) => score > 0)
