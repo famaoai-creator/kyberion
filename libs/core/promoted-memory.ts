@@ -1,0 +1,347 @@
+import AjvModule, { type ValidateFunction } from 'ajv';
+import { withExecutionContext } from './authority.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import type { DistillCandidateRecord } from './distill-candidate-registry.js';
+
+interface PromotedMemoryRecordBase {
+  record_id: string;
+  kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
+  tier: 'personal' | 'confidential' | 'public';
+  title: string;
+  summary: string;
+  candidate_id: string;
+  project_id?: string;
+  task_session_id?: string;
+  specialist_id?: string;
+  locale?: string;
+  artifact_ids?: string[];
+  evidence_refs?: string[];
+  created_at: string;
+}
+
+export interface PromotedPatternRecord extends PromotedMemoryRecordBase {
+  kind: 'pattern';
+  applicability: string[];
+  reusable_steps: string[];
+  expected_outcome: string;
+}
+
+export interface PromotedSopRecord extends PromotedMemoryRecordBase {
+  kind: 'sop_candidate';
+  procedure_steps: string[];
+  safety_notes: string[];
+  escalation_conditions: string[];
+}
+
+export interface PromotedKnowledgeHintRecord extends PromotedMemoryRecordBase {
+  kind: 'knowledge_hint';
+  hint_scope: string;
+  hint_triggers: string[];
+  recommended_refs: string[];
+}
+
+export interface PromotedReportTemplateRecord extends PromotedMemoryRecordBase {
+  kind: 'report_template';
+  template_sections: string[];
+  audience: string;
+  output_format: string;
+}
+
+export type PromotedMemoryRecord =
+  | PromotedPatternRecord
+  | PromotedSopRecord
+  | PromotedKnowledgeHintRecord
+  | PromotedReportTemplateRecord;
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const validatorCache = new Map<string, ValidateFunction>();
+
+type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
+
+function withPromotedMemoryExecutionContext<T>(
+  role: PromotedMemoryExecutionRole,
+  fn: () => T,
+): T {
+  return withExecutionContext(role, fn, 'ecosystem_architect');
+}
+
+function schemaPathForKind(kind: PromotedMemoryRecord['kind']): string {
+  switch (kind) {
+    case 'pattern':
+      return pathResolver.knowledge('public/schemas/generated-pattern-record.schema.json');
+    case 'sop_candidate':
+      return pathResolver.knowledge('public/schemas/generated-sop-record.schema.json');
+    case 'knowledge_hint':
+      return pathResolver.knowledge('public/schemas/generated-knowledge-hint-record.schema.json');
+    case 'report_template':
+      return pathResolver.knowledge('public/schemas/generated-report-template-record.schema.json');
+  }
+}
+
+function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
+  const cached = validatorCache.get(kind);
+  if (cached) return cached;
+  const raw = safeReadFile(schemaPathForKind(kind), { encoding: 'utf8' }) as string;
+  const validator = ajv.compile(JSON.parse(raw));
+  validatorCache.set(kind, validator);
+  return validator;
+}
+
+function logicalDirFor(input: { kind: PromotedMemoryRecord['kind']; tier: PromotedMemoryRecord['tier'] }): string {
+  switch (input.kind) {
+    case 'pattern':
+      return `knowledge/${input.tier}/common/patterns/generated`;
+    case 'sop_candidate':
+      return `knowledge/${input.tier}/common/operations/generated`;
+    case 'knowledge_hint':
+      return `knowledge/${input.tier}/common/wisdom/generated`;
+    case 'report_template':
+      return `knowledge/${input.tier}/common/templates/generated`;
+  }
+}
+
+function normalizeLines(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/\r?\n|;/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function fallbackSteps(summary: string, defaults: string[]): string[] {
+  const lines = summary
+    .split(/[。.!?\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines : defaults;
+}
+
+function buildMarkdown(record: PromotedMemoryRecord): string {
+  const frontmatter = [
+    `---`,
+    `record_id: ${record.record_id}`,
+    `kind: ${record.kind}`,
+    `tier: ${record.tier}`,
+    `candidate_id: ${record.candidate_id}`,
+    `project_id: ${record.project_id || ''}`,
+    `task_session_id: ${record.task_session_id || ''}`,
+    `specialist_id: ${record.specialist_id || ''}`,
+    `locale: ${record.locale || ''}`,
+    `created_at: ${record.created_at}`,
+    `---`,
+    ``,
+    `# ${record.title}`,
+    ``,
+    record.summary,
+    ``,
+  ];
+  if (record.kind === 'pattern') {
+    return [
+      ...frontmatter,
+      `## Applicability`,
+      ``,
+      ...(record.applicability.map((item) => `- ${item}`)),
+      ``,
+      `## Reusable Steps`,
+      ``,
+      ...(record.reusable_steps.map((item, index) => `${index + 1}. ${item}`)),
+      ``,
+      `## Expected Outcome`,
+      ``,
+      record.expected_outcome,
+      ``,
+      `## Evidence`,
+      ``,
+      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ``,
+      `## Artifacts`,
+      ``,
+      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+    ].join('\n');
+  }
+  if (record.kind === 'sop_candidate') {
+    return [
+      ...frontmatter,
+      `## Procedure Steps`,
+      ``,
+      ...(record.procedure_steps.map((item, index) => `${index + 1}. ${item}`)),
+      ``,
+      `## Safety Notes`,
+      ``,
+      ...(record.safety_notes.map((item) => `- ${item}`)),
+      ``,
+      `## Escalation Conditions`,
+      ``,
+      ...(record.escalation_conditions.map((item) => `- ${item}`)),
+      ``,
+      `## Evidence`,
+      ``,
+      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ``,
+      `## Artifacts`,
+      ``,
+      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+    ].join('\n');
+  }
+  if (record.kind === 'knowledge_hint') {
+    return [
+      ...frontmatter,
+      `## Hint Scope`,
+      ``,
+      record.hint_scope,
+      ``,
+      `## Trigger Phrases`,
+      ``,
+      ...(record.hint_triggers.map((item) => `- ${item}`)),
+      ``,
+      `## Recommended References`,
+      ``,
+      ...(record.recommended_refs.map((item) => `- ${item}`)),
+      ``,
+      `## Evidence`,
+      ``,
+      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ``,
+      `## Artifacts`,
+      ``,
+      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+    ].join('\n');
+  }
+  return [
+    ...frontmatter,
+    `## Audience`,
+    ``,
+    record.audience,
+    ``,
+    `## Output Format`,
+    ``,
+    record.output_format,
+    ``,
+    `## Template Sections`,
+    ``,
+    ...(record.template_sections.map((item, index) => `${index + 1}. ${item}`)),
+    ``,
+    `## Evidence`,
+    ``,
+    ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+    ``,
+    `## Artifacts`,
+    ``,
+    ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+  ].join('\n');
+}
+
+export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): PromotedMemoryRecord {
+  const tier = candidate.tier === 'personal' || candidate.tier === 'public' ? candidate.tier : 'confidential';
+  const base: PromotedMemoryRecordBase = {
+    record_id: candidate.candidate_id,
+    kind: candidate.target_kind,
+    tier,
+    title: candidate.title,
+    summary: candidate.summary,
+    candidate_id: candidate.candidate_id,
+    project_id: candidate.project_id,
+    task_session_id: candidate.task_session_id,
+    specialist_id: candidate.specialist_id,
+    locale: candidate.locale,
+    artifact_ids: candidate.artifact_ids,
+    evidence_refs: candidate.evidence_refs,
+    created_at: new Date().toISOString(),
+  };
+  const metadata = candidate.metadata || {};
+  if (candidate.target_kind === 'pattern') {
+    return {
+      ...base,
+      kind: 'pattern',
+      applicability: normalizeLines(metadata.applicability).length > 0
+        ? normalizeLines(metadata.applicability)
+        : ['repeatable delivery work', candidate.specialist_id || 'general specialist'],
+      reusable_steps: normalizeLines(metadata.reusable_steps).length > 0
+        ? normalizeLines(metadata.reusable_steps)
+        : fallbackSteps(candidate.summary, ['review the prior outcome', 'adapt the pattern to the active request', 'verify the delivered result']),
+      expected_outcome: typeof metadata.expected_outcome === 'string' && metadata.expected_outcome.trim()
+        ? metadata.expected_outcome.trim()
+        : candidate.summary,
+    };
+  }
+  if (candidate.target_kind === 'sop_candidate') {
+    return {
+      ...base,
+      kind: 'sop_candidate',
+      procedure_steps: normalizeLines(metadata.procedure_steps).length > 0
+        ? normalizeLines(metadata.procedure_steps)
+        : fallbackSteps(candidate.summary, ['inspect the current state', 'apply the standard operator action', 'confirm the outcome and capture evidence']),
+      safety_notes: normalizeLines(metadata.safety_notes).length > 0
+        ? normalizeLines(metadata.safety_notes)
+        : ['Require approval before irreversible or high-risk actions.', 'Capture evidence before and after the action.'],
+      escalation_conditions: normalizeLines(metadata.escalation_conditions).length > 0
+        ? normalizeLines(metadata.escalation_conditions)
+        : ['Unexpected runtime failure', 'Policy or approval mismatch', 'Result does not match the expected state'],
+    };
+  }
+  if (candidate.target_kind === 'knowledge_hint') {
+    return {
+      ...base,
+      kind: 'knowledge_hint',
+      hint_scope: typeof metadata.hint_scope === 'string' && metadata.hint_scope.trim()
+        ? metadata.hint_scope.trim()
+        : candidate.specialist_id || 'general reasoning',
+      hint_triggers: normalizeLines(metadata.hint_triggers).length > 0
+        ? normalizeLines(metadata.hint_triggers)
+        : [candidate.title, candidate.summary].filter(Boolean),
+      recommended_refs: normalizeLines(metadata.recommended_refs).length > 0
+        ? normalizeLines(metadata.recommended_refs)
+        : candidate.evidence_refs || [],
+    };
+  }
+  return {
+    ...base,
+    kind: 'report_template',
+    template_sections: normalizeLines(metadata.template_sections).length > 0
+      ? normalizeLines(metadata.template_sections)
+      : ['Summary', 'Current State', 'Findings', 'Next Actions'],
+    audience: typeof metadata.audience === 'string' && metadata.audience.trim()
+      ? metadata.audience.trim()
+      : 'internal stakeholders',
+    output_format: typeof metadata.output_format === 'string' && metadata.output_format.trim()
+      ? metadata.output_format.trim()
+      : 'structured document',
+  };
+}
+
+export function savePromotedMemoryRecord(
+  candidate: DistillCandidateRecord,
+  options: { executionRole?: PromotedMemoryExecutionRole } = {},
+): { logicalPath: string; record: PromotedMemoryRecord } {
+  const executionRole = options.executionRole || 'mission_controller';
+  return withPromotedMemoryExecutionContext(executionRole, () => {
+    const record = buildPromotedMemoryRecord(candidate);
+    const validate = ensureValidator(record.kind);
+    if (!validate(record)) {
+      const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
+    }
+    const logicalDir = logicalDirFor({ kind: record.kind, tier: record.tier });
+    const absDir = pathResolver.resolve(logicalDir);
+    if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
+    const baseName = record.record_id;
+    const jsonPath = pathResolver.resolve(`${logicalDir}/${baseName}.json`);
+    const mdPath = pathResolver.resolve(`${logicalDir}/${baseName}.md`);
+    safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
+    const markdown = buildMarkdown(record);
+    safeWriteFile(mdPath, markdown);
+    return {
+      logicalPath: `${logicalDir}/${baseName}.md`,
+      record,
+    };
+  });
+}

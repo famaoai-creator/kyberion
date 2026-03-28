@@ -8,6 +8,13 @@ Intent -> Plan -> State -> Result
 
 This guide explains how to operate Kyberion without forcing people to think in raw pipelines, runtime registries, or actuator contracts first.
 
+For enterprise role separation above the operator layer, also read:
+
+- `knowledge/public/architecture/enterprise-operating-kernel.md`
+- `knowledge/public/architecture/ceo-ux.md`
+- `knowledge/public/architecture/management-control-plane.md`
+- `knowledge/public/architecture/surface-responsibility-model.md`
+
 ## 1. The Core UX Contract
 
 Every surface should make these four things visible:
@@ -63,6 +70,7 @@ Use when you want:
 - runtime and mission state
 - intervention points
 - delivery inspection
+- project and mission-seed control
 
 Chronos is the control surface.
 It explains and intervenes, but it does not replace the durable control plane.
@@ -75,6 +83,16 @@ Use when you want:
 - hands-free or voice interaction
 - browser assistance
 - live task detail and artifact access
+- immediate project bootstrap context
+
+### CEO UX
+
+Use when you want:
+
+- leadership-level request intake
+- approval review
+- latest strategic outcomes
+- major exception visibility
 
 ## 3. What The User Says vs What Kyberion Does
 
@@ -245,3 +263,20 @@ If you have to explain Kyberion quickly, explain it like this:
 3. It asks only when approval is needed.
 4. It shows what is happening.
 5. It returns the result and keeps the work inspectable.
+
+## 10. Surface Responsibility Split
+
+The simplest stable split is:
+
+- `Presence Studio`
+  - concierge surface for live conversation and immediate work detail
+- `Chronos`
+  - management control plane for state, intervention, risk, and accountability
+- `CEO UX`
+  - executive surface for outcome review and approvals
+
+This split matters because it keeps:
+
+- conversation smooth
+- operations inspectable
+- executive attention high-signal

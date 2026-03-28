@@ -44,6 +44,13 @@ export interface TaskSession {
     summary: string;
     success_condition: string;
   };
+  project_context?: {
+    project_id?: string;
+    project_name?: string;
+    tier?: 'personal' | 'confidential' | 'public';
+    service_bindings?: string[];
+    locale?: string;
+  };
   artifact?: {
     kind?: string;
     output_path?: string;
@@ -67,6 +74,7 @@ export interface TaskSession {
 export interface TaskSessionIntent {
   taskType: TaskSessionType;
   goal: TaskSession['goal'];
+  projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
 }
@@ -107,6 +115,7 @@ export function createTaskSession(input: {
   mode?: TaskSessionMode;
   requiresApproval?: boolean;
   goal: TaskSession['goal'];
+  projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
 }): TaskSession {
@@ -118,6 +127,7 @@ export function createTaskSession(input: {
     status: input.status || 'awaiting_instruction',
     mode: input.mode || 'interactive',
     goal: input.goal,
+    project_context: input.projectContext,
     requirements: input.requirements,
     control: {
       interruptible: true,

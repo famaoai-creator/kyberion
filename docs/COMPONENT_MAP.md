@@ -9,6 +9,11 @@ For a layer-oriented view of the concepts themselves, read:
 - `knowledge/public/architecture/kyberion-concept-map.md`
 - `knowledge/public/architecture/llm-execution-boundary.md`
 - `knowledge/public/architecture/actuator-contract-map.md`
+- `knowledge/public/architecture/enterprise-operating-kernel.md`
+- `knowledge/public/architecture/ceo-ux.md`
+- `knowledge/public/architecture/management-control-plane.md`
+- `knowledge/public/architecture/corporate-memory-loop.md`
+- `knowledge/public/architecture/project-mission-artifact-service-model.md`
 
 ## System at a glance
 
@@ -38,6 +43,19 @@ Kyberion is easier to understand when concepts are separated into five layers:
   - actuators, pipelines, generated pipelines, delivery packs
 - `Memory`
   - evidence, run reports, status reports, distillation, wisdom
+
+Within those layers, the main durable containers are:
+
+- `Project`
+  - long-lived meaning, repositories, service bindings, artifacts, vault refs
+- `Mission`
+  - durable execution and audit trail
+- `Task Session`
+  - conversational bounded work
+- `Artifact`
+  - the concrete outcome
+- `Service Binding`
+  - the governed contract to an external system
 
 This repo map focuses on the physical layout.
 The concept map explains how those ideas fit together logically.
@@ -96,6 +114,14 @@ The current shape is:
   - runtime spawn/reuse/stop authority
 - `a2a-bridge`
   - work delegation to agent runtimes
+
+Mission orchestration should now be read together with the higher-order context model:
+
+- project gives work its long-lived meaning
+- mission gives work durable execution structure
+- task session gives work conversational entry and bounded progress
+- artifact records the outcome
+- service binding governs external system interaction
 
 Local boot sequence:
 
@@ -165,6 +191,9 @@ Chronos does not directly own mission state. It delegates to:
 
 This path defines how authenticated external service access is separated from channel delivery and from local OS execution.
 It is the practical boundary between "how we authenticate to a service", "how we deliver to a channel", and "how we run local commands".
+
+Service binding should be treated as a first-class architecture concept.
+Bindings connect projects, missions, task sessions, and artifacts to external systems without collapsing secrets into channel gateways or actuator-local config.
 
 ## Key library groups
 

@@ -80,6 +80,14 @@ The classifier should decide things such as:
 
 Execution then proceeds through validators, policies, and governed actuators.
 
+The routing result should also emit an explainable trace with at least:
+
+- intent
+- heuristic candidates
+- LLM rerank decision or timeout
+- chosen work shape
+- policy outcome
+
 ## 4. Why This Matters
 
 This model gives Kyberion:
@@ -113,3 +121,15 @@ Examples:
 - mission
 
 That is the key connection between user UX and the backend execution model.
+
+## 6. Observability
+
+Routing is part of the user experience, so it needs first-class observability.
+
+The recommended trace progression is:
+
+```text
+intent -> slot -> plan -> execution -> outcome
+```
+
+This keeps the system debuggable without forcing the user to understand raw ADF or actuator internals.

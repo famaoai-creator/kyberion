@@ -1,7 +1,177 @@
 {
+  "version": "2.0.0",
+  "ux_contract": "Intent -> Plan -> State -> Result",
+  "notes": [
+    "This catalog is user-facing first. It describes what people ask Kyberion to do.",
+    "Mission, task session, actuator, and ADF details remain backend execution concerns unless inspection is needed.",
+    "Legacy operator and maintenance intents remain available for internal and operator use."
+  ],
   "intents": [
     {
+      "id": "bootstrap-project",
+      "category": "surface",
+      "description": "Create a new long-lived project context and prepare the first work items.",
+      "surface_examples": [
+        "Webサービスを作って",
+        "新しいプロジェクトを立ち上げて",
+        "新規事業の管理基盤を作って"
+      ],
+      "plan_outline": ["frame the project goal", "create a governed project record", "prepare the first work items"],
+      "outcome_ids": ["project_created"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["プロジェクト", "Webサービス", "作って", "立ち上げて", "build a service"],
+      "resolution": {
+        "shape": "project_bootstrap",
+        "result_shape": "project_created"
+      }
+    },
+    {
+      "id": "open-site",
+      "category": "surface",
+      "description": "Open a website or navigate the active browser session to a requested destination.",
+      "surface_examples": [
+        "日経新聞を開いて",
+        "Open OpenAI docs",
+        "このサイトを見せて"
+      ],
+      "plan_outline": ["resolve destination", "open or focus browser", "navigate and confirm the page"],
+      "outcome_ids": ["browser_navigation"],
+      "specialist_id": "browser-operator",
+      "trigger_keywords": ["open", "site", "browser", "開いて", "サイト", "見せて"],
+      "resolution": {
+        "shape": "browser_session",
+        "result_shape": "browser_navigation"
+      }
+    },
+    {
+      "id": "browser-step",
+      "category": "surface",
+      "description": "Continue an active browser conversation session with a step command or confirmation.",
+      "surface_examples": [
+        "左下の承認ボタンを押して",
+        "1つ目",
+        "それで進めて"
+      ],
+      "plan_outline": ["understand the active browser step", "pick the intended target", "execute and report the outcome"],
+      "outcome_ids": ["browser_step"],
+      "specialist_id": "browser-operator",
+      "trigger_keywords": ["押して", "クリック", "1つ目", "2つ目", "それ", "進めて"],
+      "resolution": {
+        "shape": "browser_session",
+        "result_shape": "browser_step"
+      }
+    },
+    {
+      "id": "generate-presentation",
+      "category": "surface",
+      "description": "Create a presentation artifact such as a PowerPoint deck.",
+      "surface_examples": [
+        "このPDFをパワポにして",
+        "提案資料のパワーポイントを書いて",
+        "3枚の要約スライドを作って"
+      ],
+      "plan_outline": ["gather required source material", "shape the deck outline", "generate the presentation artifact"],
+      "outcome_ids": ["artifact:pptx"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["pptx", "powerpoint", "slides", "スライド", "パワポ", "パワーポイント"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "presentation_deck",
+        "result_shape": "artifact"
+      }
+    },
+    {
+      "id": "generate-report",
+      "category": "surface",
+      "description": "Create a report artifact such as docx or pdf output.",
+      "surface_examples": [
+        "今週の進捗レポートを作って",
+        "会議の報告書をdocxで作って"
+      ],
+      "plan_outline": ["collect the reporting context", "draft the document structure", "generate the report artifact"],
+      "outcome_ids": ["artifact:docx"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["report", "docx", "pdf", "レポート", "報告書"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "report_document",
+        "result_shape": "artifact"
+      }
+    },
+    {
+      "id": "generate-workbook",
+      "category": "surface",
+      "description": "Create a workbook artifact such as an Excel WBS or structured sheet.",
+      "surface_examples": [
+        "プロジェクトのWBSをエクセルで作って",
+        "座席表をxlsxにして"
+      ],
+      "plan_outline": ["collect the source structure", "map it into rows and columns", "generate the workbook artifact"],
+      "outcome_ids": ["artifact:xlsx"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["xlsx", "excel", "wbs", "エクセル"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "workbook_wbs",
+        "result_shape": "artifact"
+      }
+    },
+    {
+      "id": "inspect-service",
+      "category": "surface",
+      "description": "Inspect service state or logs and return a concise summary.",
+      "surface_examples": [
+        "voice-hub の状態を見て",
+        "presence-studio のログを見て"
+      ],
+      "plan_outline": ["inspect runtime state or logs", "distill the relevant signal", "return a concise summary"],
+      "outcome_ids": ["service_summary", "approval_request"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["status", "logs", "state", "状態", "ログ"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      }
+    },
+    {
+      "id": "knowledge-query",
+      "category": "surface",
+      "description": "Search accumulated governed knowledge and return a concise answer with relevant sources.",
+      "surface_examples": [
+        "mission authority を教えて",
+        "ナレッジで planner を調べて"
+      ],
+      "plan_outline": ["search governed knowledge", "rank the relevant sources", "return a concise answer with citations"],
+      "outcome_ids": ["knowledge_answer"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["knowledge", "ナレッジ", "調べて", "教えて"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "knowledge_answer"
+      }
+    },
+    {
+      "id": "live-query",
+      "category": "surface",
+      "description": "Return live information such as weather, location, or web search results.",
+      "surface_examples": [
+        "今日の天気を教えて",
+        "今の場所を教えて",
+        "WebでOpenAI Responses APIを検索して"
+      ],
+      "plan_outline": ["resolve the live query target", "fetch the current information", "summarize the answer for the surface"],
+      "outcome_ids": ["live_answer"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["weather", "location", "web", "search", "天気", "場所", "検索"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "live_answer"
+      }
+    },
+    {
       "id": "reconcile-ecosystem",
+      "category": "operator",
       "description": "Perform full ecosystem reconciliation (dates, docs, integrity).",
       "trigger_keywords": ["sync", "reconcile", "update all"],
       "pipeline": [
@@ -11,6 +181,7 @@
     },
     {
       "id": "audit-security",
+      "category": "operator",
       "description": "Scan for PII and check pulse integrity.",
       "trigger_keywords": ["security", "audit", "pii", "check"],
       "pipeline": [
@@ -21,6 +192,7 @@
     },
     {
       "id": "rebuild-env",
+      "category": "operator",
       "description": "Rebuild all actuators and redeploy ecosystem.",
       "trigger_keywords": ["rebuild", "deploy", "setup"],
       "pipeline": [
@@ -30,6 +202,7 @@
     },
     {
       "id": "validate-all",
+      "category": "operator",
       "description": "Validate all schemas and metadata.",
       "trigger_keywords": ["validate", "verify"],
       "pipeline": [
@@ -39,6 +212,7 @@
     },
     {
       "id": "maintenance-routine",
+      "category": "operator",
       "description": "Run routine maintenance tasks (fix shebangs, sanitize deps).",
       "trigger_keywords": ["maintenance", "sanitize", "fix"],
       "pipeline": [

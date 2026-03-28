@@ -3,6 +3,13 @@
 Kyberion uses many internal concepts, but it should expose a much smaller vocabulary at the human interaction boundary.
 This document defines the contract between `internal execution concepts` and `user-facing language`.
 
+For the broader enterprise framing above this contract, also read:
+
+- `knowledge/public/architecture/enterprise-operating-kernel.md`
+- `knowledge/public/architecture/ceo-ux.md`
+- `knowledge/public/architecture/management-control-plane.md`
+- `knowledge/public/architecture/corporate-memory-loop.md`
+
 ## Core Principle
 
 Humans should not need to understand the full internal structure.

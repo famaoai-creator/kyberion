@@ -6,17 +6,25 @@ import {
   buildPresenceSurfaceFrame,
   createBrowserConversationSession,
   createPresenceVoiceStimulus,
+  decideApprovalRequest,
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getPresenceAvatarProfile,
   getSurfaceAgentCatalogEntry,
+  listApprovalRequests,
+  listArtifactRecords,
   listBrowserConversationSessions,
+  listDistillCandidateRecords,
+  listMissionSeedRecords,
+  listProjectRecords,
+  listServiceBindingRecords,
   listTaskSessions,
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
   listSurfaceAgentCatalog,
   logger,
   pathResolver,
+  resolveWorkDesign,
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
@@ -35,6 +43,59 @@ interface SurfaceSnapshot {
   title?: string;
   components: Array<{ id: string; type: string; props?: Record<string, unknown> }>;
   data: Record<string, unknown>;
+}
+
+function inferProjectIdForApprovalRecord(record: any): string | undefined {
+  const projects = listProjectRecords();
+  const missionId = record?.requestedByContext?.missionId;
+  const serviceId = record?.target?.serviceId;
+  if (missionId) {
+    const byMission = projects.find((project) => (project.active_missions || []).includes(missionId));
+    if (byMission) return byMission.project_id;
+  }
+  if (serviceId) {
+    const byService = projects.find((project) => (project.service_bindings || []).some((bindingId) => bindingId.includes(serviceId)));
+    if (byService) return byService.project_id;
+  }
+  return undefined;
+}
+
+function buildApprovalInboxItem(record: any) {
+  const projectId = inferProjectIdForApprovalRecord(record);
+  const learned = projectId
+    ? listDistillCandidateRecords()
+        .filter((candidate) => candidate.project_id === projectId && candidate.promoted_ref)
+        .slice(0, 2)
+        .map((candidate) => candidate.title)
+    : [];
+  const requestedEffects = Array.isArray(record?.justification?.requestedEffects)
+    ? record.justification.requestedEffects.filter(Boolean)
+    : [];
+  const expectedOutcome = requestedEffects.length
+    ? requestedEffects.join(' / ')
+    : record?.target?.serviceId
+      ? `Proceed with ${record.target.serviceId}`
+      : 'Proceed with the requested work';
+  return {
+    ...record,
+    expected_outcome: expectedOutcome,
+    learned_titles: learned,
+    project_id: projectId,
+  };
+}
+
+function buildOutcomeInboxItem(item: any) {
+  const relatedCandidates = listDistillCandidateRecords()
+    .filter((candidate) => (candidate.artifact_ids || []).includes(item.artifact_id))
+    .slice(0, 3);
+  return {
+    ...item,
+    downloadable: typeof item.path === 'string' && isAllowedArtifactDownloadPath(item.path) && safeExistsSync(item.path),
+    distill_titles: relatedCandidates.map((candidate) => candidate.title),
+    promoted_refs: relatedCandidates
+      .map((candidate) => candidate.promoted_ref)
+      .filter(Boolean),
+  };
 }
 
 interface PresenceStudioState {
@@ -77,6 +138,25 @@ interface TaskSessionArtifactShape {
   output_path?: string;
 }
 
+interface ArtifactRecordShape {
+  artifact_id: string;
+  kind: string;
+  path?: string;
+}
+
+interface StandardIntentCatalog {
+  intents?: Array<{
+    id?: string;
+    category?: string;
+    description?: string;
+    surface_examples?: string[];
+    plan_outline?: string[];
+    outcome_ids?: string[];
+    specialist_id?: string;
+    resolution?: Record<string, unknown>;
+  }>;
+}
+
 const app = express();
 const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/presence-studio/static');
@@ -107,6 +187,30 @@ function isAllowedTaskArtifactPath(filePath: string): boolean {
   const resolved = path.resolve(filePath);
   const allowedRoot = path.resolve(pathResolver.sharedTmp('surface-task-sessions'));
   return resolved.startsWith(`${allowedRoot}${path.sep}`) || resolved === allowedRoot;
+}
+
+function isAllowedArtifactDownloadPath(filePath: string): boolean {
+  const resolved = path.resolve(filePath);
+  const allowedRoots = [
+    path.resolve(pathResolver.sharedTmp()),
+    path.resolve(pathResolver.active('missions/public')),
+    path.resolve(pathResolver.active('missions/confidential')),
+  ];
+  return allowedRoots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`));
+}
+
+function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
+  const normalized = String(logicalPath || '').replace(/^\/+/, '');
+  if (!/^knowledge\/(public|confidential|personal)\/common\/.+\/generated\/[^/]+\.(md|json)$/i.test(normalized)) {
+    return false;
+  }
+  const resolved = path.resolve(pathResolver.resolve(normalized));
+  const allowedRoots = [
+    path.resolve(pathResolver.knowledge('public/common')),
+    path.resolve(pathResolver.knowledge('confidential/common')),
+    path.resolve(pathResolver.knowledge('personal/common')),
+  ];
+  return allowedRoots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`));
 }
 
 function ensureStimuliDir(): void {
@@ -419,6 +523,68 @@ app.get('/api/surface-agents', (_req, res) => {
   });
 });
 
+app.get('/api/standard-intents', (_req, res) => {
+  try {
+    const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as StandardIntentCatalog;
+    const items = Array.isArray(parsed?.intents)
+      ? parsed.intents
+          .filter((intent) => intent?.category === 'surface')
+          .map((intent) => {
+            const design = resolveWorkDesign({
+              intentId: intent.id,
+              shape: typeof intent.resolution?.shape === 'string' ? intent.resolution.shape : undefined,
+              outcomeIds: Array.isArray(intent.outcome_ids) ? intent.outcome_ids : [],
+            });
+            return {
+              id: intent.id || 'unknown',
+              description: intent.description || '',
+              examples: Array.isArray(intent.surface_examples) ? intent.surface_examples : [],
+              planOutline: Array.isArray(intent.plan_outline) ? intent.plan_outline : [],
+              shape: typeof intent.resolution?.shape === 'string' ? intent.resolution.shape : undefined,
+              resultShape: typeof intent.resolution?.result_shape === 'string' ? intent.resolution.result_shape : undefined,
+              primary_specialist: design.primary_specialist,
+              conversation_agent: design.conversation_agent,
+              team_roles: design.team_roles,
+              outcomes: design.outcomes,
+              reusable_refs: design.reusable_refs,
+            };
+          })
+      : [];
+    res.json({ ok: true, items });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
+app.get('/api/projects', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listProjectRecords(),
+  });
+});
+
+app.get('/api/service-bindings', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listServiceBindingRecords(),
+  });
+});
+
+app.get('/api/mission-seeds', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listMissionSeedRecords(),
+  });
+});
+
+app.get('/api/distill-candidates', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listDistillCandidateRecords(),
+  });
+});
+
 app.get('/api/async-requests', (_req, res) => {
   res.json({
     ok: true,
@@ -431,6 +597,86 @@ app.get('/api/notifications', (_req, res) => {
     ok: true,
     items: listSurfaceNotifications('presence'),
   });
+});
+
+app.get('/api/approvals', (_req, res) => {
+  res.json({
+    ok: true,
+    items: listApprovalRequests({ status: 'pending' }).slice(0, 10).map(buildApprovalInboxItem),
+  });
+});
+
+app.post('/api/approvals/:requestId/decision', (req, res) => {
+  const requestId = String(req.params.requestId || '').trim();
+  const decision = String(req.body?.decision || '').trim();
+  if (!requestId) {
+    return res.status(400).json({ ok: false, error: 'requestId is required' });
+  }
+  if (decision !== 'approved' && decision !== 'rejected') {
+    return res.status(400).json({ ok: false, error: 'decision must be approved or rejected' });
+  }
+
+  const record = listApprovalRequests({ status: 'pending' }).find((item) => item.id === requestId);
+  if (!record) {
+    return res.status(404).json({ ok: false, error: `approval request not found: ${requestId}` });
+  }
+
+  try {
+    const updated = decideApprovalRequest('surface_runtime', {
+      channel: record.channel,
+      storageChannel: record.storageChannel,
+      requestId,
+      decision,
+      decidedBy: 'presence-studio',
+      decidedByRole: 'sovereign',
+      authMethod: 'surface_session',
+      note: 'Decision captured from Presence Studio approval inbox.',
+    });
+    return res.json({ ok: true, item: updated });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
+app.get('/api/outcomes', (_req, res) => {
+  const items = listArtifactRecords()
+    .slice(-10)
+    .reverse()
+    .map(buildOutcomeInboxItem);
+  res.json({ ok: true, items });
+});
+
+app.get('/api/knowledge-ref', (req, res) => {
+  const logicalPath = String(req.query.path || '').trim();
+  if (!logicalPath) {
+    return res.status(400).json({ ok: false, error: 'path is required' });
+  }
+  if (!isAllowedKnowledgeRefPath(logicalPath)) {
+    return res.status(403).json({ ok: false, error: `knowledge ref is not accessible: ${logicalPath}` });
+  }
+  const resolved = pathResolver.resolve(logicalPath);
+  if (!safeExistsSync(resolved)) {
+    return res.status(404).json({ ok: false, error: `knowledge ref not found: ${logicalPath}` });
+  }
+  if (logicalPath.endsWith('.json')) {
+    res.type('application/json');
+  } else {
+    res.type('text/markdown; charset=utf-8');
+  }
+  return res.send(safeReadFile(resolved, { encoding: 'utf8' }));
+});
+
+app.get('/api/artifacts/:artifactId', (req, res) => {
+  const artifactId = String(req.params.artifactId || '').trim();
+  const artifact = listArtifactRecords().find((item) => item.artifact_id === artifactId) as ArtifactRecordShape | undefined;
+  if (!artifact) {
+    return res.status(404).json({ ok: false, error: `artifact not found: ${artifactId}` });
+  }
+  const artifactPath = typeof artifact.path === 'string' ? artifact.path : '';
+  if (!artifactPath || !safeExistsSync(artifactPath) || !isAllowedArtifactDownloadPath(artifactPath)) {
+    return res.status(403).json({ ok: false, error: `artifact path is not accessible: ${artifactId}` });
+  }
+  return res.download(artifactPath, path.basename(artifactPath));
 });
 
 app.get('/api/browser-conversation-sessions', (_req, res) => {

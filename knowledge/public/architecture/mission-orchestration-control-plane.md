@@ -217,6 +217,18 @@ This keeps the concept simple:
 - one runtime supervisor
 - one surface delivery contract
 
+Chronos should also be read as part of the higher-order surface split:
+
+- `Presence Studio`
+  - conversational concierge surface
+- `Chronos`
+  - management control plane
+- `CEO UX`
+  - leadership approval and outcome surface
+
+Reference:
+- `knowledge/public/architecture/surface-responsibility-model.md`
+
 ## Migration Direction
 
 Short term:

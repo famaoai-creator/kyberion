@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/artifact-record.schema.json",
+  "title": "Artifact Record",
+  "type": "object",
+  "required": ["artifact_id", "kind", "storage_class"],
+  "properties": {
+    "artifact_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string" },
+    "mission_id": { "type": "string" },
+    "task_session_id": { "type": "string" },
+    "kind": { "type": "string", "minLength": 1 },
+    "storage_class": {
+      "type": "string",
+      "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]
+    },
+    "path": { "type": "string" },
+    "external_ref": { "type": "string" },
+    "preview_text": { "type": "string" },
+    "delivered_to": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["binding_id", "status"],
+        "properties": {
+          "binding_id": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "delivered", "failed"]
+          },
+          "external_url": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/service-binding-record.schema.json",
+  "title": "Service Binding Record",
+  "type": "object",
+  "required": ["binding_id", "service_type", "scope", "target", "allowed_actions", "secret_refs", "approval_policy"],
+  "properties": {
+    "binding_id": { "type": "string", "minLength": 1 },
+    "service_type": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "allowed_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "secret_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "approval_policy": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["allowed", "approval_required", "denied"]
+      }
+    },
+    "service_id": { "type": "string" },
+    "auth_mode": {
+      "type": "string",
+      "enum": ["none", "secret-guard", "session"]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

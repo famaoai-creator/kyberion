@@ -48,6 +48,16 @@ interface RuntimeDoctorFinding {
   recommendedAction: "stop_runtime" | "restart_runtime";
 }
 
+interface MissionProgressSummary {
+  missionId: string;
+  generatedAssets: Array<{
+    path: string;
+    category: "deliverables" | "artifacts" | "outputs" | "evidence";
+    sizeBytes: number;
+    updatedAt: string;
+  }>;
+}
+
 interface OwnerSummary {
   ts: string;
   mission_id: string;
@@ -86,6 +96,97 @@ interface BrowserSessionSummary {
     selector?: string;
     ts: string;
   }>;
+}
+
+interface ProjectRecordSummary {
+  project_id: string;
+  name: string;
+  summary: string;
+  status: "draft" | "active" | "paused" | "archived";
+  tier: "personal" | "confidential" | "public";
+  primary_locale?: string;
+  service_bindings?: string[];
+  active_missions?: string[];
+  bootstrap_work_items?: Array<{
+    work_id: string;
+    kind: "mission_seed" | "task_session";
+    title: string;
+    summary: string;
+    status: "planned" | "active" | "completed";
+    specialist_id: string;
+    outcome_id?: string;
+  }>;
+  kickoff_task_session_id?: string;
+}
+
+interface ServiceBindingRecordSummary {
+  binding_id: string;
+  service_type: string;
+  scope: string;
+  target: string;
+  allowed_actions: string[];
+  auth_mode?: "none" | "secret-guard" | "session";
+  metadata?: Record<string, unknown>;
+}
+
+interface MissionSeedRecordSummary {
+  seed_id: string;
+  project_id: string;
+  source_task_session_id?: string;
+  source_work_id?: string;
+  title: string;
+  summary: string;
+  status: "proposed" | "ready" | "promoted" | "archived";
+  specialist_id: string;
+  outcome_id?: string;
+  mission_type_hint?: string;
+  locale?: string;
+  promoted_mission_id?: string;
+}
+
+interface ArtifactRecordSummary {
+  artifact_id: string;
+  project_id?: string;
+  mission_id?: string;
+  task_session_id?: string;
+  kind: string;
+  storage_class: "repo" | "artifact_store" | "vault" | "tmp" | "external_ref";
+  path?: string;
+  external_ref?: string;
+  preview_text?: string;
+}
+
+interface PendingApprovalSummary {
+  id: string;
+  kind: "channel-approval" | "secret_mutation";
+  channel: string;
+  storageChannel: string;
+  requestedAt: string;
+  requestedBy: string;
+  title: string;
+  summary: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  pendingRoles: string[];
+  missionId?: string;
+  serviceId?: string;
+}
+
+interface DistillCandidateSummary {
+  candidate_id: string;
+  source_type: "task_session" | "mission" | "artifact";
+  tier?: "personal" | "confidential" | "public";
+  project_id?: string;
+  mission_id?: string;
+  task_session_id?: string;
+  artifact_ids?: string[];
+  title: string;
+  summary: string;
+  status: "proposed" | "promoted" | "archived";
+  target_kind: "pattern" | "sop_candidate" | "knowledge_hint" | "report_template";
+  specialist_id?: string;
+  locale?: string;
+  promoted_ref?: string;
+  evidence_refs?: string[];
 }
 
 interface AgentMessageSummary {
@@ -343,6 +444,16 @@ function missionSummaryBadgeClass(tone: MissionSummary["controlTone"]): string {
   return "bg-green-500/15 text-green-300";
 }
 
+function buildMissionIntentSummary(data: IntelligencePayload, mission: MissionSummary): string {
+  const latestHandoff = data.a2aHandoffs
+    .filter((handoff) => handoff.missionId === mission.missionId)
+    .sort((a, b) => b.ts.localeCompare(a.ts))[0];
+  if (latestHandoff?.promptExcerpt) return latestHandoff.promptExcerpt;
+  if (latestHandoff?.intent) return latestHandoff.intent;
+  if (mission.missionType) return mission.missionType;
+  return "Durable work item";
+}
+
 function surfaceSummaryBadgeClass(tone: SurfaceSummary["controlTone"]): string {
   if (tone === "pending") return "bg-violet-500/15 text-violet-200";
   if (tone === "stable") return "bg-green-500/15 text-green-300";
@@ -353,6 +464,12 @@ function surfaceSummaryBadgeClass(tone: SurfaceSummary["controlTone"]): string {
 interface IntelligencePayload {
   accessRole: "readonly" | "localadmin";
   activeMissions: MissionSummary[];
+  projects: ProjectRecordSummary[];
+  missionSeeds: MissionSeedRecordSummary[];
+  distillCandidates: DistillCandidateSummary[];
+  serviceBindings: ServiceBindingRecordSummary[];
+  recentArtifacts: ArtifactRecordSummary[];
+  pendingApprovals: PendingApprovalSummary[];
   surfaces: SurfaceSummary[];
   recentEvents: OrchestrationEvent[];
   agentMessages: AgentMessageSummary[];
@@ -362,6 +479,7 @@ interface IntelligencePayload {
   controlActions: ControlActionSummary[];
   controlActionDetails: Record<string, ControlActionDetail[]>;
   ownerSummaries: OwnerSummary[];
+  missionProgress: MissionProgressSummary[];
   browserSessions: BrowserSessionSummary[];
   browserConversationSessions: Array<{
     session_id: string;
@@ -443,15 +561,19 @@ export function MissionIntelligence({
   const [remediationTarget, setRemediationTarget] = useState<string | null>(null);
   const [outboxTarget, setOutboxTarget] = useState<string | null>(null);
   const [missionActionTarget, setMissionActionTarget] = useState<string | null>(null);
+  const [missionSeedTarget, setMissionSeedTarget] = useState<string | null>(null);
+  const [approvalTarget, setApprovalTarget] = useState<string | null>(null);
   const [surfaceActionTarget, setSurfaceActionTarget] = useState<string | null>(null);
   const [browserSessionTarget, setBrowserSessionTarget] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [distillCandidateTarget, setDistillCandidateTarget] = useState<string | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedMissionCardActionId, setExpandedMissionCardActionId] = useState<string | null>(null);
   const [expandedSurfaceCardActionId, setExpandedSurfaceCardActionId] = useState<string | null>(null);
   const [expandedGlobalSurfaceActionId, setExpandedGlobalSurfaceActionId] = useState<string | null>(null);
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>("all");
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -461,9 +583,12 @@ export function MissionIntelligence({
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const mission = params.get("mission");
-    if (!mission) return;
-    setSelectedMissionId(mission);
-    setMessageMissionFilter(mission);
+    const project = params.get("project");
+    if (mission) {
+      setSelectedMissionId(mission);
+      setMessageMissionFilter(mission);
+    }
+    if (project) setSelectedProjectId(project);
   }, []);
 
   const jumpToTarget = (action: ControlActionSummary) => {
@@ -631,6 +756,76 @@ export function MissionIntelligence({
     }
   };
 
+  const promoteMissionSeed = async (seedId: string) => {
+    try {
+      setMissionSeedTarget(seedId);
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "promote_mission_seed",
+          seedId,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Mission seed promotion failed");
+      setActionResult(`${seedId}: promoted`);
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Mission seed promotion failed");
+    } finally {
+      setMissionSeedTarget(null);
+    }
+  };
+
+  const decideApproval = async (approval: PendingApprovalSummary, decision: "approved" | "rejected") => {
+    try {
+      setApprovalTarget(approval.id);
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approval_decision",
+          requestId: approval.id,
+          channel: approval.channel,
+          storageChannel: approval.storageChannel,
+          decision,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Approval decision failed");
+      setActionResult(`${approval.id}: ${decision}`);
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Approval decision failed");
+    } finally {
+      setApprovalTarget(null);
+    }
+  };
+
+  const decideDistillCandidate = async (candidate: DistillCandidateSummary, decision: "promote" | "archive") => {
+    try {
+      setDistillCandidateTarget(candidate.candidate_id);
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "distill_candidate_decision",
+          candidateId: candidate.candidate_id,
+          decision,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Distill candidate decision failed");
+      setActionResult(`${candidate.candidate_id}: ${decision}`);
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Distill candidate decision failed");
+    } finally {
+      setDistillCandidateTarget(null);
+    }
+  };
+
   const runSurfaceControl = async (surfaceId: string | null, operation: string) => {
     try {
       setSurfaceActionTarget(`${surfaceId || "all"}:${operation}`);
@@ -684,8 +879,13 @@ export function MissionIntelligence({
     } else {
       url.searchParams.delete("mission");
     }
+    if (selectedProjectId) {
+      url.searchParams.set("project", selectedProjectId);
+    } else {
+      url.searchParams.delete("project");
+    }
     window.history.replaceState({}, "", url.toString());
-  }, [selectedMissionId]);
+  }, [selectedMissionId, selectedProjectId]);
 
   if (error) {
     return (
@@ -714,17 +914,52 @@ export function MissionIntelligence({
     );
   }
 
-  const filteredAgentMessages = messageMissionFilter === "all"
-    ? data.agentMessages
-    : data.agentMessages.filter((message) => message.missionId === messageMissionFilter);
-  const filteredA2AHandoffs = messageMissionFilter === "all"
-    ? data.a2aHandoffs
-    : data.a2aHandoffs.filter((handoff) => handoff.missionId === messageMissionFilter);
-  const effectiveMissionId = selectedMissionId || (messageMissionFilter !== "all" ? messageMissionFilter : data.activeMissions[0]?.missionId) || null;
-  const missionThread = effectiveMissionId
+  const selectedProject = selectedProjectId
+    ? data.projects.find((project) => project.project_id === selectedProjectId) || null
+    : null;
+  const selectedProjectMissionIds = new Set(selectedProject?.active_missions || []);
+  const selectedProjectBootstrapItems = selectedProject?.bootstrap_work_items || [];
+  const filteredMissions = selectedProject
+    ? data.activeMissions.filter((mission) => selectedProjectMissionIds.has(mission.missionId))
+    : data.activeMissions;
+  const filteredServiceBindings = selectedProject
+    ? data.serviceBindings.filter((binding) => (selectedProject.service_bindings || []).includes(binding.binding_id))
+    : data.serviceBindings;
+  const filteredMissionSeeds = selectedProject
+    ? data.missionSeeds.filter((seed) => seed.project_id === selectedProject.project_id)
+    : data.missionSeeds;
+  const filteredDistillCandidates = selectedProject
+    ? data.distillCandidates.filter((candidate) => candidate.project_id === selectedProject.project_id)
+    : data.distillCandidates;
+  const filteredRecentArtifacts = selectedProject
+    ? data.recentArtifacts.filter((artifact) => artifact.project_id === selectedProject.project_id)
+    : data.recentArtifacts;
+  const filteredPendingApprovals = selectedProject
+    ? data.pendingApprovals.filter((approval) => !approval.missionId || selectedProjectMissionIds.has(approval.missionId))
+    : data.pendingApprovals;
+  const filteredAgentMessages = data.agentMessages.filter((message) => {
+    if (selectedProject && message.missionId && !selectedProjectMissionIds.has(message.missionId)) return false;
+    if (messageMissionFilter !== "all" && message.missionId !== messageMissionFilter) return false;
+    return true;
+  });
+  const filteredA2AHandoffs = data.a2aHandoffs.filter((handoff) => {
+    if (selectedProject && !selectedProjectMissionIds.has(handoff.missionId)) return false;
+    if (messageMissionFilter !== "all" && handoff.missionId !== messageMissionFilter) return false;
+    return true;
+  });
+  const learnedProjectRefs = (projectId: string) =>
+    filteredDistillCandidates.filter((candidate) => candidate.project_id === projectId && candidate.promoted_ref).slice(0, 3);
+  const learnedMissionSeedRefs = (seedId: string, projectId: string, missionId?: string) =>
+    filteredDistillCandidates.filter((candidate) => {
+      if (candidate.project_id !== projectId || !candidate.promoted_ref) return false;
+      const evidence = candidate.evidence_refs || [];
+      return evidence.includes(`mission_seed:${seedId}`) || (missionId ? candidate.mission_id === missionId : false);
+    }).slice(0, 3);
+  const effectiveMissionId = selectedMissionId || (messageMissionFilter !== "all" ? messageMissionFilter : filteredMissions[0]?.missionId) || null;
+  const missionThread = effectiveMissionId && (!selectedProject || selectedProjectMissionIds.has(effectiveMissionId))
     ? buildMissionThread(effectiveMissionId, data.agentMessages, data.a2aHandoffs)
     : [];
-  const missionExceptions = data.activeMissions.filter((mission) => mission.controlTone === "attention" || mission.controlTone === "pending");
+  const missionExceptions = filteredMissions.filter((mission) => mission.controlTone === "attention" || mission.controlTone === "pending");
   const surfaceExceptions = data.surfaces.filter((surface) => surface.controlTone === "attention" || surface.health === "unhealthy");
   const deliveryExceptions = data.recentSurfaceOutbox;
   const attentionItems = buildAttentionItems({
@@ -831,6 +1066,20 @@ export function MissionIntelligence({
             ? mt("chronos_control_actions_disabled", " · control actions are disabled until a localadmin token is provided or localhost auto-admin is enabled.")
             : mt("chronos_control_actions_enabled", " · control actions enabled.")}
         </div>
+        {selectedProject && (
+          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+            project focus: <span className="font-semibold text-white/90">{selectedProject.name}</span>
+            <span className="mx-2 text-white/40">·</span>
+            <span className="font-mono text-white/70">{selectedProject.project_id}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedProjectId(null)}
+              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+            >
+              clear focus
+            </button>
+          </div>
+        )}
         <div className="mt-3 rounded-xl border border-amber-200/10 bg-stone-100/[0.035] px-3 py-3 text-[11px] leading-5 text-stone-100/68">
           Surfaces are the explainable boundary between people and agent execution. Chronos is the control surface: it should clarify mission flow, runtime risk, and intervention points before it offers controls.
         </div>
@@ -899,7 +1148,7 @@ export function MissionIntelligence({
               ))}
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <MiniSummaryCard icon={<GitBranch size={13} />} label="Mission blockers" value={missionExceptions.length} detail="Missions needing operator attention" />
+              <MiniSummaryCard icon={<GitBranch size={13} />} label="Work needing attention" value={missionExceptions.length} detail="Requests or missions that need operator attention" />
               <MiniSummaryCard icon={<Bot size={13} />} label="Runtime incidents" value={data.runtimeDoctor.length} detail="Leases or runtimes flagged by doctor" />
               <MiniSummaryCard icon={<Radar size={13} />} label="Surface incidents" value={surfaceExceptions.length} detail="Managed surfaces needing review" />
               <MiniSummaryCard icon={<Send size={13} />} label="Delivery exceptions" value={deliveryExceptions.length} detail="Outbox entries or delivery residue" />
@@ -911,12 +1160,23 @@ export function MissionIntelligence({
       <section className="grid gap-4 lg:grid-cols-[1.25fr,1fr,1fr]">
         <Panel id="mission-control-plane" title="Mission Control">
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
-            Confirm which missions are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.
+            {mt("chronos_mission_control_description", "Confirm which durable work items are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.")}
           </div>
+          {selectedProject && filteredMissions.length === 0 && selectedProjectBootstrapItems.length > 0 ? (
+            <div className="mb-4 rounded-xl border border-cyan-300/10 bg-cyan-400/5 px-4 py-3 text-[11px] leading-5 text-cyan-100/75">
+              {mt("chronos_project_bootstrap_notice", "This project does not have active missions yet. Current bootstrap work:")}
+              <div className="mt-2 text-[10px] text-cyan-100/70">
+                {selectedProjectBootstrapItems.slice(0, 4).map((item) => `${item.title} [${item.status}]`).join(" -> ")}
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-3">
-            {data.activeMissions.length === 0 ? (
+            {filteredMissions.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">No active missions.</div>
-            ) : data.activeMissions.map((mission) => {
+            ) : filteredMissions.map((mission) => {
+              const progress = data.missionProgress.find((entry) => entry.missionId === mission.missionId);
+              const latestAsset = progress?.generatedAssets?.[0];
+              const missionIntent = buildMissionIntentSummary(data, mission);
               const missionActions = getAvailableMissionActions(data, mission.missionId);
               const safeMissionActions = getActionsByRisk(missionActions, "safe");
               const riskyMissionActions = getActionsByRisk(missionActions, "risky");
@@ -933,7 +1193,7 @@ export function MissionIntelligence({
                   return latestAction ? (
                     <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-                        last control action
+                        latest intervention
                       </div>
                       <ActionStatusBadge action={latestAction} />
                     </div>
@@ -941,9 +1201,9 @@ export function MissionIntelligence({
                 })()}
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{mission.missionId}</div>
+                    <div className="text-[12px] font-semibold tracking-[0.03em] text-white/90">{missionIntent}</div>
                     <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                      {mission.missionType || "development"} · {mission.tier}
+                      {mission.missionType || "development"} · {mission.tier} · {mission.missionId}
                     </div>
                   </div>
                   <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
@@ -956,19 +1216,36 @@ export function MissionIntelligence({
                   <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${missionSummaryBadgeClass(mission.controlTone)}`}>
                     {mission.controlSummary}
                   </div>
-                  <div className="text-[10px] text-white/45">control summary</div>
+                  <div className="text-[10px] text-white/45">current state</div>
                   {mission.controlRequestedBy && (
                     <div className="text-[10px] text-white/35">
                       requested by <span className="font-mono text-white/60">{mission.controlRequestedBy}</span>
                     </div>
                   )}
                 </div>
+                <div className="mt-3 grid gap-2 text-[10px] text-white/55">
+                  <div>
+                    intent: <span className="text-white/80">{missionIntent}</span>
+                  </div>
+                  <div>
+                    plan: <span className="text-white/80">{mission.planReady ? "ready to execute or continue" : "still being aligned"}</span>
+                  </div>
+                  <div>
+                    result: <span className="text-white/80">{latestAsset ? latestAsset.path.split("/").pop() : "No artifact yet"}</span>
+                  </div>
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
                   <div>
-                    next tasks: <span className="font-mono text-white/80">{mission.nextTaskCount}</span>
+                    open work: <span className="font-mono text-white/80">{mission.nextTaskCount}</span>
                   </div>
                   <div>
                     plan: <span className="font-mono text-white/80">{mission.planReady ? "ready" : "pending"}</span>
+                  </div>
+                  <div>
+                    results: <span className="font-mono text-white/80">{progress?.generatedAssets?.length ?? 0}</span>
+                  </div>
+                  <div>
+                    latest artifact: <span className="font-mono text-white/80">{latestAsset ? latestAsset.path.split("/").pop() : "none"}</span>
                   </div>
                 </div>
                 <div className="mt-3">
@@ -980,7 +1257,7 @@ export function MissionIntelligence({
                     }}
                     className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
                   >
-                    {effectiveMissionId === mission.missionId ? "mission pinned" : "pin mission thread"}
+                    {effectiveMissionId === mission.missionId ? "focused" : "focus thread"}
                   </button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1243,6 +1520,304 @@ export function MissionIntelligence({
             ))}
           </div>
         </Panel>
+
+        <Panel title={mt("chronos_projects", "Projects")}>
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            {mt("chronos_projects_description", "Projects hold the long-lived intent context. Use this panel to see which durable work, bindings, and results already have a parent container before creating new missions.")}
+          </div>
+          <div className="space-y-3">
+            {data.projects.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_projects", "No projects registered yet.")}</div>
+            ) : data.projects.map((project) => (
+              <div key={project.project_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const learnedRefs = learnedProjectRefs(project.project_id);
+                  return (
+                    <>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{project.name}</div>
+                    <div className="mt-1 text-[10px] text-white/45">
+                      {project.project_id} · {project.tier}
+                    </div>
+                  </div>
+                  <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                    project.status === "active"
+                      ? "bg-green-500/15 text-green-300"
+                      : project.status === "draft"
+                        ? "bg-cyan-500/15 text-cyan-200"
+                        : "bg-white/10 text-white/65"
+                  }`}>
+                    {project.status}
+                  </div>
+                </div>
+                <div className="mt-3 text-[10px] text-white/70">{project.summary}</div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>{mt("chronos_missions", "missions")}: <span className="font-mono text-white/80">{project.active_missions?.length ?? 0}</span></div>
+                  <div>{mt("chronos_bindings", "bindings")}: <span className="font-mono text-white/80">{project.service_bindings?.length ?? 0}</span></div>
+                </div>
+                {project.bootstrap_work_items?.length ? (
+                  <div className="mt-3 text-[10px] text-white/58">
+                    {mt("chronos_next_work", "next work")}: {project.bootstrap_work_items.slice(0, 3).map((item) => item.title).join(" -> ")}
+                  </div>
+                ) : null}
+                {project.kickoff_task_session_id ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    {mt("chronos_kickoff", "kickoff")}: <span className="font-mono text-white/70">{project.kickoff_task_session_id}</span>
+                  </div>
+                ) : null}
+                {learnedRefs.length ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    {mt("chronos_learned", "learned")}: <span className="text-white/70">{learnedRefs.map((candidate) => candidate.title).join(", ")}</span>
+                  </div>
+                ) : null}
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProjectId(project.project_id);
+                      setSelectedMissionId((project.active_missions && project.active_missions[0]) || null);
+                      setMessageMissionFilter((project.active_missions && project.active_missions[0]) || "all");
+                    }}
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                  >
+                    {selectedProjectId === project.project_id ? mt("chronos_focused", "focused") : mt("chronos_focus_project", "focus project")}
+                  </button>
+                </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title={mt("chronos_service_bindings", "Service Bindings")}>
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            {mt("chronos_service_bindings_description", "Bindings define where Kyberion can read from or deliver to. This is the governed edge for GitHub, Slack, Drive, search, and other external systems.")}
+          </div>
+          <div className="space-y-3">
+            {filteredServiceBindings.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No service bindings registered yet.</div>
+            ) : filteredServiceBindings.slice(0, 8).map((binding) => (
+              <div key={binding.binding_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{binding.binding_id}</div>
+                  <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                    {binding.auth_mode || "none"}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/55">
+                  {binding.service_type} · {binding.scope} · {binding.target}
+                </div>
+                <div className="mt-2 text-[10px] text-white/45">
+                  actions: <span className="text-white/70">{binding.allowed_actions.slice(0, 4).join(", ") || "none"}</span>
+                  {binding.allowed_actions.length > 4 ? <span className="text-white/45"> +{binding.allowed_actions.length - 4}</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Mission Seeds">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Proposed durable work can stay here before it becomes a full mission. Use this panel to confirm bootstrap output is structured and attributable.
+          </div>
+          <div className="space-y-3">
+            {filteredMissionSeeds.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No mission seeds recorded yet.</div>
+            ) : filteredMissionSeeds.slice(0, 8).map((seed) => (
+              <div key={seed.seed_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                {(() => {
+                  const learnedRefs = learnedMissionSeedRefs(seed.seed_id, seed.project_id, seed.promoted_mission_id);
+                  return (
+                    <>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{seed.title}</div>
+                  <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                    {seed.status}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/70">{seed.summary}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>project: <span className="font-mono text-white/80">{seed.project_id}</span></div>
+                  <div>specialist: <span className="font-mono text-white/80">{seed.specialist_id}</span></div>
+                  <div>work: <span className="font-mono text-white/80">{seed.source_work_id || "-"}</span></div>
+                  <div>type: <span className="font-mono text-white/80">{seed.mission_type_hint || "-"}</span></div>
+                </div>
+                {seed.promoted_mission_id ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    mission: <span className="font-mono text-white/75">{seed.promoted_mission_id}</span>
+                  </div>
+                ) : null}
+                {learnedRefs.length ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    {mt("chronos_learned", "learned")}: <span className="text-white/70">{learnedRefs.map((candidate) => candidate.title).join(", ")}</span>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => promoteMissionSeed(seed.seed_id)}
+                    disabled={seed.status === "promoted" || missionSeedTarget === seed.seed_id}
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {missionSeedTarget === seed.seed_id ? "promoting" : seed.status === "promoted" ? "promoted" : "promote to mission"}
+                  </button>
+                </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </section>
+
+      <section className="grid gap-4">
+        <Panel title={mt("chronos_approvals", "Approvals")}>
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            {mt("chronos_approvals_description", "Approvals keep authority explicit. Review pending risky actions here before they cross a governed boundary.")}
+          </div>
+          <div className="space-y-3">
+            {filteredPendingApprovals.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_pending_approvals", "No pending approvals.")}</div>
+            ) : filteredPendingApprovals.map((approval) => (
+              <div key={approval.id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{approval.title}</div>
+                  <div className="rounded-full bg-red-500/12 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-red-200">
+                    {approval.riskLevel}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/70">{approval.summary}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>{mt("chronos_channel", "channel")}: <span className="font-mono text-white/80">{approval.channel}</span></div>
+                  <div>{mt("chronos_kind", "kind")}: <span className="font-mono text-white/80">{approval.kind}</span></div>
+                  <div>{mt("chronos_service", "service")}: <span className="font-mono text-white/80">{approval.serviceId || "-"}</span></div>
+                  <div>{mt("chronos_mission", "mission")}: <span className="font-mono text-white/80">{approval.missionId || "-"}</span></div>
+                </div>
+                {approval.pendingRoles.length > 0 ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    pending roles: <span className="text-white/70">{approval.pendingRoles.join(", ")}</span>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decideApproval(approval, "approved")}
+                    disabled={approvalTarget === approval.id}
+                    className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {approvalTarget === approval.id ? mt("chronos_processing", "processing") : mt("chronos_approve", "approve")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideApproval(approval, "rejected")}
+                    disabled={approvalTarget === approval.id}
+                    className="rounded-lg border border-red-300/15 bg-red-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-red-100/80 transition hover:bg-red-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {approvalTarget === approval.id ? mt("chronos_processing", "processing") : mt("chronos_reject", "reject")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Recent Artifacts">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Outcomes should stay attributable. This panel shows the latest recorded artifacts with their project, mission, task, and storage placement.
+          </div>
+          <div className="space-y-3">
+            {filteredRecentArtifacts.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No governed artifacts recorded yet.</div>
+            ) : filteredRecentArtifacts.map((artifact) => (
+              <div key={artifact.artifact_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{artifact.artifact_id}</div>
+                  <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                    {artifact.kind}
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>project: <span className="font-mono text-white/80">{artifact.project_id || "standalone"}</span></div>
+                  <div>mission: <span className="font-mono text-white/80">{artifact.mission_id || "-"}</span></div>
+                  <div>task: <span className="font-mono text-white/80">{artifact.task_session_id || "-"}</span></div>
+                  <div>storage: <span className="font-mono text-white/80">{artifact.storage_class}</span></div>
+                </div>
+                {(artifact.path || artifact.external_ref || artifact.preview_text) && (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    {artifact.preview_text || artifact.external_ref || artifact.path?.split("/").pop()}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title={mt("chronos_distill_candidates", "Distill Candidates")}>
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            {mt("chronos_distill_candidates_description", "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.")}
+          </div>
+          <div className="space-y-3">
+            {filteredDistillCandidates.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_distill_candidates", "No distill candidates recorded yet.")}</div>
+            ) : filteredDistillCandidates.slice(0, 10).map((candidate) => (
+              <div key={candidate.candidate_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{candidate.title}</div>
+                  <div className="rounded-full bg-violet-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-violet-200">
+                    {candidate.target_kind}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/70">{candidate.summary}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>{mt("chronos_source", "source")}: <span className="font-mono text-white/80">{candidate.source_type}</span></div>
+                  <div>{mt("chronos_project", "project")}: <span className="font-mono text-white/80">{candidate.project_id || "standalone"}</span></div>
+                  <div>{mt("chronos_mission", "mission")}: <span className="font-mono text-white/80">{candidate.mission_id || "-"}</span></div>
+                  <div>{mt("chronos_task", "task")}: <span className="font-mono text-white/80">{candidate.task_session_id || "-"}</span></div>
+                  <div>{mt("chronos_status", "status")}: <span className="font-mono text-white/80">{candidate.status}</span></div>
+                  <div>{mt("chronos_specialist", "specialist")}: <span className="font-mono text-white/80">{candidate.specialist_id || "-"}</span></div>
+                  <div>{mt("chronos_tier", "tier")}: <span className="font-mono text-white/80">{candidate.tier || "confidential"}</span></div>
+                </div>
+                {candidate.artifact_ids && candidate.artifact_ids.length ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    artifacts: <span className="text-white/70">{candidate.artifact_ids.join(", ")}</span>
+                  </div>
+                ) : null}
+                {candidate.evidence_refs && candidate.evidence_refs.length ? (
+                  <div className="mt-1 text-[10px] text-white/45">
+                    evidence: <span className="text-white/70">{candidate.evidence_refs.join(", ")}</span>
+                  </div>
+                ) : null}
+                {candidate.promoted_ref ? (
+                  <div className="mt-1 text-[10px] text-white/45">
+                    promoted ref: <span className="font-mono text-white/70">{candidate.promoted_ref}</span>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decideDistillCandidate(candidate, "promote")}
+                    disabled={candidate.status !== "proposed" || distillCandidateTarget === candidate.candidate_id}
+                    className="rounded-lg border border-violet-300/15 bg-violet-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-violet-100/80 transition hover:bg-violet-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {distillCandidateTarget === candidate.candidate_id ? mt("chronos_processing", "processing") : mt("chronos_promote", "promote")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideDistillCandidate(candidate, "archive")}
+                    disabled={candidate.status !== "proposed" || distillCandidateTarget === candidate.candidate_id}
+                    className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {distillCandidateTarget === candidate.candidate_id ? mt("chronos_processing", "processing") : mt("chronos_archive", "archive")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
       </section>
 
       <section className="grid gap-4">
@@ -1439,10 +2014,10 @@ export function MissionIntelligence({
             <RuntimeCell label="expired" value={data.browserSessions.filter((session) => session.lease_status === "expired").length} accent="red" />
           </div>
         </Panel>
-        <Panel id="browser-conversation-sessions" title="Browser Conversation Sessions">
+        <Panel id="browser-conversation-sessions" title="Browser Tasks">
           <div className="space-y-3">
             {data.browserConversationSessions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No browser conversation sessions recorded yet.</div>
+              <div className="text-[11px] italic text-kyberion-gold/30">No browser tasks recorded yet.</div>
             ) : data.browserConversationSessions.map((session) => (
               <div key={session.session_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1465,10 +2040,10 @@ export function MissionIntelligence({
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
-                  <div>goal: <span className="text-white/80">{session.goal_summary || "n/a"}</span></div>
-                  <div>step: <span className="text-white/80">{session.active_step || "n/a"}</span></div>
-                  <div>pending confirm: <span className="font-mono text-white/80">{String(session.pending_confirmation)}</span></div>
-                  <div>candidates: <span className="font-mono text-white/80">{session.candidate_target_count}</span></div>
+                  <div>intent: <span className="text-white/80">{session.goal_summary || "n/a"}</span></div>
+                  <div>current step: <span className="text-white/80">{session.active_step || "n/a"}</span></div>
+                  <div>waiting for confirmation: <span className="font-mono text-white/80">{String(session.pending_confirmation)}</span></div>
+                  <div>available actions: <span className="font-mono text-white/80">{session.candidate_target_count}</span></div>
                   <div>updated: <span className="font-mono text-white/80">{new Date(session.updated_at).toLocaleTimeString()}</span></div>
                 </div>
               </div>
@@ -1702,7 +2277,7 @@ export function MissionIntelligence({
             >
               {mt("chronos_all_missions", "all missions")}
             </button>
-            {data.activeMissions.map((mission) => (
+            {filteredMissions.map((mission) => (
               <button
                 key={mission.missionId}
                 type="button"

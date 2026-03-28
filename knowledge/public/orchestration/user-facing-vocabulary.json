@@ -171,6 +171,58 @@
         "en": "Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.",
         "ja": "Chronos は control surface です。mission や runtime state を直接変更しません。各 button は mission_controller、agent-runtime-supervisor、または surface_runtime を通じて deterministic backend action を発行し、その後 control-plane view を更新します。"
       },
+      "chronos_mission_control_description": {
+        "en": "Confirm which durable work items are active, which ones are blocked, and what the next safe intervention is. Pinning a mission narrows the unified thread below without leaving the operator console.",
+        "ja": "どの durable work が active で、どこが blocked で、次に安全に介入すべき場所がどこかを確認します。mission を pin すると、下の unified thread をその文脈に絞れます。"
+      },
+      "chronos_project_bootstrap_notice": {
+        "en": "This project does not have active missions yet. Current bootstrap work:",
+        "ja": "この project にはまだ active mission がありません。現在の bootstrap work:"
+      },
+      "chronos_projects": {
+        "en": "Projects",
+        "ja": "Projects"
+      },
+      "chronos_projects_description": {
+        "en": "Projects hold the long-lived intent context. Use this panel to see which durable work, bindings, and results already have a parent container before creating new missions.",
+        "ja": "Project は長期の intent context を保持します。新しい mission を切る前に、どの durable work・binding・result が既に親 container を持つかをここで確認します。"
+      },
+      "chronos_no_projects": {
+        "en": "No projects registered yet.",
+        "ja": "まだ project は登録されていません。"
+      },
+      "chronos_missions": {
+        "en": "missions",
+        "ja": "missions"
+      },
+      "chronos_bindings": {
+        "en": "bindings",
+        "ja": "bindings"
+      },
+      "chronos_next_work": {
+        "en": "next work",
+        "ja": "次の work"
+      },
+      "chronos_kickoff": {
+        "en": "kickoff",
+        "ja": "kickoff"
+      },
+      "chronos_focused": {
+        "en": "focused",
+        "ja": "focused"
+      },
+      "chronos_focus_project": {
+        "en": "focus project",
+        "ja": "project を focus"
+      },
+      "chronos_service_bindings": {
+        "en": "Service Bindings",
+        "ja": "Service Bindings"
+      },
+      "chronos_service_bindings_description": {
+        "en": "Bindings define where Kyberion can read from or deliver to. This is the governed edge for GitHub, Slack, Drive, search, and other external systems.",
+        "ja": "Binding は Kyberion がどこから読み取り、どこへ deliver できるかを定義します。これは GitHub、Slack、Drive、search など外部システムに対する governed edge です。"
+      },
       "chronos_live_agent_conversation": {
         "en": "Live Agent Conversation",
         "ja": "Live Agent Conversation"
