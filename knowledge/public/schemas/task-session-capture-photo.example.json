@@ -1,0 +1,34 @@
+{
+  "session_id": "TSK-CAPTURE-001",
+  "surface": "presence",
+  "task_type": "capture_photo",
+  "status": "collecting_requirements",
+  "mode": "interactive",
+  "goal": {
+    "summary": "記録用の写真を1枚撮影する",
+    "success_condition": "撮影した画像が governed path に保存される"
+  },
+  "requirements": {
+    "missing": ["subject_hint"],
+    "collected": {
+      "camera_intent": "record"
+    }
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": true
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T18:20:00+09:00",
+      "type": "instruction",
+      "text": "ちょっと写真をとって"
+    }
+  ],
+  "updated_at": "2026-03-28T18:20:00+09:00",
+  "payload": {
+    "camera_intent": "record",
+    "post_process": ["compress"]
+  }
+}

@@ -6,10 +6,22 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
   safeWriteFile: vi.fn(),
+  derivePipelineStatus: vi.fn((results: Array<{ status: string }>) => (
+    results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
+  )),
+  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  executeServicePreset: vi.fn(),
   spawnManagedProcess: vi.fn(),
   validateServiceAuth: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
-  runtimeSupervisor: { update: vi.fn(), register: vi.fn(), unregister: vi.fn() }
+  runtimeSupervisor: { update: vi.fn(), register: vi.fn(), unregister: vi.fn() },
+  pathResolver: {
+    rootDir: vi.fn(() => '/tmp/kyberion'),
+    rootResolve: vi.fn((p: string) => p),
+    shared: vi.fn((p = '') => `active/shared/${p}`),
+    resolve: vi.fn((p = '') => p),
+    knowledge: vi.fn((p = '') => `knowledge/${p}`),
+  },
 }));
 
 vi.mock('@agent/core', () => ({
@@ -17,6 +29,9 @@ vi.mock('@agent/core', () => ({
   safeReadFile: mocks.safeReadFile,
   safeExistsSync: mocks.safeExistsSync,
   safeWriteFile: mocks.safeWriteFile,
+  derivePipelineStatus: mocks.derivePipelineStatus,
+  withRetry: mocks.withRetry,
+  executeServicePreset: mocks.executeServicePreset,
   safeAppendFile: vi.fn(), // Added
   safeOpenAppendFile: vi.fn(),
   safeMkdir: vi.fn(),
@@ -24,13 +39,17 @@ vi.mock('@agent/core', () => ({
   validateServiceAuth: mocks.validateServiceAuth,
   logger: mocks.logger,
   runtimeSupervisor: mocks.runtimeSupervisor,
-  pathResolver: { rootResolve: (p: string) => p },
+  pathResolver: mocks.pathResolver,
   capabilityEntry: (id: string) => `dist/${id}.js`
 }));
 
 describe('service-actuator: RECONCILE with auth check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.withRetry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
+    mocks.derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) => (
+      results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
+    ));
   });
 
   it('should skip starting a service if validation fails', async () => {
@@ -63,6 +82,7 @@ describe('service-actuator: RECONCILE with auth check', () => {
     const result = await handleAction(input);
 
     expect(result.status).toBe('reconciled');
+    expect(mocks.pathResolver.rootResolve).toHaveBeenCalledWith('services.json');
     // Service should NOT be started due to missing auth
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
     expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('Auth validation failed for auth-service'));
@@ -99,5 +119,40 @@ describe('service-actuator: RECONCILE with auth check', () => {
     // Service SHOULD be started
     expect(mocks.spawnManagedProcess).toHaveBeenCalled();
     expect(mocks.logger.success).toHaveBeenCalledWith(expect.stringContaining('good-service started'));
+  });
+
+  it('writes pipeline context to root-resolved context_path', async () => {
+    mocks.executeServicePreset.mockResolvedValue({ ok: true, id: 'preset-result' });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        context_path: 'active/shared/tmp/service-context.json',
+      },
+      steps: [
+        {
+          op: 'preset',
+          params: {
+            service_id: 'slack',
+            action: 'post_message',
+            params: { text: 'hello' },
+            export_as: 'message_result',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.pathResolver.rootResolve).toHaveBeenCalledWith('active/shared/tmp/service-context.json');
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      'active/shared/tmp/service-context.json',
+      expect.stringContaining('"message_result"'),
+    );
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'slack',
+      'post_message',
+      { text: 'hello' },
+      'none',
+    );
   });
 });

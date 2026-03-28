@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
+import { pathResolver } from './path-resolver.js';
 import {
   rawExistsSync,
   rawMkdirp,
@@ -128,7 +129,7 @@ export const ui = {
 
 export const sre = {
   analyzeRootCause: (errorMessage: string) => {
-    const sigPath = path.resolve(process.cwd(), 'knowledge/orchestration/error-signatures.json');
+    const sigPath = pathResolver.knowledge('orchestration/error-signatures.json');
     const results = [];
     
     if (rawExistsSync(sigPath)) {
@@ -174,7 +175,7 @@ export class Cache {
   constructor(maxSize = 100, ttlMs = 3600000, persistenceDir?: string) {
     this._maxSize = maxSize;
     this._ttlMs = ttlMs;
-    this._persistenceDir = persistenceDir || path.join(process.cwd(), 'active/shared/cache');
+    this._persistenceDir = persistenceDir || pathResolver.shared('cache');
     this._map = new Map();
     this._stats = { hits: 0, misses: 0, integrityFailures: 0 };
   }
@@ -349,9 +350,9 @@ export const fileUtils = {
   getFullRoleConfig: () => {
     const mid = process.env.MISSION_ID;
     const priorityPaths: string[] = [];
-    if (mid) priorityPaths.push(path.resolve(process.cwd(), 'active/missions/' + mid + '/role-state.json'));
-    priorityPaths.push(path.resolve(process.cwd(), 'active/shared/governance/session.json'));
-    priorityPaths.push(path.resolve(process.cwd(), 'knowledge/personal/role-config.json'));
+    if (mid) priorityPaths.push(pathResolver.active(`missions/${mid}/role-state.json`));
+    priorityPaths.push(pathResolver.shared('governance/session.json'));
+    priorityPaths.push(pathResolver.knowledge('personal/role-config.json'));
 
     for (const p of priorityPaths) {
       if (rawExistsSync(p)) {
@@ -389,7 +390,7 @@ export const fileUtils = {
     }
   },
   getGoldenRule: () => {
-    const rulePath = path.resolve(process.cwd(), 'vision/_default.md');
+    const rulePath = pathResolver.vision('_default.md');
     if (rawExistsSync(rulePath)) {
       return rawReadTextFile(rulePath);
     }

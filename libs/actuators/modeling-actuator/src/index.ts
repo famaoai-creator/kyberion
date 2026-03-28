@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -36,7 +36,7 @@ const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = new AjvCtor({ allErrors: true });
 addFormats(ajv);
-const BROWSER_EXECUTION_PRESETS_PATH = path.join(process.cwd(), 'knowledge/public/orchestration/browser-execution-presets.json');
+const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge('public/orchestration/browser-execution-presets.json');
 
 /**
  * Main Entry Point
@@ -52,7 +52,7 @@ async function handleAction(input: ModelingAction) {
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
@@ -167,7 +167,7 @@ function evaluateCondition(cond: any, ctx: any): boolean {
  * CAPTURE Operators
  */
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
       return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string) };
@@ -466,7 +466,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       };
     }
     case 'terraform_to_architecture_adf': {
-      const rootDir = process.cwd();
+      const rootDir = pathResolver.rootDir();
       const terraformRoot = path.resolve(rootDir, resolve(params.dir || params.path || ctx[params.from || 'terraform_root']));
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
@@ -475,7 +475,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       };
     }
     case 'terraform_to_topology_ir': {
-      const rootDir = process.cwd();
+      const rootDir = pathResolver.rootDir();
       const terraformRoot = path.resolve(rootDir, resolve(params.dir || params.path || ctx[params.from || 'terraform_root']));
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
@@ -511,7 +511,7 @@ function loadBrowserExecutionPresetCatalog(): { default_preset?: string; presets
  * APPLY Operators
  */
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write_file':
       const outPath = path.resolve(rootDir, resolve(params.path));
@@ -529,7 +529,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
  * Strategic Reconciliation
  */
 async function performReconcile(input: ModelingAction) {
-  const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/modeling-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/modeling-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -545,7 +545,7 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

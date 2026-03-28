@@ -589,9 +589,10 @@ describe('browser-actuator v3 contract', () => {
     expect(mocks.launchPersistentContext).toHaveBeenLastCalledWith(
       path.resolve(process.cwd(), 'active/shared/tmp/browser/chrome-profile'),
       expect.objectContaining({
-      channel: 'chrome',
-      args: ['--disable-features=Translate', '--profile-directory=Profile 1'],
-    }));
+        channel: 'chrome',
+        args: ['--disable-features=Translate', '--profile-directory=Profile 1', '--remote-debugging-port=0'],
+      }),
+    );
   });
 
   it('attaches to an existing Chrome instance over CDP without launching a new browser', async () => {
@@ -613,5 +614,42 @@ describe('browser-actuator v3 contract', () => {
 
     expect(await closeBrowserSession('browser-cdp')).toBe(true);
     expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('reattaches to a retained browser session via persisted CDP metadata across processes', async () => {
+    const { handleAction, resetBrowserRuntimeLeasesForTest } = await import('./index');
+    const sessionId = 'browser-cdp-reconnect';
+    const metadataPath = path.resolve(process.cwd(), 'active/shared/runtime/browser/sessions', `${sessionId}.json`);
+    fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
+    fs.writeFileSync(metadataPath, JSON.stringify({
+      session_id: sessionId,
+      user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
+      active_tab_id: 'tab-1',
+      tab_count: 1,
+      tabs: [{ tab_id: 'tab-1', url: 'https://example.com', title: 'Test Page', active: true }],
+      updated_at: new Date().toISOString(),
+      lease_status: 'active',
+      retained: true,
+      cdp_url: 'http://127.0.0.1:9334',
+      cdp_port: 9334,
+      action_trail_count: 1,
+      recent_actions: [],
+    }, null, 2));
+
+    await resetBrowserRuntimeLeasesForTest();
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: sessionId,
+      steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+      options: {
+        headless: true,
+        lease_ms: 60_000,
+      },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9334');
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
   });
 });

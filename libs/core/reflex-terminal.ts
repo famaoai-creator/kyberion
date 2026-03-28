@@ -5,6 +5,7 @@
 
 import * as path from 'node:path';
 import { logger, ui, ptyEngine, safeExistsSync, safeMkdir, safeWriteFile } from './index.js';
+import { pathResolver } from './path-resolver.js';
 
 export interface ReflexTerminalOptions {
   shell?: string;
@@ -21,7 +22,7 @@ export class ReflexTerminal {
   private pollTimer: NodeJS.Timeout | null = null;
 
   constructor(options: ReflexTerminalOptions = {}) {
-    this.feedbackPath = options.feedbackPath || path.join(process.cwd(), 'active/shared/last_response.json');
+    this.feedbackPath = options.feedbackPath || pathResolver.shared('last_response.json');
     
     // Delegate spawning to ptyEngine
     this.sessionId = ptyEngine.spawn(

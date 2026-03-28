@@ -1,0 +1,35 @@
+{
+  "session_id": "TSK-SVC-001",
+  "surface": "presence",
+  "task_type": "service_operation",
+  "status": "awaiting_confirmation",
+  "mode": "interactive",
+  "goal": {
+    "summary": "voice-hub を再起動する",
+    "success_condition": "service operation が完了し、結果が surface に返る"
+  },
+  "requirements": {
+    "missing": [],
+    "collected": {
+      "service_name": "voice-hub",
+      "operation": "restart"
+    }
+  },
+  "control": {
+    "interruptible": true,
+    "requires_approval": false,
+    "awaiting_user_input": true
+  },
+  "history": [
+    {
+      "ts": "2026-03-28T18:34:00+09:00",
+      "type": "instruction",
+      "text": "voice-hub を再起動して"
+    }
+  ],
+  "updated_at": "2026-03-28T18:34:00+09:00",
+  "payload": {
+    "service_name": "voice-hub",
+    "operation": "restart"
+  }
+}
