@@ -44,6 +44,8 @@ describe('task-session', () => {
     });
     const result = validateTaskSession(session);
     expect(result.valid).toBe(true);
+    expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
+    expect(session.work_loop?.intent.label).toBe('capture_photo');
   });
 
   it('persists and loads task sessions', () => {
@@ -51,6 +53,7 @@ describe('task-session', () => {
       sessionId: 'TSK-TEST-WBS',
       surface: 'presence',
       taskType: 'workbook_wbs',
+      intentId: 'generate-workbook',
       status: 'planning',
       goal: {
         summary: 'WBS を Excel で作る',
@@ -63,6 +66,7 @@ describe('task-session', () => {
     saveTaskSession(session);
     const loaded = loadTaskSession('TSK-TEST-WBS');
     expect(loaded?.task_type).toBe('workbook_wbs');
+    expect(loaded?.work_loop?.outcome_design.labels.length).toBeGreaterThan(0);
     expect(getActiveTaskSession('presence')?.session_id).toBeTruthy();
   });
 

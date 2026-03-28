@@ -3,9 +3,18 @@ import { createDistillCandidateRecord } from './distill-candidate-registry.js';
 import { buildPromotedMemoryRecord, savePromotedMemoryRecord } from './promoted-memory.js';
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { buildOrganizationWorkLoopSummary } from './work-design.js';
 
 describe('promoted-memory', () => {
   it('builds a tier-aware promoted memory record', () => {
+    const workLoop = buildOrganizationWorkLoopSummary({
+      intentId: 'inspect-service',
+      taskType: 'service_operation',
+      shape: 'mission',
+      tier: 'confidential',
+      outcomeIds: ['service_summary'],
+      requiresApproval: true,
+    });
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',
       tier: 'confidential',
@@ -13,6 +22,7 @@ describe('promoted-memory', () => {
       summary: 'Operational handling should be reusable.',
       status: 'promoted',
       target_kind: 'sop_candidate',
+      work_loop: workLoop,
     });
     const record = buildPromotedMemoryRecord(candidate);
     expect(record.kind).toBe('sop_candidate');
@@ -20,6 +30,7 @@ describe('promoted-memory', () => {
     if (record.kind !== 'sop_candidate') throw new Error('expected sop_candidate');
     expect(record.procedure_steps.length).toBeGreaterThan(0);
     expect(record.safety_notes.length).toBeGreaterThan(0);
+    expect(record.work_loop?.resolution.execution_shape).toBe('mission');
   });
 
   it('builds kind-specific records from metadata', () => {

@@ -81,6 +81,7 @@ function buildApprovalInboxItem(record: any) {
     expected_outcome: expectedOutcome,
     learned_titles: learned,
     project_id: projectId,
+    work_loop: record?.work_loop,
   };
 }
 
@@ -95,6 +96,7 @@ function buildOutcomeInboxItem(item: any) {
     promoted_refs: relatedCandidates
       .map((candidate) => candidate.promoted_ref)
       .filter(Boolean),
+    work_loop: item?.work_loop,
   };
 }
 

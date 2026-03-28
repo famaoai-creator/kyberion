@@ -1,6 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface MissionSeedRecord {
   seed_id: string;
@@ -14,6 +15,7 @@ export interface MissionSeedRecord {
   outcome_id?: string;
   mission_type_hint?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   promoted_mission_id?: string;
   created_at: string;
   updated_at?: string;

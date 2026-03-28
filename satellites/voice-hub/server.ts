@@ -52,6 +52,7 @@ import {
   probeSurfaceHealth,
   readSurfaceLogTail,
   reflectPresenceAgentReply,
+  type OrganizationWorkLoopSummary,
   resolveWorkDesign,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
@@ -135,6 +136,7 @@ interface TaskSessionShape {
     service_bindings?: string[];
     locale?: string;
   };
+  work_loop?: OrganizationWorkLoopSummary;
   requirements?: {
     missing?: string[];
     collected?: Record<string, unknown>;
@@ -350,6 +352,7 @@ function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: stri
       tier: session.project_context?.tier || 'confidential',
     }).primary_specialist?.id,
     locale: session.project_context?.locale,
+    work_loop: session.work_loop,
     evidence_refs: [`task_session:${session.session_id}`, `artifact:${artifactId}`],
     metadata: buildDistillCandidateMetadata(session, previewText, artifactId),
   });
@@ -2269,6 +2272,7 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
       outcome_id: item.outcome_id,
       mission_type_hint: inferMissionTypeHintFromBootstrapWork(item),
       locale: project.primary_locale,
+      work_loop: session.work_loop,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: {
@@ -2395,6 +2399,9 @@ function tryHandleProjectBootstrap(userText: string): string | null {
       sessionId: kickoffSessionId,
       surface: 'presence',
       taskType: 'analysis',
+      intentId: 'bootstrap-project',
+      shape: 'project_bootstrap',
+      outcomeIds: ['project_created'],
       status: 'collecting_requirements',
       goal: {
         summary: kickoffWork.title,
@@ -2689,6 +2696,7 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
       storage_class: artifactKind === 'service' ? 'tmp' : 'artifact_store',
       path: outputPath,
       preview_text: previewText,
+      work_loop: session.work_loop,
       metadata: {
         project_name: session.project_context?.project_name,
         service_bindings: session.project_context?.service_bindings || [],
@@ -2795,6 +2803,8 @@ function tryHandleTaskSession(userText: string): string | null {
   const session = createTaskSession({
     surface: 'presence',
     taskType: intent.taskType,
+    intentId: intent.intentId,
+    shape: intent.taskType === 'analysis' && intent.payload?.bootstrap_kind === 'project_bootstrap' ? 'project_bootstrap' : 'task_session',
     status: intent.requirements?.missing?.includes('approval_confirmation')
       ? 'awaiting_confirmation'
       : (intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
 import { listMissionSeedRecords, loadMissionSeedRecord, saveMissionSeedRecord } from './mission-seed-registry.js';
+import { buildOrganizationWorkLoopSummary } from './work-design.js';
 
 function cleanupByPrefix(dir: string, prefix: string) {
   if (!safeExistsSync(dir)) return;
@@ -17,6 +18,16 @@ describe('mission-seed-registry', () => {
   });
 
   it('persists mission seed records for bootstrap follow-up work', () => {
+    const workLoop = buildOrganizationWorkLoopSummary({
+      intentId: 'bootstrap-project',
+      taskType: 'analysis',
+      shape: 'project_bootstrap',
+      tier: 'confidential',
+      projectId: 'PRJ-TEST-WEB',
+      locale: 'ja-JP',
+      outcomeIds: ['project_created'],
+      requiresApproval: false,
+    });
     saveMissionSeedRecord({
       seed_id: 'MSD-TEST-ARCH',
       project_id: 'PRJ-TEST-WEB',
@@ -28,11 +39,13 @@ describe('mission-seed-registry', () => {
       specialist_id: 'document-specialist',
       mission_type_hint: 'architecture',
       locale: 'ja-JP',
+      work_loop: workLoop,
       promoted_mission_id: 'MSN-TEST-ARCH',
       created_at: new Date().toISOString(),
     });
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.project_id).toBe('PRJ-TEST-WEB');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.promoted_mission_id).toBe('MSN-TEST-ARCH');
+    expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.work_loop?.resolution.execution_shape).toBe('project_bootstrap');
     expect(listMissionSeedRecords().some((item) => item.seed_id === 'MSD-TEST-ARCH')).toBe(true);
   });
 });

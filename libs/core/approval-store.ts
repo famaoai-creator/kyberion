@@ -8,6 +8,7 @@ import {
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
+import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface ApprovalRequestDraft {
   title: string;
@@ -98,6 +99,7 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   risk?: ApprovalRiskProfile;
   workflow?: ApprovalWorkflowState;
   applyResult?: ApprovalApplyResult;
+  work_loop?: OrganizationWorkLoopSummary;
 }
 
 export interface ApprovalDecisionPayload {
@@ -130,6 +132,7 @@ export function createApprovalRequest(
     justification?: ApprovalJustification;
     risk?: ApprovalRiskProfile;
     workflow?: ApprovalWorkflowState;
+    workLoop?: OrganizationWorkLoopSummary;
   },
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
@@ -156,6 +159,12 @@ export function createApprovalRequest(
     justification: params.justification,
     risk: params.risk,
     workflow: params.workflow,
+    work_loop: params.workLoop || buildOrganizationWorkLoopSummary({
+      intentId: 'approval-request',
+      shape: 'task_session',
+      outcomeIds: ['approval_request'],
+      requiresApproval: true,
+    }),
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);

@@ -3,6 +3,7 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 interface PromotedMemoryRecordBase {
   record_id: string;
@@ -15,6 +16,7 @@ interface PromotedMemoryRecordBase {
   task_session_id?: string;
   specialist_id?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   artifact_ids?: string[];
   evidence_refs?: string[];
   created_at: string;
@@ -253,6 +255,7 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     task_session_id: candidate.task_session_id,
     specialist_id: candidate.specialist_id,
     locale: candidate.locale,
+    work_loop: candidate.work_loop,
     artifact_ids: candidate.artifact_ids,
     evidence_refs: candidate.evidence_refs,
     created_at: new Date().toISOString(),

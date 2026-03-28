@@ -1369,6 +1369,13 @@
           ? linkedProject.bootstrap_work_items.slice(0, 4)
           : [];
         const learnedRefs = relatedPromotedRefsForTaskSession(item.session_id, item.project_context?.project_id);
+        const workLoop = item.work_loop || null;
+        const workLoopOutcomes = Array.isArray(workLoop?.outcome_design?.labels) && workLoop.outcome_design.labels.length
+          ? workLoop.outcome_design.labels.join(" / ")
+          : uiText("No explicit outcomes yet.", "まだ明示的な outcome はありません。");
+        const workLoopRoles = Array.isArray(workLoop?.teaming?.team_roles) && workLoop.teaming.team_roles.length
+          ? workLoop.teaming.team_roles.join(" -> ")
+          : specialist.team.join(" -> ");
         taskSessionDetailEl.innerHTML = `<div class="item">
             <div class="row"><strong>${escapeHtml(item.goal?.summary || "Requested work")}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
             <div class="small">${escapeHtml(uiText("work type", "work type"))}: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
@@ -1382,6 +1389,15 @@
             ${learnedRefs.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedRefs)}</div>` : ""}
             <div class="small">id: <span class="mono">${escapeHtml(item.session_id)}</span></div>
             ${artifactLink}
+          </div>
+          <div class="item">
+            <div class="label">Work Loop</div>
+            <div class="small">${escapeHtml(uiText("intent", "intent"))}: <span class="mono">${escapeHtml(workLoop?.intent?.label || item.task_type || "general_request")}</span></div>
+            <div class="small">${escapeHtml(uiText("context", "context"))}: <span class="mono">${escapeHtml(workLoop?.context?.project_name || workLoop?.context?.project_id || item.project_context?.project_name || item.project_context?.project_id || "standalone")}</span> · ${escapeHtml(workLoop?.context?.tier || item.project_context?.tier || "confidential")}</div>
+            <div class="small">${escapeHtml(uiText("resolution", "resolution"))}: <span class="mono">${escapeHtml(workLoop?.resolution?.execution_shape || "task_session")}</span></div>
+            <div class="small">${escapeHtml(uiText("outcome", "outcome"))}: ${escapeHtml(workLoopOutcomes)}</div>
+            <div class="small">${escapeHtml(uiText("team", "team"))}: ${escapeHtml(workLoopRoles)}</div>
+            <div class="small">${escapeHtml(uiText("authority", "authority"))}: <span class="mono">${escapeHtml(workLoop?.authority?.requires_approval ? uiText("approval required", "承認が必要") : uiText("auto proceed", "自動で進行"))}</span></div>
           </div>
           <div class="item">
             <div class="label">Recent Progress</div>
