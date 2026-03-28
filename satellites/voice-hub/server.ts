@@ -49,6 +49,7 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeReaddir,
   updateSurfaceAsyncRequest,
   safeWriteFile,
   updateTaskSession,
@@ -78,6 +79,11 @@ interface SpeechPlaybackState {
   text?: string;
   startedAt?: number;
   pid?: number;
+}
+
+interface RecentSpeechGuardState {
+  text?: string;
+  finishedAt?: number;
 }
 
 interface ConversationTurn {
@@ -156,6 +162,41 @@ const conversationMemory = new Map<string, ConversationTurn[]>();
 const activeTaskExecutions = new Set<string>();
 let activeSpeechProcess: ChildProcessWithoutNullStreams | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
+let recentSpeechGuardState: RecentSpeechGuardState = {};
+
+function normalizeSpeechEchoText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[「」『』（）()［］\[\]【】.,!?！？。、・:：;；"'`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function shouldSuppressEchoTranscript(text: string): boolean {
+  const normalizedInput = normalizeSpeechEchoText(text);
+  if (!normalizedInput) return false;
+
+  const activeSpeechText = normalizeSpeechEchoText(activeSpeechState.text || '');
+  if (activeSpeechState.status === 'speaking' && activeSpeechText && (
+    normalizedInput === activeSpeechText ||
+    activeSpeechText.includes(normalizedInput) ||
+    normalizedInput.includes(activeSpeechText)
+  )) {
+    return true;
+  }
+
+  const recentSpeechText = normalizeSpeechEchoText(recentSpeechGuardState.text || '');
+  const finishedAt = recentSpeechGuardState.finishedAt || 0;
+  if (recentSpeechText && finishedAt > 0 && Date.now() - finishedAt < 8000 && (
+    normalizedInput === recentSpeechText ||
+    recentSpeechText.includes(normalizedInput) ||
+    normalizedInput.includes(recentSpeechText)
+  )) {
+    return true;
+  }
+
+  return false;
+}
 
 function requestFingerprint(input: { text: string; intent: string; sourceId: string; speaker: string }): string {
   return createHash('sha256')
@@ -265,7 +306,13 @@ async function routeSurfaceActionWithLlm(
         setTimeout(() => reject(new Error('surface_action_routing_timeout')), 3500);
       }),
     ]);
-    return parseSurfaceActionRoutingDecision(response.text || '');
+    const parsed = parseSurfaceActionRoutingDecision(response.text || '');
+    logger.info(`[voice-hub] surface action router result: ${JSON.stringify({
+      userText,
+      candidates: candidates.map((entry) => entry.decision?.intent),
+      parsed,
+    })}`);
+    return parsed;
   } catch (error: any) {
     logger.warn(`[voice-hub] surface action routing failed: ${error?.message || error}`);
     return null;
@@ -313,11 +360,7 @@ function buildFallbackSurfaceRoutingDecision(userText: string) {
 
   if (/(ブラウザ|browser).*(開いて|立ち上げ|表示|見て)|サイトを見て|サイトを開いて|webサイト|website|open .*site|show .*site|go to/i.test(trimmed)) {
     const urlMatch = trimmed.match(/https?:\/\/\S+/i)?.[0];
-    const siteQuery = trimmed
-      .replace(/https?:\/\/\S+/ig, '')
-      .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show)/ig, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const siteQuery = normalizeBrowserSiteQuery(trimmed);
     return {
       kind: 'surface_action_routing' as const,
       intent: 'browser_open_site' as const,
@@ -358,10 +401,7 @@ function buildHeuristicSurfaceRoutingCandidates(userText: string): HeuristicSurf
 
   const trimmed = userText.trim();
   if (/(新聞|nikkei|日経|サイト|website|webサイト)/i.test(trimmed)) {
-    const siteQuery = trimmed
-      .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show)/ig, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const siteQuery = normalizeBrowserSiteQuery(trimmed);
     candidates.unshift({
       decision: {
         kind: 'surface_action_routing',
@@ -712,6 +752,10 @@ async function speakReplyManaged(text: string): Promise<void> {
     child.on('close', (code, signal) => {
       if (activeSpeechProcess === child) {
         activeSpeechProcess = null;
+        recentSpeechGuardState = {
+          text: normalized,
+          finishedAt: Date.now(),
+        };
         activeSpeechState = { status: 'idle' };
       }
       if (code === 0 || signal === 'SIGTERM') {
@@ -733,6 +777,17 @@ async function processIngest(input: {
   autoReply: boolean;
 }) {
   const { requestId, text, intent, sourceId, speaker, reflect, autoReply } = input;
+  if (shouldSuppressEchoTranscript(text)) {
+    return {
+      statusCode: 202,
+      body: {
+        ok: true,
+        request_id: requestId,
+        ignored: true,
+        reason: 'echo_suppressed',
+      },
+    };
+  }
   pruneRecentResponses();
   const existingResponse = recentResponses.get(requestId);
   if (existingResponse) {
@@ -802,11 +857,15 @@ async function processIngest(input: {
         replyText = await generateReply(text, { sessionKey });
         rememberConversationTurn(sessionKey, 'assistant', replyText);
         const speakingMs = estimateSpeechDurationMs(replyText);
-        await reflectTimeline(buildPresenceAssistantReplyTimeline({
-          agentId: 'presence-surface-agent',
-          text: replyText,
-          speaking_ms: speakingMs,
-        }));
+        try {
+          await reflectTimeline(buildPresenceAssistantReplyTimeline({
+            agentId: 'presence-surface-agent',
+            text: replyText,
+            speaking_ms: speakingMs,
+          }));
+        } catch (timelineError: any) {
+          logger.warn(`[voice-hub] Failed to dispatch assistant reply timeline: ${timelineError?.message || timelineError}`);
+        }
         speakReplyManaged(replyText).then(() => {
           logger.info('[voice-hub] assistant reply spoken successfully');
         }).catch((error: any) => {
@@ -863,6 +922,7 @@ async function reflectToPresenceSurface(text: string, speaker = 'User'): Promise
   });
   const response = await fetch(`${PRESENCE_STUDIO_URL}/api/timeline/dispatch`, {
     method: 'POST',
+    signal: withTimeoutSignal(2500),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(timeline),
   });
@@ -874,6 +934,7 @@ async function reflectToPresenceSurface(text: string, speaker = 'User'): Promise
 async function reflectTimeline(timeline: object): Promise<void> {
   const response = await fetch(`${PRESENCE_STUDIO_URL}/api/timeline/dispatch`, {
     method: 'POST',
+    signal: withTimeoutSignal(2500),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(timeline),
   });
@@ -981,6 +1042,31 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&#x2F;/g, '/');
+}
+
+function normalizeSearchResultUrl(rawUrl: string): string {
+  const trimmed = decodeHtmlEntities(rawUrl).trim();
+  if (!trimmed) return trimmed;
+  const withProtocol = trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+  try {
+    const parsed = new URL(withProtocol);
+    const uddg = parsed.searchParams.get('uddg');
+    if (parsed.hostname.includes('duckduckgo.com') && uddg) {
+      return decodeURIComponent(uddg);
+    }
+    return parsed.toString();
+  } catch {
+    return withProtocol;
+  }
+}
+
+function normalizeBrowserSiteQuery(text: string): string {
+  return text
+    .replace(/https?:\/\/\S+/ig, '')
+    .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show|欲しい|ほしい|もらっていい|してもらえる|見たい|アクセス|移動|行って)/ig, ' ')
+    .replace(/[のをへにで]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 async function fetchPresenceLocationContext(): Promise<PresenceLocationContext | null> {
@@ -1101,7 +1187,7 @@ async function searchWeb(query: string): Promise<WebSearchResult[]> {
   const html = await response.text();
   const matches = Array.from(html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)).slice(0, maxResults);
   return matches.map((match) => ({
-    url: decodeHtmlEntities(match[1]),
+    url: normalizeSearchResultUrl(match[1]),
     title: decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim()),
   })).filter((entry) => entry.title && entry.url);
 }
@@ -1136,30 +1222,118 @@ function loadBrowserRuntimeSessionForVoiceHub(sessionId: string): Record<string,
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<string, any>;
 }
 
+function listBrowserRuntimeSessionsForVoiceHub(): Array<Record<string, any>> {
+  const dirPath = pathResolver.shared('runtime/browser/sessions');
+  if (!safeExistsSync(dirPath)) return [];
+  return safeReaddir(dirPath)
+    .filter((entry) => entry.endsWith('.json'))
+    .map((entry) => loadBrowserRuntimeSessionForVoiceHub(entry.replace(/\.json$/, '')))
+    .filter((entry): entry is Record<string, any> => Boolean(entry));
+}
+
+async function isReachableBrowserCdpUrl(cdpUrl?: string): Promise<boolean> {
+  if (!cdpUrl) return false;
+  try {
+    const response = await fetch(`${String(cdpUrl).replace(/\/$/, '')}/json/version`, {
+      signal: withTimeoutSignal(1200),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function scoreBrowserRuntimeSessionForVoiceHub(session: Record<string, any>): number {
+  const activeTab = (session.tabs || []).find((tab: any) => tab.active) || session.tabs?.[0];
+  const url = String(activeTab?.url || '');
+  let score = 0;
+  if (session.cdp_url) score += 40;
+  if (session.lease_status === 'active') score += 20;
+  if (url && url !== 'about:blank' && url !== 'chrome://new-tab-page/') score += 25;
+  if (/^https?:\/\//i.test(url)) score += 10;
+  if (/^presence-/i.test(String(session.session_id || ''))) score += 15;
+  if (/^browser-(profile|cdp-reconnect)$/i.test(String(session.session_id || ''))) score -= 15;
+  return score;
+}
+
+async function resolveBrowserSessionForOpen(preferredSessionId?: string): Promise<{
+  browserSessionId: string;
+  runtimeSession: Record<string, any> | null;
+}> {
+  const preferredRuntimeSession = preferredSessionId
+    ? loadBrowserRuntimeSessionForVoiceHub(preferredSessionId)
+    : null;
+  if (preferredSessionId && preferredRuntimeSession && await isReachableBrowserCdpUrl(preferredRuntimeSession.cdp_url)) {
+    return {
+      browserSessionId: preferredSessionId,
+      runtimeSession: preferredRuntimeSession,
+    };
+  }
+
+  const sessions = listBrowserRuntimeSessionsForVoiceHub()
+    .sort((a, b) => scoreBrowserRuntimeSessionForVoiceHub(b) - scoreBrowserRuntimeSessionForVoiceHub(a));
+  for (const session of sessions) {
+    if (await isReachableBrowserCdpUrl(session.cdp_url)) {
+      return {
+        browserSessionId: String(session.session_id || preferredSessionId || 'default'),
+        runtimeSession: session,
+      };
+    }
+  }
+
+  return {
+    browserSessionId: preferredSessionId || 'default',
+    runtimeSession: preferredRuntimeSession,
+  };
+}
+
 async function executeBrowserOpenSite(params: {
   userText: string;
   url?: string;
   siteQuery?: string;
 }): Promise<string | null> {
   const activeConversation = getActiveBrowserConversationSession('presence');
-  const browserSessionId = activeConversation?.target?.browser_session_id || 'default';
+  const resolvedBrowserSession = await resolveBrowserSessionForOpen(activeConversation?.target?.browser_session_id || 'default');
+  const browserSessionId = resolvedBrowserSession.browserSessionId;
   let targetUrl = params.url?.trim();
+  logger.info(`[voice-hub] browser_open_site start: ${JSON.stringify({
+    userText: params.userText,
+    browserSessionId,
+    activeConversationId: activeConversation?.session_id,
+    activeConversationTarget: activeConversation?.target,
+    url: params.url,
+    siteQuery: params.siteQuery,
+  })}`);
 
   if (!targetUrl && params.siteQuery?.trim()) {
     const results = await searchWeb(params.siteQuery.trim());
+    logger.info(`[voice-hub] browser_open_site search results: ${JSON.stringify({
+      siteQuery: params.siteQuery.trim(),
+      resultCount: results.length,
+      topResult: results[0] || null,
+    })}`);
     targetUrl = results[0]?.url;
   }
-  if (!targetUrl) return null;
+  if (!targetUrl) {
+    logger.warn(`[voice-hub] browser_open_site could not resolve target URL for: ${JSON.stringify({
+      userText: params.userText,
+      siteQuery: params.siteQuery,
+    })}`);
+    return null;
+  }
 
-  const runtimeSession = loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
+  const runtimeSession = resolvedBrowserSession.runtimeSession || loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
+  logger.info(`[voice-hub] browser_open_site runtime session before goto: ${JSON.stringify({
+    browserSessionId,
+    runtimeSession,
+  })}`);
   const tmpPath = pathResolver.sharedTmp(`browser-conversation/open-site-${Date.now().toString(36)}.json`);
   const payload = {
     action: 'pipeline',
     session_id: browserSessionId,
     options: {
       headless: false,
-      keep_alive: true,
-      lease_ms: 5 * 60 * 1000,
+      keep_alive: false,
       connect_over_cdp: Boolean(runtimeSession?.cdp_url),
       cdp_url: runtimeSession?.cdp_url,
       cdp_port: runtimeSession?.cdp_port,
@@ -1189,19 +1363,38 @@ async function executeBrowserOpenSite(params: {
     ],
   };
   safeWriteFile(tmpPath, JSON.stringify(payload, null, 2));
-  safeExec('node', [
-    'dist/libs/actuators/browser-actuator/src/index.js',
-    '--input',
-    tmpPath,
-  ], {
-    cwd: pathResolver.rootDir(),
-    timeoutMs: 60_000,
-  });
+  try {
+    safeExec('node', [
+      'dist/libs/actuators/browser-actuator/src/index.js',
+      '--input',
+      tmpPath,
+    ], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 60_000,
+    });
+  } catch (error: any) {
+    logger.warn(`[voice-hub] browser_open_site goto failed: ${error?.message || error}`);
+    throw error;
+  }
 
   const updatedRuntimeSession = loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
   const activeTab = (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.active)
     || (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.url === targetUrl)
     || updatedRuntimeSession?.tabs?.[0];
+  logger.info(`[voice-hub] browser_open_site runtime session after goto: ${JSON.stringify({
+    browserSessionId,
+    updatedRuntimeSession,
+    activeTab,
+    targetUrl,
+  })}`);
+  if (!activeTab?.url || activeTab.url === 'about:blank' || activeTab.url === 'chrome://new-tab-page/') {
+    logger.warn(`[voice-hub] browser_open_site navigation incomplete: ${JSON.stringify({
+      browserSessionId,
+      activeTab,
+      targetUrl,
+    })}`);
+    throw new Error(`browser_open_site_navigation_incomplete:${targetUrl}`);
+  }
 
   const nextConversation = activeConversation || createBrowserConversationSession({
     sessionId: `BCS-presence-${browserSessionId}`,
@@ -1229,6 +1422,11 @@ async function executeBrowserOpenSite(params: {
   nextConversation.status = 'awaiting_instruction';
   nextConversation.updated_at = new Date().toISOString();
   saveBrowserConversationSession(nextConversation);
+  logger.info(`[voice-hub] browser_open_site conversation updated: ${JSON.stringify({
+    sessionId: nextConversation.session_id,
+    target: nextConversation.target,
+    goal: nextConversation.goal,
+  })}`);
 
   const label = activeTab?.title || params.siteQuery || targetUrl;
   return detectReplyLanguage(params.userText) === 'ja'
@@ -2225,11 +2423,15 @@ async function generateReply(userText: string, context: { sessionKey: string }):
     const browserConversationReply = tryHandleBrowserConversation(userText);
     if (browserConversationReply) return browserConversationReply;
 
-    const taskSessionReply = tryHandleTaskSession(userText);
-    if (taskSessionReply) return taskSessionReply;
-
     const heuristicCandidates = buildHeuristicSurfaceRoutingCandidates(userText);
     const topHeuristic = heuristicCandidates[0]?.decision || null;
+    logger.info(`[voice-hub] surface routing heuristic candidates: ${JSON.stringify({
+      userText,
+      candidates: heuristicCandidates.map((entry) => ({
+        reason: entry.reason,
+        decision: entry.decision,
+      })),
+    })}`);
 
     if (topHeuristic?.intent === 'browser_open_site') {
       const opened = await executeBrowserOpenSite({
@@ -2239,8 +2441,20 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       });
       if (opened) return opened;
     }
+    if (topHeuristic?.intent === 'browser_step') {
+      const browserStepReply = tryHandleBrowserConversation(userText);
+      if (browserStepReply) return browserStepReply;
+    }
+
+    const taskSessionReply = tryHandleTaskSession(userText);
+    if (taskSessionReply) return taskSessionReply;
 
     const routed = await routeSurfaceActionWithLlm(userText, context, heuristicCandidates) || topHeuristic || buildFallbackSurfaceRoutingDecision(userText);
+    logger.info(`[voice-hub] surface routing final decision: ${JSON.stringify({
+      userText,
+      topHeuristic,
+      routed,
+    })}`);
     if (routed?.intent === 'browser_open_site') {
       const opened = await executeBrowserOpenSite({
         userText,
