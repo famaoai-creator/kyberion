@@ -1,17 +1,115 @@
-# Architecture: Intent Classifier Routing (Gateway Architecture)
+# Architecture: Intent Classifier Routing
 
-## 1. 概要 (Overview)
-AIエージェントが保有するスキルの数が増加するにつれ、全てのスキル定義をシステムプロンプトにロードすることは、コンテキスト窓の浪費と意思決定コストの増大（Capability Trap）を招く。本アーキテクチャは、推論コストを最小化しつつ、大規模なスキルセットを運用するための「ゲートウェイ・モデル」を定義する。
+## 1. Purpose
 
-## 2. コア・コンポーネント
-- **The Workhorses (Tier 1 Tools)**: 常にロードされる 5-7 個の汎用ツール（read, write, exec, search, edit, replace）。
-- **Intent Classifier (Gateway)**: 主権者の自然言語入力をスキャンし、事前に定義された 146 個の専門スキルの中から最適なものを特定する軽量な推論レイヤー。
-- **Mission Pipelines (Deterministic Logic)**: 特定された意図に基づき、スキルの実行順序、パラメータ、検証条件を記述した YAML 形式の実行計画。
+Kyberion should let the user speak in outcomes while the system chooses execution machinery.
 
-## 3. 利点
-- **Context Efficiency**: LLM は 146 個のツール定義を読む必要がなくなり、本来の推論（Task Reasoning）にトークンを集中できる。
-- **Deterministic Reliability**: スキルの連鎖が YAML パイプラインとして固定されているため、推論の揺れ（Hallucination）による誤ったツール呼び出しを防げる。
-- **Execution Speed**: 意思決定（どのアプローチをとるか）がゲートウェイで即座に完了するため、実行開始までのレイテンシが大幅に削減される。
+The routing problem is therefore:
 
----
-*Standardized at Kyberion during Moltbook Technical Audit 2026-03*
+```text
+natural language intent
+  -> structured resolution
+  -> plan
+  -> task session, mission, or direct reply
+```
+
+The classifier exists to keep that translation fast, understandable, and safe.
+
+## 2. Design Rule
+
+Kyberion should not depend on either of these extremes:
+
+- pure regular-expression routing
+- pure LLM-first routing with no deterministic guardrails
+
+Instead it should use:
+
+```text
+heuristic-assisted LLM routing
+```
+
+## 3. Routing Stack
+
+### 3.1 Hard guards
+
+Deterministic handling for critical short commands.
+
+Examples:
+
+- `はい`
+- `いいえ`
+- `1つ目`
+- `止めて`
+- `戻って`
+
+### 3.2 Fast heuristic candidates
+
+Low-latency candidate generation for common work types.
+
+Examples:
+
+- browser open or browser step
+- task session creation
+- service inspection
+- knowledge query
+- weather or location query
+
+### 3.3 LLM reranking
+
+The LLM is used to refine or override candidate selection when needed.
+
+It should receive:
+
+- the raw utterance
+- current surface context
+- active browser session summary
+- active task session summary
+- heuristic candidate list
+
+### 3.4 Contract-bound execution
+
+The routing result must be expressed as structured data before execution.
+
+The classifier should decide things such as:
+
+- direct reply
+- browser operation
+- task session type
+- mission creation
+- approval requirement
+
+Execution then proceeds through validators, policies, and governed actuators.
+
+## 4. Why This Matters
+
+This model gives Kyberion:
+
+- lower latency than full LLM-first routing
+- better flexibility than regex-only routing
+- replayable behavior
+- safer control around risky actions
+
+It also keeps the UX aligned with the product model:
+
+```text
+Intent -> Plan -> Result
+```
+
+instead of:
+
+```text
+Utterance -> fragile tool guess -> opaque failure
+```
+
+## 5. Relationship To Missions
+
+Routing does not decide only which actuator to call.
+It also decides what durable work shape is appropriate.
+
+Examples:
+
+- direct answer
+- task session
+- mission
+
+That is the key connection between user UX and the backend execution model.

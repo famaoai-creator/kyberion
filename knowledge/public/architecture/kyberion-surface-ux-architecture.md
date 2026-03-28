@@ -1,351 +1,269 @@
 ---
 title: Kyberion Surface UX Architecture
 category: Architecture
-tags: [architecture, ux, surface, mission, a2ui, chronos, presence]
+tags: [architecture, ux, surface, mission, chronos, presence, intent]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-24
+last_updated: 2026-03-29
 ---
 
 # Kyberion Surface UX Architecture
 
 ## 1. Product Thesis
 
-Kyberion is a sovereign mission operating system where human intent becomes auditable agent action.
+Kyberion should feel simple even when the execution model is sophisticated.
 
-The system exists to turn a human request into:
+The primary user-facing contract is:
 
-- a durable mission contract
-- explainable agent execution
-- observable runtime and delivery behavior
-- inspectable outcomes
-- distilled knowledge that improves future work
+```text
+Intent -> Plan -> State -> Result
+```
 
-This means Kyberion is not just a chat interface, an automation tool, or an agent runtime.
+The primary internal contract is:
 
-It is a **mission loop**:
+```text
+Intent -> Resolution -> Task Session or Mission -> Actuators and ADF -> Evidence and Artifacts
+```
 
-1. a human expresses intent
-2. the system structures that intent into a mission
-3. agents and actuators execute the mission
-4. surfaces explain what is happening
-5. humans intervene only when needed
-6. outcomes remain inspectable after execution
-7. the system distills knowledge to improve the next mission
+The system succeeds when users can stay in the first model while operators and developers can still inspect the second.
 
-## 2. Core UX Principle
+## 2. UX Principle
 
-Every surface in Kyberion exists to connect humans and AI agents in an explainable way.
+Surfaces should expose:
 
-Surfaces are not decoration and they are not generic dashboards. They are operational contracts between:
+1. what the human asked for
+2. what Kyberion understood
+3. what Kyberion is doing now
+4. what came out
+5. what needs approval or intervention
 
-- human intent
-- mission state
-- agent execution
-- actuator effects
-- inspectable evidence
+Surfaces should not require users to reason first about:
 
-Each surface must help the user answer one or more of these questions:
+- actuator names
+- runtime supervisor details
+- raw ADF JSON
+- mission ledgers
+- internal event streams
 
-1. What did I ask for?
-2. What mission is currently running?
-3. What are the agents doing?
-4. What changed in the world?
-5. What requires my approval or intervention?
-6. Can I inspect what happened later?
+Those remain inspectable, but they are not the main UX.
 
-## 3. The Kyberion Cycle
-
-The product experience should always reinforce this loop:
+## 3. The User-Facing Flow
 
 ### 3.1 Intent
 
-The user issues a request.
+The user expresses a request in natural language.
 
-- can be conversational
-- can be vague
-- can be operational
+Examples:
 
-The system's job is to convert intent into a durable mission, not to hide the mission layer.
+- `このPDFをパワポにして`
+- `日経新聞を開いて`
+- `今週の進捗レポートを作って`
+- `voice-hub の状態を見て`
 
-### 3.2 Mission
+### 3.2 Resolution
 
-The request becomes a structured mission.
+Kyberion decides what shape of work this is.
 
-A mission provides:
+Possible outcomes:
 
-- objective
-- status
-- ownership
-- scope
-- progress
-- inspectable artifacts
+- direct answer
+- browser operation
+- task session
+- mission
+- approval flow
 
-The mission is the durable unit. Agents are temporary actors serving the mission.
+### 3.3 Plan
 
-### 3.3 Execution
+The system presents a short plan in human terms.
 
-Agents, runtimes, and actuators perform work.
+Examples:
 
-This layer should remain visible through explanation, not raw process noise.
+- `PDF を解析 -> レイアウトを復元 -> PPTX を生成`
+- `検索 -> サイトを開く`
+- `状態を取得 -> 要点を返す`
 
-### 3.4 Explanation
+This is the right level of explanation for surfaces.
 
-Surfaces explain mission progress, runtime state, and delivery state in human terms.
+### 3.4 State
 
-The user should not need to reverse-engineer logs to understand:
+The surface shows progress in terms such as:
 
-- what is progressing
-- what is blocked
-- what the system is waiting for
+- running
+- waiting for input
+- waiting for approval
+- completed
+- failed
 
-### 3.5 Intervention
+### 3.5 Result
 
-When the system needs help, surfaces must make the intervention point explicit.
+Results should be returned as:
 
-Interventions should be:
+- direct answer
+- artifact link or download
+- short outcome summary
+- next action
 
-- scoped
-- explainable
-- minimal
-- attributable
+## 4. Missions vs Task Sessions
 
-Sensitive mutations are a special case of intervention.
+Kyberion should not flatten everything into one generic conversation loop.
 
-For secret and credential changes, Kyberion should follow this rule:
+### Task Session
 
-- requests are proposed in-context
-- approvals are granted through a governed workflow
-- the richest review surface is preferred, but not required
+Task sessions are for conversational, bounded, inspectable work.
 
-This means Slack, terminal, and Chronos may all surface the same approval request in different ways, while the durable approval state remains shared and auditable.
+Examples:
 
-### 3.6 Inspection
+- create a PowerPoint
+- create a report
+- inspect a service
+- interactive browser assistance
+- capture and return an artifact
 
-After execution, the system must remain inspectable.
+Task sessions are the right internal abstraction when the UX should feel immediate and conversational.
 
-Users should be able to review:
+### Mission
 
-- decisions
-- actions
-- artifacts
-- anomalies
-- control actions
+Missions are for durable work that needs stronger control and auditability.
 
-### 3.7 Distillation
+Examples:
 
-Successes and failures should produce reusable knowledge.
+- engineering implementation
+- multi-step coordinated work
+- cross-agent execution
+- distillation and lifecycle checkpoints
 
-The UX implication is important: Kyberion should feel like a system that compounds capability over time, not one that forgets every mission.
+Missions are the durable backend model, not the first thing users should need to learn.
 
-## 4. Surface Taxonomy
+## 5. Surface Roles
 
-Kyberion should treat surfaces as a family of purpose-specific interfaces, not a single generic app shell.
-
-### 4.1 Command Surface
-
-Purpose:
-
-- receive human intent
-- clarify requests
-- initiate missions
-
-Typical examples:
-
-- chat entrypoints
-- request forms
-- interactive planning prompts
-
-Primary question:
-
-- What do I want the system to do?
-
-### 4.2 Control Surface
+### Command Surface
 
 Purpose:
 
-- show mission state
-- reveal risk and blockage
-- enable deliberate intervention
+- receive user intent
+- clarify missing information
+- present short plans
 
-Typical examples:
+Examples:
 
-- Chronos
+- terminal chat
+- Slack
+- Presence Studio
 
-Primary question:
-
-- Where does the system need operator attention?
-
-### 4.3 Performance Surface
+### Control Surface
 
 Purpose:
 
-- express the agent as a live presence
-- deliver output in real time
-- reflect conversational and expressive state
+- show state
+- reveal blockages
+- expose intervention points
 
-Typical examples:
+Examples:
 
-- presence-studio
+- Chronos Mirror
 
-Primary question:
-
-- How is the agent presenting itself right now?
-
-### 4.4 Work Surface
+### Work Surface
 
 Purpose:
 
-- show focused task detail
-- support a specific operational or analytical activity
-- render structured work products
+- render focused task detail
+- show artifact and progress detail
+- support specific inspection or control
 
-Typical examples:
+Examples:
 
-- A2UI-driven dashboards
-- mission-specific detail views
-- diagnostics views
+- task detail panels
+- browser conversation detail
+- artifact detail views
 
-Primary question:
-
-- What do I need to inspect or do for this specific task?
-
-### 4.5 Inspection Surface
+### Inspection Surface
 
 Purpose:
 
-- review history
-- audit decisions
-- inspect outcomes
-- support knowledge distillation
+- review outcomes later
+- inspect evidence
+- audit what happened
 
-Typical examples:
+## 6. What Each Surface Should Emphasize
 
-- future audit, review, and wisdom views
+### Terminal
 
-Primary question:
+Emphasize:
 
-- What happened, why, and what should be learned from it?
+- alignment
+- fast iteration
+- tests and diffs
+- precise intervention
 
-## 5. A2UI Role
+### Slack
 
-A2UI is not the top-level product concept.
+Emphasize:
 
-A2UI is the contract for rendering focused work surfaces inside the system.
+- natural remote requests
+- approval points
+- result delivery back to the same thread
 
-That means:
+### Chronos
 
-- the shell defines the user's mode and context
-- A2UI provides the detailed working view
-- A2UI should appear as drill-down, not as the whole product identity
+Emphasize:
 
-In practice:
+- state
+- intervention
+- inspectability
 
-- Chronos remains the control shell
-- A2UI surfaces are mounted when a focused diagnostic, policy, artifact, or task view is needed
+Chronos is the control tower, not the chat front-end.
 
-## 6. Chronos Definition
+### Presence Studio
 
-Chronos is the control surface for Kyberion.
+Emphasize:
 
-Chronos is not:
+- smooth conversation
+- live intent handling
+- task detail and artifacts
+- browser and operator assistance
 
-- a general-purpose chat client
-- a raw observability console
-- an agent playground
-- a browser debugging tool
+Presence Studio should feel like the front desk, not like a mission console full of internal IDs.
 
-Chronos is:
+## 7. Architecture Consequence
 
-- the mission control tower
-- the runtime governance console
-- the delivery exception view
+The execution system should therefore be layered like this:
 
-Chronos should answer three questions first:
+### Layer 1: Intent UX
 
-1. What is active?
-2. What is blocked or unhealthy?
-3. Where should a human intervene?
+Human request and short plan.
 
-Everything else is secondary detail.
+### Layer 2: Resolution
 
-### 6.1 Chronos Information Hierarchy
+Classification and structured routing.
 
-1. needs attention
-2. mission control
-3. runtime governance
-4. delivery exceptions
-5. audit trail
-6. deep detail and drill-down
+### Layer 3: Durable Work Shape
 
-### 6.2 Chronos Design Rule
+Direct answer, task session, or mission.
 
-Chronos should be calm when healthy and loud only on risk.
+### Layer 4: Execution
 
-## 7. Surface Design Principles
+Actuators, ADF, runtime supervisor, control plane.
 
-All surfaces should follow these principles:
+### Layer 5: Evidence and Distillation
 
-### 7.1 Explanation Before Control
+Artifacts, logs, review, reusable knowledge.
 
-Do not show control actions before the user understands what is happening.
+## 8. Design Rule
 
-### 7.2 Exception First
+Kyberion should expose complexity only when complexity is the thing the operator needs.
 
-Healthy systems should not dominate the interface. The interface should highlight what needs attention.
+Default:
 
-### 7.3 Drill-Down Over Clutter
+- show intent
+- show plan
+- show state
+- show result
 
-Keep the shell focused. Put deep detail into A2UI work surfaces, drawers, or secondary panels.
+Advanced inspection:
 
-### 7.4 Inspectability by Default
+- show mission
+- show task session internals
+- show runtime state
+- show actuator and ADF detail
 
-Users should be able to reconstruct what happened without digging through hidden state.
-
-### 7.5 Minimal Intervention
-
-The product should not encourage unnecessary operator action. Healthy autonomy is part of the UX.
-
-### 7.6 Knowledge Compounding
-
-The system should feel like it gets better through inspection and distillation, not like a stateless assistant.
-
-## 8. Visual Direction
-
-Kyberion should not feel like a neon hacker dashboard.
-
-The visual system should communicate:
-
-- sovereign operations
-- calm authority
-- inspectable control
-- mission seriousness
-
-Recommended direction:
-
-- dark slate and graphite as the base
-- restrained brass or gold as a structural accent
-- signal colors used only for state changes and urgency
-- low-noise motion
-- typography that feels institutional, not playful
-
-Keywords:
-
-- sovereign
-- control tower
-- operational calm
-- mission ledger
-- inspectable systems
-
-## 9. What Success Looks Like
-
-When the UX architecture is working, a user should feel:
-
-- I can issue a request without losing track of it
-- I understand what mission is running
-- I know what the agents are doing
-- I can tell when intervention is required
-- I can inspect what happened later
-- the system improves through repeated use
-
-That is the intended Kyberion experience.
+That separation is what keeps the system understandable as capabilities grow.

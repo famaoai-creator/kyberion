@@ -3,6 +3,7 @@ import { generateNativePdf } from '../engine.js';
 import { distillPdfDesign } from '../../pdf-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as zlib from 'node:zlib';
 import { pathResolver } from '../../../path-resolver.js';
 
 const OUT = pathResolver.sharedTmp('tests/native-pdf/test-native.pdf');
@@ -170,6 +171,82 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('/ColorSpace /Device');
     expect(t).toContain('/XObject');
     expect(t).toContain('/Im1 Do');
+  });
+
+  it('should distill JPEG image XObjects back into page images', async () => {
+    ensureDir(OUT);
+    const jpegPath = pathResolver.sharedTmp('tests/native-pdf/test-pixel.jpg');
+    if (!fs.existsSync(jpegPath)) {
+      throw new Error('Expected test JPEG fixture to exist.');
+    }
+    await generateNativePdf({
+      version: '1.0.0', generatedAt: new Date().toISOString(),
+      source: { format: 'markdown', body: '' },
+      content: { pages: [{
+        pageNumber: 1, width: 595, height: 842, text: '',
+        images: [{ path: jpegPath, x: 50, y: 50, width: 200, height: 150 }],
+      }] },
+    } as any, OUT, { compress: false });
+
+    const design = await distillPdfDesign(OUT, { aesthetic: true });
+    expect(design.content?.pages?.[0]?.images?.length).toBeGreaterThanOrEqual(1);
+    expect(design.content?.pages?.[0]?.images?.[0]).toEqual(
+      expect.objectContaining({
+        path: expect.stringMatching(/pdf-image-\d+\.jpg$/),
+        x: expect.any(Number),
+        y: expect.any(Number),
+        width: expect.any(Number),
+        height: expect.any(Number),
+      }),
+    );
+    expect(design.aesthetic?.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'image',
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
+      ]),
+    );
+  });
+
+  it('should preserve Flate image soft masks as PNG alpha', async () => {
+    const out = pathResolver.sharedTmp('tests/native-pdf/test-smask.pdf');
+    ensureDir(out);
+    const rgb = zlib.deflateSync(Buffer.from([255, 0, 0, 0, 255, 0]));
+    const alpha = zlib.deflateSync(Buffer.from([255, 0]));
+    const header = '%PDF-1.4\n';
+    const objects = [
+      '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+      '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 10 10] /Resources << /XObject << /Im1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+      '4 0 obj\n<< /Length 24 >>\nstream\nq 2 0 0 1 0 0 cm /Im1 Do Q\nendstream\nendobj\n',
+      Buffer.concat([
+        Buffer.from(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width 2 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /SMask 6 0 R /Length ${rgb.length} >>\nstream\n`, 'binary'),
+        rgb,
+        Buffer.from('\nendstream\nendobj\n', 'binary'),
+      ]),
+      Buffer.concat([
+        Buffer.from(`6 0 obj\n<< /Type /XObject /Subtype /Image /Width 2 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${alpha.length} >>\nstream\n`, 'binary'),
+        alpha,
+        Buffer.from('\nendstream\nendobj\n', 'binary'),
+      ]),
+      'trailer\n<< /Root 1 0 R >>\n%%EOF\n',
+    ];
+    fs.writeFileSync(out, Buffer.concat([Buffer.from(header, 'binary'), ...objects.map((part) => typeof part === 'string' ? Buffer.from(part, 'binary') : part)]));
+
+    const design = await distillPdfDesign(out, { aesthetic: true });
+    const image = design.content?.pages?.[0]?.images?.[0];
+    expect(image).toEqual(
+      expect.objectContaining({
+        path: expect.stringMatching(/pdf-image-\d+\.png$/),
+        width: expect.any(Number),
+        height: expect.any(Number),
+      }),
+    );
+    const png = fs.readFileSync(image!.path);
+    expect(png.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
+    expect(png[25]).toBe(6);
   });
 
   // ── P1-4: Object Streams ─────────────────────────────────

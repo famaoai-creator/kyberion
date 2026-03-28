@@ -28,6 +28,8 @@
               "xlsx_extract",
               "docx_extract",
               "pdf_extract",
+              "pdf_to_pptx_design",
+              "pdf_to_xlsx_design",
               "apply_theme",
               "apply_pattern",
               "merge_content",

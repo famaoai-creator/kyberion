@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as zlib from 'node:zlib';
-import type { PdfDesignProtocol, PdfLayoutElement, PdfPage } from '../types/pdf-protocol.js';
+import { pathResolver } from '../../path-resolver.js';
+import type { PdfDesignProtocol, PdfLayoutElement, PdfPage, PdfImageElement } from '../types/pdf-protocol.js';
 
 /**
  * High-Fidelity Native PDF Parser v4.0 [PDF 2.0 COMPLIANT]
@@ -15,6 +17,7 @@ export class NativePdfParser {
   private objectStreamCache: Map<number, Map<number, string>> = new Map();
   private objectStreamIds: number[] = [];
   private fontUnicodeCache: Map<number, Map<string, string> | null> = new Map();
+  private imagePathCache: Map<number, string | null> = new Map();
 
   constructor(filePath: string) {
     this.buffer = fs.readFileSync(filePath);
@@ -311,7 +314,7 @@ export class NativePdfParser {
 
     leafPageIds.forEach((id, index) => {
       const page = this.extractPageContent(id, index + 1);
-      if (page.text.trim() || page.elements?.length) {
+      if (page.text.trim() || page.elements?.length || page.images?.length) {
         pages.push(page);
       }
     });
@@ -339,15 +342,20 @@ export class NativePdfParser {
     const obj = this.getFullObject(id) || '';
     const { width, height } = this.extractPageGeometry(obj);
     const fontResources = this.extractFontResources(obj);
+    const imageResources = this.extractImageResources(obj);
+    const extGStateResources = this.extractExtGStateResources(obj);
     const refs = this.extractContentRefs(obj);
-    const elements: PdfLayoutElement[] = [];
+    const elements: any[] = [];
+    const images: PdfImageElement[] = [];
     const textParts: string[] = [];
 
     for (const ref of refs) {
       const decoded = this.decodeStream(ref);
       if (!decoded) continue;
+      elements.push(...this.extractGraphicElements(decoded, height, extGStateResources));
       const streamElements = this.extractPositionedText(decoded, height, fontResources);
       elements.push(...streamElements);
+      images.push(...this.extractPlacedImages(decoded, height, imageResources));
       const streamText = this.parseTextOperators(decoded).join(' ').trim();
       if (streamText) textParts.push(streamText);
     }
@@ -359,6 +367,7 @@ export class NativePdfParser {
       height,
       text: mergedText,
       elements,
+      images: images.length > 0 ? images : undefined,
     };
   }
 
@@ -391,14 +400,216 @@ export class NativePdfParser {
 
   private extractFontResources(obj: string): Map<string, number> {
     const resources = new Map<string, number>();
-    const fontSectionMatch = obj.match(/\/Font\s*<<([\s\S]*?)>>/);
-    if (!fontSectionMatch) return resources;
+    // Try inline Font dict first
+    let fontSection = obj.match(/\/Font\s*<<([\s\S]*?)>>/);
+    if (!fontSection) {
+      // Try indirect Resources reference: /Resources N 0 R
+      const resRef = obj.match(/\/Resources\s+(\d+)\s+0\s+R/);
+      if (resRef) {
+        const resObj = this.getFullObject(parseInt(resRef[1]));
+        if (resObj) {
+          fontSection = resObj.match(/\/Font\s*<<([\s\S]*?)>>/);
+        }
+      }
+    }
+    if (!fontSection) return resources;
     const fontRegex = /\/([A-Za-z0-9_.-]+)\s+(\d+)\s+0\s+R/g;
     let match: RegExpExecArray | null;
-    while ((match = fontRegex.exec(fontSectionMatch[1])) !== null) {
+    while ((match = fontRegex.exec(fontSection[1])) !== null) {
       resources.set(match[1], parseInt(match[2]));
     }
     return resources;
+  }
+
+  private extractImageResources(obj: string): Map<string, number> {
+    const resources = new Map<string, number>();
+    let xObjectSection = obj.match(/\/XObject\s*<<([\s\S]*?)>>/);
+    if (!xObjectSection) {
+      const resRef = obj.match(/\/Resources\s+(\d+)\s+0\s+R/);
+      if (resRef) {
+        const resObj = this.getFullObject(parseInt(resRef[1], 10));
+        if (resObj) {
+          xObjectSection = resObj.match(/\/XObject\s*<<([\s\S]*?)>>/);
+        }
+      }
+    }
+    if (!xObjectSection) return resources;
+    const imageRegex = /\/([A-Za-z0-9_.-]+)\s+(\d+)\s+0\s+R/g;
+    let match: RegExpExecArray | null;
+    while ((match = imageRegex.exec(xObjectSection[1])) !== null) {
+      const objectId = parseInt(match[2], 10);
+      const imageObj = this.getFullObject(objectId);
+      if (imageObj && /\/Subtype\s*\/Image\b/.test(imageObj)) {
+        resources.set(match[1], objectId);
+      }
+    }
+    return resources;
+  }
+
+  private extractExtGStateResources(obj: string): Map<string, number> {
+    const resources = new Map<string, number>();
+    let extGStateSection = obj.match(/\/ExtGState\s*<<([\s\S]*?)>>/);
+    if (!extGStateSection) {
+      const resRef = obj.match(/\/Resources\s+(\d+)\s+0\s+R/);
+      if (resRef) {
+        const resObj = this.getFullObject(parseInt(resRef[1], 10));
+        if (resObj) {
+          extGStateSection = resObj.match(/\/ExtGState\s*<<([\s\S]*?)>>/);
+        }
+      }
+    }
+    if (!extGStateSection) return resources;
+    const gsRegex = /\/([A-Za-z0-9_.-]+)\s+(\d+)\s+0\s+R/g;
+    let match: RegExpExecArray | null;
+    while ((match = gsRegex.exec(extGStateSection[1])) !== null) {
+      resources.set(match[1], parseInt(match[2], 10));
+    }
+    return resources;
+  }
+
+  private extractGraphicElements(
+    content: string,
+    pageHeight: number,
+    extGStateResources: Map<string, number>,
+  ): any[] {
+    type ColorState = { r: number; g: number; b: number };
+    const elements: any[] = [];
+    const rgbToHex = (color: ColorState) => {
+      const toHex = (value: number) => Math.max(0, Math.min(255, Math.round(value * 255))).toString(16).padStart(2, '0').toUpperCase();
+      return `${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+    };
+    const isWhite = (color: ColorState) => color.r > 0.95 && color.g > 0.95 && color.b > 0.95;
+    const isBlack = (color: ColorState) => color.r < 0.05 && color.g < 0.05 && color.b < 0.05;
+
+    let fillColor: ColorState = { r: 0, g: 0, b: 0 };
+    let strokeColor: ColorState = { r: 0, g: 0, b: 0 };
+    let lineWidth = 1;
+    let fillOpacity = 1;
+    let strokeOpacity = 1;
+
+    const applyExtGState = (name: string) => {
+      const objectId = extGStateResources.get(name);
+      if (!objectId) return;
+      const obj = this.getFullObject(objectId) || '';
+      const ca = obj.match(/\/ca\s+([\d.]+)/);
+      const CA = obj.match(/\/CA\s+([\d.]+)/);
+      if (ca) fillOpacity = parseFloat(ca[1]) || fillOpacity;
+      if (CA) strokeOpacity = parseFloat(CA[1]) || strokeOpacity;
+    };
+
+    const clipRegex = /([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+re\s+W\*?\s+n/g;
+    let clipMatch: RegExpExecArray | null;
+    while ((clipMatch = clipRegex.exec(content)) !== null) {
+      const x = parseFloat(clipMatch[1]);
+      const y = parseFloat(clipMatch[2]);
+      const w = Math.abs(parseFloat(clipMatch[3]));
+      const h = Math.abs(parseFloat(clipMatch[4]));
+      if (w < 5 || h < 5) continue;
+      if (w > pageHeight * 0.9 && h > pageHeight * 0.9) continue;
+      elements.push({
+        type: 'clip',
+        x,
+        y: pageHeight - y - h,
+        width: w,
+        height: h,
+        text: '',
+        fontSize: 0,
+        fontName: '',
+      });
+    }
+
+    const opRegex = /([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+rg|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+RG|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+sc\b|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+SC\b|([\d.\-]+)\s+g(?:\s|$)|([\d.\-]+)\s+G(?:\s|$)|([\d.\-]+)\s+w(?:\s|$)|\/([A-Za-z0-9_.-]+)\s+gs(?:\s|$)|([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+([\d.\-]+)\s+re\b|\bf\*?\b|\bS\b|\bB\*?\b/g;
+    let match: RegExpExecArray | null;
+    let pendingRect: { x: number; y: number; w: number; h: number } | null = null;
+    while ((match = opRegex.exec(content)) !== null) {
+      const token = match[0].trim();
+      if (match[1] !== undefined) {
+        fillColor = { r: parseFloat(match[1]), g: parseFloat(match[2]), b: parseFloat(match[3]) };
+        continue;
+      }
+      if (match[4] !== undefined) {
+        strokeColor = { r: parseFloat(match[4]), g: parseFloat(match[5]), b: parseFloat(match[6]) };
+        continue;
+      }
+      if (match[7] !== undefined) {
+        fillColor = { r: parseFloat(match[7]), g: parseFloat(match[8]), b: parseFloat(match[9]) };
+        continue;
+      }
+      if (match[10] !== undefined) {
+        strokeColor = { r: parseFloat(match[10]), g: parseFloat(match[11]), b: parseFloat(match[12]) };
+        continue;
+      }
+      if (match[13] !== undefined) {
+        const gray = parseFloat(match[13]);
+        fillColor = { r: gray, g: gray, b: gray };
+        continue;
+      }
+      if (match[14] !== undefined) {
+        const gray = parseFloat(match[14]);
+        strokeColor = { r: gray, g: gray, b: gray };
+        continue;
+      }
+      if (match[15] !== undefined) {
+        lineWidth = parseFloat(match[15]) || lineWidth;
+        continue;
+      }
+      if (match[16] !== undefined) {
+        applyExtGState(match[16]);
+        continue;
+      }
+      if (match[17] !== undefined) {
+        const x = parseFloat(match[17]);
+        const y = parseFloat(match[18]);
+        const w = parseFloat(match[19]);
+        const h = parseFloat(match[20]);
+        if ((Math.abs(h) < 2 && Math.abs(w) > 5) || (Math.abs(w) < 2 && Math.abs(h) > 5)) {
+          elements.push({
+            type: 'border',
+            x,
+            y: Math.abs(h) < 2 ? pageHeight - y : pageHeight - y - Math.abs(h),
+            width: Math.abs(w),
+            height: Math.abs(h),
+            text: '',
+            fontSize: 0,
+            fontName: '',
+            strokeColor: rgbToHex(strokeColor),
+            lineWidth,
+            opacity: strokeOpacity < 1 ? strokeOpacity : undefined,
+          });
+          pendingRect = null;
+          continue;
+        }
+        if (Math.abs(w) >= 5 && Math.abs(h) >= 5) {
+          pendingRect = { x, y, w, h };
+        }
+        continue;
+      }
+
+      if (!pendingRect) continue;
+      if (token === 'f' || token === 'f*' || token === 'B' || token === 'B*' || token === 'S') {
+        const width = Math.abs(pendingRect.w);
+        const height = Math.abs(pendingRect.h);
+        if (!(width > pageHeight * 0.9 && height > pageHeight * 0.9) && !(isBlack(fillColor) && width > 300 && height > 300)) {
+          elements.push({
+            type: 'rect',
+            x: pendingRect.x,
+            y: pageHeight - pendingRect.y - height,
+            width,
+            height,
+            text: '',
+            fontSize: 0,
+            fontName: '',
+            fillColor: (token !== 'S' && !isWhite(fillColor)) ? rgbToHex(fillColor) : undefined,
+            strokeColor: (token === 'S' || token === 'B' || token === 'B*') ? rgbToHex(strokeColor) : undefined,
+            lineWidth: lineWidth !== 1 ? lineWidth : undefined,
+            opacity: fillOpacity < 1 ? fillOpacity : undefined,
+          });
+        }
+        pendingRect = null;
+      }
+    }
+
+    return elements;
   }
 
   private resolveKids(parentId: number): number[] {
@@ -450,10 +661,224 @@ export class NativePdfParser {
     return decoded.toString('latin1');
   }
 
+  private readRawStream(id: number): { header: string; data: Buffer } | null {
+    const offset = this.xref.get(id);
+    if (offset === undefined) return null;
+
+    const start = this.str.indexOf('stream', offset);
+    const end = this.str.indexOf('endstream', start);
+    if (start === -1 || end === -1) return null;
+
+    let streamStart = start + 6;
+    while (this.buffer[streamStart] === 10 || this.buffer[streamStart] === 13) streamStart += 1;
+
+    return {
+      header: this.str.substring(offset, start),
+      data: this.buffer.subarray(streamStart, end),
+    };
+  }
+
   private extractTextFromStream(id: number): string {
     const decoded = this.decodeStream(id);
     if (!decoded) return '';
     return this.parseTextOperators(decoded).join(' ');
+  }
+
+  private extractPlacedImages(
+    content: string,
+    pageHeight: number,
+    imageResources: Map<string, number>,
+  ): PdfImageElement[] {
+    const images: PdfImageElement[] = [];
+    const imageRegex = /(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\s*\/([A-Za-z0-9_.-]+)\s+Do/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = imageRegex.exec(content)) !== null) {
+      const resourceName = match[7];
+      const objectId = imageResources.get(resourceName);
+      if (!objectId) continue;
+
+      const imagePath = this.materializeImageObject(objectId);
+      if (!imagePath) continue;
+
+      const a = parseFloat(match[1]) || 0;
+      const d = parseFloat(match[4]) || 0;
+      const e = parseFloat(match[5]) || 0;
+      const f = parseFloat(match[6]) || 0;
+      const width = Math.abs(a);
+      const height = Math.abs(d);
+      if (width <= 0 || height <= 0) continue;
+
+      images.push({
+        path: imagePath,
+        x: Math.max(0, e),
+        y: Math.max(0, pageHeight - f - height),
+        width,
+        height,
+      });
+    }
+
+    return images;
+  }
+
+  private materializeImageObject(objectId: number): string | null {
+    if (this.imagePathCache.has(objectId)) {
+      return this.imagePathCache.get(objectId) || null;
+    }
+
+    const raw = this.readRawStream(objectId);
+    const fullObject = this.getFullObject(objectId) || '';
+    if (!raw || !/\/Subtype\s*\/Image\b/.test(fullObject)) {
+      this.imagePathCache.set(objectId, null);
+      return null;
+    }
+
+    const softMaskObjectId = Number.parseInt(fullObject.match(/\/SMask\s+(\d+)\s+0\s+R/)?.[1] || '', 10);
+    let extension = '';
+    let data = raw.data;
+    if (/\/DCTDecode\b/.test(raw.header)) {
+      extension = '.jpg';
+    } else if (/\/JPXDecode\b/.test(raw.header)) {
+      extension = '.jp2';
+    } else if (/\/FlateDecode\b/.test(raw.header)) {
+      const alphaMask = Number.isFinite(softMaskObjectId) ? this.extractSoftMaskAlpha(softMaskObjectId) : null;
+      const png = this.convertFlateImageToPng(raw.header, raw.data, alphaMask);
+      if (!png) {
+        this.imagePathCache.set(objectId, null);
+        return null;
+      }
+      extension = '.png';
+      data = png;
+    } else if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
+      extension = '.png';
+    } else {
+      this.imagePathCache.set(objectId, null);
+      return null;
+    }
+
+    const dir = pathResolver.sharedTmp('native-pdf/images');
+    fs.mkdirSync(dir, { recursive: true });
+    const outPath = path.join(dir, `pdf-image-${objectId}${extension}`);
+    fs.writeFileSync(outPath, data);
+    this.imagePathCache.set(objectId, outPath);
+    return outPath;
+  }
+
+  private extractSoftMaskAlpha(objectId: number): Buffer | null {
+    const raw = this.readRawStream(objectId);
+    const fullObject = this.getFullObject(objectId) || '';
+    if (!raw || !/\/Subtype\s*\/Image\b/.test(fullObject) || !/\/FlateDecode\b/.test(raw.header)) {
+      return null;
+    }
+    const decoded = this.decodeFlateImage(raw.header, raw.data);
+    if (!decoded || decoded.channels !== 1 || decoded.bitsPerComponent !== 8) {
+      return null;
+    }
+    return decoded.rawPixels;
+  }
+
+  private decodeFlateImage(
+    header: string,
+    compressedData: Buffer,
+  ): { width: number; height: number; channels: number; colorType: number; bitsPerComponent: number; rawPixels: Buffer } | null {
+    const width = Number.parseInt(header.match(/\/Width\s+(\d+)/)?.[1] || '', 10);
+    const height = Number.parseInt(header.match(/\/Height\s+(\d+)/)?.[1] || '', 10);
+    const bitsPerComponent = Number.parseInt(header.match(/\/BitsPerComponent\s+(\d+)/)?.[1] || '', 10);
+    const colorSpace = header.match(/\/ColorSpace\s*\/([A-Za-z0-9]+)/)?.[1] || '';
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    if (bitsPerComponent !== 8) return null;
+
+    let channels = 0;
+    let colorType = 0;
+    if (colorSpace === 'DeviceRGB') {
+      channels = 3;
+      colorType = 2;
+    } else if (colorSpace === 'DeviceGray') {
+      channels = 1;
+      colorType = 0;
+    } else {
+      return null;
+    }
+
+    let rawPixels: Buffer;
+    try {
+      rawPixels = zlib.inflateSync(compressedData);
+    } catch {
+      return null;
+    }
+
+    const rowStride = width * channels;
+    if (rawPixels.length < rowStride * height) return null;
+    return { width, height, channels, colorType, bitsPerComponent, rawPixels: rawPixels.subarray(0, rowStride * height) };
+  }
+
+  private convertFlateImageToPng(header: string, compressedData: Buffer, alphaMask?: Buffer | null): Buffer | null {
+    const decoded = this.decodeFlateImage(header, compressedData);
+    if (!decoded) return null;
+    const { width, height, channels, rawPixels } = decoded;
+    const hasAlpha = !!alphaMask && alphaMask.length >= width * height;
+    const pngChannels = hasAlpha ? channels + 1 : channels;
+    const pngColorType = hasAlpha ? (channels === 3 ? 6 : 4) : decoded.colorType;
+    const rowStride = width * channels;
+    const pngRowStride = width * pngChannels;
+    const pngScanlines = Buffer.alloc((pngRowStride + 1) * height);
+    for (let row = 0; row < height; row += 1) {
+      const srcStart = row * rowStride;
+      const dstStart = row * (pngRowStride + 1);
+      pngScanlines[dstStart] = 0;
+      if (!hasAlpha) {
+        rawPixels.copy(pngScanlines, dstStart + 1, srcStart, srcStart + rowStride);
+        continue;
+      }
+      const alphaStart = row * width;
+      const rowPixelsStart = dstStart + 1;
+      for (let col = 0; col < width; col += 1) {
+        const srcPixel = srcStart + (col * channels);
+        const dstPixel = rowPixelsStart + (col * pngChannels);
+        for (let channel = 0; channel < channels; channel += 1) {
+          pngScanlines[dstPixel + channel] = rawPixels[srcPixel + channel];
+        }
+        pngScanlines[dstPixel + channels] = alphaMask![alphaStart + col];
+      }
+    }
+
+    const signature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = pngColorType;
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+
+    const idat = zlib.deflateSync(pngScanlines);
+    return Buffer.concat([
+      signature,
+      this.buildPngChunk('IHDR', ihdr),
+      this.buildPngChunk('IDAT', idat),
+      this.buildPngChunk('IEND', Buffer.alloc(0)),
+    ]);
+  }
+
+  private buildPngChunk(type: string, data: Buffer): Buffer {
+    const typeBuffer = Buffer.from(type, 'ascii');
+    const lengthBuffer = Buffer.alloc(4);
+    lengthBuffer.writeUInt32BE(data.length, 0);
+    const crcBuffer = Buffer.alloc(4);
+    crcBuffer.writeUInt32BE(this.crc32(Buffer.concat([typeBuffer, data])), 0);
+    return Buffer.concat([lengthBuffer, typeBuffer, data, crcBuffer]);
+  }
+
+  private crc32(buffer: Buffer): number {
+    let crc = 0 ^ (-1);
+    for (let index = 0; index < buffer.length; index += 1) {
+      crc ^= buffer[index];
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+      }
+    }
+    return (crc ^ (-1)) >>> 0;
   }
 
   /**
@@ -505,9 +930,53 @@ export class NativePdfParser {
   private extractPositionedText(content: string, pageHeight: number, fontResources: Map<string, number>): PdfLayoutElement[] {
     const elements: PdfLayoutElement[] = [];
     const btBlocks = content.split('BT');
+    type AffineMatrix = [number, number, number, number, number, number];
+    const identityMatrix: AffineMatrix = [1, 0, 0, 1, 0, 0];
+    const multiplyMatrix = (left: AffineMatrix, right: AffineMatrix): AffineMatrix => [
+      left[0] * right[0] + left[2] * right[1],
+      left[1] * right[0] + left[3] * right[1],
+      left[0] * right[2] + left[2] * right[3],
+      left[1] * right[2] + left[3] * right[3],
+      left[0] * right[4] + left[2] * right[5] + left[4],
+      left[1] * right[4] + left[3] * right[5] + left[5],
+    ];
+    const ctmStack: AffineMatrix[] = [];
+    let currentCtm: AffineMatrix = [...identityMatrix];
+    const btCtmMap: AffineMatrix[] = [];
+
+    const ctmTokenRegex = /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b/g;
+    let ctmTokenMatch: RegExpExecArray | null;
+    while ((ctmTokenMatch = ctmTokenRegex.exec(content)) !== null) {
+      const token = ctmTokenMatch[0].trim();
+      if (token === 'q') {
+        ctmStack.push([...currentCtm]);
+        continue;
+      }
+      if (token === 'Q') {
+        if (ctmStack.length > 0) currentCtm = ctmStack.pop() as AffineMatrix;
+        continue;
+      }
+      if (token === 'BT') {
+        btCtmMap.push([...currentCtm]);
+        continue;
+      }
+      if (token.endsWith('cm')) {
+        const cm: AffineMatrix = [
+          parseFloat(ctmTokenMatch[1]) || 0,
+          parseFloat(ctmTokenMatch[2]) || 0,
+          parseFloat(ctmTokenMatch[3]) || 0,
+          parseFloat(ctmTokenMatch[4]) || 0,
+          parseFloat(ctmTokenMatch[5]) || 0,
+          parseFloat(ctmTokenMatch[6]) || 0,
+        ];
+        currentCtm = multiplyMatrix(currentCtm, cm);
+      }
+    }
 
     for (let i = 1; i < btBlocks.length; i++) {
       const block = btBlocks[i].split('ET')[0];
+      const ctm = btCtmMap[i - 1] || identityMatrix;
+      const hasCtm = ctm.some((value, index) => value !== identityMatrix[index]);
       const state = {
         x: 0,
         y: 0,
@@ -536,8 +1005,14 @@ export class NativePdfParser {
         if (token.endsWith(' Tm')) {
           const tmMatch = token.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+Tm$/);
           if (tmMatch) {
+            const a = parseFloat(tmMatch[1]) || 0;
+            const b = parseFloat(tmMatch[2]) || 0;
             state.x = parseFloat(tmMatch[5]) || 0;
             state.y = parseFloat(tmMatch[6]) || 0;
+            const tmScale = Math.sqrt(a * a + b * b);
+            if (tmScale > 1 && state.fontSize <= 1) {
+              state.fontSize = tmScale;
+            }
           }
           continue;
         }
@@ -575,6 +1050,16 @@ export class NativePdfParser {
 
         const text = this.extractTextToken(token, state.fontObjectId);
         if (!text) continue;
+        if (hasCtm) {
+          const transformedState = {
+            ...state,
+            x: ctm[0] * state.x + ctm[2] * state.y + ctm[4],
+            y: ctm[1] * state.x + ctm[3] * state.y + ctm[5],
+            fontSize: state.fontSize * Math.max(1, Math.sqrt(ctm[0] * ctm[0] + ctm[1] * ctm[1])),
+          };
+          elements.push(this.buildTextElement(text, transformedState, pageHeight));
+          continue;
+        }
         elements.push(this.buildTextElement(text, state, pageHeight));
       }
     }
@@ -908,8 +1393,22 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
   const metadata = parser.extractMetadata();
   const pages = parser.extractPages();
   const fullText = pages.map(p => p.text).join('\n\n');
-  const elements = pages.flatMap((page) => page.elements || []);
-  const fonts = Array.from(new Set(elements.map((element) => element.fontName).filter(Boolean))) as string[];
+  const elements = pages.flatMap((page) => [
+    ...(page.elements || []),
+    ...((page.images || []).map((image) => ({
+      type: 'image' as const,
+      x: image.x,
+      y: image.y,
+      width: image.width,
+      height: image.height,
+    }))),
+  ]);
+  const fonts = Array.from(new Set(
+    elements
+      .filter((element): element is PdfLayoutElement => element.type !== 'image')
+      .map((element) => element.fontName)
+      .filter(Boolean),
+  )) as string[];
   const xBuckets = Array.from(new Set(elements.map((element) => Math.round(element.x / 40))));
   const layout = xBuckets.length >= 2 ? 'multi-column' : 'single-column';
 

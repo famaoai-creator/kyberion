@@ -28,6 +28,22 @@ Distilled operational knowledge or reusable method stored in the knowledge tier,
 
 A human-readable structured contract between reasoning and execution layers. In Kyberion, ADF is preferred over opaque script fragments.
 
+### Intent
+
+The human request expressed in natural language. In the intended UX, the user starts here rather than with actuator names or raw pipeline JSON.
+
+### Resolution
+
+Kyberion's structured interpretation of the user's intent. Resolution decides whether the request should become a direct reply, a browser operation, a task session, or a durable mission.
+
+### Plan
+
+A short human-readable execution summary such as `PDF を解析 -> レイアウトを復元 -> PPTX を生成`. Plans are what surfaces should show to users instead of raw ADF internals.
+
+### Result
+
+The user-facing outcome of execution: an answer, artifact, approval request, or concrete next step.
+
 ### Operator Interaction Packet
 
 A human-facing interaction contract that carries clarification prompts, status summaries, delivery summaries, and recommended next actions without exposing raw internal execution details.
@@ -35,6 +51,10 @@ A human-facing interaction contract that carries clarification prompts, status s
 ### Mission
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
+
+### Task Session
+
+A lighter-weight durable execution contract used for conversational work such as document generation, service inspection, capture flows, and interactive browser assistance.
 
 ### Project Operating System
 
