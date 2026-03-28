@@ -8,27 +8,47 @@ import { applyBrowserSessionControl } from "../../../lib/browser-session-control
 import { buildRuntimeTopology } from "../../../lib/runtime-topology";
 import { collectComputerSessions, type ComputerSessionSummary } from "../../../lib/computer-sessions";
 import {
+  buildExecutionEnv,
   clearSurfaceOutboxMessage,
+  createDistillCandidateRecord,
+  decideApprovalRequest,
+  enqueueSurfaceNotification,
   emitChannelSurfaceEvent,
   emitMissionOrchestrationObservation,
   enqueueMissionOrchestrationEvent,
   ledger,
+  listArtifactRecords,
   listApprovalRequests,
   listAgentRuntimeLeaseSummaries,
+  loadDistillCandidateRecord,
+  listMissionSeedRecords,
+  listDistillCandidateRecords,
+  listProjectRecords,
   listAgentRuntimeSnapshots,
+  listServiceBindingRecords,
   listSurfaceOutboxMessages,
+  loadMissionSeedRecord,
+  loadProjectRecord,
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
   pathResolver,
   probeSurfaceHealth,
+  savePromotedMemoryRecord,
   restartAgentRuntime,
+  safeExec,
   safeStat,
   safeExistsSync,
+  safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeWriteFile,
+  saveDistillCandidateRecord,
+  saveMissionSeedRecord,
+  saveProjectRecord,
   startMissionOrchestrationWorker,
   stopAgentRuntime,
+  updateDistillCandidateRecord,
 } from "@agent/core";
 
 interface RuntimeTopologySurfaceInput {
@@ -135,6 +155,21 @@ interface SecretApprovalSummary {
   kind?: "secret_mutation" | "computer_action";
 }
 
+interface PendingApprovalSummary {
+  id: string;
+  kind: "channel-approval" | "secret_mutation";
+  channel: string;
+  storageChannel: string;
+  requestedAt: string;
+  requestedBy: string;
+  title: string;
+  summary: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  pendingRoles: string[];
+  missionId?: string;
+  serviceId?: string;
+}
+
 interface BrowserSessionView extends BrowserSessionSummary {}
 interface BrowserConversationSessionView extends BrowserConversationSessionSummary {}
 interface ComputerSessionView extends ComputerSessionSummary {}
@@ -182,6 +217,137 @@ interface ControlActionAvailability {
   mission: Record<string, ControlActionDefinition[]>;
   surface: Record<string, ControlActionDefinition[]>;
   globalSurface: ControlActionDefinition[];
+}
+
+function inferMissionSeedPromotionTargetKind(seed: {
+  mission_type_hint?: string;
+  specialist_id?: string;
+}): "pattern" | "sop_candidate" | "knowledge_hint" {
+  const hint = String(seed.mission_type_hint || "").toLowerCase();
+  if (hint === "verification" || seed.specialist_id === "service-operator") {
+    return "sop_candidate";
+  }
+  if (hint === "architecture" || hint === "implementation") {
+    return "pattern";
+  }
+  return "knowledge_hint";
+}
+
+function buildMissionSeedPromotionMetadata(seed: {
+  seed_id: string;
+  title: string;
+  summary: string;
+  specialist_id: string;
+  mission_type_hint?: string;
+  source_task_session_id?: string;
+}, project: {
+  project_id: string;
+  name: string;
+  kickoff_brief?: string;
+}): Record<string, unknown> {
+  const targetKind = inferMissionSeedPromotionTargetKind(seed);
+  if (targetKind === "pattern") {
+    return {
+      promotion_source: "mission_seed",
+      applicability: [
+        "durable mission promotion",
+        project.name,
+        seed.mission_type_hint || "general",
+      ],
+      reusable_steps: [
+        "Review the project kickoff and current durable work candidates.",
+        "Select the mission seed with the clearest specialist and outcome fit.",
+        "Promote the seed into a governed mission and capture the resulting mission id.",
+      ],
+      expected_outcome: `${seed.title} is promoted into a durable mission with explicit project ownership.`,
+      recommended_refs: [
+        `project:${project.project_id}`,
+        `mission_seed:${seed.seed_id}`,
+      ],
+    };
+  }
+  if (targetKind === "sop_candidate") {
+    return {
+      promotion_source: "mission_seed",
+      procedure_steps: [
+        "Review the seed and confirm the project context is ready for durable execution.",
+        "Start the governed mission with the appropriate mission type and project relationship.",
+        "Record the promoted mission id and notify the surface.",
+      ],
+      safety_notes: [
+        "Promote durable work only from an approved control plane action.",
+        "Keep the project relationship and evidence trail attached to the promoted mission.",
+      ],
+      escalation_conditions: [
+        "The parent project record is missing.",
+        "mission_controller fails to start the durable mission.",
+        "The promoted mission id cannot be written back to the seed or project.",
+      ],
+    };
+  }
+  return {
+    promotion_source: "mission_seed",
+    hint_scope: "mission promotion",
+    hint_triggers: [
+      seed.title,
+      project.name,
+      seed.mission_type_hint || "durable work",
+    ],
+    recommended_refs: [
+      `project:${project.project_id}`,
+      `mission_seed:${seed.seed_id}`,
+      ...(seed.source_task_session_id ? [`task_session:${seed.source_task_session_id}`] : []),
+    ],
+    kickoff_brief: project.kickoff_brief || "",
+  };
+}
+
+function buildLearnedNotificationText(input: {
+  projectId?: string;
+  language?: "ja" | "en";
+}): string {
+  if (!input.projectId) return "";
+  const titles = listDistillCandidateRecords()
+    .filter((candidate) => candidate.project_id === input.projectId && candidate.promoted_ref)
+    .map((candidate) => candidate.title)
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .slice(0, 2);
+  if (titles.length === 0) return "";
+  if (input.language === "ja") {
+    return ` 過去の learned pattern（${titles.join("、")}）も参照できます。`;
+  }
+  return ` Learned patterns such as ${titles.join(", ")} are also available.`;
+}
+
+function inferProjectIdForApproval(input: {
+  missionId?: string;
+  serviceId?: string;
+}): string | undefined {
+  const projects = listProjectRecords();
+  if (input.missionId) {
+    const byMission = projects.find((project) => (project.active_missions || []).includes(input.missionId || ""));
+    if (byMission) return byMission.project_id;
+  }
+  if (input.serviceId) {
+    const byService = projects.find((project) => (project.service_bindings || []).some((bindingId) => bindingId.includes(input.serviceId || "")));
+    if (byService) return byService.project_id;
+  }
+  return undefined;
+}
+
+function buildApprovalDecisionText(input: {
+  title: string;
+  decision: "approved" | "rejected";
+  missionId?: string;
+  serviceId?: string;
+}): string {
+  const projectId = inferProjectIdForApproval({ missionId: input.missionId, serviceId: input.serviceId });
+  const learnedText = buildLearnedNotificationText({ projectId, language: "en" });
+  if (input.decision === "approved") {
+    return `${input.title} was approved. The requested work can proceed now.${learnedText}`;
+  }
+  return `${input.title} was rejected. The requested work will stay blocked until it is revised.`;
 }
 
 function readJson<T = any>(filePath: string): T | null {
@@ -687,6 +853,28 @@ function collectPendingSecretApprovals(): SecretApprovalSummary[] {
     .slice(0, 20);
 }
 
+function collectPendingApprovals(): PendingApprovalSummary[] {
+  return listApprovalRequests({ status: 'pending' })
+    .map((request) => ({
+      id: request.id,
+      kind: request.kind,
+      channel: request.channel,
+      storageChannel: request.storageChannel,
+      requestedAt: request.requestedAt,
+      requestedBy: request.requestedBy,
+      title: request.title,
+      summary: request.summary,
+      riskLevel: request.risk?.level || 'medium',
+      pendingRoles: request.workflow?.approvals
+        .filter((approval) => approval.status === 'pending')
+        .map((approval) => approval.role) || [],
+      missionId: request.requestedByContext?.missionId,
+      serviceId: request.target?.serviceId,
+    }))
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+    .slice(0, 24);
+}
+
 async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
   const manifest = loadSurfaceManifest();
   const state = loadSurfaceState();
@@ -886,9 +1074,21 @@ export async function GET(req: NextRequest) {
     const controlActionCatalog = collectControlActionCatalog(accessRole);
     const controlActionAvailability = collectControlActionAvailability(accessRole, activeMissions, surfaces);
     const secretApprovals = collectPendingSecretApprovals();
+    const pendingApprovals = collectPendingApprovals();
+    const projects = listProjectRecords();
+    const missionSeeds = listMissionSeedRecords();
+    const distillCandidates = listDistillCandidateRecords();
+    const serviceBindings = listServiceBindingRecords();
+    const recentArtifacts = listArtifactRecords().slice(-8).reverse();
     return NextResponse.json({
       activeMissions,
       missionProgress,
+      projects,
+      missionSeeds,
+      distillCandidates,
+      serviceBindings,
+      recentArtifacts,
+      pendingApprovals,
       secretApprovals,
       surfaces,
       accessRole,
@@ -946,10 +1146,86 @@ export async function POST(req: NextRequest) {
       action !== "clear_surface_outbox" &&
       action !== "mission_control" &&
       action !== "surface_control" &&
+      action !== "promote_mission_seed" &&
+      action !== "distill_candidate_decision" &&
+      action !== "approval_decision" &&
       action !== "close_browser_session" &&
       action !== "restart_browser_session"
     ) {
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+    }
+
+    if (action === "approval_decision") {
+      const requestId = typeof body?.requestId === "string" ? body.requestId : "";
+      const storageChannel = typeof body?.storageChannel === "string" ? body.storageChannel : "";
+      const channel = typeof body?.channel === "string" ? body.channel : "";
+      const decision = body?.decision === "approved" || body?.decision === "rejected" ? body.decision : null;
+      if (!requestId || !storageChannel || !channel || !decision) {
+        return NextResponse.json({ error: "Missing approval decision payload" }, { status: 400 });
+      }
+      const updated = decideApprovalRequest(roleToMissionRole(accessRole), {
+        channel,
+        storageChannel,
+        requestId,
+        decision,
+        decidedBy: "chronos-localadmin",
+        decidedByRole: "sovereign",
+        authMethod: "surface_session",
+        note: "Decision captured from Chronos approval panel.",
+      });
+      enqueueSurfaceNotification({
+        surface: "presence",
+        requestId: updated.correlationId || updated.id,
+        title: `Approval ${decision}`,
+        text: buildApprovalDecisionText({
+          title: updated.title,
+          decision,
+          missionId: updated.requestedByContext?.missionId,
+          serviceId: updated.target?.serviceId,
+        }),
+        status: decision === "approved" ? "completed" : "attention",
+        metadata: {
+          approval_id: updated.id,
+          channel: updated.channel,
+        },
+      });
+      return NextResponse.json({ ok: true, approval: updated });
+    }
+
+    if (action === "distill_candidate_decision") {
+      const candidateId = typeof body?.candidateId === "string" ? body.candidateId : "";
+      const decision = body?.decision === "promote" || body?.decision === "archive" ? body.decision : null;
+      if (!candidateId || !decision) {
+        return NextResponse.json({ error: "Missing distill candidate decision payload" }, { status: 400 });
+      }
+      const candidate = loadDistillCandidateRecord(candidateId);
+      if (!candidate) {
+        return NextResponse.json({ error: "Distill candidate not found" }, { status: 404 });
+      }
+      let updated = candidate;
+      if (decision === "archive") {
+        updated = updateDistillCandidateRecord(candidateId, { status: "archived" }) || candidate;
+      } else {
+        const saved = savePromotedMemoryRecord(candidate, { executionRole: "chronos_gateway" });
+        updated = updateDistillCandidateRecord(candidateId, {
+          status: "promoted",
+          promoted_ref: saved.logicalPath,
+        }) || candidate;
+      }
+      enqueueSurfaceNotification({
+        surface: "presence",
+        requestId: updated.candidate_id,
+        title: decision === "promote" ? "Memory promoted" : "Memory archived",
+        text: decision === "promote"
+          ? `${updated.title} was promoted for reuse.${buildLearnedNotificationText({ projectId: updated.project_id, language: "en" })}`
+          : `${updated.title} was archived from the memory queue.`,
+        status: "completed",
+        metadata: {
+          candidate_id: updated.candidate_id,
+          promoted_ref: updated.promoted_ref,
+        },
+      });
+      return NextResponse.json({ ok: true, candidate: updated });
     }
 
     if (action === "close_browser_session" || action === "restart_browser_session") {
@@ -973,6 +1249,112 @@ export async function POST(req: NextRequest) {
         status: "ok",
         action,
         sessionId,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === "promote_mission_seed") {
+      const seedId = typeof body?.seedId === "string" ? body.seedId : "";
+      if (!seedId) {
+        return NextResponse.json({ error: "Missing seedId" }, { status: 400 });
+      }
+      const seed = loadMissionSeedRecord(seedId);
+      if (!seed) {
+        return NextResponse.json({ error: "Mission seed not found" }, { status: 404 });
+      }
+      const project = loadProjectRecord(seed.project_id);
+      if (!project) {
+        return NextResponse.json({ error: "Parent project not found" }, { status: 404 });
+      }
+      const missionId = `MSN-${seed.seed_id.replace(/^MSD-/, "")}`.toUpperCase();
+      const persona = seed.specialist_id === "service-operator" ? "Reliability Engineer" : "Ecosystem Architect";
+      const missionType = seed.mission_type_hint || "development";
+      const env = buildExecutionEnv(process.env, "mission_controller");
+      const startOutput = safeExec(
+        "node",
+        [
+          "dist/scripts/mission_controller.js",
+          "start",
+          missionId,
+          project.tier,
+          persona,
+          "default",
+          missionType,
+          "--project-id",
+          project.project_id,
+          "--project-relationship",
+          "belongs_to",
+          "--project-note",
+          `Promoted from mission seed ${seed.seed_id}`,
+        ],
+        { env, cwd: pathResolver.rootDir(), timeoutMs: 120_000 },
+      );
+      saveMissionSeedRecord({
+        ...seed,
+        status: "promoted",
+        promoted_mission_id: missionId,
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...(seed.metadata || {}),
+          start_output: startOutput,
+        },
+      });
+      const activeMissions = new Set(project.active_missions || []);
+      activeMissions.add(missionId);
+      saveProjectRecord({
+        ...project,
+        active_missions: Array.from(activeMissions),
+        metadata: {
+          ...(project.metadata || {}),
+          last_promoted_seed_id: seed.seed_id,
+        },
+      });
+      saveDistillCandidateRecord(createDistillCandidateRecord({
+        source_type: "mission",
+        tier: project.tier,
+        project_id: project.project_id,
+        mission_id: missionId,
+        task_session_id: seed.source_task_session_id,
+        title: `Promote durable mission orchestration for ${seed.title}`,
+        summary: `${seed.title} was promoted from a project mission seed into durable mission ${missionId}. This transition may be reusable as governed organizational memory.`,
+        status: "proposed",
+        target_kind: inferMissionSeedPromotionTargetKind(seed),
+        specialist_id: seed.specialist_id,
+        locale: seed.locale || project.primary_locale,
+        evidence_refs: [
+          `project:${project.project_id}`,
+          `mission_seed:${seed.seed_id}`,
+          `mission:${missionId}`,
+          ...(seed.source_task_session_id ? [`task_session:${seed.source_task_session_id}`] : []),
+        ],
+        metadata: buildMissionSeedPromotionMetadata(seed, project),
+      }));
+      emitMissionOrchestrationObservation({
+        decision: "mission_seed_promoted",
+        event_type: "mission_seed_promoted",
+        requested_by: "chronos_localadmin",
+        mission_id: missionId,
+        resource_id: seed.seed_id,
+        why: "Chronos promoted a project mission seed into a durable mission through mission_controller.",
+      });
+      enqueueSurfaceNotification({
+        surface: "presence",
+        channel: "voice",
+        threadTs: seed.source_task_session_id || seed.seed_id,
+        sourceAgentId: "chronos_localadmin",
+        title: `Mission promoted: ${seed.title}`,
+        text: `${project.name} の mission seed 「${seed.title}」を durable mission ${missionId} として開始しました。${buildLearnedNotificationText({ projectId: project.project_id, language: "ja" })}`,
+        metadata: {
+          project_id: project.project_id,
+          seed_id: seed.seed_id,
+          mission_id: missionId,
+        },
+      });
+      return NextResponse.json({
+        status: "ok",
+        action,
+        seedId,
+        missionId,
         ts: new Date().toISOString(),
       });
     }

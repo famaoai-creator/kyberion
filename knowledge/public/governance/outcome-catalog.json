@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "outcomes": {
+    "browser_navigation": {
+      "label": "Opened page",
+      "description": "A browser destination was opened or focused.",
+      "deliverable_kind": "browser_state",
+      "downloadable": false,
+      "previewable": true
+    },
+    "browser_step": {
+      "label": "Browser step completed",
+      "description": "A browser task step was executed or queued for confirmation.",
+      "deliverable_kind": "browser_state",
+      "downloadable": false,
+      "previewable": true
+    },
+    "artifact:pptx": {
+      "label": "Presentation artifact",
+      "description": "A PowerPoint deck is generated and can be downloaded.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:docx": {
+      "label": "Document artifact",
+      "description": "A report document is generated and can be downloaded.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:xlsx": {
+      "label": "Workbook artifact",
+      "description": "A workbook is generated and can be downloaded.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "service_summary": {
+      "label": "Service summary",
+      "description": "A concise service state or log summary is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_answer": {
+      "label": "Knowledge answer",
+      "description": "A concise answer grounded in governed knowledge is returned.",
+      "deliverable_kind": "answer",
+      "downloadable": false,
+      "previewable": true
+    },
+    "live_answer": {
+      "label": "Live answer",
+      "description": "Live web, weather, or location information is returned.",
+      "deliverable_kind": "answer",
+      "downloadable": false,
+      "previewable": true
+    },
+    "approval_request": {
+      "label": "Approval request",
+      "description": "Work is paused until an explicit confirmation is received.",
+      "deliverable_kind": "approval",
+      "downloadable": false,
+      "previewable": true
+    },
+    "project_created": {
+      "label": "Project created",
+      "description": "A project context was created and is ready for follow-up work.",
+      "deliverable_kind": "project",
+      "downloadable": false,
+      "previewable": true
+    }
+  }
+}

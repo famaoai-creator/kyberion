@@ -56,9 +56,25 @@ A bounded unit of work with lifecycle state, evidence, and history. Mission oper
 
 A lighter-weight durable execution contract used for conversational work such as document generation, service inspection, capture flows, and interactive browser assistance.
 
+### Project
+
+The long-lived container of meaning around a body of work. A project can own repositories, missions, task sessions, artifacts, service bindings, and vault references.
+
+### Outcome
+
+The structured result Kyberion is trying to return for a request, such as `artifact:pptx`, `service_summary`, `browser_navigation`, or `knowledge_answer`.
+
+### Artifact
+
+The concrete output of work: a file, summary, delivery record, approval record, or other governed result object.
+
 ### Project Operating System
 
 A document/control model that treats project artifacts as an operating system for decision-making, delivery, validation, and transfer rather than as a loose bundle of documents.
+
+### Enterprise Operating Kernel
+
+The top-level framing of Kyberion as a system where leadership provides intent and approval while the platform resolves, executes, accounts for, and learns from work.
 
 ### Mission Lease
 
@@ -192,6 +208,23 @@ A surface-scoped delivery queue under `active/shared/coordination/channels/<surf
 ### Service Binding
 
 A governed authenticated access contract for an external service. Service binding resolves service-scoped credentials or session material without turning the channel gateway into the credential source of truth.
+
+Service bindings should be read together with:
+
+- `Project`
+  - the long-lived context that owns the relationship
+- `Artifact`
+  - what may be delivered through the relationship
+- `Vault`
+  - where the secret material is actually governed
+
+### Specialist Team
+
+The internal set of specialists Kyberion assigns to a request, such as a browser operator, document specialist, knowledge specialist, or mission lead. Users usually interact with one front-facing assistant while the specialist team works behind it.
+
+### Evidence
+
+The accountability substrate that links results back to source context, execution path, artifacts, approvals, and policy-relevant decisions.
 
 ### Delivery Actuator
 

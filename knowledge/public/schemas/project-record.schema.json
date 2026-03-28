@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-record.schema.json",
+  "title": "Project Record",
+  "type": "object",
+  "required": ["project_id", "name", "summary", "status", "tier"],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "paused", "archived"]
+    },
+    "primary_locale": { "type": "string" },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repo_id", "kind"],
+        "properties": {
+          "repo_id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "default_branch": { "type": "string" },
+          "root_path": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "service_bindings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "vault_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "active_missions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "bootstrap_work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["work_id", "kind", "title", "summary", "status", "specialist_id"],
+        "properties": {
+          "work_id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["mission_seed", "task_session"] },
+          "title": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["planned", "active", "completed"] },
+          "specialist_id": { "type": "string", "minLength": 1 },
+          "outcome_id": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "kickoff_task_session_id": { "type": "string" },
+    "kickoff_brief": { "type": "string" },
+    "kickoff_completed_at": { "type": "string" },
+    "proposed_mission_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
