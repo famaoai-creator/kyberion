@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/task-session-capture-photo.schema.json",
+  "title": "Task Session Capture Photo Payload",
+  "type": "object",
+  "required": ["camera_intent"],
+  "properties": {
+    "camera_intent": {
+      "type": "string",
+      "enum": ["record", "share", "reference", "ocr_source"]
+    },
+    "device_preference": { "type": "string" },
+    "save_path": { "type": "string" },
+    "post_process": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["crop", "compress", "annotate", "ocr", "share_link"]
+      }
+    },
+    "subject_hint": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -5,6 +5,14 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as path from 'node:path';
 import {
   buildPresenceAssistantReplyTimeline,
+  applyBrowserConversationCommand,
+  classifyBrowserConversationCommand,
+  classifySurfaceQueryIntent,
+  classifyTaskSessionIntent,
+  confirmBrowserConversationCandidate,
+  createTaskSession,
+  createBrowserConversationCommand,
+  executeBrowserConversationAction,
   buildPresenceVoiceIngressTimeline,
   createSurfaceAsyncRequest,
   createPresenceVoiceStimulus,
@@ -15,12 +23,22 @@ import {
   getSurfaceAgentCatalogEntry,
   getSurfaceAsyncRequest,
   getVoiceTtsLanguageConfig,
+  getActiveBrowserConversationSession,
+  getActiveTaskSession,
+  getSurfaceQueryProviderConfig,
+  extractSurfaceKnowledgeQuery,
+  extractSurfaceWebSearchQuery,
   listAgentRuntimeSnapshots,
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
+  loadSurfaceManifest,
+  loadSurfaceState,
   logger,
+  normalizeSurfaceDefinition,
   pathResolver,
   parseVoiceSttBackend,
+  probeSurfaceHealth,
+  readSurfaceLogTail,
   reflectPresenceAgentReply,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
@@ -31,6 +49,10 @@ import {
   safeExistsSync,
   safeMkdir,
   updateSurfaceAsyncRequest,
+  safeWriteFile,
+  updateTaskSession,
+  saveTaskSession,
+  recordTaskSessionHistory,
 } from '@agent/core';
 
 interface VoiceHubRecord {
@@ -60,6 +82,46 @@ interface ConversationTurn {
   text: string;
 }
 
+interface PresenceLocationContext {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  timestamp: string;
+  source?: string;
+}
+
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+interface TaskSessionShape {
+  session_id: string;
+  surface: 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
+  task_type: string;
+  status: string;
+  goal: {
+    summary: string;
+    success_condition: string;
+  };
+  requirements?: {
+    missing?: string[];
+    collected?: Record<string, unknown>;
+  };
+  control: {
+    interruptible: boolean;
+    requires_approval: boolean;
+    awaiting_user_input: boolean;
+  };
+  history: Array<{
+    ts: string;
+    type: string;
+    text: string;
+  }>;
+  payload?: Record<string, unknown>;
+}
+
 const app = express();
 const server = createServer(app);
 
@@ -79,6 +141,7 @@ const recent: VoiceHubRecord[] = [];
 const recentResponses = new Map<string, VoiceHubResponseRecord>();
 const inflightResponses = new Map<string, Promise<VoiceHubResponseRecord>>();
 const conversationMemory = new Map<string, ConversationTurn[]>();
+const activeTaskExecutions = new Set<string>();
 let activeSpeechProcess: ChildProcessWithoutNullStreams | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
 
@@ -697,6 +760,942 @@ function buildVoiceFallbackReply(userText: string): string {
   return 'I received that. I can handle short conversation and quick guidance here, and route heavier work when needed.';
 }
 
+function withTimeoutSignal(timeoutMs: number): AbortSignal {
+  return AbortSignal.timeout(timeoutMs);
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x2F;/g, '/');
+}
+
+async function fetchPresenceLocationContext(): Promise<PresenceLocationContext | null> {
+  try {
+    const response = await fetch(`${PRESENCE_STUDIO_URL}/api/context/location`, {
+      signal: withTimeoutSignal(2500),
+    });
+    if (!response.ok) return null;
+    const payload = await response.json() as { location?: PresenceLocationContext | null };
+    if (!payload?.location) return null;
+    if (!Number.isFinite(payload.location.latitude) || !Number.isFinite(payload.location.longitude)) return null;
+    return payload.location;
+  } catch {
+    return null;
+  }
+}
+
+async function tryBuildLocationReply(userText: string): Promise<string | null> {
+  const config = getSurfaceQueryProviderConfig().location;
+  if (config?.enabled === false) return null;
+  const location = await fetchPresenceLocationContext();
+  const isJapanese = detectReplyLanguage(userText) === 'ja';
+  if (!location) {
+    return isJapanese
+      ? 'この surface では現在地の共有がまだありません。ブラウザの位置情報許可を与えると答えられます。'
+      : 'This surface does not have a current location yet. Allow browser location access and I can answer that.';
+  }
+  const lat = location.latitude.toFixed(4);
+  const lon = location.longitude.toFixed(4);
+  if (isJapanese) {
+    return `現在地の共有コンテキストは緯度 ${lat}、経度 ${lon} です。取得時刻は ${location.timestamp} です。`;
+  }
+  return `The current shared location context is latitude ${lat}, longitude ${lon}, captured at ${location.timestamp}.`;
+}
+
+function weatherCodeLabel(code: number, language: 'ja' | 'en'): string {
+  const table: Record<number, [string, string]> = {
+    0: ['快晴', 'clear'],
+    1: ['おおむね晴れ', 'mostly clear'],
+    2: ['一部くもり', 'partly cloudy'],
+    3: ['くもり', 'overcast'],
+    45: ['霧', 'fog'],
+    48: ['着氷性の霧', 'depositing rime fog'],
+    51: ['弱い霧雨', 'light drizzle'],
+    53: ['霧雨', 'drizzle'],
+    55: ['強い霧雨', 'dense drizzle'],
+    61: ['弱い雨', 'light rain'],
+    63: ['雨', 'rain'],
+    65: ['強い雨', 'heavy rain'],
+    71: ['弱い雪', 'light snow'],
+    73: ['雪', 'snow'],
+    75: ['強い雪', 'heavy snow'],
+    80: ['にわか雨', 'rain showers'],
+    81: ['雨のにわか', 'rain showers'],
+    82: ['激しいにわか雨', 'violent rain showers'],
+    95: ['雷雨', 'thunderstorm'],
+  };
+  const found = table[code];
+  return found ? found[language === 'ja' ? 0 : 1] : (language === 'ja' ? '不明' : 'unknown');
+}
+
+async function tryBuildWeatherReply(userText: string): Promise<string | null> {
+  const config = getSurfaceQueryProviderConfig().weather;
+  if (config?.enabled === false) return null;
+  const location = await fetchPresenceLocationContext();
+  const isJapanese = detectReplyLanguage(userText) === 'ja';
+  if (!location) {
+    return isJapanese
+      ? '天気を答えるには現在地が必要です。ブラウザの位置情報を共有すると取得できます。'
+      : 'I need your current location to answer the weather. Share browser location and I can fetch it.';
+  }
+
+  const timeoutMs = config?.timeoutMs || 5000;
+  const url = new URL('https://api.open-meteo.com/v1/forecast');
+  url.searchParams.set('latitude', String(location.latitude));
+  url.searchParams.set('longitude', String(location.longitude));
+  url.searchParams.set('current', 'temperature_2m,weather_code');
+  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max');
+  url.searchParams.set('forecast_days', '1');
+  url.searchParams.set('timezone', 'auto');
+
+  try {
+    const response = await fetch(url, { signal: withTimeoutSignal(timeoutMs) });
+    if (!response.ok) throw new Error(`weather_http_${response.status}`);
+    const payload = await response.json() as any;
+    const currentTemp = payload?.current?.temperature_2m;
+    const weatherCode = Number(payload?.current?.weather_code ?? -1);
+    const maxTemp = payload?.daily?.temperature_2m_max?.[0];
+    const minTemp = payload?.daily?.temperature_2m_min?.[0];
+    const rainChance = payload?.daily?.precipitation_probability_max?.[0];
+    const label = weatherCodeLabel(weatherCode, isJapanese ? 'ja' : 'en');
+    if (isJapanese) {
+      return `今日の天気は ${label} です。現在 ${currentTemp} 度、予想最高 ${maxTemp} 度、最低 ${minTemp} 度、降水確率は最大 ${rainChance}% です。`;
+    }
+    return `Today's weather is ${label}. It is currently ${currentTemp} degrees, with a high of ${maxTemp}, a low of ${minTemp}, and up to ${rainChance}% precipitation chance.`;
+  } catch (error: any) {
+    logger.warn(`[voice-hub] weather lookup failed: ${error?.message || error}`);
+    return isJapanese
+      ? '天気情報の取得に失敗しました。少し時間を置いてもう一度試してください。'
+      : 'Weather lookup failed. Try again in a moment.';
+  }
+}
+
+async function searchWeb(query: string): Promise<WebSearchResult[]> {
+  const config = getSurfaceQueryProviderConfig().web_search;
+  if (config?.enabled === false) return [];
+  const maxResults = config?.maxResults || 3;
+  const timeoutMs = config?.timeoutMs || 5000;
+  const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+    signal: withTimeoutSignal(timeoutMs),
+    headers: {
+      'User-Agent': 'Kyberion Surface Search/1.0',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`web_search_http_${response.status}`);
+  }
+  const html = await response.text();
+  const matches = Array.from(html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)).slice(0, maxResults);
+  return matches.map((match) => ({
+    url: decodeHtmlEntities(match[1]),
+    title: decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim()),
+  })).filter((entry) => entry.title && entry.url);
+}
+
+async function tryBuildWebSearchReply(userText: string): Promise<string | null> {
+  const query = extractSurfaceWebSearchQuery(userText);
+  if (!query) return null;
+  const isJapanese = detectReplyLanguage(userText) === 'ja';
+  try {
+    const results = await searchWeb(query);
+    if (results.length === 0) {
+      return isJapanese
+        ? `Web 検索では「${query}」に対する有力な結果を見つけられませんでした。`
+        : `I could not find strong web results for "${query}".`;
+    }
+    const lines = results.map((entry, index) => `${index + 1}. ${entry.title}`);
+    if (isJapanese) {
+      return `「${query}」の Web 検索上位です。${lines.join('、')}。必要なら次にどれを開くか絞れます。`;
+    }
+    return `Top web results for "${query}" are ${lines.join(', ')}. If you want, I can narrow down which one to open next.`;
+  } catch (error: any) {
+    logger.warn(`[voice-hub] web search failed: ${error?.message || error}`);
+    return isJapanese
+      ? 'Web 検索に失敗しました。少し時間を置いて再試行してください。'
+      : 'Web search failed. Try again in a moment.';
+  }
+}
+
+async function tryBuildKnowledgeReply(userText: string): Promise<string | null> {
+  const extracted = extractSurfaceKnowledgeQuery(userText);
+  if (!extracted) return null;
+  const config = getSurfaceQueryProviderConfig().knowledge;
+  if (config?.enabled === false) return null;
+  const query = extracted;
+  try {
+    const output = safeExec('node', [
+      'dist/scripts/context_ranker.js',
+      '--intent', query,
+      '--role', config?.role || 'presence_surface_agent',
+      '--phase', config?.phase || 'alignment',
+      '--scope', config?.scope || 'repository',
+      '--limit', String(config?.limit || 4),
+      '--json',
+    ], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 12_000,
+    });
+    const payload = JSON.parse(output) as { results?: Array<{ path: string; title: string; score: number }> };
+    const results = Array.isArray(payload.results) ? payload.results.slice(0, 3) : [];
+    if (results.length === 0) {
+      return detectReplyLanguage(userText) === 'ja'
+        ? `蓄積ナレッジから「${query}」に近い項目は見つかりませんでした。`
+        : `I could not find stored knowledge closely matching "${query}".`;
+    }
+
+    const knowledgeBlocks = results.map((entry) => {
+      const absolutePath = pathResolver.knowledge(entry.path);
+      const raw = safeReadFile(absolutePath, { encoding: 'utf8' }) as string;
+      const excerpt = raw
+        .replace(/^---[\s\S]*?---\n?/, '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 12)
+        .join('\n')
+        .slice(0, 900);
+      return `Source: knowledge/${entry.path}\nTitle: ${entry.title}\nExcerpt:\n${excerpt}`;
+    }).join('\n\n');
+
+    const prompt = [
+      'You are answering a live voice query using retrieved Kyberion knowledge.',
+      'Return only the final spoken answer.',
+      'Answer in the user language.',
+      'Be concise but actually answer the question.',
+      'If useful, mention the most relevant knowledge file names briefly.',
+      '',
+      `User question: ${query}`,
+      '',
+      'Retrieved knowledge:',
+      knowledgeBlocks,
+    ].join('\n');
+    const response = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: prompt,
+      senderAgentId: 'kyberion:voice-hub',
+    });
+    const text = (response.text || '').trim();
+    if (text) return text;
+    const fallbackTitles = results.map((entry) => entry.title).join('、');
+    return detectReplyLanguage(userText) === 'ja'
+      ? `関連ナレッジとして ${fallbackTitles} が見つかりました。必要ならその観点で掘り下げます。`
+      : `Relevant stored knowledge includes ${fallbackTitles}. I can drill into those if you want.`;
+  } catch (error: any) {
+    logger.warn(`[voice-hub] knowledge search failed: ${error?.message || error}`);
+    return detectReplyLanguage(userText) === 'ja'
+      ? 'ナレッジ検索に失敗しました。少し時間を置いて再試行してください。'
+      : 'Knowledge search failed. Try again in a moment.';
+  }
+}
+
+function tryHandleBrowserConversation(userText: string): string | null {
+  const session = getActiveBrowserConversationSession('presence');
+  if (!session) return null;
+
+  if (session.conversation_context.pending_confirmation) {
+    const confirmed = confirmBrowserConversationCandidate(session.session_id, userText);
+    if (confirmed) return confirmed.feedback.message;
+  }
+
+  const resolution = classifyBrowserConversationCommand(userText);
+  if (!resolution) return null;
+
+  const command = createBrowserConversationCommand({
+    sessionId: session.session_id,
+    utterance: userText,
+    resolution,
+  });
+  const feedback = applyBrowserConversationCommand(session.session_id, command);
+  if (!feedback) return null;
+  if (feedback.status === 'progress' && session.candidate_targets?.length !== undefined) {
+    const refreshed = getActiveBrowserConversationSession('presence');
+    if (refreshed && refreshed.session_id === session.session_id && refreshed.candidate_targets.length === 1 && refreshed.active_step?.kind === 'click') {
+      const executed = executeBrowserConversationAction(session.session_id);
+      return executed?.feedback.message || feedback.message;
+    }
+  }
+  return feedback.message;
+}
+
+function extractQuotedValue(text: string): string | undefined {
+  return text.match(/「(.+?)」|\"(.+?)\"|『(.+?)』/)?.slice(1).find(Boolean)?.trim();
+}
+
+function extractServiceName(text: string): string | undefined {
+  return text.match(/([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i)?.[1]
+    || text.match(/service\s+([A-Za-z0-9._-]+)/i)?.[1]
+    || undefined;
+}
+
+function isAffirmativeApproval(text: string): boolean {
+  return /^(はい|ok|okay|yes|yep|実行|進めて|お願いします|承認|confirm)/i.test(text.trim());
+}
+
+function isNegativeApproval(text: string): boolean {
+  return /^(いいえ|no|cancel|stop|やめて|中止|見送り)/i.test(text.trim());
+}
+
+function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string): {
+  requirements?: TaskSessionShape['requirements'];
+  payload?: Record<string, unknown>;
+} | null {
+  const trimmed = utterance.trim();
+  if (!trimmed) return null;
+  const missing = new Set(session.requirements?.missing || []);
+  const collected = { ...(session.requirements?.collected || {}) };
+  const payload = { ...(session.payload || {}) };
+
+  if (session.task_type === 'capture_photo' && missing.has('camera_intent')) {
+    if (/ocr/i.test(trimmed)) payload.camera_intent = 'ocr_source';
+    else if (/共有|share/i.test(trimmed)) payload.camera_intent = 'share';
+    else if (/記録|record|reference/i.test(trimmed)) payload.camera_intent = 'record';
+    if (payload.camera_intent) {
+      collected.camera_intent = payload.camera_intent;
+      missing.delete('camera_intent');
+    }
+  }
+
+  if (session.task_type === 'workbook_wbs' && missing.has('project_name')) {
+    const projectName = extractQuotedValue(trimmed) || trimmed.replace(/^(この|その)?\s*(プロジェクト|案件|project)(の)?/i, '').replace(/(で|を).*/, '').trim();
+    if (projectName) {
+      payload.project_name = projectName;
+      collected.project_name = projectName;
+      missing.delete('project_name');
+    }
+  }
+
+  if (session.task_type === 'presentation_deck' && missing.has('deck_purpose')) {
+    const purpose =
+      /営業|marketing/i.test(trimmed) ? 'marketing' :
+        /社内共有|internal/i.test(trimmed) ? 'internal_share' :
+          /briefing|説明/i.test(trimmed) ? 'briefing' :
+            /提案|proposal/i.test(trimmed) ? 'proposal' :
+              undefined;
+    if (purpose) {
+      payload.deck_purpose = purpose;
+      collected.deck_purpose = purpose;
+      missing.delete('deck_purpose');
+    }
+  }
+
+  if (session.task_type === 'report_document' && missing.has('report_kind')) {
+    const reportKind =
+      /仕様|spec/i.test(trimmed) ? 'spec' :
+        /提案|proposal/i.test(trimmed) ? 'proposal' :
+          /進捗|status/i.test(trimmed) ? 'status' :
+            /要約|summary/i.test(trimmed) ? 'summary' :
+              undefined;
+    if (reportKind) {
+      payload.report_kind = reportKind;
+      collected.report_kind = reportKind;
+      missing.delete('report_kind');
+    }
+  }
+
+  if (session.task_type === 'service_operation' && missing.has('service_name')) {
+    const serviceName = extractServiceName(trimmed);
+    if (serviceName) {
+      payload.service_name = serviceName;
+      collected.service_name = serviceName;
+      missing.delete('service_name');
+      if (payload.approval_required === true) {
+        missing.add('approval_confirmation');
+      }
+    }
+  }
+
+  if (session.task_type === 'service_operation' && missing.has('approval_confirmation')) {
+    if (isAffirmativeApproval(trimmed)) {
+      payload.approval_confirmed = true;
+      collected.approval_confirmation = 'approved';
+      missing.delete('approval_confirmation');
+    }
+  }
+
+  return {
+    requirements: {
+      missing: [...missing],
+      collected,
+    },
+    payload,
+  };
+}
+
+function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
+  const taskLabelJa: Record<string, string> = {
+    capture_photo: '写真撮影',
+    workbook_wbs: 'WBS 作成',
+    presentation_deck: 'PowerPoint 資料作成',
+    report_document: 'レポート作成',
+    service_operation: 'サービス操作',
+  };
+  const label = taskLabelJa[session.task_type] || session.task_type;
+  const missing = session.requirements?.missing || [];
+  if (language === 'ja') {
+    if (missing.includes('approval_confirmation')) {
+      return `${label} を進めます。実行前に確認が必要です。続けてよければ「はい」と返してください。`;
+    }
+    if (missing.length > 0) {
+      return `${label} を進めます。続けるには ${missing.join('、')} が必要です。わかったらそのまま教えてください。`;
+    }
+    return `${label} を進めます。完了したら結果を返します。`;
+  }
+  if (missing.includes('approval_confirmation')) {
+    return `I'll handle the ${session.task_type}, but this action needs confirmation first. Reply yes to continue.`;
+  }
+  if (missing.length > 0) {
+    return `I'll handle the ${session.task_type}. I still need ${missing.join(', ')}. Tell me when you're ready.`;
+  }
+  return `I'll handle the ${session.task_type}. I'll report back when it's done.`;
+}
+
+function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
+  const missing = session.requirements?.missing || [];
+  if (language === 'ja') {
+    if (missing.includes('approval_confirmation')) {
+      return '確認が必要です。実行してよければ「はい」と返してください。';
+    }
+    if (missing.length > 0) {
+      return `更新しました。残りは ${missing.join('、')} です。`;
+    }
+    return `要件が揃いました。ここから実行して、終わったら結果を返します。`;
+  }
+  if (missing.includes('approval_confirmation')) {
+    return 'This action needs confirmation. Reply yes to continue.';
+  }
+  if (missing.length > 0) {
+    return `Updated. Remaining requirements: ${missing.join(', ')}.`;
+  }
+  return `I have enough to proceed now. I'll report back with the result.`;
+}
+
+function taskSessionArtifactBase(sessionId: string): string {
+  return pathResolver.sharedTmp(`surface-task-sessions/${sessionId}`);
+}
+
+function ensureTaskSessionExecutionDir(sessionId: string): string {
+  const dir = taskSessionArtifactBase(sessionId);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  return dir;
+}
+
+function buildPresentationDeckBrief(session: TaskSessionShape): any {
+  const payload = session.payload || {};
+  const purpose = String(payload.deck_purpose || 'proposal');
+  return {
+    kind: 'document-brief',
+    artifact_family: 'presentation',
+    document_type: 'proposal',
+    document_profile: 'executive-proposal',
+    render_target: 'pptx',
+    locale: 'ja-JP',
+    layout_template_id: 'executive-neutral',
+    payload: {
+      title: session.goal.summary || 'Presentation Deck',
+      client: 'Kyberion',
+      objective: session.goal.success_condition || 'Summarize the requested proposal clearly.',
+      audience: purpose === 'marketing' ? ['Prospective Customer', 'Executive Buyer'] : ['Project Stakeholder', 'Decision Maker'],
+      story: {
+        core_message: purpose === 'marketing'
+          ? 'This deck explains the value proposition and next action clearly.'
+          : 'This deck explains the proposal, rationale, and next action clearly.',
+        chapters: ['Overview', 'Current context', 'Recommended approach', 'Next steps'],
+        tone: purpose === 'internal_share' ? 'concise and operational' : 'executive and evidence-based',
+        closing_cta: 'Review the proposal and confirm the next step.'
+      },
+      evidence: [
+        { title: 'Request Source', point: session.history[0]?.text || session.goal.summary },
+        { title: 'Purpose', point: purpose },
+        { title: 'Success Condition', point: session.goal.success_condition },
+        { title: 'Session', point: session.session_id }
+      ],
+      required_sections: ['executive-summary', 'recommendation', 'plan']
+    }
+  };
+}
+
+function buildReportDocumentBrief(session: TaskSessionShape): any {
+  const payload = session.payload || {};
+  const reportKind = String(payload.report_kind || 'summary');
+  const format = String(payload.format || 'docx');
+  return {
+    kind: 'document-brief',
+    artifact_family: 'document',
+    document_type: 'report',
+    document_profile: 'summary-report',
+    render_target: format === 'pdf' ? 'pdf' : 'docx',
+    locale: 'ja-JP',
+    payload: {
+      title: session.goal.summary || 'Report',
+      summary: session.goal.success_condition || 'Generated from the surface task session.',
+      sections: [
+        {
+          heading: 'Request',
+          body: [session.history[0]?.text || session.goal.summary],
+          bullets: [
+            `report kind: ${reportKind}`,
+            `session id: ${session.session_id}`,
+          ]
+        },
+        {
+          heading: 'Current Understanding',
+          body: [
+            session.goal.summary,
+            session.goal.success_condition,
+          ],
+          bullets: Object.entries(session.requirements?.collected || {}).map(([key, value]) => `${key}: ${String(value)}`)
+        }
+      ]
+    }
+  };
+}
+
+function buildMediaPipelineForBrief(briefPath: string, outputPath: string, kind: 'presentation_deck' | 'report_document'): any {
+  if (kind === 'presentation_deck') {
+    return {
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'capture',
+          op: 'json_read',
+          params: { path: briefPath, export_as: 'document_brief' },
+        },
+        {
+          type: 'transform',
+          op: 'proposal_storyline_from_brief',
+          params: { from: 'document_brief', export_as: 'proposal_storyline' },
+        },
+        {
+          type: 'transform',
+          op: 'proposal_content_from_storyline',
+          params: { from: 'proposal_storyline', export_as: 'proposal_content_data' },
+        },
+        {
+          type: 'transform',
+          op: 'apply_theme',
+          params: { theme: '{{document_brief.layout_template_id}}' },
+        },
+        {
+          type: 'transform',
+          op: 'merge_content',
+          params: { content_data: '{{proposal_content_data}}', output_format: 'pptx' },
+        },
+        {
+          type: 'apply',
+          op: 'pptx_render',
+          params: { design_from: 'last_pptx_design', path: outputPath },
+        },
+      ],
+    };
+  }
+
+  return {
+    action: 'pipeline',
+    steps: [
+      {
+        type: 'capture',
+        op: 'json_read',
+        params: { path: briefPath, export_as: 'document_brief' },
+      },
+      {
+        type: 'transform',
+        op: 'document_report_design_from_brief',
+        params: { from: 'document_brief', export_as: 'last_docx_design' },
+      },
+      {
+        type: 'apply',
+        op: outputPath.endsWith('.pdf') ? 'pdf_render' : 'docx_render',
+        params: { path: outputPath },
+      },
+    ],
+  };
+}
+
+function normalizeSurfaceName(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_]+/g, '-');
+}
+
+function resolveManagedSurfaceId(serviceName: string): string | null {
+  const normalizedRequested = normalizeSurfaceName(serviceName);
+  const manifest = loadSurfaceManifest();
+  const exact = manifest.surfaces.find((surface) => normalizeSurfaceName(surface.id) === normalizedRequested);
+  if (exact) return exact.id;
+  const fuzzy = manifest.surfaces.find((surface) => normalizeSurfaceName(surface.id).includes(normalizedRequested) || normalizedRequested.includes(normalizeSurfaceName(surface.id)));
+  return fuzzy?.id || null;
+}
+
+function buildServiceOperationSummary(params: {
+  surfaceId: string;
+  operation: string;
+  status?: string;
+  detail?: string;
+  health?: string;
+  pid?: number;
+  logTail?: string[];
+}): string {
+  const lines = [
+    `surface: ${params.surfaceId}`,
+    `operation: ${params.operation}`,
+  ];
+  if (params.status) lines.push(`status: ${params.status}`);
+  if (params.health) lines.push(`health: ${params.health}`);
+  if (params.pid) lines.push(`pid: ${params.pid}`);
+  if (params.detail) lines.push(`detail: ${params.detail}`);
+  if (params.logTail?.length) {
+    lines.push('recent_log_tail:');
+    lines.push(...params.logTail.map((line) => `  ${line}`));
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function buildTaskCompletionReply(session: TaskSessionShape, previewText: string, outputPath: string): string {
+  if (session.task_type === 'service_operation') {
+    return `${previewText} 詳細はタスク詳細で確認できます。`;
+  }
+  if (session.task_type === 'presentation_deck') {
+    return 'PowerPoint 資料を生成しました。詳細はタスク詳細で確認できます。';
+  }
+  if (session.task_type === 'report_document') {
+    return 'レポート文書を生成しました。詳細はタスク詳細で確認できます。';
+  }
+  return '完了しました。詳細はタスク詳細で確認できます。';
+}
+
+function formatServiceHealthSummary(surfaceId: string, isRunning: boolean, healthStatus: string, hasRuntimeRecord: boolean): string {
+  if (!isRunning) {
+    return `${surfaceId} は停止しています。`;
+  }
+  if (healthStatus === 'healthy') {
+    if (!hasRuntimeRecord) {
+      return `${surfaceId} はヘルスチェック上は正常に応答しています。`;
+    }
+    return `${surfaceId} は稼働中で、ヘルスチェックも正常です。`;
+  }
+  if (healthStatus === 'unhealthy') {
+    return `${surfaceId} は動作していますが、ヘルスチェックは異常です。`;
+  }
+  return `${surfaceId} は稼働中です。`;
+}
+
+function summarizeLogTail(surfaceId: string, lines: string[]): string {
+  if (lines.length === 0) {
+    return `${surfaceId} のログはまだありません。`;
+  }
+  const latestMeaningful = [...lines]
+    .reverse()
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !/^\}+$/.test(line) && !/^syscall:|^address:|^port:/i.test(line));
+  if (!latestMeaningful) {
+    return `${surfaceId} の最新ログを取得しました。`;
+  }
+  const simplified = latestMeaningful
+    .replace(/^\d{4}-\d{2}-\d{2}T[0-9:.+-]+Z\s+/, '')
+    .replace(/^\[[A-Z]+\]\s+/, '')
+    .replace(/\[[A-Z]+\]\s+/g, '')
+    .replace(/^\[voice-hub\]\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normalized = simplified || latestMeaningful;
+  if (/assistant reply spoken successfully/i.test(normalized)) {
+    return `${surfaceId} の最新ログを取得しました。直近では音声応答の再生が正常に完了しています。`;
+  }
+  if (/surface conversation failed:?\s*surface_conversation_timeout/i.test(normalized)) {
+    return `${surfaceId} の最新ログを取得しました。直近では会話処理のタイムアウトが記録されています。`;
+  }
+  if (/listening on http/i.test(normalized)) {
+    return `${surfaceId} の最新ログを取得しました。現在は待受状態です。`;
+  }
+  if (/loaded .*agent definitions/i.test(normalized)) {
+    return `${surfaceId} の最新ログを取得しました。エージェント定義の読み込みは正常です。`;
+  }
+  return `${surfaceId} の最新ログを取得しました。詳細はタスク詳細で確認できます。`;
+}
+
+async function executeServiceOperationTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string }> {
+  const payload = session.payload || {};
+  const requestedName = String(payload.service_name || '').trim();
+  const operation = String(payload.operation || 'status').trim().toLowerCase();
+  if (!requestedName) {
+    throw new Error('service_name is required');
+  }
+
+  const surfaceId = resolveManagedSurfaceId(requestedName);
+  if (!surfaceId) {
+    throw new Error(`Unknown managed surface: ${requestedName}`);
+  }
+
+  if (surfaceId === 'voice-hub' && operation === 'restart') {
+    throw new Error('Restarting voice-hub from itself is not supported safely in-band. Use status/logs or restart it externally.');
+  }
+
+  const dir = ensureTaskSessionExecutionDir(session.session_id);
+  const outputPath = `${dir}/${session.session_id}.service.txt`;
+  const manifest = loadSurfaceManifest();
+  const definition = manifest.surfaces.find((surface) => surface.id === surfaceId);
+  const normalized = definition ? normalizeSurfaceDefinition(definition) : null;
+  const state = loadSurfaceState();
+  const record = state.surfaces[surfaceId];
+  const fallbackLogPath = pathResolver.shared(`logs/surfaces/${surfaceId}.log`);
+  const resolvedLogPath = record?.logPath || fallbackLogPath;
+  const logTailLines = Number(payload.log_tail_lines || 40);
+
+  if (operation === 'logs') {
+    const logTail = safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, logTailLines) : [];
+    const previewText = summarizeLogTail(surfaceId, logTail);
+    safeWriteFile(outputPath, buildServiceOperationSummary({
+      surfaceId,
+      operation,
+      status: record ? 'known' : (logTail.length > 0 ? 'log_only' : 'unknown'),
+      pid: record?.pid,
+      detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : 'no_log_path',
+      logTail,
+    }));
+    return { outputPath, previewText };
+  }
+
+  if (operation === 'status') {
+    const health = normalized ? await probeSurfaceHealth(normalized) : { status: 'unknown', detail: 'definition_not_found' };
+    const hasRuntimeRecord = Boolean(record?.pid);
+    const isRunning = hasRuntimeRecord || health.status === 'healthy';
+    const previewText = formatServiceHealthSummary(surfaceId, isRunning, health.status, hasRuntimeRecord);
+    safeWriteFile(outputPath, buildServiceOperationSummary({
+      surfaceId,
+      operation,
+      status: isRunning ? 'running' : 'stopped',
+      health: `${health.status}:${health.detail}`,
+      pid: record?.pid,
+      detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined,
+      logTail: safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, 12) : [],
+    }));
+    return { outputPath, previewText };
+  }
+
+  const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+  if (operation === 'restart') {
+    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'stop', '--surface', surfaceId, '--manifest', manifestPath], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 20_000,
+    });
+    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'start', '--surface', surfaceId, '--manifest', manifestPath], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 30_000,
+    });
+  } else if (operation === 'start' || operation === 'stop') {
+    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', operation, '--surface', surfaceId, '--manifest', manifestPath], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 30_000,
+    });
+  } else {
+    throw new Error(`Unsupported service operation: ${operation}`);
+  }
+
+  const nextState = loadSurfaceState();
+  const nextRecord = nextState.surfaces[surfaceId];
+  const nextHealth = normalized ? await probeSurfaceHealth(normalized) : { status: 'unknown', detail: 'definition_not_found' };
+  const previewText = operation === 'restart'
+    ? `${surfaceId} を再起動しました。`
+    : operation === 'start'
+      ? `${surfaceId} を起動しました。`
+      : `${surfaceId} を停止しました。`;
+  safeWriteFile(outputPath, buildServiceOperationSummary({
+    surfaceId,
+    operation,
+    status: nextRecord ? 'running' : 'stopped',
+    health: `${nextHealth.status}:${nextHealth.detail}`,
+    pid: nextRecord?.pid,
+    detail: nextRecord?.logPath || (safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined),
+    logTail: nextRecord?.logPath
+      ? readSurfaceLogTail(nextRecord.logPath, 12)
+      : (safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, 12) : []),
+  }));
+  return { outputPath, previewText };
+}
+
+async function processTaskSessionExecution(session: TaskSessionShape): Promise<void> {
+  if (activeTaskExecutions.has(session.session_id)) return;
+  if (!['presentation_deck', 'report_document', 'service_operation'].includes(session.task_type)) return;
+  activeTaskExecutions.add(session.session_id);
+  try {
+    updateTaskSession(session.session_id, {
+      status: 'executing',
+      control: {
+        ...session.control,
+        awaiting_user_input: false,
+      },
+    });
+
+    let outputPath = '';
+    let artifactKind = 'error';
+    let previewText = '';
+
+    if (session.task_type === 'service_operation') {
+      const result = await executeServiceOperationTask(session);
+      outputPath = result.outputPath;
+      artifactKind = 'service';
+      previewText = result.previewText;
+    } else {
+      const dir = ensureTaskSessionExecutionDir(session.session_id);
+      const briefPath = `${dir}/brief.json`;
+      outputPath = session.task_type === 'presentation_deck'
+        ? `${dir}/${session.session_id}.pptx`
+        : `${dir}/${session.session_id}.${String(session.payload?.format || 'docx') === 'pdf' ? 'pdf' : 'docx'}`;
+      const pipelinePath = `${dir}/pipeline.json`;
+      const brief = session.task_type === 'presentation_deck'
+        ? buildPresentationDeckBrief(session)
+        : buildReportDocumentBrief(session);
+      const pipeline = buildMediaPipelineForBrief(briefPath, outputPath, session.task_type as 'presentation_deck' | 'report_document');
+
+      safeWriteFile(briefPath, JSON.stringify(brief, null, 2));
+      safeWriteFile(pipelinePath, JSON.stringify(pipeline, null, 2));
+      safeExec('node', [
+        'dist/libs/actuators/media-actuator/src/index.js',
+        '--input',
+        pipelinePath,
+      ], {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 120_000,
+      });
+      artifactKind = session.task_type === 'presentation_deck'
+        ? 'pptx'
+        : (outputPath.endsWith('.pdf') ? 'pdf' : 'docx');
+      previewText = session.task_type === 'presentation_deck'
+        ? 'PowerPoint 資料を生成しました。'
+        : 'レポート文書を生成しました。';
+    }
+
+    const spokenReply = buildTaskCompletionReply(session, previewText, outputPath);
+
+    updateTaskSession(session.session_id, {
+      status: 'completed',
+      artifact: {
+        kind: artifactKind,
+        output_path: outputPath,
+        preview_text: previewText,
+      },
+    });
+    enqueueSurfaceNotification({
+      surface: 'presence',
+      channel: 'voice',
+      threadTs: session.session_id,
+      sourceAgentId: 'presence-surface-agent',
+      title: `Completed ${session.session_id}`,
+      text: spokenReply,
+      status: 'success',
+      requestId: session.session_id,
+    });
+    await reflectPresenceAgentReply({
+      agentId: 'presence-surface-agent',
+      speaker: 'Kyberion',
+      text: spokenReply,
+    }, PRESENCE_STUDIO_URL).catch(() => {});
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    const userFacingError = session.task_type === 'service_operation'
+      ? 'サービス操作に失敗しました。詳細はタスク詳細で確認できます。'
+      : '処理に失敗しました。詳細はタスク詳細で確認できます。';
+    updateTaskSession(session.session_id, {
+      status: 'failed',
+      artifact: {
+        kind: 'error',
+        preview_text: message,
+      },
+    });
+    enqueueSurfaceNotification({
+      surface: 'presence',
+      channel: 'voice',
+      threadTs: session.session_id,
+      sourceAgentId: 'presence-surface-agent',
+      title: `Failed ${session.session_id}`,
+      text: userFacingError,
+      status: 'error',
+      requestId: session.session_id,
+    });
+    await reflectPresenceAgentReply({
+      agentId: 'presence-surface-agent',
+      speaker: 'Kyberion',
+      text: userFacingError,
+    }, PRESENCE_STUDIO_URL).catch(() => {});
+  } finally {
+    activeTaskExecutions.delete(session.session_id);
+  }
+}
+
+function tryHandleTaskSession(userText: string): string | null {
+  const language = detectReplyLanguage(userText);
+  const active = getActiveTaskSession('presence') as TaskSessionShape | null;
+  if (active && active.control.awaiting_user_input) {
+    if (active.task_type === 'service_operation' && active.requirements?.missing?.includes('approval_confirmation') && isNegativeApproval(userText)) {
+      updateTaskSession(active.session_id, {
+        status: 'released',
+        control: {
+          ...active.control,
+          awaiting_user_input: false,
+        },
+      });
+      return language === 'ja'
+        ? 'サービス操作は見送りました。'
+        : 'I cancelled the service operation.';
+    }
+    const inferred = inferTaskRequirementUpdate(active, userText);
+    if (inferred) {
+      const nextMissing = inferred.requirements?.missing || [];
+      const updated = updateTaskSession(active.session_id, {
+        requirements: inferred.requirements,
+        payload: inferred.payload,
+        status: nextMissing.includes('approval_confirmation')
+          ? 'awaiting_confirmation'
+          : (nextMissing.length > 0 ? 'collecting_requirements' : 'planning'),
+        control: {
+          ...active.control,
+          requires_approval: Boolean(inferred.payload?.approval_required),
+          awaiting_user_input: nextMissing.length > 0,
+        },
+      }) as TaskSessionShape | null;
+      if (updated) {
+        recordTaskSessionHistory(updated.session_id, {
+          ts: new Date().toISOString(),
+          type: 'instruction',
+          text: userText,
+        });
+        if ((updated.requirements?.missing || []).length === 0) {
+          void processTaskSessionExecution(updated);
+        }
+        return buildTaskSessionProgressReply(updated, language);
+      }
+    }
+  }
+
+  const intent = classifyTaskSessionIntent(userText);
+  if (!intent) return null;
+  const session = createTaskSession({
+    surface: 'presence',
+    taskType: intent.taskType,
+    status: intent.requirements?.missing?.includes('approval_confirmation')
+      ? 'awaiting_confirmation'
+      : (intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+    requiresApproval: Boolean(intent.payload?.approval_required),
+    goal: intent.goal,
+    requirements: intent.requirements,
+    payload: intent.payload,
+  });
+  session.control.awaiting_user_input = Boolean(intent.requirements?.missing?.length);
+  saveTaskSession(session);
+  recordTaskSessionHistory(session.session_id, {
+    ts: new Date().toISOString(),
+    type: 'instruction',
+    text: userText,
+  });
+  if ((session.requirements?.missing || []).length === 0) {
+    void processTaskSessionExecution(session as TaskSessionShape);
+  }
+  return buildTaskSessionAcceptedReply(session as TaskSessionShape, language);
+}
+
 function parseMissionListSummary(output: string): { total: number; active: number; archived: number; completed: number; planned: number } {
   const lines = output.split('\n');
   const totalMatch = output.match(/(\d+)\s+mission\(s\)\s+found/i);
@@ -908,6 +1907,30 @@ function processAsyncDelegation(params: {
 
 async function generateReply(userText: string, context: { sessionKey: string }): Promise<string> {
   try {
+    const browserConversationReply = tryHandleBrowserConversation(userText);
+    if (browserConversationReply) return browserConversationReply;
+
+    const taskSessionReply = tryHandleTaskSession(userText);
+    if (taskSessionReply) return taskSessionReply;
+
+    const queryIntent = classifySurfaceQueryIntent(userText);
+    if (queryIntent === 'location') {
+      const locationReply = await tryBuildLocationReply(userText);
+      if (locationReply) return locationReply;
+    }
+    if (queryIntent === 'weather') {
+      const weatherReply = await tryBuildWeatherReply(userText);
+      if (weatherReply) return weatherReply;
+    }
+    if (queryIntent === 'knowledge_search') {
+      const knowledgeReply = await tryBuildKnowledgeReply(userText);
+      if (knowledgeReply) return knowledgeReply;
+    }
+    if (queryIntent === 'web_search') {
+      const webReply = await tryBuildWebSearchReply(userText);
+      if (webReply) return webReply;
+    }
+
     const forcedReceiver = deriveSurfaceDelegationReceiver(userText);
     const statusReply = tryBuildAsyncStatusReply(userText);
     if (statusReply) return statusReply;
