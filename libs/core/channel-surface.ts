@@ -396,7 +396,7 @@ export function deriveSurfaceDelegationReceiver(text: string): 'chronos-mirror' 
   }
 
   if (
-    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime status|runtime list|ランタイム状況|ランタイム一覧|health check|system health|ヘルスチェック|agent runtime|outbox status|chronos status/i.test(normalized)
+    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime status|runtime health|runtime list|ランタイム状況|ランタイム一覧|health check|system health|ヘルスチェック|agent runtime|outbox status|chronos status/i.test(normalized)
   ) {
     return 'chronos-mirror';
   }
