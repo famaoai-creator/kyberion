@@ -1,174 +1,163 @@
-# Quick Start: Mission-First Kyberion
+# Quick Start
 
-Kyberion is built on one idea: **keep the mission model simple and let the control plane handle the orchestration**.
+Kyberion should be approached as an intent-driven system.
 
-You define intent, Kyberion creates or resumes a mission, and the runtime supervisor plus orchestration worker coordinate the rest.
+Start with:
 
-If you want the operator-oriented version first, read [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md).
-
-## The Concept
-
-```
-Define Your Persona    →    Phase 0: Alignment (Brain)    →    Phase 1: Execution (Spinal Cord)
-─────────────────────       ──────────────────────────         ───────────────────────────────
-"I am a CEO"                Task Board & Strategy              Run Playbooks / Skills
-                            + 3-Tier Wisdom                    → intent routing → results
+```text
+Intent -> Plan -> Result
 ```
 
-The init wizard asks who you are. Based on your answer, it configures the ecosystem — setting up your personal knowledge directory, recommending the right skill bundles and playbooks, and getting you ready to automate your work safely.
+Not with:
 
----
+```text
+Actuator -> ADF -> internal runtime detail
+```
 
-## Step 1: Setup and Build
+## 1. Setup
 
 Prerequisites:
+
 - Node.js `22+`
 - `pnpm`
 
 ```bash
-# Clone the repository
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
-
-# Install dependencies
 pnpm install
-
-# Build package-local artifacts and repo dist
 pnpm build
-
-# Start background surfaces from the canonical manifest
-pnpm surfaces:reconcile
-
-# The interactive wizard configures your identity and environment
 pnpm onboard
+pnpm surfaces:reconcile
 ```
 
-The wizard will help you establish your:
-- **Name** — How the ecosystem should address you.
-- **Language** — Preferred communication language.
-- **Interaction Style** — Senior Partner, Concierge, or Minimalist.
-- **Primary Domain** — Software Engineering, CEO, PM, etc.
-
-## Step 2: Verify Your Environment
-
-```bash
-pnpm run doctor
-pnpm capabilities
-```
-
-`pnpm run doctor` で基本的な健全性を、`pnpm capabilities` で現在の OS / バイナリ環境に対してどのアクチュエータ機能が利用可能かを確認できます。
-
-If you want the local control plane running:
+## 2. Bring Up The Local Surfaces
 
 ```bash
 pnpm agent-runtime:supervisor
 pnpm mission:orchestrator
-```
-
-## Step 3: Discover What You Can Run
-
-Before starting a mission, use the CLI to discover available actuators from the global actuator index.
-
-```bash
-# Show all indexed actuators
-pnpm run cli -- list
-
-# Search by keyword
-pnpm run cli -- search browser
-
-# Inspect one actuator in more detail
-pnpm run cli -- info browser-actuator
-```
-
-## Step 3.5: Keep Package Imports Clean
-
-When you write or change runtime code, import shared kernel modules through `@agent/core` public entrypoints only.
-
-Examples:
-
-```ts
-import { safeReadFile } from "@agent/core/secure-io";
-import { rootResolve } from "@agent/core/path-resolver";
-```
-
-Do not import from:
-
-- `@agent/core/src/*`
-- `@agent/core/dist/*`
-- `../libs/core/*`
-
-Reference:
-- [`docs/PACKAGING_CONTRACT.md`](./PACKAGING_CONTRACT.md)
-
-## Step 4: Set Up Your Knowledge
-
-The wizard created `knowledge/personal/` for you — a Git-ignored directory for your private configuration.
-
-| Tier             | Where to Place            | Example                                       |
-| ---------------- | ------------------------- | --------------------------------------------- |
-| **Personal**     | `knowledge/personal/`     | API keys, personal preferences, private notes |
-| **Confidential** | `knowledge/confidential/` | Company standards, client-specific rules      |
-| **Public**       | `knowledge/`              | Shared frameworks, tech-stack guides          |
-
-Your personal settings always take priority. See [README: Governance](../README.md#governance) for details.
-
-## Step 5: Your First Mission
-
-Every mission begins in **Phase 0: Alignment**. You must discuss your intent with the agent and establish a `TASK_BOARD.md` before executing actuators and mission flows.
-
-If you want an operator UI while doing this, start Chronos:
-
-```bash
 export KYBERION_LOCALHOST_AUTOADMIN=true
 pnpm chronos:dev
 ```
 
-Chronos is the local control surface for:
+Useful local surfaces:
 
-- mission state
-- runtime leases
-- surface outbox and delivery
-- control action queue
-- live agent conversation and A2A handoffs
+- `Chronos`: `http://127.0.0.1:3000`
+- `Presence Studio`: usually `http://127.0.0.1:3031`
 
-If you are unsure when to use terminal vs Slack vs Chronos, or where to place files, see [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md).
+## 3. Use Kyberion By Asking For Outcomes
 
-### For CEOs / Executives
+The intended interface is natural language.
 
-> "I want to evaluate our new market entry using the ceo-strategy playbook. Let's do the Alignment phase first."
+Examples:
 
-*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
+- `このPDFをパワポにして`
+- `今週の進捗レポートを作って`
+- `日経新聞を開いて`
+- `voice-hub のログを見て`
+- `今日の天気を教えて`
 
-### For Engineers
+Kyberion should respond with one of these:
 
-> "I need to modernize this legacy component. Let's align on a strategy and create a Task Board."
+- a direct answer
+- a short plan
+- a request for missing information
+- an approval request
+- a result or artifact
 
-*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
+## 4. What Happens Internally
 
-### For PM / Auditors
+You do not need to drive this manually most of the time, but this is the internal model:
 
-> "Run a full product audit. Draft the plan in a Task Board first."
+1. the surface receives your intent
+2. Kyberion resolves that intent
+3. it creates a short plan
+4. it chooses one of:
+   - direct answer
+   - browser/session work
+   - task session
+   - mission
+5. it executes through actuators and ADF
+6. it returns a result
 
-*Agent will create a Task Board using the appropriate actuator chain and governance flow.*
+Rule of thumb:
 
----
+- `quick conversational work` -> answer or task session
+- `larger durable work` -> mission
 
-## Next Steps
+## 5. The Smallest Mental Model
 
-- Read the top-level overview: [`README.md`](../README.md)
-- Browse available playbooks: [`knowledge/orchestration/mission-playbooks/`](./knowledge/orchestration/mission-playbooks/)
-- Install an external plugin:
-  ```bash
-  npm run plugin -- install <package>
-  ```
-- Read the Governance Rules: [`AGENTS.md`](../AGENTS.md)
-- Understand key terms: [`docs/GLOSSARY.md`](./GLOSSARY.md)
-- Explore the architecture: [`docs/COMPONENT_MAP.md`](./COMPONENT_MAP.md)
-- Read the operator surface guide: [`docs/OPERATOR_UX_GUIDE.md`](./OPERATOR_UX_GUIDE.md)
-- Browse the current actuator catalog: [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md)
-- Review current-vs-legacy classification: [`knowledge/public/architecture/component-lifecycle-inventory.md`](../knowledge/public/architecture/component-lifecycle-inventory.md)
+If you only remember a few things, remember these:
 
----
+1. Ask for an outcome, not a tool.
+2. Kyberion will show a plan when needed.
+3. Approvals appear only for risky actions.
+4. Results come back as answers, artifacts, or task/mission state.
+5. Missions are the durable backend model, not the primary UI.
 
-**Need Help?**
-See [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) for the manifest-backed actuator catalog, or ask Kyberion: "Help me find the right actuator for [your task]."
+## 6. When To Use Each Surface
+
+### Terminal
+
+Use when:
+
+- you are coding
+- you want diffs, tests, and patches
+- you want the fastest iteration loop
+
+### Slack
+
+Use when:
+
+- you want remote conversation
+- you want approvals or follow-ups in a thread
+- you want results delivered back into the same thread
+
+### Chronos
+
+Use when:
+
+- you want to inspect system state
+- you want to understand what is running
+- you need operator intervention
+
+### Presence Studio
+
+Use when:
+
+- you want voice interaction
+- you want conversational browser or task assistance
+- you want to inspect live task details and artifacts
+
+## 7. Direct Operator Commands
+
+When you need to operate internals directly:
+
+### Health and discovery
+
+```bash
+pnpm doctor
+pnpm capabilities
+pnpm run cli -- list
+pnpm run cli -- search browser
+```
+
+### Mission lifecycle
+
+```bash
+MC="node dist/scripts/mission_controller.js"
+$MC start MY-TASK confidential
+$MC status MY-TASK
+$MC checkpoint step-1 "Progress note"
+$MC verify MY-TASK verified "Verification summary"
+$MC finish MY-TASK
+```
+
+These are operator tools.
+They are not the normal end-user interface.
+
+## 8. Where To Read Next
+
+- [README.md](/Users/famao/kyberion/README.md)
+- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
+- [docs/GLOSSARY.md](/Users/famao/kyberion/docs/GLOSSARY.md)
+- [CAPABILITIES_GUIDE.md](/Users/famao/kyberion/CAPABILITIES_GUIDE.md)

@@ -191,6 +191,10 @@ function describeStep(step: any): string {
       return `Extract PPTX design from ${step.params?.path || '?'}`;
     case 'xlsx_extract':
       return `Extract XLSX design from ${step.params?.path || '?'}`;
+    case 'pdf_to_pptx_design':
+      return `Convert PDF design to PPTX design`;
+    case 'pdf_to_xlsx_design':
+      return `Convert PDF design to XLSX design`;
     case 'pptx_render':
       return `Render PPTX to ${step.params?.path || '?'}`;
     case 'xlsx_render':
