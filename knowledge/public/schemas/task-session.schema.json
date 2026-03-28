@@ -53,12 +53,37 @@
       },
       "additionalProperties": false
     },
+    "project_context": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "locale": { "type": "string" },
+        "service_bindings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
     "artifact": {
       "type": "object",
       "properties": {
         "kind": { "type": "string" },
         "output_path": { "type": "string" },
-        "preview_text": { "type": "string" }
+        "preview_text": { "type": "string" },
+        "artifact_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "storage_class": {
+          "type": "string",
+          "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]
+        },
+        "external_ref": { "type": "string" }
       },
       "additionalProperties": true
     },

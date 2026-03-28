@@ -6,6 +6,8 @@ import * as path from 'node:path';
 import {
   buildPresenceAssistantReplyTimeline,
   applyBrowserConversationCommand,
+  attachArtifactRecordToTaskSession,
+  buildProjectBootstrapWorkItems,
   classifyBrowserConversationCommand,
   classifySurfaceQueryIntent,
   classifyTaskSessionIntent,
@@ -13,6 +15,9 @@ import {
   createTaskSession,
   createBrowserConversationCommand,
   executeBrowserConversationAction,
+  createArtifactRecord,
+  createDistillCandidateRecord,
+  listServiceBindingRecords,
   buildPresenceVoiceIngressTimeline,
   createSurfaceAsyncRequest,
   createPresenceVoiceStimulus,
@@ -29,6 +34,12 @@ import {
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
   listAgentRuntimeSnapshots,
+  listDistillCandidateRecords,
+  loadProjectRecord,
+  resolveProjectRecordForText,
+  saveProjectRecord,
+  saveMissionSeedRecord,
+  saveServiceBindingRecord,
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
   loadSurfaceManifest,
@@ -41,6 +52,7 @@ import {
   probeSurfaceHealth,
   readSurfaceLogTail,
   reflectPresenceAgentReply,
+  resolveWorkDesign,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
   runSurfaceConversation,
@@ -52,6 +64,8 @@ import {
   safeReaddir,
   updateSurfaceAsyncRequest,
   safeWriteFile,
+  saveArtifactRecord,
+  saveDistillCandidateRecord,
   updateTaskSession,
   saveTaskSession,
   recordTaskSessionHistory,
@@ -114,6 +128,13 @@ interface TaskSessionShape {
     summary: string;
     success_condition: string;
   };
+  project_context?: {
+    project_id?: string;
+    project_name?: string;
+    tier?: 'personal' | 'confidential' | 'public';
+    service_bindings?: string[];
+    locale?: string;
+  };
   requirements?: {
     missing?: string[];
     collected?: Record<string, unknown>;
@@ -129,6 +150,234 @@ interface TaskSessionShape {
     text: string;
   }>;
   payload?: Record<string, unknown>;
+}
+
+function inferDistillTargetKind(taskType: string): 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' {
+  if (taskType === 'presentation_deck' || taskType === 'workbook_wbs') return 'pattern';
+  if (taskType === 'report_document') return 'report_template';
+  if (taskType === 'service_operation') return 'sop_candidate';
+  return 'knowledge_hint';
+}
+
+function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: string, artifactId: string): Record<string, unknown> {
+  const payload = session.payload || {};
+  const projectName = session.project_context?.project_name || 'current project';
+  if (session.task_type === 'analysis' && payload.bootstrap_kind === 'project_bootstrap') {
+    const projectId = String(session.project_context?.project_id || '').trim();
+    const project = projectId ? loadProjectRecord(projectId) : null;
+    const workItems = Array.isArray(project?.bootstrap_work_items) ? project.bootstrap_work_items : [];
+    const nextWork = workItems.find((item) => item.status === 'active') || workItems[1] || workItems[0] || null;
+    const seedTitles = workItems
+      .filter((item) => item.kind === 'mission_seed')
+      .map((item) => item.title)
+      .filter(Boolean);
+    const kickoffBrief = String(payload.project_brief || project?.kickoff_brief || '').trim();
+    return {
+      preview_text: previewText,
+      task_type: session.task_type,
+      bootstrap_kind: 'project_bootstrap',
+      project_name: projectName,
+      project_brief: kickoffBrief,
+      hint_scope: 'project bootstrap',
+      hint_triggers: [
+        session.goal?.summary || 'project kickoff',
+        kickoffBrief,
+        projectName,
+      ].filter(Boolean),
+      recommended_refs: [
+        `task_session:${session.session_id}`,
+        `artifact:${artifactId}`,
+        ...(projectId ? [`project:${projectId}`] : []),
+        ...seedTitles.map((title) => `mission_seed:${title}`),
+      ],
+      applicability: [
+        'project bootstrap',
+        projectName,
+        session.project_context?.tier || 'confidential',
+      ],
+      reusable_steps: [
+        'Capture the project brief, audience, and first deliverable.',
+        'Translate the brief into the first bounded work items.',
+        'Promote durable work candidates for architecture, implementation, and verification.',
+      ],
+      expected_outcome: nextWork
+        ? `${projectName} kickoff completes with ${nextWork.title} as the next active work.`
+        : previewText || `${projectName} kickoff is structured for follow-on work.`,
+      template_sections: [
+        'Project Goal',
+        'Audience',
+        'Initial Deliverable',
+        'Bootstrap Work Items',
+        'Next Durable Work',
+      ],
+      audience: 'project lead and leadership',
+      output_format: 'project kickoff brief',
+    };
+  }
+  if (session.task_type === 'presentation_deck') {
+    const purpose = String(payload.deck_purpose || 'proposal');
+    return {
+      preview_text: previewText,
+      task_type: session.task_type,
+      project_name: projectName,
+      applicability: [
+        'presentation delivery',
+        purpose,
+        projectName,
+      ],
+      reusable_steps: [
+        'Capture the user goal, audience, and success condition.',
+        'Translate the request into an executive slide storyline.',
+        'Generate the PPTX artifact and verify the result.',
+      ],
+      expected_outcome: previewText || 'A reusable presentation artifact is delivered.',
+    };
+  }
+  if (session.task_type === 'workbook_wbs') {
+    return {
+      preview_text: previewText,
+      task_type: session.task_type,
+      project_name: projectName,
+      applicability: [
+        'work breakdown structure',
+        String(payload.granularity || 'work_package'),
+        projectName,
+      ],
+      reusable_steps: [
+        'Resolve the project scope and desired WBS granularity.',
+        'Translate the work into a structured workbook layout.',
+        'Generate the XLSX artifact and confirm it can be reused.',
+      ],
+      expected_outcome: previewText || 'A reusable workbook artifact is delivered.',
+    };
+  }
+  if (session.task_type === 'report_document') {
+    const reportKind = String(payload.report_kind || 'summary');
+    const format = String(payload.format || 'docx');
+    return {
+      preview_text: previewText,
+      task_type: session.task_type,
+      project_name: projectName,
+      template_sections: reportKind === 'status'
+        ? ['Summary', 'Current Status', 'Risks', 'Next Actions']
+        : reportKind === 'spec'
+          ? ['Overview', 'Requirements', 'Constraints', 'Acceptance Criteria']
+          : reportKind === 'proposal'
+            ? ['Summary', 'Context', 'Recommendation', 'Next Step']
+            : ['Summary', 'Findings', 'Implications', 'Next Actions'],
+      audience: reportKind === 'proposal' ? 'decision makers' : 'internal stakeholders',
+      output_format: format,
+    };
+  }
+  if (session.task_type === 'service_operation') {
+    const operation = String(payload.operation || 'status');
+    const serviceName = String(payload.service_name || 'service');
+    return {
+      preview_text: previewText,
+      task_type: session.task_type,
+      project_name: projectName,
+      procedure_steps: operation === 'logs'
+        ? [
+            `Resolve the managed surface for ${serviceName}.`,
+            'Read the latest governed logs.',
+            'Summarize the most relevant operational signal.',
+          ]
+        : operation === 'status'
+          ? [
+              `Resolve the managed surface for ${serviceName}.`,
+              'Inspect runtime state and health evidence.',
+              'Summarize the observed service status.',
+            ]
+          : [
+              `Resolve the managed surface for ${serviceName}.`,
+              `Request the controlled ${operation} action.`,
+              'Confirm the post-action state and report the outcome.',
+            ],
+      safety_notes: [
+        'Require explicit approval for start, stop, or restart actions.',
+        'Capture before/after evidence and keep the summary concise.',
+      ],
+      escalation_conditions: [
+        'Managed surface could not be resolved.',
+        'The runtime action failed or timed out.',
+        'The post-action state does not match the requested operation.',
+      ],
+    };
+  }
+  return {
+    preview_text: previewText,
+    task_type: session.task_type,
+    project_name: projectName,
+    artifact_id: artifactId,
+    hint_scope: session.task_type,
+    hint_triggers: [
+      session.goal?.summary || session.task_type,
+      session.history[0]?.text || '',
+    ].filter(Boolean),
+    recommended_refs: [
+      `task_session:${session.session_id}`,
+      `artifact:${artifactId}`,
+    ],
+  };
+}
+
+function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: string, previewText: string) {
+  const title = session.task_type === 'presentation_deck'
+    ? 'Promote reusable presentation workflow'
+    : session.task_type === 'report_document'
+      ? 'Promote reusable reporting workflow'
+      : session.task_type === 'workbook_wbs'
+        ? 'Promote reusable workbook workflow'
+        : session.task_type === 'service_operation'
+          ? 'Promote operational service handling guidance'
+          : 'Promote reusable work pattern';
+  const summary = session.task_type === 'service_operation'
+    ? `${session.goal?.summary || session.task_type} produced operational output that may be worth promoting into a governed SOP candidate.`
+    : `${session.goal?.summary || session.task_type} completed successfully and may be reusable as a governed ${inferDistillTargetKind(session.task_type)}.`;
+  const candidate = createDistillCandidateRecord({
+    source_type: 'task_session',
+    tier: session.project_context?.tier || 'confidential',
+    project_id: session.project_context?.project_id,
+    task_session_id: session.session_id,
+    artifact_ids: [artifactId],
+    title,
+    summary,
+    status: 'proposed',
+    target_kind: inferDistillTargetKind(session.task_type),
+    specialist_id: resolveWorkDesign({
+      taskType: session.task_type,
+      shape: 'task_session',
+      tier: session.project_context?.tier || 'confidential',
+    }).primary_specialist?.id,
+    locale: session.project_context?.locale,
+    evidence_refs: [`task_session:${session.session_id}`, `artifact:${artifactId}`],
+    metadata: buildDistillCandidateMetadata(session, previewText, artifactId),
+  });
+  saveDistillCandidateRecord(candidate);
+}
+
+function buildLearnedHintText(input: {
+  language: 'ja' | 'en';
+  reusableRefs?: Array<{ title?: string }>;
+  projectId?: string;
+}): string {
+  const designRefs = Array.isArray(input.reusableRefs) ? input.reusableRefs : [];
+  const projectRefs = input.projectId
+    ? listDistillCandidateRecords()
+        .filter((candidate) => candidate.project_id === input.projectId && candidate.promoted_ref)
+        .slice(0, 2)
+        .map((candidate) => ({ title: candidate.title }))
+    : [];
+  const titles = [...designRefs, ...projectRefs]
+    .map((item) => String(item.title || '').trim())
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .slice(0, 2);
+  if (titles.length === 0) return '';
+  if (input.language === 'ja') {
+    return `過去の learned pattern（${titles.join('、')}）も参照して進めます。`;
+  }
+  return `I will also reuse learned patterns such as ${titles.join(', ')}. `;
 }
 
 interface SurfaceRouterContext {
@@ -1563,6 +1812,12 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
   const collected = { ...(session.requirements?.collected || {}) };
   const payload = { ...(session.payload || {}) };
 
+  if (session.task_type === 'analysis' && payload.bootstrap_kind === 'project_bootstrap' && missing.has('project_brief')) {
+    payload.project_brief = trimmed;
+    collected.project_brief = trimmed;
+    missing.delete('project_brief');
+  }
+
   if (session.task_type === 'capture_photo' && missing.has('camera_intent')) {
     if (/ocr/i.test(trimmed)) payload.camera_intent = 'ocr_source';
     else if (/共有|share/i.test(trimmed)) payload.camera_intent = 'share';
@@ -1641,6 +1896,7 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
 
 function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
   const taskLabelJa: Record<string, string> = {
+    analysis: 'プロジェクト整理',
     capture_photo: '写真撮影',
     workbook_wbs: 'WBS 作成',
     presentation_deck: 'PowerPoint 資料作成',
@@ -1649,34 +1905,75 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   };
   const label = taskLabelJa[session.task_type] || session.task_type;
   const missing = session.requirements?.missing || [];
+  const workDesign = resolveWorkDesign({
+    taskType: session.task_type,
+    shape: 'task_session',
+    outcomeIds: session.task_type === 'presentation_deck'
+      ? ['artifact:pptx']
+      : session.task_type === 'report_document'
+        ? ['artifact:docx']
+        : session.task_type === 'workbook_wbs'
+          ? ['artifact:xlsx']
+          : session.task_type === 'service_operation'
+            ? ['service_summary']
+            : [],
+  });
+  const specialistLabel = workDesign.primary_specialist?.label || 'Kyberion';
+  const learnedHint = buildLearnedHintText({
+    language,
+    reusableRefs: workDesign.reusable_refs,
+    projectId: session.project_context?.project_id,
+  });
   if (language === 'ja') {
+    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
+      return `${session.project_context?.project_name || 'プロジェクト'} の立ち上げを受け取りました。${specialistLabel} が担当します。${learnedHint}まず、何を作るか、誰向けか、最初の成果物をまとめて教えてください。`;
+    }
     if (missing.includes('approval_confirmation')) {
-      return `${label} を進めます。実行前に確認が必要です。続けてよければ「はい」と返してください。`;
+      return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}実行前に確認が必要です。続けてよければ「はい」と返してください。`;
     }
     if (missing.length > 0) {
-      return `${label} を進めます。続けるには ${missing.join('、')} が必要です。わかったらそのまま教えてください。`;
+      return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}進めるには ${missing.join('、')} が必要です。わかったらそのまま教えてください。`;
     }
-    return `${label} を進めます。完了したら結果を返します。`;
+    return `${label} の依頼を受け取りました。${specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。${learnedHint}`.trim();
+  }
+  if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
+    return `I started the project kickoff. ${specialistLabel} will handle it. ${learnedHint}Tell me what you want to build, who it is for, and the first deliverable.`;
   }
   if (missing.includes('approval_confirmation')) {
-    return `I'll handle the ${session.task_type}, but this action needs confirmation first. Reply yes to continue.`;
+    return `I received the ${label} request. ${specialistLabel} will handle it. ${learnedHint}This action needs confirmation first. Reply yes to continue.`;
   }
   if (missing.length > 0) {
-    return `I'll handle the ${session.task_type}. I still need ${missing.join(', ')}. Tell me when you're ready.`;
+    return `I received the ${label} request. ${specialistLabel} will handle it. ${learnedHint}I still need ${missing.join(', ')}. Tell me when you're ready.`;
   }
-  return `I'll handle the ${session.task_type}. I'll report back when it's done.`;
+  return `I received the ${label} request. ${specialistLabel} will plan it, run it, and report back when it's done. ${learnedHint}`.trim();
 }
 
 function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
   const missing = session.requirements?.missing || [];
+  const workDesign = resolveWorkDesign({
+    taskType: session.task_type,
+    shape: 'task_session',
+    tier: session.project_context?.tier || 'confidential',
+  });
+  const learnedHint = buildLearnedHintText({
+    language,
+    reusableRefs: workDesign.reusable_refs,
+    projectId: session.project_context?.project_id,
+  });
   if (language === 'ja') {
+    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
+      return `初期要件を受け取りました。${learnedHint}ここから最初の work plan を固めて返します。`;
+    }
     if (missing.includes('approval_confirmation')) {
       return '確認が必要です。実行してよければ「はい」と返してください。';
     }
     if (missing.length > 0) {
-      return `更新しました。残りは ${missing.join('、')} です。`;
+      return `依頼内容を更新しました。残りは ${missing.join('、')} です。`;
     }
-    return `要件が揃いました。ここから実行して、終わったら結果を返します。`;
+    return `依頼内容が揃いました。${learnedHint}ここから実行して、終わったら結果を返します。`;
+  }
+  if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
+    return `I captured the kickoff requirements. ${learnedHint}I will turn them into the first work plan now.`;
   }
   if (missing.includes('approval_confirmation')) {
     return 'This action needs confirmation. Reply yes to continue.';
@@ -1684,7 +1981,7 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
   if (missing.length > 0) {
     return `Updated. Remaining requirements: ${missing.join(', ')}.`;
   }
-  return `I have enough to proceed now. I'll report back with the result.`;
+  return `I have enough to proceed now. ${learnedHint}I'll report back with the result.`;
 }
 
 function taskSessionArtifactBase(sessionId: string): string {
@@ -1697,16 +1994,34 @@ function ensureTaskSessionExecutionDir(sessionId: string): string {
   return dir;
 }
 
+function resolvePreferredLocale(input: {
+  session?: TaskSessionShape;
+  project?: { primary_locale?: string | null } | null;
+}): string {
+  const sessionLocale = String(input.session?.payload?.locale || input.session?.project_context?.locale || '').trim();
+  if (sessionLocale) return sessionLocale;
+  const projectLocale = String(input.project?.primary_locale || '').trim();
+  if (projectLocale) return projectLocale;
+  return String(process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US');
+}
+
 function buildPresentationDeckBrief(session: TaskSessionShape): any {
   const payload = session.payload || {};
   const purpose = String(payload.deck_purpose || 'proposal');
+  const reusableRefs = resolveWorkDesign({
+    intentId: 'generate-presentation',
+    taskType: session.task_type,
+    shape: 'task_session',
+    outcomeIds: ['artifact:pptx'],
+    tier: session.project_context?.tier || 'confidential',
+  }).reusable_refs;
   return {
     kind: 'document-brief',
     artifact_family: 'presentation',
     document_type: 'proposal',
     document_profile: 'executive-proposal',
     render_target: 'pptx',
-    locale: 'ja-JP',
+    locale: resolvePreferredLocale({ session }),
     layout_template_id: 'executive-neutral',
     payload: {
       title: session.goal.summary || 'Presentation Deck',
@@ -1727,7 +2042,8 @@ function buildPresentationDeckBrief(session: TaskSessionShape): any {
         { title: 'Success Condition', point: session.goal.success_condition },
         { title: 'Session', point: session.session_id }
       ],
-      required_sections: ['executive-summary', 'recommendation', 'plan']
+      required_sections: ['executive-summary', 'recommendation', 'plan'],
+      reusable_refs: reusableRefs,
     }
   };
 }
@@ -1736,16 +2052,24 @@ function buildReportDocumentBrief(session: TaskSessionShape): any {
   const payload = session.payload || {};
   const reportKind = String(payload.report_kind || 'summary');
   const format = String(payload.format || 'docx');
+  const reusableRefs = resolveWorkDesign({
+    intentId: 'generate-report',
+    taskType: session.task_type,
+    shape: 'task_session',
+    outcomeIds: [format === 'pdf' ? 'artifact:pdf' : 'artifact:docx'],
+    tier: session.project_context?.tier || 'confidential',
+  }).reusable_refs;
   return {
     kind: 'document-brief',
     artifact_family: 'document',
     document_type: 'report',
     document_profile: 'summary-report',
     render_target: format === 'pdf' ? 'pdf' : 'docx',
-    locale: 'ja-JP',
+    locale: resolvePreferredLocale({ session }),
     payload: {
       title: session.goal.summary || 'Report',
       summary: session.goal.success_condition || 'Generated from the surface task session.',
+      reusable_refs: reusableRefs,
       sections: [
         {
           heading: 'Request',
@@ -1866,6 +2190,99 @@ function buildServiceOperationSummary(params: {
   return `${lines.join('\n')}\n`;
 }
 
+function buildProjectBootstrapSummary(params: {
+  projectName: string;
+  projectId: string;
+  brief: string;
+  workItems: Array<{ work_id: string; title: string; status: string; kind: string }>;
+}): string {
+  return [
+    `project: ${params.projectName}`,
+    `project_id: ${params.projectId}`,
+    '',
+    'brief:',
+    params.brief,
+    '',
+    'bootstrap_work_items:',
+    ...params.workItems.map((item) => `- ${item.work_id} [${item.status}] ${item.kind}: ${item.title}`),
+    '',
+  ].join('\n');
+}
+
+function inferMissionTypeHintFromBootstrapWork(item: { title?: string; summary?: string; work_id?: string }): string {
+  const text = `${item.title || ''} ${item.summary || ''}`.toLowerCase();
+  if (/architect|設計/.test(text)) return 'architecture';
+  if (/build|実装/.test(text)) return 'implementation';
+  if (/verify|試験|launch|運用/.test(text)) return 'verification';
+  return 'general';
+}
+
+async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string }> {
+  const projectId = String(session.project_context?.project_id || '').trim();
+  if (!projectId) throw new Error('project_id is required');
+  const project = loadProjectRecord(projectId);
+  if (!project) throw new Error(`unknown project: ${projectId}`);
+
+  const workItems = Array.isArray(project.bootstrap_work_items)
+    ? [...project.bootstrap_work_items]
+    : [];
+  if (workItems[0]) workItems[0] = { ...workItems[0], status: 'completed' };
+  if (workItems[1] && workItems[1].status === 'planned') workItems[1] = { ...workItems[1], status: 'active' };
+
+  const brief = String(session.payload?.project_brief || '').trim();
+  const dir = ensureTaskSessionExecutionDir(session.session_id);
+  const outputPath = `${dir}/${session.session_id}.project.txt`;
+  safeWriteFile(outputPath, buildProjectBootstrapSummary({
+    projectName: project.name,
+    projectId: project.project_id,
+    brief,
+    workItems: workItems.map((item) => ({
+      work_id: String(item.work_id || ''),
+      title: String(item.title || ''),
+      status: String(item.status || 'planned'),
+      kind: String(item.kind || 'task_session'),
+    })),
+  }));
+
+  saveProjectRecord({
+    ...project,
+    bootstrap_work_items: workItems,
+    kickoff_brief: brief,
+    kickoff_completed_at: new Date().toISOString(),
+    proposed_mission_ids: workItems.filter((item) => item.kind === 'mission_seed').map((item) => item.work_id),
+    metadata: {
+      ...(project.metadata || {}),
+    },
+  });
+
+  for (const item of workItems) {
+    if (item.kind !== 'mission_seed') continue;
+    saveMissionSeedRecord({
+      seed_id: `MSD-${String(item.work_id || '').replace(/^WRK-/, '')}`,
+      project_id: project.project_id,
+      source_task_session_id: session.session_id,
+      source_work_id: item.work_id,
+      title: item.title,
+      summary: item.summary,
+      status: item.status === 'completed' ? 'promoted' : 'ready',
+      specialist_id: item.specialist_id,
+      outcome_id: item.outcome_id,
+      mission_type_hint: inferMissionTypeHintFromBootstrapWork(item),
+      locale: project.primary_locale,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: {
+        kickoff_brief: brief,
+      },
+    });
+  }
+
+  return {
+    outputPath,
+    previewText: `${project.name} の初期整理を完了しました。次は ${workItems.find((item) => item.status === 'active')?.title || '最初の durable work'} を進めます。`,
+  };
+}
+
 function buildTaskCompletionReply(session: TaskSessionShape, previewText: string, outputPath: string): string {
   if (session.task_type === 'service_operation') {
     return `${previewText} 詳細はタスク詳細で確認できます。`;
@@ -1877,6 +2294,175 @@ function buildTaskCompletionReply(session: TaskSessionShape, previewText: string
     return 'レポート文書を生成しました。詳細はタスク詳細で確認できます。';
   }
   return '完了しました。詳細はタスク詳細で確認できます。';
+}
+
+function slugifyProjectId(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'PROJECT';
+}
+
+function inferProjectNameFromUtterance(text: string): string {
+  const trimmed = text.trim();
+  const explicit = trimmed.match(/(?:新しい|新規の?)?\s*([^\s]+(?:\s*[^\s]+){0,5})\s*(?:プロジェクト|Webサービス|サービス)\s*(?:を)?\s*(?:作って|立ち上げて)/i);
+  if (explicit?.[1]) return explicit[1].trim();
+  if (/webサービス|web service/i.test(trimmed)) return 'Web Service';
+  if (/試験計画/i.test(trimmed)) return 'Test Planning';
+  return 'New Project';
+}
+
+function inferBindingDraftsFromUtterance(text: string): Array<{
+  binding_id: string;
+  service_type: string;
+  scope: string;
+  target: string;
+  allowed_actions: string[];
+}> {
+  const normalized = text.toLowerCase();
+  const drafts: Array<{
+    binding_id: string;
+    service_type: string;
+    scope: string;
+    target: string;
+    allowed_actions: string[];
+  }> = [];
+  if (/github|git hub/.test(normalized) || /webサービス|web service/.test(normalized)) {
+    drafts.push({
+      binding_id: 'github:default:new-project',
+      service_type: 'github',
+      scope: 'repository',
+      target: 'default/new-project',
+      allowed_actions: ['read', 'push_branch', 'pull_request'],
+    });
+  }
+  if (/slack/.test(normalized)) {
+    drafts.push({
+      binding_id: 'slack:default:workspace',
+      service_type: 'slack',
+      scope: 'workspace',
+      target: 'default',
+      allowed_actions: ['read', 'post_message'],
+    });
+  }
+  return drafts;
+}
+
+function tryHandleProjectBootstrap(userText: string): string | null {
+  if (!/(webサービス|web service|新しい.*プロジェクト|新規.*プロジェクト|プロジェクト.*立ち上げ|サービス.*作って)/i.test(userText)) {
+    return null;
+  }
+  const projectName = inferProjectNameFromUtterance(userText);
+  const existing = resolveProjectRecordForText({ utterance: userText, projectName });
+  if (existing) {
+    const language = detectReplyLanguage(userText);
+    const learnedHint = buildLearnedHintText({
+      language,
+      projectId: existing.project_id,
+    });
+    return language === 'ja'
+      ? `既存の ${existing.name} プロジェクトを使って進められます。${learnedHint}次に、最初の work を指示してください。`
+      : `We can continue with the existing ${existing.name} project. ${learnedHint}Tell me the first work you want next.`;
+  }
+  const projectId = `PRJ-${slugifyProjectId(projectName)}-${Date.now().toString(36).toUpperCase()}`;
+  const bindingDrafts = inferBindingDraftsFromUtterance(userText);
+  for (const draft of bindingDrafts) {
+    if (listServiceBindingRecords().some((item) => item.binding_id === draft.binding_id)) continue;
+    saveServiceBindingRecord({
+      ...draft,
+      secret_refs: [],
+      approval_policy: Object.fromEntries(draft.allowed_actions.map((action) => [action, action === 'push_branch' || action === 'pull_request' || action === 'post_message' ? 'allowed' : 'approval_required'])) as Record<string, 'allowed' | 'approval_required' | 'denied'>,
+      auth_mode: 'secret-guard',
+      service_id: draft.service_type,
+      metadata: {
+        draft: true,
+        created_by: 'voice-hub',
+      },
+    });
+  }
+  const bootstrapWorkItems = buildProjectBootstrapWorkItems({
+    projectId,
+    projectName,
+    utterance: userText,
+  });
+  const projectLocale = String(process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US');
+  const kickoffWork = bootstrapWorkItems[0] || null;
+  let kickoffSessionId: string | undefined;
+  if (kickoffWork) {
+    kickoffSessionId = `TSK-${kickoffWork.work_id.replace(/^WRK-/, '')}`;
+    const kickoffSession = createTaskSession({
+      sessionId: kickoffSessionId,
+      surface: 'presence',
+      taskType: 'analysis',
+      status: 'collecting_requirements',
+      goal: {
+        summary: kickoffWork.title,
+        success_condition: kickoffWork.summary,
+      },
+      projectContext: {
+        project_id: projectId,
+        project_name: projectName,
+        tier: 'confidential',
+        service_bindings: bindingDrafts.map((draft) => draft.binding_id),
+        locale: projectLocale,
+      },
+      requirements: {
+        missing: ['project_brief'],
+        collected: {},
+      },
+      payload: {
+        bootstrap_kind: 'project_bootstrap',
+        bootstrap_work_ids: bootstrapWorkItems.map((item) => item.work_id),
+      },
+    });
+    saveTaskSession(kickoffSession);
+    recordTaskSessionHistory(kickoffSession.session_id, {
+      ts: new Date().toISOString(),
+      type: 'plan',
+      text: `Bootstrap kickoff created for ${projectName}. Next work: ${bootstrapWorkItems.map((item) => item.title).join(' -> ')}`,
+    });
+  }
+  saveProjectRecord({
+    project_id: projectId,
+    name: projectName,
+    summary: `${projectName} project created from surface intent.`,
+    status: 'active',
+    tier: 'confidential',
+    primary_locale: projectLocale,
+    service_bindings: bindingDrafts.map((draft) => draft.binding_id),
+    active_missions: [],
+    bootstrap_work_items: bootstrapWorkItems,
+    kickoff_task_session_id: kickoffSessionId,
+    metadata: {
+      created_from_surface: 'presence',
+      created_from_utterance: userText,
+    },
+  });
+  const firstSteps = bootstrapWorkItems.slice(0, 3).map((item) => item.title).join('、');
+  return `${projectName} プロジェクトを作成しました。Project Lead が担当し、まず ${firstSteps} を進めます。最初の kickoff work は ${kickoffSessionId || kickoffWork?.work_id || '作成済み'} です。次に、作りたい内容や最初の成果物を教えてください。`;
+}
+
+function resolveProjectContextForTask(userText: string, intent: ReturnType<typeof classifyTaskSessionIntent>): TaskSessionShape['project_context'] | undefined {
+  if (!intent) return undefined;
+  const payload = intent.payload || {};
+  const explicitProjectName = typeof payload.project_name === 'string'
+    ? payload.project_name
+    : typeof payload.project_id === 'string'
+      ? payload.project_id
+      : undefined;
+  const project = resolveProjectRecordForText({
+    utterance: userText,
+    projectName: explicitProjectName,
+  });
+  if (!project) return undefined;
+  return {
+    project_id: project.project_id,
+    project_name: project.name,
+    tier: project.tier,
+    service_bindings: project.service_bindings || [],
+    locale: project.primary_locale,
+  };
 }
 
 function formatServiceHealthSummary(surfaceId: string, isRunning: boolean, healthStatus: string, hasRuntimeRecord: boolean): string {
@@ -2031,7 +2617,7 @@ async function executeServiceOperationTask(session: TaskSessionShape): Promise<{
 
 async function processTaskSessionExecution(session: TaskSessionShape): Promise<void> {
   if (activeTaskExecutions.has(session.session_id)) return;
-  if (!['presentation_deck', 'report_document', 'service_operation'].includes(session.task_type)) return;
+  if (!['presentation_deck', 'report_document', 'service_operation', 'analysis'].includes(session.task_type)) return;
   activeTaskExecutions.add(session.session_id);
   try {
     updateTaskSession(session.session_id, {
@@ -2046,7 +2632,12 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
     let artifactKind = 'error';
     let previewText = '';
 
-    if (session.task_type === 'service_operation') {
+    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
+      const result = await executeProjectBootstrapKickoffTask(session);
+      outputPath = result.outputPath;
+      artifactKind = 'project_bootstrap';
+      previewText = result.previewText;
+    } else if (session.task_type === 'service_operation') {
       const result = await executeServiceOperationTask(session);
       outputPath = result.outputPath;
       artifactKind = 'service';
@@ -2091,6 +2682,21 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
         preview_text: previewText,
       },
     });
+    const artifactRecord = createArtifactRecord({
+      project_id: session.project_context?.project_id,
+      task_session_id: session.session_id,
+      kind: artifactKind,
+      storage_class: artifactKind === 'service' ? 'tmp' : 'artifact_store',
+      path: outputPath,
+      preview_text: previewText,
+      metadata: {
+        project_name: session.project_context?.project_name,
+        service_bindings: session.project_context?.service_bindings || [],
+      },
+    });
+    saveArtifactRecord(artifactRecord);
+    attachArtifactRecordToTaskSession(session.session_id, artifactRecord);
+    maybeCreateDistillCandidate(session, artifactRecord.artifact_id, previewText);
     enqueueSurfaceNotification({
       surface: 'presence',
       channel: 'voice',
@@ -2185,6 +2791,7 @@ function tryHandleTaskSession(userText: string): string | null {
 
   const intent = classifyTaskSessionIntent(userText);
   if (!intent) return null;
+  const projectContext = resolveProjectContextForTask(userText, intent);
   const session = createTaskSession({
     surface: 'presence',
     taskType: intent.taskType,
@@ -2193,6 +2800,7 @@ function tryHandleTaskSession(userText: string): string | null {
       : (intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
     requiresApproval: Boolean(intent.payload?.approval_required),
     goal: intent.goal,
+    projectContext,
     requirements: intent.requirements,
     payload: intent.payload,
   });
@@ -2420,6 +3028,9 @@ function processAsyncDelegation(params: {
 
 async function generateReply(userText: string, context: { sessionKey: string }): Promise<string> {
   try {
+    const projectBootstrapReply = tryHandleProjectBootstrap(userText);
+    if (projectBootstrapReply) return projectBootstrapReply;
+
     const browserConversationReply = tryHandleBrowserConversation(userText);
     if (browserConversationReply) return browserConversationReply;
 
