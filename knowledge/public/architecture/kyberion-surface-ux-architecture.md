@@ -27,6 +27,18 @@ Intent -> Resolution -> Task Session or Mission -> Actuators and ADF -> Evidence
 
 The system succeeds when users can stay in the first model while operators and developers can still inspect the second.
 
+The primary observability contract should mirror the same structure:
+
+```text
+Intent -> Slot -> Plan -> Execution -> Outcome
+```
+
+This surface architecture should also be read together with:
+
+- `knowledge/public/architecture/ceo-ux.md`
+- `knowledge/public/architecture/management-control-plane.md`
+- `knowledge/public/architecture/surface-responsibility-model.md`
+
 ## 2. UX Principle
 
 Surfaces should expose:
@@ -210,6 +222,7 @@ Emphasize:
 - state
 - intervention
 - inspectability
+- project and mission control context
 
 Chronos is the control tower, not the chat front-end.
 
@@ -218,6 +231,59 @@ Chronos is the control tower, not the chat front-end.
 Emphasize:
 
 - smooth conversation
+- what Kyberion understood
+- what plan is being followed
+- the current result or waiting point
+- immediate artifact access and next action guidance
+
+### CEO UX
+
+Emphasize:
+
+- requested outcome
+- approvals waiting
+- latest important results
+- major exceptions
+
+The CEO UX is a decision surface, not an operator console.
+
+## 7. Observability Model
+
+Kyberion should not expose raw backend internals first, but it must preserve them.
+
+The recommended observability layers are:
+
+1. `intent`
+   - the original request
+   - normalized resolution
+   - confidence and surface context
+2. `slot`
+   - required fields
+   - what is missing
+   - what was filled by follow-up dialogue
+3. `plan`
+   - standard intent or template chosen
+   - human-readable short plan
+   - fallback or generated planning decision
+4. `execution`
+   - task session, browser session, or mission state
+   - approvals
+   - actuator steps and evidence
+5. `outcome`
+   - answer or artifact
+   - short summary
+   - next action or intervention point
+
+Surfaces should default to showing:
+
+- intent
+- current plan
+- state
+- result
+
+Operators should be able to drill down into the deeper trace when needed.
+
+See also: [Intent-First Observability Model](./intent-observability-model.md)
 - live intent handling
 - task detail and artifacts
 - browser and operator assistance

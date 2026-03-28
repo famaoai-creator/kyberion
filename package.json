@@ -52,6 +52,7 @@
     "onboard": "node dist/scripts/onboarding_wizard.js",
     "mission:journal": "node dist/scripts/mission_journal.js",
     "dashboard": "node dist/scripts/sovereign_dashboard.js",
+    "control": "node dist/scripts/control_plane_cli.js",
     "surfaces:reconcile": "node dist/scripts/surface_runtime.js --action reconcile",
     "surfaces:status": "node dist/scripts/surface_runtime.js --action status",
     "surfaces:start": "node dist/scripts/surface_runtime.js --action start",
