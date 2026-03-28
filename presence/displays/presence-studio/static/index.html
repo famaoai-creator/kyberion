@@ -298,77 +298,107 @@
         </section>
         <section class="panel">
           <div class="status"><span class="dot"></span><span id="status">ready</span></div>
-          <div class="subtitle" id="subtitle">Surface ready. Send A2UI or voice stimuli.</div>
+          <div class="subtitle" id="subtitle">Ready for your next request.</div>
           <div class="controls">
             <button class="button" id="ptt-toggle" type="button">Hold To Talk</button>
-            <button class="button" id="native-mic-toggle" type="button">Start Native STT</button>
-            <button class="button" id="mic-toggle" type="button">Start Browser STT</button>
+            <button class="button" id="native-mic-toggle" type="button">Start Native Mic</button>
+            <button class="button" id="mic-toggle" type="button">Start Browser Mic</button>
             <button class="button" id="hands-free-toggle" type="button">Enable Hands-Free</button>
             <select class="select" id="conversation-mode">
-              <option value="conversation">Conversation Mode</option>
-              <option value="operator">Operator Mode</option>
-              <option value="private">Private Mode</option>
+              <option value="conversation">Conversation</option>
+              <option value="operator">Operator</option>
+              <option value="private">Private</option>
             </select>
             <select class="select" id="native-device"></select>
             <select class="select" id="stt-backend"></select>
             <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
           </div>
           <div class="footer" id="voice-presence-state">Voice state: idle</div>
-          <div class="footer">This MVP uses the existing A2UI transport and the governed `voice` channel stimuli path.</div>
+          <div class="footer">Talk in natural language. Kyberion will interpret the intent, choose a plan, and return a result.</div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Current Surface Agent</div>
+          <div class="label">Current Assistant</div>
           <div class="capability-card" id="current-agent"></div>
         </section>
         <section class="panel">
-          <div class="label">Surface Agent Catalog</div>
+          <div class="label">Common Requests</div>
           <div class="list" id="agent-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Transcript</div>
+          <div class="label">Projects</div>
+          <div class="list" id="project-catalog"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Service Bindings</div>
+          <div class="list" id="binding-catalog"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Conversation</div>
           <div class="list" id="transcript"></div>
         </section>
         <section class="panel">
-          <div class="label">Recent Voice Stimuli</div>
+          <div class="label">Recent Inputs</div>
           <div class="list" id="stimuli"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Async Requests</div>
+          <div class="label">In Progress</div>
           <div class="list" id="async-requests"></div>
         </section>
         <section class="panel">
-          <div class="label">Notifications</div>
+          <div class="label">Updates</div>
           <div class="list" id="notifications"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Task Sessions</div>
+          <div class="label">Approval Inbox</div>
+          <div class="list" id="approval-inbox"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Latest Outcomes</div>
+          <div class="list" id="outcome-inbox"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Requested Work</div>
           <div class="list" id="task-session-active"></div>
         </section>
         <section class="panel">
-          <div class="label">Browser Conversation</div>
+          <div class="label">Browser Task</div>
           <div class="controls" style="margin-top: 0; margin-bottom: 14px;">
             <select class="select" id="browser-session"></select>
-            <button class="button" id="browser-session-bootstrap" type="button">Bootstrap Browser Session</button>
+            <button class="button" id="browser-session-bootstrap" type="button">Prepare Browser</button>
           </div>
           <div class="list" id="browser-conversation-active"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Browser Candidates</div>
+          <div class="label">Available Browser Actions</div>
           <div class="list" id="browser-conversation-candidates"></div>
         </section>
         <section class="panel">
-          <div class="label">Task Detail</div>
+          <div class="label">Work Detail</div>
           <div class="list" id="task-session-detail"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Mission Seeds</div>
+          <div class="list" id="mission-seed-catalog"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Memory Detail</div>
+          <div class="list" id="memory-detail"></div>
         </section>
       </div>
     </div>
@@ -383,6 +413,8 @@
       const stimuliEl = document.getElementById("stimuli");
       const asyncRequestsEl = document.getElementById("async-requests");
       const notificationsEl = document.getElementById("notifications");
+      const approvalInboxEl = document.getElementById("approval-inbox");
+      const outcomeInboxEl = document.getElementById("outcome-inbox");
       const taskSessionActiveEl = document.getElementById("task-session-active");
       const taskSessionDetailEl = document.getElementById("task-session-detail");
       const browserConversationActiveEl = document.getElementById("browser-conversation-active");
@@ -391,6 +423,10 @@
       const browserSessionBootstrapEl = document.getElementById("browser-session-bootstrap");
       const currentAgentEl = document.getElementById("current-agent");
       const agentCatalogEl = document.getElementById("agent-catalog");
+      const projectCatalogEl = document.getElementById("project-catalog");
+      const bindingCatalogEl = document.getElementById("binding-catalog");
+      const missionSeedCatalogEl = document.getElementById("mission-seed-catalog");
+      const memoryDetailEl = document.getElementById("memory-detail");
       const pttToggleEl = document.getElementById("ptt-toggle");
       const nativeMicToggleEl = document.getElementById("native-mic-toggle");
       const micToggleEl = document.getElementById("mic-toggle");
@@ -414,8 +450,17 @@
       let browserFinalTranscript = "";
       let browserInterimTranscript = "";
       let surfaceAgentCatalog = { currentAgentId: "presence-surface-agent", current: null, agents: [] };
+      let standardIntents = [];
+      let projectCatalog = [];
+      let bindingCatalog = [];
+      let missionSeedCatalog = [];
+      let distillCandidateCatalog = [];
+      let selectedKnowledgeRef = null;
+      let knowledgeRefDetail = null;
       let asyncRequests = [];
       let notifications = [];
+      let approvals = [];
+      let outcomes = [];
       let taskSessionState = { active: null, items: [] };
       let selectedTaskSessionId = null;
       let browserConversationState = { active: null, items: [] };
@@ -684,7 +729,7 @@
             <div class="small">${current.summary || "No summary available."}</div>
           </div>
           <div>
-            <div class="label">Can Do</div>
+            <div class="label">Capabilities</div>
             ${renderChips(current.capabilities || [])}
           </div>
           <div>
@@ -696,18 +741,58 @@
             ${renderChips(current.delegationTargets || [])}
           </div>
           <div>
-            <div class="label">Will Not Do</div>
+            <div class="label">Guardrails</div>
             ${renderChips(current.deniedActuators || [])}
           </div>
         `;
       }
 
+      function renderStandardIntents() {
+        const items = Array.isArray(standardIntents) ? standardIntents : [];
+        if (!items.length) {
+          agentCatalogEl.innerHTML = `<div class="item small">No common requests available yet.</div>`;
+          return;
+        }
+        renderList(agentCatalogEl, items.slice(0, 8), (item) =>
+          `<div class="row"><strong>${escapeHtml(item.examples?.[0] || item.id || "request")}</strong><span class="mono">${escapeHtml(item.shape || "direct")}</span></div>
+           <div class="small">${escapeHtml(item.description || "No description available.")}</div>
+           <div class="small">handled by: <span class="mono">${escapeHtml(item.primary_specialist?.label || "Kyberion")}</span></div>
+           <div class="small">team: ${escapeHtml((item.team_roles || []).join(" -> ") || "surface_liaison")}</div>
+           <div class="small">plan: ${escapeHtml((item.planOutline || []).join(" -> ") || "resolve -> execute -> return result")}</div>
+           <div class="small">result: <span class="mono">${escapeHtml((item.outcomes || []).map((outcome) => outcome.label).join(" · ") || item.resultShape || "answer")}</span></div>
+           ${(item.reusable_refs || []).length ? `<div class="small">learned: ${escapeHtml((item.reusable_refs || []).map((ref) => ref.title).join(" · "))}</div>` : ""}
+           <div class="small">examples: ${escapeHtml((item.examples || []).slice(0, 3).join(" · ") || "n/a")}</div>`
+        );
+      }
+
       async function loadSurfaceAgents() {
         try {
-          const response = await fetch("/api/surface-agents");
+          const [response, intentsResponse, projectsResponse, bindingsResponse, missionSeedsResponse, distillCandidatesResponse] = await Promise.all([
+            fetch("/api/surface-agents"),
+            fetch("/api/standard-intents"),
+            fetch("/api/projects"),
+            fetch("/api/service-bindings"),
+            fetch("/api/mission-seeds"),
+            fetch("/api/distill-candidates"),
+          ]);
           const body = await response.json();
+          const intentsBody = await intentsResponse.json();
+          const projectsBody = await projectsResponse.json();
+          const bindingsBody = await bindingsResponse.json();
+          const missionSeedsBody = await missionSeedsResponse.json();
+          const distillCandidatesBody = await distillCandidatesResponse.json();
           if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          if (!intentsResponse.ok || !intentsBody.ok) throw new Error(intentsBody.error || `HTTP ${intentsResponse.status}`);
+          if (!projectsResponse.ok || !projectsBody.ok) throw new Error(projectsBody.error || `HTTP ${projectsResponse.status}`);
+          if (!bindingsResponse.ok || !bindingsBody.ok) throw new Error(bindingsBody.error || `HTTP ${bindingsResponse.status}`);
+          if (!missionSeedsResponse.ok || !missionSeedsBody.ok) throw new Error(missionSeedsBody.error || `HTTP ${missionSeedsResponse.status}`);
+          if (!distillCandidatesResponse.ok || !distillCandidatesBody.ok) throw new Error(distillCandidatesBody.error || `HTTP ${distillCandidatesResponse.status}`);
           surfaceAgentCatalog = body;
+          standardIntents = intentsBody.items || [];
+          projectCatalog = projectsBody.items || [];
+          bindingCatalog = bindingsBody.items || [];
+          missionSeedCatalog = missionSeedsBody.items || [];
+          distillCandidateCatalog = distillCandidatesBody.items || [];
         } catch (error) {
           surfaceAgentCatalog = {
             currentAgentId: "presence-surface-agent",
@@ -722,31 +807,316 @@
               deniedActuators: []
             }]
           };
+          standardIntents = [{
+            id: "error",
+            description: error.message || String(error),
+            examples: ["Catalog unavailable"],
+            shape: "error",
+          }];
+          projectCatalog = [];
+          bindingCatalog = [];
+          missionSeedCatalog = [];
+          distillCandidateCatalog = [];
         }
+      }
+
+      function normalizeUiLocale(value) {
+        return String(value || navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+      }
+
+      function uiText(en, ja) {
+        return normalizeUiLocale() === "ja" ? (ja || en) : en;
+      }
+
+      function relatedPromotedRefsForProject(projectId) {
+        const items = Array.isArray(distillCandidateCatalog) ? distillCandidateCatalog : [];
+        return items.filter((item) => item.project_id === projectId && item.promoted_ref).slice(0, 3);
+      }
+
+      function relatedPromotedRefsForMissionSeed(seed) {
+        const items = Array.isArray(distillCandidateCatalog) ? distillCandidateCatalog : [];
+        return items.filter((item) => {
+          if (item.project_id !== seed.project_id || !item.promoted_ref) return false;
+          const evidence = Array.isArray(item.evidence_refs) ? item.evidence_refs : [];
+          return evidence.includes(`mission_seed:${seed.seed_id}`) || (seed.promoted_mission_id && item.mission_id === seed.promoted_mission_id);
+        }).slice(0, 3);
+      }
+
+      function relatedPromotedRefsForTaskSession(sessionId, projectId) {
+        const items = Array.isArray(distillCandidateCatalog) ? distillCandidateCatalog : [];
+        return items.filter((item) => {
+          if (!item.promoted_ref) return false;
+          if (item.task_session_id === sessionId) return true;
+          return Boolean(projectId) && item.project_id === projectId;
+        }).slice(0, 4);
+      }
+
+      function renderLearnedRefLinks(items) {
+        const refs = Array.isArray(items) ? items : [];
+        if (!refs.length) return "";
+        return refs.map((entry) => {
+          const logicalPath = String(entry.promoted_ref || "").trim();
+          const label = String(entry.title || logicalPath.split("/").pop() || logicalPath || "memory");
+          if (!logicalPath) return escapeHtml(label);
+          return `<button class="button button-link" type="button" data-knowledge-ref="${escapeHtml(logicalPath)}">${escapeHtml(label)}</button>`;
+        }).join(" · ");
+      }
+
+      function parseKnowledgeRefContent(rawText, logicalPath) {
+        const text = String(rawText || "");
+        const lines = text.split(/\r?\n/);
+        const detail = {
+          path: logicalPath,
+          title: String(logicalPath || "memory").split("/").pop() || "memory",
+          summary: "",
+          metadata: {},
+          sections: [],
+          body: "",
+        };
+        let startIndex = 0;
+        if (lines[0] === "---") {
+          const endIndex = lines.findIndex((line, index) => index > 0 && line === "---");
+          if (endIndex > 0) {
+            const frontmatterLines = lines.slice(1, endIndex);
+            for (const line of frontmatterLines) {
+              const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+              if (!match) continue;
+              detail.metadata[match[1]] = match[2].trim();
+            }
+            startIndex = endIndex + 1;
+          }
+        }
+        let currentSection = null;
+        const bodyLines = [];
+        for (const line of lines.slice(startIndex)) {
+          if (!detail.title && line.startsWith("# ")) {
+            detail.title = line.slice(2).trim();
+            continue;
+          }
+          if (line.startsWith("# ")) {
+            detail.title = line.slice(2).trim() || detail.title;
+            continue;
+          }
+          if (line.startsWith("## ")) {
+            currentSection = { title: line.slice(3).trim(), lines: [] };
+            detail.sections.push(currentSection);
+            continue;
+          }
+          if (currentSection) {
+            currentSection.lines.push(line);
+          } else {
+            bodyLines.push(line);
+          }
+        }
+        detail.body = bodyLines.join("\n").trim();
+        detail.summary = detail.metadata.summary || detail.body.split("\n").find((line) => line.trim()) || "";
+        return detail;
+      }
+
+      async function openKnowledgeRef(logicalPath) {
+        const path = String(logicalPath || "").trim();
+        if (!path) return;
+        selectedKnowledgeRef = path;
+        knowledgeRefDetail = {
+          path,
+          title: String(path).split("/").pop() || path,
+          summary: uiText("Loading memory...", "memory を読み込み中です..."),
+          metadata: {},
+          sections: [],
+          body: "",
+        };
+        renderMemoryDetail();
+        try {
+          const response = await fetch(`/api/knowledge-ref?path=${encodeURIComponent(path)}`);
+          const text = await response.text();
+          if (!response.ok) {
+            throw new Error(text || `HTTP ${response.status}`);
+          }
+          knowledgeRefDetail = parseKnowledgeRefContent(text, path);
+        } catch (error) {
+          knowledgeRefDetail = {
+            path,
+            title: String(path).split("/").pop() || path,
+            summary: error.message || String(error),
+            metadata: {},
+            sections: [],
+            body: "",
+          };
+        }
+        renderMemoryDetail();
+      }
+
+      function renderMemoryDetail() {
+        if (!selectedKnowledgeRef || !knowledgeRefDetail) {
+          memoryDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a learned memory to inspect its title, summary, evidence, and reusable sections.", "learned memory を選ぶと、title / summary / evidence / reusable sections を確認できます。"))}</div>`;
+          return;
+        }
+        const detail = knowledgeRefDetail;
+        const metadataEntries = Object.entries(detail.metadata || {}).filter(([, value]) => String(value || "").trim());
+        const sections = Array.isArray(detail.sections) ? detail.sections : [];
+        memoryDetailEl.innerHTML = `<div class="item">
+            <div class="row"><strong>${escapeHtml(detail.title || "memory")}</strong><span class="mono">${escapeHtml(selectedKnowledgeRef.split("/").slice(-2).join("/"))}</span></div>
+            <div class="small">${escapeHtml(detail.summary || uiText("No summary available yet.", "まだ summary はありません。"))}</div>
+            <div class="small">${escapeHtml(uiText("path", "path"))}: <span class="mono">${escapeHtml(selectedKnowledgeRef)}</span></div>
+            <div class="small"><a href="/api/knowledge-ref?path=${encodeURIComponent(selectedKnowledgeRef)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("Open raw memory", "raw memory を開く"))}</a></div>
+          </div>
+          ${metadataEntries.length ? `<div class="item">
+            <div class="label">${escapeHtml(uiText("Metadata", "Metadata"))}</div>
+            <div class="history-list">
+              ${metadataEntries.map(([key, value]) => `<div class="small"><span class="mono">${escapeHtml(key)}</span>: ${escapeHtml(String(value))}</div>`).join("")}
+            </div>
+          </div>` : ""}
+          ${detail.body ? `<div class="item">
+            <div class="label">${escapeHtml(uiText("Overview", "Overview"))}</div>
+            <div class="history-list">${detail.body.split("\n").filter((line) => line.trim()).slice(0, 8).map((line) => `<div class="small">${escapeHtml(line)}</div>`).join("")}</div>
+          </div>` : ""}
+          ${sections.length ? sections.map((section) => `<div class="item">
+            <div class="label">${escapeHtml(section.title || "Section")}</div>
+            <div class="history-list">
+              ${(section.lines || []).filter((line) => line.trim()).slice(0, 12).map((line) => `<div class="small">${escapeHtml(line)}</div>`).join("") || `<div class="small">${escapeHtml(uiText("No detail.", "詳細はありません。"))}</div>`}
+            </div>
+          </div>`).join("") : ""}`;
+      }
+
+      function renderProjectCatalog() {
+        const items = Array.isArray(projectCatalog) ? projectCatalog : [];
+        if (!items.length) {
+          projectCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No projects registered yet.", "まだ project は登録されていません。"))}</div>`;
+          return;
+        }
+        renderList(projectCatalogEl, items.slice(0, 8), (item) => {
+          const bootstrapItems = Array.isArray(item.bootstrap_work_items) ? item.bootstrap_work_items.slice(0, 3) : [];
+          const kickoffTaskSessionId = item.kickoff_task_session_id || "";
+          const learnedItems = relatedPromotedRefsForProject(item.project_id || "");
+          return `<div class="row"><strong>${escapeHtml(item.name || item.project_id || "project")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
+           <div class="small">${escapeHtml(item.summary || "")}</div>
+           <div class="small">${escapeHtml(uiText("bindings", "binding"))}: <span class="mono">${escapeHtml(String((item.service_bindings || []).length))}</span> · ${escapeHtml(uiText("missions", "mission"))}: <span class="mono">${escapeHtml(String((item.active_missions || []).length))}</span></div>
+           <div class="small">id: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span></div>
+           ${bootstrapItems.length ? `<div class="small">${escapeHtml(uiText("next work", "次の work"))}: ${escapeHtml(bootstrapItems.map((entry) => entry.title).join(" -> "))}</div>` : ""}
+           ${kickoffTaskSessionId ? `<div class="small">${escapeHtml(uiText("kickoff", "kickoff"))}: <span class="mono">${escapeHtml(kickoffTaskSessionId)}</span></div>` : ""}
+           ${learnedItems.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedItems)}</div>` : ""}`;
+        });
+      }
+
+      function renderBindingCatalog() {
+        const items = Array.isArray(bindingCatalog) ? bindingCatalog : [];
+        if (!items.length) {
+          bindingCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No service bindings registered yet.", "まだ service binding は登録されていません。"))}</div>`;
+          return;
+        }
+        renderList(bindingCatalogEl, items.slice(0, 8), (item) =>
+          `<div class="row"><strong>${escapeHtml(item.binding_id || "binding")}</strong><span class="mono">${escapeHtml(item.service_type || "service")}</span></div>
+           <div class="small">${escapeHtml(uiText("target", "target"))}: ${escapeHtml(item.target || "unknown")}</div>
+           <div class="small">${escapeHtml(uiText("scope", "scope"))}: <span class="mono">${escapeHtml(item.scope || "unknown")}</span> · ${escapeHtml(uiText("actions", "actions"))}: <span class="mono">${escapeHtml((item.allowed_actions || []).slice(0, 3).join(", ") || "n/a")}</span></div>`
+        );
+      }
+
+      function renderMissionSeedCatalog() {
+        const items = Array.isArray(missionSeedCatalog) ? missionSeedCatalog : [];
+        if (!items.length) {
+          missionSeedCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No mission seeds recorded yet.", "まだ mission seed はありません。"))}</div>`;
+          return;
+        }
+        renderList(missionSeedCatalogEl, items.slice(0, 8), (item) => {
+          const learnedItems = relatedPromotedRefsForMissionSeed(item);
+          return `<div class="row"><strong>${escapeHtml(item.title || item.seed_id || "mission seed")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
+           <div class="small">${escapeHtml(item.summary || "")}</div>
+           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span> · ${escapeHtml(uiText("specialist", "specialist"))}: <span class="mono">${escapeHtml(item.specialist_id || "unknown")}</span></div>
+           <div class="small">${escapeHtml(uiText("type", "type"))}: <span class="mono">${escapeHtml(item.mission_type_hint || "general")}</span> · ${escapeHtml(uiText("source work", "source work"))}: <span class="mono">${escapeHtml(item.source_work_id || "-")}</span></div>
+           ${item.promoted_mission_id ? `<div class="small">${escapeHtml(uiText("mission", "mission"))}: <span class="mono">${escapeHtml(item.promoted_mission_id)}</span></div>` : ""}
+           ${learnedItems.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedItems)}</div>` : ""}`;
+        });
+      }
+
+      function renderApprovalInbox() {
+        const items = Array.isArray(approvals) ? approvals : [];
+        approvalInboxEl.innerHTML = "";
+        if (!items.length) {
+          approvalInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No approvals are waiting.", "承認待ちはありません。"))}</div>`;
+          return;
+        }
+        for (const item of items.slice(0, 8)) {
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = `
+            <div class="row"><strong>${escapeHtml(item.title || item.id || "approval")}</strong><span class="mono">${escapeHtml(item.status || "pending")}</span></div>
+            <div class="small">${escapeHtml(item.summary || "")}</div>
+            <div class="small">${escapeHtml(uiText("risk", "risk"))}: <span class="mono">${escapeHtml(item.risk?.level || item.severity || "unknown")}</span> · ${escapeHtml(uiText("requested by", "requested by"))}: <span class="mono">${escapeHtml(item.requestedBy || "system")}</span></div>
+            ${item.expected_outcome ? `<div class="small">${escapeHtml(uiText("expected outcome", "expected outcome"))}: ${escapeHtml(item.expected_outcome)}</div>` : ""}
+            ${(item.learned_titles || []).length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${escapeHtml((item.learned_titles || []).join(" · "))}</div>` : ""}
+            <div class="controls" style="margin-top: 10px; margin-bottom: 0;">
+              <button class="button" type="button" data-approval-id="${escapeHtml(item.id)}" data-decision="approved">${escapeHtml(uiText("Approve", "承認"))}</button>
+              <button class="button secondary" type="button" data-approval-id="${escapeHtml(item.id)}" data-decision="rejected">${escapeHtml(uiText("Reject", "却下"))}</button>
+            </div>
+          `;
+          approvalInboxEl.appendChild(node);
+        }
+        approvalInboxEl.querySelectorAll("[data-approval-id]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const requestId = button.getAttribute("data-approval-id");
+            const decision = button.getAttribute("data-decision");
+            if (!requestId || !decision) return;
+            try {
+              await fetch(`/api/approvals/${encodeURIComponent(requestId)}/decision`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ decision }),
+              });
+              await loadAsyncState();
+              if (latestState) render(latestState);
+            } catch (_) {
+              // Best effort only.
+            }
+          });
+        });
+      }
+
+      function renderOutcomeInbox() {
+        const items = Array.isArray(outcomes) ? outcomes : [];
+        if (!items.length) {
+          outcomeInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No recent outcomes yet.", "最近の outcome はまだありません。"))}</div>`;
+          return;
+        }
+        renderList(outcomeInboxEl, items.slice(0, 8), (item) =>
+          `<div class="row"><strong>${escapeHtml(item.preview_text || item.kind || "outcome")}</strong><span class="mono">${escapeHtml(item.kind || "artifact")}</span></div>
+           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "standalone")}</span> · ${escapeHtml(uiText("storage", "storage"))}: <span class="mono">${escapeHtml(item.storage_class || "unknown")}</span></div>
+           <div class="small">${escapeHtml(uiText("artifact", "artifact"))}: <span class="mono">${escapeHtml(item.artifact_id || "unknown")}</span></div>
+           ${(item.distill_titles || []).length ? `<div class="small">${escapeHtml(uiText("memory candidate", "memory candidate"))}: ${escapeHtml((item.distill_titles || []).join(" · "))}</div>` : ""}
+           ${(item.promoted_refs || []).length ? `<div class="small">${escapeHtml(uiText("promoted", "promoted"))}: ${(item.promoted_refs || []).map((ref) => `<button class="button button-link" type="button" data-knowledge-ref="${escapeHtml(ref)}">${escapeHtml(String(ref).split("/").pop() || ref)}</button>`).join(" · ")}</div>` : ""}
+           ${item.downloadable ? `<div class="small"><a href="/api/artifacts/${encodeURIComponent(item.artifact_id)}">${escapeHtml(uiText("Download artifact", "成果物をダウンロード"))}</a></div>` : ""}`
+        );
       }
 
       async function loadAsyncState() {
         try {
-          const [requestsResponse, notificationsResponse, taskSessionsResponse, browserConversationResponse, browserSessionsResponse] = await Promise.all([
+          const [requestsResponse, notificationsResponse, approvalsResponse, outcomesResponse, taskSessionsResponse, browserConversationResponse, browserSessionsResponse] = await Promise.all([
             fetch("/api/async-requests"),
             fetch("/api/notifications"),
+            fetch("/api/approvals"),
+            fetch("/api/outcomes"),
             fetch("/api/task-sessions"),
             fetch("/api/browser-conversation-sessions"),
             fetch("/api/browser-sessions"),
           ]);
           const requestsBody = await requestsResponse.json();
           const notificationsBody = await notificationsResponse.json();
+          const approvalsBody = await approvalsResponse.json();
+          const outcomesBody = await outcomesResponse.json();
           const taskSessionsBody = await taskSessionsResponse.json();
           const browserConversationBody = await browserConversationResponse.json();
           const browserSessionsBody = await browserSessionsResponse.json();
           asyncRequests = requestsBody.items || [];
           notifications = notificationsBody.items || [];
+          approvals = approvalsBody.items || [];
+          outcomes = outcomesBody.items || [];
           taskSessionState = taskSessionsBody || { active: null, items: [] };
           browserConversationState = browserConversationBody || { active: null, items: [] };
           browserSessions = browserSessionsBody.items || [];
         } catch (_) {
           asyncRequests = [];
           notifications = [];
+          approvals = [];
+          outcomes = [];
           taskSessionState = { active: null, items: [] };
           browserConversationState = { active: null, items: [] };
           browserSessions = [];
@@ -790,6 +1160,7 @@
         const speechStatus = String(latestSpeechState?.status || "idle");
         const hasBrowserFocus = Boolean(browserConversationState?.active);
         const operatorMode = mode === "operator";
+        const activeWorkSummary = taskSessionState?.active?.goal?.summary || null;
 
         if (isSpeechPlaying || speechStatus === "speaking") {
           return {
@@ -797,7 +1168,7 @@
             expression: "joy",
             subtitle: operatorMode
               ? "Operator response in progress. You can interrupt with a follow-up instruction."
-              : "Responding now. You can interrupt if needed.",
+              : uiText("Responding now. You can interrupt if needed.", "いま応答しています。必要なら割り込めます。"),
           };
         }
         if (isPushToTalkActive || isListening || isNativeListening || isRecognitionStarting) {
@@ -806,7 +1177,7 @@
             expression: "listening",
             subtitle: operatorMode
               ? "Operator mode is listening for the next browser instruction."
-              : "Listening for your next turn.",
+              : uiText("Listening for your next turn.", "次の発話を待っています。"),
           };
         }
         if (browserSendInFlight) {
@@ -815,14 +1186,14 @@
             expression: "thinking",
             subtitle: operatorMode
               ? "Working through the browser step now."
-              : "Processing what you said.",
+              : (activeWorkSummary ? uiText(`Planning and executing: ${activeWorkSummary}`, `計画して実行中: ${activeWorkSummary}`) : uiText("Processing what you said.", "内容を処理しています。")),
           };
         }
         if (operatorMode && hasBrowserFocus) {
           return {
             status: "operator-ready",
             expression: "thinking",
-            subtitle: "Operator mode is armed. Say the next browser step naturally.",
+            subtitle: uiText("Operator mode is armed. Say the next browser step naturally.", "Operator mode で待機中です。次のブラウザ操作を自然に話してください。"),
           };
         }
         if (isHandsFreeActive) {
@@ -830,8 +1201,8 @@
             status: "hands-free",
             expression: "neutral",
             subtitle: mode === "conversation"
-              ? "Hands-free conversation is on."
-              : `Hands-free ${mode} mode is on.`,
+              ? (activeWorkSummary ? uiText(`Hands-free conversation is on. Current work: ${activeWorkSummary}`, `Hands-free 会話中です。現在の work: ${activeWorkSummary}`) : uiText("Hands-free conversation is on.", "Hands-free 会話中です。"))
+              : uiText(`Hands-free ${mode} mode is on.`, `Hands-free ${mode} mode が有効です。`),
           };
         }
         return {
@@ -850,7 +1221,7 @@
         updatedEl.textContent = data.updatedAt || state.lastUpdatedAt || "waiting for state";
         expressionEl.textContent = derivedVoiceUiState.expression || data.expression || "neutral";
         statusEl.textContent = derivedVoiceUiState.status || data.status || "idle";
-        subtitleEl.textContent = derivedVoiceUiState.subtitle || data.subtitle || "Surface ready. Send A2UI or voice stimuli.";
+        subtitleEl.textContent = derivedVoiceUiState.subtitle || data.subtitle || "Ready for your next request.";
 
         const expressionKey = String(derivedVoiceUiState.expression || data.expression || "neutral");
         const expressionAvatarMap = data.expressionAvatarMap && typeof data.expressionAvatarMap === "object"
@@ -874,11 +1245,13 @@
         );
 
         renderCurrentAgent(data.agentId || surfaceAgentCatalog.currentAgentId);
-        renderList(agentCatalogEl, surfaceAgentCatalog.agents || [], (agent) =>
-          `<div class="row"><strong>${agent.displayName || agent.agentId}</strong><span class="mono">${agent.agentId}</span></div>
-           <div class="small">${agent.summary || ""}</div>
-           <div style="margin-top:8px;">${renderChips(agent.capabilities || [])}</div>`
-        );
+        renderStandardIntents();
+        renderProjectCatalog();
+        renderBindingCatalog();
+        renderMissionSeedCatalog();
+        renderApprovalInbox();
+        renderOutcomeInbox();
+        renderMemoryDetail();
 
         renderList(asyncRequestsEl, asyncRequests || [], (item) =>
           `<div class="row"><strong>${item.request_id}</strong><span class="mono">${item.status}</span></div>
@@ -944,18 +1317,17 @@
         const selected = ensureSelectedTaskSession();
         taskSessionActiveEl.innerHTML = "";
         if (!items.length) {
-          taskSessionActiveEl.innerHTML = `<div class="item small">No task sessions yet.</div>`;
-          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          taskSessionActiveEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No requested work yet.", "まだ依頼された work はありません。"))}</div>`;
+          taskSessionDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a work item to inspect its progress and results.", "work を選ぶと進捗と結果を確認できます。"))}</div>`;
           return;
         }
         for (const item of items) {
           const node = document.createElement("button");
           node.type = "button";
           node.className = `item task-session-entry${selected?.session_id === item.session_id ? " selected" : ""}`;
-          node.innerHTML = `<div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
-            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
-            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
-            <div class="small">artifact: <span class="mono">${escapeHtml(item.artifact?.kind || "none")}</span></div>`;
+          node.innerHTML = `<div class="row"><strong>${escapeHtml(item.goal?.summary || "Requested work")}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(uiText("result", "result"))}: <span class="mono">${escapeHtml(item.artifact?.kind || "pending")}</span></div>
+            <div class="small">id: <span class="mono">${escapeHtml(item.session_id)}</span></div>`;
           node.addEventListener("click", () => {
             selectedTaskSessionId = item.session_id;
             renderTaskSessions();
@@ -963,13 +1335,25 @@
           taskSessionActiveEl.appendChild(node);
         }
         renderTaskSessionDetail(selected);
+        taskSessionActiveEl.querySelectorAll("[data-knowledge-ref]").forEach((button) => {
+          button.addEventListener("click", () => openKnowledgeRef(button.getAttribute("data-knowledge-ref")));
+        });
       }
 
       function renderTaskSessionDetail(item) {
         if (!item) {
-          taskSessionDetailEl.innerHTML = `<div class="item small">Select a task session to inspect its detail.</div>`;
+          taskSessionDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a work item to inspect its progress and results.", "work を選ぶと進捗と結果を確認できます。"))}</div>`;
           return;
         }
+        const specialistMap = {
+          presentation_deck: { label: uiText("Document Specialist", "Document Specialist"), team: ["planner", "implementer", "reviewer"] },
+          report_document: { label: uiText("Document Specialist", "Document Specialist"), team: ["planner", "implementer", "reviewer"] },
+          workbook_wbs: { label: uiText("Document Specialist", "Document Specialist"), team: ["planner", "implementer", "reviewer"] },
+          service_operation: { label: uiText("Service Operator", "Service Operator"), team: ["operator", "reviewer"] },
+          browser: { label: uiText("Browser Operator", "Browser Operator"), team: ["surface_liaison", "operator"] },
+          capture_photo: { label: uiText("Surface Concierge", "Surface Concierge"), team: ["surface_liaison"] },
+        };
+        const specialist = specialistMap[item.task_type] || { label: uiText("Surface Concierge", "Surface Concierge"), team: ["surface_liaison"] };
         const history = Array.isArray(item.history) ? item.history.slice(-6).reverse() : [];
         const artifact = item.artifact || null;
         const artifactLink = artifact?.output_path
@@ -978,22 +1362,46 @@
         const fileName = artifact?.output_path
           ? String(artifact.output_path).split("/").pop()
           : "";
+        const linkedProject = Array.isArray(projectCatalog)
+          ? projectCatalog.find((project) => project.project_id === item.project_context?.project_id)
+          : null;
+        const bootstrapItems = Array.isArray(linkedProject?.bootstrap_work_items)
+          ? linkedProject.bootstrap_work_items.slice(0, 4)
+          : [];
+        const learnedRefs = relatedPromotedRefsForTaskSession(item.session_id, item.project_context?.project_id);
         taskSessionDetailEl.innerHTML = `<div class="item">
-            <div class="row"><strong>${escapeHtml(item.session_id)}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
-            <div class="small">${escapeHtml(item.goal?.summary || "task session")}</div>
-            <div class="small">type: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
-            <div class="small">missing: <span class="mono">${escapeHtml((item.requirements?.missing || []).join(", ") || "none")}</span></div>
-            <div class="small">preview: ${escapeHtml(artifact?.preview_text || "No artifact preview yet.")}</div>
-            ${fileName ? `<div class="small">file: <span class="mono">${escapeHtml(fileName)}</span></div>` : ""}
+            <div class="row"><strong>${escapeHtml(item.goal?.summary || "Requested work")}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
+            <div class="small">${escapeHtml(uiText("work type", "work type"))}: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
+            <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_context?.project_name || item.project_context?.project_id || "standalone")}</span></div>
+            <div class="small">${escapeHtml(uiText("handled by", "handled by"))}: <span class="mono">${escapeHtml(specialist.label)}</span></div>
+            <div class="small">${escapeHtml(uiText("team", "team"))}: ${escapeHtml((specialist.team || []).join(" -> ") || "surface_liaison")}</div>
+            <div class="small">${escapeHtml(uiText("waiting on", "waiting on"))}: <span class="mono">${escapeHtml((item.requirements?.missing || []).join(", ") || "nothing")}</span></div>
+            <div class="small">${escapeHtml(uiText("latest result", "latest result"))}: ${escapeHtml(artifact?.preview_text || uiText("No result preview yet.", "まだ結果プレビューはありません。"))}</div>
+            ${fileName ? `<div class="small">${escapeHtml(uiText("artifact", "artifact"))}: <span class="mono">${escapeHtml(fileName)}</span></div>` : ""}
+            ${bootstrapItems.length ? `<div class="small">${escapeHtml(uiText("project plan", "project plan"))}: ${escapeHtml(bootstrapItems.map((entry) => entry.title).join(" -> "))}</div>` : ""}
+            ${learnedRefs.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedRefs)}</div>` : ""}
+            <div class="small">id: <span class="mono">${escapeHtml(item.session_id)}</span></div>
             ${artifactLink}
           </div>
           <div class="item">
-            <div class="label">Recent History</div>
+            <div class="label">Recent Progress</div>
             <div class="history-list">
               ${history.length ? history.map((entry) => `<div class="small"><span class="mono">${escapeHtml(entry.ts || "")}</span> ${escapeHtml(entry.text || "")}</div>`).join("") : `<div class="small">No history yet.</div>`}
             </div>
           </div>`;
+        taskSessionDetailEl.querySelectorAll("[data-knowledge-ref]").forEach((button) => {
+          button.addEventListener("click", () => openKnowledgeRef(button.getAttribute("data-knowledge-ref")));
+        });
       }
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest("[data-knowledge-ref]");
+        if (!button) return;
+        event.preventDefault();
+        openKnowledgeRef(button.getAttribute("data-knowledge-ref"));
+      });
 
       function setupMic() {
         nativeMicToggleEl.addEventListener("click", () => {

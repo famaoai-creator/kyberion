@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/generated-report-template-record.schema.json",
+  "title": "Generated Report Template Record",
+  "type": "object",
+  "required": ["record_id", "kind", "tier", "title", "summary", "candidate_id", "created_at", "template_sections", "audience", "output_format"],
+  "properties": {
+    "record_id": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "const": "report_template" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string" },
+    "task_session_id": { "type": "string" },
+    "specialist_id": { "type": "string" },
+    "locale": { "type": "string" },
+    "artifact_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "created_at": { "type": "string", "minLength": 1 },
+    "template_sections": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "audience": { "type": "string", "minLength": 1 },
+    "output_format": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}
