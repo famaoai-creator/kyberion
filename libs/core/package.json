@@ -39,6 +39,10 @@
       "types": "./dist/agent-registry.d.ts",
       "default": "./dist/agent-registry.js"
     },
+    "./agent-provider-resolution": {
+      "types": "./dist/agent-provider-resolution.d.ts",
+      "default": "./dist/agent-provider-resolution.js"
+    },
     "./agent-runtime-supervisor": {
       "types": "./dist/agent-runtime-supervisor.d.ts",
       "default": "./dist/agent-runtime-supervisor.js"
