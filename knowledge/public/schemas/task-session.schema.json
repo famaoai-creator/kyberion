@@ -58,6 +58,8 @@
       "properties": {
         "project_id": { "type": "string" },
         "project_name": { "type": "string" },
+        "track_id": { "type": "string" },
+        "track_name": { "type": "string" },
         "tier": {
           "type": "string",
           "enum": ["personal", "confidential", "public"]

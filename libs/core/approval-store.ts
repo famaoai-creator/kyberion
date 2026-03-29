@@ -99,6 +99,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   risk?: ApprovalRiskProfile;
   workflow?: ApprovalWorkflowState;
   applyResult?: ApprovalApplyResult;
+  track_id?: string;
+  track_name?: string;
   work_loop?: OrganizationWorkLoopSummary;
 }
 
@@ -132,6 +134,8 @@ export function createApprovalRequest(
     justification?: ApprovalJustification;
     risk?: ApprovalRiskProfile;
     workflow?: ApprovalWorkflowState;
+    trackId?: string;
+    trackName?: string;
     workLoop?: OrganizationWorkLoopSummary;
   },
 ): ApprovalRequestRecord {
@@ -159,6 +163,8 @@ export function createApprovalRequest(
     justification: params.justification,
     risk: params.risk,
     workflow: params.workflow,
+    track_id: params.trackId,
+    track_name: params.trackName,
     work_loop: params.workLoop || buildOrganizationWorkLoopSummary({
       intentId: 'approval-request',
       shape: 'task_session',

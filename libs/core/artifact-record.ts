@@ -9,6 +9,8 @@ import type { OrganizationWorkLoopSummary } from './work-design.js';
 export interface ArtifactRecord {
   artifact_id: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   kind: string;
@@ -90,6 +92,8 @@ export function attachArtifactRecordToTaskSession(sessionId: string, record: Art
     preview_text: record.preview_text || session.artifact?.preview_text,
     artifact_id: record.artifact_id,
     project_id: record.project_id,
+    track_id: record.track_id,
+    track_name: record.track_name,
     mission_id: record.mission_id,
     storage_class: record.storage_class,
     external_ref: record.external_ref,

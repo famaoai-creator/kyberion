@@ -60,6 +60,8 @@ describe('promoted-memory', () => {
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',
       tier: 'public',
+      track_id: 'TRK-TEST-REL1',
+      track_name: 'Release 1',
       title: 'Reusable pattern',
       summary: 'Presentation pattern should be reusable.',
       status: 'promoted',
@@ -76,6 +78,7 @@ describe('promoted-memory', () => {
     expect(saved.logicalPath).toContain('knowledge/public/common/patterns/generated/');
     expect(saved.record.record_id).toBe(candidate.candidate_id);
     expect(saved.record.kind).toBe('pattern');
+    expect(saved.record.track_id).toBe('TRK-TEST-REL1');
     if (saved.record.kind !== 'pattern') throw new Error('expected pattern');
     expect(saved.record.applicability).toContain('presentation delivery');
     const markdownPath = pathResolver.resolve(saved.logicalPath);

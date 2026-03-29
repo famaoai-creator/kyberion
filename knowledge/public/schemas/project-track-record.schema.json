@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-track-record.schema.json",
+  "title": "Project Track Record",
+  "type": "object",
+  "required": [
+    "track_id",
+    "project_id",
+    "name",
+    "summary",
+    "status",
+    "track_type",
+    "lifecycle_model",
+    "tier"
+  ],
+  "properties": {
+    "track_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "active", "paused", "completed", "archived"]
+    },
+    "track_type": {
+      "type": "string",
+      "enum": ["delivery", "change", "release", "incident", "compliance", "operations", "research"]
+    },
+    "lifecycle_model": {
+      "type": "string",
+      "enum": ["sdlc", "continuous_delivery", "incident_response", "continuous_operations", "research_cycle"]
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "primary_locale": { "type": "string" },
+    "release_id": { "type": "string" },
+    "change_scope": { "type": "string" },
+    "gate_profile_id": { "type": "string" },
+    "active_missions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "required_artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

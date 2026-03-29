@@ -49,6 +49,8 @@ export interface TaskSession {
   project_context?: {
     project_id?: string;
     project_name?: string;
+    track_id?: string;
+    track_name?: string;
     tier?: 'personal' | 'confidential' | 'public';
     service_bindings?: string[];
     locale?: string;
@@ -95,6 +97,47 @@ const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-ses
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
+let standardIntentCache: Array<{
+  id?: string;
+  trigger_keywords?: string[];
+  resolution?: {
+    shape?: string;
+    task_kind?: string;
+  };
+}> | null = null;
+
+function loadStandardIntentCatalog() {
+  if (standardIntentCache) return standardIntentCache;
+  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    intents?: Array<{
+      id?: string;
+      trigger_keywords?: string[];
+      resolution?: {
+        shape?: string;
+        task_kind?: string;
+      };
+    }>;
+  };
+  standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
+  return standardIntentCache;
+}
+
+function matchesStandardIntent(utterance: string, intentId: string): boolean {
+  const normalized = utterance.toLowerCase();
+  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
+  const keywords = Array.isArray(intent?.trigger_keywords) ? intent!.trigger_keywords : [];
+  return keywords.some((keyword) => normalized.includes(String(keyword).toLowerCase()));
+}
+
+function isBootstrapProjectUtterance(utterance: string): boolean {
+  if (!matchesStandardIntent(utterance, 'bootstrap-project')) return false;
+  if (matchesStandardIntent(utterance, 'generate-workbook')) return false;
+  if (matchesStandardIntent(utterance, 'generate-presentation')) return false;
+  if (matchesStandardIntent(utterance, 'generate-report')) return false;
+  if (matchesStandardIntent(utterance, 'inspect-service')) return false;
+  return true;
+}
 
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
@@ -134,6 +177,8 @@ export function createTaskSession(input: {
     outcomeIds: input.outcomeIds,
     projectId: input.projectContext?.project_id,
     projectName: input.projectContext?.project_name,
+    trackId: input.projectContext?.track_id,
+    trackName: input.projectContext?.track_name,
     tier: input.projectContext?.tier,
     locale: input.projectContext?.locale,
     serviceBindings: input.projectContext?.service_bindings,
@@ -164,6 +209,24 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   const trimmed = utterance.trim();
   if (!trimmed) return null;
 
+  if (isBootstrapProjectUtterance(trimmed)) {
+    return {
+      taskType: 'analysis',
+      intentId: 'bootstrap-project',
+      goal: {
+        summary: 'Bootstrap a governed project context',
+        success_condition: 'A project record, kickoff context, and first work items are prepared.',
+      },
+      requirements: {
+        missing: ['project_brief'],
+        collected: {},
+      },
+      payload: {
+        bootstrap_kind: 'project_bootstrap',
+      },
+    };
+  }
+
   if (/(写真|撮影|photo|picture|camera)/i.test(trimmed)) {
     return {
       taskType: 'capture_photo',
@@ -188,7 +251,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-workbook') || /(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
     return {
       taskType: 'workbook_wbs',
       intentId: 'generate-workbook',
@@ -206,7 +269,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-presentation') || /(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
     return {
       taskType: 'presentation_deck',
       intentId: 'generate-presentation',
@@ -231,7 +294,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-report') || /(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
     return {
       taskType: 'report_document',
       intentId: 'generate-report',
@@ -256,7 +319,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'inspect-service') || /(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
     const operation = /再起動|restart/i.test(trimmed)
       ? 'restart'
       : /停止|stop/i.test(trimmed)

@@ -7,6 +7,8 @@ import type { OrganizationWorkLoopSummary } from './work-design.js';
 export interface MissionSeedRecord {
   seed_id: string;
   project_id: string;
+  track_id?: string;
+  track_name?: string;
   source_task_session_id?: string;
   source_work_id?: string;
   title: string;

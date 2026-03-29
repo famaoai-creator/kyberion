@@ -14,6 +14,8 @@ interface PromotedMemoryRecordBase {
   summary: string;
   candidate_id: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   task_session_id?: string;
   specialist_id?: string;
   locale?: string;
@@ -252,6 +254,8 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     summary: candidate.summary,
     candidate_id: candidate.candidate_id,
     project_id: candidate.project_id,
+    track_id: candidate.track_id,
+    track_name: candidate.track_name,
     task_session_id: candidate.task_session_id,
     specialist_id: candidate.specialist_id,
     locale: candidate.locale,

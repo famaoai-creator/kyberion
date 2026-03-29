@@ -9,6 +9,8 @@
     "source_type": { "type": "string", "enum": ["task_session", "mission", "artifact"] },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
     "project_id": { "type": "string" },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
     "mission_id": { "type": "string" },
     "task_session_id": { "type": "string" },
     "artifact_ids": {

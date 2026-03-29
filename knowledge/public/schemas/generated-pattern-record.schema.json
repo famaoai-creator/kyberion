@@ -12,6 +12,8 @@
     "summary": { "type": "string", "minLength": 1 },
     "candidate_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string" },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
     "task_session_id": { "type": "string" },
     "specialist_id": { "type": "string" },
     "locale": { "type": "string" },

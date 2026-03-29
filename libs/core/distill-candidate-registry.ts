@@ -10,6 +10,8 @@ export interface DistillCandidateRecord {
   source_type: 'task_session' | 'mission' | 'artifact';
   tier?: 'personal' | 'confidential' | 'public';
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   artifact_ids?: string[];

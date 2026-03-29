@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
@@ -16,6 +17,54 @@ import { handleAction } from './index.js';
 describe('media-actuator pdf to pptx bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('renders a drawio diagram file directly from a document brief', async () => {
+    const outputPath = 'active/shared/tmp/media/document-brief-direct-render.drawio';
+    if (safeExistsSync(outputPath)) {
+      safeRmSync(outputPath, { force: true });
+    }
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'document_diagram_render_from_brief',
+          params: {
+            brief: {
+              kind: 'document-brief',
+              artifact_family: 'diagram',
+              document_type: 'architecture-diagram',
+              document_profile: 'solution-overview',
+              render_target: 'drawio',
+              locale: 'en-US',
+              layout_template_id: 'kyberion-sovereign',
+              payload: {
+                title: 'Kyberion Overview',
+                graph: {
+                  nodes: [
+                    { id: 'intent', type: 'generic', label: 'Intent' },
+                    { id: 'work', type: 'generic', label: 'Work Loop' },
+                  ],
+                  edges: [
+                    { id: 'edge-1', from: 'intent', to: 'work', label: 'resolves to' },
+                  ],
+                },
+              },
+            },
+            path: outputPath,
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(safeExistsSync(outputPath)).toBe(true);
+    const content = safeReadFile(outputPath, { encoding: 'utf8' }) as string;
+    expect(content).toContain('Kyberion Overview');
+    expect(content).toContain('value="intent"');
+    expect(content).toContain('value="work"');
   });
 
   it('bridges pdf design into pptx design before render', async () => {
