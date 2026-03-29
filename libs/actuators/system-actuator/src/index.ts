@@ -8,6 +8,10 @@ import {
   derivePipelineStatus,
   emitComputerSurfacePatch,
   pathResolver,
+  resolveVars,
+  evaluateCondition,
+  getPathValue,
+  resolveWriteArtifactSpec,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -911,26 +915,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ctx = { ...ctx, ...saved };
   }
 
-      const resolve = (val: any) => {
-    if (typeof val !== 'string') return val;
-    
-    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
-    }
-
-    // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
-    });
-  };
+  const resolve = (val: any) => resolveVars(val, ctx);
 
   const results = [];
   for (const step of steps) {
@@ -968,7 +953,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -995,24 +980,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
   }
 }
 
-function evaluateCondition(cond: any, ctx: any): boolean {
-  if (!cond) return true;
-  const parts = cond.from.split('.');
-  let val = ctx;
-  for (const part of parts) { val = val?.[part]; }
-
-  switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    default: return !!val;
-  }
-}
-
-async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
+async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'shell':
@@ -1041,7 +1009,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   }
 }
 
-async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
+async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   switch (op) {
     case 'regex_extract': {
       const input = String(ctx[params.from || 'last_capture'] || '');
@@ -1050,7 +1018,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'json_query': {
       const data = ctx[params.from || 'last_capture_data'];
-      const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
+      const result = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: result };
     }
     case 'sre_analyze': {
@@ -1075,7 +1043,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   }
 }
 
-async function opApply(op: string, params: any, ctx: any, resolve: Function) {
+async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'keyboard':
@@ -1120,10 +1088,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     case 'notify': logger.info(`🔔 [NOTIFICATION] ${resolve(params.text)}`); break;
     case 'write_file':
-      const out = path.resolve(rootDir, resolve(params.path));
-      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
+    case 'write_artifact':
+      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
+      const out = path.resolve(rootDir, spec.path);
+      const content = spec.content;
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
     case 'log': logger.info(`[SYSTEM_LOG] ${resolve(params.message || 'Action completed')}`); break;

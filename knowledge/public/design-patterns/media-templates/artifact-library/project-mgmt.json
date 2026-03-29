@@ -1,0 +1,184 @@
+{
+  "domain": "project-management",
+  "profiles": {
+    "project-charter": {
+      "artifact_family": "presentation",
+      "document_type": "charter",
+      "sections": [
+        { "section_id": "cover", "title": "Project Charter: {{title}}", "layout_key": "cover-statement" },
+        { "section_id": "business-need", "title": "Business Need", "layout_key": "why-change" },
+        { "section_id": "objectives", "title": "Measurable Project Objectives", "layout_key": "evidence-callout" },
+        { "section_id": "requirements", "title": "High-Level Requirements", "layout_key": "title-body" },
+        { "section_id": "risks", "title": "Overall Project Risk", "layout_key": "risk-controls" },
+        { "section_id": "milestones", "title": "Summary Milestone Schedule", "layout_key": "timeline-roadmap" },
+        { "section_id": "budget", "title": "Preapproved Financial Resources", "layout_key": "three-pillars" },
+        { "section_id": "stakeholders", "title": "Stakeholder List", "layout_key": "operating-model" },
+        { "section_id": "authorization", "title": "Project Authorization", "layout_key": "decision-cta" }
+      ]
+    },
+    "project-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Project Management Plan: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "subsidiary-plans", "title": "Subsidiary Management Plans", "layout_key": "doc-sections" },
+        { "section_id": "baselines", "title": "Baselines (Scope, Schedule, Cost)", "layout_key": "doc-sections" },
+        { "section_id": "lifecycle", "title": "Project Lifecycle Description", "layout_key": "doc-sections" },
+        { "section_id": "management-review", "title": "Management Reviews", "layout_key": "doc-summary" }
+      ]
+    },
+    "scope-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Scope Management Plan", "layout_key": "doc-title" },
+        { "section_id": "wbs-creation", "title": "WBS Creation Process", "layout_key": "doc-sections" },
+        { "section_id": "scope-verification", "title": "Scope Verification & Acceptance", "layout_key": "doc-sections" }
+      ]
+    },
+    "schedule-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Schedule Management Plan", "layout_key": "doc-title" },
+        { "section_id": "methodology", "title": "Scheduling Methodology", "layout_key": "doc-sections" },
+        { "section_id": "maintenance", "title": "Schedule Maintenance", "layout_key": "doc-sections" }
+      ]
+    },
+    "cost-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Cost Management Plan", "layout_key": "doc-title" },
+        { "section_id": "units", "title": "Units of Measure & Precision", "layout_key": "doc-summary" },
+        { "section_id": "control-thresholds", "title": "Control Thresholds", "layout_key": "doc-sections" }
+      ]
+    },
+    "quality-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Quality Management Plan", "layout_key": "doc-title" },
+        { "section_id": "standards", "title": "Quality Standards", "layout_key": "doc-sections" },
+        { "section_id": "objectives", "title": "Quality Objectives", "layout_key": "doc-sections" },
+        { "section_id": "control", "title": "Quality Control & Assurance", "layout_key": "doc-sections" }
+      ]
+    },
+    "resource-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Resource Management Plan", "layout_key": "doc-title" },
+        { "section_id": "identification", "title": "Resource Identification", "layout_key": "doc-sections" },
+        { "section_id": "roles", "title": "Roles & Responsibilities (RACI)", "layout_key": "doc-sections" },
+        { "section_id": "org-chart", "title": "Project Organization Chart", "layout_key": "doc-summary" }
+      ]
+    },
+    "communications-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Communications Management Plan", "layout_key": "doc-title" },
+        { "section_id": "requirements", "title": "Stakeholder Communication Requirements", "layout_key": "doc-sections" },
+        { "section_id": "frequency", "title": "Communication Frequency & Format", "layout_key": "doc-sections" }
+      ]
+    },
+    "risk-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Risk Management Plan", "layout_key": "doc-title" },
+        { "section_id": "methodology", "title": "Risk Methodology", "layout_key": "doc-sections" },
+        { "section_id": "categories", "title": "Risk Categories (RBS)", "layout_key": "doc-sections" },
+        { "section_id": "definition", "title": "Risk Probability & Impact Definitions", "layout_key": "doc-sections" }
+      ]
+    },
+    "procurement-management-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Procurement Management Plan", "layout_key": "doc-title" },
+        { "section_id": "types", "title": "Contract Types", "layout_key": "doc-sections" },
+        { "section_id": "metrics", "title": "Procurement Metrics", "layout_key": "doc-sections" }
+      ]
+    },
+    "stakeholder-engagement-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Stakeholder Engagement Plan", "layout_key": "doc-title" },
+        { "section_id": "levels", "title": "Engagement Levels", "layout_key": "doc-sections" },
+        { "section_id": "scope", "title": "Scope of Engagement", "layout_key": "doc-sections" }
+      ]
+    },
+    "wbs-dictionary": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "WBS Dictionary", "layout_key": "doc-title" },
+        { "section_id": "components", "title": "WBS Component Descriptions", "layout_key": "doc-sections" }
+      ]
+    },
+    "risk-register": {
+      "artifact_family": "spreadsheet",
+      "document_type": "log",
+      "sections": [
+        { "section_id": "overview", "title": "Risk Overview", "layout_key": "sheet-overview" },
+        { "section_id": "risks", "title": "Identified Risks", "layout_key": "sheet-main-table" },
+        { "section_id": "responses", "title": "Risk Response Plans", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "issue-log": {
+      "artifact_family": "spreadsheet",
+      "document_type": "log",
+      "sections": [
+        { "section_id": "summary", "title": "Issue Summary", "layout_key": "sheet-overview" },
+        { "section_id": "logs", "title": "Active Issues", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "change-log": {
+      "artifact_family": "spreadsheet",
+      "document_type": "log",
+      "sections": [
+        { "section_id": "summary", "title": "Change Summary", "layout_key": "sheet-overview" },
+        { "section_id": "changes", "title": "Requested Changes", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "lessons-learned-register": {
+      "artifact_family": "spreadsheet",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "summary", "title": "Lesson Summary", "layout_key": "sheet-overview" },
+        { "section_id": "details", "title": "Detailed Findings", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "stakeholder-register": {
+      "artifact_family": "spreadsheet",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "overview", "title": "Stakeholder Overview", "layout_key": "sheet-overview" },
+        { "section_id": "list", "title": "Stakeholder Details", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "milestone-report": {
+      "artifact_family": "presentation",
+      "document_type": "report",
+      "sections": [
+        { "section_id": "cover", "title": "Milestone Status: {{title}}", "layout_key": "cover-statement" },
+        { "section_id": "summary", "title": "Executive Status Summary", "layout_key": "title-body" },
+        { "section_id": "roadmap", "title": "Updated Roadmap", "layout_key": "timeline-roadmap" },
+        { "section_id": "risks", "title": "Critical Risks", "layout_key": "risk-controls" }
+      ]
+    },
+    "project-closure-report": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "sections": [
+        { "section_id": "title", "title": "Project Closure Report: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "acceptance", "title": "Final Product Acceptance", "layout_key": "doc-sections" },
+        { "section_id": "closure-ops", "title": "Handover to Operations", "layout_key": "doc-sections" },
+        { "section_id": "distillation", "title": "Knowledge Distillation Summary", "layout_key": "doc-summary" }
+      ]
+    }
+  }
+}

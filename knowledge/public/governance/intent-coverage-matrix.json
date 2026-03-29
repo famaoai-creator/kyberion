@@ -127,6 +127,38 @@
       ]
     },
     {
+      "intent_id": "cross-project-remediation",
+      "status": "partial",
+      "entry_path": "task-session classifier",
+      "work_shape": "task_session",
+      "outcome_ids": ["remediation_plan"],
+      "execution_path": [
+        "task-session classifier",
+        "knowledge-backed cross-project analysis",
+        "follow-up remediation planning"
+      ],
+      "gaps": [
+        "follow-up fix execution and automatic mission splitting are not yet first-class",
+        "cross-project corpus resolution still depends on operator context and future binding-aware retrieval"
+      ]
+    },
+    {
+      "intent_id": "incident-informed-review",
+      "status": "partial",
+      "entry_path": "task-session classifier",
+      "work_shape": "task_session",
+      "outcome_ids": ["review_findings"],
+      "execution_path": [
+        "task-session classifier",
+        "incident and failure history lookup",
+        "review synthesis with governed findings"
+      ],
+      "gaps": [
+        "review target binding and incident corpus retrieval are not yet first-class runtime contracts",
+        "automated review execution from the intake path remains future work"
+      ]
+    },
+    {
       "intent_id": "live-query",
       "status": "partial",
       "entry_path": "direct reply route",

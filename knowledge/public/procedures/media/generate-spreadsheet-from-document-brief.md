@@ -31,8 +31,11 @@ Separate the spreadsheet into:
    - `payload.row_tones`
 4. Use `column.validation_key` when the layout template should inject governed list validation.
 5. Use a tracker-oriented `layout_template_id` when conditional formatting and overdue rules should come from knowledge-owned defaults.
-6. Transform through `document_spreadsheet_design_from_brief`.
-7. Render with `xlsx_render`.
+6. Prefer the canonical route:
+   - `document_outline_from_brief`
+   - `brief_to_design_protocol`
+   - `generate_document`
+7. `document_spreadsheet_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Example
 - [`document-brief-wbs-spreadsheet.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json)

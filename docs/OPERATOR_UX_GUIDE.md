@@ -70,7 +70,7 @@ Use when you want:
 - runtime and mission state
 - intervention points
 - delivery inspection
-- project and mission-seed control
+- project, track, gate, and mission-seed control
 
 Chronos is the control surface.
 It explains and intervenes, but it does not replace the durable control plane.
@@ -244,15 +244,35 @@ pnpm run cli -- info browser-actuator
 
 ```bash
 MC="node dist/scripts/mission_controller.js"
-$MC start MY-TASK confidential
+$MC start MY-TASK --tier confidential --persona ecosystem_architect
 $MC status MY-TASK
-$MC checkpoint step-1 "Progress note"
+$MC checkpoint MY-TASK step-1 "Progress note"
 $MC verify MY-TASK verified "Verification summary"
 $MC finish MY-TASK
 ```
 
 Direct mission commands are for operators.
 They are not the primary UX you should teach first.
+
+### Control plane CLI
+
+```bash
+pnpm control presence tracks
+pnpm control presence ref active/projects/test-web/tracks/TRK-TEST-REL1/02_define/requirements-definition.md
+
+pnpm control chronos tracks
+pnpm control chronos mission-seeds
+pnpm control chronos ref knowledge/public/templates/blueprints/requirements-traceability-matrix.md
+pnpm control chronos seed-track TRK-TEST-REL1 requirements-definition
+```
+
+Use this flow when you want to follow the governed operator path directly from the terminal:
+
+```text
+Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
+```
+
+`chronos seed-track` remains permission-gated by Chronos localadmin access.
 
 ## 9. The Smallest Teaching Version
 

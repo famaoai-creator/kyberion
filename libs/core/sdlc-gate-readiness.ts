@@ -206,6 +206,58 @@ export function buildTrackNextWorkProposal(input: {
       outcome_ids: [target.artifact_id],
       labels: [target.artifact_id],
     },
+    process_design: {
+      plan_outline: [
+        `prepare ${target.artifact_id}`,
+        'capture the governed artifact evidence',
+        'advance the blocked gate with verified output',
+      ],
+      intake_requirements: [
+        'track context',
+        'target artifact',
+        'template reference',
+      ],
+      operator_checklist: [
+        'open the template or skeleton',
+        'materialize the governed artifact in the project track path',
+        'capture evidence and reusable findings',
+      ],
+    },
+    execution_boundary: {
+      llm_zone: {
+        allowed: [
+          'draft artifact content within the governed template',
+          'summarize readiness and next action',
+        ],
+        forbidden: [
+          'override_governed_track_artifact_requirements',
+          'invent_gate_state_transitions',
+          'declare_gate_completion_without_evidence',
+        ],
+      },
+      knowledge_zone: {
+        owns: [
+          'gate catalog',
+          'required artifacts',
+          'template references',
+        ],
+      },
+      compiler_zone: {
+        responsibilities: [
+          'map gate readiness to next required artifact',
+          'materialize the governed skeleton path',
+          'prepare mission seed work context',
+        ],
+      },
+      executor_zone: {
+        responsibilities: [
+          'persist governed artifact output',
+          'retain readiness evidence',
+          'preserve project and track context',
+        ],
+      },
+      rule: 'LLM drafts within the governed template; knowledge defines gate requirements; compiler maps readiness to work; executors persist evidence',
+    },
     teaming: {
       specialist_id: specialistId,
       specialist_label: specialistId,

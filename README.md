@@ -21,6 +21,21 @@ Internally, Kyberion uses missions, task sessions, actuators, ADF pipelines, run
 
 For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md).
 
+CLI operators can also follow the same governed control path directly:
+
+```text
+Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
+```
+
+Representative commands:
+
+```bash
+pnpm control presence tracks
+pnpm control chronos tracks
+pnpm control chronos mission-seeds
+pnpm control chronos ref knowledge/public/templates/blueprints/requirements-traceability-matrix.md
+```
+
 ## The Product Model
 
 Kyberion should feel like this:

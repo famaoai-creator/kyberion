@@ -1,0 +1,34 @@
+{
+  "domain": "industrial-general-high-fidelity",
+  "profiles": {
+    "bill-of-materials-bom": {
+      "artifact_family": "spreadsheet",
+      "document_type": "specification",
+      "description": "Hierarchical list of raw materials, sub-assemblies, and components.",
+      "sections": [
+        { "section_id": "1-summary", "title": "BOM Summary and Assembly Level", "layout_key": "sheet-overview" },
+        { "section_id": "2-components", "title": "Component Details and Part Numbers", "layout_key": "sheet-main-table" },
+        { "section_id": "3-sourcing", "title": "Sourcing and Lead Time Data", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "reliability-test-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Standardized environmental and stress testing for hardware.",
+      "sections": [
+        { "section_id": "1-objectives", "title": "1. Test Objectives and Standards (HALT/HASS)", "layout_key": "doc-title" },
+        { "section_id": "2-environmental", "title": "2. Environmental Stress Profiles (Temp, Vibe)", "layout_key": "three-pillars" },
+        { "section_id": "3-criteria", "title": "3. Pass/Fail Criteria and MTBF Targets", "layout_key": "evidence-callout" }
+      ]
+    },
+    "store-launch-checklist": {
+      "artifact_family": "spreadsheet",
+      "document_type": "tracker",
+      "description": "Comprehensive GTM checklist for physical retail locations.",
+      "sections": [
+        { "section_id": "1-milestones", "title": "Launch Milestones", "layout_key": "timeline-roadmap" },
+        { "section_id": "2-readiness", "title": "Operational Readiness Checklist", "layout_key": "sheet-main-table" }
+      ]
+    }
+  }
+}

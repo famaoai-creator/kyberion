@@ -1,0 +1,118 @@
+{
+  "systems": {
+    "executive-standard": {
+      "theme": "kyberion-standard",
+      "profiles": ["executive-proposal", "summary-report"],
+      "branding": {
+        "tone": "executive",
+        "logo_url": "/assets/logos/kyberion-logo.png"
+      },
+      "tenant_overrides": {
+        "client-a": {
+          "matchers": ["aster bank", "client-a"],
+          "theme": "client-a",
+          "branding": {
+            "brand_name": "Aster Bank",
+            "logo_url": "/vault/tenants/client-a/logo.png",
+            "tone": "corporate"
+          }
+        },
+        "client-b": {
+          "matchers": ["client-b"],
+          "theme": "client-b",
+          "branding": {
+            "brand_name": "Client B",
+            "tone": "modern"
+          }
+        }
+      },
+      "semantic_overrides": {
+        "summary": {
+          "pptx": {
+            "body_font_size_delta": 1,
+            "visual_fill_role": "accent"
+          }
+        },
+        "decision": {
+          "pptx": {
+            "title_align": "center",
+            "body_font_size_delta": 2
+          }
+        }
+      },
+      "slide_layout_overrides": {
+        "decision-cta": {
+          "body": {
+            "style": {
+              "fontSize": 20
+            }
+          }
+        }
+      }
+    },
+    "sovereign-vision": {
+      "theme": "kyberion-sovereign",
+      "profiles": ["vision-proposal"],
+      "branding": {
+        "tone": "visionary"
+      },
+      "semantic_overrides": {
+        "hero": {
+          "pptx": {
+            "body_font_size_delta": 3,
+            "body_color_role": "primary"
+          }
+        },
+        "architecture": {
+          "pptx": {
+            "visual_fill_role": "accent",
+            "visual_text_role": "primary"
+          }
+        }
+      },
+      "slide_layout_overrides": {
+        "immersive-vision": {
+          "title": {
+            "style": {
+              "fontSize": 28
+            }
+          }
+        }
+      }
+    },
+    "operator-ops": {
+      "theme": "kyberion-standard",
+      "profiles": ["operator-tracker"],
+      "branding": {
+        "tone": "operational"
+      },
+      "semantic_overrides": {
+        "signals": {
+          "tracker": {
+            "priority": 0
+          }
+        },
+        "execution": {
+          "tracker": {
+            "priority": 1
+          }
+        }
+      }
+    },
+    "solution-architecture": {
+      "theme": "aws-architecture",
+      "profiles": ["solution-overview"],
+      "branding": {
+        "tone": "technical"
+      },
+      "semantic_overrides": {
+        "architecture": {
+          "pptx": {
+            "visual_fill_role": "accent",
+            "visual_text_role": "primary"
+          }
+        }
+      }
+    }
+  }
+}

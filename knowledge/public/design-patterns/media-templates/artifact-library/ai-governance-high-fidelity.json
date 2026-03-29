@@ -1,0 +1,49 @@
+{
+  "domain": "ai-governance-high-fidelity",
+  "profiles": {
+    "ai-model-validation-report": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "description": "Technical and performance validation report for AI models.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary and Validation Status", "layout_key": "doc-summary" },
+        { "section_id": "2-model-scope", "title": "2. Model Overview and Intended Use", "layout_key": "doc-title" },
+        { "section_id": "3-data-validation", "title": "3. Data Validation and Lineage", "layout_key": "three-point-architecture" },
+        { "section_id": "3-1-splits", "title": "3.1 Training/Validation/Test Set Splits", "layout_key": "doc-sections" },
+        { "section_id": "3-2-quality", "title": "3.2 Data Quality and Representativeness", "layout_key": "evidence-callout" },
+        { "section_id": "4-performance-metrics", "title": "4. Performance Metrics and Benchmarking", "layout_key": "doc-title" },
+        { "section_id": "4-1-core-metrics", "title": "4.1 Accuracy, Precision, Recall, F1", "layout_key": "evidence-callout" },
+        { "section_id": "5-robustness-testing", "title": "5. Robustness and Reliability Testing", "layout_key": "risk-controls" },
+        { "section_id": "5-1-adversarial", "title": "5.1 Adversarial and Edge Case Analysis", "layout_key": "doc-sections" },
+        { "section_id": "6-explainability", "title": "6. Explainability and Interpretability (SHAP/LIME)", "layout_key": "three-pillars" },
+        { "section_id": "7-conclusion", "title": "7. Validation Conclusion and Mitigation Plans", "layout_key": "decision-cta" }
+      ]
+    },
+    "ai-data-governance-policy": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Operational and legal standards for AI training data.",
+      "sections": [
+        { "section_id": "1-policy-governance", "title": "1. Policy Governance and Ownership", "layout_key": "operating-model" },
+        { "section_id": "2-data-sourcing", "title": "2. Data Acquisition and Ethical Sourcing", "layout_key": "doc-sections" },
+        { "section_id": "3-privacy-security", "title": "3. Data Privacy and Anonymization (GDPR)", "layout_key": "risk-controls" },
+        { "section_id": "4-quality-mgmt", "title": "4. Data Quality and Bias Detection", "layout_key": "evidence-callout" },
+        { "section_id": "5-lifecycle", "title": "5. Data Lifecycle and Versioning", "layout_key": "timeline-roadmap" },
+        { "section_id": "6-compliance", "title": "6. Regulatory Compliance Mapping", "layout_key": "doc-sections" }
+      ]
+    },
+    "ai-ethics-safety-guidelines": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Human-centric guidelines for ethical AI behavior.",
+      "sections": [
+        { "section_id": "1-core-principles", "title": "1. Core Ethical Principles (Agency, Fairness)", "layout_key": "immersive-vision" },
+        { "section_id": "2-bias-framework", "title": "2. Bias and Fairness Framework", "layout_key": "three-pillars" },
+        { "section_id": "3-safety-prevention", "title": "3. Safety and Harm Prevention (Kill Switch)", "layout_key": "risk-controls" },
+        { "section_id": "4-accountability", "title": "4. Accountability and Redressal Mechanisms", "layout_key": "operating-model" },
+        { "section_id": "5-impact-analysis", "title": "5. Environmental and Social Impact", "layout_key": "evidence-callout" },
+        { "section_id": "6-monitoring", "title": "6. Continuous Ethics Monitoring and Audit", "layout_key": "timeline-roadmap" }
+      ]
+    }
+  }
+}

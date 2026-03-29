@@ -25,9 +25,9 @@ last_updated: 2026-03-21
 
 - `pptx_extract`
 - `theme_from_pptx_design`
-- `proposal_storyline_from_brief`
-- `proposal_content_from_storyline`
-- `pptx_render`
+- `document_outline_from_brief`
+- `brief_to_design_protocol`
+- `generate_document`
 - Media examples と theme catalog
 
 ## Input Contract
@@ -46,9 +46,9 @@ last_updated: 2026-03-21
 1. source deck extract
 2. theme distill
 3. proposal brief 作成
-4. storyline 生成
-5. slide content 生成
-6. PPTX render
+4. profile-aware outline 生成
+5. design protocol compile
+6. binary render
 7. 必要なら appendix / executive summary / evidence map 作成
 
 ## Core Contracts
@@ -64,6 +64,7 @@ last_updated: 2026-03-21
 
 - proposal deck
 - proposal brief
-- storyline ADF
+- outline ADF
+- design protocol
 - supporting evidence summary
 - optional executive memo

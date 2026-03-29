@@ -1,0 +1,205 @@
+{
+  "kind": "artifact-library-index",
+  "version": "1.0.0",
+  "artifact_library_path": "knowledge/public/design-patterns/media-templates/artifact-library",
+  "pack_count": 27,
+  "profile_count": 100,
+  "packs": [
+    {
+      "file": "project-mgmt.json",
+      "domain": "project-management",
+      "profile_count": 19,
+      "profiles": [
+        "project-charter",
+        "project-management-plan",
+        "scope-management-plan",
+        "schedule-management-plan",
+        "cost-management-plan",
+        "quality-management-plan",
+        "resource-management-plan",
+        "communications-management-plan",
+        "risk-management-plan",
+        "procurement-management-plan",
+        "stakeholder-engagement-plan",
+        "wbs-dictionary",
+        "risk-register",
+        "issue-log",
+        "change-log",
+        "lessons-learned-register",
+        "stakeholder-register",
+        "milestone-report",
+        "project-closure-report"
+      ]
+    },
+    {
+      "file": "project-mgmt-high-fidelity.json",
+      "domain": "project-management-high-fidelity",
+      "profile_count": 1,
+      "profiles": ["project-management-plan-v2"]
+    },
+    {
+      "file": "project-controls-high-fidelity.json",
+      "domain": "project-controls-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["scope-management-plan-v2", "schedule-management-plan-v2", "cost-management-plan-v2"]
+    },
+    {
+      "file": "requirements.json",
+      "domain": "requirements-engineering",
+      "profile_count": 6,
+      "profiles": [
+        "business-requirements-document",
+        "requirements-definition",
+        "user-story-backlog",
+        "use-case-specification",
+        "requirements-traceability-matrix",
+        "data-dictionary"
+      ]
+    },
+    {
+      "file": "requirements-high-fidelity.json",
+      "domain": "requirements-high-fidelity",
+      "profile_count": 1,
+      "profiles": ["software-requirements-specification-v2"]
+    },
+    {
+      "file": "architecture.json",
+      "domain": "design-architecture",
+      "profile_count": 6,
+      "profiles": [
+        "basic-design",
+        "architecture-design",
+        "api-specification",
+        "database-design",
+        "detailed-design",
+        "interface-control-document"
+      ]
+    },
+    {
+      "file": "architecture-high-fidelity.json",
+      "domain": "architecture-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["architecture-definition-document", "detailed-design-specification", "database-design-report"]
+    },
+    {
+      "file": "engineering-architecture-high-fidelity.json",
+      "domain": "engineering-architecture-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["microservices-design-guide", "api-architecture-standard", "cloud-migration-strategy"]
+    },
+    {
+      "file": "quality.json",
+      "domain": "quality-validation",
+      "profile_count": 3,
+      "profiles": ["test-plan", "test-case-specification", "test-validation-report"]
+    },
+    {
+      "file": "quality-high-fidelity.json",
+      "domain": "quality-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["master-test-plan", "security-audit-report", "quality-assurance-strategy"]
+    },
+    {
+      "file": "release-ops.json",
+      "domain": "release-operations",
+      "profile_count": 3,
+      "profiles": ["release-plan", "operation-runbook", "disaster-recovery-plan"]
+    },
+    {
+      "file": "release-ops-high-fidelity.json",
+      "domain": "release-ops-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["service-design-package", "sre-error-budget-policy", "disaster-recovery-plan-v2"]
+    },
+    {
+      "file": "engineering-practice-high-fidelity.json",
+      "domain": "engineering-practice-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["service-level-objective-slo", "incident-post-mortem", "cicd-governance-standards"]
+    },
+    {
+      "file": "execution.json",
+      "domain": "execution-control",
+      "profile_count": 3,
+      "profiles": ["weekly-status-report", "meeting-minutes", "mission-ledger"]
+    },
+    {
+      "file": "governance.json",
+      "domain": "governance-risk",
+      "profile_count": 3,
+      "profiles": ["compliance-control-matrix", "information-asset-registry", "risk-assessment-report"]
+    },
+    {
+      "file": "ai-governance-high-fidelity.json",
+      "domain": "ai-governance-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["ai-model-validation-report", "ai-data-governance-policy", "ai-ethics-safety-guidelines"]
+    },
+    {
+      "file": "privacy-compliance-high-fidelity.json",
+      "domain": "privacy-compliance-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["privacy-impact-assessment-pia", "soc2-readiness-report", "vulnerability-management-policy"]
+    },
+    {
+      "file": "legal-compliance-high-fidelity.json",
+      "domain": "legal-compliance-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["data-processing-agreement-dpa", "ip-licensing-agreement", "internal-control-policy"]
+    },
+    {
+      "file": "business-strategy.json",
+      "domain": "business-strategy",
+      "profile_count": 2,
+      "profiles": ["market-analysis", "pitch-deck"]
+    },
+    {
+      "file": "business-strategy-high-fidelity.json",
+      "domain": "business-strategy-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["strategic-business-plan", "investment-pitch-deck-v2", "corporate-governance-framework"]
+    },
+    {
+      "file": "sales-cs-high-fidelity.json",
+      "domain": "sales-cs-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["sales-playbook", "customer-journey-map", "quarterly-business-review-qbr"]
+    },
+    {
+      "file": "marketing-legal-high-fidelity.json",
+      "domain": "marketing-legal-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["brand-identity-guidelines", "digital-marketing-campaign-plan", "master-services-agreement"]
+    },
+    {
+      "file": "hr-ops-high-fidelity.json",
+      "domain": "hr-ops-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["employee-handbook-v2025", "recruitment-strategy-plan", "performance-review-framework"]
+    },
+    {
+      "file": "corporate-high-fidelity.json",
+      "domain": "corporate-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["business-continuity-plan-bcp", "esg-sustainability-report", "corporate-communication-strategy"]
+    },
+    {
+      "file": "biz-ops-industry-fidelity.json",
+      "domain": "biz-ops-industry-fidelity",
+      "profile_count": 4,
+      "profiles": ["annual-operating-plan-aop", "customer-onboarding-plan", "kyc-aml-compliance-policy", "hipaa-compliance-manual"]
+    },
+    {
+      "file": "industrial-general-high-fidelity.json",
+      "domain": "industrial-general-high-fidelity",
+      "profile_count": 3,
+      "profiles": ["bill-of-materials-bom", "reliability-test-plan", "store-launch-checklist"]
+    },
+    {
+      "file": "expansion-high-fidelity.json",
+      "domain": "expansion-high-fidelity",
+      "profile_count": 4,
+      "profiles": ["incident-postmortem-report-v2", "vendor-risk-assessment-v2", "model-card-enterprise-v2", "change-impact-assessment-v2"]
+    }
+  ]
+}

@@ -145,15 +145,25 @@ pnpm run cli -- search browser
 
 ```bash
 MC="node dist/scripts/mission_controller.js"
-$MC start MY-TASK confidential
+$MC start MY-TASK --tier confidential --persona ecosystem_architect
 $MC status MY-TASK
-$MC checkpoint step-1 "Progress note"
+$MC checkpoint MY-TASK step-1 "Progress note"
 $MC verify MY-TASK verified "Verification summary"
 $MC finish MY-TASK
 ```
 
 These are operator tools.
 They are not the normal end-user interface.
+
+### Track and gate flow
+
+```bash
+pnpm control presence tracks
+pnpm control chronos tracks
+pnpm control chronos ref knowledge/public/templates/blueprints/requirements-traceability-matrix.md
+```
+
+Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next Required Artifact` without opening a surface.
 
 ## 8. Where To Read Next
 

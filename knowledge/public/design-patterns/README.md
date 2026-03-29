@@ -81,7 +81,8 @@ design-patterns/
   report/         # 報告書パターン
   infographic/    # 図解・フロー可視化パターン
   media-templates/
-    themes.json   # カラーパレット・フォント・ブランドアセット定義
+    themes/       # カラーパレット・フォント・ブランドアセット定義
+    artifact-library/ # high-fidelity document profile packs
     excel-sheet-themes.json # Excel workbook / sheet UX の共通規律
 ```
 
@@ -89,7 +90,7 @@ design-patterns/
 
 | Op | 説明 |
 | :--- | :--- |
-| `apply_theme` | themes.json からテーマをロードし `active_theme` に設定 |
+| `apply_theme` | `media-templates/themes/` からテーマをロードし `active_theme` に設定 |
 | `apply_pattern` | デザインパターン JSON をロードし `active_pattern` に設定 |
 | `merge_content` | テーマ + パターン + コンテンツを統合してレンダリング可能なプロトコルを生成 |
 | `set` | コンテキスト変数を任意に設定 |
@@ -143,7 +144,9 @@ Excel テンプレート群は次で管理する。
 
 ## Common Themes
 
-共通 theme 定義は `media-templates/themes.json` に集約する。
+共通 theme 定義は `media-templates/themes/` に集約する。
+
+高密度な document profile 群は `media-templates/artifact-library/` に置き、directory scan で media resolver に統合する。
 
 - `kyberion-standard`: 汎用の標準テーマ
 - `kyberion-sovereign`: 役員向け・戦略資料向けの濃色アクセント

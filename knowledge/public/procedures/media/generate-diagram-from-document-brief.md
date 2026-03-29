@@ -29,7 +29,8 @@ Separate the diagram into:
    - `payload.graph` for `drawio`
 4. Either:
    - transform through `document_diagram_asset_from_brief` and then render with `mermaid_render`, `d2_render`, or `drawio_write`
-   - or render directly with `document_diagram_render_from_brief` for a single-step `brief -> file` flow
+   - or use the canonical route with `document_outline_from_brief` plus `generate_document` where applicable
+   - `document_diagram_render_from_brief` remains available as a compatibility adapter for direct `brief -> file` flows
 
 ## 5. Examples
 - [`document-brief-mermaid-diagram.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json)

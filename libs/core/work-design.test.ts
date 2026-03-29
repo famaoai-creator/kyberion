@@ -32,6 +32,28 @@ describe('work-design', () => {
     expect(resolved.team_roles).toContain('operator');
   });
 
+  it('resolves a knowledge specialist for cross-project remediation analysis', () => {
+    const resolved = resolveWorkDesign({
+      intentId: 'cross-project-remediation',
+      taskType: 'analysis',
+      shape: 'task_session',
+      outcomeIds: ['remediation_plan'],
+    });
+    expect(resolved.primary_specialist?.id).toBe('knowledge-specialist');
+    expect(resolved.outcomes[0]?.id).toBe('remediation_plan');
+  });
+
+  it('resolves a knowledge specialist for incident-informed review', () => {
+    const resolved = resolveWorkDesign({
+      intentId: 'incident-informed-review',
+      taskType: 'analysis',
+      shape: 'task_session',
+      outcomeIds: ['review_findings'],
+    });
+    expect(resolved.primary_specialist?.id).toBe('knowledge-specialist');
+    expect(resolved.outcomes[0]?.id).toBe('review_findings');
+  });
+
   it('prefers standard-intent catalog specialist and outcome definitions', () => {
     const resolved = resolveWorkDesign({
       intentId: 'bootstrap-project',
@@ -81,6 +103,27 @@ describe('work-design', () => {
     expect(summary.context.project_id).toBe('PRJ-123');
     expect(summary.resolution.execution_shape).toBe('task_session');
     expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
+    expect(summary.process_design.operator_checklist).toContain('confirm the governed output path');
+    expect(summary.execution_boundary.rule).toContain('knowledge defines process');
     expect(summary.teaming.specialist_id).toBe('document-specialist');
+  });
+
+  it('builds process design from intent catalog for incident-informed review', () => {
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'incident-informed-review',
+      taskType: 'analysis',
+      shape: 'task_session',
+      outcomeIds: ['review_findings'],
+      tier: 'confidential',
+    });
+    expect(summary.process_design.plan_outline).toEqual([
+      'search incident and failure history',
+      'review the current target against those lessons',
+      'return governed findings and follow-up checks',
+    ]);
+    expect(summary.process_design.intake_requirements).toContain('incident basis');
+    expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
+    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('resolve_target_binding');
+    expect(summary.execution_boundary.llm_zone.forbidden).toContain('invent_review_target_bindings');
   });
 });

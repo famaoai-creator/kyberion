@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver, resolveVars, evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -63,26 +63,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ctx = { ...ctx, ...saved };
   }
 
-      const resolve = (val: any) => {
-    if (typeof val !== 'string') return val;
-    
-    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
-    }
-
-    // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
-    });
-  };
+  const resolve = (val: any) => resolveVars(val, ctx);
 
   const results = [];
   for (const step of steps) {
@@ -120,7 +101,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 /**
  * CONTROL Operators
  */
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -146,27 +127,10 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
   }
 }
 
-function evaluateCondition(cond: any, ctx: any): boolean {
-  if (!cond) return true;
-  const parts = cond.from.split('.');
-  let val = ctx;
-  for (const part of parts) { val = val?.[part]; }
-  
-  switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    default: return !!val;
-  }
-}
-
 /**
  * CAPTURE Operators
  */
-async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
+async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
@@ -184,14 +148,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 /**
  * TRANSFORM Operators
  */
-async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
+async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   switch (op) {
     case 'ajv_validate':
       const validate = ajv.compile(ctx[params.schema_from || 'last_schema_data']);
       const valid = validate(ctx[params.data_from || 'last_capture_data']);
       return { ...ctx, [params.export_as || 'is_valid']: valid, [params.errors_as || 'validation_errors']: validate.errors };
     case 'json_query':
-      const res = params.path.split('.').reduce((o: any, i: string) => o?.[i], ctx[params.from || 'last_capture_data']);
+      const res = getPathValue(ctx[params.from || 'last_capture_data'], params.path);
       return { ...ctx, [params.export_as]: res };
     case 'mermaid_gen':
       const items = ctx[params.from || 'skills_list'] || [];
@@ -510,14 +474,16 @@ function loadBrowserExecutionPresetCatalog(): { default_preset?: string; presets
 /**
  * APPLY Operators
  */
-async function opApply(op: string, params: any, ctx: any, resolve: Function) {
+async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write_file':
-      const outPath = path.resolve(rootDir, resolve(params.path));
-      const content = params.from ? ctx[params.from] : (ctx.last_transform ?? ctx.last_capture);
+    case 'write_artifact':
+      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
+      const outPath = path.resolve(rootDir, spec.path);
+      const content = spec.content;
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      safeWriteFile(outPath, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      safeWriteFile(outPath, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
       break;
     case 'log':
       logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);

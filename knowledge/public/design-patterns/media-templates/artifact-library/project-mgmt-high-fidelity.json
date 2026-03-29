@@ -1,0 +1,39 @@
+{
+  "domain": "project-management-high-fidelity",
+  "profiles": {
+    "project-management-plan-v2": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Comprehensive PMP based on PMBOK 7th Edition performance domains.",
+      "sections": [
+        { "section_id": "1-introduction", "title": "1. Introduction", "layout_key": "doc-title" },
+        { "section_id": "1-1-purpose", "title": "1.1 Project Purpose and Justification", "layout_key": "doc-sections" },
+        { "section_id": "1-2-objectives", "title": "1.2 Project Objectives and Success Criteria", "layout_key": "doc-summary" },
+        { "section_id": "1-3-value-delivery", "title": "1.3 System for Value Delivery", "layout_key": "doc-sections" },
+        { "section_id": "2-principles", "title": "2. Project Management Principles", "layout_key": "doc-title" },
+        { "section_id": "2-1-stewardship", "title": "2.1 Stewardship and Team Responsibility", "layout_key": "doc-sections" },
+        { "section_id": "2-2-stakeholders", "title": "2.2 Stakeholder Engagement and Value Focus", "layout_key": "doc-sections" },
+        { "section_id": "2-3-leadership", "title": "2.3 Leadership and Systems Thinking", "layout_key": "doc-sections" },
+        { "section_id": "3-performance-domains", "title": "3. Project Performance Domains", "layout_key": "doc-title" },
+        { "section_id": "3-1-stakeholder", "title": "3.1 Stakeholder Performance Domain", "layout_key": "doc-sections" },
+        { "section_id": "3-2-team", "title": "3.2 Team Performance Domain", "layout_key": "doc-sections" },
+        { "section_id": "3-3-lifecycle", "title": "3.3 Development Approach and Life Cycle Domain", "layout_key": "doc-sections" },
+        { "section_id": "3-4-planning", "title": "3.4 Planning Performance Domain (Scope, Schedule, Budget)", "layout_key": "doc-sections" },
+        { "section_id": "3-5-work", "title": "3.5 Project Work Performance Domain", "layout_key": "doc-sections" },
+        { "section_id": "3-6-delivery", "title": "3.6 Delivery Performance Domain (Quality and Scope)", "layout_key": "doc-sections" },
+        { "section_id": "3-7-measurement", "title": "3.7 Measurement Performance Domain (KPIs & Metrics)", "layout_key": "doc-summary" },
+        { "section_id": "3-8-uncertainty", "title": "3.8 Uncertainty Performance Domain (Risk & Resilience)", "layout_key": "risk-controls" },
+        { "section_id": "4-tailoring", "title": "4. Tailoring", "layout_key": "doc-title" },
+        { "section_id": "4-1-methodology", "title": "4.1 Methodology Selection", "layout_key": "doc-sections" },
+        { "section_id": "4-2-artifacts", "title": "4.2 Process and Artifact Tailoring", "layout_key": "doc-sections" },
+        { "section_id": "5-models-methods", "title": "5. Models, Methods, and Artifacts", "layout_key": "doc-title" },
+        { "section_id": "5-1-models", "title": "5.1 Applied Management Models", "layout_key": "doc-sections" },
+        { "section_id": "5-2-methods", "title": "5.2 Project Management Methods", "layout_key": "doc-sections" },
+        { "section_id": "6-appendices", "title": "6. Appendices", "layout_key": "doc-appendix" },
+        { "section_id": "a-charter", "title": "Appendix A: Project Charter Reference", "layout_key": "doc-sections" },
+        { "section_id": "b-raci", "title": "Appendix B: Responsibility Assignment Matrix (RACI)", "layout_key": "doc-sections" },
+        { "section_id": "c-change-plan", "title": "Appendix C: Change Management Plan", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

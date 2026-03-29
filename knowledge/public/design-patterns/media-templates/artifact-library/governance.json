@@ -1,0 +1,30 @@
+{
+  "domain": "governance-risk",
+  "profiles": {
+    "compliance-control-matrix": {
+      "artifact_family": "spreadsheet",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "controls", "title": "Governance Controls", "layout_key": "sheet-main-table" },
+        { "section_id": "evidence", "title": "Evidence Requirements", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "information-asset-registry": {
+      "artifact_family": "spreadsheet",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "assets", "title": "Information Assets", "layout_key": "sheet-main-table" },
+        { "section_id": "classification", "title": "Data Classification", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "risk-assessment-report": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "sections": [
+        { "section_id": "title", "title": "Risk Assessment: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "threats", "title": "Identified Threats", "layout_key": "risk-controls" },
+        { "section_id": "mitigation", "title": "Mitigation Strategies", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

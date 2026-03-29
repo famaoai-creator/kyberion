@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver, resolveVars, evaluateCondition, getPathValue } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -413,33 +413,7 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     pipelineId: sessionId,
   });
 
-  const resolveKey = (key: string): any => {
-    // {{env.VAR_NAME}} → process.env.VAR_NAME
-    if (key.startsWith('env.')) {
-      return process.env[key.slice(4)] || '';
-    }
-    const parts = key.split('.');
-    let current: any = ctx;
-    for (const part of parts) { current = current?.[part]; }
-    return current;
-  };
-
-  const resolve = (val: any): any => {
-    if (typeof val !== 'string') return val;
-
-    // 単一の変数参照 "{{var}}" の場合は、型を維持して生データを返す
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const resolved = resolveKey(singleVarMatch[1].trim());
-      return resolved !== undefined ? resolved : '';
-    }
-
-    // 文字列混在の場合は従来通り文字列展開
-    return val.replace(/{{(.*?)}}/g, (_, p: string) => {
-      const resolved = resolveKey(p.trim());
-      return resolved !== undefined ? (typeof resolved === 'object' ? JSON.stringify(resolved) : String(resolved)) : '';
-    });
-  };
+  const resolve = (val: any): any => resolveVars(val, ctx);
 
   const results = [];
   let stepIndex = 0;
@@ -767,23 +741,6 @@ async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRu
   return { context: ctx };
 }
 
-function evaluateCondition(cond: any, ctx: any): boolean {
-  if (!cond) return true;
-  const parts = cond.from.split('.');
-  let val = ctx;
-  for (const part of parts) { val = val?.[part]; }
-  
-  switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    default: return !!val;
-  }
-}
-
 /**
  * CAPTURE Operators
  */
@@ -939,7 +896,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'json_query': {
       const data = ctx[params.from || 'last_capture'];
-      const res = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
+      const res = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: res };
     }
     case 'export_playwright': {

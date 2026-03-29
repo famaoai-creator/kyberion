@@ -1,0 +1,63 @@
+{
+  "domain": "design-architecture",
+  "profiles": {
+    "basic-design": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Basic Design: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "concept", "title": "Design Concept & Principles", "layout_key": "immersive-vision" },
+        { "section_id": "architecture", "title": "System Architecture Overview", "layout_key": "three-point-architecture" },
+        { "section_id": "subsystems", "title": "Subsystem Breakdown", "layout_key": "three-pillars" },
+        { "section_id": "security", "title": "Security Design", "layout_key": "risk-controls" }
+      ]
+    },
+    "architecture-design": {
+      "artifact_family": "diagram",
+      "document_type": "architecture-diagram",
+      "sections": [
+        { "section_id": "context", "title": "System Context", "layout_key": "diagram-context" },
+        { "section_id": "components", "title": "Component Interaction", "layout_key": "three-point-architecture" }
+      ]
+    },
+    "api-specification": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "API Specification", "layout_key": "doc-title" },
+        { "section_id": "endpoints", "title": "Endpoints & Methods", "layout_key": "doc-sections" },
+        { "section_id": "data-models", "title": "Request/Response Models", "layout_key": "three-point-architecture" },
+        { "section_id": "auth", "title": "Authentication & Authorization", "layout_key": "risk-controls" }
+      ]
+    },
+    "database-design": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Database Design", "layout_key": "doc-title" },
+        { "section_id": "erd", "title": "Entity Relationship Diagram (ERD)", "layout_key": "three-point-architecture" },
+        { "section_id": "schema", "title": "Table Schema Details", "layout_key": "doc-sections" },
+        { "section_id": "indexing", "title": "Indexing & Performance Tuning", "layout_key": "doc-sections" }
+      ]
+    },
+    "detailed-design": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Detailed Design: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "module-logic", "title": "Module Logic & Algorithms", "layout_key": "doc-sections" },
+        { "section_id": "internal-interfaces", "title": "Internal Interfaces", "layout_key": "doc-sections" },
+        { "section_id": "error-handling", "title": "Error Handling & Logging", "layout_key": "risk-controls" }
+      ]
+    },
+    "interface-control-document": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Interface Control Document (ICD)", "layout_key": "doc-title" },
+        { "section_id": "external-systems", "title": "External System Interfaces", "layout_key": "three-pillars" },
+        { "section_id": "protocols", "title": "Communication Protocols", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}
