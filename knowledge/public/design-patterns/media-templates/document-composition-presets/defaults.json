@@ -1,0 +1,8 @@
+{
+  "defaults": {
+    "proposal": "executive-proposal",
+    "report": "summary-report",
+    "spreadsheet": "operator-tracker",
+    "diagram": "solution-overview"
+  }
+}

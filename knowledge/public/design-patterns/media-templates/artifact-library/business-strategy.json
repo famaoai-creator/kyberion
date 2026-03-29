@@ -1,0 +1,26 @@
+{
+  "domain": "business-strategy",
+  "profiles": {
+    "market-analysis": {
+      "artifact_family": "presentation",
+      "document_type": "analysis",
+      "sections": [
+        { "section_id": "cover", "title": "Market Analysis: {{title}}", "layout_key": "cover-statement" },
+        { "section_id": "landscape", "title": "Current Market Landscape", "layout_key": "title-body" },
+        { "section_id": "competitors", "title": "Competitive Landscape", "layout_key": "three-pillars" },
+        { "section_id": "opportunities", "title": "Identified Opportunities", "layout_key": "evidence-callout" }
+      ]
+    },
+    "pitch-deck": {
+      "artifact_family": "presentation",
+      "document_type": "proposal",
+      "sections": [
+        { "section_id": "hook", "title": "{{title}}", "layout_key": "cover-statement" },
+        { "section_id": "problem", "title": "The Problem", "layout_key": "why-change" },
+        { "section_id": "solution", "title": "Our Solution", "layout_key": "immersive-vision" },
+        { "section_id": "business-model", "title": "Business Model", "layout_key": "operating-model" },
+        { "section_id": "ask", "title": "The Ask", "layout_key": "decision-cta" }
+      ]
+    }
+  }
+}

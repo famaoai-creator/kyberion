@@ -1306,6 +1306,11 @@ export async function POST(req: NextRequest) {
       const missionId = `MSN-${seed.seed_id.replace(/^MSD-/, "")}`.toUpperCase();
       const persona = seed.specialist_id === "service-operator" ? "Reliability Engineer" : "Ecosystem Architect";
       const missionType = seed.mission_type_hint || "development";
+      const executionContract = seed.metadata && typeof seed.metadata.execution_contract === "object"
+        ? seed.metadata.execution_contract as Record<string, unknown>
+        : null;
+      const contractTarget = typeof executionContract?.review_target === "string" ? executionContract.review_target : "";
+      const contractRepo = typeof executionContract?.repository_id === "string" ? executionContract.repository_id : "";
       const env = buildExecutionEnv(process.env, "mission_controller");
       const startArgs = [
         "dist/scripts/mission_controller.js",
@@ -1326,7 +1331,7 @@ export async function POST(req: NextRequest) {
         "--project-relationship",
         "belongs_to",
         "--project-note",
-        `Promoted from mission seed ${seed.seed_id}`,
+        `Promoted from mission seed ${seed.seed_id}${contractTarget ? ` targeting ${contractTarget}` : ""}${contractRepo ? ` in ${contractRepo}` : ""}`,
       ];
       if (seed.track_id) startArgs.push("--track-id", seed.track_id);
       if (seed.track_name) startArgs.push("--track-name", seed.track_name);
@@ -1346,6 +1351,7 @@ export async function POST(req: NextRequest) {
         metadata: {
           ...(seed.metadata || {}),
           start_output: startOutput,
+          promoted_execution_contract: executionContract,
         },
       });
       const activeMissions = new Set(project.active_missions || []);

@@ -82,14 +82,14 @@
       "id": "proposal-storyline-pptx",
       "title": "Proposal Storyline PPTX",
       "path": "libs/actuators/media-actuator/examples/proposal-storyline-pptx.json",
-      "description": "Builds a proposal storyline from a structured brief, turns it into slide content, and renders a themed PPTX deck.",
-      "tags": ["proposal", "pptx", "storyline", "brief", "theme", "example"]
+      "description": "Legacy compatibility example for proposal storyline inspection and slide-content debugging.",
+      "tags": ["proposal", "pptx", "storyline", "legacy", "debug", "example"]
     },
     {
       "id": "document-brief-proposal-pptx",
       "title": "Proposal PPTX (Canonical Document Brief)",
       "path": "libs/actuators/media-actuator/examples/document-brief-proposal-pptx.json",
-      "description": "Builds a proposal deck from the canonical document-brief contract using presentation/proposal/pptx routing plus a knowledge-owned theme template.",
+      "description": "Builds a proposal deck from the canonical document-brief contract through document_outline_from_brief, brief_to_design_protocol, and generate_document.",
       "tags": ["proposal", "pptx", "document-brief", "canonical", "presentation", "theme", "example"]
     },
     {

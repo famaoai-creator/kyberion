@@ -1,0 +1,50 @@
+{
+  "domain": "engineering-practice-high-fidelity",
+  "profiles": {
+    "service-level-objective-slo": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Reliability targets aligning engineering with user happiness.",
+      "sections": [
+        { "section_id": "1-metadata", "title": "Document Metadata and Owners", "layout_key": "doc-title" },
+        { "section_id": "2-overview", "title": "Service Overview and Critical User Journeys", "layout_key": "immersive-vision" },
+        { "section_id": "3-sli", "title": "Service Level Indicators (SLIs)", "layout_key": "three-pillars" },
+        { "section_id": "3-1-availability", "title": "3.1 Availability Definition", "layout_key": "doc-sections" },
+        { "section_id": "3-2-latency", "title": "3.2 Latency Thresholds", "layout_key": "doc-sections" },
+        { "section_id": "4-slo", "title": "Service Level Objectives (SLOs)", "layout_key": "evidence-callout" },
+        { "section_id": "5-error-budget", "title": "Error Budget Policy", "layout_key": "risk-controls" },
+        { "section_id": "5-1-burn-rate", "title": "5.1 Burn Rate Alerts", "layout_key": "doc-sections" },
+        { "section_id": "6-dependencies", "title": "Upstream and Downstream Dependencies", "layout_key": "three-point-architecture" }
+      ]
+    },
+    "incident-post-mortem": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "description": "Blameless analysis to prevent recurrence and improve resilience.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "Executive Summary (What happened?)", "layout_key": "doc-summary" },
+        { "section_id": "2-metadata", "title": "Incident Metadata (Severity, Duration)", "layout_key": "doc-sections" },
+        { "section_id": "3-impact", "title": "Impact Analysis (Users, Business)", "layout_key": "evidence-callout" },
+        { "section_id": "4-timeline", "title": "Timeline of Events", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-rca", "title": "Root Cause Analysis (The 5 Whys)", "layout_key": "three-pillars" },
+        { "section_id": "6-effectiveness", "title": "Detection and Response Effectiveness", "layout_key": "operating-model" },
+        { "section_id": "7-action-items", "title": "Corrective Action Items", "layout_key": "doc-sections" },
+        { "section_id": "8-lessons", "title": "Lessons Learned", "layout_key": "immersive-vision" }
+      ]
+    },
+    "cicd-governance-standards": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Security and quality standards for automated delivery.",
+      "sections": [
+        { "section_id": "1-overview", "title": "Governance Framework Overview", "layout_key": "doc-title" },
+        { "section_id": "2-iam", "title": "Access Control and Identity (IAM)", "layout_key": "operating-model" },
+        { "section_id": "3-devsecops", "title": "Pipeline Security (SAST/SCA/Secret Scanning)", "layout_key": "risk-controls" },
+        { "section_id": "4-quality-gates", "title": "Quality Gates and Test Thresholds", "layout_key": "evidence-callout" },
+        { "section_id": "5-deployment", "title": "Deployment and Rollback Standards", "layout_key": "two-column-story" },
+        { "section_id": "6-audit", "title": "Audit, Traceability, and Provenance", "layout_key": "three-point-architecture" },
+        { "section_id": "7-pac", "title": "Policy as Code (PaC) Enforcement", "layout_key": "three-pillars" }
+      ]
+    }
+  }
+}

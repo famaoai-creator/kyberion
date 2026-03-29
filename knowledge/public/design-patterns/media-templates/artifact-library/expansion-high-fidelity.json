@@ -1,0 +1,59 @@
+{
+  "domain": "expansion-high-fidelity",
+  "profiles": {
+    "incident-postmortem-report-v2": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "description": "High-fidelity incident postmortem with executive summary, timeline, contributing factors, and corrective actions.",
+      "sections": [
+        { "section_id": "title", "title": "Incident Postmortem", "layout_key": "doc-title" },
+        { "section_id": "summary", "title": "Executive Summary", "layout_key": "doc-summary" },
+        { "section_id": "timeline", "title": "Incident Timeline", "layout_key": "timeline-roadmap" },
+        { "section_id": "impact", "title": "Impact Assessment", "layout_key": "evidence-callout" },
+        { "section_id": "root-causes", "title": "Contributing Factors and Root Causes", "layout_key": "risk-controls" },
+        { "section_id": "actions", "title": "Corrective and Preventive Actions", "layout_key": "doc-sections" },
+        { "section_id": "appendix", "title": "Appendix", "layout_key": "doc-appendix" }
+      ]
+    },
+    "vendor-risk-assessment-v2": {
+      "artifact_family": "document",
+      "document_type": "assessment",
+      "description": "Vendor risk assessment covering security, resilience, legal exposure, and mitigation controls.",
+      "sections": [
+        { "section_id": "title", "title": "Vendor Risk Assessment", "layout_key": "doc-title" },
+        { "section_id": "vendor-profile", "title": "Vendor Profile and Criticality", "layout_key": "doc-summary" },
+        { "section_id": "security", "title": "Security and Privacy Posture", "layout_key": "risk-controls" },
+        { "section_id": "operational", "title": "Operational Resilience", "layout_key": "operating-model" },
+        { "section_id": "legal", "title": "Legal and Contractual Exposure", "layout_key": "doc-sections" },
+        { "section_id": "recommendation", "title": "Recommendation and Conditions", "layout_key": "decision-cta" }
+      ]
+    },
+    "model-card-enterprise-v2": {
+      "artifact_family": "document",
+      "document_type": "governance-record",
+      "description": "Enterprise model card for AI systems with intended use, limitations, evaluations, and controls.",
+      "sections": [
+        { "section_id": "title", "title": "Enterprise Model Card", "layout_key": "doc-title" },
+        { "section_id": "system", "title": "Model Identity and Intended Use", "layout_key": "doc-summary" },
+        { "section_id": "training", "title": "Training Data and Inputs", "layout_key": "three-point-architecture" },
+        { "section_id": "evaluation", "title": "Evaluation Results and Quality Signals", "layout_key": "evidence-callout" },
+        { "section_id": "risks", "title": "Risks, Limitations, and Prohibited Uses", "layout_key": "risk-controls" },
+        { "section_id": "controls", "title": "Operational Controls and Monitoring", "layout_key": "operating-model" },
+        { "section_id": "appendix", "title": "Appendix", "layout_key": "doc-appendix" }
+      ]
+    },
+    "change-impact-assessment-v2": {
+      "artifact_family": "document",
+      "document_type": "assessment",
+      "description": "Cross-functional change impact assessment for specification or architecture updates.",
+      "sections": [
+        { "section_id": "title", "title": "Change Impact Assessment", "layout_key": "doc-title" },
+        { "section_id": "change-summary", "title": "Change Summary and Trigger", "layout_key": "doc-summary" },
+        { "section_id": "affected-systems", "title": "Affected Systems and Interfaces", "layout_key": "three-point-architecture" },
+        { "section_id": "process-impact", "title": "Process and Role Impact", "layout_key": "operating-model" },
+        { "section_id": "risk-impact", "title": "Risk, Compliance, and Control Impact", "layout_key": "risk-controls" },
+        { "section_id": "recommended-actions", "title": "Recommended Follow-up Actions", "layout_key": "timeline-roadmap" }
+      ]
+    }
+  }
+}

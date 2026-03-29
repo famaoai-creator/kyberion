@@ -1,0 +1,48 @@
+{
+  "domain": "hr-ops-high-fidelity",
+  "profiles": {
+    "employee-handbook-v2025": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Modern cultural and compliance-driven employee guide.",
+      "sections": [
+        { "section_id": "1-culture", "title": "1. Introduction and Culture", "layout_key": "immersive-vision" },
+        { "section_id": "1-1-mission", "title": "1.1 Mission, Vision, and Values", "layout_key": "three-pillars" },
+        { "section_id": "2-compliance", "title": "2. Employment Policies and Compliance", "layout_key": "doc-sections" },
+        { "section_id": "3-guidelines", "title": "3. Workplace Guidelines (Remote/Hybrid)", "layout_key": "two-column-story" },
+        { "section_id": "3-1-code-conduct", "title": "3.1 Code of Conduct and AI Ethics", "layout_key": "risk-controls" },
+        { "section_id": "4-compensation", "title": "4. Compensation, Benefits, and Transparency", "layout_key": "doc-sections" },
+        { "section_id": "5-time-off", "title": "5. Time Off and Leave Policies", "layout_key": "doc-sections" },
+        { "section_id": "6-safety", "title": "6. Health, Safety, and Wellness", "layout_key": "operating-model" },
+        { "section_id": "7-acknowledgment", "title": "7. Acknowledgment of Receipt", "layout_key": "decision-cta" }
+      ]
+    },
+    "recruitment-strategy-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Proactive talent pipelining and GTM for human capital.",
+      "sections": [
+        { "section_id": "1-planning", "title": "1. Workforce Planning and Needs Assessment", "layout_key": "doc-summary" },
+        { "section_id": "2-evp", "title": "2. Employer Branding and Value Proposition (EVP)", "layout_key": "evidence-callout" },
+        { "section_id": "3-sourcing", "title": "3. Sourcing Strategy (Active/Referral/DEI)", "layout_key": "three-pillars" },
+        { "section_id": "4-selection", "title": "4. Selection and Interview Framework", "layout_key": "operating-model" },
+        { "section_id": "5-technology", "title": "5. Recruitment Technology Stack (ATS/AI)", "layout_key": "three-point-architecture" },
+        { "section_id": "6-metrics", "title": "6. Metrics and Continuous Improvement", "layout_key": "evidence-callout" }
+      ]
+    },
+    "performance-review-framework": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Growth-oriented dialogue framework beyond annual critiques.",
+      "sections": [
+        { "section_id": "1-philosophy", "title": "1. Framework Philosophy and Frequency", "layout_key": "immersive-vision" },
+        { "section_id": "2-goal-setting", "title": "2. Goal Setting and OKR Alignment", "layout_key": "timeline-roadmap" },
+        { "section_id": "3-components", "title": "3. Review Components (Self/Manager/360)", "layout_key": "three-pillars" },
+        { "section_id": "4-mapping", "title": "4. Competency and Value Mapping", "layout_key": "operating-model" },
+        { "section_id": "5-feedback", "title": "5. Feedback Conversations (SBI Model)", "layout_key": "doc-sections" },
+        { "section_id": "6-pip", "title": "6. Performance Improvement Plans (PIP)", "layout_key": "risk-controls" },
+        { "section_id": "7-calibration", "title": "7. Calibration and Finalization", "layout_key": "decision-cta" }
+      ]
+    }
+  }
+}

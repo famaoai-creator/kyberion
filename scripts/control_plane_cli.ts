@@ -2,12 +2,68 @@ import {
   ControlPlaneClientError,
   createControlPlaneClient,
   createStandardYargs,
+  findIntentOutcomePattern,
   getControlPlaneRemediationPlan,
+  loadIntentOutcomePatterns,
   logger,
+  safeReadFile,
   safeExec,
 } from "@agent/core";
+import * as path from "node:path";
 
 type SurfaceKind = "presence" | "chronos";
+const ARTIFACT_LIBRARY_INDEX_PATH = "knowledge/public/design-patterns/media-templates/artifact-library/index.json";
+
+function loadArtifactLibraryIndex(): any {
+  const fullPath = path.resolve(process.cwd(), ARTIFACT_LIBRARY_INDEX_PATH);
+  return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+}
+
+function normalizeCatalogQuery(input: unknown): string {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function searchArtifactLibraryProfiles(query?: string): any[] {
+  const index = loadArtifactLibraryIndex();
+  const normalized = normalizeCatalogQuery(query);
+  const items = asArray(index.packs).flatMap((pack: any) =>
+    asArray<string>(pack.profiles).map((profileId) => ({
+      profile_id: profileId,
+      domain: pack.domain,
+      file: pack.file,
+    })),
+  );
+  if (!normalized) return items;
+  return items.filter((item) => {
+    const haystack = [
+      item.profile_id,
+      item.domain,
+      item.file,
+    ].map(normalizeCatalogQuery).join(" ");
+    return haystack.includes(normalized);
+  });
+}
+
+function resolveArtifactLibraryProfile(profileId: string): any {
+  const index = loadArtifactLibraryIndex();
+  const normalizedProfileId = String(profileId || "").trim();
+  for (const pack of asArray(index.packs)) {
+    if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
+    const fullPath = path.resolve(process.cwd(), "knowledge/public/design-patterns/media-templates/artifact-library", String(pack.file));
+    const doc = JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+    return {
+      profile_id: normalizedProfileId,
+      domain: pack.domain,
+      file: pack.file,
+      definition: doc?.profiles?.[normalizedProfileId] || null,
+    };
+  }
+  return null;
+}
 
 interface DoctorCheckResult {
   surface: SurfaceKind;
@@ -97,6 +153,15 @@ function printItems(title: string, items: unknown[], projector: (item: any) => s
 
 function asArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
+}
+
+function filterByProjectId<T extends { project_id?: string }>(items: T[], projectId?: string): T[] {
+  if (!projectId) return items;
+  return items.filter((item) => item.project_id === projectId);
+}
+
+function isKnowledgePath(logicalPath: string): boolean {
+  return /^knowledge\//.test(String(logicalPath || "").trim());
 }
 
 async function runDoctor(input: { json: boolean; verbose: boolean; fix: boolean; surface?: SurfaceKind }): Promise<void> {
@@ -229,6 +294,22 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       item.promoted_mission_id ? `mission: ${item.promoted_mission_id}` : "mission: -",
     ]);
   }
+  if (action === "tracks") {
+    const [projectId] = args;
+    const items = filterByProjectId(await client.listProjectTracks(), projectId);
+    if (json) return printJson(items);
+    return printItems("Project Tracks", items, (item) => [
+      `${item.name || item.track_id} [${item.status || "unknown"}]`,
+      `track: ${item.track_id} · project: ${item.project_id || "unknown"}`,
+      `type: ${item.track_type || "unknown"} · lifecycle: ${item.lifecycle_model || "unknown"}`,
+      item.gate_readiness
+        ? `gates: ${item.gate_readiness.ready_gate_count || 0}/${item.gate_readiness.total_gate_count || 0} · current: ${item.gate_readiness.current_gate_id || "-"}`
+        : "gates: -",
+      asArray(item.gate_readiness?.next_required_artifacts).length
+        ? `next required: ${asArray(item.gate_readiness?.next_required_artifacts).map((entry) => entry.artifact_id || "artifact").join(", ")}`
+        : "next required: -",
+    ]);
+  }
   if (action === "approvals") {
     const items = await client.listApprovals();
     if (json) return printJson(items);
@@ -284,6 +365,18 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
     process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
     return;
   }
+  if (action === "ref") {
+    const [logicalPath] = args;
+    if (!logicalPath) {
+      throw new Error("Usage: control presence ref <knowledge/...|active/projects/...>");
+    }
+    const pathname = isKnowledgePath(logicalPath)
+      ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
+      : `/api/runtime-ref?path=${encodeURIComponent(logicalPath)}`;
+    const text = await client.getText(pathname);
+    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    return;
+  }
   throw new Error(`Unsupported presence action: ${action}`);
 }
 
@@ -322,10 +415,43 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
     if (json) return printJson(items);
     return printItems("Mission Seeds", items, (item) => [
       `${item.title || item.seed_id} [${item.status || "unknown"}]`,
-      `seed: ${item.seed_id} · project: ${item.project_id || "standalone"}`,
+      `seed: ${item.seed_id} · project: ${item.project_id || "standalone"} · track: ${item.track_name || item.track_id || "-"}`,
       `specialist: ${item.specialist_id || "unknown"} · type: ${item.mission_type_hint || "general"}`,
       item.promoted_mission_id ? `mission: ${item.promoted_mission_id}` : "mission: -",
+      item.metadata?.template_ref ? `template: ${item.metadata.template_ref}` : "template: -",
+      item.metadata?.skeleton_path ? `skeleton: ${item.metadata.skeleton_path}` : "skeleton: -",
+      item.metadata?.execution_contract && typeof item.metadata.execution_contract === "object"
+        ? `execution: ${String((item.metadata.execution_contract as any).recommended_action || "-")} -> ${String((item.metadata.execution_contract as any).review_target || (item.metadata.execution_contract as any).repository_id || "-")}`
+        : "execution: -",
     ]);
+  }
+  if (action === "tracks") {
+    const [projectId] = args;
+    const items = filterByProjectId(await client.listProjectTracks(), projectId);
+    if (json) return printJson(items);
+    return printItems("Chronos Tracks", items, (item) => [
+      `${item.name || item.track_id} [${item.status || "unknown"}]`,
+      `track: ${item.track_id} · project: ${item.project_id || "unknown"}`,
+      `type: ${item.track_type || "unknown"} · lifecycle: ${item.lifecycle_model || "unknown"}`,
+      item.gate_readiness
+        ? `gates: ${item.gate_readiness.ready_gate_count || 0}/${item.gate_readiness.total_gate_count || 0} · current: ${item.gate_readiness.current_gate_id || "-"}`
+        : "gates: -",
+      asArray(item.gate_readiness?.next_required_artifacts).length
+        ? `next required: ${asArray(item.gate_readiness?.next_required_artifacts).map((entry) => {
+            const parts = [entry.artifact_id || "artifact"];
+            if (entry.template_ref) parts.push(`template=${entry.template_ref}`);
+            return parts.join(" ");
+          }).join(", ")}`
+        : "next required: -",
+    ]);
+  }
+  if (action === "seed-track") {
+    const [trackId, artifactId] = args;
+    if (!trackId) {
+      throw new Error("Usage: control chronos seed-track <trackId> [artifactId]");
+    }
+    const body = await client.postJson("/api/intelligence", { action: "create_track_seed", trackId, artifactId });
+    return printJson(body);
   }
   if (action === "promote-seed") {
     const [seedId] = args;
@@ -370,7 +496,73 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
     const body = await client.postJson("/api/intelligence", { action: "surface_control", operation, surfaceId });
     return printJson(body);
   }
+  if (action === "ref") {
+    const [logicalPath] = args;
+    if (!logicalPath) {
+      throw new Error("Usage: control chronos ref <knowledge/...|active/projects/...>");
+    }
+    const pathname = isKnowledgePath(logicalPath)
+      ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
+      : `/api/runtime-file?path=${encodeURIComponent(logicalPath)}`;
+    const text = await client.getText(pathname);
+    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    return;
+  }
   throw new Error(`Unsupported chronos action: ${action}`);
+}
+
+async function handleCatalog(action: string, args: string[], json: boolean): Promise<void> {
+  if (action === "intents") {
+    const [query] = args;
+    const normalized = normalizeCatalogQuery(query);
+    const items = loadIntentOutcomePatterns().filter((item) => {
+      if (!normalized) return true;
+      const haystack = [
+        item.intent_id,
+        ...(item.primary_outcome_ids || []),
+        ...(item.contract_layers || []),
+      ].map(normalizeCatalogQuery).join(" ");
+      return haystack.includes(normalized);
+    });
+    if (json) return printJson(items);
+    return printItems("Intent Outcome Patterns", items, (item) => [
+      `${item.intent_id}`,
+      `outcomes: ${(item.primary_outcome_ids || []).join(", ") || "-"}`,
+      `flow: ${(item.canonical_flow || []).slice(0, 3).join(" -> ") || "-"}`,
+    ]);
+  }
+  if (action === "intent") {
+    const [intentId] = args;
+    if (!intentId) {
+      throw new Error("Usage: control catalog intent <intentId>");
+    }
+    const item = findIntentOutcomePattern(intentId);
+    if (!item) {
+      throw new Error(`Unknown intent-outcome pattern: ${intentId}`);
+    }
+    return printJson(item);
+  }
+  if (action === "profiles") {
+    const [query] = args;
+    const items = searchArtifactLibraryProfiles(query);
+    if (json) return printJson(items);
+    return printItems("Artifact Library Profiles", items, (item) => [
+      `${item.profile_id} [${item.domain || "unknown"}]`,
+      `pack: ${item.file || "-"}`,
+    ]);
+  }
+  if (action === "profile") {
+    const [profileId] = args;
+    if (!profileId) {
+      throw new Error("Usage: control catalog profile <profileId>");
+    }
+    const item = resolveArtifactLibraryProfile(profileId);
+    if (!item) {
+      throw new Error(`Unknown artifact-library profile: ${profileId}`);
+    }
+    return printJson(item);
+  }
+  throw new Error(`Unsupported catalog action: ${action}`);
 }
 
 function printHelp(): void {
@@ -380,23 +572,32 @@ Usage:
   pnpm control doctor
   pnpm control doctor --surface presence --verbose
   pnpm control doctor --fix
+  pnpm control catalog intents [query]
+  pnpm control catalog intent <intentId>
+  pnpm control catalog profiles [query]
+  pnpm control catalog profile <profileId>
   pnpm control presence projects
+  pnpm control presence tracks [projectId]
   pnpm control presence approvals
   pnpm control presence approve <requestId> <approved|rejected>
   pnpm control presence outcomes
   pnpm control presence tasks
   pnpm control presence task <sessionId>
   pnpm control presence memory <knowledge/logical/path.md>
+  pnpm control presence ref <knowledge/...|active/projects/...>
 
   pnpm control chronos overview
+  pnpm control chronos tracks [projectId]
   pnpm control chronos approvals
   pnpm control chronos approve <requestId> <storageChannel> <channel> <approved|rejected>
   pnpm control chronos mission-seeds
+  pnpm control chronos seed-track <trackId> [artifactId]
   pnpm control chronos promote-seed <seedId>
   pnpm control chronos distill-candidates
   pnpm control chronos distill <candidateId> <promote|archive>
   pnpm control chronos mission-control <missionId> <operation>
   pnpm control chronos surface-control <operation> [surfaceId]
+  pnpm control chronos ref <knowledge/...|active/projects/...>
 
 Environment:
   PRESENCE_STUDIO_URL  default http://127.0.0.1:3031
@@ -428,11 +629,15 @@ async function main(): Promise<void> {
     });
     return;
   }
-  if (surface !== "presence" && surface !== "chronos") {
-    throw new Error(`Unsupported surface "${surface}". Use "presence" or "chronos".`);
+  if (surface !== "presence" && surface !== "chronos" && surface !== "catalog") {
+    throw new Error(`Unsupported surface "${surface}". Use "presence", "chronos", or "catalog".`);
   }
   if (!action) {
     printHelp();
+    return;
+  }
+  if (surface === "catalog") {
+    await handleCatalog(action, rest, Boolean(argv.json));
     return;
   }
   if (surface === "presence") {

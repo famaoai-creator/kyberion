@@ -1,0 +1,53 @@
+{
+  "domain": "release-ops-high-fidelity",
+  "profiles": {
+    "service-design-package": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Comprehensive ITIL v4 Service Design Package (SDP).",
+      "sections": [
+        { "section_id": "1-service-definition", "title": "1. Service Definition & Business Case", "layout_key": "doc-title" },
+        { "section_id": "1-1-requirements", "title": "1.1 Business Requirements & Outcomes", "layout_key": "doc-summary" },
+        { "section_id": "1-2-slr", "title": "1.2 Service Level Requirements (SLR)", "layout_key": "evidence-callout" },
+        { "section_id": "2-functional-design", "title": "2. Service Functional Design", "layout_key": "doc-sections" },
+        { "section_id": "2-1-processes", "title": "2.1 Process Integration (Incident, Change)", "layout_key": "operating-model" },
+        { "section_id": "3-tech-architecture", "title": "3. Technical Architecture & Infrastructure", "layout_key": "three-point-architecture" },
+        { "section_id": "3-1-dependencies", "title": "3.1 Cloud/SaaS Dependencies", "layout_key": "three-pillars" },
+        { "section_id": "4-mgmt-design", "title": "4. Service Management Design", "layout_key": "doc-title" },
+        { "section_id": "4-1-sla", "title": "4.1 SLA/OLA/UC Drafts", "layout_key": "risk-controls" },
+        { "section_id": "4-2-monitoring", "title": "4.2 Monitoring & Capacity Models", "layout_key": "doc-sections" },
+        { "section_id": "5-readiness", "title": "5. Service Transition & Readiness", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-1-rollback", "title": "5.1 Back-out and Rollback Procedures", "layout_key": "risk-controls" }
+      ]
+    },
+    "sre-error-budget-policy": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "SRE-driven social contract for reliability and velocity.",
+      "sections": [
+        { "section_id": "1-slo-definition", "title": "1. Service Level Objectives (SLOs)", "layout_key": "immersive-vision" },
+        { "section_id": "1-1-sli", "title": "1.1 SLI Definitions (Latency, Availability)", "layout_key": "evidence-callout" },
+        { "section_id": "2-budget-calculation", "title": "2. Error Budget Calculation", "layout_key": "doc-summary" },
+        { "section_id": "3-policy-actions", "title": "3. Error Budget Policy Actions", "layout_key": "three-pillars" },
+        { "section_id": "3-1-thresholds", "title": "3.1 Burn Rate Monitoring & Thresholds", "layout_key": "risk-controls" },
+        { "section_id": "4-escalation", "title": "4. Escalation & Exceptions", "layout_key": "operating-model" },
+        { "section_id": "5-post-mortem-reqs", "title": "5. Post-Mortem Requirements", "layout_key": "doc-sections" }
+      ]
+    },
+    "disaster-recovery-plan-v2": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "High-fidelity DR plan focusing on technical restoration and governance.",
+      "sections": [
+        { "section_id": "1-governance", "title": "1. Governance and Strategy", "layout_key": "doc-title" },
+        { "section_id": "1-1-rto-rpo", "title": "1.1 RTO & RPO Objectives", "layout_key": "evidence-callout" },
+        { "section_id": "2-response-team", "title": "2. Response Team & Communication", "layout_key": "operating-model" },
+        { "section_id": "3-tech-recovery", "title": "3. Technical Recovery Procedures", "layout_key": "doc-title" },
+        { "section_id": "3-1-tier1", "title": "3.1 Tier 1 (Critical Infrastructure)", "layout_key": "three-point-architecture" },
+        { "section_id": "3-2-tier2", "title": "3.2 Tier 2 (Primary Applications)", "layout_key": "three-pillars" },
+        { "section_id": "4-data-backup", "title": "4. Data and Backup Management", "layout_key": "risk-controls" },
+        { "section_id": "5-testing", "title": "5. Testing and Maintenance (Drill Schedule)", "layout_key": "timeline-roadmap" }
+      ]
+    }
+  }
+}

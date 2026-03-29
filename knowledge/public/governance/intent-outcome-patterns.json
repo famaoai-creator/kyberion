@@ -1,0 +1,335 @@
+{
+  "version": "1.0.0",
+  "notes": [
+    "This catalog defines the canonical completion pattern for each surface intent.",
+    "It exists to make intent-to-outcome execution auditable across contracts, runtime, evidence, and follow-up."
+  ],
+  "patterns": [
+    {
+      "intent_id": "bootstrap-project",
+      "canonical_flow": [
+        "intent normalization",
+        "project bootstrap task session",
+        "project record creation",
+        "default track resolution",
+        "kickoff work and mission seed creation"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "project_record",
+        "mission_seed"
+      ],
+      "primary_outcome_ids": ["project_created"],
+      "evidence": [
+        "project record",
+        "kickoff task session artifact",
+        "bootstrap mission seeds"
+      ],
+      "completion_criteria": [
+        "project record exists",
+        "project has governed root path",
+        "default track exists or resolves",
+        "follow-up work items are seeded"
+      ],
+      "follow_up": [
+        "Chronos or CLI can inspect tracks",
+        "mission seed can be promoted"
+      ]
+    },
+    {
+      "intent_id": "generate-presentation",
+      "canonical_flow": [
+        "intent normalization",
+        "document brief creation",
+        "document outline from brief",
+        "brief to design protocol",
+        "generate document",
+        "artifact record persistence"
+      ],
+      "contract_layers": [
+        "task_session",
+        "document_brief",
+        "document_outline_adf",
+        "design_protocol",
+        "artifact_record"
+      ],
+      "primary_outcome_ids": ["artifact:pptx"],
+      "evidence": [
+        "governed pptx file",
+        "artifact record",
+        "task session work loop"
+      ],
+      "completion_criteria": [
+        "document_profile resolves",
+        "sections are compiled into protocol",
+        "pptx artifact is written to governed path",
+        "artifact record is persisted"
+      ],
+      "follow_up": [
+        "distill candidate or promoted memory can reuse the artifact",
+        "track evidence can satisfy gate requirements"
+      ]
+    },
+    {
+      "intent_id": "generate-report",
+      "canonical_flow": [
+        "intent normalization",
+        "document brief creation",
+        "document outline from brief",
+        "brief to design protocol",
+        "generate document",
+        "artifact record persistence"
+      ],
+      "contract_layers": [
+        "task_session",
+        "document_brief",
+        "document_outline_adf",
+        "design_protocol",
+        "artifact_record"
+      ],
+      "primary_outcome_ids": ["artifact:docx", "artifact:pdf"],
+      "evidence": [
+        "governed docx or pdf file",
+        "artifact record",
+        "task session work loop"
+      ],
+      "completion_criteria": [
+        "report profile resolves from knowledge",
+        "sections-first structure is preserved",
+        "docx or pdf artifact is written to governed path",
+        "artifact record is persisted"
+      ],
+      "follow_up": [
+        "report can be attached to delivery or gate evidence",
+        "report can be reused in promoted memory"
+      ]
+    },
+    {
+      "intent_id": "generate-workbook",
+      "canonical_flow": [
+        "intent normalization",
+        "document brief creation",
+        "document outline from brief",
+        "brief to design protocol",
+        "generate document",
+        "artifact record persistence"
+      ],
+      "contract_layers": [
+        "task_session",
+        "document_brief",
+        "document_outline_adf",
+        "design_protocol",
+        "artifact_record"
+      ],
+      "primary_outcome_ids": ["artifact:xlsx"],
+      "evidence": [
+        "governed xlsx file",
+        "artifact record",
+        "task session work loop"
+      ],
+      "completion_criteria": [
+        "spreadsheet profile resolves",
+        "semantic rows and columns compile into xlsx protocol",
+        "xlsx artifact is written to governed path",
+        "artifact record is persisted"
+      ],
+      "follow_up": [
+        "workbook can be used for operator tracking",
+        "signals sheet can feed review or verification work"
+      ]
+    },
+    {
+      "intent_id": "inspect-service",
+      "canonical_flow": [
+        "intent normalization",
+        "task session creation",
+        "service inspection execution",
+        "summary or approval packet generation"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "approval_store"
+      ],
+      "primary_outcome_ids": ["service_summary", "approval_request"],
+      "evidence": [
+        "service summary artifact or reply",
+        "approval record when gated"
+      ],
+      "completion_criteria": [
+        "service target resolves",
+        "summary or approval request is returned",
+        "gated operations preserve approval state"
+      ],
+      "follow_up": [
+        "operator can approve or deny",
+        "service findings can become remediation or verification work"
+      ]
+    },
+    {
+      "intent_id": "open-site",
+      "canonical_flow": [
+        "intent normalization",
+        "browser destination resolution",
+        "browser actuator navigation"
+      ],
+      "contract_layers": [
+        "browser routing packet",
+        "browser session state"
+      ],
+      "primary_outcome_ids": ["browser_navigation"],
+      "evidence": [
+        "browser session state"
+      ],
+      "completion_criteria": [
+        "destination resolves",
+        "active browser navigates or focuses the page"
+      ],
+      "follow_up": [
+        "browser-step can continue from the active session"
+      ]
+    },
+    {
+      "intent_id": "browser-step",
+      "canonical_flow": [
+        "intent normalization",
+        "active browser session resolution",
+        "browser actuator step execution"
+      ],
+      "contract_layers": [
+        "browser routing packet",
+        "browser session state"
+      ],
+      "primary_outcome_ids": ["browser_step"],
+      "evidence": [
+        "browser session state"
+      ],
+      "completion_criteria": [
+        "active browser session exists",
+        "step command is executed or queued for confirmation"
+      ],
+      "follow_up": [
+        "subsequent browser steps can continue from the same session"
+      ]
+    },
+    {
+      "intent_id": "knowledge-query",
+      "canonical_flow": [
+        "intent normalization",
+        "knowledge scope resolution",
+        "governed knowledge lookup",
+        "direct reply synthesis"
+      ],
+      "contract_layers": [
+        "direct reply answer",
+        "knowledge refs"
+      ],
+      "primary_outcome_ids": ["knowledge_answer"],
+      "evidence": [
+        "governed knowledge refs in the answer"
+      ],
+      "completion_criteria": [
+        "question topic resolves",
+        "answer is grounded in governed refs"
+      ],
+      "follow_up": [
+        "query can be escalated into task session when physical work is needed"
+      ]
+    },
+    {
+      "intent_id": "cross-project-remediation",
+      "canonical_flow": [
+        "intent normalization",
+        "task session creation",
+        "process design resolution",
+        "governed ref ranking",
+        "impact band classification",
+        "analysis artifact generation",
+        "follow-up seed fan-out"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "analysis artifact",
+        "analysis_execution_contract",
+        "mission_seed"
+      ],
+      "primary_outcome_ids": ["remediation_plan"],
+      "evidence": [
+        "analysis markdown artifact",
+        "finding candidates",
+        "follow-up remediation and verification seeds"
+      ],
+      "completion_criteria": [
+        "source corpus and target scope resolve",
+        "analysis artifact is written to governed path",
+        "follow-up seeds are created when project context exists"
+      ],
+      "follow_up": [
+        "review findings can fan out into remediation missions",
+        "verification work can be promoted from seeds"
+      ]
+    },
+    {
+      "intent_id": "incident-informed-review",
+      "canonical_flow": [
+        "intent normalization",
+        "task session creation",
+        "process design resolution",
+        "incident ref ranking",
+        "review target binding",
+        "impact band classification",
+        "analysis artifact generation",
+        "follow-up seed fan-out"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "analysis artifact",
+        "analysis_execution_contract",
+        "mission_seed"
+      ],
+      "primary_outcome_ids": ["review_findings"],
+      "evidence": [
+        "analysis markdown artifact",
+        "review target binding",
+        "finding candidates",
+        "follow-up review and verification seeds"
+      ],
+      "completion_criteria": [
+        "incident basis resolves",
+        "review target resolves or is inferred",
+        "analysis artifact is written to governed path",
+        "follow-up seeds are created when project context exists"
+      ],
+      "follow_up": [
+        "review seed can be promoted into mission work",
+        "verification seed can be promoted after fixes"
+      ]
+    },
+    {
+      "intent_id": "live-query",
+      "canonical_flow": [
+        "intent normalization",
+        "live data target resolution",
+        "current information fetch",
+        "direct reply synthesis"
+      ],
+      "contract_layers": [
+        "direct reply answer"
+      ],
+      "primary_outcome_ids": ["live_answer"],
+      "evidence": [
+        "live answer content"
+      ],
+      "completion_criteria": [
+        "live target resolves",
+        "current answer is returned"
+      ],
+      "follow_up": [
+        "query can be escalated into task session when sustained work is needed"
+      ]
+    }
+  ]
+}

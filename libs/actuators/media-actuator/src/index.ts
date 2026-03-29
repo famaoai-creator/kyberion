@@ -4,12 +4,16 @@ import {
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeReaddir,
+  safeLstat,
   safeExec,
   derivePipelineStatus,
   pathResolver,
   pptxUtils,
   xlsxUtils,
   docxUtils,
+  loadProjectRecord,
+  loadServiceBindingRecord,
   resolveRef,
   handleStepError,
 } from '@agent/core';
@@ -80,12 +84,41 @@ function resolveSlideTemplate(template: any, slideData: any, fallback = ''): str
     .replace(/{{\s*visual\s*}}/g, slideData?.visual || '');
 }
 
-function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
+function loadSlideLayoutPresetCatalog(rootDir: string): any {
+  return loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets',
+    filePath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets.json',
+    fallback: { defaults: {}, presets: {} },
+  });
+}
+
+function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
+  const layoutKey = String(slideData?.layout_key || '').trim();
+  const mediaKind = String(slideData?.media_kind || '').trim();
+  const presetKey = layoutKey || mediaKind;
+  const catalog = loadSlideLayoutPresetCatalog(rootDir);
+  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
+  const system = slideData?.design_system_id ? designSystems.systems?.[slideData.design_system_id] : null;
+  const defaults = catalog.defaults?.['title-body'] || null;
+  const preset = catalog.presets?.[presetKey] || catalog.presets?.[mediaKind] || defaults;
+  const override = system?.slide_layout_overrides?.[presetKey] || system?.slide_layout_overrides?.[mediaKind] || null;
+  if (!preset && !override) return null;
+  return mergePptxShape(preset || {}, override || {});
+}
+
+function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
   const themeColors = theme?.colors || {};
+  const semanticType = data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
+  const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType, data.design_system_id);
+  const pptxTokens = semanticTokens.pptx || {};
   const pageLayouts = pattern?.page_layouts || {};
   const pageLayoutId = data.page_layout || data.page_layout_id || data.layout_id;
   const pageLayout = pageLayoutId ? pageLayouts[pageLayoutId] : undefined;
-  const placeholderConfig = pageLayout?.placeholders || {};
+  const runtimePreset = resolveRuntimeSlidePreset(rootDir, data);
+  const placeholderConfig = {
+    ...(runtimePreset || {}),
+    ...(pageLayout?.placeholders || {}),
+  };
   const bodyText = Array.isArray(data.body) ? data.body.join('\n') : (data.subtitle || data.body || '');
   const elements: any[] = [];
 
@@ -104,9 +137,13 @@ function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: 
         bold: true,
         color: (themeColors.text || '#000000').replace('#', ''),
         fontFamily: theme?.fonts?.heading?.split(',')[0] || 'Inter',
-        align: 'center',
+        align: pptxTokens.title_align || 'center',
       },
     }, placeholderConfig.title);
+    titleElement.style = {
+      ...(titleElement.style || {}),
+      align: pptxTokens.title_align || titleElement.style?.align,
+    };
     titleElement.text = resolveSlideTemplate(titleElement.text, data, data.title);
     elements.push(titleElement);
   }
@@ -118,13 +155,18 @@ function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: 
       pos: { x: 1, y: 1.8, w: 8, h: 2.8 },
       text: bodyText,
       style: {
-        fontSize: 18,
-        color: (themeColors.secondary || '#334155').replace('#', ''),
+        fontSize: 18 + Number(pptxTokens.body_font_size_delta || 0),
+        color: resolveThemeHexColor(themeColors, pptxTokens.body_color_role, '#334155').replace('#', ''),
         fontFamily: theme?.fonts?.body?.split(',')[0] || 'System-ui',
         align: 'left',
         valign: 'top',
       },
     }, placeholderConfig.body);
+    bodyElement.style = {
+      ...(bodyElement.style || {}),
+      fontSize: 18 + Number(pptxTokens.body_font_size_delta || 0),
+      color: resolveThemeHexColor(themeColors, pptxTokens.body_color_role, '#334155').replace('#', ''),
+    };
     bodyElement.text = resolveSlideTemplate(bodyElement.text, data, bodyText);
     elements.push(bodyElement);
   }
@@ -136,14 +178,19 @@ function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: 
       pos: { x: 1, y: 4.6, w: 8, h: 0.5 },
       text: `[Visual: ${data.visual}]`,
       style: {
-        fill: 'F1F5F9',
-        color: '64748B',
+        fill: resolveThemeHexColor(themeColors, pptxTokens.visual_fill_role, '#F1F5F9').replace('#', ''),
+        color: resolveThemeHexColor(themeColors, pptxTokens.visual_text_role, '#64748B').replace('#', ''),
         fontSize: 12,
         italic: true,
         align: 'center',
         valign: 'middle',
       },
     }, placeholderConfig.visual);
+    visualElement.style = {
+      ...(visualElement.style || {}),
+      fill: resolveThemeHexColor(themeColors, pptxTokens.visual_fill_role, '#F1F5F9').replace('#', ''),
+      color: resolveThemeHexColor(themeColors, pptxTokens.visual_text_role, '#64748B').replace('#', ''),
+    };
     visualElement.text = resolveSlideTemplate(visualElement.text, data, `[Visual: ${data.visual}]`);
     elements.push(visualElement);
   }
@@ -162,6 +209,9 @@ function buildPptxSlideFromPattern(data: any, idx: number, theme: any, pattern: 
     extensions: data.extensions || pageLayout?.extensions,
     metadata: {
       pageLayoutId,
+      layoutKey: data.layout_key,
+      mediaKind: data.media_kind,
+      semanticType,
       canvas,
       hasMaster: Boolean(activeMaster),
     },
@@ -316,12 +366,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       };
     }
     case 'apply_theme': {
-      const themesPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json');
-      if (!safeExistsSync(themesPath)) {
-        logger.warn('[MEDIA_TRANSFORM] themes.json not found, skipping theme application');
+      const themes = loadThemeCatalog(rootDir);
+      if (!themes || typeof themes !== 'object' || !themes.themes) {
+        logger.warn('[MEDIA_TRANSFORM] theme catalog not found, skipping theme application');
         return ctx;
       }
-      const themes = JSON.parse(safeReadFile(themesPath, { encoding: 'utf8' }) as string);
       const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
       const theme = themes.themes[themeName];
       if (!theme) {
@@ -365,7 +414,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             extensions: activeMaster?.extensions,
             bgXml: activeMaster?.bgXml,
           },
-          slides: contentData.map((data: any, idx: number) => buildPptxSlideFromPattern(data, idx, theme, pattern, activeMaster, canvas)),
+          slides: contentData.map((data: any, idx: number) => buildPptxSlideFromPattern(rootDir, data, idx, theme, pattern, activeMaster, canvas)),
         };
         return { ...ctx, last_pptx_design: protocol, merged_output_format: 'pptx' };
       }
@@ -411,41 +460,19 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         throw new Error(`proposal_storyline_from_brief could not find context key: ${fromKey}`);
       }
       const brief = normalizeProposalBrief(rawBrief);
-
-      const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
-      const evidence = Array.isArray(brief.evidence) ? brief.evidence : [];
-      const slides = [
-        {
-          id: 'cover',
-          title: brief.title || 'Proposal',
-          objective: brief.story?.core_message || brief.objective || 'Proposal overview',
-          body: [
-            `${brief.client || 'Client'} proposal`,
-            ...(Array.isArray(brief.audience) ? [`Audience: ${brief.audience.join(', ')}`] : []),
-          ],
-          visual: 'cover statement',
-        },
-        ...chapters.map((chapter: string, idx: number) => ({
-          id: `chapter_${idx + 1}`,
-          title: chapter,
-          objective: chapter,
-          body: [
-            brief.story?.core_message || brief.objective || 'Core proposal message',
-            evidence[idx]?.point || `Key point for ${chapter}`,
-          ],
-          visual: evidence[idx]?.title || 'supporting visual',
-        })),
-        {
-          id: 'next_steps',
-          title: 'Next Steps',
-          objective: brief.story?.closing_cta || 'Agree next action',
-          body: [
-            brief.story?.closing_cta || 'Confirm scope and move to execution planning',
-            `Tone: ${brief.story?.tone || 'professional'}`,
-          ],
-          visual: 'timeline / next action',
-        },
-      ];
+      const outline = buildProposalNarrativeOutline(rootDir, brief);
+      const slides = outline.toc.map((entry: any, idx: number) => ({
+        id: entry.section_id || `slide_${idx + 1}`,
+        title: entry.title,
+        objective: entry.objective,
+        body: Array.isArray(entry.body) ? entry.body : [entry.objective].filter(Boolean),
+        visual: entry.visual,
+        media_kind: entry.media_kind,
+        layout_key: entry.layout_key,
+        semantic_type: entry.semantic_type,
+        design_system_id: outline.design_system_id,
+        branding: outline.branding || {},
+      }));
 
       return {
         ...ctx,
@@ -455,9 +482,48 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           client: brief.client,
           core_message: brief.story?.core_message,
           document_profile: brief.document_profile,
+          design_system_id: outline.design_system_id,
+          branding: outline.branding || {},
           layout_template_id: brief.layout_template_id,
+          narrative_pattern_id: outline.narrative_pattern_id,
+          recommended_theme: outline.recommended_theme,
+          recommended_layout_template_id: outline.recommended_layout_template_id,
+          toc: outline.toc,
           slides,
         },
+      };
+    }
+    case 'document_outline_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`document_outline_from_brief could not find context key: ${fromKey}`);
+      }
+      const category = resolveMediaBriefCategory(rawBrief);
+      const brief = normalizeBriefForCategory(rootDir, rawBrief);
+      const outline = buildOutlineFromNormalizedBrief(rootDir, category, brief);
+
+      return {
+        ...ctx,
+        [params.export_as || 'document_outline']: outline,
+      };
+    }
+    case 'brief_to_design_protocol': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`brief_to_design_protocol could not find context key: ${fromKey}`);
+      }
+      const compiled = compileBriefToDesignProtocol(rootDir, rawBrief);
+      const exportKey = params.export_as || compiled.exportKey;
+      return {
+        ...ctx,
+        active_theme: ctx.active_theme || compiled.theme || ctx.active_theme,
+        active_theme_name: ctx.active_theme_name || compiled.themeName,
+        document_outline: compiled.outline,
+        [exportKey]: compiled.protocol,
+        last_design_protocol: compiled.protocol,
+        last_design_protocol_kind: compiled.protocolKind,
       };
     }
     case 'proposal_content_from_storyline': {
@@ -472,10 +538,17 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         body: Array.isArray(slide.body) ? slide.body : [slide.objective].filter(Boolean),
         subtitle: slide.objective,
         visual: slide.visual,
+        media_kind: slide.media_kind,
+        layout_key: slide.layout_key,
+        semantic_type: slide.semantic_type,
+        design_system_id: storyline.design_system_id,
+        branding: storyline.branding || {},
       }));
 
       return {
         ...ctx,
+        active_theme: ctx.active_theme || resolveNamedTheme(rootDir, storyline.recommended_theme) || ctx.active_theme,
+        active_theme_name: ctx.active_theme_name || storyline.recommended_theme,
         [params.export_as || 'proposal_content_data']: contentData,
       };
     }
@@ -524,44 +597,32 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       return nextCtx;
     }
     case 'document_spreadsheet_design_from_brief': {
-      const fromKey = resolve(params.from) || 'last_json';
-      const rawBrief = ctx[fromKey];
-      if (!rawBrief || typeof rawBrief !== 'object') {
-        throw new Error(`document_spreadsheet_design_from_brief could not find context key: ${fromKey}`);
-      }
-
-      const brief = normalizeSpreadsheetDocumentBrief(rootDir, rawBrief);
-      return {
-        ...ctx,
-        [params.export_as || 'last_xlsx_design']: brief.payload.protocol || buildTrackerSpreadsheetProtocol(rootDir, brief),
-        document_spreadsheet_brief: brief,
-      };
+      warnLegacyMediaOp(op);
+      const rawBrief = resolveObjectInput(ctx, params, resolve, {
+        fromKey: params.from,
+        opName: 'document_spreadsheet_design_from_brief',
+      });
+      return buildCompiledBriefContext({
+        rootDir,
+        ctx,
+        rawBrief,
+        exportAs: params.export_as || 'last_xlsx_design',
+        briefContextKey: 'document_spreadsheet_brief',
+      });
     }
     case 'document_report_design_from_brief': {
-      const fromKey = resolve(params.from) || 'last_json';
-      const rawBrief = ctx[fromKey];
-      if (!rawBrief || typeof rawBrief !== 'object') {
-        throw new Error(`document_report_design_from_brief could not find context key: ${fromKey}`);
-      }
-
-      const brief = normalizeReportDocumentBrief(rawBrief);
-      if (brief.render_target === 'docx') {
-        return {
-          ...ctx,
-          [params.export_as || 'last_docx_design']: buildReportDocxProtocol(rootDir, brief),
-          document_report_brief: brief,
-        };
-      }
-
-      if (brief.render_target === 'pdf') {
-        return {
-          ...ctx,
-          [params.export_as || 'last_pdf_design']: buildReportPdfProtocol(rootDir, brief),
-          document_report_brief: brief,
-        };
-      }
-
-      throw new Error(`Unsupported report render_target: ${brief.render_target}`);
+      warnLegacyMediaOp(op);
+      const rawBrief = resolveObjectInput(ctx, params, resolve, {
+        fromKey: params.from,
+        opName: 'document_report_design_from_brief',
+      });
+      return buildCompiledBriefContext({
+        rootDir,
+        ctx,
+        rawBrief,
+        exportAs: params.export_as,
+        briefContextKey: 'document_report_brief',
+      });
     }
     case 'drawio_from_graph': {
       const graph = resolveGraphDefinition(rootDir, params, ctx, resolve);
@@ -641,77 +702,18 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'document_diagram_render_from_brief': {
-      const fromKey = resolve(params.from) || 'last_json';
-      const rawBrief = params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
-      if (!rawBrief || typeof rawBrief !== 'object') {
-        throw new Error(`document_diagram_render_from_brief could not find context key: ${fromKey}`);
-      }
-
+      warnLegacyMediaOp(op);
+      const rawBrief = resolveObjectInput(ctx, params, resolve, {
+        paramKey: 'brief',
+        fromKey: params.from,
+        opName: 'document_diagram_render_from_brief',
+      });
       const brief = normalizeDiagramDocumentBrief(rawBrief);
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
-      ensureParentDir(outPath);
-
-      if (brief.render_target === 'drawio') {
-        const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
-        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
-        const document = generateDrawioDocument(brief.payload.graph, {
-          title: brief.payload.title || brief.title || 'Diagram',
-          theme: activeTheme,
-          iconMap,
-          iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
-        });
-        safeWriteFile(outPath, document);
-        const stats = fs.statSync(outPath);
-        logger.info(`✅ [MEDIA] Draw.io diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
-        break;
-      }
-
-      if (brief.render_target === 'mmd') {
-        const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
-        safeMkdir(tempDir, { recursive: true });
-
-        const inputPath = path.join(tempDir, 'diagram.mmd');
-        safeWriteFile(inputPath, brief.payload.source);
-
-        const args = ['-i', inputPath, '-o', outPath];
-        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
-        const mermaidConfig = buildMermaidConfig(activeTheme, params.background_color ? resolve(params.background_color) : undefined);
-        const configPath = path.join(tempDir, 'mermaid.config.json');
-        safeWriteFile(configPath, JSON.stringify(mermaidConfig, null, 2));
-        args.push('-c', configPath);
-
-        if (params.width) args.push('-w', String(resolve(params.width)));
-        if (params.height) args.push('-H', String(resolve(params.height)));
-        if (params.background_color) args.push('-b', String(resolve(params.background_color)));
-
-        safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
-
-        const stats = fs.statSync(outPath);
-        logger.info(`✅ [MEDIA] Mermaid diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
-        break;
-      }
-
-      if (brief.render_target === 'd2') {
-        const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
-        safeMkdir(tempDir, { recursive: true });
-
-        const inputPath = path.join(tempDir, 'diagram.d2');
-        safeWriteFile(inputPath, brief.payload.source);
-
-        const args = [inputPath, outPath];
-        if (params.layout) args.push('--layout', String(resolve(params.layout)));
-        if (params.theme_id) args.push('--theme', String(resolve(params.theme_id)));
-        if (params.sketch) args.push('--sketch');
-        if (params.pad) args.push('--pad', String(resolve(params.pad)));
-
-        safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
-
-        const stats = fs.statSync(outPath);
-        logger.info(`✅ [MEDIA] D2 diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
-        break;
-      }
-
-      throw new Error(`Unsupported diagram render_target: ${brief.render_target}`);
+      await renderDiagramDocumentBrief(rootDir, brief, outPath, params, ctx, resolve);
+      const stats = fs.statSync(outPath);
+      logger.info(`✅ [MEDIA] Diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
+      break;
     }
     case 'pptx_render': {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
@@ -739,7 +741,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'xlsx_render': {
-      const xlsxProtocol = ctx[params.design_from || 'last_xlsx_design'];
+      const xlsxProtocol = normalizeXlsxDesignProtocol(ctx[params.design_from || 'last_xlsx_design']);
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
       await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
@@ -763,6 +765,25 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
       const pdfStats = fs.statSync(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
+      break;
+    }
+    case 'generate_document': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const inlineData = params.data && typeof params.data === 'object' ? params.data : {};
+      const source = params.brief && typeof params.brief === 'object' ? params.brief : (ctx[fromKey] && typeof ctx[fromKey] === 'object' ? ctx[fromKey] : {});
+      const renderTarget = String(params.render_target || source.render_target || inlineData.render_target || '').trim();
+      const profileId = String(params.profile_id || source.document_profile || inlineData.document_profile || '').trim();
+      const brief = buildUnifiedDocumentBrief(rootDir, {
+        profileId,
+        renderTarget,
+        source,
+        data: inlineData,
+      });
+      const compiled = compileBriefToDesignProtocol(rootDir, brief);
+      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      await renderCompiledProtocol(compiled, outPath, params.options);
+      const stats = fs.statSync(outPath);
+      logger.info(`✅ [MEDIA] Unified document generated at: ${outPath} (${stats.size} bytes).`);
       break;
     }
     case 'write_file':
@@ -790,6 +811,1063 @@ function ensureParentDir(targetPath: string): void {
   if (!safeExistsSync(parentDir)) {
     safeMkdir(parentDir, { recursive: true });
   }
+}
+
+function deepMergeCatalog(base: any, next: any): any {
+  if (Array.isArray(base) || Array.isArray(next)) {
+    return cloneJsonValue(next);
+  }
+  if (!base || typeof base !== 'object') return cloneJsonValue(next);
+  if (!next || typeof next !== 'object') return cloneJsonValue(next);
+  const merged: Record<string, any> = { ...base };
+  for (const [key, value] of Object.entries(next)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key])) {
+      merged[key] = deepMergeCatalog(merged[key], value);
+    } else {
+      merged[key] = cloneJsonValue(value);
+    }
+  }
+  return merged;
+}
+
+function readJsonFilesRecursively(dirPath: string): any[] {
+  if (!safeExistsSync(dirPath)) return [];
+  const entries = safeReaddir(dirPath).sort();
+  const docs: any[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry);
+    const stat = safeLstat(fullPath);
+    if (stat.isDirectory()) {
+      docs.push(...readJsonFilesRecursively(fullPath));
+      continue;
+    }
+    if (!entry.endsWith('.json')) continue;
+    docs.push(JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string));
+  }
+  return docs;
+}
+
+function loadJsonCatalog(rootDir: string, input: {
+  directoryPath: string;
+  filePath: string;
+  fallback: any;
+}): any {
+  const dirPath = path.resolve(rootDir, input.directoryPath);
+  const filePath = path.resolve(rootDir, input.filePath);
+  const docs = readJsonFilesRecursively(dirPath);
+  if (docs.length > 0) {
+    return docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(input.fallback));
+  }
+  if (safeExistsSync(filePath)) {
+    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  }
+  return cloneJsonValue(input.fallback);
+}
+
+function loadArtifactLibraryCatalog(rootDir: string): any {
+  const dirPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/artifact-library');
+  const docs = readJsonFilesRecursively(dirPath);
+  const fallback = { profiles: {} };
+  if (docs.length === 0) {
+    return fallback;
+  }
+  return docs.reduce((acc, doc) => {
+    if (!doc || typeof doc !== 'object') return acc;
+    return deepMergeCatalog(acc, { profiles: doc.profiles || {} });
+  }, cloneJsonValue(fallback));
+}
+
+function loadDocumentCompositionCatalog(rootDir: string): any {
+  const primaryCatalog = loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/document-composition-presets',
+    filePath: 'knowledge/public/design-patterns/media-templates/document-composition-presets.json',
+    fallback: { defaults: {}, profiles: {} },
+  });
+  const artifactLibraryCatalog = loadArtifactLibraryCatalog(rootDir);
+  return {
+    ...primaryCatalog,
+    profiles: {
+      ...(artifactLibraryCatalog.profiles || {}),
+      ...(primaryCatalog.profiles || {}),
+    },
+  };
+}
+
+function loadThemeCatalog(rootDir: string): any {
+  return loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/themes',
+    filePath: 'knowledge/public/design-patterns/media-templates/themes.json',
+    fallback: { default_theme: 'kyberion-standard', themes: {} },
+  });
+}
+
+function loadMediaDesignSystemsCatalog(rootDir: string): any {
+  return loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/media-design-systems',
+    filePath: 'knowledge/public/design-patterns/media-templates/media-design-systems.json',
+    fallback: { default_system: 'executive-standard', systems: {} },
+  });
+}
+
+function normalizeDesignLookupKey(input: any): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function resolveDesignBindingHints(brief: any): {
+  tenant_id?: string;
+  client_key?: string;
+  design_system_id?: string;
+  theme?: string;
+  branding?: Record<string, any>;
+} {
+  const direct = {
+    tenant_id: String(brief?.tenant_id || brief?.payload?.tenant_id || '').trim() || undefined,
+    client_key: String(brief?.client_key || brief?.payload?.client_key || '').trim() || undefined,
+    design_system_id: String(brief?.design_system_id || brief?.payload?.design_system_id || '').trim() || undefined,
+    theme: String(brief?.theme || brief?.payload?.theme || '').trim() || undefined,
+    branding: (brief?.branding && typeof brief.branding === 'object') ? brief.branding : ((brief?.payload?.branding && typeof brief.payload.branding === 'object') ? brief.payload.branding : {}),
+  };
+  const projectId = String(brief?.project_id || brief?.payload?.project_id || '').trim();
+  const project = projectId ? loadProjectRecord(projectId) : null;
+  const projectMeta = (project?.metadata && typeof project.metadata === 'object') ? project.metadata as Record<string, any> : {};
+  const bindingIds = [
+    ...((Array.isArray(project?.service_bindings) ? project!.service_bindings : []).map((value: any) => String(value))),
+    ...((Array.isArray(brief?.service_binding_ids) ? brief.service_binding_ids : []).map((value: any) => String(value))),
+    ...((Array.isArray(brief?.payload?.service_binding_ids) ? brief.payload.service_binding_ids : []).map((value: any) => String(value))),
+  ].filter(Boolean);
+  const bindings = bindingIds
+    .map((bindingId) => loadServiceBindingRecord(bindingId))
+    .filter((value): value is NonNullable<typeof value> => Boolean(value));
+  const bindingMeta = bindings
+    .map((binding) => (binding.metadata && typeof binding.metadata === 'object') ? binding.metadata as Record<string, any> : {})
+    .find((meta) => Object.keys(meta).length > 0) || {};
+
+  return {
+    tenant_id: direct.tenant_id || String(projectMeta.tenant_id || bindingMeta.tenant_id || '').trim() || undefined,
+    client_key: direct.client_key || String(projectMeta.client_key || bindingMeta.client_key || '').trim() || undefined,
+    design_system_id: direct.design_system_id || String(projectMeta.design_system_id || bindingMeta.design_system_id || '').trim() || undefined,
+    theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
+    branding: {
+      ...(projectMeta.branding || {}),
+      ...(bindingMeta.branding || {}),
+      ...(direct.branding || {}),
+    },
+  };
+}
+
+function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId: string; system: any; tenantOverride: any; resolvedThemeName: string; branding: any } {
+  const catalog = loadMediaDesignSystemsCatalog(rootDir);
+  const bindingHints = resolveDesignBindingHints(brief);
+  const explicit = String(bindingHints.design_system_id || '').trim();
+  const resolveTenantOverride = (system: any) => {
+    const tenantKey = normalizeDesignLookupKey(bindingHints.tenant_id || bindingHints.client_key || brief?.client || brief?.payload?.client);
+    const overrides = system?.tenant_overrides || {};
+    const matched = Object.entries(overrides).find(([overrideId, override]: any) => {
+      if (normalizeDesignLookupKey(overrideId) === tenantKey) return true;
+      return Array.isArray(override?.matchers) && override.matchers.some((matcher: string) => normalizeDesignLookupKey(matcher) === tenantKey);
+    });
+    return matched ? (matched[1] as any) : null;
+  };
+  const buildResult = (designSystemId: string, system: any) => {
+    const tenantOverride = resolveTenantOverride(system);
+    return {
+      designSystemId,
+      system,
+      tenantOverride,
+      resolvedThemeName: String(bindingHints.theme || tenantOverride?.theme || system?.theme || 'kyberion-standard'),
+      branding: {
+        ...(system?.branding || {}),
+        ...(tenantOverride?.branding || {}),
+        ...(bindingHints.branding || {}),
+      },
+    };
+  };
+  if (explicit && catalog.systems?.[explicit]) {
+    return buildResult(explicit, catalog.systems[explicit]);
+  }
+  const profileId = String(brief?.document_profile || '').trim();
+  const matched = Object.entries(catalog.systems || {}).find(([, system]: any) =>
+    Array.isArray(system?.profiles) && system.profiles.includes(profileId),
+  );
+  if (matched) {
+    return buildResult(matched[0], matched[1]);
+  }
+  const fallbackId = String(catalog.default_system || 'executive-standard');
+  return buildResult(fallbackId, catalog.systems?.[fallbackId] || {});
+}
+
+function loadSemanticRenderTokenCatalog(rootDir: string): any {
+  return loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
+    filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
+    fallback: { defaults: { content: {} }, semantics: {}, signal_tones: {} },
+  });
+}
+
+function resolveSemanticRenderTokens(rootDir: string, semanticType?: string, designSystemId?: string): any {
+  const catalog = loadSemanticRenderTokenCatalog(rootDir);
+  const key = String(semanticType || 'content').trim() || 'content';
+  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
+  const systemOverrides = designSystemId
+    ? designSystems.systems?.[designSystemId]?.semantic_overrides?.[key] || {}
+    : {};
+  return {
+    ...(catalog.defaults?.content || {}),
+    ...(catalog.semantics?.[key] || {}),
+    ...systemOverrides,
+  };
+}
+
+function resolveSemanticComponentRule(rootDir: string, semanticType: string | undefined, medium: string, component: string): any {
+  const tokens = resolveSemanticRenderTokens(rootDir, semanticType);
+  return {
+    ...((tokens?.[medium] && tokens[medium][component]) ? tokens[medium][component] : {}),
+  };
+}
+
+function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
+  const catalog = loadThemeCatalog(rootDir);
+  const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
+  return catalog.themes?.[themeName] || catalog.themes?.[catalog.default_theme] || null;
+}
+
+function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profileId: string; preset: any } {
+  const catalog = loadDocumentCompositionCatalog(rootDir);
+  const { designSystemId, resolvedThemeName, branding } = resolveMediaDesignSystem(rootDir, brief);
+  const profileId = String(
+    brief.document_profile ||
+    catalog.defaults?.[brief.document_type] ||
+    catalog.defaults?.[brief.artifact_family] ||
+    '',
+  ).trim();
+  const preset = catalog.profiles?.[profileId];
+  if (!preset) {
+    return {
+      profileId,
+      preset: {
+        narrative_pattern_id: 'generic-structured',
+        design_system_id: designSystemId,
+        recommended_theme: resolvedThemeName || 'kyberion-standard',
+        branding,
+        recommended_layout_template_id: brief.layout_template_id,
+        sections: [],
+      },
+    };
+  }
+  return {
+    profileId,
+    preset: {
+      ...preset,
+      design_system_id: preset.design_system_id || designSystemId,
+      recommended_theme: resolvedThemeName || preset.recommended_theme || 'kyberion-standard',
+      branding: {
+        ...(preset.branding || {}),
+        ...(branding || {}),
+      },
+    },
+  };
+}
+
+function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protocol: any; theme: any; themeName: string } {
+  const theme = resolveNamedTheme(rootDir, outline.recommended_theme);
+  const themeColors = theme?.colors || {};
+  const canvas = { w: 10, h: 5.625 };
+  const contentData = outline.toc.map((entry: any) => ({
+    title: entry.title,
+    body: Array.isArray(entry.body) ? entry.body : [entry.objective].filter(Boolean),
+    subtitle: entry.objective,
+    visual: entry.visual || entry.supporting_visual,
+    media_kind: entry.media_kind,
+    layout_key: entry.layout_key,
+    semantic_type: entry.semantic_type,
+    design_system_id: outline.design_system_id,
+    branding: outline.branding || {},
+  }));
+  const protocol = {
+    version: '3.0.0',
+    generatedAt: new Date().toISOString(),
+    metadata: {
+      composition: outline,
+      generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
+    },
+    canvas,
+    theme: {
+      dk1: (themeColors.primary || '#000000').replace('#', ''),
+      dk2: (themeColors.secondary || themeColors.text || '#44546A').replace('#', ''),
+      lt1: (themeColors.background || '#FFFFFF').replace('#', ''),
+      lt2: (themeColors.background || '#E7E6E6').replace('#', ''),
+      accent1: (themeColors.accent || '#38BDF8').replace('#', ''),
+      accent2: (themeColors.secondary || '#334155').replace('#', ''),
+    },
+    master: {
+      elements: [],
+    },
+    slides: contentData.map((data: any, idx: number) => buildPptxSlideFromPattern(rootDir, data, idx, theme, {}, null, canvas)),
+  };
+  return {
+    protocol,
+    theme,
+    themeName: outline.recommended_theme,
+  };
+}
+
+function buildPresentationPptxProtocol(rootDir: string, brief: any): { protocol: any; outline: any; theme: any; themeName: string } {
+  const outline = buildProposalNarrativeOutline(rootDir, brief);
+  const compiled = buildOutlineDrivenPptxProtocol(rootDir, outline);
+  return {
+    ...compiled,
+    outline,
+  };
+}
+
+type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
+type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
+const LEGACY_MEDIA_OPS = new Set([
+  'document_report_design_from_brief',
+  'document_spreadsheet_design_from_brief',
+  'document_diagram_render_from_brief',
+]);
+
+function warnLegacyMediaOp(op: string): void {
+  if (!LEGACY_MEDIA_OPS.has(op)) return;
+  logger.warn(
+    `[MEDIA_COMPAT] ${op} is a compatibility adapter. Prefer document_outline_from_brief -> brief_to_design_protocol -> generate_document.`,
+  );
+}
+
+function buildMediaGenerationBoundary(briefOrOutline: any): any {
+  return {
+    source_of_truth: {
+      document_profile: String(briefOrOutline?.document_profile || ''),
+      design_system_id: String(briefOrOutline?.design_system_id || ''),
+      knowledge_controls: [
+        'document_profile',
+        'sections',
+        'narrative_pattern_id',
+        'layout_key',
+        'media_kind',
+        'semantic_type',
+        'recommended_theme',
+      ],
+    },
+    llm_zone: {
+      allowed: [
+        'normalize_intent_into_brief',
+        'draft_section_objective',
+        'draft_body_content',
+        'draft_bullets_callouts_tables',
+        'localize_operator_facing_text',
+      ],
+      forbidden: [
+        'override_governed_sections',
+        'invent_layout_coordinates',
+        'invent_semantic_tokens',
+        'write_renderer_specific_binary_contracts',
+      ],
+    },
+    compiler_zone: {
+      responsibilities: [
+        'resolve_profile_and_sections_from_knowledge',
+        'map_sections_to_outline',
+        'map_outline_to_design_protocol',
+        'fill_renderer_defaults_and_guards',
+      ],
+    },
+    renderer_zone: {
+      responsibilities: [
+        'materialize_pptx_docx_pdf_xlsx_binary',
+        'apply_format_specific_low_level_rules',
+        'preserve_reproducibility',
+      ],
+    },
+    rule: 'sections-first; document_type is fallback taxonomy; render_target chooses physical renderer last',
+  };
+}
+
+function resolveMediaBriefCategory(rawBrief: any): MediaBriefCategory {
+  if (!rawBrief || typeof rawBrief !== 'object') {
+    throw new Error('resolveMediaBriefCategory: brief must be an object');
+  }
+  if (rawBrief.kind === 'proposal-brief') return 'presentation';
+  const artifactFamily = String(rawBrief.artifact_family || '').trim();
+  if (!rawBrief.kind && artifactFamily === 'presentation') return 'presentation';
+  if (!rawBrief.kind && artifactFamily === 'document') return 'document';
+  if (!rawBrief.kind && artifactFamily === 'spreadsheet') return 'spreadsheet';
+  if (!rawBrief.kind && artifactFamily === 'diagram') return 'diagram';
+  if (rawBrief.kind !== 'document-brief') {
+    throw new Error(`Unsupported brief kind: ${String(rawBrief.kind || 'unknown')}`);
+  }
+  if (artifactFamily === 'presentation') return 'presentation';
+  if (artifactFamily === 'document') return 'document';
+  if (artifactFamily === 'spreadsheet') return 'spreadsheet';
+  if (artifactFamily === 'diagram') return 'diagram';
+  throw new Error(`Unsupported artifact_family in document-brief: ${artifactFamily || 'unknown'}`);
+}
+
+function normalizeBriefForCategory(rootDir: string, rawBrief: any): any {
+  const category = resolveMediaBriefCategory(rawBrief);
+  if (!rawBrief?.kind) return rawBrief;
+  if (category === 'presentation') return normalizeProposalBrief(rawBrief);
+  if (category === 'document') return normalizeReportDocumentBrief(rawBrief);
+  if (category === 'spreadsheet') return normalizeSpreadsheetDocumentBrief(rootDir, rawBrief);
+  return normalizeDiagramDocumentBrief(rawBrief);
+}
+
+function buildOutlineFromNormalizedBrief(rootDir: string, category: MediaBriefCategory, brief: any): any {
+  const outlineBuilders: Record<MediaBriefCategory, (rootDir: string, brief: any) => any> = {
+    presentation: buildProposalNarrativeOutline,
+    document: buildReportNarrativeOutline,
+    spreadsheet: buildSpreadsheetNarrativeOutline,
+    diagram: buildDiagramNarrativeOutline,
+  };
+  return outlineBuilders[category](rootDir, brief);
+}
+
+function resolveObjectInput(ctx: any, params: any, resolve: Function, defaults: {
+  paramKey?: string;
+  fromKey?: string;
+  opName: string;
+}): any {
+  const fromKey = resolve(defaults.fromKey || 'last_json');
+  const inline = defaults.paramKey ? params[defaults.paramKey] : undefined;
+  const value = inline && typeof inline === 'object' ? inline : ctx[fromKey];
+  if (!value || typeof value !== 'object') {
+    throw new Error(`${defaults.opName} could not find context key: ${fromKey}`);
+  }
+  return value;
+}
+
+function buildCompiledBriefContext(input: {
+  rootDir: string;
+  ctx: any;
+  rawBrief: any;
+  exportAs?: string;
+  briefContextKey?: string;
+}): any {
+  const normalizedBrief = normalizeBriefForCategory(input.rootDir, input.rawBrief);
+  const compiled = compileBriefToDesignProtocol(input.rootDir, normalizedBrief);
+  return {
+    ...input.ctx,
+    active_theme: input.ctx.active_theme || resolveNamedTheme(input.rootDir, compiled.themeName) || input.ctx.active_theme,
+    active_theme_name: input.ctx.active_theme_name || compiled.themeName,
+    [input.exportAs || compiled.exportKey]: compiled.protocol,
+    ...(input.briefContextKey ? { [input.briefContextKey]: normalizedBrief } : {}),
+    document_outline: compiled.outline,
+  };
+}
+
+async function renderCompiledProtocol(compiled: {
+  protocol: any;
+  protocolKind: ProtocolKind;
+}, outPath: string, options?: any): Promise<void> {
+  ensureParentDir(outPath);
+  const renderers: Record<ProtocolKind, () => Promise<void>> = {
+    pptx: async () => generateNativePptx(compiled.protocol, outPath),
+    xlsx: async () => generateNativeXlsx(normalizeXlsxDesignProtocol(compiled.protocol), outPath),
+    docx: async () => generateNativeDocx(compiled.protocol, outPath),
+    pdf: async () => generateNativePdf(compiled.protocol, outPath, options),
+  };
+  const renderer = renderers[compiled.protocolKind];
+  if (!renderer) {
+    throw new Error(`Unsupported generated protocol kind: ${compiled.protocolKind}`);
+  }
+  await renderer();
+}
+
+async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: string, params: any, ctx: any, resolve: Function): Promise<void> {
+  ensureParentDir(outPath);
+  const renderers: Record<string, () => Promise<void>> = {
+    drawio: async () => {
+      const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
+      const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
+      const document = generateDrawioDocument(brief.payload.graph, {
+        title: brief.payload.title || brief.title || 'Diagram',
+        theme: activeTheme,
+        iconMap,
+        iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+      });
+      safeWriteFile(outPath, document);
+    },
+    mmd: async () => {
+      const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
+      safeMkdir(tempDir, { recursive: true });
+      const inputPath = path.join(tempDir, 'diagram.mmd');
+      safeWriteFile(inputPath, brief.payload.source);
+      const args = ['-i', inputPath, '-o', outPath];
+      const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
+      const mermaidConfig = buildMermaidConfig(activeTheme, params.background_color ? resolve(params.background_color) : undefined);
+      const configPath = path.join(tempDir, 'mermaid.config.json');
+      safeWriteFile(configPath, JSON.stringify(mermaidConfig, null, 2));
+      args.push('-c', configPath);
+      if (params.width) args.push('-w', String(resolve(params.width)));
+      if (params.height) args.push('-H', String(resolve(params.height)));
+      if (params.background_color) args.push('-b', String(resolve(params.background_color)));
+      safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+    },
+    d2: async () => {
+      const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
+      safeMkdir(tempDir, { recursive: true });
+      const inputPath = path.join(tempDir, 'diagram.d2');
+      safeWriteFile(inputPath, brief.payload.source);
+      const args = [inputPath, outPath];
+      if (params.layout) args.push('--layout', String(resolve(params.layout)));
+      if (params.theme_id) args.push('--theme', String(resolve(params.theme_id)));
+      if (params.sketch) args.push('--sketch');
+      if (params.pad) args.push('--pad', String(resolve(params.pad)));
+      safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+    },
+  };
+  const renderer = renderers[String(brief.render_target || '').trim()];
+  if (!renderer) {
+    throw new Error(`Unsupported diagram render_target: ${brief.render_target}`);
+  }
+  await renderer();
+}
+
+function compileBriefToDesignProtocol(rootDir: string, rawBrief: any): {
+  protocol: any;
+  outline: any;
+  theme: any;
+  themeName: string;
+  protocolKind: ProtocolKind;
+  exportKey: string;
+} {
+  const category = resolveMediaBriefCategory(rawBrief);
+  const brief = normalizeBriefForCategory(rootDir, rawBrief);
+  const outline = buildOutlineFromNormalizedBrief(rootDir, category, brief);
+  const theme = resolveNamedTheme(rootDir, outline.recommended_theme);
+
+  if (category === 'presentation') {
+    const compiled = buildPresentationPptxProtocol(rootDir, brief);
+    return {
+      ...compiled,
+      protocolKind: 'pptx',
+      exportKey: 'last_pptx_design',
+    };
+  }
+
+  if (category === 'document') {
+    const compilers: Record<string, () => { protocol: any; protocolKind: ProtocolKind; exportKey: string }> = {
+      pptx: () => ({
+        protocol: buildOutlineDrivenPptxProtocol(rootDir, outline).protocol,
+        protocolKind: 'pptx',
+        exportKey: 'last_pptx_design',
+      }),
+      docx: () => ({
+        protocol: buildReportDocxProtocol(rootDir, brief),
+        protocolKind: 'docx',
+        exportKey: 'last_docx_design',
+      }),
+      pdf: () => ({
+        protocol: buildReportPdfProtocol(rootDir, brief),
+        protocolKind: 'pdf',
+        exportKey: 'last_pdf_design',
+      }),
+    };
+    const compile = compilers[String(brief.render_target || '').trim()];
+    if (!compile) {
+      throw new Error(`Unsupported document render_target: ${String(brief.render_target || 'unknown')}`);
+    }
+    return {
+      ...compile(),
+      outline,
+      theme,
+      themeName: outline.recommended_theme,
+    };
+  }
+
+  if (category === 'spreadsheet') {
+    return {
+      protocol: normalizeXlsxDesignProtocol(brief.payload.protocol || buildTrackerSpreadsheetProtocol(rootDir, brief)),
+      outline,
+      theme,
+      themeName: outline.recommended_theme,
+      protocolKind: 'xlsx',
+      exportKey: 'last_xlsx_design',
+    };
+  }
+
+  throw new Error(`Unsupported brief for compileBriefToDesignProtocol: ${String(rawBrief?.kind || 'unknown')}`);
+}
+
+function buildCompositionTokenMap(brief: any): Record<string, string> {
+  return {
+    title: String(brief.title || brief.payload?.title || 'Document'),
+    client: String(brief.client || brief.payload?.client || ''),
+    objective: String(brief.objective || brief.payload?.objective || ''),
+    core_message: String(brief.story?.core_message || brief.payload?.story?.core_message || brief.objective || brief.payload?.objective || ''),
+    closing_cta: String(brief.story?.closing_cta || brief.payload?.story?.closing_cta || ''),
+    audience: Array.isArray(brief.audience || brief.payload?.audience)
+      ? (brief.audience || brief.payload?.audience).join(', ')
+      : '',
+    tone: String(brief.story?.tone || brief.payload?.story?.tone || ''),
+  };
+}
+
+function chooseDocumentSectionEvidence(index: number, brief: any): any {
+  const evidence = Array.isArray(brief.evidence || brief.payload?.evidence) ? (brief.evidence || brief.payload?.evidence) : [];
+  return evidence[index] || evidence[evidence.length - 1] || null;
+}
+
+function columnNumberToLetter(input: number): string {
+  let n = Math.max(1, Math.floor(input));
+  let out = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+function inferPrimitiveCellType(value: any): 'n' | 'b' | 'd' | 's' {
+  if (typeof value === 'number') return 'n';
+  if (typeof value === 'boolean') return 'b';
+  if (value instanceof Date) return 'd';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(value)) return 'd';
+  return 's';
+}
+
+function buildSmartTableSheet(sheet: any, index: number): any {
+  const smartTable = sheet?.smart_table;
+  if (!smartTable || typeof smartTable !== 'object') return sheet;
+  const headers = Array.isArray(smartTable.headers) ? smartTable.headers.map((value: any) => String(value)) : [];
+  const rows = Array.isArray(smartTable.rows) ? smartTable.rows : [];
+  if (headers.length === 0) return sheet;
+  const dataRows = rows.map((row: any, rowIndex: number) => ({
+    index: rowIndex + 2,
+    cells: headers.map((header, columnIndex) => {
+      const value = Array.isArray(row) ? row[columnIndex] : row?.[header];
+      return {
+        ref: `${columnNumberToLetter(columnIndex + 1)}${rowIndex + 2}`,
+        type: inferPrimitiveCellType(value),
+        value: value ?? '',
+      };
+    }),
+  }));
+  const normalizedRows = [
+    {
+      index: 1,
+      cells: headers.map((header, columnIndex) => ({
+        ref: `${columnNumberToLetter(columnIndex + 1)}1`,
+        type: 's',
+        value: header,
+      })),
+    },
+    ...dataRows,
+  ];
+  const endCell = `${columnNumberToLetter(headers.length)}${Math.max(rows.length + 1, 1)}`;
+  return {
+    ...sheet,
+    rows: normalizedRows,
+    columns: Array.isArray(sheet?.columns) && sheet.columns.length > 0
+      ? sheet.columns
+      : headers.map((_: string, columnIndex: number) => ({ min: columnIndex + 1, max: columnIndex + 1, width: 18, customWidth: true })),
+    tables: Array.isArray(sheet?.tables) && sheet.tables.length > 0
+      ? sheet.tables
+      : [{
+          id: 1,
+          name: `Table${index + 1}`,
+          displayName: `Table${index + 1}`,
+          ref: `A1:${endCell}`,
+          headerRowCount: 1,
+          totalsRowShown: false,
+          columns: headers.map((header, columnIndex) => ({ id: columnIndex + 1, name: header })),
+          styleInfo: {
+            name: 'TableStyleMedium2',
+            showRowStripes: true,
+          },
+        }],
+    autoFilter: sheet?.autoFilter || { ref: `A1:${endCell}` },
+    dimension: sheet?.dimension || `A1:${endCell}`,
+  };
+}
+
+function normalizeXlsxDesignProtocol(protocol: any): any {
+  if (!protocol || typeof protocol !== 'object') {
+    throw new Error('normalizeXlsxDesignProtocol: protocol must be an object');
+  }
+  const sheets = Array.isArray(protocol.sheets) ? protocol.sheets : [];
+  return {
+    ...protocol,
+    styles: {
+      ...(protocol.styles || {}),
+      fonts: Array.isArray(protocol.styles?.fonts) ? protocol.styles.fonts : [],
+      fills: Array.isArray(protocol.styles?.fills) ? protocol.styles.fills : [],
+      borders: Array.isArray(protocol.styles?.borders) ? protocol.styles.borders : [],
+      numFmts: Array.isArray(protocol.styles?.numFmts) ? protocol.styles.numFmts : [],
+      cellXfs: Array.isArray(protocol.styles?.cellXfs) ? protocol.styles.cellXfs : [],
+      namedStyles: Array.isArray(protocol.styles?.namedStyles) ? protocol.styles.namedStyles : [],
+      dxfs: Array.isArray(protocol.styles?.dxfs) ? protocol.styles.dxfs : [],
+    },
+    sharedStrings: Array.isArray(protocol.sharedStrings) ? protocol.sharedStrings : [],
+    sharedStringsRich: Array.isArray(protocol.sharedStringsRich) ? protocol.sharedStringsRich : [],
+    definedNames: Array.isArray(protocol.definedNames) ? protocol.definedNames : [],
+    sheets: sheets.map((rawSheet: any, index: number) => {
+      const sheet = buildSmartTableSheet(rawSheet, index);
+      return {
+        id: String(sheet?.id || `sheet${index + 1}`),
+        name: String(sheet?.name || `Sheet ${index + 1}`),
+        state: sheet?.state || 'visible',
+        dimension: sheet?.dimension,
+        sheetView: sheet?.sheetView || {},
+        columns: Array.isArray(sheet?.columns) ? sheet.columns : [],
+        rows: Array.isArray(sheet?.rows) ? sheet.rows : [],
+        mergeCells: Array.isArray(sheet?.mergeCells) ? sheet.mergeCells : [],
+        drawing: sheet?.drawing && typeof sheet.drawing === 'object'
+          ? { ...sheet.drawing, elements: Array.isArray(sheet.drawing.elements) ? sheet.drawing.elements : [] }
+          : undefined,
+        tables: Array.isArray(sheet?.tables) ? sheet.tables : [],
+        conditionalFormats: Array.isArray(sheet?.conditionalFormats) ? sheet.conditionalFormats : [],
+        dataValidations: Array.isArray(sheet?.dataValidations) ? sheet.dataValidations : [],
+        autoFilter: sheet?.autoFilter,
+        pageSetup: sheet?.pageSetup,
+        sheetPrXml: sheet?.sheetPrXml,
+        extensions: sheet?.extensions,
+      };
+    }),
+  };
+}
+
+function themeToPptxPalette(theme: any): any {
+  const colors = theme?.colors || {};
+  return {
+    dk1: String(colors.primary || '#000000').replace('#', ''),
+    dk2: String(colors.secondary || colors.text || '#44546A').replace('#', ''),
+    lt1: String(colors.background || '#FFFFFF').replace('#', ''),
+    lt2: String(colors.background || '#E7E6E6').replace('#', ''),
+    accent1: String(colors.accent || '#38BDF8').replace('#', ''),
+    accent2: String(colors.secondary || '#334155').replace('#', ''),
+  };
+}
+
+function themeToDocxStyleHints(theme: any, locale?: string): { headingFont: string; bodyFont: string; accent: string } {
+  const headingFont = normalizeFontFamily(
+    locale?.startsWith('ja')
+      ? theme?.fonts?.heading || 'Meiryo'
+      : theme?.fonts?.heading || 'Aptos',
+  );
+  const bodyFont = normalizeFontFamily(
+    locale?.startsWith('ja')
+      ? theme?.fonts?.body || 'Meiryo'
+      : theme?.fonts?.body || 'Aptos',
+  );
+  return {
+    headingFont,
+    bodyFont,
+    accent: String(theme?.colors?.accent || '#2563eb').replace('#', ''),
+  };
+}
+
+function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
+  switch (String(role || '').trim()) {
+    case 'accent':
+      return accentHex || palette.accent1 || '2563EB';
+    case 'secondary':
+      return palette.dk2 || palette.dk1 || '334155';
+    case 'primary':
+      return palette.dk1 || '111827';
+    default:
+      return palette.dk2 || palette.dk1 || accentHex || '334155';
+  }
+}
+
+function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#334155'): string {
+  switch (String(role || '').trim()) {
+    case 'accent':
+      return String(themeColors.accent || fallback);
+    case 'primary':
+      return String(themeColors.primary || fallback);
+    case 'secondary':
+      return String(themeColors.secondary || themeColors.text || fallback);
+    case 'background':
+      return String(themeColors.background || '#F8FAFC');
+    case 'success':
+      return String(themeColors.success || '#DCFCE7');
+    case 'warning':
+      return String(themeColors.warning || '#FEF3C7');
+    case 'info':
+      return String(themeColors.info || '#DBEAFE');
+    case 'muted':
+      return String(themeColors.muted || '#F1F5F9');
+    default:
+      return String(themeColors.secondary || themeColors.text || fallback);
+  }
+}
+
+function applyCompositionTemplate(template: any, tokens: Record<string, string>, fallback = ''): string {
+  const source = typeof template === 'string' ? template : fallback;
+  return source.replace(/{{\s*([\w-]+)\s*}}/g, (_, key) => tokens[key] || '');
+}
+
+function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): string {
+  const layout = String(layoutKey || '').trim();
+  const media = String(mediaKind || '').trim();
+
+  if (['cover-statement', 'doc-title'].includes(layout) || ['hero', 'title-page'].includes(media)) return 'hero';
+  if (['title-body', 'doc-summary', 'sheet-overview'].includes(layout) || ['summary', 'dashboard'].includes(media)) return 'summary';
+  if (['evidence-callout'].includes(layout) || ['evidence'].includes(media)) return 'evidence';
+  if (['risk-controls'].includes(layout) || ['controls'].includes(media)) return 'control';
+  if (['timeline-roadmap'].includes(layout) || ['timeline'].includes(media)) return 'roadmap';
+  if (['decision-cta'].includes(layout) || ['cta'].includes(media)) return 'decision';
+  if (['doc-appendix'].includes(layout) || ['appendix'].includes(media)) return 'appendix';
+  if (['sheet-signals'].includes(layout) || ['signals'].includes(media)) return 'signals';
+  if (['sheet-main-table'].includes(layout) || ['table'].includes(media)) return 'execution';
+  if (['three-point-architecture', 'diagram-context', 'operating-model'].includes(layout) || ['architecture', 'diagram', 'model'].includes(media)) return 'architecture';
+  return 'content';
+}
+
+function rankSignalTone(tone?: string): number {
+  const key = String(tone || '').toLowerCase();
+  const fallback: Record<string, number> = { danger: 0, critical: 0, high: 0, warning: 1, medium: 1, info: 2, success: 3, low: 3 };
+  return fallback[key] ?? 2;
+}
+
+function chooseProposalSectionEvidence(sectionId: string, brief: any): any {
+  const evidence = Array.isArray(brief.evidence) ? brief.evidence : [];
+  const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
+  const lowerChapters = chapters.map((entry: string) => String(entry).toLowerCase());
+  const keywordMap: Record<string, string[]> = {
+    'why-change': ['why', 'change', 'pain', 'problem', 'now'],
+    'target-outcome': ['target', 'journey', 'future', 'outcome', 'vision'],
+    'solution-shape': ['solution', 'approach', 'shape', 'architecture'],
+    'governance': ['governance', 'control', 'risk', 'operation'],
+    'delivery-plan': ['delivery', 'plan', 'roadmap', 'phase'],
+  };
+  const keywords = keywordMap[sectionId] || [];
+  const chapterIndex = lowerChapters.findIndex((chapter) => keywords.some((keyword) => chapter.includes(keyword)));
+  if (chapterIndex >= 0 && evidence[chapterIndex]) return evidence[chapterIndex];
+  if (sectionId === 'why-change') return evidence[0];
+  if (sectionId === 'target-outcome') return evidence[1] || evidence[0];
+  if (sectionId === 'solution-shape') return evidence[2] || evidence[1] || evidence[0];
+  if (sectionId === 'governance') return evidence[2] || evidence[0];
+  if (sectionId === 'delivery-plan') return evidence[3] || evidence[evidence.length - 1];
+  return evidence[0];
+}
+
+function buildProposalNarrativeOutline(rootDir: string, brief: any): any {
+  const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
+  const tokens = buildCompositionTokenMap(brief);
+  const sections = Array.isArray(preset.sections) ? preset.sections : [];
+  const requestedSections = Array.isArray(brief.required_sections) ? new Set(brief.required_sections.map((value: any) => String(value))) : null;
+  const toc = sections
+    .filter((section: any) => !requestedSections || requestedSections.size === 0 || requestedSections.has(section.section_id) || ['cover', 'decision'].includes(section.section_id))
+    .map((section: any, index: number) => {
+      const supporting = chooseProposalSectionEvidence(section.section_id, brief) || {};
+      const chapter = Array.isArray(brief.story?.chapters) ? brief.story.chapters[index] : undefined;
+      return {
+        section_id: section.section_id,
+        title: applyCompositionTemplate(section.title, tokens, chapter || section.section_id),
+        objective: applyCompositionTemplate(section.objective, tokens, chapter || brief.objective || ''),
+        body: [
+          supporting.point || chapter || brief.story?.core_message || brief.objective,
+          section.section_id === 'executive-summary' && tokens.audience ? `Audience: ${tokens.audience}` : undefined,
+          section.section_id === 'decision' && tokens.tone ? `Tone: ${tokens.tone}` : undefined,
+        ].filter(Boolean),
+        visual: supporting.title || section.visual || 'supporting visual',
+        media_kind: section.media_kind || 'content',
+        layout_key: section.layout_key || 'title-body',
+        semantic_type: classifyRenderSemantic(section.layout_key, section.media_kind),
+      };
+    });
+
+  return {
+    kind: 'document-outline-adf',
+    artifact_family: brief.artifact_family,
+    document_type: brief.document_type,
+    document_profile: profileId,
+    design_system_id: preset.design_system_id,
+    branding: preset.branding || {},
+    narrative_pattern_id: preset.narrative_pattern_id || 'generic-structured',
+    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    generation_boundary: buildMediaGenerationBoundary({
+      document_profile: profileId,
+      design_system_id: preset.design_system_id,
+    }),
+    toc,
+  };
+}
+
+function buildReportNarrativeOutline(rootDir: string, brief: any): any {
+  const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
+  const payloadSections = Array.isArray(brief.payload?.sections) ? brief.payload.sections : [];
+  const presetSections = Array.isArray(preset.sections) ? preset.sections : [];
+  const appendixPattern = /\b(appendix|appendices|annex|supplement|reference)\b/i;
+  const tokens = buildCompositionTokenMap(brief);
+  const chapters = Array.isArray(brief.story?.chapters || brief.payload?.story?.chapters)
+    ? (brief.story?.chapters || brief.payload?.story?.chapters)
+    : [];
+  const sections = payloadSections.length > 0
+    ? payloadSections.map((section: any) => ({
+        section_id: String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        title: String(section.heading || 'Section'),
+        objective: Array.isArray(section.body) ? String(section.body[0] || '') : '',
+        body: [
+          ...(Array.isArray(section.body) ? section.body.map((value: any) => String(value)) : []),
+          ...(Array.isArray(section.bullets) ? section.bullets.map((value: any) => `- ${String(value)}`) : []),
+        ].filter(Boolean),
+        visual: Array.isArray(section.callouts) && section.callouts[0]?.title ? String(section.callouts[0].title) : undefined,
+        media_kind: appendixPattern.test(String(section.heading || '')) ? 'appendix' : 'section-flow',
+        layout_key: appendixPattern.test(String(section.heading || '')) ? 'doc-appendix' : 'doc-sections',
+      }))
+    : presetSections.map((section: any, index: number) => {
+        const evidence = chooseDocumentSectionEvidence(index, brief);
+        const chapter = String(chapters[index] || '').trim();
+        const objective = applyCompositionTemplate(section.objective, tokens, chapter || brief.objective || section.title || '');
+        const body = [
+          chapter || objective || brief.objective || '',
+          evidence?.point ? String(evidence.point) : '',
+        ].filter(Boolean);
+        return {
+          section_id: String(section.section_id || 'section'),
+          title: applyCompositionTemplate(section.title, tokens, section.title || 'Section'),
+          objective: objective || chapter || brief.objective || '',
+          body,
+          visual: evidence?.title ? String(evidence.title) : undefined,
+          media_kind: String(section.media_kind || 'section-flow'),
+          layout_key: String(section.layout_key || 'doc-sections'),
+        };
+      });
+  return {
+    kind: 'document-outline-adf',
+    artifact_family: brief.artifact_family,
+    document_type: brief.document_type,
+    document_profile: profileId,
+    design_system_id: preset.design_system_id,
+    branding: preset.branding || {},
+    narrative_pattern_id: preset.narrative_pattern_id || 'report-standard',
+    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    generation_boundary: buildMediaGenerationBoundary({
+      document_profile: profileId,
+      design_system_id: preset.design_system_id,
+    }),
+    toc: [
+      {
+        section_id: 'title',
+        title: brief.payload?.title || brief.title || 'Report',
+        objective: brief.objective || brief.summary || '',
+        body: [brief.objective || brief.summary || ''].filter(Boolean),
+        visual: brief.title || 'overview',
+        media_kind: 'title-page',
+        layout_key: 'doc-title',
+        semantic_type: classifyRenderSemantic('doc-title', 'title-page'),
+      },
+      ...((brief.payload?.summary || brief.summary) ? [{
+        section_id: 'summary',
+        title: 'Summary',
+        objective: brief.payload?.summary || brief.summary || brief.objective || '',
+        body: [brief.payload?.summary || brief.summary || brief.objective || ''].filter(Boolean),
+        visual: chooseDocumentSectionEvidence(0, brief)?.title || 'summary',
+        media_kind: 'summary',
+        layout_key: 'doc-summary',
+        semantic_type: classifyRenderSemantic('doc-summary', 'summary'),
+      }] : []),
+      ...sections.map((section: any) => ({
+        section_id: String(section.section_id || 'section'),
+        title: String(section.title || 'Section'),
+        objective: String(section.objective || ''),
+        body: Array.isArray(section.body) ? section.body : [section.objective].filter(Boolean),
+        visual: section.visual,
+        media_kind: String(section.media_kind || 'section-flow'),
+        layout_key: String(section.layout_key || 'doc-sections'),
+        semantic_type: classifyRenderSemantic(
+          String(section.layout_key || 'doc-sections'),
+          String(section.media_kind || 'section-flow'),
+        ),
+      })),
+    ],
+  };
+}
+
+function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any): any {
+  const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
+  const protocol = brief.payload?.protocol;
+  const sheetNames = Array.isArray(protocol?.worksheets)
+    ? protocol.worksheets.map((sheet: any) => String(sheet?.name || 'Sheet'))
+    : [];
+  const presetSections = Array.isArray(preset.sections) ? preset.sections : [];
+  const sectionIndex = new Map<string, any>(
+    presetSections.map((section: any) => [String(section.section_id || ''), section]),
+  );
+  return {
+    kind: 'document-outline-adf',
+    artifact_family: brief.artifact_family,
+    document_type: brief.document_type,
+    document_profile: profileId,
+    design_system_id: preset.design_system_id,
+    branding: preset.branding || {},
+    narrative_pattern_id: preset.narrative_pattern_id || 'operator-dashboard',
+    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    generation_boundary: buildMediaGenerationBoundary({
+      document_profile: profileId,
+      design_system_id: preset.design_system_id,
+    }),
+    toc: [
+      {
+        section_id: 'overview',
+        title: sectionIndex.get('overview')?.title || 'Overview',
+        media_kind: sectionIndex.get('overview')?.media_kind || 'dashboard',
+        layout_key: sectionIndex.get('overview')?.layout_key || 'sheet-overview',
+        semantic_type: classifyRenderSemantic(sectionIndex.get('overview')?.layout_key || 'sheet-overview', sectionIndex.get('overview')?.media_kind || 'dashboard'),
+      },
+      {
+        section_id: 'execution-board',
+        title: sectionIndex.get('execution-board')?.title || 'Execution Board',
+        media_kind: sectionIndex.get('execution-board')?.media_kind || 'table',
+        layout_key: sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table',
+        semantic_type: classifyRenderSemantic(sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table', sectionIndex.get('execution-board')?.media_kind || 'table'),
+      },
+      {
+        section_id: 'signals',
+        title: sectionIndex.get('signals')?.title || 'Signals and Risks',
+        media_kind: sectionIndex.get('signals')?.media_kind || 'signals',
+        layout_key: sectionIndex.get('signals')?.layout_key || 'sheet-signals',
+        semantic_type: classifyRenderSemantic(sectionIndex.get('signals')?.layout_key || 'sheet-signals', sectionIndex.get('signals')?.media_kind || 'signals'),
+      },
+      ...sheetNames.map((name: string) => ({
+        section_id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        title: name,
+        media_kind: 'table',
+        layout_key: 'sheet-main-table',
+        semantic_type: classifyRenderSemantic('sheet-main-table', 'table'),
+      })),
+    ],
+  };
+}
+
+function buildDiagramNarrativeOutline(rootDir: string, brief: any): any {
+  const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
+  return {
+    kind: 'document-outline-adf',
+    artifact_family: brief.artifact_family,
+    document_type: brief.document_type,
+    document_profile: profileId,
+    design_system_id: preset.design_system_id,
+    branding: preset.branding || {},
+    narrative_pattern_id: preset.narrative_pattern_id || 'solution-overview',
+    recommended_theme: preset.recommended_theme || brief.layout_template_id || 'aws-architecture',
+    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    generation_boundary: buildMediaGenerationBoundary({
+      document_profile: profileId,
+      design_system_id: preset.design_system_id,
+    }),
+    toc: [
+      {
+        section_id: 'system-context',
+        title: brief.title || brief.payload?.title || 'Diagram',
+        media_kind: 'diagram',
+        layout_key: 'diagram-context',
+        semantic_type: classifyRenderSemantic('diagram-context', 'diagram'),
+      },
+    ],
+  };
 }
 
 function normalizeInvoiceDocumentBrief(input: any): any {
@@ -867,6 +1945,85 @@ function normalizeProposalBrief(input: any): any {
   }
 
   throw new Error(`Unsupported proposal brief kind: ${String(input.kind || 'unknown')}`);
+}
+
+function buildUnifiedDocumentBrief(rootDir: string, input: {
+  profileId?: string;
+  renderTarget?: string;
+  source?: any;
+  data?: any;
+}): any {
+  const source = (input.source && typeof input.source === 'object') ? input.source : {};
+  const data = (input.data && typeof input.data === 'object') ? input.data : {};
+  const renderTarget = String(input.renderTarget || source.render_target || data.render_target || '').trim();
+  const profileId = String(input.profileId || source.document_profile || data.document_profile || '').trim();
+  const catalog = loadDocumentCompositionCatalog(rootDir);
+  const profilePreset = profileId ? catalog.profiles?.[profileId] || null : null;
+  const artifactFamily = String(
+    source.artifact_family ||
+    data.artifact_family ||
+    profilePreset?.artifact_family ||
+    (renderTarget === 'pptx' ? 'presentation' : renderTarget === 'xlsx' ? 'spreadsheet' : 'document'),
+  ).trim();
+  const documentType = String(
+    source.document_type ||
+    data.document_type ||
+    profilePreset?.document_type ||
+    (artifactFamily === 'presentation' ? 'proposal' : artifactFamily === 'spreadsheet' ? 'tracker' : 'report'),
+  ).trim();
+
+  if (!renderTarget) {
+    throw new Error('generate_document requires render_target');
+  }
+  if (!profileId) {
+    throw new Error('generate_document requires profile_id or document_profile');
+  }
+
+  if (artifactFamily === 'presentation') {
+    return {
+      kind: 'proposal-brief',
+      artifact_family: 'presentation',
+      document_type: documentType,
+      document_profile: profileId,
+      render_target: 'pptx',
+      locale: source.locale || data.locale || 'en-US',
+      layout_template_id: source.layout_template_id || data.layout_template_id,
+      project_id: source.project_id || data.project_id,
+      title: source.title || data.title || profileId,
+      objective: source.objective || data.objective || '',
+      client: source.client || data.client,
+      story: source.story || data.story || {},
+      evidence: source.evidence || data.evidence || [],
+      payload: source.payload || data.payload,
+    };
+  }
+
+  if (artifactFamily === 'spreadsheet') {
+    return {
+      kind: 'document-brief',
+      artifact_family: 'spreadsheet',
+      document_type: documentType,
+      document_profile: profileId,
+      render_target: 'xlsx',
+      locale: source.locale || data.locale || 'en-US',
+      layout_template_id: source.layout_template_id || data.layout_template_id,
+      payload: source.payload || data.payload || data,
+    };
+  }
+
+  return {
+    kind: 'document-brief',
+    artifact_family: 'document',
+    document_type: documentType,
+    document_profile: profileId,
+    render_target: renderTarget,
+    locale: source.locale || data.locale || 'en-US',
+    layout_template_id: source.layout_template_id || data.layout_template_id,
+    project_id: source.project_id || data.project_id,
+    title: source.title || data.title,
+    summary: source.summary || data.summary,
+    payload: source.payload || data.payload || data,
+  };
 }
 
 function normalizeDiagramDocumentBrief(input: any): any {
@@ -957,18 +2114,10 @@ function normalizeReportDocumentBrief(input: any): any {
   if (input.artifact_family !== 'document') {
     throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
   }
-  if (input.document_type !== 'report') {
-    throw new Error(`Unsupported document_type in document-brief: ${String(input.document_type)}`);
-  }
-  if (!['docx', 'pdf'].includes(String(input.render_target))) {
+  if (!['docx', 'pdf', 'pptx'].includes(String(input.render_target))) {
     throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
   }
-  if (!input.payload || typeof input.payload !== 'object') {
-    throw new Error('document-brief for report requires an object payload.');
-  }
-  if (!Array.isArray(input.payload.sections) || input.payload.sections.length === 0) {
-    throw new Error('document-brief for report requires payload.sections.');
-  }
+  const payload = (input.payload && typeof input.payload === 'object') ? input.payload : {};
 
   return {
     artifact_family: input.artifact_family,
@@ -977,28 +2126,40 @@ function normalizeReportDocumentBrief(input: any): any {
     render_target: input.render_target,
     locale: input.locale || 'en-US',
     layout_template_id: input.layout_template_id,
-    payload: input.payload,
+    title: input.title,
+    summary: input.summary,
+    payload,
   };
 }
 
 function buildReportDocxProtocol(rootDir: string, brief: any): any {
+  const outline = buildReportNarrativeOutline(rootDir, brief);
+  const { preset } = resolveDocumentCompositionPreset(rootDir, brief);
   const { template } = resolveDocumentLayoutTemplate(rootDir, {
     document_type: 'report',
     layout_template_id: brief.layout_template_id,
   });
+  const activeTheme = resolveNamedTheme(rootDir, preset?.recommended_theme);
+  const themeHints = themeToDocxStyleHints(activeTheme, brief.locale);
+  const palette = themeToPptxPalette(activeTheme);
   const docxLayout = template?.docx || {};
   const layoutProfileTemplate = docxLayout.layout_profile || {};
   const numberingPolicyTemplate = docxLayout.numbering_policy || {};
   const headingFont = normalizeFontFamily(
     brief.locale?.startsWith('ja')
-      ? template?.fonts?.heading || 'Meiryo'
-      : template?.fonts?.heading || 'Aptos',
+      ? themeHints.headingFont || template?.fonts?.heading || 'Meiryo'
+      : themeHints.headingFont || template?.fonts?.heading || 'Aptos',
   );
   const bodyFont = normalizeFontFamily(
     brief.locale?.startsWith('ja')
-      ? template?.fonts?.body || 'Meiryo'
-      : template?.fonts?.body || 'Aptos',
+      ? themeHints.bodyFont || template?.fonts?.body || 'Meiryo'
+      : themeHints.bodyFont || template?.fonts?.body || 'Aptos',
   );
+  const appendixHeadingRule = resolveSemanticComponentRule(rootDir, 'appendix', 'docx', 'heading');
+  const appendixBodyRule = resolveSemanticComponentRule(rootDir, 'appendix', 'docx', 'body');
+  const evidenceCalloutTitleRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_title');
+  const evidenceCalloutBodyRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_body');
+  const tableCaptionRule = resolveSemanticComponentRule(rootDir, 'content', 'docx', 'table_caption');
   const bodyBlocks: any[] = [
     {
       type: 'paragraph',
@@ -1019,10 +2180,15 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
   }
 
   for (const section of brief.payload.sections) {
+    const sectionId = String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const sectionPlan = Array.isArray(outline.toc)
+      ? outline.toc.find((entry: any) => entry.section_id === sectionId)
+      : null;
+    const headingStyle = sectionPlan?.layout_key === 'doc-appendix' ? 'Heading3' : 'Heading2';
     bodyBlocks.push({
       type: 'paragraph',
       paragraph: {
-        pPr: { pStyle: 'Heading2' },
+        pPr: { pStyle: headingStyle },
         content: [{ type: 'run', run: { content: [{ type: 'text', text: section.heading || 'Section' }] } }],
       },
     });
@@ -1032,6 +2198,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
         bodyBlocks.push({
           type: 'paragraph',
           paragraph: {
+            pPr: { pStyle: headingStyle === 'Heading3' ? 'AppendixBody' : 'Normal' },
             content: [{ type: 'run', run: { content: [{ type: 'text', text: String(paragraph) }] } }],
           },
         });
@@ -1057,10 +2224,11 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
           bodyBlocks.push({
             type: 'paragraph',
             paragraph: {
+              pPr: { pStyle: 'CalloutTitle' },
               content: [{
                 type: 'run',
                 run: {
-                  rPr: { bold: true, color: { val: String(template?.colors?.accent || '#2563eb').replace('#', '') } },
+                  rPr: { bold: true, color: { val: themeHints.accent || String(template?.colors?.accent || '#2563eb').replace('#', '') } },
                   content: [{ type: 'text', text: title }],
                 },
               }],
@@ -1071,6 +2239,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
           bodyBlocks.push({
             type: 'paragraph',
             paragraph: {
+              pPr: { pStyle: 'CalloutBody' },
               content: [{ type: 'run', run: { content: [{ type: 'text', text: String(callout.body) }] } }],
             },
           });
@@ -1084,6 +2253,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
           bodyBlocks.push({
             type: 'paragraph',
             paragraph: {
+              pPr: { pStyle: 'TableCaption' },
               content: [{
                 type: 'run',
                 run: {
@@ -1120,10 +2290,10 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
               {
                 trPr: { tblHeader: true },
                 cells: columns.map((column: string) => ({
-                  tcPr: {
-                    tcW: { w: cellWidth, type: 'dxa' },
-                    shd: { val: 'clear', fill: String(template?.colors?.primary || '#1f2937').replace('#', '') },
-                  },
+                    tcPr: {
+                      tcW: { w: cellWidth, type: 'dxa' },
+                      shd: { val: 'clear', fill: palette.dk1 || String(template?.colors?.primary || '#1f2937').replace('#', '') },
+                    },
                   content: [{
                     type: 'paragraph',
                     paragraph: {
@@ -1184,9 +2354,16 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
       ].join('\n').trim(),
     },
     theme: {
-      colors: { dk1: '111827', lt1: 'FFFFFF', accent1: '2563EB' },
+      colors: {
+        dk1: palette.dk1 || '111827',
+        dk2: palette.dk2 || palette.dk1 || '44546A',
+        lt1: palette.lt1 || 'FFFFFF',
+        lt2: palette.lt2 || palette.lt1 || 'E7E6E6',
+        accent1: palette.accent1 || '2563EB',
+        accent2: palette.accent2 || palette.dk2 || '334155',
+      },
       majorFont: headingFont,
-      minorFont: headingFont,
+      minorFont: bodyFont,
     },
     layoutProfile: {
       fonts: {
@@ -1268,11 +2445,102 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
           },
           rPr: { bold: true, sz: docxLayout.section_font_size || 26 },
         },
+        {
+          styleId: 'Heading3',
+          type: 'paragraph',
+          name: 'Heading 3',
+          pPr: {
+            spacing: {
+              before: appendixHeadingRule.spacing_before || ((docxLayout.section_spacing_before || 120) - 20),
+              after: appendixHeadingRule.spacing_after || docxLayout.section_spacing_after || 80,
+            },
+          },
+          rPr: {
+            bold: appendixHeadingRule.bold ?? true,
+            color: { val: resolveThemeColorRole(palette, themeHints.accent, appendixHeadingRule.color_role) },
+            sz: appendixHeadingRule.font_size || Math.max((docxLayout.section_font_size || 26) - 2, 20),
+          },
+        },
+        {
+          styleId: 'CalloutTitle',
+          type: 'paragraph',
+          name: 'Callout Title',
+          pPr: {
+            spacing: {
+              before: evidenceCalloutTitleRule.spacing_before || 80,
+              after: evidenceCalloutTitleRule.spacing_after || 40,
+            },
+          },
+          rPr: {
+            bold: evidenceCalloutTitleRule.bold ?? true,
+            color: { val: resolveThemeColorRole(palette, themeHints.accent, evidenceCalloutTitleRule.color_role) },
+            sz: evidenceCalloutTitleRule.font_size || Math.max((docxLayout.section_font_size || 26) - 4, 18),
+          },
+        },
+        {
+          styleId: 'CalloutBody',
+          type: 'paragraph',
+          name: 'Callout Body',
+          pPr: {
+            spacing: {
+              after: evidenceCalloutBodyRule.spacing_after || 80,
+            },
+          },
+          rPr: {
+            italics: evidenceCalloutBodyRule.italics ?? true,
+            color: { val: resolveThemeColorRole(palette, themeHints.accent, evidenceCalloutBodyRule.color_role) },
+            sz: evidenceCalloutBodyRule.font_size || 21,
+          },
+        },
+        {
+          styleId: 'TableCaption',
+          type: 'paragraph',
+          name: 'Table Caption',
+          pPr: {
+            spacing: {
+              before: tableCaptionRule.spacing_before || 60,
+              after: tableCaptionRule.spacing_after || 40,
+            },
+          },
+          rPr: {
+            bold: tableCaptionRule.bold ?? true,
+            color: { val: resolveThemeColorRole(palette, themeHints.accent, tableCaptionRule.color_role) },
+            sz: tableCaptionRule.font_size || 20,
+          },
+        },
+        {
+          styleId: 'AppendixBody',
+          type: 'paragraph',
+          name: 'Appendix Body',
+          pPr: {
+            spacing: {
+              after: appendixBodyRule.spacing_after || 60,
+            },
+          },
+          rPr: {
+            color: { val: resolveThemeColorRole(palette, themeHints.accent, appendixBodyRule.color_role) },
+            sz: appendixBodyRule.font_size || 20,
+          },
+        },
       ],
     },
     numbering: {
       abstractNums: [{ abstractNumId: 0, levels: [{ ilvl: 0, numFmt: 'bullet', lvlText: '•', jc: 'left' }] }],
       nums: [{ numId: 1, abstractNumId: 0 }],
+    },
+    metadata: {
+      composition: outline,
+      generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
+      recommendedTheme: preset?.recommended_theme || 'kyberion-standard',
+      branding: preset?.branding || {},
+      sectionSemantics: Array.isArray(outline.toc)
+        ? outline.toc.map((entry: any) => ({
+            section_id: entry.section_id,
+            layout_key: entry.layout_key,
+            media_kind: entry.media_kind,
+            semantic_type: entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
+          }))
+        : [],
     },
     body: bodyBlocks,
     sections: [{
@@ -2888,10 +4156,13 @@ function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hints?: Pd
 }
 
 function buildReportPdfProtocol(rootDir: string, brief: any): any {
+  const outline = buildReportNarrativeOutline(rootDir, brief);
+  const { preset } = resolveDocumentCompositionPreset(rootDir, brief);
   const { template, templateId } = resolveDocumentLayoutTemplate(rootDir, {
     document_type: 'report',
     layout_template_id: brief.layout_template_id,
   });
+  const activeTheme = resolveNamedTheme(rootDir, preset?.recommended_theme);
   const pdfLayout = template?.pdf || {};
   const hexToPdfRgb = (hex: string | undefined, fallback: [number, number, number]): [number, number, number] => {
     if (!hex || typeof hex !== 'string') return fallback;
@@ -2905,11 +4176,16 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
   };
   const tableStyle = pdfLayout.table || {};
   const tableWidth = Number(tableStyle.width || 490);
-  const headerFill = hexToPdfRgb(tableStyle.header_fill, [0.12, 0.16, 0.22]);
+  const headerFill = hexToPdfRgb(tableStyle.header_fill, hexToPdfRgb(activeTheme?.colors?.primary, [0.12, 0.16, 0.22]));
   const gridStroke = hexToPdfRgb(tableStyle.grid_stroke, [0.8, 0.84, 0.89]);
   const outerStroke = hexToPdfRgb(tableStyle.outer_stroke, [0.58, 0.64, 0.72]);
   const zebraFill = hexToPdfRgb(tableStyle.zebra_fill, [0.97, 0.98, 0.99]);
   const showZebra = tableStyle.show_zebra !== false;
+  const accentFill = hexToPdfRgb(activeTheme?.colors?.accent, [0.93, 0.96, 1.0]);
+  const themePrimary = String(activeTheme?.colors?.primary || template?.colors?.primary || '#1f2937');
+  const themeSecondary = String(activeTheme?.colors?.secondary || template?.colors?.secondary || '#4b5563');
+  const themeAccent = String(activeTheme?.colors?.accent || template?.colors?.accent || '#2563eb');
+  const themeBackground = String(activeTheme?.colors?.background || '#ffffff');
   const vectors: any[] = [];
   const bodySections = [
     brief.payload.title || 'Report',
@@ -2944,22 +4220,60 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
   }
 
   for (const section of brief.payload.sections) {
+    const sectionId = String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const sectionPlan = Array.isArray(outline.toc)
+      ? outline.toc.find((entry: any) => entry.section_id === sectionId)
+      : null;
+    const semanticType = sectionPlan?.semantic_type || classifyRenderSemantic(sectionPlan?.layout_key, sectionPlan?.media_kind);
+    const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType);
+    const pdfTokens = semanticTokens.pdf || {};
+    const isAppendix = semanticType === 'appendix';
+    const sectionHeaderColor = pdfTokens.header_color === 'secondary'
+      ? hexToPdfRgb(themeSecondary, [0.3, 0.34, 0.39])
+      : pdfTokens.header_color === 'accent'
+        ? hexToPdfRgb(themeAccent, [0.15, 0.39, 0.92])
+        : hexToPdfRgb(themePrimary, [0.12, 0.16, 0.22]);
+    const sectionBodyX = pdfTokens.body_x === 'margin' ? (pdfLayout.margin_left || 48) : (pdfLayout.content_x || 56);
+    const bodyFontSize = (pdfLayout.body_font_size || 10) + Number(pdfTokens.body_font_size_delta || 0);
+    const blockFill = pdfTokens.block_fill === 'primary'
+      ? headerFill
+      : pdfTokens.block_fill === 'accent'
+        ? accentFill
+        : null;
     elements.push({
       type: 'text',
       x: pdfLayout.margin_left || 48,
       y: cursorY,
       text: section.heading || 'Section',
-      fontSize: pdfLayout.section_font_size || 14,
+      fontSize: isAppendix ? Math.max((pdfLayout.section_font_size || 14) - 2, 11) : (pdfLayout.section_font_size || 14),
+      color: sectionHeaderColor,
     });
     cursorY += 22;
+    if (blockFill) {
+      const blockHeight = Math.max(
+        (Array.isArray(section.body) ? section.body.length : 0) * (pdfLayout.line_height || 16) + 18,
+        26,
+      );
+      vectors.push({
+        shape: {
+          kind: 'rect',
+          x: (pdfLayout.margin_left || 48) - 8,
+          y: cursorY - 8,
+          width: 490,
+          height: blockHeight,
+        },
+        fillColor: blockFill,
+        fillOpacity: Number(pdfTokens.block_opacity || 0),
+      });
+    }
     if (Array.isArray(section.body)) {
       for (const paragraph of section.body) {
         elements.push({
           type: 'text',
-          x: pdfLayout.content_x || 56,
+          x: sectionBodyX,
           y: cursorY,
           text: String(paragraph),
-          fontSize: pdfLayout.body_font_size || 10,
+          fontSize: bodyFontSize,
         });
         cursorY += pdfLayout.line_height || 16;
       }
@@ -2989,8 +4303,8 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
             width: 470,
             height: calloutBoxHeight,
           },
-          fillColor: [0.93, 0.96, 1.0],
-          fillOpacity: 0.7,
+          fillColor: pdfTokens.callout_fill === 'primary' ? headerFill : accentFill,
+          fillOpacity: Number(pdfTokens.callout_opacity ?? 0.7),
         });
         if (title) {
           elements.push({
@@ -3139,6 +4453,18 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
       subject: brief.document_profile || 'summary-report',
       author: 'Kyberion Media-Actuator',
       creationDate: new Date().toISOString(),
+      composition: outline,
+      generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
+      recommendedTheme: preset?.recommended_theme || 'kyberion-standard',
+      branding: preset?.branding || {},
+      sectionSemantics: Array.isArray(outline.toc)
+        ? outline.toc.map((entry: any) => ({
+            section_id: entry.section_id,
+            layout_key: entry.layout_key,
+            media_kind: entry.media_kind,
+            semantic_type: entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
+          }))
+        : [],
     },
     content: {
       text: bodySections.join('\n'),
@@ -3147,9 +4473,17 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
     aesthetic: {
       layout: 'single-column',
       elements,
-      colors: [template?.colors?.primary || '#1f2937', template?.colors?.secondary || '#4b5563', template?.colors?.accent || '#2563eb'],
+      colors: [themePrimary, themeSecondary, themeAccent],
       fonts: [brief.locale?.startsWith('ja') ? 'HeiseiKakuGo-W5' : 'Helvetica'],
-      branding: { logoPresence: false, primaryColor: '#1f2937', tone: 'professional' },
+      branding: {
+        logoPresence: Boolean(preset?.branding?.logo_url || activeTheme?.assets?.logo_url),
+        logoUrl: preset?.branding?.logo_url || activeTheme?.assets?.logo_url || null,
+        brandName: preset?.branding?.brand_name || brief.payload?.client || brief.client || null,
+        primaryColor: themePrimary,
+        secondaryColor: themeSecondary,
+        backgroundColor: themeBackground,
+        tone: preset?.branding?.tone || 'professional',
+      },
       templateId,
     },
     renderOptions: {
@@ -3164,11 +4498,18 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
 }
 
 function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
+  const outline = buildSpreadsheetNarrativeOutline(rootDir, brief);
+  const { preset } = resolveDocumentCompositionPreset(rootDir, brief);
+  const semanticCatalog = loadSemanticRenderTokenCatalog(rootDir);
   const { template } = resolveDocumentLayoutTemplate(rootDir, {
     document_type: 'tracker',
     layout_template_id: brief.layout_template_id,
   });
-  const colors = template?.colors || {};
+  const activeTheme = resolveNamedTheme(rootDir, preset?.recommended_theme);
+  const colors = {
+    ...(template?.colors || {}),
+    ...(activeTheme?.colors || {}),
+  };
   const layout = template?.layout || {};
   const toneCatalog = template?.tones?.states || {};
   const validationDefaults = template?.validation_defaults || {};
@@ -3188,6 +4529,15 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
   const rowTones = brief.payload.row_tones && typeof brief.payload.row_tones === 'object'
     ? brief.payload.row_tones
     : {};
+  const boardSection = Array.isArray(outline.toc)
+    ? outline.toc.find((entry: any) => entry.section_id === 'execution-board')
+    : null;
+  const overviewSection = Array.isArray(outline.toc)
+    ? outline.toc.find((entry: any) => entry.section_id === 'overview')
+    : null;
+  const signalsSection = Array.isArray(outline.toc)
+    ? outline.toc.find((entry: any) => entry.section_id === 'signals')
+    : null;
 
   const styleMap = {
     base: 0,
@@ -3373,6 +4723,112 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
   const successTextColor = String(toneCatalog.success?.text_color || '#166534');
   const warningTextColor = String(toneCatalog.warning?.text_color || '#92400E');
   const dangerTextColor = String(toneCatalog.danger?.text_color || '#991B1B');
+  const summaryLastColumnLetter = String.fromCharCode(64 + Math.max(summaryCards.length, 1));
+  const overviewRows: any[] = [
+    {
+      index: 1,
+      height: layout.title_row_height || 30,
+      customHeight: true,
+      cells: [{ ref: 'A1', type: 's', value: overviewSection?.title || 'Overview', styleIndex: styleMap.title }],
+    },
+  ];
+  if (summaryCards.length > 0) {
+    summaryCards.forEach((card: any, index: number) => {
+      const rowIndex = index + 3;
+      overviewRows.push({
+        index: rowIndex,
+        height: layout.summary_row_height || 20,
+        customHeight: true,
+        cells: [
+          { ref: `A${rowIndex}`, type: 's', value: String(card.label || 'Metric'), styleIndex: styleMap.header },
+          { ref: `B${rowIndex}`, type: 's', value: String(card.value || ''), styleIndex: toneToStyle(card.tone) },
+        ],
+      });
+    });
+  } else {
+    overviewRows.push({
+      index: 3,
+      height: layout.summary_row_height || 20,
+      customHeight: true,
+      cells: [{ ref: 'A3', type: 's', value: 'No summary cards provided.', styleIndex: styleMap.body }],
+    });
+  }
+  const signalRowsSource = rows.filter((row: any) => {
+    const tone = rowToneKey ? String(row[rowToneKey] ?? '') : '';
+    const status = String(row.status ?? '');
+    return ['warning', 'danger'].includes(String(rowTones[tone] || tone).toLowerCase()) || /risk|blocked|late|issue/i.test(status);
+  });
+  const explicitSignalEntries = [
+    ...(Array.isArray(brief.payload.signals) ? brief.payload.signals.map((entry: any) => ({ ...entry, signalType: 'signal' })) : []),
+    ...(Array.isArray(brief.payload.risks) ? brief.payload.risks.map((entry: any) => ({ ...entry, signalType: 'risk' })) : []),
+    ...(Array.isArray(brief.payload.incidents) ? brief.payload.incidents.map((entry: any) => ({ ...entry, signalType: 'incident' })) : []),
+    ...(Array.isArray(brief.payload.controls) ? brief.payload.controls.map((entry: any) => ({ ...entry, signalType: 'control' })) : []),
+  ];
+  const normalizedSignalEntries = explicitSignalEntries.map((entry: any) => ({
+    task: String(entry.title || entry.name || entry.control || entry.risk || entry.incident || entry.summary || 'Signal'),
+    owner: String(entry.owner || entry.assignee || entry.team || entry.function || ''),
+    status: String(entry.status || entry.severity || entry.tone || entry.state || entry.signalType || ''),
+    tone: String(entry.tone || entry.severity || (entry.signalType === 'risk' ? 'warning' : entry.signalType === 'incident' ? 'danger' : 'info')),
+  }));
+  const signalRows: any[] = [
+    {
+      index: 1,
+      height: layout.title_row_height || 30,
+      customHeight: true,
+      cells: [{ ref: 'A1', type: 's', value: signalsSection?.title || 'Signals and Risks', styleIndex: styleMap.title }],
+    },
+    {
+      index: 3,
+      height: layout.header_row_height || 22,
+      customHeight: true,
+      cells: [
+        { ref: 'A3', type: 's', value: 'Task', styleIndex: styleMap.header },
+        { ref: 'B3', type: 's', value: 'Owner', styleIndex: styleMap.header },
+        { ref: 'C3', type: 's', value: 'Status', styleIndex: styleMap.header },
+      ],
+    },
+  ];
+  const combinedSignalEntries = [
+    ...normalizedSignalEntries,
+    ...signalRowsSource.map((row: any) => {
+      const tone = rowToneKey ? String(row[rowToneKey] ?? '') : '';
+      const resolvedTone = tone && rowTones[tone] ? String(rowTones[tone]) : tone;
+      return {
+        task: String(row.task ?? row.title ?? ''),
+        owner: String(row.owner ?? ''),
+        status: String(row.status ?? ''),
+        tone: resolvedTone || 'warning',
+      };
+    }),
+  ].sort((left, right) => {
+    const signalTones = semanticCatalog.signal_tones || {};
+    const leftRank = signalTones[String(left.tone || '').toLowerCase()] ?? rankSignalTone(left.tone);
+    const rightRank = signalTones[String(right.tone || '').toLowerCase()] ?? rankSignalTone(right.tone);
+    const toneDelta = leftRank - rightRank;
+    if (toneDelta !== 0) return toneDelta;
+    return String(left.task || '').localeCompare(String(right.task || ''));
+  });
+  if (combinedSignalEntries.length === 0) {
+    signalRows.push({
+      index: 4,
+      height: layout.data_row_height || 20,
+      customHeight: Boolean(layout.data_row_height),
+      cells: [{ ref: 'A4', type: 's', value: 'No elevated signals detected.', styleIndex: styleMap.body }],
+    });
+  } else {
+    combinedSignalEntries.forEach((row: any, index: number) => {
+      signalRows.push({
+        index: 4 + index,
+        height: layout.data_row_height || 20,
+        customHeight: Boolean(layout.data_row_height),
+        cells: [
+          { ref: `A${4 + index}`, type: 's', value: String(row.task ?? row.title ?? ''), styleIndex: toneToStyle(String(row.tone || 'info')) },
+          { ref: `B${4 + index}`, type: 's', value: String(row.owner ?? ''), styleIndex: toneToStyle(String(row.tone || 'info')) },
+          { ref: `C${4 + index}`, type: 's', value: String(row.status ?? ''), styleIndex: toneToStyle(String(row.tone || 'info')) },
+        ],
+      });
+    });
+  }
 
   return {
     version: '3.0.0',
@@ -3439,10 +4895,59 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
     sharedStringsRich: [],
     definedNames: [],
     workbookProperties: { defaultThemeVersion: 164011 },
+    metadata: {
+      title,
+      subject: brief.document_profile || 'operator-tracker',
+      composition: outline,
+      generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
+      recommendedTheme: preset?.recommended_theme || 'kyberion-standard',
+      branding: preset?.branding || {},
+      sheetRoles: [
+        { role: 'overview', title: overviewSection?.title || 'Overview' },
+        { role: 'execution-board', title: boardSection?.title || 'Execution Board' },
+        { role: 'signals', title: signalsSection?.title || 'Signals and Risks' },
+      ],
+      sheetSemantics: [
+        {
+          role: 'overview',
+          layout_key: overviewSection?.layout_key || 'sheet-overview',
+          media_kind: overviewSection?.media_kind || 'dashboard',
+          semantic_type: classifyRenderSemantic(overviewSection?.layout_key || 'sheet-overview', overviewSection?.media_kind || 'dashboard'),
+        },
+        {
+          role: 'execution-board',
+          layout_key: boardSection?.layout_key || 'sheet-main-table',
+          media_kind: boardSection?.media_kind || 'table',
+          semantic_type: classifyRenderSemantic(boardSection?.layout_key || 'sheet-main-table', boardSection?.media_kind || 'table'),
+        },
+        {
+          role: 'signals',
+          layout_key: signalsSection?.layout_key || 'sheet-signals',
+          media_kind: signalsSection?.media_kind || 'signals',
+          semantic_type: classifyRenderSemantic(signalsSection?.layout_key || 'sheet-signals', signalsSection?.media_kind || 'signals'),
+        },
+      ],
+    },
     sheets: [
       {
+        id: 'sheet-overview',
+        name: overviewSection?.title || 'Overview',
+        dimension: `A1:B${Math.max(overviewRows.length, 1)}`,
+        sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: 1 },
+        columns: [
+          { min: 1, max: 1, width: 28, customWidth: true },
+          { min: 2, max: 2, width: 18, customWidth: true },
+        ],
+        rows: overviewRows,
+        mergeCells: [{ ref: `A1:${summaryLastColumnLetter === 'A' ? 'B' : summaryLastColumnLetter}1` }],
+        tables: [],
+        conditionalFormats: [],
+        dataValidations: [],
+        pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+      },
+      {
         id: 'sheet1',
-        name: brief.payload.sheet_name || 'Tracker',
+        name: brief.payload.sheet_name || boardSection?.title || 'Tracker',
         dimension: `A1:${lastColumnLetter}${Math.max(sheetRows.length, 1)}`,
         sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: layout.freeze_header === false ? 0 : headerRowIndex },
         columns: widths.map((width: number, index: number) => ({ min: index + 1, max: index + 1, width, customWidth: true })),
@@ -3452,6 +4957,23 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
         conditionalFormats,
         dataValidations,
         autoFilter: { ref: `A${headerRowIndex}:${lastColumnLetter}${Math.max(dataStartIndex + rows.length - 1, headerRowIndex)}` },
+        pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+      },
+      {
+        id: 'sheet-signals',
+        name: signalsSection?.title || 'Signals and Risks',
+        dimension: `A1:C${Math.max(signalRows.length, 1)}`,
+        sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: 3 },
+        columns: [
+          { min: 1, max: 1, width: 32, customWidth: true },
+          { min: 2, max: 2, width: 18, customWidth: true },
+          { min: 3, max: 3, width: 18, customWidth: true },
+        ],
+        rows: signalRows,
+        mergeCells: [{ ref: 'A1:C1' }],
+        tables: [],
+        conditionalFormats: [],
+        dataValidations: [],
         pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
       },
     ],
@@ -3950,8 +5472,8 @@ function resolveDrawioIconMap(rootDir: string, params: any, resolve: Function): 
 }
 
 function loadFallbackDrawioTheme(rootDir: string, preferredTheme?: string): any {
-  const themesPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json');
-  if (!safeExistsSync(themesPath)) {
+  const themes = loadThemeCatalog(rootDir);
+  if (!themes || typeof themes !== 'object' || !themes.themes) {
     return {
       colors: {
         primary: '#232f3e',
@@ -3966,8 +5488,6 @@ function loadFallbackDrawioTheme(rootDir: string, preferredTheme?: string): any 
       },
     };
   }
-
-  const themes = JSON.parse(safeReadFile(themesPath, { encoding: 'utf8' }) as string);
   return themes.themes?.[preferredTheme || ''] || themes.themes?.['aws-architecture'] || themes.themes?.['kyberion-sovereign'] || themes.themes?.['kyberion-standard'];
 }
 

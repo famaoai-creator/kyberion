@@ -1,0 +1,70 @@
+{
+  "domain": "architecture-high-fidelity",
+  "profiles": {
+    "architecture-definition-document": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Enterprise-grade architecture definition aligned with TOGAF and ISO 42010.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary", "layout_key": "doc-summary" },
+        { "section_id": "2-introduction", "title": "2. Introduction and Scope", "layout_key": "doc-title" },
+        { "section_id": "2-1-purpose", "title": "2.1 Purpose of the Architecture Definition", "layout_key": "doc-sections" },
+        { "section_id": "2-2-scope", "title": "2.2 Scope of the Architecture", "layout_key": "doc-sections" },
+        { "section_id": "2-3-stakeholders", "title": "2.3 Stakeholders and Concerns", "layout_key": "operating-model" },
+        { "section_id": "3-vision-principles", "title": "3. Architecture Vision and Principles", "layout_key": "doc-title" },
+        { "section_id": "3-1-goals", "title": "3.1 Business Goals and Strategic Drivers", "layout_key": "immersive-vision" },
+        { "section_id": "3-2-principles", "title": "3.2 Architecture Principles", "layout_key": "three-pillars" },
+        { "section_id": "3-3-constraints", "title": "3.3 Constraints (Budget, Regulatory, Legacy)", "layout_key": "risk-controls" },
+        { "section_id": "4-baseline", "title": "4. Baseline Architecture (As-Is)", "layout_key": "doc-title" },
+        { "section_id": "4-1-overview", "title": "4.1 Current State Overview", "layout_key": "doc-sections" },
+        { "section_id": "4-2-technical-debt", "title": "4.2 Known Issues and Technical Debt", "layout_key": "evidence-callout" },
+        { "section_id": "5-target", "title": "5. Target Architecture (To-Be)", "layout_key": "doc-title" },
+        { "section_id": "5-1-business", "title": "5.1 Business Architecture", "layout_key": "operating-model" },
+        { "section_id": "5-2-data", "title": "5.2 Data Architecture", "layout_key": "three-point-architecture" },
+        { "section_id": "5-3-application", "title": "5.3 Application Architecture", "layout_key": "three-point-architecture" },
+        { "section_id": "5-4-technology", "title": "5.4 Technology Architecture", "layout_key": "three-point-architecture" },
+        { "section_id": "6-gap-analysis", "title": "6. Gap Analysis", "layout_key": "doc-sections" },
+        { "section_id": "7-rationale", "title": "7. Rationale and Justification", "layout_key": "doc-title" },
+        { "section_id": "7-1-alternatives", "title": "7.1 Evaluation of Alternatives", "layout_key": "doc-sections" },
+        { "section_id": "7-2-cost-benefit", "title": "7.2 Cost-Benefit Analysis", "layout_key": "evidence-callout" },
+        { "section_id": "8-implementation", "title": "8. Implementation and Migration Plan", "layout_key": "timeline-roadmap" },
+        { "section_id": "9-governance", "title": "9. Governance and Compliance", "layout_key": "risk-controls" },
+        { "section_id": "a-appendices", "title": "Appendix A: Architecture Decision Records (ADR)", "layout_key": "doc-appendix" }
+      ]
+    },
+    "detailed-design-specification": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Deep-dive technical design for implementation teams.",
+      "sections": [
+        { "section_id": "1-identification", "title": "1. Architecture Description Identification", "layout_key": "doc-title" },
+        { "section_id": "2-concerns", "title": "2. Stakeholders and Concerns Mapping", "layout_key": "operating-model" },
+        { "section_id": "3-viewpoints", "title": "3. Architecture Viewpoints", "layout_key": "three-pillars" },
+        { "section_id": "4-functional-view", "title": "4. Functional View (Components & APIs)", "layout_key": "doc-sections" },
+        { "section_id": "5-information-view", "title": "5. Information View (Data & State)", "layout_key": "three-point-architecture" },
+        { "section_id": "6-process-view", "title": "6. Process and Concurrency View", "layout_key": "doc-sections" },
+        { "section_id": "7-development-view", "title": "7. Development View (Modules & Deps)", "layout_key": "doc-sections" },
+        { "section_id": "8-consistency", "title": "8. Consistency and Correspondences", "layout_key": "doc-sections" },
+        { "section_id": "9-rationale", "title": "9. Architecture Rationale (ADRs)", "layout_key": "doc-summary" },
+        { "section_id": "10-error-handling", "title": "10. Error Handling and Resilience", "layout_key": "risk-controls" }
+      ]
+    },
+    "database-design-report": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "High-fidelity database design encompassing schema, security, and ops.",
+      "sections": [
+        { "section_id": "1-introduction", "title": "1. Introduction and Objectives", "layout_key": "doc-title" },
+        { "section_id": "2-requirements", "title": "2. Data Requirements and Projections", "layout_key": "doc-summary" },
+        { "section_id": "3-conceptual", "title": "3. Conceptual Design (ERD)", "layout_key": "three-point-architecture" },
+        { "section_id": "4-logical", "title": "4. Logical Design (Data Dictionary)", "layout_key": "doc-sections" },
+        { "section_id": "5-physical", "title": "5. Physical Design (Storage & Indexing)", "layout_key": "doc-sections" },
+        { "section_id": "6-partitioning", "title": "6. Partitioning and Sharding Strategy", "layout_key": "doc-sections" },
+        { "section_id": "7-security", "title": "7. Security and Integrity (RBAC, Encryption)", "layout_key": "risk-controls" },
+        { "section_id": "8-performance", "title": "8. Performance and Caching (Redis)", "layout_key": "doc-sections" },
+        { "section_id": "9-operations", "title": "9. Operations (Backup, RTO/RPO)", "layout_key": "doc-summary" },
+        { "section_id": "10-migrations", "title": "10. Schema Migration Plan", "layout_key": "timeline-roadmap" }
+      ]
+    }
+  }
+}

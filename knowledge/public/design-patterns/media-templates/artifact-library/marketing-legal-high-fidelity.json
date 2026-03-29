@@ -1,0 +1,49 @@
+{
+  "domain": "marketing-legal-high-fidelity",
+  "profiles": {
+    "brand-identity-guidelines": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "The Brand Bible for ensuring visual and verbal consistency.",
+      "sections": [
+        { "section_id": "1-core-identity", "title": "1. Brand Strategy and Core Identity", "layout_key": "doc-title" },
+        { "section_id": "1-1-vision-mission", "title": "1.1 Mission, Vision, and Values", "layout_key": "immersive-vision" },
+        { "section_id": "1-2-personality", "title": "1.2 Brand Personality and Attributes", "layout_key": "evidence-callout" },
+        { "section_id": "2-verbal-identity", "title": "2. Verbal Identity (Voice and Tone)", "layout_key": "doc-sections" },
+        { "section_id": "3-logo-system", "title": "3. Visual Identity: Logo System", "layout_key": "three-pillars" },
+        { "section_id": "3-1-logo-usage", "title": "3.1 Clear Space and Usage Rules", "layout_key": "doc-sections" },
+        { "section_id": "4-design-elements", "title": "4. Visual Identity: Design Elements", "layout_key": "three-point-architecture" },
+        { "section_id": "4-1-color-palette", "title": "4.1 Color Palette (HEX/CMYK)", "layout_key": "doc-sections" },
+        { "section_id": "4-2-typography", "title": "4.2 Typography and Hierarchy", "layout_key": "doc-sections" },
+        { "section_id": "5-applications", "title": "5. Brand Applications and Rollout", "layout_key": "two-column-story" }
+      ]
+    },
+    "digital-marketing-campaign-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Strategic roadmap for multi-channel digital campaigns.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary and SMART Goals", "layout_key": "doc-summary" },
+        { "section_id": "2-market-insight", "title": "2. Market Insight and Audience Segmentation", "layout_key": "three-pillars" },
+        { "section_id": "3-creative-strategy", "title": "3. Creative Strategy and Messaging", "layout_key": "immersive-vision" },
+        { "section_id": "4-media-plan", "title": "4. Channel and Media Plan (Paid/Owned/Earned)", "layout_key": "two-column-story" },
+        { "section_id": "5-execution-ops", "title": "5. Execution and Operations", "layout_key": "timeline-roadmap" },
+        { "section_id": "6-measurement", "title": "6. Measurement and KPIs", "layout_key": "evidence-callout" },
+        { "section_id": "7-tech-stack", "title": "7. Marketing Tech Stack", "layout_key": "three-point-architecture" }
+      ]
+    },
+    "master-services-agreement": {
+      "artifact_family": "document",
+      "document_type": "contract",
+      "description": "Durable legal framework for service-based partnerships.",
+      "sections": [
+        { "section_id": "1-framework", "title": "1. Definitions and Relationship Framework", "layout_key": "doc-title" },
+        { "section_id": "2-scope", "title": "2. Scope of Services and Performance (SLA)", "layout_key": "doc-sections" },
+        { "section_id": "3-financial", "title": "3. Financial Terms and Invoicing", "layout_key": "doc-sections" },
+        { "section_id": "4-ip-confidentiality", "title": "4. Intellectual Property and Confidentiality", "layout_key": "risk-controls" },
+        { "section_id": "5-risk-liability", "title": "5. Risk Management, Indemnification, and Liability", "layout_key": "risk-controls" },
+        { "section_id": "6-termination", "title": "6. Term, Termination, and Dispute Resolution", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "domain": "business-strategy-high-fidelity",
+  "profiles": {
+    "strategic-business-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "2025 best-practice internal roadmap for strategic direction.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary", "layout_key": "doc-summary" },
+        { "section_id": "2-vision-mission", "title": "2. Vision, Mission and Values", "layout_key": "immersive-vision" },
+        { "section_id": "3-situational-analysis", "title": "3. Situational Analysis (SWOT/PESTEL)", "layout_key": "three-pillars" },
+        { "section_id": "4-strategic-goals", "title": "4. Strategic Goals and Priorities", "layout_key": "doc-sections" },
+        { "section_id": "5-market-positioning", "title": "5. Market and Competitive Positioning", "layout_key": "two-column-story" },
+        { "section_id": "6-operational-action-plan", "title": "6. Operational Action Plan", "layout_key": "timeline-roadmap" },
+        { "section_id": "7-financial-forecasts", "title": "7. Financial Goals and Forecasts", "layout_key": "doc-sections" },
+        { "section_id": "8-kpis", "title": "8. Key Performance Indicators (KPIs)", "layout_key": "evidence-callout" },
+        { "section_id": "9-risk-management", "title": "9. Strategic Risk Management", "layout_key": "risk-controls" },
+        { "section_id": "10-review-cycle", "title": "10. Review and Adaptation Cycle", "layout_key": "operating-model" }
+      ]
+    },
+    "investment-pitch-deck-v2": {
+      "artifact_family": "presentation",
+      "document_type": "proposal",
+      "description": "VC-preferred 12-slide storytelling structure.",
+      "sections": [
+        { "section_id": "1-title", "title": "{{title}}", "layout_key": "cover-statement" },
+        { "section_id": "2-problem", "title": "The Problem", "layout_key": "why-change" },
+        { "section_id": "3-solution", "title": "The Solution", "layout_key": "immersive-vision" },
+        { "section_id": "4-market-opportunity", "title": "Market Opportunity (TAM/SAM/SOM)", "layout_key": "evidence-callout" },
+        { "section_id": "5-product-tech", "title": "Product and Technology", "layout_key": "three-point-architecture" },
+        { "section_id": "6-business-model", "title": "Business Model", "layout_key": "operating-model" },
+        { "section_id": "7-traction", "title": "Traction and Proof of Concept", "layout_key": "evidence-callout" },
+        { "section_id": "8-competition", "title": "Competitive Landscape", "layout_key": "three-pillars" },
+        { "section_id": "9-gtm", "title": "Go-To-Market Strategy", "layout_key": "two-column-story" },
+        { "section_id": "10-team", "title": "The Winning Team", "layout_key": "three-pillars" },
+        { "section_id": "11-financials-roadmap", "title": "Financials and Milestones", "layout_key": "timeline-roadmap" },
+        { "section_id": "12-the-ask", "title": "The Ask and Why Now", "layout_key": "decision-cta" }
+      ]
+    },
+    "corporate-governance-framework": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Governance framework for SMEs and startups.",
+      "sections": [
+        { "section_id": "1-board-structure", "title": "1. Board Structure and Roles", "layout_key": "operating-model" },
+        { "section_id": "2-shareholder-rights", "title": "2. Rights of Shareholders", "layout_key": "doc-sections" },
+        { "section_id": "3-management-accountability", "title": "3. Management Accountability (DoA)", "layout_key": "doc-sections" },
+        { "section_id": "4-ethical-conduct", "title": "4. Ethical Conduct and Whistleblowing", "layout_key": "risk-controls" },
+        { "section_id": "5-internal-control", "title": "5. Risk and Internal Control", "layout_key": "risk-controls" },
+        { "section_id": "6-transparency", "title": "6. Transparency and Disclosure", "layout_key": "doc-summary" },
+        { "section_id": "7-stakeholder-engagement", "title": "7. Stakeholder Engagement (ESG)", "layout_key": "two-column-story" },
+        { "section_id": "8-dispute-resolution", "title": "8. Dispute Resolution", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

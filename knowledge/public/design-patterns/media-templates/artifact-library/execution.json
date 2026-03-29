@@ -1,0 +1,34 @@
+{
+  "domain": "execution-control",
+  "profiles": {
+    "weekly-status-report": {
+      "artifact_family": "presentation",
+      "document_type": "report",
+      "sections": [
+        { "section_id": "cover", "title": "Weekly Status: {{title}}", "layout_key": "cover-statement" },
+        { "section_id": "achievements", "title": "Key Achievements", "layout_key": "evidence-callout" },
+        { "section_id": "progress", "title": "Progress vs Plan", "layout_key": "timeline-roadmap" },
+        { "section_id": "raid", "title": "Risks, Actions, Issues, Dependencies", "layout_key": "risk-controls" },
+        { "section_id": "next-steps", "title": "Planned for Next Week", "layout_key": "decision-cta" }
+      ]
+    },
+    "meeting-minutes": {
+      "artifact_family": "document",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "title", "title": "Meeting Minutes: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "participants", "title": "Attendees & Agenda", "layout_key": "doc-summary" },
+        { "section_id": "decisions", "title": "Key Decisions", "layout_key": "doc-sections" },
+        { "section_id": "actions", "title": "Action Items", "layout_key": "doc-sections" }
+      ]
+    },
+    "mission-ledger": {
+      "artifact_family": "spreadsheet",
+      "document_type": "log",
+      "sections": [
+        { "section_id": "overview", "title": "Mission Overview", "layout_key": "sheet-overview" },
+        { "section_id": "missions", "title": "Mission Registry", "layout_key": "sheet-main-table" }
+      ]
+    }
+  }
+}

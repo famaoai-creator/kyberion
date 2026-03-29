@@ -1,0 +1,54 @@
+{
+  "domain": "legal-compliance-high-fidelity",
+  "profiles": {
+    "data-processing-agreement-dpa": {
+      "artifact_family": "document",
+      "document_type": "contract",
+      "description": "Essential GDPR/CCPA compliance agreement between Controller and Processor.",
+      "sections": [
+        { "section_id": "1-definitions", "title": "1. Definitions (Personal Data, Processing)", "layout_key": "doc-sections" },
+        { "section_id": "2-scope-purpose", "title": "2. Scope and Purpose of Processing", "layout_key": "doc-sections" },
+        { "section_id": "3-processor-obligations", "title": "3. Obligations of the Processor", "layout_key": "doc-sections" },
+        { "section_id": "3-1-instructions", "title": "3.1 Documented Instructions and Confidentiality", "layout_key": "risk-controls" },
+        { "section_id": "4-sub-processing", "title": "4. Sub-processing and Authorization", "layout_key": "risk-controls" },
+        { "section_id": "5-data-subject-rights", "title": "5. Assistance with Data Subject Rights", "layout_key": "doc-sections" },
+        { "section_id": "6-security-measures", "title": "6. Technical and Organizational Security Measures (TOMs)", "layout_key": "three-point-architecture" },
+        { "section_id": "7-breach-notification", "title": "7. Personal Data Breach Notification", "layout_key": "risk-controls" },
+        { "section_id": "8-audit-inspection", "title": "8. Audits and Inspection Rights", "layout_key": "doc-sections" },
+        { "section_id": "9-transfers", "title": "9. International Data Transfers (SCCs)", "layout_key": "doc-sections" },
+        { "section_id": "10-termination-return", "title": "10. Post-Termination Data Return or Deletion", "layout_key": "doc-summary" }
+      ]
+    },
+    "ip-licensing-agreement": {
+      "artifact_family": "document",
+      "document_type": "contract",
+      "description": "Legal framework for granting IP rights and royalty management.",
+      "sections": [
+        { "section_id": "1-definitions-territory", "title": "1. Definitions, Territory, and Field of Use", "layout_key": "doc-sections" },
+        { "section_id": "2-grant-of-license", "title": "2. Grant of License (Exclusivity & Sublicensing)", "layout_key": "doc-sections" },
+        { "section_id": "3-ownership", "title": "3. Intellectual Property Ownership and Retention", "layout_key": "risk-controls" },
+        { "section_id": "4-consideration", "title": "4. Consideration, Royalties, and Payment Terms", "layout_key": "evidence-callout" },
+        { "section_id": "4-1-audit-rights", "title": "4.1 Financial Audit Rights", "layout_key": "risk-controls" },
+        { "section_id": "5-quality-control", "title": "5. Quality Control and Brand Standards", "layout_key": "doc-sections" },
+        { "section_id": "6-warranties-indemnity", "title": "6. Representations, Warranties, and Indemnification", "layout_key": "risk-controls" },
+        { "section_id": "7-term-termination", "title": "7. Term, Termination, and Survival Clauses", "layout_key": "doc-summary" },
+        { "section_id": "8-dispute-resolution", "title": "8. Dispute Resolution and Governing Law", "layout_key": "doc-sections" }
+      ]
+    },
+    "internal-control-policy": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Organizational framework for asset safeguarding and financial accuracy.",
+      "sections": [
+        { "section_id": "1-introduction", "title": "1. Introduction and Purpose (COSO Alignment)", "layout_key": "doc-title" },
+        { "section_id": "2-control-environment", "title": "2. Control Environment and Tone at the Top", "layout_key": "operating-model" },
+        { "section_id": "3-risk-assessment", "title": "3. Risk Assessment Framework", "layout_key": "three-pillars" },
+        { "section_id": "4-control-activities", "title": "4. Control Activities (Preventative & Detective)", "layout_key": "doc-sections" },
+        { "section_id": "4-1-sod", "title": "4.1 Segregation of Duties (SoD)", "layout_key": "risk-controls" },
+        { "section_id": "5-information-comm", "title": "5. Information, Communication, and Whistleblowing", "layout_key": "doc-sections" },
+        { "section_id": "6-monitoring", "title": "6. Monitoring and Ongoing Evaluation", "layout_key": "timeline-roadmap" },
+        { "section_id": "7-remediation", "title": "7. Deficiency Reporting and Remediation", "layout_key": "doc-summary" }
+      ]
+    }
+  }
+}

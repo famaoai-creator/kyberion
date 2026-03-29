@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "title-body": {
+      "title": { "pos": { "x": 0.8, "y": 0.6, "w": 8.4, "h": 0.8 }, "style": { "fontSize": 24, "bold": true, "align": "left" } },
+      "body": { "pos": { "x": 0.9, "y": 1.7, "w": 8.1, "h": 2.5 }, "style": { "fontSize": 16, "align": "left" } },
+      "visual": { "pos": { "x": 0.9, "y": 4.5, "w": 8.1, "h": 0.45 }, "style": { "fill": "F8FAFC", "color": "64748B" } }
+    }
+  }
+}
