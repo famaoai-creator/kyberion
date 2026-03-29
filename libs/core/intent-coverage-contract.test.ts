@@ -22,6 +22,15 @@ type StandardIntent = {
   };
 };
 
+type IntentOutcomePattern = {
+  intent_id: string;
+  primary_outcome_ids?: string[];
+  canonical_flow?: string[];
+  contract_layers?: string[];
+  evidence?: string[];
+  completion_criteria?: string[];
+};
+
 function loadCoverageRecords(): CoverageRecord[] {
   const filePath = pathResolver.knowledge('public/governance/intent-coverage-matrix.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: CoverageRecord[] };
@@ -32,6 +41,12 @@ function loadStandardIntents(): StandardIntent[] {
   const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntent[] };
   return Array.isArray(parsed.intents) ? parsed.intents : [];
+}
+
+function loadIntentOutcomePatterns(): IntentOutcomePattern[] {
+  const filePath = pathResolver.knowledge('public/governance/intent-outcome-patterns.json');
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { patterns?: IntentOutcomePattern[] };
+  return Array.isArray(parsed.patterns) ? parsed.patterns : [];
 }
 
 describe('intent coverage contract', () => {
@@ -75,6 +90,31 @@ describe('intent coverage contract', () => {
       const classified = classifyTaskSessionIntent(String(sample));
       expect(classified, `could not classify implemented intent sample for ${entry.intent_id}`).toBeTruthy();
       expect(classified?.intentId).toBe(entry.intent_id);
+    }
+  });
+
+  it('keeps every surface intent mapped to an intent-outcome pattern with valid outcomes', () => {
+    const standardIntents = loadStandardIntents().filter((intent) => intent.category === 'surface');
+    const patterns = loadIntentOutcomePatterns();
+    const outcomes = loadOutcomeCatalog();
+
+    for (const intent of standardIntents) {
+      const pattern = patterns.find((entry) => entry.intent_id === intent.id);
+      expect(pattern, `missing intent-outcome pattern for ${intent.id}`).toBeTruthy();
+      expect(pattern?.canonical_flow?.length || 0, `missing canonical flow for ${intent.id}`).toBeGreaterThan(0);
+      expect(pattern?.contract_layers?.length || 0, `missing contract layers for ${intent.id}`).toBeGreaterThan(0);
+      expect(pattern?.evidence?.length || 0, `missing evidence expectations for ${intent.id}`).toBeGreaterThan(0);
+      expect(pattern?.completion_criteria?.length || 0, `missing completion criteria for ${intent.id}`).toBeGreaterThan(0);
+
+      for (const outcomeId of pattern?.primary_outcome_ids || []) {
+        expect(outcomes[outcomeId], `missing outcome ${outcomeId} for ${intent.id}`).toBeTruthy();
+      }
+
+      for (const outcomeId of intent.outcome_ids || []) {
+        expect(pattern?.primary_outcome_ids || [], `pattern outcomes missing ${outcomeId} for ${intent.id}`).toEqual(
+          expect.arrayContaining([outcomeId]),
+        );
+      }
     }
   });
 });

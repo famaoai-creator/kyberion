@@ -405,4 +405,89 @@ describe('orchestrator-actuator', () => {
       ],
     }));
   });
+
+  it('infers required inputs from context aliases when building an execution brief', async () => {
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('actuator-request-archetypes.json')) {
+        return JSON.stringify({
+          default_archetype: 'project-document-pack',
+          archetypes: [
+            {
+              id: 'project-document-pack',
+              trigger_keywords: ['プロジェクト', 'project'],
+              summary_template: 'Generate a project document pack.',
+              normalized_scope: ['project-os'],
+              target_actuators: ['orchestrator-actuator'],
+              deliverables: ['project documents'],
+              required_inputs: ['project name', 'delivery scope', 'phase or gate', 'related missions'],
+            },
+          ],
+        });
+      }
+      throw new Error(`unexpected read: ${filePath}`);
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        request_text: '新しいプロジェクト PRJ-SIM-2026 を開始します。',
+        project_name: 'Simulation Project 2026',
+        delivery_scope: 'project OS',
+        phase: 'define',
+        related_missions: ['MSN-BOOT-1'],
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'request_to_execution_brief',
+          params: {
+            export_as: 'brief',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.context.brief.readiness).toBe('fully_automatable');
+    expect(result.context.brief.missing_inputs).toEqual([]);
+    expect(result.context.brief.inferred_inputs).toEqual([
+      'project name',
+      'delivery scope',
+      'phase or gate',
+      'related missions',
+    ]);
+  });
+
+  it('falls back to brief when pipeline bundle step omits brief_from', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        resolution_plan: {
+          kind: 'actuator-resolution-plan',
+          archetype_id: 'project-document-pack',
+          summary: 'Build project pack',
+        },
+        brief: {
+          kind: 'actuator-execution-brief',
+          archetype_id: 'project-document-pack',
+          summary: 'Brief ready',
+          missing_inputs: [],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'resolution_plan_to_pipeline_bundle',
+          params: {
+            from: 'resolution_plan',
+            export_as: 'bundle',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.context.bundle.kind).toBe('actuator-pipeline-bundle');
+    expect(result.context.bundle.status).toBe('ready');
+  });
 });

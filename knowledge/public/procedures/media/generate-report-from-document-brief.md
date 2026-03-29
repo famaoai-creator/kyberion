@@ -30,8 +30,11 @@ Separate the report into:
    - `sections[].callouts`
    - `sections[].tables`
 5. Set `layout_template_id` when a governed report style should control spacing and table visuals.
-6. Transform through `document_report_design_from_brief`.
-7. Render with `docx_render` or `pdf_render`.
+6. Prefer the canonical route:
+   - `document_outline_from_brief`
+   - `brief_to_design_protocol`
+   - `generate_document`
+7. `document_report_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Examples
 - [`document-brief-report-docx.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-actuator/examples/document-brief-report-docx.json)

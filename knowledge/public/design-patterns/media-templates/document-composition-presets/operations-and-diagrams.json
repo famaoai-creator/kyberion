@@ -1,0 +1,26 @@
+{
+  "profiles": {
+    "operator-tracker": {
+      "artifact_family": "spreadsheet",
+      "document_type": "tracker",
+      "narrative_pattern_id": "operator-dashboard",
+      "recommended_theme": "kyberion-standard",
+      "recommended_layout_template_id": "operator-tracker-standard",
+      "sections": [
+        { "section_id": "overview", "title": "Overview", "media_kind": "dashboard", "layout_key": "sheet-overview" },
+        { "section_id": "execution-board", "title": "Execution Board", "media_kind": "table", "layout_key": "sheet-main-table" },
+        { "section_id": "signals", "title": "Signals and Risks", "media_kind": "signals", "layout_key": "sheet-signals" }
+      ]
+    },
+    "solution-overview": {
+      "artifact_family": "diagram",
+      "document_type": "architecture-diagram",
+      "narrative_pattern_id": "solution-overview",
+      "recommended_theme": "aws-architecture",
+      "recommended_layout_template_id": "solution-overview",
+      "sections": [
+        { "section_id": "system-context", "title": "{{title}}", "media_kind": "diagram", "layout_key": "diagram-context" }
+      ]
+    }
+  }
+}

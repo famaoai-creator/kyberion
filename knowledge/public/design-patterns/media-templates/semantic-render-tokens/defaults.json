@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "content": {
+      "pptx": {
+        "title_align": "left",
+        "body_font_size_delta": 0,
+        "body_color_role": "secondary",
+        "visual_fill_role": "background",
+        "visual_text_role": "secondary"
+      },
+      "pdf": {
+        "body_x": "content",
+        "body_font_size_delta": 0,
+        "header_color": "primary",
+        "block_fill": null,
+        "block_opacity": 0,
+        "callout_fill": "accent",
+        "callout_opacity": 0.7
+      },
+      "docx": {
+        "table_caption": {
+          "spacing_before": 60,
+          "spacing_after": 40,
+          "color_role": "secondary",
+          "font_size": 20,
+          "bold": true
+        }
+      },
+      "tracker": {
+        "priority": 2
+      }
+    }
+  }
+}

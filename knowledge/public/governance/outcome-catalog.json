@@ -57,6 +57,20 @@
       "downloadable": false,
       "previewable": true
     },
+    "remediation_plan": {
+      "label": "Remediation plan",
+      "description": "A governed cross-project remediation plan identifies where a known issue should be fixed or verified.",
+      "deliverable_kind": "plan",
+      "downloadable": false,
+      "previewable": true
+    },
+    "review_findings": {
+      "label": "Review findings",
+      "description": "A governed review summarizes findings, risks, and checks informed by prior incidents and operational evidence.",
+      "deliverable_kind": "review",
+      "downloadable": false,
+      "previewable": true
+    },
     "live_answer": {
       "label": "Live answer",
       "description": "Live web, weather, or location information is returned.",

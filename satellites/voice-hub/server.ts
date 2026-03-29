@@ -6,6 +6,11 @@ import * as path from 'node:path';
 import {
   buildPresenceAssistantReplyTimeline,
   applyBrowserConversationCommand,
+  buildAnalysisCorpusSnippets,
+  buildAnalysisExecutionContract,
+  buildAnalysisFindingCandidates,
+  classifyAnalysisImpactBands,
+  buildAnalysisIntentSupport,
   attachArtifactRecordToTaskSession,
   buildProjectBootstrapWorkItems,
   classifyBrowserConversationCommand,
@@ -17,6 +22,7 @@ import {
   executeBrowserConversationAction,
   createArtifactRecord,
   createDistillCandidateRecord,
+  findIntentOutcomePattern,
   listServiceBindingRecords,
   buildPresenceVoiceIngressTimeline,
   createSurfaceAsyncRequest,
@@ -84,6 +90,20 @@ interface VoiceHubRecord {
   source_id: string;
   intent: string;
   ts: string;
+}
+
+function buildIntentPatternHint(intentId: string | undefined, language: 'ja' | 'en', section: 'completion' | 'follow_up'): string {
+  const pattern = findIntentOutcomePattern(intentId);
+  const items = section === 'completion' ? pattern?.completion_criteria : pattern?.follow_up;
+  if (!items || items.length === 0) return '';
+  if (language === 'ja') {
+    return section === 'completion'
+      ? ` 完了条件は ${items.slice(0, 2).join('、')} です。`
+      : ` 次は ${items[0]}。`;
+  }
+  return section === 'completion'
+    ? ` Completion is measured by ${items.slice(0, 2).join(', ')}.`
+    : ` Next: ${items[0]}.`;
 }
 
 interface VoiceHubResponseRecord {
@@ -1900,9 +1920,31 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
     reusableRefs: workDesign.reusable_refs,
     projectId: session.project_context?.project_id,
   });
+  const suggestedRefs = Array.isArray(session.payload?.suggested_refs)
+    ? session.payload?.suggested_refs.filter((value): value is string => typeof value === 'string').slice(0, 3)
+    : [];
+  const suggestedRefHintJa = suggestedRefs.length
+    ? ` 参照候補は ${suggestedRefs.join('、')} です。`
+    : '';
+  const suggestedRefHintEn = suggestedRefs.length
+    ? ` Suggested references: ${suggestedRefs.join(', ')}.`
+    : '';
+  const completionHint = buildIntentPatternHint(session.work_loop?.intent?.label, language, 'completion');
   if (language === 'ja') {
     if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
       return `${session.project_context?.project_name || 'プロジェクト'} の立ち上げを受け取りました。${specialistLabel} が担当します。${learnedHint}まず、何を作るか、誰向けか、最初の成果物をまとめて教えてください。`;
+    }
+    if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'cross_project_remediation') {
+      if (missing.length > 0) {
+        return `横断 remediation 依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
+      }
+      return `横断 remediation 依頼を受け取りました。${specialistLabel} が要件・incident・既存知見を横断して未展開箇所を洗い出します。${learnedHint}${suggestedRefHintJa}${completionHint}`.trim();
+    }
+    if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'incident_informed_review') {
+      if (missing.length > 0) {
+        return `incident-aware review を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
+      }
+      return `incident-aware review を受け取りました。${specialistLabel} が過去 incident を踏まえてレビューします。${learnedHint}${suggestedRefHintJa}${completionHint}`.trim();
     }
     if (missing.includes('approval_confirmation')) {
       return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}実行前に確認が必要です。続けてよければ「はい」と返してください。`;
@@ -1910,10 +1952,22 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
     if (missing.length > 0) {
       return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}進めるには ${missing.join('、')} が必要です。わかったらそのまま教えてください。`;
     }
-    return `${label} の依頼を受け取りました。${specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。${learnedHint}`.trim();
+    return `${label} の依頼を受け取りました。${specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。${learnedHint}${completionHint}`.trim();
   }
   if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
     return `I started the project kickoff. ${specialistLabel} will handle it. ${learnedHint}Tell me what you want to build, who it is for, and the first deliverable.`;
+  }
+  if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'cross_project_remediation') {
+    if (missing.length > 0) {
+      return `I received the cross-project remediation request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
+    }
+    return `I received the cross-project remediation request. ${specialistLabel} will review requirements, incidents, and reusable findings to identify propagation gaps. ${learnedHint}${suggestedRefHintEn}${completionHint}`.trim();
+  }
+  if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'incident_informed_review') {
+    if (missing.length > 0) {
+      return `I received the incident-informed review request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
+    }
+    return `I received the incident-informed review request. ${specialistLabel} will review the current scope against prior incidents and known failures. ${learnedHint}${suggestedRefHintEn}${completionHint}`.trim();
   }
   if (missing.includes('approval_confirmation')) {
     return `I received the ${label} request. ${specialistLabel} will handle it. ${learnedHint}This action needs confirmation first. Reply yes to continue.`;
@@ -1921,7 +1975,7 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   if (missing.length > 0) {
     return `I received the ${label} request. ${specialistLabel} will handle it. ${learnedHint}I still need ${missing.join(', ')}. Tell me when you're ready.`;
   }
-  return `I received the ${label} request. ${specialistLabel} will plan it, run it, and report back when it's done. ${learnedHint}`.trim();
+  return `I received the ${label} request. ${specialistLabel} will plan it, run it, and report back when it's done. ${learnedHint}${completionHint}`.trim();
 }
 
 function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
@@ -1936,9 +1990,18 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
     reusableRefs: workDesign.reusable_refs,
     projectId: session.project_context?.project_id,
   });
+  const suggestedRefs = Array.isArray(session.payload?.suggested_refs)
+    ? session.payload?.suggested_refs.filter((value): value is string => typeof value === 'string').slice(0, 3)
+    : [];
+  const suggestedRefHintJa = suggestedRefs.length ? ` 参照候補は ${suggestedRefs.join('、')} です。` : '';
+  const suggestedRefHintEn = suggestedRefs.length ? ` Suggested references: ${suggestedRefs.join(', ')}.` : '';
   if (language === 'ja') {
     if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
       return `初期要件を受け取りました。${learnedHint}ここから最初の work plan を固めて返します。`;
+    }
+    if (session.task_type === 'analysis' && (session.payload?.analysis_kind === 'cross_project_remediation' || session.payload?.analysis_kind === 'incident_informed_review')) {
+      if (missing.length > 0) return `依頼内容を更新しました。残りは ${missing.join('、')} です。${suggestedRefHintJa}`.trim();
+      return `依頼内容が揃いました。${learnedHint}${suggestedRefHintJa}ここから横断分析を進めます。`.trim();
     }
     if (missing.includes('approval_confirmation')) {
       return '確認が必要です。実行してよければ「はい」と返してください。';
@@ -1950,6 +2013,10 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
   }
   if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
     return `I captured the kickoff requirements. ${learnedHint}I will turn them into the first work plan now.`;
+  }
+  if (session.task_type === 'analysis' && (session.payload?.analysis_kind === 'cross_project_remediation' || session.payload?.analysis_kind === 'incident_informed_review')) {
+    if (missing.length > 0) return `Updated. Remaining requirements: ${missing.join(', ')}.${suggestedRefHintEn}`.trim();
+    return `I have enough to proceed with the cross-cutting analysis now. ${learnedHint}${suggestedRefHintEn}`.trim();
   }
   if (missing.includes('approval_confirmation')) {
     return 'This action needs confirmation. Reply yes to continue.';
@@ -2069,44 +2136,6 @@ function buildReportDocumentBrief(session: TaskSessionShape): any {
 }
 
 function buildMediaPipelineForBrief(briefPath: string, outputPath: string, kind: 'presentation_deck' | 'report_document'): any {
-  if (kind === 'presentation_deck') {
-    return {
-      action: 'pipeline',
-      steps: [
-        {
-          type: 'capture',
-          op: 'json_read',
-          params: { path: briefPath, export_as: 'document_brief' },
-        },
-        {
-          type: 'transform',
-          op: 'proposal_storyline_from_brief',
-          params: { from: 'document_brief', export_as: 'proposal_storyline' },
-        },
-        {
-          type: 'transform',
-          op: 'proposal_content_from_storyline',
-          params: { from: 'proposal_storyline', export_as: 'proposal_content_data' },
-        },
-        {
-          type: 'transform',
-          op: 'apply_theme',
-          params: { theme: '{{document_brief.layout_template_id}}' },
-        },
-        {
-          type: 'transform',
-          op: 'merge_content',
-          params: { content_data: '{{proposal_content_data}}', output_format: 'pptx' },
-        },
-        {
-          type: 'apply',
-          op: 'pptx_render',
-          params: { design_from: 'last_pptx_design', path: outputPath },
-        },
-      ],
-    };
-  }
-
   return {
     action: 'pipeline',
     steps: [
@@ -2117,13 +2146,18 @@ function buildMediaPipelineForBrief(briefPath: string, outputPath: string, kind:
       },
       {
         type: 'transform',
-        op: 'document_report_design_from_brief',
-        params: { from: 'document_brief', export_as: 'last_docx_design' },
+        op: 'document_outline_from_brief',
+        params: { from: 'document_brief', export_as: 'document_outline' },
+      },
+      {
+        type: 'transform',
+        op: 'brief_to_design_protocol',
+        params: { from: 'document_brief', export_as: 'compiled_design_protocol' },
       },
       {
         type: 'apply',
-        op: outputPath.endsWith('.pdf') ? 'pdf_render' : 'docx_render',
-        params: { path: outputPath },
+        op: 'generate_document',
+        params: { brief: '{{document_brief}}', output_path: outputPath },
       },
     ],
   };
@@ -2183,6 +2217,244 @@ function buildProjectBootstrapSummary(params: {
     ...params.workItems.map((item) => `- ${item.work_id} [${item.status}] ${item.kind}: ${item.title}`),
     '',
   ].join('\n');
+}
+
+function listSuggestedRefsFromSession(session: TaskSessionShape): string[] {
+  return Array.isArray(session.payload?.suggested_refs)
+    ? session.payload.suggested_refs.filter((value): value is string => typeof value === 'string')
+    : [];
+}
+
+function buildAnalysisExecutionSummary(session: TaskSessionShape): string {
+  const suggestedRefs = listSuggestedRefsFromSession(session);
+  const snippets = buildAnalysisCorpusSnippets(suggestedRefs, 5);
+  const impactBands = classifyAnalysisImpactBands({
+    refs: suggestedRefs,
+    projectId: session.project_context?.project_id,
+    trackId: session.project_context?.track_id,
+    reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
+    targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+  });
+  const collected = session.requirements?.collected || {};
+  const payload = session.payload || {};
+  const findings = buildAnalysisFindingCandidates({
+    analysisKind: typeof payload.analysis_kind === 'string' ? payload.analysis_kind : undefined,
+    impactBands,
+    snippets,
+    reviewExecutionTarget: payload.review_execution_target as any,
+  });
+  const lines = [
+    `session_id: ${session.session_id}`,
+    `intent: ${String(session.work_loop?.intent?.label || session.task_type)}`,
+    `goal: ${session.goal.summary}`,
+    `success_condition: ${session.goal.success_condition}`,
+    '',
+    'project_context:',
+    `- project_id: ${session.project_context?.project_id || ''}`,
+    `- project_name: ${session.project_context?.project_name || ''}`,
+    `- track_id: ${session.project_context?.track_id || ''}`,
+    `- track_name: ${session.project_context?.track_name || ''}`,
+    '',
+    'process_design:',
+    ...(session.work_loop?.process_design?.plan_outline || []).map((item) => `- ${item}`),
+    '',
+    'execution_boundary:',
+    `- rule: ${session.work_loop?.execution_boundary?.rule || ''}`,
+    ...((session.work_loop?.execution_boundary?.llm_zone?.allowed || []).map((item) => `- llm_allowed: ${item}`)),
+    ...((session.work_loop?.execution_boundary?.llm_zone?.forbidden || []).map((item) => `- llm_forbidden: ${item}`)),
+    ...((session.work_loop?.execution_boundary?.knowledge_zone?.owns || []).map((item) => `- knowledge_owns: ${item}`)),
+    ...((session.work_loop?.execution_boundary?.compiler_zone?.responsibilities || []).map((item) => `- compiler: ${item}`)),
+    ...((session.work_loop?.execution_boundary?.executor_zone?.responsibilities || []).map((item) => `- executor: ${item}`)),
+    '',
+    'intake_requirements:',
+    ...(session.work_loop?.process_design?.intake_requirements || []).map((item) => `- ${item}`),
+    '',
+    'collected_inputs:',
+    ...Object.entries(collected).map(([key, value]) => `- ${key}: ${String(value)}`),
+    '',
+    'analysis_payload:',
+    ...Object.entries(payload).map(([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`),
+    '',
+    'review_execution_target:',
+    ...(payload.review_execution_target && typeof payload.review_execution_target === 'object'
+      ? Object.entries(payload.review_execution_target as Record<string, unknown>).map(([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+      : ['- none']),
+    '',
+    'suggested_refs:',
+    ...suggestedRefs.map((ref) => `- ${ref}`),
+    '',
+    'reference_snippets:',
+    ...snippets.flatMap((snippet) => [
+      `- ref: ${snippet.ref}`,
+      `  title: ${snippet.title}`,
+      `  excerpt: ${snippet.excerpt}`,
+    ]),
+    '',
+    'impact_bands:',
+    ...impactBands.map((item) => `- [${item.band}] ${item.ref} :: ${item.reason}`),
+    '',
+    'finding_candidates:',
+    ...findings.flatMap((finding) => [
+      `- id: ${finding.finding_id}`,
+      `  title: ${finding.title}`,
+      `  severity: ${finding.severity}`,
+      `  action_type: ${finding.action_type}`,
+      `  rationale: ${finding.rationale}`,
+      `  refs: ${finding.refs.join(', ')}`,
+    ]),
+    '',
+    'next_action:',
+    session.payload?.analysis_kind === 'incident_informed_review'
+      ? '- convert review findings into a guarded review mission or approval packet'
+      : '- convert remediation findings into bounded fix missions by project or track',
+    '',
+  ];
+  return lines.join('\n');
+}
+
+function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
+  seedId: string;
+  title: string;
+  summary: string;
+  specialistId: string;
+  outcomeId: string;
+  missionTypeHint: string;
+}> {
+  const projectId = String(session.project_context?.project_id || '').trim();
+  if (!projectId) return [];
+  const analysisKind = String(session.payload?.analysis_kind || '').trim();
+  if (!analysisKind) return [];
+  const targetLabel = String(
+    session.payload?.review_target ||
+    session.payload?.target_scope ||
+    session.project_context?.track_name ||
+    session.project_context?.project_name ||
+    projectId,
+  ).trim();
+  const suggestedRefs = listSuggestedRefsFromSession(session);
+  const snippets = buildAnalysisCorpusSnippets(suggestedRefs, 5);
+  const impactBands = classifyAnalysisImpactBands({
+    refs: suggestedRefs,
+    projectId: session.project_context?.project_id,
+    trackId: session.project_context?.track_id,
+    reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
+    targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+  });
+  const findings = buildAnalysisFindingCandidates({
+    analysisKind,
+    impactBands,
+    snippets,
+    reviewExecutionTarget: session.payload?.review_execution_target as any,
+  });
+  if (analysisKind === 'incident_informed_review') {
+    return [
+      {
+        seedId: `MSD-${session.session_id}-REVIEW`,
+        title: `Review follow-up for ${targetLabel}`,
+        summary: findings[0]?.title || 'Convert incident-informed review findings into bounded review tasks and approval-ready findings.',
+        specialistId: 'knowledge-specialist',
+        outcomeId: 'review_findings',
+        missionTypeHint: 'verification',
+      },
+      {
+        seedId: `MSD-${session.session_id}-VERIFY`,
+        title: `Verify controls for ${targetLabel}`,
+        summary: findings[1]?.title || 'Turn prior-incident lessons into explicit verification checks against the current target.',
+        specialistId: 'service-operator',
+        outcomeId: 'review_findings',
+        missionTypeHint: 'verification',
+      },
+    ];
+  }
+  if (analysisKind === 'cross_project_remediation') {
+    return [
+      {
+        seedId: `MSD-${session.session_id}-REMEDIATE`,
+        title: `Remediate propagation gaps for ${targetLabel}`,
+        summary: findings[0]?.title || 'Turn cross-project remediation findings into bounded fix missions.',
+        specialistId: 'knowledge-specialist',
+        outcomeId: 'remediation_plan',
+        missionTypeHint: 'implementation',
+      },
+      {
+        seedId: `MSD-${session.session_id}-VERIFY`,
+        title: `Verify remediation coverage for ${targetLabel}`,
+        summary: findings[1]?.title || 'Confirm that the identified bug or control gap is propagated and fixed across the governed target scope.',
+        specialistId: 'service-operator',
+        outcomeId: 'remediation_plan',
+        missionTypeHint: 'verification',
+      },
+    ];
+  }
+  return [];
+}
+
+async function executeAnalysisTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string; followUpSeedId?: string }> {
+  const dir = ensureTaskSessionExecutionDir(session.session_id);
+  const outputPath = `${dir}/${session.session_id}.analysis.md`;
+  safeWriteFile(outputPath, buildAnalysisExecutionSummary(session));
+
+  let followUpSeedId: string | undefined;
+  const seeds = buildAnalysisFollowUpSeeds(session);
+  const analysisFindings = buildAnalysisFindingCandidates({
+    analysisKind: String(session.payload?.analysis_kind || ''),
+    impactBands: classifyAnalysisImpactBands({
+      refs: listSuggestedRefsFromSession(session),
+      projectId: session.project_context?.project_id,
+      trackId: session.project_context?.track_id,
+      reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
+      targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+    }),
+    snippets: buildAnalysisCorpusSnippets(listSuggestedRefsFromSession(session), 5),
+    reviewExecutionTarget: session.payload?.review_execution_target as any,
+  });
+  if (seeds.length > 0 && session.project_context?.project_id) {
+    for (const seed of seeds) {
+      const executionContract = buildAnalysisExecutionContract({
+        analysisKind: String(session.payload?.analysis_kind || ''),
+        reviewExecutionTarget: session.payload?.review_execution_target as any,
+        findings: analysisFindings,
+        actionType: seed.missionTypeHint === 'implementation'
+          ? 'remediation'
+          : seed.specialistId === 'service-operator'
+            ? 'verification'
+            : 'review',
+      });
+      saveMissionSeedRecord({
+        seed_id: seed.seedId,
+        project_id: session.project_context.project_id,
+        track_id: session.project_context.track_id,
+        track_name: session.project_context.track_name,
+        source_task_session_id: session.session_id,
+        title: seed.title,
+        summary: seed.summary,
+        status: 'ready',
+        specialist_id: seed.specialistId,
+        outcome_id: seed.outcomeId,
+        mission_type_hint: seed.missionTypeHint,
+        locale: session.project_context.locale,
+        work_loop: session.work_loop,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          analysis_kind: session.payload?.analysis_kind,
+          suggested_refs: listSuggestedRefsFromSession(session),
+          review_target: session.payload?.review_target,
+          review_execution_target: session.payload?.review_execution_target,
+          execution_contract: executionContract,
+          finding_candidates: analysisFindings,
+          target_scope: session.payload?.target_scope,
+        },
+      });
+    }
+    followUpSeedId = seeds[0]?.seedId;
+  }
+
+  const previewText = session.payload?.analysis_kind === 'incident_informed_review'
+    ? `過去 incident を踏まえた review brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`
+    : `横断 remediation brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`;
+
+  return { outputPath, previewText, followUpSeedId };
 }
 
 function inferMissionTypeHintFromBootstrapWork(item: { title?: string; summary?: string; work_id?: string }): string {
@@ -2263,16 +2535,20 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
 }
 
 function buildTaskCompletionReply(session: TaskSessionShape, previewText: string, outputPath: string): string {
+  const followUpHintJa = buildIntentPatternHint(session.work_loop?.intent?.label, 'ja', 'follow_up');
+  const followUpHintEn = buildIntentPatternHint(session.work_loop?.intent?.label, 'en', 'follow_up');
   if (session.task_type === 'service_operation') {
-    return `${previewText} 詳細はタスク詳細で確認できます。`;
+    return `${previewText} 詳細はタスク詳細で確認できます。${followUpHintJa}`.trim();
   }
   if (session.task_type === 'presentation_deck') {
-    return 'PowerPoint 資料を生成しました。詳細はタスク詳細で確認できます。';
+    return `PowerPoint 資料を生成しました。詳細はタスク詳細で確認できます。${followUpHintJa}`.trim();
   }
   if (session.task_type === 'report_document') {
-    return 'レポート文書を生成しました。詳細はタスク詳細で確認できます。';
+    return `レポート文書を生成しました。詳細はタスク詳細で確認できます。${followUpHintJa}`.trim();
   }
-  return '完了しました。詳細はタスク詳細で確認できます。';
+  return session.project_context?.locale?.startsWith('ja')
+    ? `完了しました。詳細はタスク詳細で確認できます。${followUpHintJa}`.trim()
+    : `Completed. Check task detail for the full record.${followUpHintEn}`.trim();
 }
 
 function slugifyProjectId(value: string): string {
@@ -2688,6 +2964,11 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
       outputPath = result.outputPath;
       artifactKind = 'project_bootstrap';
       previewText = result.previewText;
+    } else if (session.task_type === 'analysis') {
+      const result = await executeAnalysisTask(session);
+      outputPath = result.outputPath;
+      artifactKind = 'analysis';
+      previewText = result.previewText;
     } else if (session.task_type === 'service_operation') {
       const result = await executeServiceOperationTask(session);
       outputPath = result.outputPath;
@@ -2846,21 +3127,29 @@ function tryHandleTaskSession(userText: string): string | null {
   const intent = classifyTaskSessionIntent(userText);
   if (!intent) return null;
   const projectContext = resolveProjectContextForTask(userText, intent);
+  const analysisSupport = buildAnalysisIntentSupport({
+    intentId: intent.intentId,
+    taskType: intent.taskType,
+    utterance: userText,
+    payload: intent.payload,
+    requirements: intent.requirements,
+    projectContext,
+  });
   const session = createTaskSession({
     surface: 'presence',
     taskType: intent.taskType,
     intentId: intent.intentId,
     shape: intent.taskType === 'analysis' && intent.payload?.bootstrap_kind === 'project_bootstrap' ? 'project_bootstrap' : 'task_session',
-    status: intent.requirements?.missing?.includes('approval_confirmation')
+    status: analysisSupport.requirements?.missing?.includes('approval_confirmation')
       ? 'awaiting_confirmation'
-      : (intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+      : (analysisSupport.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
     requiresApproval: Boolean(intent.payload?.approval_required),
     goal: intent.goal,
     projectContext,
-    requirements: intent.requirements,
-    payload: intent.payload,
+    requirements: analysisSupport.requirements,
+    payload: analysisSupport.payload,
   });
-  session.control.awaiting_user_input = Boolean(intent.requirements?.missing?.length);
+  session.control.awaiting_user_input = Boolean(analysisSupport.requirements?.missing?.length);
   saveTaskSession(session);
   recordTaskSessionHistory(session.session_id, {
     ts: new Date().toISOString(),

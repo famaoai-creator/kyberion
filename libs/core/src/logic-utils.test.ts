@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateCondition, resolveVars } from './logic-utils.js';
+import { evaluateCondition, getPathValue, resolveVars, resolveWriteArtifactSpec } from './logic-utils.js';
 
 describe('logic-utils', () => {
   const ctx = {
@@ -26,6 +26,12 @@ describe('logic-utils', () => {
     expect(resolveVars('{{mission.missing}}', ctx)).toBe('');
   });
 
+  it('resolves deep and indexed path values safely', () => {
+    expect(getPathValue({ report: { metrics: [{ count: 3 }] } }, 'report.metrics[0].count')).toBe(3);
+    expect(getPathValue({ report: { metrics: { count: 5 } } }, 'report.metrics.count')).toBe(5);
+    expect(getPathValue({ report: {} }, 'report.metrics.count')).toBeUndefined();
+  });
+
   it('evaluates supported condition operators', () => {
     expect(evaluateCondition(undefined, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.id', operator: 'exists' }, ctx)).toBe(true);
@@ -37,5 +43,20 @@ describe('logic-utils', () => {
     expect(evaluateCondition({ from: 'mission.priority', operator: 'gt', value: 5 }, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.priority', operator: 'lt', value: 10 }, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.priority', operator: 'unknown' }, ctx)).toBe(true);
+  });
+
+  it('builds unified write artifact specs from path, output_path, content, and from', () => {
+    expect(resolveWriteArtifactSpec({ path: 'out.txt', content: 'hello' }, ctx)).toEqual({
+      path: 'out.txt',
+      content: 'hello',
+    });
+    expect(resolveWriteArtifactSpec({ output_path: 'out.json', from: 'mission.meta' }, ctx)).toEqual({
+      path: 'out.json',
+      content: ctx.mission.meta,
+    });
+    expect(resolveWriteArtifactSpec({ output_path: 'out.json', from: 'mission' }, ctx)).toEqual({
+      path: 'out.json',
+      content: ctx.mission,
+    });
   });
 });

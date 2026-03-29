@@ -13,6 +13,11 @@ It exists to prevent drift between:
 - actuator and pipeline execution
 - approval, evidence, and memory loops
 
+For the canonical completion pattern of each surface intent, see:
+
+- [intent-outcome-patterns.md](/Users/famao/kyberion/knowledge/public/architecture/intent-outcome-patterns.md)
+- [intent-outcome-patterns.json](/Users/famao/kyberion/knowledge/public/governance/intent-outcome-patterns.json)
+
 ## Coverage Levels
 
 - `implemented`
@@ -34,6 +39,8 @@ It exists to prevent drift between:
 | `open-site` | `partial` | `voice-hub` browser path | `browser_session` | `browser_navigation` | Works, but not yet unified with task-session style catalog-first runtime routing |
 | `browser-step` | `partial` | `voice-hub` browser path | `browser_session` | `browser_step` | Works, but still route-specific |
 | `knowledge-query` | `partial` | direct reply path | `direct_reply` | `knowledge_answer` | Available, but resolver path is not yet fully catalog-first |
+| `cross-project-remediation` | `partial` | `task-session` classifier | `task_session` | `remediation_plan` | Natural-language bug propagation review can be normalized into governed analysis work, but automatic fix fan-out is not first-class yet |
+| `incident-informed-review` | `partial` | `task-session` classifier | `task_session` | `review_findings` | Prior-incident-aware review can be normalized into governed analysis work, but review target binding and execution are still incomplete |
 | `live-query` | `partial` | direct reply path | `direct_reply` | `live_answer` | Available, but runtime coverage is less normalized than core work flows |
 
 ## What Is Strong

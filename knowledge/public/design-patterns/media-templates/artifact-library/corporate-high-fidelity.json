@@ -1,0 +1,51 @@
+{
+  "domain": "corporate-high-fidelity",
+  "profiles": {
+    "business-continuity-plan-bcp": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Comprehensive BCP ensuring resilience against major disruptions.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary and Policy Statement", "layout_key": "doc-summary" },
+        { "section_id": "2-governance", "title": "2. Governance and BCP Team Organization", "layout_key": "operating-model" },
+        { "section_id": "3-bia", "title": "3. Business Impact Analysis (BIA)", "layout_key": "three-pillars" },
+        { "section_id": "3-1-rto-rpo", "title": "3.1 RTO and RPO Objectives by Function", "layout_key": "evidence-callout" },
+        { "section_id": "4-risk-assessment", "title": "4. Risk Assessment (Threats and Impacts)", "layout_key": "risk-controls" },
+        { "section_id": "5-recovery-strategies", "title": "5. Recovery Strategies (IT, Site, Workforce)", "layout_key": "doc-sections" },
+        { "section_id": "6-activation", "title": "6. Incident Response and Plan Activation", "layout_key": "timeline-roadmap" },
+        { "section_id": "7-maintenance", "title": "7. Plan Maintenance and Exercise Schedule", "layout_key": "doc-sections" },
+        { "section_id": "a-contacts", "title": "Appendix A: Emergency Contact Lists", "layout_key": "doc-appendix" }
+      ]
+    },
+    "esg-sustainability-report": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "description": "Investor-grade ESG report aligned with GRI and SASB.",
+      "sections": [
+        { "section_id": "1-leadership", "title": "1. Leadership Perspective (CEO Letter)", "layout_key": "immersive-vision" },
+        { "section_id": "2-esg-strategy", "title": "2. ESG Strategy and Materiality Assessment", "layout_key": "three-pillars" },
+        { "section_id": "3-environmental", "title": "3. Environmental (E): Climate and GHG", "layout_key": "evidence-callout" },
+        { "section_id": "4-social", "title": "4. Social (S): DEI and Wellbeing", "layout_key": "two-column-story" },
+        { "section_id": "5-governance", "title": "5. Governance (G): Ethics and Compensation", "layout_key": "risk-controls" },
+        { "section_id": "6-performance-data", "title": "6. Performance Data and GRI Index", "layout_key": "doc-sections" },
+        { "section_id": "7-assurance", "title": "7. Independent Assurance Statement", "layout_key": "doc-summary" }
+      ]
+    },
+    "corporate-communication-strategy": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Strategic alignment of internal and external messaging.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Strategic Intent and Executive Summary", "layout_key": "doc-summary" },
+        { "section_id": "2-situation-analysis", "title": "2. Situation Analysis (SWOT/Audit)", "layout_key": "three-pillars" },
+        { "section_id": "3-objectives", "title": "3. Goals and SMART Objectives", "layout_key": "evidence-callout" },
+        { "section_id": "4-audience", "title": "4. Audience Segmentation and Stakeholder Map", "layout_key": "operating-model" },
+        { "section_id": "5-messaging", "title": "5. Key Messaging and Core Narrative", "layout_key": "immersive-vision" },
+        { "section_id": "6-channels", "title": "6. Communication Channels and Media Mix", "layout_key": "two-column-story" },
+        { "section_id": "7-crisis-plan", "title": "7. Crisis Communication Protocols", "layout_key": "risk-controls" },
+        { "section_id": "8-timeline", "title": "8. Implementation Roadmap and Timeline", "layout_key": "timeline-roadmap" },
+        { "section_id": "9-measurement", "title": "9. Measurement, Sentiment, and ROI", "layout_key": "evidence-callout" }
+      ]
+    }
+  }
+}

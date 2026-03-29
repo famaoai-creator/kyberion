@@ -35,10 +35,10 @@ node dist/libs/actuators/media-actuator/src/index.js --input libs/actuators/medi
   生成した PowerPoint から theme と master placeholder を抽出し、context JSON に保存
 - `pptx-master-theme-reuse.json`:
   抽出した theme / master をベースに派生 PowerPoint を生成
-- `proposal-storyline-pptx.json`:
-  structured proposal brief から storyline と slide content を生成し、PPTX 提案書を render する
 - `document-brief-proposal-pptx.json`:
-  canonical な `document-brief` から提案書 PPTX を生成する。`presentation / proposal / pptx / layout_template_id` で区別する
+  canonical な `document-brief` から提案書 PPTX を生成する。`document_outline_from_brief -> brief_to_design_protocol -> generate_document` の正規ルートを使う
+- `proposal-storyline-pptx.json`:
+  proposal storyline の inspection / debug 用。旧来の narrative 展開を確認する互換サンプル
 - `document-brief-mermaid-diagram.json`:
   canonical な `document-brief` から Mermaid 図を生成する。`diagram / architecture-diagram / mmd` で区別する
 - `document-brief-d2-diagram.json`:

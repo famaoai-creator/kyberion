@@ -1,0 +1,48 @@
+{
+  "domain": "sales-cs-high-fidelity",
+  "profiles": {
+    "sales-playbook": {
+      "artifact_family": "document",
+      "document_type": "manual",
+      "description": "Standardized guide for navigating the end-to-end sales cycle.",
+      "sections": [
+        { "section_id": "1-strategy", "title": "1. Company Strategy and Positioning", "layout_key": "immersive-vision" },
+        { "section_id": "2-icp", "title": "2. Ideal Customer Profile (ICP) and Personas", "layout_key": "three-pillars" },
+        { "section_id": "3-process", "title": "3. The Sales Process (Prospecting to Closing)", "layout_key": "timeline-roadmap" },
+        { "section_id": "4-messaging", "title": "4. Messaging, Pitches, and Templates", "layout_key": "doc-sections" },
+        { "section_id": "5-objection-handling", "title": "5. Objection Handling Frameworks", "layout_key": "risk-controls" },
+        { "section_id": "6-competition", "title": "6. Competitive Intelligence (Battlecards)", "layout_key": "evidence-callout" },
+        { "section_id": "7-success-stories", "title": "7. Success Stories and ROI Calculators", "layout_key": "evidence-callout" }
+      ]
+    },
+    "customer-journey-map": {
+      "artifact_family": "document",
+      "document_type": "analysis",
+      "description": "Visual and strategic representation of the end-to-end CX.",
+      "sections": [
+        { "section_id": "1-objectives", "title": "1. Map Objectives and Persona Scope", "layout_key": "doc-summary" },
+        { "section_id": "2-stages", "title": "2. Journey Stages (Awareness to Advocacy)", "layout_key": "timeline-roadmap" },
+        { "section_id": "3-touchpoints", "title": "3. Actions, Touchpoints, and Channels", "layout_key": "three-point-architecture" },
+        { "section_id": "4-emotions", "title": "4. Customer Emotions and Moments of Truth", "layout_key": "evidence-callout" },
+        { "section_id": "5-pain-points", "title": "5. Pain Points and Friction Barriers", "layout_key": "risk-controls" },
+        { "section_id": "6-opportunities", "title": "6. Strategic Improvement Opportunities", "layout_key": "immersive-vision" },
+        { "section_id": "7-kpis", "title": "7. KPIs and Team Ownership", "layout_key": "operating-model" }
+      ]
+    },
+    "quarterly-business-review-qbr": {
+      "artifact_family": "presentation",
+      "document_type": "report",
+      "description": "Strategic partnership meeting deck focused on value realization.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary and Health Metrics", "layout_key": "doc-summary" },
+        { "section_id": "2-progress", "title": "2. Progress vs. Mutual Success Goals", "layout_key": "evidence-callout" },
+        { "section_id": "3-performance", "title": "3. Performance Narrative and Wins", "layout_key": "timeline-roadmap" },
+        { "section_id": "4-roi-realization", "title": "4. Tangible ROI and Value Realization", "layout_key": "evidence-callout" },
+        { "section_id": "5-benchmarking", "title": "5. Industry Benchmarking", "layout_key": "three-pillars" },
+        { "section_id": "6-roadmap", "title": "6. Product/Service Roadmap Alignment", "layout_key": "immersive-vision" },
+        { "section_id": "7-strategic-challenges", "title": "7. Strategic Challenges and Risks", "layout_key": "risk-controls" },
+        { "section_id": "8-next-goals", "title": "8. Priorities for the Next 90 Days", "layout_key": "decision-cta" }
+      ]
+    }
+  }
+}

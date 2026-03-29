@@ -34,6 +34,8 @@ interface StandardIntentCatalogFile {
     category?: string;
     specialist_id?: string;
     outcome_ids?: string[];
+    plan_outline?: string[];
+    intake_requirements?: string[];
     resolution?: {
       shape?: string;
       task_kind?: string;
@@ -75,6 +77,27 @@ export interface OrganizationWorkLoopSummary {
   outcome_design: {
     outcome_ids: string[];
     labels: string[];
+  };
+  process_design: {
+    plan_outline: string[];
+    intake_requirements: string[];
+    operator_checklist: string[];
+  };
+  execution_boundary: {
+    llm_zone: {
+      allowed: string[];
+      forbidden: string[];
+    };
+    knowledge_zone: {
+      owns: string[];
+    };
+    compiler_zone: {
+      responsibilities: string[];
+    };
+    executor_zone: {
+      responsibilities: string[];
+    };
+    rule: string;
   };
   teaming: {
     specialist_id?: string;
@@ -122,6 +145,127 @@ function loadStandardIntentCatalog(): StandardIntentCatalogFile['intents'] {
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
   return loadStandardIntentCatalog().find((intent) => intent?.id === intentId) || null;
+}
+
+function buildProcessDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['process_design'] {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const planOutline = Array.isArray(intentDefinition?.plan_outline)
+    ? intentDefinition!.plan_outline.map(String).filter(Boolean)
+    : [];
+  const intakeRequirements = Array.isArray(intentDefinition?.intake_requirements)
+    ? intentDefinition!.intake_requirements.map(String).filter(Boolean)
+    : [];
+
+  const operatorChecklist = [
+    ...planOutline,
+    ...(input.shape === 'task_session' || input.taskType
+      ? ['confirm the governed output path', 'capture evidence and reusable findings']
+      : []),
+    ...(input.shape === 'project_bootstrap'
+      ? ['confirm project root and default track', 'prepare the first governed work items']
+      : []),
+  ].filter(Boolean);
+
+  return {
+    plan_outline: planOutline,
+    intake_requirements: intakeRequirements,
+    operator_checklist: operatorChecklist,
+  };
+}
+
+function buildExecutionBoundary(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['execution_boundary'] {
+  const isAnalysis =
+    input.intentId === 'incident-informed-review' ||
+    input.intentId === 'cross-project-remediation' ||
+    input.taskType === 'analysis';
+
+  if (isAnalysis) {
+    return {
+      llm_zone: {
+        allowed: [
+          'normalize_analysis_request',
+          'draft_findings_language',
+          'summarize_incident_or_requirement_history',
+          'propose_follow_up_work_items',
+        ],
+        forbidden: [
+          'override_governed_process_design',
+          'invent_review_target_bindings',
+          'mutate_repo_or_mission_state_directly',
+          'declare_verification_complete_without_evidence',
+        ],
+      },
+      knowledge_zone: {
+        owns: [
+          'intent definitions',
+          'process_design',
+          'outcome catalog',
+          'specialist routing',
+        ],
+      },
+      compiler_zone: {
+        responsibilities: [
+          'resolve_target_binding',
+          'rank_governed_refs',
+          'classify_impact_bands',
+          'build_finding_candidates_and_execution_contract',
+        ],
+      },
+      executor_zone: {
+        responsibilities: [
+          'persist_analysis_artifact',
+          'create_follow_up_seeds',
+          'preserve_governed_project_track_context',
+        ],
+      },
+      rule: 'LLM drafts findings language; knowledge defines process; compiler binds targets and findings; executors persist artifacts and seeds',
+    };
+  }
+
+  return {
+    llm_zone: {
+      allowed: [
+        'normalize_request',
+        'draft_content_within_governed_slots',
+        'explain_next_action',
+      ],
+      forbidden: [
+        'override_governed_structure',
+        'invent_low_level_execution_contracts',
+        'declare_completion_without_evidence',
+      ],
+    },
+    knowledge_zone: {
+      owns: [
+        'intent definitions',
+        'process_design',
+        'outcome catalog',
+        'specialist routing',
+      ],
+    },
+    compiler_zone: {
+      responsibilities: [
+        'map_intent_to_governed_execution_shape',
+        'prepare_contracts_and_paths',
+      ],
+    },
+    executor_zone: {
+      responsibilities: [
+        'perform_governed_execution',
+        'persist_evidence',
+        'preserve_reproducibility',
+      ],
+    },
+    rule: 'LLM drafts within governed slots; knowledge defines process; compiler shapes execution; executors persist and reproduce',
+  };
 }
 
 function inferExecutionShape(input: {
@@ -281,6 +425,8 @@ export function buildOrganizationWorkLoopSummary(input: {
       outcome_ids: design.outcomes.map((outcome) => outcome.id),
       labels: design.outcomes.map((outcome) => outcome.label),
     },
+    process_design: buildProcessDesign(input),
+    execution_boundary: buildExecutionBoundary(input),
     teaming: {
       specialist_id: design.primary_specialist?.id,
       specialist_label: design.primary_specialist?.label,

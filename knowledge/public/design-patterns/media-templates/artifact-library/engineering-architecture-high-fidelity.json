@@ -1,0 +1,41 @@
+{
+  "domain": "engineering-architecture-high-fidelity",
+  "profiles": {
+    "microservices-design-guide": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Structural principles for building resilient distributed systems.",
+      "sections": [
+        { "section_id": "1-foundations", "title": "1. Core Principles (SRP, DDD, Cohesion)", "layout_key": "immersive-vision" },
+        { "section_id": "2-data-management", "title": "2. Data Management (Database-per-Service, Saga)", "layout_key": "three-pillars" },
+        { "section_id": "3-communication", "title": "3. Inter-Service Communication (gRPC, Sync/Async)", "layout_key": "three-point-architecture" },
+        { "section_id": "4-resiliency", "title": "4. Resiliency Patterns (Circuit Breaker, Bulkhead)", "layout_key": "risk-controls" },
+        { "section_id": "5-observability", "title": "5. Observability (Tracing, Logging, Health)", "layout_key": "operating-model" }
+      ]
+    },
+    "api-architecture-standard": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Standardized digital handshake for internal and external consumers.",
+      "sections": [
+        { "section_id": "1-design-fundamentals", "title": "1. Design Fundamentals (REST, API-First)", "layout_key": "doc-title" },
+        { "section_id": "2-request-response", "title": "2. Request/Response Standards (HTTP, Status)", "layout_key": "doc-sections" },
+        { "section_id": "3-security-governance", "title": "3. Security and Governance (OAuth2, Throttling)", "layout_key": "risk-controls" },
+        { "section_id": "4-lifecycle", "title": "4. Lifecycle Management (Versioning, Deprecation)", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-developer-experience", "title": "5. Developer Experience (Swagger, SDKs)", "layout_key": "evidence-callout" }
+      ]
+    },
+    "cloud-migration-strategy": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Lifecycle of moving workloads to cloud native environments.",
+      "sections": [
+        { "section_id": "1-assessment", "title": "1. Readiness Assessment and TCO Analysis", "layout_key": "doc-summary" },
+        { "section_id": "2-methodology", "title": "2. Migration Methodologies (The 7 Rs)", "layout_key": "three-pillars" },
+        { "section_id": "3-foundational-infra", "title": "3. Landing Zones (IAM, Networking, Guardrails)", "layout_key": "three-point-architecture" },
+        { "section_id": "4-execution-data", "title": "4. Execution and Data Migration Strategy", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-optimization", "title": "5. Post-Migration Optimization (FinOps, IaC)", "layout_key": "evidence-callout" }
+      ]
+    }
+  }
+}

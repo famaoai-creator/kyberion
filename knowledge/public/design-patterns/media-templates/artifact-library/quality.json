@@ -1,0 +1,35 @@
+{
+  "domain": "quality-validation",
+  "profiles": {
+    "test-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Test Plan: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "strategy", "title": "Testing Strategy", "layout_key": "immersive-vision" },
+        { "section_id": "scope", "title": "Test Scope", "layout_key": "two-column-story" },
+        { "section_id": "acceptance", "title": "Acceptance Criteria", "layout_key": "evidence-callout" },
+        { "section_id": "environment", "title": "Test Environment", "layout_key": "operating-model" },
+        { "section_id": "schedule", "title": "Test Schedule", "layout_key": "timeline-roadmap" }
+      ]
+    },
+    "test-case-specification": {
+      "artifact_family": "spreadsheet",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "summary", "title": "Test Case Summary", "layout_key": "sheet-overview" },
+        { "section_id": "cases", "title": "Test Cases", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "test-validation-report": {
+      "artifact_family": "presentation",
+      "document_type": "report",
+      "sections": [
+        { "section_id": "cover", "title": "Validation Results: {{title}}", "layout_key": "cover-statement" },
+        { "section_id": "summary", "title": "Pass/Fail Summary", "layout_key": "evidence-callout" },
+        { "section_id": "defects", "title": "Identified Defects", "layout_key": "risk-controls" },
+        { "section_id": "conclusion", "title": "Release Recommendation", "layout_key": "decision-cta" }
+      ]
+    }
+  }
+}

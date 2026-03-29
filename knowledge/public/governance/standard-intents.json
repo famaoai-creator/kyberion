@@ -143,12 +143,53 @@
         "ナレッジで planner を調べて"
       ],
       "plan_outline": ["search governed knowledge", "rank the relevant sources", "return a concise answer with citations"],
+      "intake_requirements": ["knowledge scope", "question or topic"],
       "outcome_ids": ["knowledge_answer"],
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": ["knowledge", "ナレッジ", "調べて", "教えて"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "knowledge_answer"
+      }
+    },
+    {
+      "id": "cross-project-remediation",
+      "category": "surface",
+      "description": "Review past requirements, incidents, or prior fixes and identify where the same bug or control gap must be propagated and remediated.",
+      "surface_examples": [
+        "過去の要件定義を横断的に見て横展開されていないバグを修正して",
+        "Review prior requirements and find where the same bug still needs to be fixed",
+        "同じ不具合が未展開のプロジェクトを洗い出して remediation plan を作って"
+      ],
+      "plan_outline": ["search governed requirements and prior evidence", "identify likely propagation gaps", "prepare a governed remediation plan and follow-up work"],
+      "intake_requirements": ["source corpus", "target scope", "known issue or gap"],
+      "outcome_ids": ["remediation_plan"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["横断", "横展開", "未展開", "過去の要件定義", "不具合", "バグ", "requirements", "propagate", "propagation", "remediation", "same bug", "fix across"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "analysis",
+        "result_shape": "plan"
+      }
+    },
+    {
+      "id": "incident-informed-review",
+      "category": "surface",
+      "description": "Review code, design, or delivery scope in the light of prior incidents and return findings, risks, and required follow-up checks.",
+      "surface_examples": [
+        "過去のインシデント結果を踏まえてレビューを実施して",
+        "Review this change based on prior incidents and known failures",
+        "障害の振り返りを踏まえて今回の設計をレビューして"
+      ],
+      "plan_outline": ["search incident and failure history", "review the current target against those lessons", "return governed findings and follow-up checks"],
+      "intake_requirements": ["incident basis", "review target", "expected decision or release scope"],
+      "outcome_ids": ["review_findings"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["インシデント", "障害", "振り返り", "レビュー", "known failures", "prior incidents", "incident-informed", "review based on", "postmortem"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "analysis",
+        "result_shape": "review"
       }
     },
     {
