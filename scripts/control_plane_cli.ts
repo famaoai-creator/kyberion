@@ -6,6 +6,7 @@ import {
   getControlPlaneRemediationPlan,
   loadIntentOutcomePatterns,
   logger,
+  pathResolver,
   safeReadFile,
   safeExec,
 } from "@agent/core";
@@ -15,7 +16,7 @@ type SurfaceKind = "presence" | "chronos";
 const ARTIFACT_LIBRARY_INDEX_PATH = "knowledge/public/design-patterns/media-templates/artifact-library/index.json";
 
 function loadArtifactLibraryIndex(): any {
-  const fullPath = path.resolve(process.cwd(), ARTIFACT_LIBRARY_INDEX_PATH);
+  const fullPath = path.resolve(pathResolver.rootDir(), ARTIFACT_LIBRARY_INDEX_PATH);
   return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
 }
 
@@ -53,7 +54,7 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   const normalizedProfileId = String(profileId || "").trim();
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
-    const fullPath = path.resolve(process.cwd(), "knowledge/public/design-patterns/media-templates/artifact-library", String(pack.file));
+    const fullPath = path.resolve(pathResolver.rootDir(), "knowledge/public/design-patterns/media-templates/artifact-library", String(pack.file));
     const doc = JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
     return {
       profile_id: normalizedProfileId,
@@ -118,12 +119,12 @@ function attemptSurfaceFix(surface: SurfaceKind): string {
   const steps: string[] = [];
   try {
     for (const action of actions) {
-      const output = safeExec("node", action.args, { cwd: process.cwd(), timeoutMs: 120_000 });
+      const output = safeExec("node", action.args, { cwd: pathResolver.rootDir(), timeoutMs: 120_000 });
       steps.push(summarizeSurfaceRuntimeOutput(output, action.fallback));
     }
     return steps.join(" -> ");
   } catch (error) {
-    const reconcileOutput = safeExec("pnpm", ["surfaces:reconcile"], { cwd: process.cwd(), timeoutMs: 120_000 });
+    const reconcileOutput = safeExec("pnpm", ["surfaces:reconcile"], { cwd: pathResolver.rootDir(), timeoutMs: 120_000 });
     const reconcileTail = formatExecTail(reconcileOutput, "reconcile completed");
     const reason = error instanceof Error ? error.message : String(error);
     steps.push(`fallback to reconcile after targeted restart failed: ${reason}`);

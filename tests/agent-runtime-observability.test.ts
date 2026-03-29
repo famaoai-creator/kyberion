@@ -1,10 +1,37 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const { resolveAgentProviderTargetMock } = vi.hoisted(() => ({
+  resolveAgentProviderTargetMock: vi.fn(
+    ({
+      preferredProvider,
+      preferredModelId,
+    }: {
+      preferredProvider: string;
+      preferredModelId?: string;
+    }) => ({
+      provider: preferredProvider,
+      modelId: preferredModelId || preferredProvider,
+      strategy: 'preferred' as const,
+      availableProviders: [preferredProvider],
+    }),
+  ),
+}));
+
+vi.mock('@agent/core/agent-provider-resolution', async () => ({
+  resolveAgentProviderTarget: resolveAgentProviderTargetMock,
+}));
+
 import { agentLifecycle } from '@agent/core/agent-lifecycle';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { agentRegistry } from '@agent/core/agent-registry';
 import { ACPMediator } from '@agent/core/acp-mediator';
 
 describe('agent runtime observability', () => {
+  beforeEach(async () => {
+    await agentLifecycle.shutdownAll();
+    runtimeSupervisor.resetForTests();
+    resolveAgentProviderTargetMock.mockClear();
+  });
+
   afterEach(async () => {
     await agentLifecycle.shutdownAll();
     runtimeSupervisor.resetForTests();
