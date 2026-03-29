@@ -1,0 +1,21 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "json_read",
+      "params": {
+        "path": "libs/actuators/media-actuator/examples/assets/document-brief-drawio-diagram.json",
+        "export_as": "document_brief"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "document_diagram_render_from_brief",
+      "params": {
+        "from": "document_brief",
+        "path": "active/shared/tmp/media/document-brief-direct-drawio-diagram.drawio"
+      }
+    }
+  ]
+}

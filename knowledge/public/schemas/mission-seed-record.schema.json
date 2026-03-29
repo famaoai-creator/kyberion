@@ -15,6 +15,8 @@
   "properties": {
     "seed_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
     "source_task_session_id": { "type": "string" },
     "source_work_id": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },

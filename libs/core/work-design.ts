@@ -62,6 +62,8 @@ export interface OrganizationWorkLoopSummary {
   context: {
     project_id?: string;
     project_name?: string;
+    track_id?: string;
+    track_name?: string;
     tier: 'personal' | 'confidential' | 'public';
     locale?: string;
     service_bindings: string[];
@@ -243,6 +245,8 @@ export function buildOrganizationWorkLoopSummary(input: {
   tier?: 'personal' | 'confidential' | 'public';
   projectId?: string;
   projectName?: string;
+  trackId?: string;
+  trackName?: string;
   locale?: string;
   serviceBindings?: string[];
   requiresApproval?: boolean;
@@ -263,6 +267,8 @@ export function buildOrganizationWorkLoopSummary(input: {
     context: {
       project_id: input.projectId,
       project_name: input.projectName,
+      track_id: input.trackId,
+      track_name: input.trackName,
       tier,
       locale: input.locale,
       service_bindings: Array.isArray(input.serviceBindings) ? input.serviceBindings : [],

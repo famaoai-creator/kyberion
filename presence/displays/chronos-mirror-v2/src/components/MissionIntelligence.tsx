@@ -12,6 +12,10 @@ interface MissionSummary {
   status: string;
   tier: string;
   missionType?: string;
+  projectId?: string;
+  projectPath?: string;
+  trackId?: string;
+  trackName?: string;
   planReady: boolean;
   nextTaskCount: number;
   controlSummary: string;
@@ -119,6 +123,34 @@ interface ProjectRecordSummary {
   kickoff_task_session_id?: string;
 }
 
+interface ProjectTrackRecordSummary {
+  track_id: string;
+  project_id: string;
+  name: string;
+  summary: string;
+  status: "planned" | "active" | "paused" | "completed" | "archived";
+  track_type: "delivery" | "change" | "release" | "incident" | "compliance" | "operations" | "research";
+  lifecycle_model: "sdlc" | "continuous_delivery" | "incident_response" | "continuous_operations" | "research_cycle";
+  tier: "personal" | "confidential" | "public";
+  primary_locale?: string;
+  release_id?: string;
+  change_scope?: string;
+  gate_profile_id?: string;
+  active_missions?: string[];
+  required_artifacts?: string[];
+  gate_readiness?: {
+    ready_gate_count: number;
+    total_gate_count: number;
+    current_gate_id?: string;
+    current_phase?: string;
+    ready: boolean;
+    next_required_artifacts?: Array<{
+      artifact_id: string;
+      template_ref?: string;
+    }>;
+  };
+}
+
 interface ServiceBindingRecordSummary {
   binding_id: string;
   service_type: string;
@@ -132,6 +164,8 @@ interface ServiceBindingRecordSummary {
 interface MissionSeedRecordSummary {
   seed_id: string;
   project_id: string;
+  track_id?: string;
+  track_name?: string;
   source_task_session_id?: string;
   source_work_id?: string;
   title: string;
@@ -148,6 +182,8 @@ interface MissionSeedRecordSummary {
 interface ArtifactRecordSummary {
   artifact_id: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   kind: string;
@@ -157,7 +193,7 @@ interface ArtifactRecordSummary {
   preview_text?: string;
   work_loop?: {
     intent?: { label?: string };
-    context?: { project_id?: string; project_name?: string; tier?: string; locale?: string; service_bindings?: string[] };
+    context?: { project_id?: string; project_name?: string; track_id?: string; track_name?: string; tier?: string; locale?: string; service_bindings?: string[] };
     resolution?: { execution_shape?: string; task_type?: string };
     outcome_design?: { outcome_ids?: string[]; labels?: string[] };
     teaming?: { specialist_id?: string; specialist_label?: string; conversation_agent?: string; team_roles?: string[] };
@@ -178,6 +214,7 @@ interface PendingApprovalSummary {
   riskLevel: "low" | "medium" | "high" | "critical";
   pendingRoles: string[];
   missionId?: string;
+  trackId?: string;
   serviceId?: string;
   work_loop?: ArtifactRecordSummary["work_loop"];
 }
@@ -187,6 +224,8 @@ interface DistillCandidateSummary {
   source_type: "task_session" | "mission" | "artifact";
   tier?: "personal" | "confidential" | "public";
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   artifact_ids?: string[];
@@ -582,6 +621,15 @@ interface IntelligencePayload {
   accessRole: "readonly" | "localadmin";
   activeMissions: MissionSummary[];
   projects: ProjectRecordSummary[];
+  projectTracks: ProjectTrackRecordSummary[];
+  gateReadiness?: Array<{
+    track_id: string;
+    ready_gate_count: number;
+    total_gate_count: number;
+    current_gate_id?: string;
+    current_phase?: string;
+    ready: boolean;
+  }>;
   missionSeeds: MissionSeedRecordSummary[];
   distillCandidates: DistillCandidateSummary[];
   serviceBindings: ServiceBindingRecordSummary[];
@@ -663,6 +711,17 @@ interface SurfaceSummary {
   controlRequestedBy?: string;
 }
 
+interface ReferenceDetail {
+  path: string;
+  title: string;
+  summary: string;
+  metadata: Record<string, string>;
+  sections: Array<{ title: string; lines: string[] }>;
+  body: string;
+  endpoint: string;
+  openLabel: string;
+}
+
 export function MissionIntelligence({
   focusedView = null,
   onClearFocus,
@@ -679,6 +738,7 @@ export function MissionIntelligence({
   const [outboxTarget, setOutboxTarget] = useState<string | null>(null);
   const [missionActionTarget, setMissionActionTarget] = useState<string | null>(null);
   const [missionSeedTarget, setMissionSeedTarget] = useState<string | null>(null);
+  const [trackSeedTarget, setTrackSeedTarget] = useState<string | null>(null);
   const [approvalTarget, setApprovalTarget] = useState<string | null>(null);
   const [surfaceActionTarget, setSurfaceActionTarget] = useState<string | null>(null);
   const [browserSessionTarget, setBrowserSessionTarget] = useState<string | null>(null);
@@ -691,6 +751,9 @@ export function MissionIntelligence({
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>("all");
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [selectedReferencePath, setSelectedReferencePath] = useState<string | null>(null);
+  const [referenceDetail, setReferenceDetail] = useState<ReferenceDetail | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -701,11 +764,13 @@ export function MissionIntelligence({
     const params = new URLSearchParams(window.location.search);
     const mission = params.get("mission");
     const project = params.get("project");
+    const track = params.get("track");
     if (mission) {
       setSelectedMissionId(mission);
       setMessageMissionFilter(mission);
     }
     if (project) setSelectedProjectId(project);
+    if (track) setSelectedTrackId(track);
   }, []);
 
   const jumpToTarget = (action: ControlActionSummary) => {
@@ -895,6 +960,140 @@ export function MissionIntelligence({
     }
   };
 
+  const createTrackSeed = async (trackId: string, artifactId?: string) => {
+    try {
+      setTrackSeedTarget(trackId);
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_track_seed",
+          trackId,
+          artifactId,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Track seed creation failed");
+      setActionResult(`${trackId}: seed ready`);
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Track seed creation failed");
+    } finally {
+      setTrackSeedTarget(null);
+    }
+  };
+
+  const parseReferenceContent = (rawText: string, logicalPath: string, endpoint: string, openLabel: string): ReferenceDetail => {
+    const lines = String(rawText || "").split(/\r?\n/);
+    const detail: ReferenceDetail = {
+      path: logicalPath,
+      title: String(logicalPath || "reference").split("/").pop() || "reference",
+      summary: "",
+      metadata: {},
+      sections: [],
+      body: "",
+      endpoint,
+      openLabel,
+    };
+    let startIndex = 0;
+    if (lines[0] === "---") {
+      const endIndex = lines.findIndex((line, index) => index > 0 && line === "---");
+      if (endIndex > 0) {
+        for (const line of lines.slice(1, endIndex)) {
+          const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+          if (match) detail.metadata[match[1]] = match[2].trim();
+        }
+        startIndex = endIndex + 1;
+      }
+    }
+    let currentSection: { title: string; lines: string[] } | null = null;
+    const bodyLines: string[] = [];
+    for (const line of lines.slice(startIndex)) {
+      if (line.startsWith("# ")) {
+        detail.title = line.slice(2).trim() || detail.title;
+        continue;
+      }
+      if (line.startsWith("## ")) {
+        currentSection = { title: line.slice(3).trim(), lines: [] };
+        detail.sections.push(currentSection);
+        continue;
+      }
+      if (currentSection) currentSection.lines.push(line);
+      else bodyLines.push(line);
+    }
+    detail.body = bodyLines.join("\n").trim();
+    detail.summary = detail.metadata.summary || detail.body.split("\n").find((line) => line.trim()) || "";
+    return detail;
+  };
+
+  const openRuntimeReference = async (logicalPath: string) => {
+    const path = String(logicalPath || "").trim();
+    if (!path) return;
+    const endpoint = "/api/runtime-file";
+    setSelectedReferencePath(path);
+    setReferenceDetail({
+      path,
+      title: path.split("/").pop() || path,
+      summary: "Loading skeleton...",
+      metadata: {},
+      sections: [],
+      body: "",
+      endpoint,
+      openLabel: "open raw skeleton",
+    });
+    try {
+      const res = await fetch(`${endpoint}?path=${encodeURIComponent(path)}`);
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      setReferenceDetail(parseReferenceContent(text, path, endpoint, "open raw skeleton"));
+    } catch (err: any) {
+      setReferenceDetail({
+        path,
+        title: path.split("/").pop() || path,
+        summary: err.message || "Failed to load skeleton",
+        metadata: {},
+        sections: [],
+        body: "",
+        endpoint,
+        openLabel: "open raw skeleton",
+      });
+    }
+  };
+
+  const openKnowledgeReference = async (logicalPath: string) => {
+    const path = String(logicalPath || "").trim();
+    if (!path) return;
+    const endpoint = "/api/knowledge-ref";
+    setSelectedReferencePath(path);
+    setReferenceDetail({
+      path,
+      title: path.split("/").pop() || path,
+      summary: "Loading template...",
+      metadata: {},
+      sections: [],
+      body: "",
+      endpoint,
+      openLabel: "open raw template",
+    });
+    try {
+      const res = await fetch(`${endpoint}?path=${encodeURIComponent(path)}`);
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      setReferenceDetail(parseReferenceContent(text, path, endpoint, "open raw template"));
+    } catch (err: any) {
+      setReferenceDetail({
+        path,
+        title: path.split("/").pop() || path,
+        summary: err.message || "Failed to load template",
+        metadata: {},
+        sections: [],
+        body: "",
+        endpoint,
+        openLabel: "open raw template",
+      });
+    }
+  };
+
   const decideApproval = async (approval: PendingApprovalSummary, decision: "approved" | "rejected") => {
     try {
       setApprovalTarget(approval.id);
@@ -1002,8 +1201,13 @@ export function MissionIntelligence({
     } else {
       url.searchParams.delete("project");
     }
+    if (selectedTrackId) {
+      url.searchParams.set("track", selectedTrackId);
+    } else {
+      url.searchParams.delete("track");
+    }
     window.history.replaceState({}, "", url.toString());
-  }, [selectedMissionId, selectedProjectId]);
+  }, [selectedMissionId, selectedProjectId, selectedTrackId]);
 
   const missionPinStatusLabel = selectedMissionId ? "mission pinned" : "pin mission thread";
 
@@ -1037,26 +1241,52 @@ export function MissionIntelligence({
   const selectedProject = selectedProjectId
     ? data.projects.find((project) => project.project_id === selectedProjectId) || null
     : null;
+  const availableTracks = selectedProject
+    ? data.projectTracks.filter((track) => track.project_id === selectedProject.project_id)
+    : data.projectTracks;
+  const gateReadinessByTrack = new Map((data.gateReadiness || []).map((item) => [item.track_id, item]));
+  const hydratedTracks = availableTracks.map((track) => ({
+    ...track,
+    gate_readiness: track.gate_readiness || gateReadinessByTrack.get(track.track_id),
+  }));
+  const selectedTrack = selectedTrackId
+    ? hydratedTracks.find((track) => track.track_id === selectedTrackId) || null
+    : null;
   const selectedProjectMissionIds = new Set(selectedProject?.active_missions || []);
   const selectedProjectBootstrapItems = selectedProject?.bootstrap_work_items || [];
-  const filteredMissions = selectedProject
+  const projectFilteredMissions = selectedProject
     ? data.activeMissions.filter((mission) => selectedProjectMissionIds.has(mission.missionId))
     : data.activeMissions;
+  const filteredMissions = selectedTrack
+    ? projectFilteredMissions.filter((mission) => mission.trackId === selectedTrack.track_id)
+    : projectFilteredMissions;
   const filteredServiceBindings = selectedProject
     ? data.serviceBindings.filter((binding) => (selectedProject.service_bindings || []).includes(binding.binding_id))
     : data.serviceBindings;
   const filteredMissionSeeds = selectedProject
     ? data.missionSeeds.filter((seed) => seed.project_id === selectedProject.project_id)
     : data.missionSeeds;
+  const filteredMissionSeedsByTrack = selectedTrack
+    ? filteredMissionSeeds.filter((seed) => seed.track_id === selectedTrack.track_id || seed.work_loop?.context?.track_id === selectedTrack.track_id)
+    : filteredMissionSeeds;
   const filteredDistillCandidates = selectedProject
     ? data.distillCandidates.filter((candidate) => candidate.project_id === selectedProject.project_id)
     : data.distillCandidates;
+  const filteredDistillCandidatesByTrack = selectedTrack
+    ? filteredDistillCandidates.filter((candidate) => candidate.track_id === selectedTrack.track_id || candidate.work_loop?.context?.track_id === selectedTrack.track_id)
+    : filteredDistillCandidates;
   const filteredRecentArtifacts = selectedProject
     ? data.recentArtifacts.filter((artifact) => artifact.project_id === selectedProject.project_id)
     : data.recentArtifacts;
+  const filteredRecentArtifactsByTrack = selectedTrack
+    ? filteredRecentArtifacts.filter((artifact) => artifact.track_id === selectedTrack.track_id || artifact.work_loop?.context?.track_id === selectedTrack.track_id)
+    : filteredRecentArtifacts;
   const filteredPendingApprovals = selectedProject
     ? data.pendingApprovals.filter((approval) => !approval.missionId || selectedProjectMissionIds.has(approval.missionId))
     : data.pendingApprovals;
+  const filteredPendingApprovalsByTrack = selectedTrack
+    ? filteredPendingApprovals.filter((approval) => approval.trackId === selectedTrack.track_id || approval.work_loop?.context?.track_id === selectedTrack.track_id)
+    : filteredPendingApprovals;
   const filteredAgentMessages = data.agentMessages.filter((message) => {
     if (selectedProject && message.missionId && !selectedProjectMissionIds.has(message.missionId)) return false;
     if (messageMissionFilter !== "all" && message.missionId !== messageMissionFilter) return false;
@@ -1068,9 +1298,9 @@ export function MissionIntelligence({
     return true;
   });
   const learnedProjectRefs = (projectId: string) =>
-    filteredDistillCandidates.filter((candidate) => candidate.project_id === projectId && candidate.promoted_ref).slice(0, 3);
+    filteredDistillCandidatesByTrack.filter((candidate) => candidate.project_id === projectId && candidate.promoted_ref).slice(0, 3);
   const learnedMissionSeedRefs = (seedId: string, projectId: string, missionId?: string) =>
-    filteredDistillCandidates.filter((candidate) => {
+    filteredDistillCandidatesByTrack.filter((candidate) => {
       if (candidate.project_id !== projectId || !candidate.promoted_ref) return false;
       const evidence = candidate.evidence_refs || [];
       return evidence.includes(`mission_seed:${seedId}`) || (missionId ? candidate.mission_id === missionId : false);
@@ -1117,6 +1347,14 @@ export function MissionIntelligence({
         "recent-surface-outbox": "Delivery Exceptions",
         "owner-summaries": "Audit Trail",
       } as Record<string, string>)[focusedView] || "Focused View"
+    : null;
+  const referenceMetadataEntries = Object.entries(referenceDetail?.metadata || {}).filter(([, value]) => String(value || "").trim());
+  const referenceSections = Array.isArray(referenceDetail?.sections) ? referenceDetail.sections : [];
+  const selectedReferenceSeed = selectedReferencePath
+    ? filteredMissionSeedsByTrack.find((seed) => (
+      seed.metadata?.skeleton_path === selectedReferencePath
+      || seed.metadata?.template_ref === selectedReferencePath
+    )) || null
     : null;
 
   return (
@@ -1194,6 +1432,20 @@ export function MissionIntelligence({
             <button
               type="button"
               onClick={() => setSelectedProjectId(null)}
+              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+            >
+              clear focus
+            </button>
+          </div>
+        )}
+        {selectedTrack && (
+          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+            track focus: <span className="font-semibold text-white/90">{selectedTrack.name}</span>
+            <span className="mx-2 text-white/40">·</span>
+            <span className="font-mono text-white/70">{selectedTrack.track_id}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedTrackId(null)}
               className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
             >
               clear focus
@@ -1325,6 +1577,13 @@ export function MissionIntelligence({
                     <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/35">
                       {mission.missionType || "development"} · {mission.tier} · {mission.missionId}
                     </div>
+                    {(mission.projectId || mission.trackId) ? (
+                      <div className="mt-1 text-[10px] text-white/42">
+                        {mission.projectId ? `project ${mission.projectId}` : null}
+                        {mission.projectId && mission.trackId ? " · " : null}
+                        {mission.trackId ? `track ${mission.trackName || mission.trackId}` : null}
+                      </div>
+                    ) : null}
                   </div>
                   <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
                     mission.planReady ? "bg-green-500/15 text-green-300" : "bg-yellow-500/10 text-yellow-200"
@@ -1499,6 +1758,10 @@ export function MissionIntelligence({
                     <div className="text-[10px] text-white/35">No managed runtimes discovered.</div>
                   ) : data.runtimeTopology.runtimes.map((runtime) => (
                     <div key={runtime.agentId} className="rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2">
+                      {(() => {
+                        const resolution = providerResolutionSummary(runtime.metadata);
+                        return (
+                          <>
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-[10px] font-mono text-white/82">{runtime.agentId}</div>
                         <div className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${
@@ -1516,12 +1779,20 @@ export function MissionIntelligence({
                       <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-white/38">
                         {runtime.provider}{runtime.modelId ? `/${runtime.modelId}` : ""} · {runtime.ownerType}:{runtime.ownerId}
                       </div>
+                      {resolution ? (
+                        <div className="mt-1 text-[9px] text-white/45">
+                          preferred {resolution.preferred} · strategy {resolution.strategy}
+                        </div>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap gap-2 text-[9px] text-white/42">
                         {runtime.leaseKind && <span>lease {runtime.leaseKind}</span>}
                         {runtime.requestedBy && <span>requested by {runtime.requestedBy}</span>}
                         {typeof runtime.pid === "number" && <span>pid {runtime.pid}</span>}
                         <span>activity {runtime.recentActivityCount}</span>
                       </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -1722,6 +1993,69 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
+        <Panel title={mt("chronos_tracks", "Tracks")}>
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            {mt("chronos_tracks_description", "Tracks are the SDLC and gating lanes inside a project. Focus a track to review evidence, approvals, and durable work without assuming one project equals one lifecycle.")}
+          </div>
+          <div className="space-y-3">
+            {hydratedTracks.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_tracks", "No tracks registered yet.")}</div>
+            ) : hydratedTracks.map((track) => (
+              <div key={track.track_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{track.name}</div>
+                    <div className="mt-1 text-[10px] text-white/45">
+                      {track.track_id} · {track.track_type} · {track.lifecycle_model}
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-white/65">
+                    {track.status}
+                  </div>
+                </div>
+                <div className="mt-3 text-[10px] text-white/70">{track.summary}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>{mt("chronos_project", "project")}: <span className="font-mono text-white/80">{track.project_id}</span></div>
+                  <div>{mt("chronos_required_artifacts", "required artifacts")}: <span className="font-mono text-white/80">{track.required_artifacts?.length ?? 0}</span></div>
+                  {track.gate_readiness ? (
+                    <>
+                      <div>{mt("chronos_gate_readiness", "gate readiness")}: <span className="font-mono text-white/80">{track.gate_readiness.ready_gate_count}/{track.gate_readiness.total_gate_count}</span></div>
+                      <div>{mt("chronos_current_gate", "current gate")}: <span className="font-mono text-white/80">{track.gate_readiness.current_gate_id || (track.gate_readiness.ready ? "ready" : "-")}</span></div>
+                    </>
+                  ) : null}
+                </div>
+                {track.gate_readiness?.next_required_artifacts?.length ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    {mt("chronos_next_required", "next required")}: <span className="font-mono text-white/75">{track.gate_readiness.next_required_artifacts.map((artifact) => artifact.artifact_id).join(", ")}</span>
+                  </div>
+                ) : null}
+                {track.release_id ? (
+                  <div className="mt-2 text-[10px] text-white/45">release: <span className="font-mono text-white/70">{track.release_id}</span></div>
+                ) : null}
+                <div className="mt-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTrackId(track.track_id)}
+                      className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                    >
+                      {selectedTrackId === track.track_id ? mt("chronos_focused", "focused") : mt("chronos_focus_track", "focus track")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => createTrackSeed(track.track_id, track.gate_readiness?.next_required_artifacts?.[0]?.artifact_id)}
+                      disabled={!track.gate_readiness?.next_required_artifacts?.length || trackSeedTarget === track.track_id}
+                      className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {trackSeedTarget === track.track_id ? "seeding" : mt("chronos_seed_next_work", "seed next work")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
         <Panel title={mt("chronos_service_bindings", "Service Bindings")}>
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
             {mt("chronos_service_bindings_description", "Bindings define where Kyberion can read from or deliver to. This is the governed edge for GitHub, Slack, Drive, search, and other external systems.")}
@@ -1754,9 +2088,9 @@ export function MissionIntelligence({
             Proposed durable work can stay here before it becomes a full mission. Use this panel to confirm bootstrap output is structured and attributable.
           </div>
           <div className="space-y-3">
-            {filteredMissionSeeds.length === 0 ? (
+            {filteredMissionSeedsByTrack.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">No mission seeds recorded yet.</div>
-            ) : filteredMissionSeeds.slice(0, 8).map((seed) => (
+            ) : filteredMissionSeedsByTrack.slice(0, 8).map((seed) => (
               <div key={seed.seed_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const learnedRefs = learnedMissionSeedRefs(seed.seed_id, seed.project_id, seed.promoted_mission_id);
@@ -1776,6 +2110,30 @@ export function MissionIntelligence({
                   <div>work: <span className="font-mono text-white/80">{seed.source_work_id || "-"}</span></div>
                   <div>type: <span className="font-mono text-white/80">{seed.mission_type_hint || "-"}</span></div>
                 </div>
+                {typeof seed.metadata?.template_ref === "string" ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    template:{" "}
+                    <button
+                      type="button"
+                      onClick={() => openKnowledgeReference(seed.metadata?.template_ref as string)}
+                      className="font-mono text-cyan-200/80 transition hover:text-cyan-100"
+                    >
+                      {seed.metadata.template_ref}
+                    </button>
+                  </div>
+                ) : null}
+                {typeof seed.metadata?.skeleton_path === "string" ? (
+                  <div className="mt-1 text-[10px] text-white/45">
+                    skeleton:{" "}
+                    <button
+                      type="button"
+                      onClick={() => openRuntimeReference(seed.metadata?.skeleton_path as string)}
+                      className="font-mono text-cyan-200/80 transition hover:text-cyan-100"
+                    >
+                      {seed.metadata.skeleton_path}
+                    </button>
+                  </div>
+                ) : null}
                 {seed.promoted_mission_id ? (
                   <div className="mt-2 text-[10px] text-white/45">
                     mission: <span className="font-mono text-white/75">{seed.promoted_mission_id}</span>
@@ -1812,6 +2170,128 @@ export function MissionIntelligence({
             ))}
           </div>
         </Panel>
+
+        <Panel title={mt("chronos_skeleton_detail", "Skeleton Detail")}>
+          {!selectedReferencePath || !referenceDetail ? (
+            <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+              {mt("chronos_skeleton_detail_empty", "Select a track-generated skeleton to inspect its title, metadata, overview, and sections without leaving Chronos.")}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{referenceDetail.title || "reference"}</div>
+                  <div className="font-mono text-[10px] text-white/45">
+                    {selectedReferencePath.split("/").slice(-2).join("/")}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/70">
+                  {referenceDetail.summary || mt("chronos_no_summary", "No summary available yet.")}
+                </div>
+                <div className="mt-2 text-[10px] text-white/45">
+                  path: <span className="font-mono text-white/70">{selectedReferencePath}</span>
+                </div>
+                <div className="mt-2 text-[10px]">
+                  <a
+                    className="text-cyan-200/80 transition hover:text-cyan-100"
+                    href={`${referenceDetail.endpoint}?path=${encodeURIComponent(selectedReferencePath)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {referenceDetail.openLabel || mt("chronos_open_raw_skeleton", "open raw skeleton")}
+                  </a>
+                </div>
+                {selectedReferenceSeed ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/45">
+                      <div>seed: <span className="font-mono text-white/75">{selectedReferenceSeed.seed_id}</span></div>
+                      <div>track: <span className="font-mono text-white/75">{selectedReferenceSeed.track_name || selectedReferenceSeed.track_id || "-"}</span></div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedReferenceSeed.track_id ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTrackId(selectedReferenceSeed.track_id || null)}
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                        >
+                          {mt("chronos_focus_track", "focus track")}
+                        </button>
+                      ) : null}
+                      {typeof selectedReferenceSeed.metadata?.template_ref === "string" && selectedReferenceSeed.metadata.template_ref !== selectedReferencePath ? (
+                        <button
+                          type="button"
+                          onClick={() => openKnowledgeReference(selectedReferenceSeed.metadata?.template_ref as string)}
+                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        >
+                          {mt("chronos_open_template", "open template")}
+                        </button>
+                      ) : null}
+                      {typeof selectedReferenceSeed.metadata?.skeleton_path === "string" && selectedReferenceSeed.metadata.skeleton_path !== selectedReferencePath ? (
+                        <button
+                          type="button"
+                          onClick={() => openRuntimeReference(selectedReferenceSeed.metadata?.skeleton_path as string)}
+                          className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12"
+                        >
+                          {mt("chronos_open_skeleton", "open skeleton")}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => promoteMissionSeed(selectedReferenceSeed.seed_id)}
+                        disabled={selectedReferenceSeed.status === "promoted" || missionSeedTarget === selectedReferenceSeed.seed_id}
+                        className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {missionSeedTarget === selectedReferenceSeed.seed_id
+                          ? mt("chronos_processing", "processing")
+                          : selectedReferenceSeed.status === "promoted"
+                            ? mt("chronos_promoted", "promoted")
+                            : mt("chronos_promote_to_mission", "promote to mission")}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {referenceMetadataEntries.length ? (
+                <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{mt("chronos_metadata", "Metadata")}</div>
+                  <div className="mt-2 space-y-1">
+                    {referenceMetadataEntries.map(([key, value]) => (
+                      <div key={key} className="text-[10px] text-white/55">
+                        <span className="font-mono text-white/70">{key}</span>: {String(value)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {referenceDetail.body ? (
+                <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{mt("chronos_overview", "Overview")}</div>
+                  <div className="mt-2 space-y-1">
+                    {referenceDetail.body.split("\n").filter((line) => line.trim()).slice(0, 8).map((line, index) => (
+                      <div key={`${line}-${index}`} className="text-[10px] text-white/55">{line}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {referenceSections.map((section) => (
+                <div key={section.title} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{section.title || "Section"}</div>
+                  <div className="mt-2 space-y-1">
+                    {section.lines.filter((line) => line.trim()).slice(0, 12).map((line, index) => (
+                      <div key={`${section.title}-${index}`} className="text-[10px] text-white/55">{line}</div>
+                    ))}
+                    {!section.lines.some((line) => line.trim()) ? (
+                      <div className="text-[10px] text-white/45">{mt("chronos_no_detail", "No detail.")}</div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
       </section>
 
       <section className="grid gap-4">
@@ -1820,9 +2300,9 @@ export function MissionIntelligence({
             {mt("chronos_approvals_description", "Approvals keep authority explicit. Review pending risky actions here before they cross a governed boundary.")}
           </div>
           <div className="space-y-3">
-            {filteredPendingApprovals.length === 0 ? (
+            {filteredPendingApprovalsByTrack.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_pending_approvals", "No pending approvals.")}</div>
-            ) : filteredPendingApprovals.map((approval) => (
+            ) : filteredPendingApprovalsByTrack.map((approval) => (
               <div key={approval.id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const workLoop = buildApprovalWorkLoopPreview(approval);
@@ -1886,9 +2366,9 @@ export function MissionIntelligence({
             Outcomes should stay attributable. This panel shows the latest recorded artifacts with their project, mission, task, and storage placement.
           </div>
           <div className="space-y-3">
-            {filteredRecentArtifacts.length === 0 ? (
+            {filteredRecentArtifactsByTrack.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">No governed artifacts recorded yet.</div>
-            ) : filteredRecentArtifacts.map((artifact) => (
+            ) : filteredRecentArtifactsByTrack.map((artifact) => (
               <div key={artifact.artifact_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const workLoop = buildArtifactWorkLoopPreview(artifact);
@@ -1933,9 +2413,9 @@ export function MissionIntelligence({
             {mt("chronos_distill_candidates_description", "Completed work can become reusable organizational memory. This queue highlights outcome-backed candidates that may be promoted into patterns, SOPs, or governed knowledge later.")}
           </div>
           <div className="space-y-3">
-            {filteredDistillCandidates.length === 0 ? (
+            {filteredDistillCandidatesByTrack.length === 0 ? (
               <div className="text-[11px] italic text-kyberion-gold/30">{mt("chronos_no_distill_candidates", "No distill candidates recorded yet.")}</div>
-            ) : filteredDistillCandidates.slice(0, 10).map((candidate) => (
+            ) : filteredDistillCandidatesByTrack.slice(0, 10).map((candidate) => (
               <div key={candidate.candidate_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
                 {(() => {
                   const workLoop = buildDistillCandidateWorkLoopPreview(candidate);
@@ -2664,4 +3144,18 @@ function RuntimeCell({
       <div className={`mt-2 text-lg font-semibold ${accentClass}`}>{value}</div>
     </div>
   );
+}
+
+function providerResolutionSummary(metadata?: Record<string, unknown>): { preferred: string; strategy: string } | null {
+  const resolution = metadata?.provider_resolution;
+  if (!resolution || typeof resolution !== "object") return null;
+  const record = resolution as Record<string, unknown>;
+  const preferredProvider = typeof record.preferredProvider === "string" ? record.preferredProvider : "";
+  const preferredModelId = typeof record.preferredModelId === "string" ? record.preferredModelId : "";
+  const strategy = typeof record.strategy === "string" ? record.strategy : "preferred";
+  if (!preferredProvider) return null;
+  return {
+    preferred: `${preferredProvider}${preferredModelId ? `/${preferredModelId}` : ""}`,
+    strategy,
+  };
 }

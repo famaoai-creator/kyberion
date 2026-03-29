@@ -31,6 +31,8 @@ describe('mission-seed-registry', () => {
     saveMissionSeedRecord({
       seed_id: 'MSD-TEST-ARCH',
       project_id: 'PRJ-TEST-WEB',
+      track_id: 'TRK-TEST-REL1',
+      track_name: 'Release 1',
       source_task_session_id: 'TSK-TEST-KICKOFF',
       source_work_id: 'WRK-TEST-ARCH',
       title: 'Design architecture',
@@ -44,6 +46,7 @@ describe('mission-seed-registry', () => {
       created_at: new Date().toISOString(),
     });
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.project_id).toBe('PRJ-TEST-WEB');
+    expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.track_id).toBe('TRK-TEST-REL1');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.promoted_mission_id).toBe('MSN-TEST-ARCH');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.work_loop?.resolution.execution_shape).toBe('project_bootstrap');
     expect(listMissionSeedRecords().some((item) => item.seed_id === 'MSD-TEST-ARCH')).toBe(true);

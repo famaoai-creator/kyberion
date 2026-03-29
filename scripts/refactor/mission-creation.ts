@@ -161,8 +161,8 @@ export async function startMission(
   } = args;
 
   if (!id) {
-    logger.error('Usage: mission_controller start <MISSION_ID> [tier]');
-    logger.info('  Tiers: personal | confidential | public (default: confidential)');
+    logger.error('Usage: mission_controller start <MISSION_ID> [--tier <personal|confidential|public>]');
+    logger.info('  Preferred: use named options for tier, persona, type, vision, relationships, and --dry-run.');
     return;
   }
 
@@ -216,6 +216,15 @@ export async function startMission(
           project: {
             ...(state.relationships?.project || {}),
             ...normalizedRelationships.project,
+          },
+        };
+      }
+      if (normalizedRelationships.track) {
+        state.relationships = {
+          ...(state.relationships || {}),
+          track: {
+            ...(state.relationships?.track || {}),
+            ...normalizedRelationships.track,
           },
         };
       }
