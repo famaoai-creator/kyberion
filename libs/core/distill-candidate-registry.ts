@@ -1,6 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 
@@ -34,8 +35,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  const raw = safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  validateFn = ajv.compile(JSON.parse(raw));
+  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
   return validateFn;
 }
 

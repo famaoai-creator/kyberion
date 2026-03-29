@@ -1,6 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
@@ -85,8 +86,7 @@ function schemaPathForKind(kind: PromotedMemoryRecord['kind']): string {
 function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
   const cached = validatorCache.get(kind);
   if (cached) return cached;
-  const raw = safeReadFile(schemaPathForKind(kind), { encoding: 'utf8' }) as string;
-  const validator = ajv.compile(JSON.parse(raw));
+  const validator = compileSchemaFromPath(ajv, schemaPathForKind(kind));
   validatorCache.set(kind, validator);
   return validator;
 }
