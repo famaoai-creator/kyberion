@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeExec = vi.fn(() => '');
 const safeReadFile = vi.fn(() => '{}');
@@ -6,6 +6,21 @@ const safeWriteFile = vi.fn();
 const safeMkdir = vi.fn();
 const safeExistsSync = vi.fn(() => false);
 const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed');
+const resolveVars = vi.fn((value: any, ctx: Record<string, any>) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  return value.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, key: string) => {
+    const trimmed = key.trim();
+    return trimmed in ctx ? String(ctx[trimmed]) : '';
+  });
+});
+const evaluateCondition = vi.fn(() => false);
+const getPathValue = vi.fn((data: any, path: string) => path.split('.').reduce((acc, key) => acc?.[key], data));
+const resolveWriteArtifactSpec = vi.fn((params: any, ctx: any, resolve: (value: any) => any) => ({
+  path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
+  content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
+}));
 const activateApplication = vi.fn((application: string) => safeExec('osascript', ['-e', `tell application "${application}" to activate`]));
 const detectFocusedInput = vi.fn(() => {
   const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
@@ -76,6 +91,10 @@ vi.mock('@agent/core', () => ({
   safeMkdir,
   safeExistsSync,
   derivePipelineStatus,
+  resolveVars,
+  evaluateCondition,
+  getPathValue,
+  resolveWriteArtifactSpec,
   safeExec,
   emitComputerSurfacePatch,
   activateApplication,
@@ -150,6 +169,32 @@ function restorePlatform() {
     configurable: true,
   });
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  safeExec.mockImplementation(() => '');
+  safeReadFile.mockImplementation(() => '{}');
+  safeWriteFile.mockImplementation(() => {});
+  safeMkdir.mockImplementation(() => {});
+  safeExistsSync.mockImplementation(() => false);
+  derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed');
+  resolveVars.mockImplementation((value: any, ctx: Record<string, any>) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+    return value.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, key: string) => {
+      const trimmed = key.trim();
+      return trimmed in ctx ? String(ctx[trimmed]) : '';
+    });
+  });
+  evaluateCondition.mockImplementation(() => false);
+  getPathValue.mockImplementation((data: any, path: string) => path.split('.').reduce((acc, key) => acc?.[key], data));
+  resolveWriteArtifactSpec.mockImplementation((params: any, ctx: any, resolve: (value: any) => any) => ({
+    path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
+    content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
+  }));
+  restorePlatform();
+});
 
 describe('system-actuator computer_interaction adapter', () => {
   it('detects the currently focused input element', async () => {
