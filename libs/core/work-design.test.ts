@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadOutcomeCatalog, loadSpecialistCatalog, resolveWorkDesign } from './work-design.js';
+import { buildOrganizationWorkLoopSummary, loadOutcomeCatalog, loadSpecialistCatalog, resolveWorkDesign } from './work-design.js';
 import { createDistillCandidateRecord, saveDistillCandidateRecord } from './distill-candidate-registry.js';
 
 describe('work-design', () => {
@@ -63,5 +63,24 @@ describe('work-design', () => {
       tier: 'confidential',
     });
     expect(resolved.reusable_refs.some((item) => item.candidate_id === candidate.candidate_id)).toBe(true);
+  });
+
+  it('builds an organization work loop summary from task inputs', () => {
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'generate-presentation',
+      taskType: 'presentation_deck',
+      shape: 'task_session',
+      outcomeIds: ['artifact:pptx'],
+      tier: 'confidential',
+      projectId: 'PRJ-123',
+      projectName: 'Banking App',
+      locale: 'ja-JP',
+      serviceBindings: ['github:org:banking-app'],
+      requiresApproval: false,
+    });
+    expect(summary.context.project_id).toBe('PRJ-123');
+    expect(summary.resolution.execution_shape).toBe('task_session');
+    expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
+    expect(summary.teaming.specialist_id).toBe('document-specialist');
   });
 });

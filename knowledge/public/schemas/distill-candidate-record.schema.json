@@ -9,6 +9,8 @@
     "source_type": { "type": "string", "enum": ["task_session", "mission", "artifact"] },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
     "project_id": { "type": "string" },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
     "mission_id": { "type": "string" },
     "task_session_id": { "type": "string" },
     "artifact_ids": {
@@ -21,6 +23,7 @@
     "target_kind": { "type": "string", "enum": ["pattern", "sop_candidate", "knowledge_hint", "report_template"] },
     "specialist_id": { "type": "string" },
     "locale": { "type": "string" },
+    "work_loop": { "$ref": "./organization-work-loop.schema.json" },
     "promoted_ref": { "type": "string" },
     "evidence_refs": {
       "type": "array",

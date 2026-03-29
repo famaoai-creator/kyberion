@@ -7,6 +7,8 @@
   "properties": {
     "artifact_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string" },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
     "mission_id": { "type": "string" },
     "task_session_id": { "type": "string" },
     "kind": { "type": "string", "minLength": 1 },
@@ -17,6 +19,7 @@
     "path": { "type": "string" },
     "external_ref": { "type": "string" },
     "preview_text": { "type": "string" },
+    "work_loop": { "$ref": "./organization-work-loop.schema.json" },
     "delivered_to": {
       "type": "array",
       "items": {

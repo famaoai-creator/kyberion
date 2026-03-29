@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1655,7 +1655,18 @@ async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
     } else {
       await lease.runtime.context.close();
     }
+    if (safeExistsSync(lease.sessionMetadataPath)) {
+      safeRmSync(lease.sessionMetadataPath, { force: true });
+    }
+    if (safeExistsSync(lease.userDataDir)) {
+      safeRmSync(lease.userDataDir, { recursive: true, force: true });
+    }
     browserRuntimeLeases.delete(sessionId);
+  }
+  if (safeExistsSync(BROWSER_SESSION_DIR)) {
+    for (const entry of safeReaddir(BROWSER_SESSION_DIR)) {
+      if (entry.endsWith('.json')) safeRmSync(path.join(BROWSER_SESSION_DIR, entry), { force: true });
+    }
   }
 }
 

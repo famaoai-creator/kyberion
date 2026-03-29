@@ -1,13 +1,17 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface DistillCandidateRecord {
   candidate_id: string;
   source_type: 'task_session' | 'mission' | 'artifact';
   tier?: 'personal' | 'confidential' | 'public';
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   artifact_ids?: string[];
@@ -17,6 +21,7 @@ export interface DistillCandidateRecord {
   target_kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
   specialist_id?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   promoted_ref?: string;
   evidence_refs?: string[];
   created_at: string;
@@ -32,8 +37,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  const raw = safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  validateFn = ajv.compile(JSON.parse(raw));
+  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
   return validateFn;
 }
 

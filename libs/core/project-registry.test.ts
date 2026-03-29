@@ -31,6 +31,8 @@ describe('project and artifact registries', () => {
       tier: 'confidential',
       primary_locale: 'ja-JP',
       service_bindings: ['BIND-TEST-GITHUB'],
+      default_track_id: 'TRK-TEST-REL1',
+      active_tracks: ['TRK-TEST-REL1'],
       bootstrap_work_items: buildProjectBootstrapWorkItems({
         projectId: 'PRJ-TEST-WEB',
         projectName: 'Test Web Service',
@@ -42,6 +44,7 @@ describe('project and artifact registries', () => {
     expect(loadProjectRecord('PRJ-TEST-WEB')?.name).toBe('Test Web Service');
     expect(loadProjectRecord('PRJ-TEST-WEB')?.primary_locale).toBe('ja-JP');
     expect(loadProjectRecord('PRJ-TEST-WEB')?.kickoff_task_session_id).toBe('TSK-TEST-KICKOFF');
+    expect(loadProjectRecord('PRJ-TEST-WEB')?.default_track_id).toBe('TRK-TEST-REL1');
     expect(listProjectRecords().some((item) => item.project_id === 'PRJ-TEST-WEB')).toBe(true);
     expect(resolveProjectRecordForText({ utterance: 'Test Web Service の試験計画を作って' })?.project_id).toBe('PRJ-TEST-WEB');
   });
@@ -79,15 +82,20 @@ describe('project and artifact registries', () => {
     const artifact = createArtifactRecord({
       artifact_id: 'ART-TEST-DECK',
       project_id: 'PRJ-TEST-WEB',
+      track_id: 'TRK-TEST-REL1',
+      track_name: 'Release 1',
       task_session_id: 'TSK-TEST-ARTIFACT',
       kind: 'pptx',
       storage_class: 'artifact_store',
       path: 'active/shared/tmp/example.pptx',
       preview_text: 'Deck generated.',
+      work_loop: session.work_loop,
     });
     saveArtifactRecord(artifact);
     attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', artifact);
     expect(loadArtifactRecord('ART-TEST-DECK')?.project_id).toBe('PRJ-TEST-WEB');
+    expect(loadArtifactRecord('ART-TEST-DECK')?.track_id).toBe('TRK-TEST-REL1');
+    expect(loadArtifactRecord('ART-TEST-DECK')?.work_loop?.resolution.execution_shape).toBe('task_session');
   });
 
   it('builds bootstrap work items for project creation flows', () => {

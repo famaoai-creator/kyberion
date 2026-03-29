@@ -1,8 +1,10 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 interface PromotedMemoryRecordBase {
   record_id: string;
@@ -12,9 +14,12 @@ interface PromotedMemoryRecordBase {
   summary: string;
   candidate_id: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   task_session_id?: string;
   specialist_id?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   artifact_ids?: string[];
   evidence_refs?: string[];
   created_at: string;
@@ -83,8 +88,7 @@ function schemaPathForKind(kind: PromotedMemoryRecord['kind']): string {
 function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
   const cached = validatorCache.get(kind);
   if (cached) return cached;
-  const raw = safeReadFile(schemaPathForKind(kind), { encoding: 'utf8' }) as string;
-  const validator = ajv.compile(JSON.parse(raw));
+  const validator = compileSchemaFromPath(ajv, schemaPathForKind(kind));
   validatorCache.set(kind, validator);
   return validator;
 }
@@ -250,9 +254,12 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     summary: candidate.summary,
     candidate_id: candidate.candidate_id,
     project_id: candidate.project_id,
+    track_id: candidate.track_id,
+    track_name: candidate.track_name,
     task_session_id: candidate.task_session_id,
     specialist_id: candidate.specialist_id,
     locale: candidate.locale,
+    work_loop: candidate.work_loop,
     artifact_ids: candidate.artifact_ids,
     evidence_refs: candidate.evidence_refs,
     created_at: new Date().toISOString(),

@@ -44,6 +44,8 @@ describe('task-session', () => {
     });
     const result = validateTaskSession(session);
     expect(result.valid).toBe(true);
+    expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
+    expect(session.work_loop?.intent.label).toBe('capture_photo');
   });
 
   it('persists and loads task sessions', () => {
@@ -51,10 +53,18 @@ describe('task-session', () => {
       sessionId: 'TSK-TEST-WBS',
       surface: 'presence',
       taskType: 'workbook_wbs',
+      intentId: 'generate-workbook',
       status: 'planning',
       goal: {
         summary: 'WBS を Excel で作る',
         success_condition: 'xlsx が保存される',
+      },
+      projectContext: {
+        project_id: 'PRJ-TEST-WEB',
+        project_name: 'Test Web Service',
+        track_id: 'TRK-TEST-REL1',
+        track_name: 'Release 1',
+        tier: 'confidential',
       },
       payload: {
         project_name: 'Kyberion',
@@ -63,6 +73,9 @@ describe('task-session', () => {
     saveTaskSession(session);
     const loaded = loadTaskSession('TSK-TEST-WBS');
     expect(loaded?.task_type).toBe('workbook_wbs');
+    expect(loaded?.work_loop?.outcome_design.labels.length).toBeGreaterThan(0);
+    expect(loaded?.work_loop?.context.track_id).toBe('TRK-TEST-REL1');
+    expect(loaded?.work_loop?.context.track_name).toBe('Release 1');
     expect(getActiveTaskSession('presence')?.session_id).toBeTruthy();
   });
 
@@ -90,6 +103,8 @@ describe('task-session', () => {
 
   it('classifies photo and workbook intents from conversational utterances', () => {
     expect(classifyTaskSessionIntent('ちょっと写真をとって')?.taskType).toBe('capture_photo');
+    expect(classifyTaskSessionIntent('Webサービスを作って')?.intentId).toBe('bootstrap-project');
+    expect(classifyTaskSessionIntent('Webサービスを作って')?.taskType).toBe('analysis');
     expect(classifyTaskSessionIntent('プロジェクトのWBSをエクセルで作成して')?.taskType).toBe('workbook_wbs');
     expect(classifyTaskSessionIntent('パワーポイントの資料を書いて')?.taskType).toBe('presentation_deck');
     expect(classifyTaskSessionIntent('今週の進捗レポートを docx で作って')?.taskType).toBe('report_document');
