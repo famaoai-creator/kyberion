@@ -3,7 +3,7 @@
   "$id": "https://kyberion.local/schemas/organization-work-loop.schema.json",
   "title": "Organization Work Loop Summary",
   "type": "object",
-  "required": ["intent", "context", "resolution", "outcome_design", "process_design", "teaming", "authority", "learning"],
+  "required": ["intent", "context", "resolution", "outcome_design", "process_design", "execution_boundary", "teaming", "authority", "learning"],
   "properties": {
     "intent": {
       "type": "object",
@@ -76,6 +76,62 @@
           "type": "array",
           "items": { "type": "string" }
         }
+      },
+      "additionalProperties": false
+    },
+    "execution_boundary": {
+      "type": "object",
+      "required": ["llm_zone", "knowledge_zone", "compiler_zone", "executor_zone", "rule"],
+      "properties": {
+        "llm_zone": {
+          "type": "object",
+          "required": ["allowed", "forbidden"],
+          "properties": {
+            "allowed": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "forbidden": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "knowledge_zone": {
+          "type": "object",
+          "required": ["owns"],
+          "properties": {
+            "owns": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "compiler_zone": {
+          "type": "object",
+          "required": ["responsibilities"],
+          "properties": {
+            "responsibilities": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "executor_zone": {
+          "type": "object",
+          "required": ["responsibilities"],
+          "properties": {
+            "responsibilities": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "rule": { "type": "string" }
       },
       "additionalProperties": false
     },
