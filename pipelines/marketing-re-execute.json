@@ -1,0 +1,43 @@
+{
+  "pipeline_id": "marketing-re-execution",
+  "version": "2.0.0",
+  "description": "Re-execute marketing content creation with a valid PPTX generation flow",
+  "action": "pipeline",
+  "context": {
+    "mission_id": "KYBERION-MARKETING-EXPANSION"
+  },
+  "steps": [
+    {
+      "id": "apply-theme",
+      "type": "transform",
+      "op": "media:apply_theme",
+      "params": {
+        "theme": "kyberion-sovereign"
+      }
+    },
+    {
+      "id": "apply-pattern",
+      "type": "transform",
+      "op": "media:apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
+      }
+    },
+    {
+      "id": "merge-pptx-content",
+      "type": "transform",
+      "op": "media:merge_content",
+      "params": {
+        "output_format": "pptx"
+      }
+    },
+    {
+      "id": "render-pptx",
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/kyberion_intro.pptx"
+      }
+    }
+  ]
+}

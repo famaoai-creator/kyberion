@@ -42,6 +42,18 @@ export function normalizeRelationships(
     };
   }
 
+  if (overlays.track) {
+    relationships.track = {
+      relationship_type: overlays.track.relationship_type || relationships.track?.relationship_type || 'belongs_to',
+      track_id: overlays.track.track_id || relationships.track?.track_id,
+      track_name: overlays.track.track_name || relationships.track?.track_name,
+      track_type: overlays.track.track_type || relationships.track?.track_type,
+      lifecycle_model: overlays.track.lifecycle_model || relationships.track?.lifecycle_model,
+      traceability_refs: overlays.track.traceability_refs || relationships.track?.traceability_refs || [],
+      note: overlays.track.note || relationships.track?.note,
+    };
+  }
+
   return relationships;
 }
 

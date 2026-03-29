@@ -15,9 +15,10 @@ export async function GET(req: NextRequest) {
   try {
     const accessRole = getChronosAccessRoleOrThrow(req);
     process.env.MISSION_ROLE = roleToMissionRole(accessRole);
-    const [{ discoverProviders }, { loadAgentManifests }, { agentRegistry }, runtimeSupervisor, runtimeSupervisorClient] = await Promise.all([
+    const [{ discoverProviders }, { loadAgentManifests }, { loadAgentProfileIndex }, { agentRegistry }, runtimeSupervisor, runtimeSupervisorClient] = await Promise.all([
       import("@agent/core/provider-discovery"),
       import("@agent/core/agent-manifest"),
+      import("@agent/core/mission-team-composer"),
       import("@agent/core/agent-registry"),
       import("@agent/core/agent-runtime-supervisor"),
       import("@agent/core/agent-runtime-supervisor-client"),
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
 
     // ?manifests=true returns available agent definitions
     if (req.nextUrl.searchParams.get("manifests") === "true") {
+      const profiles = loadAgentProfileIndex();
       const manifests = loadAgentManifests().map(m => ({
         agentId: m.agentId,
         provider: m.provider,
@@ -38,6 +40,8 @@ export async function GET(req: NextRequest) {
         capabilities: m.capabilities,
         trustRequired: m.trustRequired,
         requiresEnv: m.requires.env || [],
+        providerStrategy: profiles[m.agentId]?.provider_strategy || "adaptive",
+        fallbackProviders: profiles[m.agentId]?.fallback_providers || [],
       }));
       return NextResponse.json({ status: "ok", accessRole, manifests });
     }
@@ -74,6 +78,7 @@ export async function GET(req: NextRequest) {
         process: null,
         supportsSoftRefresh: true,
         providerRuntime: entry.metadata || {},
+        providerResolution: entry.metadata?.provider_resolution || null,
       }));
       healthOverride = {
         total: agents.length,
@@ -102,6 +107,7 @@ export async function GET(req: NextRequest) {
         process: entry.process || null,
         supportsSoftRefresh: entry.supportsSoftRefresh,
         providerRuntime: entry.providerRuntime || {},
+        providerResolution: (entry.agent.metadata as Record<string, unknown> | undefined)?.provider_resolution || null,
       }));
     }
     return NextResponse.json({ status: "ok", accessRole, ...(healthOverride || snapshot), agents });
@@ -134,6 +140,7 @@ export async function POST(req: NextRequest) {
           modelId: body.modelId,
           systemPrompt: body.systemPrompt,
           capabilities: body.capabilities,
+          runtimeMetadata: body.runtimeMetadata,
           requestedBy: "chronos_agents_api",
         };
         try {
@@ -207,6 +214,7 @@ export async function POST(req: NextRequest) {
             modelId: body.modelId,
             systemPrompt: body.systemPrompt,
             capabilities: body.capabilities,
+            runtimeMetadata: body.runtimeMetadata,
             requestedBy: "chronos_agents_api",
           });
           return NextResponse.json({ status: "ok", agentId: body.agentId, snapshot });

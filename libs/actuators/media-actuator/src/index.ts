@@ -640,6 +640,79 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`✅ [MEDIA] D2 rendered at: ${outPath} (${stats.size} bytes).`);
       break;
     }
+    case 'document_diagram_render_from_brief': {
+      const fromKey = resolve(params.from) || 'last_json';
+      const rawBrief = params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
+      if (!rawBrief || typeof rawBrief !== 'object') {
+        throw new Error(`document_diagram_render_from_brief could not find context key: ${fromKey}`);
+      }
+
+      const brief = normalizeDiagramDocumentBrief(rawBrief);
+      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      ensureParentDir(outPath);
+
+      if (brief.render_target === 'drawio') {
+        const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
+        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
+        const document = generateDrawioDocument(brief.payload.graph, {
+          title: brief.payload.title || brief.title || 'Diagram',
+          theme: activeTheme,
+          iconMap,
+          iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+        });
+        safeWriteFile(outPath, document);
+        const stats = fs.statSync(outPath);
+        logger.info(`✅ [MEDIA] Draw.io diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
+        break;
+      }
+
+      if (brief.render_target === 'mmd') {
+        const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
+        safeMkdir(tempDir, { recursive: true });
+
+        const inputPath = path.join(tempDir, 'diagram.mmd');
+        safeWriteFile(inputPath, brief.payload.source);
+
+        const args = ['-i', inputPath, '-o', outPath];
+        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id);
+        const mermaidConfig = buildMermaidConfig(activeTheme, params.background_color ? resolve(params.background_color) : undefined);
+        const configPath = path.join(tempDir, 'mermaid.config.json');
+        safeWriteFile(configPath, JSON.stringify(mermaidConfig, null, 2));
+        args.push('-c', configPath);
+
+        if (params.width) args.push('-w', String(resolve(params.width)));
+        if (params.height) args.push('-H', String(resolve(params.height)));
+        if (params.background_color) args.push('-b', String(resolve(params.background_color)));
+
+        safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+
+        const stats = fs.statSync(outPath);
+        logger.info(`✅ [MEDIA] Mermaid diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
+        break;
+      }
+
+      if (brief.render_target === 'd2') {
+        const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
+        safeMkdir(tempDir, { recursive: true });
+
+        const inputPath = path.join(tempDir, 'diagram.d2');
+        safeWriteFile(inputPath, brief.payload.source);
+
+        const args = [inputPath, outPath];
+        if (params.layout) args.push('--layout', String(resolve(params.layout)));
+        if (params.theme_id) args.push('--theme', String(resolve(params.theme_id)));
+        if (params.sketch) args.push('--sketch');
+        if (params.pad) args.push('--pad', String(resolve(params.pad)));
+
+        safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+
+        const stats = fs.statSync(outPath);
+        logger.info(`✅ [MEDIA] D2 diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
+        break;
+      }
+
+      throw new Error(`Unsupported diagram render_target: ${brief.render_target}`);
+    }
     case 'pptx_render': {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));

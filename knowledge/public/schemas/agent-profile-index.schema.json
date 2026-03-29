@@ -14,7 +14,9 @@
           "team_roles": { "type": "array", "items": { "type": "string" } },
           "provider": { "type": "string" },
           "modelId": { "type": "string" },
-          "capabilities": { "type": "array", "items": { "type": "string" } }
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "provider_strategy": { "type": "string", "enum": ["strict", "preferred", "adaptive"] },
+          "fallback_providers": { "type": "array", "items": { "type": "string" } }
         }
       }
     }

@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-work-loop.schema.json",
+  "title": "Organization Work Loop Summary",
+  "type": "object",
+  "required": ["intent", "context", "resolution", "outcome_design", "teaming", "authority", "learning"],
+  "properties": {
+    "intent": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "required": ["tier", "service_bindings"],
+      "properties": {
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "track_id": { "type": "string" },
+        "track_name": { "type": "string" },
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "locale": { "type": "string" },
+        "service_bindings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resolution": {
+      "type": "object",
+      "required": ["execution_shape"],
+      "properties": {
+        "execution_shape": {
+          "type": "string",
+          "enum": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+        },
+        "task_type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "outcome_design": {
+      "type": "object",
+      "required": ["outcome_ids", "labels"],
+      "properties": {
+        "outcome_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "teaming": {
+      "type": "object",
+      "required": ["team_roles"],
+      "properties": {
+        "specialist_id": { "type": "string" },
+        "specialist_label": { "type": "string" },
+        "conversation_agent": { "type": "string" },
+        "team_roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": ["requires_approval"],
+      "properties": {
+        "requires_approval": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "learning": {
+      "type": "object",
+      "required": ["reusable_refs"],
+      "properties": {
+        "reusable_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

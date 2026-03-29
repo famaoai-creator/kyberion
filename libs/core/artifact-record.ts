@@ -1,12 +1,16 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { loadTaskSession, saveTaskSession, type TaskSession } from './task-session.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface ArtifactRecord {
   artifact_id: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   mission_id?: string;
   task_session_id?: string;
   kind: string;
@@ -14,6 +18,7 @@ export interface ArtifactRecord {
   path?: string;
   external_ref?: string;
   preview_text?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   delivered_to?: Array<{
     binding_id: string;
     status: 'pending' | 'delivered' | 'failed';
@@ -30,8 +35,7 @@ let artifactValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (artifactValidateFn) return artifactValidateFn;
-  const raw = safeReadFile(ARTIFACT_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  artifactValidateFn = ajv.compile(JSON.parse(raw));
+  artifactValidateFn = compileSchemaFromPath(ajv, ARTIFACT_SCHEMA_PATH);
   return artifactValidateFn;
 }
 
@@ -88,10 +92,15 @@ export function attachArtifactRecordToTaskSession(sessionId: string, record: Art
     preview_text: record.preview_text || session.artifact?.preview_text,
     artifact_id: record.artifact_id,
     project_id: record.project_id,
+    track_id: record.track_id,
+    track_name: record.track_name,
     mission_id: record.mission_id,
     storage_class: record.storage_class,
     external_ref: record.external_ref,
   };
+  if (record.work_loop) {
+    session.work_loop = record.work_loop;
+  }
   saveTaskSession(session);
   return session;
 }

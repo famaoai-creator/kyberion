@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   buildPresenceSurfaceFrame,
+  buildTrackGateReadinessSummaries,
   createBrowserConversationSession,
   createPresenceVoiceStimulus,
   decideApprovalRequest,
@@ -11,12 +12,14 @@ import {
   getActiveTaskSession,
   getPresenceAvatarProfile,
   getSurfaceAgentCatalogEntry,
+  listAgentRuntimeSnapshots,
   listApprovalRequests,
   listArtifactRecords,
   listBrowserConversationSessions,
   listDistillCandidateRecords,
   listMissionSeedRecords,
   listProjectRecords,
+  listProjectTrackRecords,
   listServiceBindingRecords,
   listTaskSessions,
   listSurfaceAsyncRequests,
@@ -81,6 +84,7 @@ function buildApprovalInboxItem(record: any) {
     expected_outcome: expectedOutcome,
     learned_titles: learned,
     project_id: projectId,
+    work_loop: record?.work_loop,
   };
 }
 
@@ -95,6 +99,7 @@ function buildOutcomeInboxItem(item: any) {
     promoted_refs: relatedCandidates
       .map((candidate) => candidate.promoted_ref)
       .filter(Boolean),
+    work_loop: item?.work_loop,
   };
 }
 
@@ -197,6 +202,16 @@ function isAllowedArtifactDownloadPath(filePath: string): boolean {
     path.resolve(pathResolver.active('missions/confidential')),
   ];
   return allowedRoots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`));
+}
+
+function isAllowedRuntimeRefPath(logicalPath: string): boolean {
+  const normalized = String(logicalPath || '').replace(/^\/+/, '');
+  if (!/^active\/projects\/.+\.(md|json)$/i.test(normalized)) {
+    return false;
+  }
+  const resolved = path.resolve(pathResolver.resolve(normalized));
+  const allowedRoot = path.resolve(pathResolver.active('projects'));
+  return resolved === allowedRoot || resolved.startsWith(`${allowedRoot}${path.sep}`);
 }
 
 function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
@@ -515,10 +530,24 @@ app.get('/api/surface-agents', (_req, res) => {
   const currentAgentId = typeof state.surfaces['presence-studio']?.data?.agentId === 'string'
     ? state.surfaces['presence-studio']?.data?.agentId as string
     : 'presence-surface-agent';
+  const currentRuntime = listAgentRuntimeSnapshots().find((entry) => entry.agent.agentId === currentAgentId);
+  const providerResolution = currentRuntime?.agent?.metadata && typeof currentRuntime.agent.metadata === 'object'
+    ? (currentRuntime.agent.metadata.provider_resolution as Record<string, unknown> | undefined)
+    : undefined;
+  const currentCatalogEntry = getSurfaceAgentCatalogEntry(currentAgentId);
   res.json({
     ok: true,
     currentAgentId,
-    current: getSurfaceAgentCatalogEntry(currentAgentId),
+    current: currentCatalogEntry ? {
+      ...currentCatalogEntry,
+      resolvedProvider: currentRuntime?.agent?.provider,
+      resolvedModelId: currentRuntime?.agent?.modelId,
+      providerResolution: providerResolution ? {
+        preferredProvider: typeof providerResolution.preferredProvider === 'string' ? providerResolution.preferredProvider : undefined,
+        preferredModelId: typeof providerResolution.preferredModelId === 'string' ? providerResolution.preferredModelId : undefined,
+        strategy: typeof providerResolution.strategy === 'string' ? providerResolution.strategy : undefined,
+      } : undefined,
+    } : null,
     agents: listSurfaceAgentCatalog(),
   });
 });
@@ -561,6 +590,22 @@ app.get('/api/projects', (_req, res) => {
   res.json({
     ok: true,
     items: listProjectRecords(),
+  });
+});
+
+app.get('/api/project-tracks', (_req, res) => {
+  const tracks = listProjectTrackRecords();
+  const gateReadiness = buildTrackGateReadinessSummaries({
+    tracks,
+    artifacts: listArtifactRecords(),
+  });
+  const gateReadinessMap = new Map(gateReadiness.map((item) => [item.track_id, item]));
+  res.json({
+    ok: true,
+    items: tracks.map((track) => ({
+      ...track,
+      gate_readiness: gateReadinessMap.get(track.track_id),
+    })),
   });
 });
 
@@ -663,6 +708,22 @@ app.get('/api/knowledge-ref', (req, res) => {
   } else {
     res.type('text/markdown; charset=utf-8');
   }
+  return res.send(safeReadFile(resolved, { encoding: 'utf8' }));
+});
+
+app.get('/api/runtime-ref', (req, res) => {
+  const logicalPath = String(req.query.path || '').trim();
+  if (!logicalPath) {
+    return res.status(400).json({ ok: false, error: 'path is required' });
+  }
+  if (!isAllowedRuntimeRefPath(logicalPath)) {
+    return res.status(403).json({ ok: false, error: `runtime ref is not accessible: ${logicalPath}` });
+  }
+  const resolved = pathResolver.resolve(logicalPath);
+  if (!safeExistsSync(resolved)) {
+    return res.status(404).json({ ok: false, error: `runtime ref not found: ${logicalPath}` });
+  }
+  res.type(logicalPath.endsWith('.json') ? 'application/json' : 'text/markdown; charset=utf-8');
   return res.send(safeReadFile(resolved, { encoding: 'utf8' }));
 });
 

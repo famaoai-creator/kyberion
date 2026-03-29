@@ -19,6 +19,10 @@ Its operating thesis is:
 
 This document defines the top-level enterprise model that sits above actuators, ADF contracts, missions, and runtime services.
 
+For the parent organizational model, also read:
+
+- `knowledge/public/architecture/organization-work-loop.md`
+
 ## 2. Core Loop
 
 The enterprise operating loop is:
@@ -32,7 +36,7 @@ Intent
 -> Learn
 ```
 
-This extends the simpler interaction contract of `Intent -> Plan -> Result` into a company-scale control model.
+This extends the simpler interaction contract of `Intent -> Plan -> Result` into a company-scale control model built on top of the broader organization work loop.
 
 ## 3. Human and System Responsibilities
 

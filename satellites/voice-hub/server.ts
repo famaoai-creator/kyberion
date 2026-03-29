@@ -36,8 +36,11 @@ import {
   listAgentRuntimeSnapshots,
   listDistillCandidateRecords,
   loadProjectRecord,
+  loadProjectTrackRecord,
   resolveProjectRecordForText,
+  resolveProjectTrackRecordForText,
   saveProjectRecord,
+  saveProjectTrackRecord,
   saveMissionSeedRecord,
   saveServiceBindingRecord,
   listSurfaceAsyncRequests,
@@ -71,6 +74,7 @@ import {
   recordTaskSessionHistory,
   createBrowserConversationSession,
   saveBrowserConversationSession,
+  type TaskSession,
 } from '@agent/core';
 
 interface VoiceHubRecord {
@@ -119,38 +123,7 @@ interface WebSearchResult {
   snippet?: string;
 }
 
-interface TaskSessionShape {
-  session_id: string;
-  surface: 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
-  task_type: string;
-  status: string;
-  goal: {
-    summary: string;
-    success_condition: string;
-  };
-  project_context?: {
-    project_id?: string;
-    project_name?: string;
-    tier?: 'personal' | 'confidential' | 'public';
-    service_bindings?: string[];
-    locale?: string;
-  };
-  requirements?: {
-    missing?: string[];
-    collected?: Record<string, unknown>;
-  };
-  control: {
-    interruptible: boolean;
-    requires_approval: boolean;
-    awaiting_user_input: boolean;
-  };
-  history: Array<{
-    ts: string;
-    type: string;
-    text: string;
-  }>;
-  payload?: Record<string, unknown>;
-}
+type TaskSessionShape = TaskSession;
 
 function inferDistillTargetKind(taskType: string): 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' {
   if (taskType === 'presentation_deck' || taskType === 'workbook_wbs') return 'pattern';
@@ -338,6 +311,8 @@ function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: stri
     source_type: 'task_session',
     tier: session.project_context?.tier || 'confidential',
     project_id: session.project_context?.project_id,
+    track_id: session.project_context?.track_id,
+    track_name: session.project_context?.track_name,
     task_session_id: session.session_id,
     artifact_ids: [artifactId],
     title,
@@ -350,6 +325,7 @@ function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: stri
       tier: session.project_context?.tier || 'confidential',
     }).primary_specialist?.id,
     locale: session.project_context?.locale,
+    work_loop: session.work_loop,
     evidence_refs: [`task_session:${session.session_id}`, `artifact:${artifactId}`],
     metadata: buildDistillCandidateMetadata(session, previewText, artifactId),
   });
@@ -2260,6 +2236,8 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
     saveMissionSeedRecord({
       seed_id: `MSD-${String(item.work_id || '').replace(/^WRK-/, '')}`,
       project_id: project.project_id,
+      track_id: session.project_context?.track_id,
+      track_name: session.project_context?.track_name,
       source_task_session_id: session.session_id,
       source_work_id: item.work_id,
       title: item.title,
@@ -2269,6 +2247,7 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
       outcome_id: item.outcome_id,
       mission_type_hint: inferMissionTypeHintFromBootstrapWork(item),
       locale: project.primary_locale,
+      work_loop: session.work_loop,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: {
@@ -2302,6 +2281,27 @@ function slugifyProjectId(value: string): string {
     .replace(/[^A-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'PROJECT';
+}
+
+function inferDefaultTrackNameFromProjectName(projectName: string): string {
+  return `${projectName} Primary Delivery`;
+}
+
+function slugifyProjectRootToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'project';
+}
+
+function inferProjectRootPath(projectId: string, projectName: string): string {
+  const token = slugifyProjectRootToken(projectName || projectId);
+  return pathResolver.active(`projects/${token}`);
+}
+
+function inferDefaultTrackId(projectId: string): string {
+  return `TRK-${projectId.replace(/^PRJ-/, '')}-PRIMARY`;
 }
 
 function inferProjectNameFromUtterance(text: string): string {
@@ -2386,7 +2386,32 @@ function tryHandleProjectBootstrap(userText: string): string | null {
     projectName,
     utterance: userText,
   });
+  const trackId = inferDefaultTrackId(projectId);
+  const trackName = inferDefaultTrackNameFromProjectName(projectName);
   const projectLocale = String(process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US');
+  const projectRootPath = inferProjectRootPath(projectId, projectName);
+  if (!safeExistsSync(projectRootPath)) {
+    safeMkdir(projectRootPath, { recursive: true });
+  }
+  saveProjectTrackRecord({
+    track_id: trackId,
+    project_id: projectId,
+    name: trackName,
+    summary: `${projectName} の既定 delivery track。`,
+    status: 'active',
+    track_type: 'delivery',
+    lifecycle_model: 'sdlc',
+    tier: 'confidential',
+    primary_locale: projectLocale,
+    gate_profile_id: 'default-sdlc',
+    required_artifacts: [
+      'requirements-definition',
+      'requirements-traceability-matrix',
+      'architecture-design',
+      'test-plan',
+      'release-readiness-checklist',
+    ],
+  });
   const kickoffWork = bootstrapWorkItems[0] || null;
   let kickoffSessionId: string | undefined;
   if (kickoffWork) {
@@ -2395,6 +2420,9 @@ function tryHandleProjectBootstrap(userText: string): string | null {
       sessionId: kickoffSessionId,
       surface: 'presence',
       taskType: 'analysis',
+      intentId: 'bootstrap-project',
+      shape: 'project_bootstrap',
+      outcomeIds: ['project_created'],
       status: 'collecting_requirements',
       goal: {
         summary: kickoffWork.title,
@@ -2403,6 +2431,8 @@ function tryHandleProjectBootstrap(userText: string): string | null {
       projectContext: {
         project_id: projectId,
         project_name: projectName,
+        track_id: trackId,
+        track_name: trackName,
         tier: 'confidential',
         service_bindings: bindingDrafts.map((draft) => draft.binding_id),
         locale: projectLocale,
@@ -2430,6 +2460,15 @@ function tryHandleProjectBootstrap(userText: string): string | null {
     status: 'active',
     tier: 'confidential',
     primary_locale: projectLocale,
+    repositories: [
+      {
+        repo_id: `REPO-${projectId.replace(/^PRJ-/, '')}`,
+        kind: 'project-root',
+        root_path: path.relative(pathResolver.rootDir(), projectRootPath),
+      },
+    ],
+    default_track_id: trackId,
+    active_tracks: [trackId],
     service_bindings: bindingDrafts.map((draft) => draft.binding_id),
     active_missions: [],
     bootstrap_work_items: bootstrapWorkItems,
@@ -2456,9 +2495,21 @@ function resolveProjectContextForTask(userText: string, intent: ReturnType<typeo
     projectName: explicitProjectName,
   });
   if (!project) return undefined;
+  const explicitTrackName = typeof payload.track_name === 'string'
+    ? payload.track_name
+    : typeof payload.track_id === 'string'
+      ? payload.track_id
+      : undefined;
+  const track = resolveProjectTrackRecordForText({
+    projectId: project.project_id,
+    utterance: userText,
+    trackName: explicitTrackName,
+  }) || (project.default_track_id ? loadProjectTrackRecord(project.default_track_id) : null);
   return {
     project_id: project.project_id,
     project_name: project.name,
+    track_id: track?.track_id,
+    track_name: track?.name,
     tier: project.tier,
     service_bindings: project.service_bindings || [],
     locale: project.primary_locale,
@@ -2684,11 +2735,14 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
     });
     const artifactRecord = createArtifactRecord({
       project_id: session.project_context?.project_id,
+      track_id: session.project_context?.track_id,
+      track_name: session.project_context?.track_name,
       task_session_id: session.session_id,
       kind: artifactKind,
       storage_class: artifactKind === 'service' ? 'tmp' : 'artifact_store',
       path: outputPath,
       preview_text: previewText,
+      work_loop: session.work_loop,
       metadata: {
         project_name: session.project_context?.project_name,
         service_bindings: session.project_context?.service_bindings || [],
@@ -2795,6 +2849,8 @@ function tryHandleTaskSession(userText: string): string | null {
   const session = createTaskSession({
     surface: 'presence',
     taskType: intent.taskType,
+    intentId: intent.intentId,
+    shape: intent.taskType === 'analysis' && intent.payload?.bootstrap_kind === 'project_bootstrap' ? 'project_bootstrap' : 'task_session',
     status: intent.requirements?.missing?.includes('approval_confirmation')
       ? 'awaiting_confirmation'
       : (intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
