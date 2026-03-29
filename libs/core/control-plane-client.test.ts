@@ -45,6 +45,29 @@ describe('control-plane-client', () => {
     expect(seeds[0]?.seed_id).toBe('MSD-1');
   });
 
+  it('maps project tracks and gate readiness through the typed wrapper', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      accessRole: 'readonly',
+      projectTracks: [{ track_id: 'TRK-1', project_id: 'PRJ-1', name: 'Release 1' }],
+      gateReadiness: [{
+        track_id: 'TRK-1',
+        ready_gate_count: 1,
+        total_gate_count: 4,
+        current_gate_id: 'requirements_review',
+        next_required_artifacts: [{ artifact_id: 'requirements-definition', template_ref: 'knowledge/public/templates/blueprints/requirements-traceability-matrix.md' }],
+      }],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch;
+
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    const tracks = await client.listProjectTracks();
+    expect(tracks[0]?.track_id).toBe('TRK-1');
+    expect(tracks[0]?.gate_readiness?.current_gate_id).toBe('requirements_review');
+    expect(tracks[0]?.gate_readiness?.next_required_artifacts?.[0]?.artifact_id).toBe('requirements-definition');
+  });
+
   it('raises a stale surface error with a suggested command', async () => {
     globalThis.fetch = vi.fn(async () => new Response(
       '<html><body><pre>Cannot GET /api/projects</pre></body></html>',
@@ -52,6 +75,20 @@ describe('control-plane-client', () => {
     )) as typeof fetch;
 
     await expect(requestControlPlaneJson('presence', '/api/projects'))
+      .rejects
+      .toMatchObject<Partial<ControlPlaneClientError>>({
+        name: 'ControlPlaneClientError',
+        suggestedCommand: 'pnpm surfaces:reconcile',
+      });
+  });
+
+  it('treats next not-found pages as stale surface mismatches', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(
+      '<!DOCTYPE html><html><head><title>404: This page could not be found.</title></head><body>This page could not be found.</body></html>',
+      { status: 404, headers: { 'content-type': 'text/html' } },
+    )) as typeof fetch;
+
+    await expect(requestControlPlaneJson('chronos', '/api/knowledge-ref?path=test'))
       .rejects
       .toMatchObject<Partial<ControlPlaneClientError>>({
         name: 'ControlPlaneClientError',
