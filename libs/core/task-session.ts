@@ -2,6 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 
@@ -97,8 +98,7 @@ let taskSessionValidateFn: ValidateFunction | null = null;
 
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
-  const raw = safeReadFile(TASK_SESSION_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  taskSessionValidateFn = ajv.compile(JSON.parse(raw));
+  taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
   return taskSessionValidateFn;
 }
 
