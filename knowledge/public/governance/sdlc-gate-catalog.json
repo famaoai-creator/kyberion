@@ -1,0 +1,131 @@
+{
+  "concept": "sdlc-gate-catalog",
+  "version": "1.0.0",
+  "gates": [
+    {
+      "gate_id": "gate-initiation-approval",
+      "phase": "initiate",
+      "scope": "project",
+      "purpose": "Authorize the project to proceed from idea to defined scope.",
+      "required_artifacts": [
+        "project-charter",
+        "business-impact-analysis",
+        "stakeholder-communication-register"
+      ],
+      "exit_criteria": [
+        "Problem statement and success criteria are approved.",
+        "Decision owner and stakeholder map are explicit.",
+        "Funding, capacity, or sponsorship assumptions are documented."
+      ]
+    },
+    {
+      "gate_id": "gate-requirements-baseline",
+      "phase": "define",
+      "scope": "track",
+      "purpose": "Freeze the accountable requirements baseline before design completion.",
+      "required_artifacts": [
+        "requirements-definition",
+        "requirements-traceability-matrix",
+        "slo-sli-definition",
+        "information-asset-registry"
+      ],
+      "exit_criteria": [
+        "Requirements have identifiers and acceptance criteria.",
+        "Traceability links requirements to future design and validation.",
+        "Information assets and service objectives are agreed."
+      ]
+    },
+    {
+      "gate_id": "gate-design-approval",
+      "phase": "design",
+      "scope": "track",
+      "purpose": "Approve the target architecture and operating design before build.",
+      "required_artifacts": [
+        "basic-design",
+        "architecture-design",
+        "detailed-design",
+        "operational-design",
+        "data-flow-lifecycle-map",
+        "environment-setup-guide",
+        "compliance-control-matrix"
+      ],
+      "exit_criteria": [
+        "Design covers functional, operational, security, and data concerns.",
+        "Control obligations are mapped to design and procedure references.",
+        "Open design risks have owners and disposition."
+      ]
+    },
+    {
+      "gate_id": "gate-build-readiness",
+      "phase": "build",
+      "scope": "track",
+      "purpose": "Ensure execution is controlled and changes are governable.",
+      "required_artifacts": [
+        "project-management-plan",
+        "mission-ledger",
+        "raid-log",
+        "issue-log",
+        "change-control-ledger"
+      ],
+      "exit_criteria": [
+        "Work breakdown, ownership, and reporting cadence are active.",
+        "Active changes are traceable through mission and change ledgers.",
+        "Known risks, assumptions, issues, and dependencies are current."
+      ]
+    },
+    {
+      "gate_id": "gate-validation-approval",
+      "phase": "validate",
+      "scope": "track",
+      "purpose": "Demonstrate that the release candidate is acceptable for release decision.",
+      "required_artifacts": [
+        "test-plan",
+        "test-case-specification",
+        "requirements-traceability-matrix",
+        "test-validation-report",
+        "security-audit-report",
+        "gate-review-packet"
+      ],
+      "exit_criteria": [
+        "Planned validation is complete or approved with explicit exceptions.",
+        "Requirements are traced to test evidence and defects.",
+        "Security findings and residual risks are dispositioned."
+      ]
+    },
+    {
+      "gate_id": "gate-release-readiness",
+      "phase": "transfer_run",
+      "scope": "track",
+      "purpose": "Decide whether release and cutover may proceed.",
+      "required_artifacts": [
+        "release-readiness-checklist",
+        "cutover-migration-plan",
+        "rollback-plan",
+        "deployment-verification-report",
+        "operation-runbook",
+        "user-manual-faq"
+      ],
+      "exit_criteria": [
+        "Operational, deployment, and rollback readiness are approved.",
+        "Post-deployment verification criteria are explicit.",
+        "Support and user-facing handoff materials are available."
+      ]
+    },
+    {
+      "gate_id": "gate-closure-review",
+      "phase": "close",
+      "scope": "track",
+      "purpose": "Formally close delivery and capture reusable learning.",
+      "required_artifacts": [
+        "incident-report",
+        "post-mortem",
+        "mission-closure-report"
+      ],
+      "exit_criteria": [
+        "Open critical items have a follow-up owner.",
+        "Lessons learned are recorded for reuse.",
+        "Closure approval is recorded."
+      ]
+    }
+  ]
+}

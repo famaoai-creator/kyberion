@@ -5,6 +5,7 @@ This document defines the contract between `internal execution concepts` and `us
 
 For the broader enterprise framing above this contract, also read:
 
+- `knowledge/public/architecture/organization-work-loop.md`
 - `knowledge/public/architecture/enterprise-operating-kernel.md`
 - `knowledge/public/architecture/ceo-ux.md`
 - `knowledge/public/architecture/management-control-plane.md`

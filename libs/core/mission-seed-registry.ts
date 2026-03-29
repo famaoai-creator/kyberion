@@ -1,10 +1,14 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import type { OrganizationWorkLoopSummary } from './work-design.js';
 
 export interface MissionSeedRecord {
   seed_id: string;
   project_id: string;
+  track_id?: string;
+  track_name?: string;
   source_task_session_id?: string;
   source_work_id?: string;
   title: string;
@@ -14,6 +18,7 @@ export interface MissionSeedRecord {
   outcome_id?: string;
   mission_type_hint?: string;
   locale?: string;
+  work_loop?: OrganizationWorkLoopSummary;
   promoted_mission_id?: string;
   created_at: string;
   updated_at?: string;
@@ -28,8 +33,7 @@ let seedValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (seedValidateFn) return seedValidateFn;
-  const raw = safeReadFile(SEED_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  seedValidateFn = ajv.compile(JSON.parse(raw));
+  seedValidateFn = compileSchemaFromPath(ajv, SEED_SCHEMA_PATH);
   return seedValidateFn;
 }
 

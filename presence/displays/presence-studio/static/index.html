@@ -333,8 +333,18 @@
           <div class="list" id="project-catalog"></div>
         </section>
         <section class="panel">
+          <div class="label">Tracks</div>
+          <div class="list" id="track-catalog"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
           <div class="label">Service Bindings</div>
           <div class="list" id="binding-catalog"></div>
+        </section>
+        <section class="panel">
+          <div class="label">Mission Seeds</div>
+          <div class="list" id="mission-seed-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
@@ -393,10 +403,6 @@
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
-          <div class="label">Mission Seeds</div>
-          <div class="list" id="mission-seed-catalog"></div>
-        </section>
-        <section class="panel">
           <div class="label">Memory Detail</div>
           <div class="list" id="memory-detail"></div>
         </section>
@@ -424,6 +430,7 @@
       const currentAgentEl = document.getElementById("current-agent");
       const agentCatalogEl = document.getElementById("agent-catalog");
       const projectCatalogEl = document.getElementById("project-catalog");
+      const trackCatalogEl = document.getElementById("track-catalog");
       const bindingCatalogEl = document.getElementById("binding-catalog");
       const missionSeedCatalogEl = document.getElementById("mission-seed-catalog");
       const memoryDetailEl = document.getElementById("memory-detail");
@@ -452,11 +459,13 @@
       let surfaceAgentCatalog = { currentAgentId: "presence-surface-agent", current: null, agents: [] };
       let standardIntents = [];
       let projectCatalog = [];
+      let trackCatalog = [];
       let bindingCatalog = [];
       let missionSeedCatalog = [];
       let distillCandidateCatalog = [];
-      let selectedKnowledgeRef = null;
-      let knowledgeRefDetail = null;
+      let selectedReferenceRef = null;
+      let selectedReferenceEndpoint = null;
+      let referenceDetail = null;
       let asyncRequests = [];
       let notifications = [];
       let approvals = [];
@@ -728,6 +737,13 @@
             <div class="row"><strong>${current.displayName}</strong><span class="mono">${current.agentId}</span></div>
             <div class="small">${current.summary || "No summary available."}</div>
           </div>
+          ${(current.providerResolution || current.resolvedProvider || current.resolvedModelId) ? `
+          <div>
+            <div class="label">Model Routing</div>
+            <div class="small">preferred: <span class="mono">${escapeHtml(current.providerResolution?.preferredProvider || current.provider || "unknown")}${current.providerResolution?.preferredModelId ? `/${escapeHtml(current.providerResolution.preferredModelId)}` : current.modelId ? `/${escapeHtml(current.modelId)}` : ""}</span></div>
+            <div class="small">resolved: <span class="mono">${escapeHtml(current.resolvedProvider || current.provider || "unknown")}${current.resolvedModelId ? `/${escapeHtml(current.resolvedModelId)}` : current.modelId ? `/${escapeHtml(current.modelId)}` : ""}</span></div>
+            <div class="small">strategy: <span class="mono">${escapeHtml(current.providerResolution?.strategy || "preferred")}</span></div>
+          </div>` : ""}
           <div>
             <div class="label">Capabilities</div>
             ${renderChips(current.capabilities || [])}
@@ -767,10 +783,11 @@
 
       async function loadSurfaceAgents() {
         try {
-          const [response, intentsResponse, projectsResponse, bindingsResponse, missionSeedsResponse, distillCandidatesResponse] = await Promise.all([
+          const [response, intentsResponse, projectsResponse, tracksResponse, bindingsResponse, missionSeedsResponse, distillCandidatesResponse] = await Promise.all([
             fetch("/api/surface-agents"),
             fetch("/api/standard-intents"),
             fetch("/api/projects"),
+            fetch("/api/project-tracks"),
             fetch("/api/service-bindings"),
             fetch("/api/mission-seeds"),
             fetch("/api/distill-candidates"),
@@ -778,18 +795,21 @@
           const body = await response.json();
           const intentsBody = await intentsResponse.json();
           const projectsBody = await projectsResponse.json();
+          const tracksBody = await tracksResponse.json();
           const bindingsBody = await bindingsResponse.json();
           const missionSeedsBody = await missionSeedsResponse.json();
           const distillCandidatesBody = await distillCandidatesResponse.json();
           if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
           if (!intentsResponse.ok || !intentsBody.ok) throw new Error(intentsBody.error || `HTTP ${intentsResponse.status}`);
           if (!projectsResponse.ok || !projectsBody.ok) throw new Error(projectsBody.error || `HTTP ${projectsResponse.status}`);
+          if (!tracksResponse.ok || !tracksBody.ok) throw new Error(tracksBody.error || `HTTP ${tracksResponse.status}`);
           if (!bindingsResponse.ok || !bindingsBody.ok) throw new Error(bindingsBody.error || `HTTP ${bindingsResponse.status}`);
           if (!missionSeedsResponse.ok || !missionSeedsBody.ok) throw new Error(missionSeedsBody.error || `HTTP ${missionSeedsResponse.status}`);
           if (!distillCandidatesResponse.ok || !distillCandidatesBody.ok) throw new Error(distillCandidatesBody.error || `HTTP ${distillCandidatesResponse.status}`);
           surfaceAgentCatalog = body;
           standardIntents = intentsBody.items || [];
           projectCatalog = projectsBody.items || [];
+          trackCatalog = tracksBody.items || [];
           bindingCatalog = bindingsBody.items || [];
           missionSeedCatalog = missionSeedsBody.items || [];
           distillCandidateCatalog = distillCandidatesBody.items || [];
@@ -814,6 +834,7 @@
             shape: "error",
           }];
           projectCatalog = [];
+          trackCatalog = [];
           bindingCatalog = [];
           missionSeedCatalog = [];
           distillCandidateCatalog = [];
@@ -913,52 +934,76 @@
         return detail;
       }
 
-      async function openKnowledgeRef(logicalPath) {
+      async function openReferenceRef(logicalPath, endpoint, loadingLabel, openLabel) {
         const path = String(logicalPath || "").trim();
         if (!path) return;
-        selectedKnowledgeRef = path;
-        knowledgeRefDetail = {
+        selectedReferenceRef = path;
+        selectedReferenceEndpoint = endpoint;
+        referenceDetail = {
           path,
           title: String(path).split("/").pop() || path,
-          summary: uiText("Loading memory...", "memory を読み込み中です..."),
+          summary: loadingLabel,
           metadata: {},
           sections: [],
           body: "",
+          openLabel,
         };
         renderMemoryDetail();
         try {
-          const response = await fetch(`/api/knowledge-ref?path=${encodeURIComponent(path)}`);
+          const response = await fetch(`${endpoint}?path=${encodeURIComponent(path)}`);
           const text = await response.text();
           if (!response.ok) {
             throw new Error(text || `HTTP ${response.status}`);
           }
-          knowledgeRefDetail = parseKnowledgeRefContent(text, path);
+          referenceDetail = {
+            ...parseKnowledgeRefContent(text, path),
+            openLabel,
+          };
         } catch (error) {
-          knowledgeRefDetail = {
+          referenceDetail = {
             path,
             title: String(path).split("/").pop() || path,
             summary: error.message || String(error),
             metadata: {},
             sections: [],
             body: "",
+            openLabel,
           };
         }
         renderMemoryDetail();
       }
 
+      async function openKnowledgeRef(logicalPath) {
+        return openReferenceRef(
+          logicalPath,
+          "/api/knowledge-ref",
+          uiText("Loading memory...", "memory を読み込み中です..."),
+          uiText("Open raw memory", "raw memory を開く"),
+        );
+      }
+
+      async function openRuntimeRef(logicalPath) {
+        return openReferenceRef(
+          logicalPath,
+          "/api/runtime-ref",
+          uiText("Loading skeleton...", "skeleton を読み込み中です..."),
+          uiText("Open raw skeleton", "raw skeleton を開く"),
+        );
+      }
+
       function renderMemoryDetail() {
-        if (!selectedKnowledgeRef || !knowledgeRefDetail) {
+        if (!selectedReferenceRef || !referenceDetail) {
           memoryDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a learned memory to inspect its title, summary, evidence, and reusable sections.", "learned memory を選ぶと、title / summary / evidence / reusable sections を確認できます。"))}</div>`;
           return;
         }
-        const detail = knowledgeRefDetail;
+        const detail = referenceDetail;
         const metadataEntries = Object.entries(detail.metadata || {}).filter(([, value]) => String(value || "").trim());
         const sections = Array.isArray(detail.sections) ? detail.sections : [];
         memoryDetailEl.innerHTML = `<div class="item">
-            <div class="row"><strong>${escapeHtml(detail.title || "memory")}</strong><span class="mono">${escapeHtml(selectedKnowledgeRef.split("/").slice(-2).join("/"))}</span></div>
+            <div class="row"><strong>${escapeHtml(detail.title || "memory")}</strong><span class="mono">${escapeHtml(selectedReferenceRef.split("/").slice(-2).join("/"))}</span></div>
             <div class="small">${escapeHtml(detail.summary || uiText("No summary available yet.", "まだ summary はありません。"))}</div>
-            <div class="small">${escapeHtml(uiText("path", "path"))}: <span class="mono">${escapeHtml(selectedKnowledgeRef)}</span></div>
-            <div class="small"><a href="/api/knowledge-ref?path=${encodeURIComponent(selectedKnowledgeRef)}" target="_blank" rel="noreferrer">${escapeHtml(uiText("Open raw memory", "raw memory を開く"))}</a></div>
+            <div class="small">${escapeHtml(uiText("path", "path"))}: <span class="mono">${escapeHtml(selectedReferenceRef)}</span></div>
+            <div class="small"><a href="${selectedReferenceEndpoint}?path=${encodeURIComponent(selectedReferenceRef)}" target="_blank" rel="noreferrer">${escapeHtml(detail.openLabel || uiText("Open raw memory", "raw memory を開く"))}</a></div>
           </div>
           ${metadataEntries.length ? `<div class="item">
             <div class="label">${escapeHtml(uiText("Metadata", "Metadata"))}</div>
@@ -998,6 +1043,24 @@
         });
       }
 
+      function renderTrackCatalog() {
+        const items = Array.isArray(trackCatalog) ? trackCatalog : [];
+        if (!items.length) {
+          trackCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No tracks registered yet.", "まだ track は登録されていません。"))}</div>`;
+          return;
+        }
+        renderList(trackCatalogEl, items.slice(0, 8), (item) =>
+          `<div class="row"><strong>${escapeHtml(item.name || item.track_id || "track")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
+           <div class="small">${escapeHtml(item.summary || "")}</div>
+           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span></div>
+           <div class="small">${escapeHtml(uiText("type", "type"))}: <span class="mono">${escapeHtml(item.track_type || "delivery")}</span> · ${escapeHtml(uiText("lifecycle", "lifecycle"))}: <span class="mono">${escapeHtml(item.lifecycle_model || "sdlc")}</span></div>
+           ${item.release_id ? `<div class="small">release: <span class="mono">${escapeHtml(item.release_id)}</span></div>` : ""}
+           ${(item.required_artifacts || []).length ? `<div class="small">${escapeHtml(uiText("required artifacts", "required artifacts"))}: <span class="mono">${escapeHtml(String((item.required_artifacts || []).length))}</span></div>` : ""}
+           ${item.gate_readiness ? `<div class="small">${escapeHtml(uiText("gate readiness", "gate readiness"))}: <span class="mono">${escapeHtml(String(item.gate_readiness.ready_gate_count || 0))}/${escapeHtml(String(item.gate_readiness.total_gate_count || 0))}</span> · ${escapeHtml(uiText("current gate", "current gate"))}: <span class="mono">${escapeHtml(item.gate_readiness.current_gate_id || (item.gate_readiness.ready ? "ready" : "-"))}</span></div>` : ""}
+           ${item.gate_readiness && Array.isArray(item.gate_readiness.next_required_artifacts) && item.gate_readiness.next_required_artifacts.length ? `<div class="small">${escapeHtml(uiText("next required", "next required"))}: <span class="mono">${escapeHtml(item.gate_readiness.next_required_artifacts.map((entry) => entry.artifact_id).join(", "))}</span></div>` : ""}`
+        );
+      }
+
       function renderBindingCatalog() {
         const items = Array.isArray(bindingCatalog) ? bindingCatalog : [];
         if (!items.length) {
@@ -1021,10 +1084,19 @@
           const learnedItems = relatedPromotedRefsForMissionSeed(item);
           return `<div class="row"><strong>${escapeHtml(item.title || item.seed_id || "mission seed")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
            <div class="small">${escapeHtml(item.summary || "")}</div>
-           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span> · ${escapeHtml(uiText("specialist", "specialist"))}: <span class="mono">${escapeHtml(item.specialist_id || "unknown")}</span></div>
+           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span> · ${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || "-")}</span></div>
+           <div class="small">${escapeHtml(uiText("specialist", "specialist"))}: <span class="mono">${escapeHtml(item.specialist_id || "unknown")}</span></div>
            <div class="small">${escapeHtml(uiText("type", "type"))}: <span class="mono">${escapeHtml(item.mission_type_hint || "general")}</span> · ${escapeHtml(uiText("source work", "source work"))}: <span class="mono">${escapeHtml(item.source_work_id || "-")}</span></div>
+           ${item.metadata && item.metadata.template_ref ? `<div class="small">${escapeHtml(uiText("template", "template"))}: <span class="mono">${escapeHtml(item.metadata.template_ref)}</span></div>` : ""}
+           ${item.metadata && item.metadata.skeleton_path ? `<div class="small">${escapeHtml(uiText("skeleton", "skeleton"))}: <button class="button button-link mono" type="button" data-runtime-ref="${escapeHtml(item.metadata.skeleton_path)}">${escapeHtml(item.metadata.skeleton_path)}</button></div>` : ""}
            ${item.promoted_mission_id ? `<div class="small">${escapeHtml(uiText("mission", "mission"))}: <span class="mono">${escapeHtml(item.promoted_mission_id)}</span></div>` : ""}
            ${learnedItems.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedItems)}</div>` : ""}`;
+        });
+        missionSeedCatalogEl.querySelectorAll("[data-runtime-ref]").forEach((button) => {
+          button.addEventListener("click", () => openRuntimeRef(button.getAttribute("data-runtime-ref")));
+        });
+        missionSeedCatalogEl.querySelectorAll("[data-knowledge-ref]").forEach((button) => {
+          button.addEventListener("click", () => openKnowledgeRef(button.getAttribute("data-knowledge-ref")));
         });
       }
 
@@ -1042,6 +1114,7 @@
             <div class="row"><strong>${escapeHtml(item.title || item.id || "approval")}</strong><span class="mono">${escapeHtml(item.status || "pending")}</span></div>
             <div class="small">${escapeHtml(item.summary || "")}</div>
             <div class="small">${escapeHtml(uiText("risk", "risk"))}: <span class="mono">${escapeHtml(item.risk?.level || item.severity || "unknown")}</span> · ${escapeHtml(uiText("requested by", "requested by"))}: <span class="mono">${escapeHtml(item.requestedBy || "system")}</span></div>
+            ${(item.track_name || item.track_id || item.work_loop?.context?.track_name || item.work_loop?.context?.track_id) ? `<div class="small">${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || item.work_loop?.context?.track_name || item.work_loop?.context?.track_id)}</span></div>` : ""}
             ${item.expected_outcome ? `<div class="small">${escapeHtml(uiText("expected outcome", "expected outcome"))}: ${escapeHtml(item.expected_outcome)}</div>` : ""}
             ${(item.learned_titles || []).length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${escapeHtml((item.learned_titles || []).join(" · "))}</div>` : ""}
             <div class="controls" style="margin-top: 10px; margin-bottom: 0;">
@@ -1079,7 +1152,8 @@
         }
         renderList(outcomeInboxEl, items.slice(0, 8), (item) =>
           `<div class="row"><strong>${escapeHtml(item.preview_text || item.kind || "outcome")}</strong><span class="mono">${escapeHtml(item.kind || "artifact")}</span></div>
-           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "standalone")}</span> · ${escapeHtml(uiText("storage", "storage"))}: <span class="mono">${escapeHtml(item.storage_class || "unknown")}</span></div>
+           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "standalone")}</span> · ${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || item.work_loop?.context?.track_name || item.work_loop?.context?.track_id || "-")}</span></div>
+           <div class="small">${escapeHtml(uiText("storage", "storage"))}: <span class="mono">${escapeHtml(item.storage_class || "unknown")}</span></div>
            <div class="small">${escapeHtml(uiText("artifact", "artifact"))}: <span class="mono">${escapeHtml(item.artifact_id || "unknown")}</span></div>
            ${(item.distill_titles || []).length ? `<div class="small">${escapeHtml(uiText("memory candidate", "memory candidate"))}: ${escapeHtml((item.distill_titles || []).join(" · "))}</div>` : ""}
            ${(item.promoted_refs || []).length ? `<div class="small">${escapeHtml(uiText("promoted", "promoted"))}: ${(item.promoted_refs || []).map((ref) => `<button class="button button-link" type="button" data-knowledge-ref="${escapeHtml(ref)}">${escapeHtml(String(ref).split("/").pop() || ref)}</button>`).join(" · ")}</div>` : ""}
@@ -1247,6 +1321,7 @@
         renderCurrentAgent(data.agentId || surfaceAgentCatalog.currentAgentId);
         renderStandardIntents();
         renderProjectCatalog();
+        renderTrackCatalog();
         renderBindingCatalog();
         renderMissionSeedCatalog();
         renderApprovalInbox();
@@ -1369,10 +1444,18 @@
           ? linkedProject.bootstrap_work_items.slice(0, 4)
           : [];
         const learnedRefs = relatedPromotedRefsForTaskSession(item.session_id, item.project_context?.project_id);
+        const workLoop = item.work_loop || null;
+        const workLoopOutcomes = Array.isArray(workLoop?.outcome_design?.labels) && workLoop.outcome_design.labels.length
+          ? workLoop.outcome_design.labels.join(" / ")
+          : uiText("No explicit outcomes yet.", "まだ明示的な outcome はありません。");
+        const workLoopRoles = Array.isArray(workLoop?.teaming?.team_roles) && workLoop.teaming.team_roles.length
+          ? workLoop.teaming.team_roles.join(" -> ")
+          : specialist.team.join(" -> ");
         taskSessionDetailEl.innerHTML = `<div class="item">
             <div class="row"><strong>${escapeHtml(item.goal?.summary || "Requested work")}</strong><span class="mono">${escapeHtml(item.status)}</span></div>
             <div class="small">${escapeHtml(uiText("work type", "work type"))}: <span class="mono">${escapeHtml(item.task_type || "unknown")}</span></div>
             <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_context?.project_name || item.project_context?.project_id || "standalone")}</span></div>
+            <div class="small">${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.project_context?.track_name || item.project_context?.track_id || workLoop?.context?.track_name || workLoop?.context?.track_id || "-")}</span></div>
             <div class="small">${escapeHtml(uiText("handled by", "handled by"))}: <span class="mono">${escapeHtml(specialist.label)}</span></div>
             <div class="small">${escapeHtml(uiText("team", "team"))}: ${escapeHtml((specialist.team || []).join(" -> ") || "surface_liaison")}</div>
             <div class="small">${escapeHtml(uiText("waiting on", "waiting on"))}: <span class="mono">${escapeHtml((item.requirements?.missing || []).join(", ") || "nothing")}</span></div>
@@ -1382,6 +1465,15 @@
             ${learnedRefs.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedRefs)}</div>` : ""}
             <div class="small">id: <span class="mono">${escapeHtml(item.session_id)}</span></div>
             ${artifactLink}
+          </div>
+          <div class="item">
+            <div class="label">Work Loop</div>
+            <div class="small">${escapeHtml(uiText("intent", "intent"))}: <span class="mono">${escapeHtml(workLoop?.intent?.label || item.task_type || "general_request")}</span></div>
+            <div class="small">${escapeHtml(uiText("context", "context"))}: <span class="mono">${escapeHtml(workLoop?.context?.project_name || workLoop?.context?.project_id || item.project_context?.project_name || item.project_context?.project_id || "standalone")}</span> / <span class="mono">${escapeHtml(workLoop?.context?.track_name || workLoop?.context?.track_id || item.project_context?.track_name || item.project_context?.track_id || "-")}</span> · ${escapeHtml(workLoop?.context?.tier || item.project_context?.tier || "confidential")}</div>
+            <div class="small">${escapeHtml(uiText("resolution", "resolution"))}: <span class="mono">${escapeHtml(workLoop?.resolution?.execution_shape || "task_session")}</span></div>
+            <div class="small">${escapeHtml(uiText("outcome", "outcome"))}: ${escapeHtml(workLoopOutcomes)}</div>
+            <div class="small">${escapeHtml(uiText("team", "team"))}: ${escapeHtml(workLoopRoles)}</div>
+            <div class="small">${escapeHtml(uiText("authority", "authority"))}: <span class="mono">${escapeHtml(workLoop?.authority?.requires_approval ? uiText("approval required", "承認が必要") : uiText("auto proceed", "自動で進行"))}</span></div>
           </div>
           <div class="item">
             <div class="label">Recent Progress</div>

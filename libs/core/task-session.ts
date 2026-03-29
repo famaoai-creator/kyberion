@@ -2,7 +2,9 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type TaskSessionType =
@@ -47,10 +49,13 @@ export interface TaskSession {
   project_context?: {
     project_id?: string;
     project_name?: string;
+    track_id?: string;
+    track_name?: string;
     tier?: 'personal' | 'confidential' | 'public';
     service_bindings?: string[];
     locale?: string;
   };
+  work_loop?: OrganizationWorkLoopSummary;
   artifact?: {
     kind?: string;
     output_path?: string;
@@ -73,6 +78,7 @@ export interface TaskSession {
 
 export interface TaskSessionIntent {
   taskType: TaskSessionType;
+  intentId?: string;
   goal: TaskSession['goal'];
   projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
@@ -91,11 +97,51 @@ const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-ses
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
+let standardIntentCache: Array<{
+  id?: string;
+  trigger_keywords?: string[];
+  resolution?: {
+    shape?: string;
+    task_kind?: string;
+  };
+}> | null = null;
+
+function loadStandardIntentCatalog() {
+  if (standardIntentCache) return standardIntentCache;
+  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    intents?: Array<{
+      id?: string;
+      trigger_keywords?: string[];
+      resolution?: {
+        shape?: string;
+        task_kind?: string;
+      };
+    }>;
+  };
+  standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
+  return standardIntentCache;
+}
+
+function matchesStandardIntent(utterance: string, intentId: string): boolean {
+  const normalized = utterance.toLowerCase();
+  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
+  const keywords = Array.isArray(intent?.trigger_keywords) ? intent!.trigger_keywords : [];
+  return keywords.some((keyword) => normalized.includes(String(keyword).toLowerCase()));
+}
+
+function isBootstrapProjectUtterance(utterance: string): boolean {
+  if (!matchesStandardIntent(utterance, 'bootstrap-project')) return false;
+  if (matchesStandardIntent(utterance, 'generate-workbook')) return false;
+  if (matchesStandardIntent(utterance, 'generate-presentation')) return false;
+  if (matchesStandardIntent(utterance, 'generate-report')) return false;
+  if (matchesStandardIntent(utterance, 'inspect-service')) return false;
+  return true;
+}
 
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
-  const raw = safeReadFile(TASK_SESSION_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  taskSessionValidateFn = ajv.compile(JSON.parse(raw));
+  taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
   return taskSessionValidateFn;
 }
 
@@ -116,10 +162,28 @@ export function createTaskSession(input: {
   requiresApproval?: boolean;
   goal: TaskSession['goal'];
   projectContext?: TaskSession['project_context'];
+  intentId?: string;
+  shape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+  outcomeIds?: string[];
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
+  workLoop?: OrganizationWorkLoopSummary;
 }): TaskSession {
   const now = new Date().toISOString();
+  const workLoop = input.workLoop || buildOrganizationWorkLoopSummary({
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape,
+    outcomeIds: input.outcomeIds,
+    projectId: input.projectContext?.project_id,
+    projectName: input.projectContext?.project_name,
+    trackId: input.projectContext?.track_id,
+    trackName: input.projectContext?.track_name,
+    tier: input.projectContext?.tier,
+    locale: input.projectContext?.locale,
+    serviceBindings: input.projectContext?.service_bindings,
+    requiresApproval: input.requiresApproval,
+  });
   return {
     session_id: input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     surface: input.surface,
@@ -128,6 +192,7 @@ export function createTaskSession(input: {
     mode: input.mode || 'interactive',
     goal: input.goal,
     project_context: input.projectContext,
+    work_loop: workLoop,
     requirements: input.requirements,
     control: {
       interruptible: true,
@@ -144,9 +209,28 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   const trimmed = utterance.trim();
   if (!trimmed) return null;
 
+  if (isBootstrapProjectUtterance(trimmed)) {
+    return {
+      taskType: 'analysis',
+      intentId: 'bootstrap-project',
+      goal: {
+        summary: 'Bootstrap a governed project context',
+        success_condition: 'A project record, kickoff context, and first work items are prepared.',
+      },
+      requirements: {
+        missing: ['project_brief'],
+        collected: {},
+      },
+      payload: {
+        bootstrap_kind: 'project_bootstrap',
+      },
+    };
+  }
+
   if (/(写真|撮影|photo|picture|camera)/i.test(trimmed)) {
     return {
       taskType: 'capture_photo',
+      intentId: 'capture-photo',
       goal: {
         summary: 'Capture a photo for the requested purpose',
         success_condition: 'A photo artifact is captured and stored in a governed path.',
@@ -167,9 +251,10 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-workbook') || /(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
     return {
       taskType: 'workbook_wbs',
+      intentId: 'generate-workbook',
       goal: {
         summary: 'Create a WBS workbook from the project context',
         success_condition: 'An XLSX workbook draft is generated in a governed path.',
@@ -184,9 +269,10 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-presentation') || /(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
     return {
       taskType: 'presentation_deck',
+      intentId: 'generate-presentation',
       goal: {
         summary: 'Create a presentation deck from available project context',
         success_condition: 'A PPTX draft is generated in a governed path.',
@@ -208,9 +294,10 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'generate-report') || /(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
     return {
       taskType: 'report_document',
+      intentId: 'generate-report',
       goal: {
         summary: 'Create a document artifact for the requested audience',
         success_condition: 'A report document is generated in a governed path.',
@@ -232,7 +319,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
-  if (/(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
+  if (matchesStandardIntent(trimmed, 'inspect-service') || /(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
     const operation = /再起動|restart/i.test(trimmed)
       ? 'restart'
       : /停止|stop/i.test(trimmed)
@@ -248,6 +335,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     const requiresApproval = ['restart', 'start', 'stop'].includes(operation);
     return {
       taskType: 'service_operation',
+      intentId: 'inspect-service',
       goal: {
         summary: 'Operate or inspect a managed service',
         success_condition: 'The requested service operation completes and the result is reported back.',

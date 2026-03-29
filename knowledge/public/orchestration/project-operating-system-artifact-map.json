@@ -4,6 +4,7 @@
     {
       "id": "why",
       "name": "Why",
+      "scope": "project",
       "artifacts": [
         "project-charter",
         "business-impact-analysis",
@@ -13,8 +14,10 @@
     {
       "id": "what",
       "name": "What",
+      "scope": "track",
       "artifacts": [
         "requirements-definition",
+        "requirements-traceability-matrix",
         "slo-sli-definition",
         "information-asset-registry"
       ]
@@ -22,6 +25,7 @@
     {
       "id": "how",
       "name": "How",
+      "scope": "track",
       "artifacts": [
         "basic-design",
         "architecture-design",
@@ -29,12 +33,14 @@
         "operational-design",
         "data-flow-lifecycle-map",
         "operation-runbook",
-        "environment-setup-guide"
+        "environment-setup-guide",
+        "compliance-control-matrix"
       ]
     },
     {
       "id": "control",
       "name": "Control",
+      "scope": "mixed",
       "artifacts": [
         "project-management-plan",
         "mission-ledger",
@@ -47,10 +53,15 @@
     {
       "id": "evidence",
       "name": "Evidence",
+      "scope": "track",
       "artifacts": [
         "test-plan",
+        "test-case-specification",
         "test-validation-report",
         "security-audit-report",
+        "release-readiness-checklist",
+        "deployment-verification-report",
+        "rollback-plan",
         "incident-report",
         "mission-closure-report"
       ]
@@ -59,6 +70,7 @@
   "lifecycle": [
     {
       "phase": "initiate",
+      "scope": "project",
       "required": [
         "project-charter",
         "business-impact-analysis",
@@ -67,25 +79,31 @@
     },
     {
       "phase": "define",
+      "scope": "track",
       "required": [
         "requirements-definition",
+        "requirements-traceability-matrix",
         "slo-sli-definition",
         "information-asset-registry"
       ]
     },
     {
       "phase": "design",
+      "scope": "track",
       "required": [
         "basic-design",
         "architecture-design",
         "detailed-design",
         "operational-design",
         "data-flow-lifecycle-map",
-        "operation-runbook"
+        "operation-runbook",
+        "environment-setup-guide",
+        "compliance-control-matrix"
       ]
     },
     {
       "phase": "build",
+      "scope": "track",
       "required": [
         "project-management-plan",
         "mission-ledger",
@@ -96,8 +114,11 @@
     },
     {
       "phase": "validate",
+      "scope": "track",
       "required": [
         "test-plan",
+        "test-case-specification",
+        "requirements-traceability-matrix",
         "test-validation-report",
         "security-audit-report",
         "gate-review-packet"
@@ -105,8 +126,12 @@
     },
     {
       "phase": "transfer_run",
+      "scope": "track",
       "required": [
+        "release-readiness-checklist",
         "cutover-migration-plan",
+        "rollback-plan",
+        "deployment-verification-report",
         "operation-runbook",
         "user-manual-faq",
         "incident-report",
@@ -116,19 +141,26 @@
   ],
   "dependencies": [
     ["project-charter", "requirements-definition"],
+    ["requirements-definition", "requirements-traceability-matrix"],
     ["requirements-definition", "architecture-design"],
     ["requirements-definition", "basic-design"],
     ["basic-design", "detailed-design"],
     ["architecture-design", "detailed-design"],
     ["detailed-design", "operational-design"],
+    ["architecture-design", "compliance-control-matrix"],
     ["requirements-definition", "test-plan"],
+    ["requirements-traceability-matrix", "test-case-specification"],
+    ["test-case-specification", "test-validation-report"],
     ["test-plan", "test-validation-report"],
     ["detailed-design", "test-validation-report"],
     ["project-management-plan", "mission-ledger"],
     ["mission-ledger", "gate-review-packet"],
     ["project-management-plan", "gate-review-packet"],
     ["test-validation-report", "gate-review-packet"],
+    ["security-audit-report", "release-readiness-checklist"],
     ["gate-review-packet", "cutover-migration-plan"],
+    ["cutover-migration-plan", "rollback-plan"],
+    ["cutover-migration-plan", "deployment-verification-report"],
     ["gate-review-packet", "mission-closure-report"]
   ]
 }

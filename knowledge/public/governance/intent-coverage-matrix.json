@@ -1,0 +1,158 @@
+{
+  "version": "1.0.0",
+  "generated_manually": true,
+  "notes": [
+    "This matrix tracks runtime coverage for user-facing intents.",
+    "Coverage is measured across intent resolution, execution shape, actuator path, and governed outcome persistence."
+  ],
+  "coverage_levels": {
+    "implemented": "Stable runtime path with governed outcome and evidence.",
+    "partial": "Usable path exists, but runtime is still route-specific, weakly normalized, or incomplete.",
+    "missing": "Catalog exists without first-class runtime or actuator coverage."
+  },
+  "intents": [
+    {
+      "intent_id": "bootstrap-project",
+      "status": "implemented",
+      "entry_path": "voice-hub",
+      "work_shape": "project_bootstrap",
+      "outcome_ids": ["project_created"],
+      "execution_path": [
+        "voice-hub",
+        "project-registry",
+        "task-session",
+        "mission-seed-registry",
+        "chronos promote"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "generate-presentation",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session",
+      "work_shape": "task_session",
+      "outcome_ids": ["artifact:pptx"],
+      "execution_path": [
+        "task-session classifier",
+        "voice-hub brief builder",
+        "media pipeline",
+        "artifact record"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "generate-report",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session",
+      "work_shape": "task_session",
+      "outcome_ids": ["artifact:docx", "artifact:pdf"],
+      "execution_path": [
+        "task-session classifier",
+        "voice-hub brief builder",
+        "document render pipeline",
+        "artifact record"
+      ],
+      "gaps": [
+        "artifact:pdf should stay normalized in outcome catalog"
+      ]
+    },
+    {
+      "intent_id": "generate-workbook",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session",
+      "work_shape": "task_session",
+      "outcome_ids": ["artifact:xlsx"],
+      "execution_path": [
+        "task-session classifier",
+        "voice-hub workbook brief",
+        "xlsx render path",
+        "artifact record"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "inspect-service",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session",
+      "work_shape": "task_session",
+      "outcome_ids": ["service_summary", "approval_request"],
+      "execution_path": [
+        "task-session classifier",
+        "service inspection flow",
+        "approval store",
+        "surface/control-plane display"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "open-site",
+      "status": "partial",
+      "entry_path": "voice-hub browser route",
+      "work_shape": "browser_session",
+      "outcome_ids": ["browser_navigation"],
+      "execution_path": [
+        "voice-hub browser conversation",
+        "browser-actuator"
+      ],
+      "gaps": [
+        "not yet catalog-first through the same work resolver path as task sessions"
+      ]
+    },
+    {
+      "intent_id": "browser-step",
+      "status": "partial",
+      "entry_path": "voice-hub browser route",
+      "work_shape": "browser_session",
+      "outcome_ids": ["browser_step"],
+      "execution_path": [
+        "voice-hub browser conversation",
+        "browser-actuator"
+      ],
+      "gaps": [
+        "runtime path still route-specific"
+      ]
+    },
+    {
+      "intent_id": "knowledge-query",
+      "status": "partial",
+      "entry_path": "direct reply route",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["knowledge_answer"],
+      "execution_path": [
+        "knowledge search path",
+        "direct reply"
+      ],
+      "gaps": [
+        "resolver path not yet unified with the catalog-first task/session flow"
+      ]
+    },
+    {
+      "intent_id": "live-query",
+      "status": "partial",
+      "entry_path": "direct reply route",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["live_answer"],
+      "execution_path": [
+        "live data fetch path",
+        "direct reply"
+      ],
+      "gaps": [
+        "runtime path less normalized than core work flows"
+      ]
+    }
+  ],
+  "cross_cutting_gaps": [
+    "standard-intents catalog is not yet the single runtime source of truth",
+    "outcome catalog normalization is incomplete",
+    "super-nerve action taxonomy is still hand-maintained",
+    "service-binding-aware execution is partial",
+    "freeform generative image capability is not yet first-class"
+  ],
+  "next_priorities": [
+    "catalog-first resolver",
+    "outcome catalog normalization",
+    "shared op registry for orchestrator routing",
+    "binding-aware execution",
+    "coverage contract tests per surface intent"
+  ]
+}

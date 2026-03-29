@@ -619,6 +619,7 @@ describe('browser-actuator v3 contract', () => {
   it('reattaches to a retained browser session via persisted CDP metadata across processes', async () => {
     const { handleAction, resetBrowserRuntimeLeasesForTest } = await import('./index');
     const sessionId = 'browser-cdp-reconnect';
+    await resetBrowserRuntimeLeasesForTest();
     const metadataPath = path.resolve(process.cwd(), 'active/shared/runtime/browser/sessions', `${sessionId}.json`);
     fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
     fs.writeFileSync(metadataPath, JSON.stringify({
@@ -635,8 +636,6 @@ describe('browser-actuator v3 contract', () => {
       action_trail_count: 1,
       recent_actions: [],
     }, null, 2));
-
-    await resetBrowserRuntimeLeasesForTest();
 
     const result = await handleAction({
       action: 'pipeline',

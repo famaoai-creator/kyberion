@@ -18,6 +18,8 @@ export interface ProjectRecord {
   service_bindings?: string[];
   vault_refs?: string[];
   active_missions?: string[];
+  default_track_id?: string;
+  active_tracks?: string[];
   bootstrap_work_items?: ProjectBootstrapWorkItem[];
   kickoff_task_session_id?: string;
   kickoff_brief?: string;

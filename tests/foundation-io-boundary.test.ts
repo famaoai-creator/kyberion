@@ -22,6 +22,8 @@ describe('Foundation IO boundary', () => {
       .filter((relPath) => relPath !== 'libs/core/fs-primitives.ts')
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/dist/'))
+      .filter((relPath) => !relPath.startsWith('active/shared/tmp/'))
+      .filter((relPath) => !relPath.startsWith('active/shared/runtime/'))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
         return /from\s+['"][^'"]*fs-primitives(?:\.js)?['"]/.test(content);

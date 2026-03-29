@@ -29,6 +29,13 @@
       "downloadable": true,
       "previewable": true
     },
+    "artifact:pdf": {
+      "label": "PDF artifact",
+      "description": "A PDF document is generated and can be downloaded.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
     "artifact:xlsx": {
       "label": "Workbook artifact",
       "description": "A workbook is generated and can be downloaded.",

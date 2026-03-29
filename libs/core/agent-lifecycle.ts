@@ -8,6 +8,7 @@ import { safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
+import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 
 /** Walk up from cwd to find the project root (contains AGENTS.md) */
 function resolveProjectRoot(): string {
@@ -185,7 +186,22 @@ class AgentLifecycleManagerImpl {
   }
 
   private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
-    this.spawnOptions.set(agentId, { ...options, agentId });
+    const resolvedTarget = resolveAgentProviderTarget({
+      preferredProvider: options.provider,
+      preferredModelId: options.modelId,
+      providerStrategy: String((options as any)?.runtimeMetadata?.provider_strategy || 'adaptive') as 'strict' | 'preferred' | 'adaptive',
+      fallbackProviders: Array.isArray((options as any)?.runtimeMetadata?.fallback_providers)
+        ? ((options as any).runtimeMetadata.fallback_providers as string[])
+        : undefined,
+    });
+    const resolvedOptions: SpawnOptions = {
+      ...options,
+      agentId,
+      provider: resolvedTarget.provider,
+      modelId: resolvedTarget.modelId,
+    };
+
+    this.spawnOptions.set(agentId, resolvedOptions);
     this.ensureMetrics(agentId);
 
     // Requirements gate: check manifest prerequisites
@@ -198,7 +214,7 @@ class AgentLifecycleManagerImpl {
     }
 
     // Trust gate
-    const trustRequired = options.trustRequired ?? manifest?.trustRequired ?? 0;
+    const trustRequired = resolvedOptions.trustRequired ?? manifest?.trustRequired ?? 0;
     if (trustRequired > 0) {
       const existing = agentRegistry.get(agentId);
       const score = existing?.trustScore ?? 5.0;
@@ -207,37 +223,51 @@ class AgentLifecycleManagerImpl {
       }
     }
 
-    const config = PROVIDER_CONFIG[options.provider];
+    const config = PROVIDER_CONFIG[resolvedOptions.provider];
 
     // Register in registry
     agentRegistry.register({
       agentId,
-      provider: options.provider,
-      modelId: options.modelId || config?.defaultModel || options.provider,
-      capabilities: options.capabilities || [],
+      provider: resolvedOptions.provider,
+      modelId: resolvedOptions.modelId || config?.defaultModel || resolvedOptions.provider,
+      capabilities: resolvedOptions.capabilities || [],
       trustScore: 5.0,
       sessionId: null,
       threadId: agentId,
-      parentAgentId: options.parentAgentId,
-      missionId: options.missionId,
+      parentAgentId: resolvedOptions.parentAgentId,
+      missionId: resolvedOptions.missionId,
+      metadata: {
+        provider_resolution: {
+          preferredProvider: options.provider,
+          preferredModelId: options.modelId || null,
+          strategy: resolvedTarget.strategy,
+          availableProviders: resolvedTarget.availableProviders,
+        },
+      },
     });
 
     agentRegistry.updateStatus(agentId, 'booting');
 
+    if (resolvedTarget.strategy === 'fallback') {
+      logger.info(
+        `[LIFECYCLE] Falling back agent ${agentId} from ${options.provider}/${options.modelId || '-'} to ${resolvedOptions.provider}/${resolvedOptions.modelId || '-'}`,
+      );
+    }
+
     // Codex and Claude use exec mode, not ACP
-    if (options.provider === 'codex' || options.provider === 'claude') {
+    if (resolvedOptions.provider === 'codex' || resolvedOptions.provider === 'claude') {
       let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter;
 
-      if (options.provider === 'claude') {
+      if (resolvedOptions.provider === 'claude') {
         // Resolve tool restrictions from manifest
         const { allowedTools, disallowedTools } = ClaudeAdapter.resolveToolRestrictions(
           manifest?.allowedActuators || [],
           manifest?.deniedActuators || []
         );
         adapter = new ClaudeAdapter({
-          systemPrompt: options.systemPrompt,
-          cwd: options.cwd || PROJECT_ROOT,
-          model: options.modelId,
+          systemPrompt: resolvedOptions.systemPrompt,
+          cwd: resolvedOptions.cwd || PROJECT_ROOT,
+          model: resolvedOptions.modelId,
           allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
           disallowedTools: disallowedTools.length > 0 ? disallowedTools : undefined,
           permissionMode: 'auto',
@@ -248,10 +278,10 @@ class AgentLifecycleManagerImpl {
           adapter = new CodexAdapter();
         } else {
           adapter = new CodexAppServerAdapter({
-            model: options.modelId,
+            model: resolvedOptions.modelId,
             modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
-            cwd: options.cwd || PROJECT_ROOT,
-            systemPrompt: options.systemPrompt,
+            cwd: resolvedOptions.cwd || PROJECT_ROOT,
+            systemPrompt: resolvedOptions.systemPrompt,
             approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
           });
         }
@@ -262,15 +292,15 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: options.missionId || agentId,
-        ownerType: options.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.missionId || agentId,
+        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
-        metadata: { provider: options.provider, modelId: options.modelId || config?.defaultModel || options.provider },
+        metadata: { provider: resolvedOptions.provider, modelId: resolvedOptions.modelId || config?.defaultModel || resolvedOptions.provider },
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');
-      logger.info(`[LIFECYCLE] Agent ${agentId} (${options.provider}) ready.`);
+      logger.info(`[LIFECYCLE] Agent ${agentId} (${resolvedOptions.provider}) ready.`);
 
       const handle: AgentHandle = {
         agentId,
@@ -308,16 +338,16 @@ class AgentLifecycleManagerImpl {
     // ACP-based agents (gemini, claude, etc.)
     if (!config) {
       agentRegistry.updateStatus(agentId, 'error');
-      throw new Error(`Unknown provider: ${options.provider}. Supported: ${Object.keys(PROVIDER_CONFIG).join(', ')}, codex`);
+      throw new Error(`Unknown provider: ${resolvedOptions.provider}. Supported: ${Object.keys(PROVIDER_CONFIG).join(', ')}, codex`);
     }
 
     const mediatorOpts: ACPMediatorOptions = {
       threadId: agentId,
       bootCommand: config.bootCommand,
       bootArgs: [...config.bootArgs],
-      modelId: options.modelId || config.defaultModel,
-      systemPrompt: options.systemPrompt,
-      cwd: options.cwd || PROJECT_ROOT,
+      modelId: resolvedOptions.modelId || config.defaultModel,
+      systemPrompt: resolvedOptions.systemPrompt,
+      cwd: resolvedOptions.cwd || PROJECT_ROOT,
     };
 
     const mediator = new ACPMediator(mediatorOpts);
@@ -328,15 +358,15 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: options.missionId || agentId,
-        ownerType: options.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.missionId || agentId,
+        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
-        metadata: { provider: options.provider, modelId: mediatorOpts.modelId },
+        metadata: { provider: resolvedOptions.provider, modelId: mediatorOpts.modelId },
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');
-      logger.info(`[LIFECYCLE] Agent ${agentId} (${options.provider}/${mediatorOpts.modelId}) ready.`);
+      logger.info(`[LIFECYCLE] Agent ${agentId} (${resolvedOptions.provider}/${mediatorOpts.modelId}) ready.`);
     } catch (e: any) {
       agentRegistry.updateStatus(agentId, 'error');
       this.mediators.delete(agentId);

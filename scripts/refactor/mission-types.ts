@@ -22,6 +22,15 @@ export interface MissionState {
       traceability_refs?: string[];
       note?: string;
     };
+    track?: {
+      track_id?: string;
+      track_name?: string;
+      track_type?: 'delivery' | 'release' | 'change' | 'incident' | 'operations' | 'governance' | 'compliance' | 'research';
+      lifecycle_model?: string;
+      relationship_type: 'belongs_to' | 'supports' | 'governs' | 'independent';
+      traceability_refs?: string[];
+      note?: string;
+    };
   };
   delegation?: {
     agent_id: string;
@@ -45,7 +54,7 @@ export interface MissionState {
 
 export type MissionRelationships = NonNullable<MissionState['relationships']>;
 
-export const BOOLEAN_FLAGS = new Set(['--ephemeral', '--refresh', '--seal', '--force', '--execute']);
+export const BOOLEAN_FLAGS = new Set(['--ephemeral', '--refresh', '--seal', '--force', '--execute', '--dry-run']);
 export const VALUE_FLAGS = new Set([
   '--persona',
   '--tenant',
@@ -53,6 +62,10 @@ export const VALUE_FLAGS = new Set([
   '--mission-type',
   '--vision',
   '--vision-ref',
+  '--tier',
+  '--relationships',
+  '--relationships-json',
+  '--relationships-file',
   '--project-id',
   '--project-path',
   '--project-relationship',
@@ -60,6 +73,13 @@ export const VALUE_FLAGS = new Set([
   '--gate-impact',
   '--traceability-refs',
   '--project-note',
+  '--track-id',
+  '--track-name',
+  '--track-type',
+  '--lifecycle-model',
+  '--track-relationship',
+  '--track-traceability-refs',
+  '--track-note',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

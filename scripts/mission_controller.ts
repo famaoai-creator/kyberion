@@ -18,6 +18,8 @@
 import * as path from 'node:path';
 import {
   findMissionPath,
+  loadProjectRecord,
+  loadProjectTrackRecord,
   logger,
   pathResolver,
   safeReadFile,
@@ -27,14 +29,15 @@ import {
   safeReaddir,
   safeUnlinkSync,
   transitionStatus,
+  validateWritePermission,
 } from '@agent/core';
 
 // --- Sub-module imports ---
 import { type MissionState, type MissionRelationships } from './refactor/mission-types.js';
 import {
   extractMissionControllerPositionalArgs,
+  extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
-  extractProjectRelationshipOptions,
 } from './refactor/mission-cli-args.js';
 import { getGitHash, initMissionRepo, getCurrentBranch } from './refactor/mission-git.js';
 import {
@@ -49,6 +52,8 @@ import { createMission as _createMission, startMission as _startMission } from '
 import {
   syncProjectLedger as _syncProjectLedger,
   syncProjectLedgerIfLinked as _syncProjectLedgerIfLinked,
+  resolveProjectLedgerJsonPath,
+  resolveProjectLedgerPath,
 } from './refactor/mission-project-ledger.js';
 import {
   delegateMission as _delegateMission,
@@ -74,7 +79,103 @@ import {
 } from './refactor/mission-governance.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
-export { extractMissionControllerPositionalArgs, extractProjectRelationshipOptionsFromArgv, assertCanGrantMissionAuthority };
+export { extractMissionControllerPositionalArgs, extractProjectRelationshipOptionsFromArgv, extractMissionStartCreateOptionsFromArgv, assertCanGrantMissionAuthority };
+
+export interface ResolvedMissionCliInput {
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  missionType?: string;
+  visionRef?: string;
+  persona?: string;
+  relationships?: MissionRelationships;
+  ledgerTargets?: {
+    markdown: string;
+    json: string;
+  };
+}
+
+export function resolveMissionStartCreateInputFromArgv(argv: string[] = process.argv): ResolvedMissionCliInput {
+  const positionalArgs = extractMissionControllerPositionalArgs(argv);
+  const arg2 = positionalArgs[2];
+  const arg3 = positionalArgs[3];
+  const arg4 = positionalArgs[4];
+  const arg5 = positionalArgs[5];
+  const arg6 = positionalArgs[6];
+  const arg7 = positionalArgs[7];
+  const namedStartCreateOptions = extractMissionStartCreateOptionsFromArgv(argv);
+  const relationships = normalizeRelationships(
+    JSON.parse(arg7 || '{}'),
+    namedStartCreateOptions.relationships || {},
+  );
+  if (relationships?.project?.project_id && !relationships.track?.track_id) {
+    const projectRecord = loadProjectRecord(relationships.project.project_id);
+    const defaultTrackId = projectRecord?.default_track_id;
+    if (defaultTrackId) {
+      const trackRecord = loadProjectTrackRecord(defaultTrackId);
+      if (trackRecord) {
+        relationships.track = {
+          relationship_type: 'belongs_to',
+          track_id: trackRecord.track_id,
+          track_name: trackRecord.name,
+          track_type: trackRecord.track_type,
+          lifecycle_model: trackRecord.lifecycle_model,
+          traceability_refs: [],
+        };
+      }
+    }
+  }
+  const projectPath = relationships?.project?.project_path;
+
+  return {
+    tier: namedStartCreateOptions.tier || (arg2 as any),
+    tenantId: namedStartCreateOptions.tenantId || arg3,
+    missionType: namedStartCreateOptions.missionType || arg4,
+    visionRef: namedStartCreateOptions.visionRef || arg5,
+    persona: namedStartCreateOptions.persona || arg6,
+    relationships,
+    ledgerTargets: projectPath
+      ? {
+          markdown: resolveProjectLedgerPath(projectPath),
+          json: resolveProjectLedgerJsonPath(projectPath),
+        }
+      : undefined,
+  };
+}
+
+export function validateMissionStartCreateInput(
+  actionName: 'create' | 'start',
+  missionId?: string,
+  argv: string[] = process.argv,
+): ResolvedMissionCliInput {
+  const input = resolveMissionStartCreateInputFromArgv(argv);
+  if (!missionId) return input;
+  const project = input.relationships?.project;
+  const track = input.relationships?.track;
+  if (project?.project_id && !project.project_path) {
+    throw new Error(`${actionName} ${missionId}: --project-id requires --project-path`);
+  }
+  if (project?.project_path && !project.project_id) {
+    throw new Error(`${actionName} ${missionId}: --project-path requires --project-id`);
+  }
+  if (track?.track_id && !project?.project_id) {
+    throw new Error(`${actionName} ${missionId}: --track-id requires --project-id`);
+  }
+  if (project?.project_path && input.ledgerTargets) {
+    const markdownGuard = validateWritePermission(input.ledgerTargets.markdown);
+    if (!markdownGuard.allowed) {
+      throw new Error(
+        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.markdown)}' is not writable under current authority. ${markdownGuard.reason}`,
+      );
+    }
+    const jsonGuard = validateWritePermission(input.ledgerTargets.json);
+    if (!jsonGuard.allowed) {
+      throw new Error(
+        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.json)}' is not writable under current authority. ${jsonGuard.reason}`,
+      );
+    }
+  }
+  return input;
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ROOT_DIR = pathResolver.rootDir();
@@ -268,6 +369,13 @@ function showMissionStatus(id: string) {
     console.log(`  Relation:    ${state.relationships.project.relationship_type}`);
     console.log(`  Gate Impact: ${state.relationships.project.gate_impact || 'none'}`);
   }
+  if (state.relationships?.track) {
+    console.log(`  Track:       ${state.relationships.track.track_id || '-'}`);
+    if (state.relationships.track.track_name) {
+      console.log(`  Track Name:  ${state.relationships.track.track_name}`);
+    }
+    console.log(`  Track Rel:   ${state.relationships.track.relationship_type}`);
+  }
 
   console.log(`  Next:        ${nextAction}`);
 
@@ -287,9 +395,8 @@ Kyberion Sovereign Mission Controller (KSMC)
 Usage: node dist/scripts/mission_controller.js <command> [args]
 
 Lifecycle Commands:
-  create   <ID> [tier] [tenant] [type] [vision] [persona] [relationships]
-                                 Create a new mission (status: planned)
-  start    <ID> [tier]           Activate a mission (planned/paused/failed → active)
+  create   <ID>                  Create a new mission (status: planned)
+  start    <ID>                  Activate a mission (planned/paused/failed → active)
   checkpoint [task_id] [note]    Record a checkpoint on the current active mission
   verify   <ID> <verified|rejected> <note>
                                  Verify a mission (active → distilling or back to active)
@@ -323,6 +430,23 @@ Maintenance Commands:
 Typical Workflow:
   start → checkpoint (repeat) → verify → distill → finish
 
+Mission Input Contract:
+  Positionals:
+    <ID>                         Only the mission ID should be positional for create/start
+  Preferred named options:
+    --tier <personal|confidential|public>
+    --tenant-id <TENANT>
+    --mission-type <TYPE>
+    --vision-ref <REF>
+    --persona <NAME>
+    --dry-run
+    --relationships <JSON>
+    --relationships-file <PATH>
+
+  Validation:
+    Linked project missions must point to a project_path whose 04_control ledger
+    is writable under the current authority. Unsafe targets like libs/core will fail fast.
+
 Project Traceability Options:
   --project-id <ID>              Link mission to a project identifier
   --project-path <PATH>          Record the related project-os path
@@ -331,6 +455,15 @@ Project Traceability Options:
   --gate-impact <TYPE>           none | informational | review_required | blocking
   --traceability-refs <CSV>      Comma-separated evidence or document refs
   --project-note <TEXT>          Free-text note for the project relationship
+
+Track Traceability Options:
+  --track-id <ID>                Link mission to a project track identifier
+  --track-name <NAME>            Human-readable track name
+  --track-type <TYPE>            delivery | release | change | incident | operations | governance
+  --lifecycle-model <MODEL>      Track lifecycle profile (for example default-sdlc)
+  --track-relationship <TYPE>    belongs_to | supports | governs | independent
+  --track-traceability-refs <CSV> Comma-separated track-level refs
+  --track-note <TEXT>            Free-text note for the track relationship
 `);
 }
 
@@ -377,11 +510,35 @@ async function main() {
   const arg7 = positionalArgs[7];
 
   const hasRefresh = process.argv.includes('--refresh');
-  const relationshipOptions = extractProjectRelationshipOptions();
+  const hasDryRun = process.argv.includes('--dry-run');
 
   switch (action) {
-    case 'create': await createMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
-    case 'start': await startMission(arg1, arg2 as any, arg3, arg4, arg5, arg6, normalizeRelationships(JSON.parse(arg7 || '{}'), relationshipOptions)); break;
+    case 'create': {
+      const input = validateMissionStartCreateInput('create', arg1);
+      if (hasDryRun) {
+        console.log(JSON.stringify({
+          action: 'create',
+          mission_id: arg1,
+          input,
+        }, null, 2));
+        break;
+      }
+      await createMission(arg1, input.tier as any, input.tenantId, input.missionType, input.visionRef, input.persona, input.relationships);
+      break;
+    }
+    case 'start': {
+      const input = validateMissionStartCreateInput('start', arg1);
+      if (hasDryRun) {
+        console.log(JSON.stringify({
+          action: 'start',
+          mission_id: arg1,
+          input,
+        }, null, 2));
+        break;
+      }
+      await startMission(arg1, input.tier as any, input.persona, input.tenantId, input.missionType, input.visionRef, input.relationships);
+      break;
+    }
     case 'grant': await grantMissionAccess(arg1, arg2, arg3 ? parseInt(arg3) : undefined); break;
     case 'sudo': await grantMissionSudo(arg1, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined); break;
     case 'checkpoint':

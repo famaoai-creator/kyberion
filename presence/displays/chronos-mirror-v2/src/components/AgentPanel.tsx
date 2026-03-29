@@ -39,6 +39,12 @@ interface AgentRecord {
   } | null;
   supportsSoftRefresh: boolean;
   providerRuntime?: Record<string, unknown>;
+  providerResolution?: {
+    preferredProvider?: string;
+    preferredModelId?: string;
+    strategy?: string;
+    availableProviders?: string[];
+  } | null;
 }
 
 interface HealthSnapshot {
@@ -57,6 +63,8 @@ interface ManifestEntry {
   capabilities: string[];
   trustRequired: number;
   requiresEnv: string[];
+  providerStrategy?: string;
+  fallbackProviders?: string[];
 }
 
 interface ProviderOption {
@@ -84,6 +92,14 @@ const STATUS_COLORS: Record<string, string> = {
   shutdown: "bg-gray-800",
 };
 
+function describeProviderResolution(agent: AgentRecord): string | null {
+  const resolution = agent.providerResolution;
+  if (!resolution?.preferredProvider) return null;
+  const preferred = `${resolution.preferredProvider}${resolution.preferredModelId ? `/${resolution.preferredModelId}` : ""}`;
+  const resolved = `${agent.provider}${agent.modelId ? `/${agent.modelId}` : ""}`;
+  return `preferred ${preferred} -> resolved ${resolved} [${resolution.strategy || "preferred"}]`;
+}
+
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const locale = resolveChronosLocale();
   const at = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
@@ -98,6 +114,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const [selectedManifest, setSelectedManifest] = useState("");
   const [spawnProvider, setSpawnProvider] = useState("");
   const [spawnModel, setSpawnModel] = useState("");
+  const [spawnProviderStrategy, setSpawnProviderStrategy] = useState<"strict" | "preferred" | "adaptive">("adaptive");
+  const [spawnFallbackProviders, setSpawnFallbackProviders] = useState("");
   const [spawnPrompt, setSpawnPrompt] = useState("");
   const [viewingLogs, setViewingLogs] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ ts: number; type: string; content: string }[]>([]);
@@ -177,6 +195,13 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           provider: spawnProvider,
           modelId: spawnModel,
           systemPrompt: spawnPrompt || undefined,
+          runtimeMetadata: {
+            provider_strategy: spawnProviderStrategy,
+            fallback_providers: spawnFallbackProviders
+              .split(",")
+              .map((entry) => entry.trim())
+              .filter(Boolean),
+          },
         };
       }
 
@@ -188,6 +213,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       if (res.ok) {
         setShowSpawn(false);
         setSpawnPrompt("");
+        setSpawnProviderStrategy("adaptive");
+        setSpawnFallbackProviders("");
         await fetchAgents();
       } else {
         const err = await res.json();
@@ -307,6 +334,11 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <span>Trust: {trustLabel}</span>
                   {agent.capabilities.length > 0 && <span>[{agent.capabilities.join(", ")}]</span>}
                 </div>
+                {describeProviderResolution(agent) ? (
+                  <div className="text-[8px] opacity-35 mt-1 font-mono">
+                    {describeProviderResolution(agent)}
+                  </div>
+                ) : null}
                 <div className="text-[8px] opacity-35 flex flex-wrap gap-3 mt-1 font-mono">
                   <span>turns {metrics.turnCount}</span>
                   <span>errors {metrics.errorCount}</span>
@@ -435,6 +467,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                               <span className="text-yellow-500">needs: {m.requiresEnv.join(", ")}</span>
                             )}
                           </div>
+                          <div className="text-[8px] opacity-35 mt-1 font-mono">
+                            strategy {m.providerStrategy || "adaptive"}{(m.fallbackProviders || []).length ? ` · fallback ${(m.fallbackProviders || []).join(", ")}` : ""}
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -486,6 +521,27 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     rows={2}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] outline-none resize-none"
                   />
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <select
+                      value={spawnProviderStrategy}
+                      onChange={(e) => setSpawnProviderStrategy(e.target.value as "strict" | "preferred" | "adaptive")}
+                      className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                    >
+                      <option value="adaptive">adaptive</option>
+                      <option value="preferred">preferred</option>
+                      <option value="strict">strict</option>
+                    </select>
+                    <input
+                      value={spawnFallbackProviders}
+                      onChange={(e) => setSpawnFallbackProviders(e.target.value)}
+                      placeholder="fallback providers (claude,codex)"
+                      className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                    />
+                  </div>
+                  <div className="text-[9px] opacity-35 font-mono">
+                    routing strategy {spawnProviderStrategy}
+                    {spawnFallbackProviders.trim() ? ` · fallback ${spawnFallbackProviders}` : ""}
+                  </div>
                 </>
               )}
 

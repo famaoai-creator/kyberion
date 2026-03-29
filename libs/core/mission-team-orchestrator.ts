@@ -88,6 +88,10 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
         provider: profile.provider,
         modelId: profile.modelId,
         capabilities: profile.capabilities,
+        runtimeMetadata: {
+          provider_strategy: profile.provider_strategy || 'adaptive',
+          fallback_providers: profile.fallback_providers || [],
+        },
         missionId: missionId.toUpperCase(),
         requestedBy: 'mission_team_orchestrator',
       };

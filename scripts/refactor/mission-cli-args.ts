@@ -3,7 +3,17 @@
  * CLI argument parsing utilities for the Mission Controller.
  */
 
+import { safeExistsSync, safeReadFile } from '@agent/core';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
+
+export interface MissionStartCreateOptions {
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  missionType?: string;
+  visionRef?: string;
+  persona?: string;
+  relationships?: Partial<MissionRelationships>;
+}
 
 export function extractMissionControllerPositionalArgs(argv: string[]): string[] {
   const rawArgs = argv.slice(2);
@@ -72,6 +82,71 @@ export function extractProjectRelationshipOptionsFromArgv(argv: string[]): Parti
   };
 }
 
+export function extractTrackRelationshipOptionsFromArgv(argv: string[]): Partial<MissionRelationships> {
+  const trackId = getOptionValue('--track-id', argv);
+  const trackName = getOptionValue('--track-name', argv);
+  const trackType = getOptionValue('--track-type', argv) as MissionRelationships['track'] extends infer T
+    ? T extends { track_type: infer R } ? R : never
+    : never;
+  const lifecycleModel = getOptionValue('--lifecycle-model', argv);
+  const relationshipType = getOptionValue('--track-relationship', argv) as MissionRelationships['track'] extends infer T
+    ? T extends { relationship_type: infer R } ? R : never
+    : never;
+  const traceabilityRefs = parseCsvOption('--track-traceability-refs', argv);
+  const note = getOptionValue('--track-note', argv);
+
+  const hasTrackOptions = Boolean(
+    trackId || trackName || trackType || lifecycleModel || relationshipType || traceabilityRefs?.length || note,
+  );
+
+  if (!hasTrackOptions) {
+    return {};
+  }
+
+  return {
+    track: {
+      relationship_type: relationshipType || 'belongs_to',
+      track_id: trackId,
+      track_name: trackName,
+      track_type: trackType,
+      lifecycle_model: lifecycleModel,
+      traceability_refs: traceabilityRefs || [],
+      note,
+    },
+  };
+}
+
 export function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
   return extractProjectRelationshipOptionsFromArgv(process.argv);
+}
+
+export function extractJsonRelationshipsOption(argv: string[] = process.argv): Partial<MissionRelationships> {
+  const raw = getOptionValue('--relationships-json', argv) || getOptionValue('--relationships', argv);
+  if (!raw) return {};
+  return JSON.parse(raw) as Partial<MissionRelationships>;
+}
+
+export function extractFileRelationshipsOption(argv: string[] = process.argv): Partial<MissionRelationships> {
+  const filePath = getOptionValue('--relationships-file', argv);
+  if (!filePath) return {};
+  if (!safeExistsSync(filePath)) {
+    throw new Error(`Relationships file not found: ${filePath}`);
+  }
+  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Partial<MissionRelationships>;
+}
+
+export function extractMissionStartCreateOptionsFromArgv(argv: string[] = process.argv): MissionStartCreateOptions {
+  return {
+    tier: getOptionValue('--tier', argv) as MissionStartCreateOptions['tier'] | undefined,
+    tenantId: getOptionValue('--tenant-id', argv) || getOptionValue('--tenant', argv),
+    missionType: getOptionValue('--mission-type', argv),
+    visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),
+    persona: getOptionValue('--persona', argv),
+    relationships: {
+      ...extractJsonRelationshipsOption(argv),
+      ...extractFileRelationshipsOption(argv),
+      ...extractProjectRelationshipOptionsFromArgv(argv),
+      ...extractTrackRelationshipOptionsFromArgv(argv),
+    },
+  };
 }

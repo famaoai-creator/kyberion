@@ -6,6 +6,7 @@
       "team_roles": ["owner", "tester", "operator"],
       "provider": "gemini",
       "modelId": "auto-gemini-3",
+      "provider_strategy": "strict",
       "capabilities": ["reasoning", "coordination", "routing", "analysis"]
     },
     "planner-agent": {
@@ -13,6 +14,7 @@
       "team_roles": ["planner"],
       "provider": "gemini",
       "modelId": "auto-gemini-3",
+      "provider_strategy": "strict",
       "capabilities": ["planning", "strategy", "decomposition", "coordination"]
     },
     "implementation-architect": {
@@ -20,6 +22,8 @@
       "team_roles": ["planner", "implementer", "reviewer", "tester", "experience_designer"],
       "provider": "gemini",
       "modelId": "auto-gemini-3",
+      "provider_strategy": "preferred",
+      "fallback_providers": ["claude", "codex"],
       "capabilities": ["architecture", "code", "review", "planning", "a2a"]
     },
     "sovereign-brain": {
@@ -27,6 +31,7 @@
       "team_roles": ["owner", "planner", "reviewer", "product_strategist"],
       "provider": "gemini",
       "modelId": "auto-gemini-3",
+      "provider_strategy": "strict",
       "capabilities": ["reasoning", "strategy", "coordination", "analysis"]
     },
     "slack-surface-agent": {
@@ -34,6 +39,8 @@
       "team_roles": ["surface_liaison"],
       "provider": "gemini",
       "modelId": "gemini-2.5-flash",
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "copilot", "codex"],
       "capabilities": ["slack", "surface", "conversation", "delegation"]
     },
     "chronos-mirror": {
@@ -41,6 +48,8 @@
       "team_roles": ["operator", "surface_liaison"],
       "provider": "gemini",
       "modelId": "gemini-2.5-flash",
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "copilot", "codex"],
       "capabilities": ["a2ui", "dashboard", "commands", "gateway"]
     },
     "presence-surface-agent": {
@@ -48,6 +57,8 @@
       "team_roles": ["surface_liaison"],
       "provider": "gemini",
       "modelId": "gemini-2.5-flash",
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "copilot", "codex"],
       "capabilities": ["presence", "surface", "conversation", "realtime"]
     },
     "onboarding-surface-agent": {
@@ -55,6 +66,8 @@
       "team_roles": ["surface_liaison"],
       "provider": "gemini",
       "modelId": "gemini-2.5-flash",
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "copilot", "codex"],
       "capabilities": ["onboarding", "surface", "identity", "guidance"]
     }
   }

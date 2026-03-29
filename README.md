@@ -4,7 +4,11 @@
 [![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
 [![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
 
-Kyberion is an intent-driven agent operating system.
+Kyberion is an Organization Work Loop engine.
+
+It turns organizational intent into governed execution, evidence, and reusable memory.
+
+For the top-level architecture, see [knowledge/public/architecture/organization-work-loop.md](/Users/famao/kyberion/knowledge/public/architecture/organization-work-loop.md).
 
 The intended user experience is simple:
 
@@ -23,6 +27,12 @@ Kyberion should feel like this:
 
 ```text
 Intent -> Plan -> Result
+```
+
+This is the user-facing simplification of a larger organizational model:
+
+```text
+Intent -> Context -> Resolution -> Outcome Design -> Teaming -> Authority -> Execution -> Accounting -> Learning
 ```
 
 Examples:
@@ -158,7 +168,7 @@ Examples:
 
 ### Execution
 
-The internal layer where Kyberion uses missions, sessions, actuators, and ADF.
+The internal layer where Kyberion uses projects, missions, task sessions, actuators, and ADF.
 
 This layer exists for durability, governance, replayability, and safety.
 

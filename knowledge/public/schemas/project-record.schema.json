@@ -43,6 +43,11 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "default_track_id": { "type": "string" },
+    "active_tracks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "bootstrap_work_items": {
       "type": "array",
       "items": {

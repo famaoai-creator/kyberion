@@ -1,0 +1,41 @@
+{
+  "pipeline_id": "marketing-strategy-distillation",
+  "version": "1.0.0",
+  "description": "Distill a marketing strategy for general users",
+  "action": "pipeline",
+  "context": {
+    "target_audience": "General users, Business managers, Solo entrepreneurs",
+    "product_name": "Kyberion",
+    "output_path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/strategy.md"
+  },
+  "steps": [
+    {
+      "id": "strategy-distill",
+      "type": "transform",
+      "op": "wisdom:distill",
+      "params": {
+        "context": "Produce a marketing strategy for {{product_name}} aimed at {{target_audience}}. Focus on 'Safety through Governance' and 'Simplicity through Intents'.",
+        "format": "markdown",
+        "export_as": "marketing_copy"
+      }
+    },
+    {
+      "id": "render-deck",
+      "type": "apply",
+      "op": "media:document_report_design_from_brief",
+      "params": {
+        "brief": "{{marketing_copy}}",
+        "output_path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/expansion_plan.pdf"
+      }
+    },
+    {
+      "id": "write-markdown",
+      "type": "apply",
+      "op": "file:write",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{marketing_copy}}"
+      }
+    }
+  ]
+}

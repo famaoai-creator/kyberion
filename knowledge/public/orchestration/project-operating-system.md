@@ -12,6 +12,11 @@
 - 運用設計書
 - テスト結果報告書
 - ゲーティング資料
+- 要件トレーサビリティマトリクス
+- リリース判定チェックリスト
+- ロールバック計画
+- デプロイ確認報告
+- コンプライアンス統制マトリクス
 
 ## Core Concept
 
@@ -34,11 +39,19 @@
 
 この 2 軸で見ると、各文書の役割が明確になります。
 
+ただし、`Project = 1 SDLC` と固定しません。  
+Project は長寿命の統制単位で、その下に複数の `Track` を持てます。
+
+- `Project`
+  - charter, stakeholder, communication などの共有統制
+- `Track`
+  - requirements, design, validation, release の実行線
+
 ## Five Control Layers
 
 ### 1. Why
 
-プロジェクトの存在理由と成功条件を定義する層です。
+project の存在理由と成功条件を定義する層です。
 
 代表文書:
 
@@ -48,17 +61,18 @@
 
 ### 2. What
 
-何を作るか、何を満たすべきかを定義する層です。
+track ごとに、何を作るか、何を満たすべきかを定義する層です。
 
 代表文書:
 
 - [`requirements-definition.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/requirements-definition.md)
+- [`requirements-traceability-matrix.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/requirements-traceability-matrix.md)
 - [`slo-sli-definition.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/slo-sli-definition.md)
 - [`information-asset-registry.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/information-asset-registry.md)
 
 ### 3. How
 
-どう作るか、どう動かすかを定義する層です。
+track ごとに、どう作るか、どう動かすかを定義する層です。
 
 代表文書:
 
@@ -69,10 +83,12 @@
 - [`operation-runbook.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/operation-runbook.md)
 - [`data-flow-lifecycle-map.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/data-flow-lifecycle-map.md)
 - [`environment-setup-guide.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/environment-setup-guide.md)
+- [`compliance-control-matrix.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/compliance-control-matrix.md)
 
 ### 4. Control
 
-進行管理、意思決定、変更統制、品質統制を担う層です。
+進行管理、意思決定、変更統制、品質統制を担う層です。  
+この層は project 共通の control と、track ごとの execution control が混在します。
 
 代表文書:
 
@@ -85,13 +101,17 @@
 
 ### 5. Evidence
 
-本当にできたか、出荷してよいかを証明する層です。
+track ごとに、本当にできたか、出荷してよいかを証明する層です。
 
 代表文書:
 
 - [`test-plan.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-plan.md)
+- [`test-case-specification.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-case-specification.md)
 - [`test-validation-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-validation-report.md)
 - [`security-audit-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/security-audit-report.md)
+- [`release-readiness-checklist.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/release-readiness-checklist.md)
+- [`rollback-plan.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/rollback-plan.md)
+- [`deployment-verification-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/deployment-verification-report.md)
 - [`incident-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/incident-report.md)
 - [`mission-closure-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/mission-closure-report.md)
 
@@ -104,6 +124,10 @@
 - なぜやるか
 - 誰が意思決定するか
 - 何を成功とみなすか
+
+scope:
+
+- `project`
 
 必須成果物:
 
@@ -118,9 +142,14 @@
 - 何を作るか
 - 何を受け入れ条件とするか
 
+scope:
+
+- `track`
+
 必須成果物:
 
 - Requirements Definition
+- Requirements Traceability Matrix
 - SLO/SLI Definition
 - Information Asset Registry
 
@@ -131,6 +160,10 @@
 - どう実現するか
 - どう運用するか
 
+scope:
+
+- `track`
+
 必須成果物:
 
 - Basic Design
@@ -139,12 +172,18 @@
 - Operational Design
 - Data Flow & Lifecycle Map
 - Operation Runbook
+- Environment Setup Guide
+- Compliance Control Matrix
 
 ### Build
 
 目的:
 
 - 実装を統制された形で進める
+
+scope:
+
+- `track`
 
 必須成果物:
 
@@ -160,9 +199,15 @@
 
 - できたことを証明し、リリース可否を判断する
 
+scope:
+
+- `track`
+
 必須成果物:
 
 - Test Plan
+- Test Case Specification
+- Requirements Traceability Matrix
 - Test Validation Report
 - Security Audit Report
 - Gate Review Material
@@ -173,9 +218,16 @@
 
 - 運用へ安全に引き継ぎ、改善を継続する
 
+scope:
+
+- `track`
+
 必須成果物:
 
+- Release Readiness Checklist
 - Cutover / Migration Plan
+- Rollback Plan
+- Deployment Verification Report
 - Operation Runbook
 - User Manual / FAQ
 - Incident Report
@@ -205,17 +257,30 @@
 
 と紐づいている必要があります。
 
-同じ考え方で、`Mission` も `Project` と同一視しません。整合は project 側の `mission-ledger.md` と、mission 側の `relationships.project` で持ちます。
+同じく、`リリース判定` も単独会議にしません。必ず
+
+- requirements-traceability-matrix
+- compliance-control-matrix
+- release-readiness-checklist
+- rollback-plan
+- deployment-verification-report
+
+と結びます。
+
+同じ考え方で、`Mission` も `Project` や `Track` と同一視しません。整合は project / track 側の ledger と、mission 側の relationship で持ちます。
 
 - `Project`
   - 長寿命の統制単位
-  - 憲章、要件、設計、gate を持つ
+  - 憲章、共有方針、stakeholder 文書を持つ
+- `Track`
+  - project 配下の delivery / change / release / incident 線
+  - 要件、設計、validation、release gate を持つ
 - `Mission`
   - 短寿命の実行単位
   - 改修、調査、提案、検証、障害対応などを担う
 - `Mission Ledger`
   - 両者を結ぶ台帳
-  - どの mission がどの artifacts / gate に影響したかを記録する
+  - どの mission がどの project / track / artifacts / gate に影響したかを記録する
 
 推奨関係種別:
 
@@ -223,6 +288,34 @@
 - `supports`
 - `governs`
 - `independent`
+
+## SDLC Gates
+
+Project Operating System では、各 phase の終わりに gate を置きます。  
+通常、`Initiation Approval` は project scope、それ以降は track scope です。
+
+1. `Initiation Approval`
+- Project Charter と Business Impact Analysis を承認する
+
+2. `Requirements Baseline`
+- Requirements Definition と Traceability Matrix を baseline 化する
+
+3. `Design Approval`
+- Architecture / Detailed / Operational Design と Control Matrix を承認する
+
+4. `Build Readiness`
+- PM / Mission / Change の control artifacts が稼働していることを確認する
+
+5. `Validation Approval`
+- Test, Security, Traceability, Gate Packet を揃えて release candidate を評価する
+
+6. `Release Readiness`
+- Release Checklist, Cutover, Rollback, Deployment Verification を揃えて go / no-go を決める
+
+7. `Closure Review`
+- Incident / Post-Mortem / Closure Report で学習を固定する
+
+gate 詳細は [`sdlc-gating-model.md`](/Users/famao/kyberion/knowledge/public/architecture/sdlc-gating-model.md) と [`sdlc-gate-catalog.json`](/Users/famao/kyberion/knowledge/public/governance/sdlc-gate-catalog.json) を参照します。
 
 ## Recommended Directory Structure
 
@@ -232,35 +325,44 @@ project-os/
     project-charter.md
     business-impact-analysis.md
     stakeholder-communication-register.md
-  02_define/
-    requirements-definition.md
-    slo-sli-definition.md
-    information-asset-registry.md
-  03_design/
-    basic-design.md
-    architecture-design.md
-    detailed-design.md
-    operational-design.md
-    data-flow-lifecycle-map.md
-    operation-runbook.md
-  04_control/
-    project-management-plan.md
-    mission-ledger.md
-    raid-log.md
-    issue-log.md
-    change-control-ledger.md
-    gate-review-packet.md
-  05_validate/
-    test-plan.md
-    test-validation-report.md
-    security-audit-report.md
-    evidence/
-  06_transfer_run/
-    cutover-migration-plan.md
-    user-manual-faq.md
-    post-mortem.md
-    incident-report.md
-    mission-closure-report.md
+  tracks/
+    TRK-release-1/
+      02_define/
+        requirements-definition.md
+        requirements-traceability-matrix.md
+        slo-sli-definition.md
+        information-asset-registry.md
+      03_design/
+        basic-design.md
+        architecture-design.md
+        detailed-design.md
+        operational-design.md
+        data-flow-lifecycle-map.md
+        operation-runbook.md
+        environment-setup-guide.md
+        compliance-control-matrix.md
+      04_control/
+        project-management-plan.md
+        mission-ledger.md
+        raid-log.md
+        issue-log.md
+        change-control-ledger.md
+        gate-review-packet.md
+      05_validate/
+        test-plan.md
+        test-case-specification.md
+        test-validation-report.md
+        security-audit-report.md
+        evidence/
+      06_transfer_run/
+        release-readiness-checklist.md
+        cutover-migration-plan.md
+        rollback-plan.md
+        deployment-verification-report.md
+        user-manual-faq.md
+        post-mortem.md
+        incident-report.md
+        mission-closure-report.md
 ```
 
 ## Gating Concept

@@ -55,6 +55,41 @@ export interface WorkDesignSummary {
   }>;
 }
 
+export interface OrganizationWorkLoopSummary {
+  intent: {
+    label: string;
+  };
+  context: {
+    project_id?: string;
+    project_name?: string;
+    track_id?: string;
+    track_name?: string;
+    tier: 'personal' | 'confidential' | 'public';
+    locale?: string;
+    service_bindings: string[];
+  };
+  resolution: {
+    execution_shape: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+    task_type?: string;
+  };
+  outcome_design: {
+    outcome_ids: string[];
+    labels: string[];
+  };
+  teaming: {
+    specialist_id?: string;
+    specialist_label?: string;
+    conversation_agent?: string;
+    team_roles: string[];
+  };
+  authority: {
+    requires_approval: boolean;
+  };
+  learning: {
+    reusable_refs: string[];
+  };
+}
+
 function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | 'public' {
   return value === 'personal' || value === 'public' ? value : 'confidential';
 }
@@ -87,6 +122,36 @@ function loadStandardIntentCatalog(): StandardIntentCatalogFile['intents'] {
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
   return loadStandardIntentCatalog().find((intent) => intent?.id === intentId) || null;
+}
+
+function inferExecutionShape(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+  projectId?: string;
+}): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
+  if (input.shape === 'project_bootstrap' || input.intentId === 'bootstrap-project') {
+    return 'project_bootstrap';
+  }
+  if (input.shape === 'mission') {
+    return 'mission';
+  }
+  if (input.taskType) {
+    return 'task_session';
+  }
+  return 'direct_reply';
+}
+
+function inferIntentLabel(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+}): string {
+  if (input.intentId === 'bootstrap-project') return 'Project bootstrap';
+  if (input.intentId) return input.intentId;
+  if (input.taskType) return input.taskType;
+  if (input.queryType) return input.queryType;
+  return 'general_request';
 }
 
 function specialistIdForIntent(input: {
@@ -168,5 +233,65 @@ export function resolveWorkDesign(input: {
     team_roles: primary?.team_roles || [],
     outcomes: resolvedOutcomes,
     reusable_refs: reusableRefs,
+  };
+}
+
+export function buildOrganizationWorkLoopSummary(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+  outcomeIds?: string[];
+  tier?: 'personal' | 'confidential' | 'public';
+  projectId?: string;
+  projectName?: string;
+  trackId?: string;
+  trackName?: string;
+  locale?: string;
+  serviceBindings?: string[];
+  requiresApproval?: boolean;
+}): OrganizationWorkLoopSummary {
+  const tier = normalizeKnowledgeTier(input.tier);
+  const design = resolveWorkDesign({
+    intentId: input.intentId,
+    taskType: input.taskType,
+    queryType: input.queryType,
+    shape: input.shape,
+    outcomeIds: input.outcomeIds,
+    tier,
+  });
+  return {
+    intent: {
+      label: inferIntentLabel(input),
+    },
+    context: {
+      project_id: input.projectId,
+      project_name: input.projectName,
+      track_id: input.trackId,
+      track_name: input.trackName,
+      tier,
+      locale: input.locale,
+      service_bindings: Array.isArray(input.serviceBindings) ? input.serviceBindings : [],
+    },
+    resolution: {
+      execution_shape: inferExecutionShape(input),
+      task_type: input.taskType,
+    },
+    outcome_design: {
+      outcome_ids: design.outcomes.map((outcome) => outcome.id),
+      labels: design.outcomes.map((outcome) => outcome.label),
+    },
+    teaming: {
+      specialist_id: design.primary_specialist?.id,
+      specialist_label: design.primary_specialist?.label,
+      conversation_agent: design.conversation_agent || undefined,
+      team_roles: design.team_roles,
+    },
+    authority: {
+      requires_approval: Boolean(input.requiresApproval),
+    },
+    learning: {
+      reusable_refs: design.reusable_refs.map((ref) => ref.promoted_ref || ref.title),
+    },
   };
 }

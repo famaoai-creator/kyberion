@@ -9,6 +9,9 @@ import { buildRuntimeTopology } from "../../../lib/runtime-topology";
 import { collectComputerSessions, type ComputerSessionSummary } from "../../../lib/computer-sessions";
 import {
   buildExecutionEnv,
+  buildTrackGateReadinessSummaries,
+  buildTrackNextWorkProposal,
+  materializeTrackArtifactSkeleton,
   clearSurfaceOutboxMessage,
   createDistillCandidateRecord,
   decideApprovalRequest,
@@ -24,11 +27,13 @@ import {
   listMissionSeedRecords,
   listDistillCandidateRecords,
   listProjectRecords,
+  listProjectTrackRecords,
   listAgentRuntimeSnapshots,
   listServiceBindingRecords,
   listSurfaceOutboxMessages,
   loadMissionSeedRecord,
   loadProjectRecord,
+  loadProjectTrackRecord,
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
@@ -64,6 +69,10 @@ interface MissionSummary {
   status: string;
   tier: string;
   missionType?: string;
+  projectId?: string;
+  projectPath?: string;
+  trackId?: string;
+  trackName?: string;
   planReady: boolean;
   nextTaskCount: number;
   controlSummary: string;
@@ -168,6 +177,7 @@ interface PendingApprovalSummary {
   pendingRoles: string[];
   missionId?: string;
   serviceId?: string;
+  work_loop?: Record<string, unknown>;
 }
 
 interface BrowserSessionView extends BrowserSessionSummary {}
@@ -350,6 +360,14 @@ function buildApprovalDecisionText(input: {
   return `${input.title} was rejected. The requested work will stay blocked until it is revised.`;
 }
 
+function resolveProjectRootPath(project: ReturnType<typeof loadProjectRecord>): string | null {
+  if (!project) return null;
+  const repoRoot = project.repositories?.find((repo) => typeof repo.root_path === "string" && repo.root_path.trim());
+  if (repoRoot?.root_path) return repoRoot.root_path;
+  const metadataRoot = typeof project.metadata?.root_path === "string" ? project.metadata.root_path : null;
+  return metadataRoot || null;
+}
+
 function readJson<T = any>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   return JSON.parse(safeReadFile(filePath, { encoding: "utf8" }) as string) as T;
@@ -387,6 +405,10 @@ function collectActiveMissions(): MissionSummary[] {
           status: state.status,
           tier: state.tier || root.tier,
           missionType: state.mission_type,
+          projectId: state.relationships?.project?.project_id,
+          projectPath: state.relationships?.project?.project_path,
+          trackId: state.relationships?.track?.track_id,
+          trackName: state.relationships?.track?.track_name,
           planReady,
           nextTaskCount,
           controlSummary,
@@ -869,7 +891,9 @@ function collectPendingApprovals(): PendingApprovalSummary[] {
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.role) || [],
       missionId: request.requestedByContext?.missionId,
+      trackId: request.track_id,
       serviceId: request.target?.serviceId,
+      work_loop: request.work_loop,
     }))
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 24);
@@ -1067,7 +1091,10 @@ export async function GET(req: NextRequest) {
           requestedBy: typeof lease.metadata?.requestedBy === "string" ? lease.metadata.requestedBy : undefined,
           leaseKind: typeof lease.metadata?.execution_mode === "string" ? lease.metadata.execution_mode : undefined,
           pid: snapshot?.runtime?.pid,
-          metadata: lease.metadata,
+          metadata: {
+            ...(snapshot?.agent.metadata || {}),
+            ...(lease.metadata || {}),
+          },
         };
       });
     }
@@ -1076,14 +1103,19 @@ export async function GET(req: NextRequest) {
     const secretApprovals = collectPendingSecretApprovals();
     const pendingApprovals = collectPendingApprovals();
     const projects = listProjectRecords();
+    const projectTracks = listProjectTrackRecords();
     const missionSeeds = listMissionSeedRecords();
     const distillCandidates = listDistillCandidateRecords();
     const serviceBindings = listServiceBindingRecords();
-    const recentArtifacts = listArtifactRecords().slice(-8).reverse();
+    const allArtifacts = listArtifactRecords();
+    const recentArtifacts = allArtifacts.slice(-8).reverse();
+    const gateReadiness = buildTrackGateReadinessSummaries({ tracks: projectTracks, artifacts: allArtifacts });
     return NextResponse.json({
       activeMissions,
       missionProgress,
       projects,
+      projectTracks,
+      gateReadiness,
       missionSeeds,
       distillCandidates,
       serviceBindings,
@@ -1147,6 +1179,7 @@ export async function POST(req: NextRequest) {
       action !== "mission_control" &&
       action !== "surface_control" &&
       action !== "promote_mission_seed" &&
+      action !== "create_track_seed" &&
       action !== "distill_candidate_decision" &&
       action !== "approval_decision" &&
       action !== "close_browser_session" &&
@@ -1266,33 +1299,49 @@ export async function POST(req: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: "Parent project not found" }, { status: 404 });
       }
+      const projectPath = resolveProjectRootPath(project);
+      if (!projectPath) {
+        return NextResponse.json({ error: "Parent project has no governed root_path" }, { status: 400 });
+      }
       const missionId = `MSN-${seed.seed_id.replace(/^MSD-/, "")}`.toUpperCase();
       const persona = seed.specialist_id === "service-operator" ? "Reliability Engineer" : "Ecosystem Architect";
       const missionType = seed.mission_type_hint || "development";
       const env = buildExecutionEnv(process.env, "mission_controller");
-      const startOutput = safeExec(
-        "node",
-        [
-          "dist/scripts/mission_controller.js",
-          "start",
-          missionId,
-          project.tier,
-          persona,
-          "default",
-          missionType,
-          "--project-id",
-          project.project_id,
-          "--project-relationship",
-          "belongs_to",
-          "--project-note",
-          `Promoted from mission seed ${seed.seed_id}`,
-        ],
-        { env, cwd: pathResolver.rootDir(), timeoutMs: 120_000 },
-      );
+      const startArgs = [
+        "dist/scripts/mission_controller.js",
+        "start",
+        missionId,
+        "--tier",
+        project.tier,
+        "--persona",
+        persona,
+        "--tenant-id",
+        "default",
+        "--mission-type",
+        missionType,
+        "--project-id",
+        project.project_id,
+        "--project-path",
+        projectPath,
+        "--project-relationship",
+        "belongs_to",
+        "--project-note",
+        `Promoted from mission seed ${seed.seed_id}`,
+      ];
+      if (seed.track_id) startArgs.push("--track-id", seed.track_id);
+      if (seed.track_name) startArgs.push("--track-name", seed.track_name);
+      const track = seed.track_id ? loadProjectTrackRecord(seed.track_id) : null;
+      if (track?.track_type) startArgs.push("--track-type", track.track_type);
+      if (track?.lifecycle_model) startArgs.push("--lifecycle-model", track.lifecycle_model);
+      if (seed.track_id || seed.track_name) startArgs.push("--track-relationship", "belongs_to");
+      const startOutput = safeExec("node", startArgs, { env, cwd: pathResolver.rootDir(), timeoutMs: 120_000 });
       saveMissionSeedRecord({
         ...seed,
         status: "promoted",
         promoted_mission_id: missionId,
+        track_id: seed.track_id,
+        track_name: seed.track_name,
+        work_loop: seed.work_loop,
         updated_at: new Date().toISOString(),
         metadata: {
           ...(seed.metadata || {}),
@@ -1313,6 +1362,8 @@ export async function POST(req: NextRequest) {
         source_type: "mission",
         tier: project.tier,
         project_id: project.project_id,
+        track_id: seed.track_id,
+        track_name: seed.track_name,
         mission_id: missionId,
         task_session_id: seed.source_task_session_id,
         title: `Promote durable mission orchestration for ${seed.title}`,
@@ -1321,6 +1372,7 @@ export async function POST(req: NextRequest) {
         target_kind: inferMissionSeedPromotionTargetKind(seed),
         specialist_id: seed.specialist_id,
         locale: seed.locale || project.primary_locale,
+        work_loop: seed.work_loop,
         evidence_refs: [
           `project:${project.project_id}`,
           `mission_seed:${seed.seed_id}`,
@@ -1355,6 +1407,86 @@ export async function POST(req: NextRequest) {
         action,
         seedId,
         missionId,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === "create_track_seed") {
+      const trackId = typeof body?.trackId === "string" ? body.trackId : "";
+      const artifactId = typeof body?.artifactId === "string" ? body.artifactId : undefined;
+      if (!trackId) {
+        return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
+      }
+      const track = loadProjectTrackRecord(trackId);
+      if (!track) {
+        return NextResponse.json({ error: "Track not found" }, { status: 404 });
+      }
+      const project = loadProjectRecord(track.project_id);
+      if (!project) {
+        return NextResponse.json({ error: "Parent project not found" }, { status: 404 });
+      }
+      const readiness = buildTrackGateReadinessSummaries({
+        tracks: [track],
+        artifacts: listArtifactRecords(),
+      })[0];
+      if (!readiness) {
+        return NextResponse.json({ error: "Track readiness not available" }, { status: 400 });
+      }
+      const proposal = buildTrackNextWorkProposal({ project, track, readiness, artifactId });
+      if (!proposal) {
+        return NextResponse.json({ error: "No pending gate artifact to propose" }, { status: 400 });
+      }
+      const projectPath = resolveProjectRootPath(project);
+      if (!projectPath) {
+        return NextResponse.json({ error: "Parent project has no governed root_path" }, { status: 400 });
+      }
+      const skeletonPath = materializeTrackArtifactSkeleton({
+        projectRootPath: projectPath,
+        proposal,
+      });
+      const existing = loadMissionSeedRecord(proposal.seed_id);
+      const now = new Date().toISOString();
+      const seed = existing || {
+        seed_id: proposal.seed_id,
+        project_id: project.project_id,
+        track_id: track.track_id,
+        track_name: track.name,
+        source_work_id: `track_gate:${track.track_id}:${proposal.artifact_id}`,
+        title: proposal.title,
+        summary: proposal.summary,
+        status: "ready" as const,
+        specialist_id: proposal.specialist_id,
+        outcome_id: proposal.artifact_id,
+        mission_type_hint: proposal.mission_type_hint,
+        locale: project.primary_locale,
+        work_loop: proposal.work_loop,
+        created_at: now,
+        updated_at: now,
+        metadata: {
+          proposed_from_gate_id: readiness.current_gate_id,
+          template_ref: proposal.template_ref,
+          skeleton_path: skeletonPath,
+        },
+      };
+      if (!existing) {
+        saveMissionSeedRecord(seed);
+      }
+      enqueueSurfaceNotification({
+        surface: "presence",
+        requestId: seed.seed_id,
+        title: "Track seed proposed",
+        text: `${track.name} needs ${proposal.artifact_id}. Mission seed ${seed.seed_id} is ready for review.`,
+        status: "completed",
+        metadata: {
+          seed_id: seed.seed_id,
+          project_id: project.project_id,
+          track_id: track.track_id,
+        },
+      });
+      return NextResponse.json({
+        status: "ok",
+        action,
+        seed,
         ts: new Date().toISOString(),
       });
     }

@@ -24,6 +24,8 @@ export interface AgentProfileRecord {
   provider: string;
   modelId: string;
   capabilities: string[];
+  provider_strategy?: 'strict' | 'preferred' | 'adaptive';
+  fallback_providers?: string[];
 }
 
 interface MissionTeamTemplate {

@@ -177,6 +177,7 @@ export { ReflexTerminal } from './reflex-terminal.js';
 export type { ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
+export * from './actuator-op-registry.js';
 export * from './stimuli-journal.js';
 
 // Mission Status Guard
@@ -200,6 +201,7 @@ export * from './agent-lifecycle.js';
 export * from './a2a-bridge.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
+export * from './agent-provider-resolution.js';
 export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
 export * from './artifact-store.js';
@@ -231,6 +233,8 @@ export * from './surface-query.js';
 export * from './task-session.js';
 export * from './work-design.js';
 export * from './project-registry.js';
+export * from './project-track-registry.js';
+export * from './sdlc-gate-readiness.js';
 export * from './service-binding-registry.js';
 export * from './artifact-record.js';
 export * from './control-plane-client.js';
