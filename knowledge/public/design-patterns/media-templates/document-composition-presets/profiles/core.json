@@ -1,0 +1,71 @@
+{
+  "profiles": {
+    "executive-proposal": {
+      "artifact_family": "presentation",
+      "document_type": "proposal",
+      "narrative_pattern_id": "problem-solution-executive",
+      "recommended_theme": "kyberion-standard",
+      "recommended_layout_template_id": "executive-neutral",
+      "sections": [
+        { "section_id": "cover", "title": "{{title}}", "objective": "{{core_message}}", "media_kind": "hero", "layout_key": "cover-statement", "visual": "hero statement" },
+        { "section_id": "executive-summary", "title": "Executive Summary", "objective": "{{objective}}", "media_kind": "summary", "layout_key": "title-body", "visual": "summary card" },
+        { "section_id": "why-change", "title": "Why Change Now", "objective": "Frame the business urgency and cost of inaction", "media_kind": "evidence", "layout_key": "evidence-callout", "visual": "pain points / baseline" },
+        { "section_id": "target-outcome", "title": "Target Outcome", "objective": "Show the future-state result and customer or operator gain", "media_kind": "journey", "layout_key": "two-column-story", "visual": "future-state journey" },
+        { "section_id": "solution-shape", "title": "Solution Shape", "objective": "Describe the recommended approach and its differentiators", "media_kind": "architecture", "layout_key": "three-point-architecture", "visual": "solution blueprint" },
+        { "section_id": "governance", "title": "Governance and Controls", "objective": "Explain how risk, compliance, and operations stay governed", "media_kind": "controls", "layout_key": "risk-controls", "visual": "control model" },
+        { "section_id": "delivery-plan", "title": "Delivery Plan", "objective": "Break delivery into phases, milestones, and measurable wins", "media_kind": "timeline", "layout_key": "timeline-roadmap", "visual": "roadmap / milestones" },
+        { "section_id": "decision", "title": "Decision and Next Steps", "objective": "{{closing_cta}}", "media_kind": "cta", "layout_key": "decision-cta", "visual": "decision / next action" }
+      ]
+    },
+    "vision-proposal": {
+      "artifact_family": "presentation",
+      "document_type": "proposal",
+      "narrative_pattern_id": "future-vision",
+      "recommended_theme": "kyberion-sovereign",
+      "recommended_layout_template_id": "executive-neutral",
+      "sections": [
+        { "section_id": "cover", "title": "{{title}}", "objective": "{{core_message}}", "media_kind": "hero", "layout_key": "cover-statement", "visual": "vision statement" },
+        { "section_id": "future-state", "title": "The Future State", "objective": "Describe the changed world after adoption", "media_kind": "vision", "layout_key": "immersive-vision", "visual": "north-star concept" },
+        { "section_id": "capability-shifts", "title": "Capability Shifts", "objective": "Explain what becomes newly possible", "media_kind": "capability", "layout_key": "three-pillars", "visual": "capability map" },
+        { "section_id": "operating-model", "title": "Operating Model", "objective": "Show how teams, systems, and controls evolve", "media_kind": "model", "layout_key": "operating-model", "visual": "operating model" },
+        { "section_id": "phased-realization", "title": "Phased Realization", "objective": "Translate the vision into staged execution", "media_kind": "timeline", "layout_key": "timeline-roadmap", "visual": "phase plan" },
+        { "section_id": "decision", "title": "Commitment Required", "objective": "{{closing_cta}}", "media_kind": "cta", "layout_key": "decision-cta", "visual": "commitment ask" }
+      ]
+    },
+    "summary-report": {
+      "artifact_family": "document",
+      "document_type": "report",
+      "narrative_pattern_id": "report-standard",
+      "recommended_theme": "kyberion-standard",
+      "recommended_layout_template_id": "report-standard",
+      "sections": [
+        { "section_id": "title", "title": "{{title}}", "media_kind": "title-page", "layout_key": "doc-title" },
+        { "section_id": "summary", "title": "Summary", "media_kind": "summary", "layout_key": "doc-summary" },
+        { "section_id": "body", "title": "Analysis", "media_kind": "section-flow", "layout_key": "doc-sections" },
+        { "section_id": "appendix", "title": "Appendix", "media_kind": "appendix", "layout_key": "doc-appendix" }
+      ]
+    },
+    "operator-tracker": {
+      "artifact_family": "spreadsheet",
+      "document_type": "tracker",
+      "narrative_pattern_id": "operator-dashboard",
+      "recommended_theme": "kyberion-standard",
+      "recommended_layout_template_id": "operator-tracker-standard",
+      "sections": [
+        { "section_id": "overview", "title": "Overview", "media_kind": "dashboard", "layout_key": "sheet-overview" },
+        { "section_id": "execution-board", "title": "Execution Board", "media_kind": "table", "layout_key": "sheet-main-table" },
+        { "section_id": "signals", "title": "Signals and Risks", "media_kind": "signals", "layout_key": "sheet-signals" }
+      ]
+    },
+    "solution-overview": {
+      "artifact_family": "diagram",
+      "document_type": "architecture-diagram",
+      "narrative_pattern_id": "solution-overview",
+      "recommended_theme": "aws-architecture",
+      "recommended_layout_template_id": "solution-overview",
+      "sections": [
+        { "section_id": "system-context", "title": "{{title}}", "media_kind": "diagram", "layout_key": "diagram-context" }
+      ]
+    }
+  }
+}

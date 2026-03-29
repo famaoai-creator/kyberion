@@ -319,6 +319,75 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
+  if (
+    matchesStandardIntent(trimmed, 'cross-project-remediation') ||
+    /(横断.*(要件定義|仕様|incident|不具合|バグ)|横展開.*(不具合|バグ|修正)|same bug|remediation|propagat(?:e|ion)|requirements?.*(review|sweep)|未展開.*(修正|fix))/i.test(trimmed)
+  ) {
+    const hasSourceCorpus = /(要件定義|仕様|requirements?|incident|障害|不具合|bug)/i.test(trimmed);
+    const hasTargetScope = /(横断|横展開|across|cross-project|全体|複数プロジェクト)/i.test(trimmed);
+    return {
+      taskType: 'analysis',
+      intentId: 'cross-project-remediation',
+      goal: {
+        summary: 'Find where a known issue or requirement gap has not been propagated and prepare a remediation plan',
+        success_condition: 'A governed remediation plan identifies affected scope, follow-up fixes, and verification targets.',
+      },
+      requirements: {
+        missing: [
+          ...(hasSourceCorpus ? [] : ['source_corpus']),
+          ...(hasTargetScope ? [] : ['target_scope']),
+        ],
+        collected: {},
+      },
+      payload: {
+        analysis_kind: 'cross_project_remediation',
+        source_corpus: /(要件定義|requirements?)/i.test(trimmed)
+          ? 'requirements'
+          : /(incident|障害)/i.test(trimmed)
+            ? 'incidents'
+            : /(不具合|bug)/i.test(trimmed)
+              ? 'bug_history'
+              : undefined,
+        propagation_mode: /横展開|propagat(?:e|ion)/i.test(trimmed) ? 'propagation_gap_review' : 'cross_project_review',
+        action_bias: /(修正|fix)/i.test(trimmed) ? 'remediation' : 'analysis',
+      },
+    };
+  }
+
+  if (
+    matchesStandardIntent(trimmed, 'incident-informed-review') ||
+    /((過去| prior|known).*(インシデント|障害|incident|failure).*(踏まえて|based on).*(レビュー|review)|postmortem.*review|障害.*振り返り.*レビュー|incident-informed review)/i.test(trimmed)
+  ) {
+    const hasIncidentBasis = /(インシデント|障害|incident|failure|postmortem)/i.test(trimmed);
+    const hasReviewTarget = /(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)/i.test(trimmed);
+    return {
+      taskType: 'analysis',
+      intentId: 'incident-informed-review',
+      goal: {
+        summary: 'Review the current scope against prior incidents and known failures',
+        success_condition: 'A governed review captures findings, risks, and required follow-up checks informed by prior incidents.',
+      },
+      requirements: {
+        missing: [
+          ...(hasIncidentBasis ? [] : ['incident_basis']),
+          ...(hasReviewTarget ? [] : ['review_target']),
+        ],
+        collected: {},
+      },
+      payload: {
+        analysis_kind: 'incident_informed_review',
+        incident_basis: hasIncidentBasis ? 'incident_history' : undefined,
+        review_target_kind: /コード|code|pr|pull request/i.test(trimmed)
+          ? 'code_change'
+          : /設計|design/i.test(trimmed)
+            ? 'design'
+            : /delivery|変更|change/i.test(trimmed)
+              ? 'delivery_scope'
+              : 'general_scope',
+      },
+    };
+  }
+
   if (matchesStandardIntent(trimmed, 'inspect-service') || /(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
     const operation = /再起動|restart/i.test(trimmed)
       ? 'restart'

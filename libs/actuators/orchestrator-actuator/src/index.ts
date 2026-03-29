@@ -185,8 +185,8 @@ async function opTransform(op: string, params: any, ctx: any) {
       const requestText = String(resolveVars(params.request_text || ctx.request_text || '', ctx)).trim();
       if (!requestText) throw new Error('request_to_execution_brief requires request_text');
       const archetype = detectRequestArchetype(requestText, catalog);
-      const providedInputs = Array.isArray(params.provided_inputs) ? params.provided_inputs.map(String) : [];
-      const missingInputs = (archetype.required_inputs || []).filter((item: string) => !providedInputs.includes(item));
+      const providedInputs = resolveExecutionBriefInputs(params, ctx, archetype);
+      const missingInputs = (archetype.required_inputs || []).filter((item: string) => !providedInputs.provided.includes(item));
       const assumptions = missingInputs.map((item: string) => `Missing input: ${item}`);
       const clarificationQuestions = missingInputs.map((item: string) => ({
         id: item,
@@ -226,6 +226,9 @@ async function opTransform(op: string, params: any, ctx: any) {
           target_actuators: archetype.target_actuators || [],
           deliverables: archetype.deliverables || [],
           missing_inputs: missingInputs,
+          provided_inputs: providedInputs.provided,
+          inferred_inputs: providedInputs.inferred,
+          input_bindings: providedInputs.bindings,
           assumptions,
           clarification_questions: clarificationQuestions,
           readiness: readiness.level,
@@ -611,9 +614,11 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'resolution_plan_to_pipeline_bundle': {
       const plan = ctx[params.from || 'resolution_plan'];
-      const brief = ctx[params.brief_from || 'execution_brief'];
+      const brief = resolveExecutionBriefReference(ctx, params.brief_from) as Record<string, unknown> | undefined;
       if (!plan || typeof plan !== 'object') throw new Error('resolution_plan_to_pipeline_bundle requires actuator-resolution-plan');
-      if (!brief || typeof brief !== 'object') throw new Error('resolution_plan_to_pipeline_bundle requires actuator-execution-brief');
+      if (!brief || typeof brief !== 'object') {
+        throw new Error('resolution_plan_to_pipeline_bundle requires actuator-execution-brief. Provide params.brief_from or export the brief as "execution_brief" or "brief".');
+      }
       const missingInputs = Array.isArray(brief.missing_inputs) ? brief.missing_inputs.map(String) : [];
       const jobs = missingInputs.length === 0
         ? buildPipelineBundleJobs(String(plan.archetype_id || 'structured-delivery'))
@@ -671,7 +676,7 @@ function loadActuatorRequestArchetypes(): any {
 }
 
 function detectRequestArchetype(requestText: string, catalog: any): any {
-  const text = requestText.toLowerCase();
+  const text = normalizeRequestTextForArchetypeDetection(requestText);
   const archetypes = Array.isArray(catalog?.archetypes) ? catalog.archetypes : [];
   const scored = archetypes.map((archetype: any) => {
     const hits = (archetype.trigger_keywords || []).filter((keyword: string) => text.includes(String(keyword).toLowerCase())).length;
@@ -689,6 +694,143 @@ function detectRequestArchetype(requestText: string, catalog: any): any {
     deliverables: ['execution brief'],
     required_inputs: ['objective'],
   };
+}
+
+const ARCHETYPE_DETECTION_BRIDGE: Array<{ pattern: RegExp; hints: string[] }> = [
+  { pattern: /(プロジェクト|要件定義|設計書|運用設計|ゲート|トレーサビリティ)/i, hints: ['project', 'requirements', 'design', 'gate'] },
+  { pattern: /(提案書|提案資料|営業資料|ピッチ|デッキ|スライド|プレゼン)/i, hints: ['proposal', 'deck', 'pitch'] },
+  { pattern: /(サイト|webサイト|lp|landing page|価格ページ|pricing page|デザインをクローン|踏襲)/i, hints: ['website', 'landing page', 'design', 'reference source'] },
+  { pattern: /(モバイル|アプリ|ios|android|webview)/i, hints: ['mobile', 'app', 'ios', 'android', 'webview'] },
+  { pattern: /(状態|健全性|ヘルス|readiness|稼働状況)/i, hints: ['status', 'health', 'readiness'] },
+  { pattern: /(作って|作成して|生成して|まとめて|build|deliver)/i, hints: ['build', 'deliver'] },
+];
+
+function normalizeRequestTextForArchetypeDetection(requestText: string): string {
+  const original = String(requestText || '').toLowerCase();
+  const hints = new Set<string>();
+  for (const bridge of ARCHETYPE_DETECTION_BRIDGE) {
+    if (bridge.pattern.test(requestText)) {
+      for (const hint of bridge.hints) hints.add(hint.toLowerCase());
+    }
+  }
+  return `${original} ${Array.from(hints).join(' ')}`.trim();
+}
+
+const EXECUTION_BRIEF_INPUT_ALIASES: Record<string, string[]> = {
+  'reference source': ['reference_source', 'reference source', 'reference', 'url', 'source_url', 'source', 'app', 'app_name'],
+  'preserved elements': ['preserved_elements', 'preserved elements', 'keep', 'elements_to_preserve'],
+  'new concept': ['new_concept', 'new concept', 'concept', 'objective', 'goal'],
+  'target environment': ['target_environment', 'target environment', 'environment', 'target', 'deployment_target'],
+  'execution environment': ['execution_environment', 'execution environment', 'runtime_environment'],
+  'source materials': ['source_materials', 'source materials', 'materials', 'brief_path', 'proposal_brief_path', 'input_files'],
+  'target audience': ['target_audience', 'target audience', 'audience', 'reader'],
+  'storyline': ['storyline', 'outline', 'narrative', 'chapter_plan'],
+  'required output format': ['required_output_format', 'required output format', 'output_format', 'format'],
+  'project name': ['project_name', 'project name', 'name'],
+  'delivery scope': ['delivery_scope', 'delivery scope', 'scope'],
+  'phase or gate': ['phase_or_gate', 'phase or gate', 'phase', 'gate'],
+  'related missions': ['related_missions', 'related missions', 'missions', 'mission_ids'],
+  'objective': ['objective', 'goal', 'intent'],
+  'target artifact': ['target_artifact', 'artifact', 'deliverable'],
+  'environment': ['environment', 'target_environment', 'execution_environment'],
+  'acceptance criteria': ['acceptance_criteria', 'acceptance criteria', 'definition_of_done'],
+};
+
+function resolveExecutionBriefInputs(params: any, ctx: any, archetype: any): {
+  provided: string[];
+  inferred: string[];
+  bindings: Array<{ input: string; source: string; value_preview: string }>;
+} {
+  const explicitInputs = Array.isArray(params.provided_inputs) ? params.provided_inputs.map((item: unknown) => String(item).trim()).filter(Boolean) : [];
+  const explicitSet = new Set(explicitInputs.map((item) => normalizeExecutionBriefInputName(item)));
+  const provided = new Set<string>();
+  const inferred = new Set<string>();
+  const bindings: Array<{ input: string; source: string; value_preview: string }> = [];
+
+  for (const requiredInput of Array.isArray(archetype?.required_inputs) ? archetype.required_inputs.map(String) : []) {
+    const canonical = normalizeExecutionBriefInputName(requiredInput);
+    if (explicitSet.has(canonical)) {
+      provided.add(requiredInput);
+      bindings.push({ input: requiredInput, source: 'provided_inputs', value_preview: 'explicitly provided' });
+      continue;
+    }
+    const binding = inferExecutionBriefInputBinding(requiredInput, params, ctx);
+    if (binding) {
+      provided.add(requiredInput);
+      inferred.add(requiredInput);
+      bindings.push(binding);
+    }
+  }
+
+  return {
+    provided: Array.from(provided),
+    inferred: Array.from(inferred),
+    bindings,
+  };
+}
+
+function normalizeExecutionBriefInputName(input: string): string {
+  return String(input || '').trim().toLowerCase().replace(/[_\s-]+/g, ' ');
+}
+
+function inferExecutionBriefInputBinding(
+  requiredInput: string,
+  params: any,
+  ctx: any,
+): { input: string; source: string; value_preview: string } | null {
+  const aliases = EXECUTION_BRIEF_INPUT_ALIASES[requiredInput] || [requiredInput];
+  const sources: Array<{ source: string; object: Record<string, unknown> | null | undefined }> = [
+    { source: 'params', object: params && typeof params === 'object' ? params : null },
+    { source: 'context', object: ctx && typeof ctx === 'object' ? ctx : null },
+  ];
+  for (const alias of aliases) {
+    for (const entry of sources) {
+      const value = lookupAliasValue(entry.object, alias);
+      if (!isMeaningfulInputValue(value)) continue;
+      return {
+        input: requiredInput,
+        source: `${entry.source}.${String(alias)}`,
+        value_preview: previewExecutionBriefInputValue(value),
+      };
+    }
+  }
+  return null;
+}
+
+function lookupAliasValue(target: Record<string, unknown> | null | undefined, alias: string): unknown {
+  if (!target) return undefined;
+  if (alias in target) return target[alias];
+  const normalizedAlias = normalizeExecutionBriefInputName(alias);
+  for (const [key, value] of Object.entries(target)) {
+    if (normalizeExecutionBriefInputName(key) === normalizedAlias) return value;
+  }
+  return undefined;
+}
+
+function isMeaningfulInputValue(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return true;
+}
+
+function previewExecutionBriefInputValue(value: unknown): string {
+  if (typeof value === 'string') return value.trim().slice(0, 120);
+  if (Array.isArray(value)) return `${value.length} item(s)`;
+  if (typeof value === 'object' && value) return `object:${Object.keys(value as Record<string, unknown>).slice(0, 3).join(',')}`;
+  return String(value);
+}
+
+function resolveExecutionBriefReference(ctx: any, explicitKey?: string): unknown {
+  if (explicitKey && ctx?.[explicitKey]) return ctx[explicitKey];
+  if (ctx?.execution_brief) return ctx.execution_brief;
+  if (ctx?.brief) return ctx.brief;
+  const briefCandidates = Object.entries(ctx || {}).filter(([, value]) => (
+    value && typeof value === 'object' && (value as Record<string, unknown>).kind === 'actuator-execution-brief'
+  ));
+  if (briefCandidates.length === 1) return briefCandidates[0]?.[1];
+  return undefined;
 }
 
 function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
@@ -794,14 +936,14 @@ function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
       return [
         {
           id: 'render-proposal-deck',
-          title: 'Generate proposal storyline and render PPTX',
+          title: 'Generate proposal deck through the canonical media route',
           actuator: 'media-actuator',
-          template_path: 'libs/actuators/media-actuator/examples/proposal-storyline-pptx.json',
+          template_path: 'libs/actuators/media-actuator/examples/document-brief-proposal-pptx.json',
           recommended_procedure: 'knowledge/public/procedures/service/design-clone-and-build-proposal.md',
           parameter_overrides: {
             'steps[0].params.path': '{{proposal_brief_path}}',
             'context.context_path': 'active/shared/tmp/media/{{delivery_pack_id}}.context.json',
-            'steps[5].params.path': 'active/shared/tmp/media/{{delivery_pack_id}}.pptx',
+            'steps[3].params.output_path': 'active/shared/tmp/media/{{delivery_pack_id}}.pptx',
           },
           outputs: [
             'active/shared/tmp/media/{{delivery_pack_id}}.pptx',
@@ -985,6 +1127,10 @@ function buildClarificationQuestion(inputName: string): string {
     case 'target audience': return '想定読者または利用者を指定してください。';
     case 'storyline': return 'どういう流れで伝えたいか、章立てまたは要点を指定してください。';
     case 'required output format': return '必要な出力形式を指定してください。例: pptx / docx / pdf。';
+    case 'project name': return 'プロジェクト名を指定してください。正式名または運用名で構いません。';
+    case 'delivery scope': return '今回の納品範囲を指定してください。例: project OS / document pack / design pack。';
+    case 'phase or gate': return '対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。';
+    case 'related missions': return '関連する mission があれば指定してください。無ければ none と答えてください。';
     default: return `${inputName} を指定してください。`;
   }
 }

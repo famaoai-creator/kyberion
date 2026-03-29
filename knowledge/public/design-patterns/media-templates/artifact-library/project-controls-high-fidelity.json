@@ -1,0 +1,49 @@
+{
+  "domain": "project-controls-high-fidelity",
+  "profiles": {
+    "scope-management-plan-v2": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Formal procedures for defining, validating, and controlling project scope.",
+      "sections": [
+        { "section_id": "1-introduction", "title": "1. Introduction and Objectives", "layout_key": "doc-title" },
+        { "section_id": "2-definition-process", "title": "2. Scope Definition Process", "layout_key": "doc-sections" },
+        { "section_id": "3-wbs-creation", "title": "3. WBS Creation and Maintenance", "layout_key": "three-pillars" },
+        { "section_id": "4-wbs-dictionary", "title": "4. WBS Dictionary Guidelines", "layout_key": "doc-sections" },
+        { "section_id": "5-scope-validation", "title": "5. Scope Validation and Acceptance", "layout_key": "evidence-callout" },
+        { "section_id": "6-scope-control", "title": "6. Scope Control and Change Management", "layout_key": "risk-controls" },
+        { "section_id": "7-roles", "title": "7. Roles and Responsibilities", "layout_key": "operating-model" }
+      ]
+    },
+    "schedule-management-plan-v2": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Criteria and activities for developing and controlling the project schedule.",
+      "sections": [
+        { "section_id": "1-model-development", "title": "1. Project Schedule Model Development", "layout_key": "doc-title" },
+        { "section_id": "2-iteration-length", "title": "2. Release and Iteration Length (Agile/Hybrid)", "layout_key": "timeline-roadmap" },
+        { "section_id": "3-accuracy-level", "title": "3. Level of Accuracy and Units of Measure", "layout_key": "doc-summary" },
+        { "section_id": "4-procedure-links", "title": "4. Organizational Procedure Links (WBS)", "layout_key": "three-point-architecture" },
+        { "section_id": "5-model-maintenance", "title": "5. Project Schedule Model Maintenance", "layout_key": "doc-sections" },
+        { "section_id": "6-control-thresholds", "title": "6. Control Thresholds and Action Triggers", "layout_key": "risk-controls" },
+        { "section_id": "7-performance-measurement", "title": "7. Rules of Performance Measurement (EVM)", "layout_key": "evidence-callout" },
+        { "section_id": "8-reporting-formats", "title": "8. Reporting Formats and Frequency", "layout_key": "doc-sections" }
+      ]
+    },
+    "cost-management-plan-v2": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Procedures for estimating, budgeting, and controlling project costs.",
+      "sections": [
+        { "section_id": "1-units-precision", "title": "1. Units of Measure and Level of Precision", "layout_key": "doc-summary" },
+        { "section_id": "2-accuracy-level", "title": "2. Level of Accuracy", "layout_key": "doc-sections" },
+        { "section_id": "3-procedure-links", "title": "3. Organizational Procedure Links (Control Accounts)", "layout_key": "three-pillars" },
+        { "section_id": "4-control-thresholds", "title": "4. Control Thresholds", "layout_key": "risk-controls" },
+        { "section_id": "5-performance-measurement", "title": "5. Rules of Performance Measurement", "layout_key": "evidence-callout" },
+        { "section_id": "6-reporting-formats", "title": "6. Reporting Formats", "layout_key": "doc-sections" },
+        { "section_id": "7-funding-choices", "title": "7. Strategic Funding and Currency Management", "layout_key": "operating-model" },
+        { "section_id": "8-process-descriptions", "title": "8. Estimating and Budgeting Processes", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

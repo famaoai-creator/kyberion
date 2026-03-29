@@ -8,6 +8,8 @@ import {
   pathResolver,
   resolveVars,
   evaluateCondition,
+  getPathValue,
+  resolveWriteArtifactSpec,
   withRetry,
   derivePipelineStatus
 } from '@agent/core';
@@ -195,7 +197,7 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'json_query': {
       const data = ctx[params.from || 'last_capture_data'];
-      const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
+      const result = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: result };
     }
     case 'array_count': {
@@ -215,10 +217,12 @@ async function opTransform(op: string, params: any, ctx: any) {
 async function opApply(op: string, params: any, ctx: any) {
   switch (op) {
     case 'write_file':
-      const out = pathResolver.rootResolve(resolveVars(params.path, ctx));
-      const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'];
+    case 'write_artifact':
+      const spec = resolveWriteArtifactSpec(params, ctx, (value) => resolveVars(value, ctx));
+      const out = pathResolver.rootResolve(spec.path);
+      const content = spec.content;
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
       break;
     case 'knowledge_inject':
       const kPath = resolveVars(params.knowledge_path, ctx);

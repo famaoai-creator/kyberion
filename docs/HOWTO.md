@@ -32,8 +32,11 @@ All physical changes to the codebase MUST be performed within a mission context.
 start → checkpoint (repeat) → verify → distill → finish
 ```
 
-1. **Start**: `node dist/scripts/mission_controller.js start <ID> [tier]`
+1. **Start**: `node dist/scripts/mission_controller.js start <ID> --tier <tier> [options...]`
    Creates and activates a mission. Status: `planned → active`.
+   Only `<ID>` is positional. Everything else is a named option.
+   Example:
+   `node dist/scripts/mission_controller.js start TASK-01 --tier confidential --persona ecosystem_architect --project-id PRJ-1 --project-path active/projects/sample --track-id TRK-REL1`
 
 2. **Work & Checkpoint**: Perform tasks, then record progress:
    `node dist/scripts/mission_controller.js checkpoint <ID> <TASK_ID> "description"`
@@ -81,6 +84,26 @@ Kyberion uses a `single-owner, multi-worker` mission model.
 - Shared execution artifacts should go to mission-local `coordination/` first, and only use `active/shared/` for global discovery or observability.
 
 The response will be a standardized A2A `result` message containing the pipeline context.
+
+---
+
+## 🧭 3.5 Control Plane CLI
+
+Use the control-plane CLI when you want the same project/track/gate flow that Presence Studio and Chronos expose:
+
+```bash
+pnpm control presence tracks [projectId]
+pnpm control chronos tracks [projectId]
+pnpm control chronos mission-seeds
+pnpm control chronos ref <knowledge/...|active/projects/...>
+pnpm control chronos seed-track <trackId> [artifactId]
+```
+
+Mental model:
+
+```text
+Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
+```
 
 ---
 

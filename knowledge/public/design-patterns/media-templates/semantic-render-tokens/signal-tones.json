@@ -1,0 +1,12 @@
+{
+  "signal_tones": {
+    "danger": 0,
+    "critical": 0,
+    "high": 0,
+    "warning": 1,
+    "medium": 1,
+    "info": 2,
+    "success": 3,
+    "low": 3
+  }
+}

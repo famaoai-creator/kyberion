@@ -14,41 +14,26 @@
     },
     {
       "type": "transform",
-      "op": "proposal_storyline_from_brief",
+      "op": "document_outline_from_brief",
       "params": {
         "from": "proposal_brief",
-        "export_as": "proposal_storyline"
+        "export_as": "document_outline"
       }
     },
     {
       "type": "transform",
-      "op": "proposal_content_from_storyline",
+      "op": "brief_to_design_protocol",
       "params": {
-        "from": "proposal_storyline",
-        "export_as": "proposal_content_data"
-      }
-    },
-    {
-      "type": "transform",
-      "op": "apply_theme",
-      "params": {
-        "theme": "{{proposal_brief.layout_template_id}}"
-      }
-    },
-    {
-      "type": "transform",
-      "op": "merge_content",
-      "params": {
-        "content_data": "{{proposal_content_data}}",
-        "output_format": "pptx"
+        "from": "proposal_brief",
+        "export_as": "compiled_design_protocol"
       }
     },
     {
       "type": "apply",
-      "op": "pptx_render",
+      "op": "generate_document",
       "params": {
-        "design_from": "last_pptx_design",
-        "path": "active/shared/tmp/media/document-brief-proposal-example.pptx"
+        "brief": "{{proposal_brief}}",
+        "output_path": "active/shared/tmp/media/document-brief-proposal-example.pptx"
       }
     }
   ]

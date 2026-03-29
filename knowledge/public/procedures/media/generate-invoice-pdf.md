@@ -7,6 +7,7 @@ Generate an invoice PDF from a canonical `document-brief` and a knowledge-owned 
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/public/schemas/document-brief.schema.json`
 - **Layout Catalog**: `knowledge/public/design-patterns/media-templates/document-layouts.json`
+- **Profile Catalog**: `knowledge/public/design-patterns/media-templates/document-composition-presets/` and `knowledge/public/design-patterns/media-templates/artifact-library/`
 
 ## 3. Principle
 Separate the invoice into:

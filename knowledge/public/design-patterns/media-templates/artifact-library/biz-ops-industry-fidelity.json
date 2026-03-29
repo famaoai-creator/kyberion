@@ -1,0 +1,61 @@
+{
+  "domain": "biz-ops-industry-fidelity",
+  "profiles": {
+    "annual-operating-plan-aop": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Strategic alignment of daily operations with financial targets.",
+      "sections": [
+        { "section_id": "1-executive-summary", "title": "1. Executive Summary and Strategic Priorities", "layout_key": "doc-summary" },
+        { "section_id": "2-previous-performance", "title": "2. Previous Year Performance Review", "layout_key": "evidence-callout" },
+        { "section_id": "3-market-competitive", "title": "3. Market and Competitive SWOT Analysis", "layout_key": "three-pillars" },
+        { "section_id": "4-smart-goals", "title": "4. Strategic Goals and SMART Objectives", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-financial-plan", "title": "5. Financial Plan and Departmental Budgets", "layout_key": "doc-sections" },
+        { "section_id": "6-resource-allocation", "title": "6. Hiring and Infrastructure Requirements", "layout_key": "operating-model" },
+        { "section_id": "7-risk-contingency", "title": "7. Operational Risk and Contingency Plans", "layout_key": "risk-controls" },
+        { "section_id": "8-monitoring-cadence", "title": "8. Implementation and Reporting Cadence", "layout_key": "evidence-callout" }
+      ]
+    },
+    "customer-onboarding-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "description": "Lifecycle strategy for reducing TTV and ensuring retention.",
+      "sections": [
+        { "section_id": "1-onboarding-strategy", "title": "1. Strategy, Goals, and 'Aha! Moment'", "layout_key": "immersive-vision" },
+        { "section_id": "2-welcome-experience", "title": "2. Welcome Experience and Kick-off", "layout_key": "doc-sections" },
+        { "section_id": "3-education-training", "title": "3. Education, Training, and Role-based Paths", "layout_key": "three-pillars" },
+        { "section_id": "4-adoption-milestones", "title": "4. Product Adoption and Milestone Tracking", "layout_key": "timeline-roadmap" },
+        { "section_id": "5-feedback-csat", "title": "5. Feedback, CSAT, and NPS Surveys", "layout_key": "evidence-callout" },
+        { "section_id": "6-cs-transition", "title": "6. Transition to Customer Success", "layout_key": "operating-model" }
+      ]
+    },
+    "kyc-aml-compliance-policy": {
+      "artifact_family": "document",
+      "document_type": "policy",
+      "description": "Regulatory framework for preventing financial crime (BSA/FATF).",
+      "sections": [
+        { "section_id": "1-policy-governance", "title": "1. Policy Governance and MLRO Authority", "layout_key": "operating-model" },
+        { "section_id": "2-risk-approach", "title": "2. Risk-Based Approach (RBA) Scoring", "layout_key": "risk-controls" },
+        { "section_id": "3-customer-identification", "title": "3. Customer Identification Program (CIP)", "layout_key": "doc-sections" },
+        { "section_id": "4-due-diligence", "title": "4. Customer Due Diligence (CDD/EDD/UBO)", "layout_key": "three-point-architecture" },
+        { "section_id": "5-transaction-monitoring", "title": "5. Transaction Monitoring and Alert Triage", "layout_key": "evidence-callout" },
+        { "section_id": "6-reporting-obligations", "title": "6. Reporting Obligations (SAR/CTR)", "layout_key": "risk-controls" },
+        { "section_id": "7-record-training", "title": "7. Record-Keeping and Employee Training", "layout_key": "doc-sections" }
+      ]
+    },
+    "hipaa-compliance-manual": {
+      "artifact_family": "document",
+      "document_type": "manual",
+      "description": "Standardized protection for Patient Health Information (PHI).",
+      "sections": [
+        { "section_id": "1-regulatory-overview", "title": "1. Regulatory Overview and PHI Scope", "layout_key": "doc-title" },
+        { "section_id": "2-privacy-rule", "title": "2. The Privacy Rule (Permitted Uses, NPP)", "layout_key": "doc-sections" },
+        { "section_id": "3-administrative-safeguards", "title": "3. Administrative Safeguards (Risk Analysis)", "layout_key": "operating-model" },
+        { "section_id": "4-physical-safeguards", "title": "4. Physical Safeguards (Facility, Device)", "layout_key": "risk-controls" },
+        { "section_id": "5-technical-safeguards", "title": "5. Technical Safeguards (Audit, Encryption)", "layout_key": "three-point-architecture" },
+        { "section_id": "6-breach-notification", "title": "6. Breach Notification Rule and Investigation", "layout_key": "evidence-callout" },
+        { "section_id": "7-business-associate", "title": "7. Business Associate Management (BAA)", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

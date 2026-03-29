@@ -1,0 +1,44 @@
+{
+  "domain": "requirements-high-fidelity",
+  "profiles": {
+    "software-requirements-specification-v2": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "description": "Comprehensive SRS based on IEEE 830 standard.",
+      "sections": [
+        { "section_id": "1-introduction", "title": "1. Introduction", "layout_key": "doc-title" },
+        { "section_id": "1-1-purpose", "title": "1.1 Purpose", "layout_key": "doc-sections" },
+        { "section_id": "1-2-scope", "title": "1.2 Scope", "layout_key": "doc-summary" },
+        { "section_id": "1-3-definitions", "title": "1.3 Definitions, Acronyms, and Abbreviations", "layout_key": "doc-sections" },
+        { "section_id": "1-4-references", "title": "1.4 References", "layout_key": "doc-sections" },
+        { "section_id": "1-5-overview", "title": "1.5 Overview", "layout_key": "doc-sections" },
+        { "section_id": "2-overall-description", "title": "2. Overall Description", "layout_key": "doc-title" },
+        { "section_id": "2-1-product-perspective", "title": "2.1 Product Perspective", "layout_key": "three-point-architecture" },
+        { "section_id": "2-2-product-functions", "title": "2.2 Product Functions", "layout_key": "three-pillars" },
+        { "section_id": "2-3-user-classes", "title": "2.3 User Classes and Characteristics", "layout_key": "operating-model" },
+        { "section_id": "2-4-operating-environment", "title": "2.4 Operating Environment", "layout_key": "doc-sections" },
+        { "section_id": "2-5-constraints", "title": "2.5 Design and Implementation Constraints", "layout_key": "risk-controls" },
+        { "section_id": "2-6-user-docs", "title": "2.6 User Documentation", "layout_key": "doc-sections" },
+        { "section_id": "2-7-assumptions", "title": "2.7 Assumptions and Dependencies", "layout_key": "doc-sections" },
+        { "section_id": "3-external-interface", "title": "3. External Interface Requirements", "layout_key": "doc-title" },
+        { "section_id": "3-1-user-interfaces", "title": "3.1 User Interfaces", "layout_key": "doc-sections" },
+        { "section_id": "3-2-hardware-interfaces", "title": "3.2 Hardware Interfaces", "layout_key": "doc-sections" },
+        { "section_id": "3-3-software-interfaces", "title": "3.3 Software Interfaces", "layout_key": "doc-sections" },
+        { "section_id": "3-4-comm-interfaces", "title": "3.4 Communications Interfaces", "layout_key": "doc-sections" },
+        { "section_id": "4-system-features", "title": "4. System Features (Functional Requirements)", "layout_key": "doc-title" },
+        { "section_id": "4-1-feature-1", "title": "4.1 System Feature 1", "layout_key": "doc-sections" },
+        { "section_id": "4-2-feature-2", "title": "4.2 System Feature 2", "layout_key": "doc-sections" },
+        { "section_id": "5-nonfunctional-reqs", "title": "5. Other Nonfunctional Requirements", "layout_key": "doc-title" },
+        { "section_id": "5-1-performance", "title": "5.1 Performance Requirements", "layout_key": "doc-sections" },
+        { "section_id": "5-2-safety", "title": "5.2 Safety Requirements", "layout_key": "risk-controls" },
+        { "section_id": "5-3-security", "title": "5.3 Security Requirements", "layout_key": "risk-controls" },
+        { "section_id": "5-4-quality-attributes", "title": "5.4 Software Quality Attributes", "layout_key": "evidence-callout" },
+        { "section_id": "5-5-business-rules", "title": "5.5 Business Rules", "layout_key": "doc-sections" },
+        { "section_id": "6-other-reqs", "title": "6. Other Requirements", "layout_key": "doc-sections" },
+        { "section_id": "7-appendices", "title": "7. Appendices", "layout_key": "doc-appendix" },
+        { "section_id": "a-glossary", "title": "Appendix A: Glossary", "layout_key": "doc-sections" },
+        { "section_id": "b-analysis-models", "title": "Appendix B: Analysis Models", "layout_key": "three-point-architecture" }
+      ]
+    }
+  }
+}

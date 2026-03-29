@@ -113,5 +113,11 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('voice-hub のログを見て')?.payload?.service_name).toBe('voice-hub');
     expect(classifyTaskSessionIntent('voice-hub を再起動して')?.requirements?.missing).toContain('approval_confirmation');
     expect(classifyTaskSessionIntent('voice-hub のログを見て')?.requirements?.missing || []).not.toContain('approval_confirmation');
+    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.intentId).toBe('cross-project-remediation');
+    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.taskType).toBe('analysis');
+    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.requirements?.missing || []).toEqual([]);
+    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.intentId).toBe('incident-informed-review');
+    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.taskType).toBe('analysis');
+    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.requirements?.missing || []).toEqual([]);
   });
 });

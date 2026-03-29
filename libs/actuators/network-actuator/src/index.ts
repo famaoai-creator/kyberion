@@ -9,6 +9,8 @@ import {
   pathResolver,
   resolveVars,
   evaluateCondition,
+  getPathValue,
+  resolveWriteArtifactSpec,
   withRetry,
   derivePipelineStatus
 } from '@agent/core';
@@ -168,7 +170,7 @@ async function opTransform(op: string, params: any, ctx: any) {
   switch (op) {
     case 'json_query':
       const data = ctx[params.from || 'last_capture'];
-      const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
+      const result = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: result };
 
     case 'regex_extract':
@@ -186,8 +188,10 @@ async function opTransform(op: string, params: any, ctx: any) {
 async function opApply(op: string, params: any, ctx: any) {
   switch (op) {
     case 'write_file':
-      const outPath = pathResolver.rootResolve(resolveVars(params.path, ctx));
-      const content = typeof ctx.last_capture === 'object' ? JSON.stringify(ctx.last_capture, null, 2) : ctx.last_capture;
+    case 'write_artifact':
+      const spec = resolveWriteArtifactSpec(params, ctx, (value) => resolveVars(value, ctx));
+      const outPath = pathResolver.rootResolve(spec.path);
+      const content = typeof spec.content === 'string' ? spec.content : spec.content === undefined ? '' : JSON.stringify(spec.content, null, 2);
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
       safeWriteFile(outPath, content);
       break;

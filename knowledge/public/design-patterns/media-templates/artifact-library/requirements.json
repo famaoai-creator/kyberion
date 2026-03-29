@@ -1,0 +1,60 @@
+{
+  "domain": "requirements-engineering",
+  "profiles": {
+    "business-requirements-document": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Business Requirements Document (BRD)", "layout_key": "doc-title" },
+        { "section_id": "business-goals", "title": "Business Goals & Strategic Objectives", "layout_key": "doc-summary" },
+        { "section_id": "scope", "title": "Project Scope & Boundary", "layout_key": "doc-sections" },
+        { "section_id": "stakeholder-needs", "title": "Stakeholder Needs & Constraints", "layout_key": "doc-sections" }
+      ]
+    },
+    "requirements-definition": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Requirements Definition: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "functional", "title": "Functional Requirements", "layout_key": "doc-sections" },
+        { "section_id": "non-functional", "title": "Non-Functional Requirements", "layout_key": "risk-controls" },
+        { "section_id": "constraints", "title": "Design & Implementation Constraints", "layout_key": "doc-sections" }
+      ]
+    },
+    "user-story-backlog": {
+      "artifact_family": "spreadsheet",
+      "document_type": "tracker",
+      "sections": [
+        { "section_id": "overview", "title": "Product Backlog Overview", "layout_key": "sheet-overview" },
+        { "section_id": "stories", "title": "User Stories", "layout_key": "sheet-main-table" },
+        { "section_id": "acceptance", "title": "Acceptance Criteria", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "use-case-specification": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Use Case: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "actors", "title": "Actors & Pre-conditions", "layout_key": "doc-summary" },
+        { "section_id": "flow", "title": "Main Success Scenario", "layout_key": "doc-sections" },
+        { "section_id": "alternative", "title": "Alternative Flows", "layout_key": "doc-sections" }
+      ]
+    },
+    "requirements-traceability-matrix": {
+      "artifact_family": "spreadsheet",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "matrix", "title": "Traceability Matrix", "layout_key": "sheet-main-table" }
+      ]
+    },
+    "data-dictionary": {
+      "artifact_family": "document",
+      "document_type": "specification",
+      "sections": [
+        { "section_id": "title", "title": "Data Dictionary", "layout_key": "doc-title" },
+        { "section_id": "entities", "title": "Entity Definitions", "layout_key": "doc-sections" },
+        { "section_id": "attributes", "title": "Attribute Details", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}

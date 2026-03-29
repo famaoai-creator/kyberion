@@ -2,12 +2,68 @@ import {
   ControlPlaneClientError,
   createControlPlaneClient,
   createStandardYargs,
+  findIntentOutcomePattern,
   getControlPlaneRemediationPlan,
+  loadIntentOutcomePatterns,
   logger,
+  safeReadFile,
   safeExec,
 } from "@agent/core";
+import * as path from "node:path";
 
 type SurfaceKind = "presence" | "chronos";
+const ARTIFACT_LIBRARY_INDEX_PATH = "knowledge/public/design-patterns/media-templates/artifact-library/index.json";
+
+function loadArtifactLibraryIndex(): any {
+  const fullPath = path.resolve(process.cwd(), ARTIFACT_LIBRARY_INDEX_PATH);
+  return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+}
+
+function normalizeCatalogQuery(input: unknown): string {
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function searchArtifactLibraryProfiles(query?: string): any[] {
+  const index = loadArtifactLibraryIndex();
+  const normalized = normalizeCatalogQuery(query);
+  const items = asArray(index.packs).flatMap((pack: any) =>
+    asArray<string>(pack.profiles).map((profileId) => ({
+      profile_id: profileId,
+      domain: pack.domain,
+      file: pack.file,
+    })),
+  );
+  if (!normalized) return items;
+  return items.filter((item) => {
+    const haystack = [
+      item.profile_id,
+      item.domain,
+      item.file,
+    ].map(normalizeCatalogQuery).join(" ");
+    return haystack.includes(normalized);
+  });
+}
+
+function resolveArtifactLibraryProfile(profileId: string): any {
+  const index = loadArtifactLibraryIndex();
+  const normalizedProfileId = String(profileId || "").trim();
+  for (const pack of asArray(index.packs)) {
+    if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
+    const fullPath = path.resolve(process.cwd(), "knowledge/public/design-patterns/media-templates/artifact-library", String(pack.file));
+    const doc = JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+    return {
+      profile_id: normalizedProfileId,
+      domain: pack.domain,
+      file: pack.file,
+      definition: doc?.profiles?.[normalizedProfileId] || null,
+    };
+  }
+  return null;
+}
 
 interface DoctorCheckResult {
   surface: SurfaceKind;
@@ -364,6 +420,9 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       item.promoted_mission_id ? `mission: ${item.promoted_mission_id}` : "mission: -",
       item.metadata?.template_ref ? `template: ${item.metadata.template_ref}` : "template: -",
       item.metadata?.skeleton_path ? `skeleton: ${item.metadata.skeleton_path}` : "skeleton: -",
+      item.metadata?.execution_contract && typeof item.metadata.execution_contract === "object"
+        ? `execution: ${String((item.metadata.execution_contract as any).recommended_action || "-")} -> ${String((item.metadata.execution_contract as any).review_target || (item.metadata.execution_contract as any).repository_id || "-")}`
+        : "execution: -",
     ]);
   }
   if (action === "tracks") {
@@ -452,6 +511,60 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
   throw new Error(`Unsupported chronos action: ${action}`);
 }
 
+async function handleCatalog(action: string, args: string[], json: boolean): Promise<void> {
+  if (action === "intents") {
+    const [query] = args;
+    const normalized = normalizeCatalogQuery(query);
+    const items = loadIntentOutcomePatterns().filter((item) => {
+      if (!normalized) return true;
+      const haystack = [
+        item.intent_id,
+        ...(item.primary_outcome_ids || []),
+        ...(item.contract_layers || []),
+      ].map(normalizeCatalogQuery).join(" ");
+      return haystack.includes(normalized);
+    });
+    if (json) return printJson(items);
+    return printItems("Intent Outcome Patterns", items, (item) => [
+      `${item.intent_id}`,
+      `outcomes: ${(item.primary_outcome_ids || []).join(", ") || "-"}`,
+      `flow: ${(item.canonical_flow || []).slice(0, 3).join(" -> ") || "-"}`,
+    ]);
+  }
+  if (action === "intent") {
+    const [intentId] = args;
+    if (!intentId) {
+      throw new Error("Usage: control catalog intent <intentId>");
+    }
+    const item = findIntentOutcomePattern(intentId);
+    if (!item) {
+      throw new Error(`Unknown intent-outcome pattern: ${intentId}`);
+    }
+    return printJson(item);
+  }
+  if (action === "profiles") {
+    const [query] = args;
+    const items = searchArtifactLibraryProfiles(query);
+    if (json) return printJson(items);
+    return printItems("Artifact Library Profiles", items, (item) => [
+      `${item.profile_id} [${item.domain || "unknown"}]`,
+      `pack: ${item.file || "-"}`,
+    ]);
+  }
+  if (action === "profile") {
+    const [profileId] = args;
+    if (!profileId) {
+      throw new Error("Usage: control catalog profile <profileId>");
+    }
+    const item = resolveArtifactLibraryProfile(profileId);
+    if (!item) {
+      throw new Error(`Unknown artifact-library profile: ${profileId}`);
+    }
+    return printJson(item);
+  }
+  throw new Error(`Unsupported catalog action: ${action}`);
+}
+
 function printHelp(): void {
   process.stdout.write(`Kyberion Control Plane CLI
 
@@ -459,6 +572,10 @@ Usage:
   pnpm control doctor
   pnpm control doctor --surface presence --verbose
   pnpm control doctor --fix
+  pnpm control catalog intents [query]
+  pnpm control catalog intent <intentId>
+  pnpm control catalog profiles [query]
+  pnpm control catalog profile <profileId>
   pnpm control presence projects
   pnpm control presence tracks [projectId]
   pnpm control presence approvals
@@ -512,11 +629,15 @@ async function main(): Promise<void> {
     });
     return;
   }
-  if (surface !== "presence" && surface !== "chronos") {
-    throw new Error(`Unsupported surface "${surface}". Use "presence" or "chronos".`);
+  if (surface !== "presence" && surface !== "chronos" && surface !== "catalog") {
+    throw new Error(`Unsupported surface "${surface}". Use "presence", "chronos", or "catalog".`);
   }
   if (!action) {
     printHelp();
+    return;
+  }
+  if (surface === "catalog") {
+    await handleCatalog(action, rest, Boolean(argv.json));
     return;
   }
   if (surface === "presence") {

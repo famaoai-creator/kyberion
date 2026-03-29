@@ -18,11 +18,22 @@ Interpret the Sovereign's intent and define Victory Conditions to initiate a mis
 ## Physical Enforcement
 Once Alignment is reached, the agent MUST execute the following command to set the mission to "Active".
 
-- **Command**: `node dist/scripts/mission_controller.js start <MISSION_ID> <PERSONA>`
+- **Command**: `node dist/scripts/mission_controller.js start <MISSION_ID> --persona <PERSONA> --tier <TIER>`
 - **Validation**:
   - Verification of `my-identity.json`.
   - Automatic creation and switching to the mission branch (`mission/id`).
   - Initialization of `mission-state.json`.
+
+Only `MISSION_ID` is positional.
+Project and track relationships must be passed as named options such as:
+
+- `--project-id`
+- `--project-path`
+- `--project-relationship`
+- `--track-id`
+- `--track-name`
+- `--track-type`
+- `--lifecycle-model`
 
 ---
 *Status: Mandated by AGENTS.md*

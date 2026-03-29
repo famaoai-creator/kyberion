@@ -22,9 +22,20 @@
     {
       "id": "render-deck",
       "type": "apply",
-      "op": "media:document_report_design_from_brief",
+      "op": "media:generate_document",
       "params": {
-        "brief": "{{marketing_copy}}",
+        "profile_id": "summary-report",
+        "render_target": "pdf",
+        "data": {
+          "title": "Kyberion Marketing Expansion Plan",
+          "summary": "{{marketing_copy}}",
+          "sections": [
+            {
+              "heading": "Strategy",
+              "body": ["{{marketing_copy}}"]
+            }
+          ]
+        },
         "output_path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/expansion_plan.pdf"
       }
     },

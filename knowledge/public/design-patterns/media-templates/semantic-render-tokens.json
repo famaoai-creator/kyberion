@@ -1,0 +1,230 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "content": {
+      "pptx": {
+        "title_align": "left",
+        "body_font_size_delta": 0,
+        "body_color_role": "secondary",
+        "visual_fill_role": "background",
+        "visual_text_role": "secondary"
+      },
+      "pdf": {
+        "body_x": "content",
+        "body_font_size_delta": 0,
+        "header_color": "primary",
+        "block_fill": null,
+        "block_opacity": 0,
+        "callout_fill": "accent",
+        "callout_opacity": 0.7
+      },
+      "docx": {
+        "table_caption": {
+          "spacing_before": 60,
+          "spacing_after": 40,
+          "color_role": "secondary",
+          "font_size": 20,
+          "bold": true
+        }
+      },
+      "tracker": {
+        "priority": 2
+      }
+    }
+  },
+  "semantics": {
+    "hero": {
+      "pptx": {
+        "title_align": "left",
+        "body_font_size_delta": 2,
+        "body_color_role": "primary",
+        "visual_fill_role": "background",
+        "visual_text_role": "primary"
+      },
+      "pdf": {
+        "header_color": "primary"
+      },
+      "tracker": {
+        "priority": 2
+      }
+    },
+    "summary": {
+      "pptx": {
+        "title_align": "left",
+        "body_font_size_delta": 1,
+        "body_color_role": "primary",
+        "visual_fill_role": "accent",
+        "visual_text_role": "accent"
+      },
+      "pdf": {
+        "body_x": "margin",
+        "body_font_size_delta": 1,
+        "header_color": "accent",
+        "block_fill": "accent",
+        "block_opacity": 0.12
+      },
+      "tracker": {
+        "priority": 2
+      }
+    },
+    "evidence": {
+      "pptx": {
+        "body_font_size_delta": 1,
+        "body_color_role": "secondary",
+        "visual_fill_role": "accent",
+        "visual_text_role": "accent"
+      },
+      "pdf": {
+        "header_color": "primary",
+        "callout_fill": "accent",
+        "callout_opacity": 0.8
+      },
+      "docx": {
+        "callout_title": {
+          "spacing_before": 80,
+          "spacing_after": 40,
+          "color_role": "accent",
+          "font_size": 18,
+          "bold": true
+        },
+        "callout_body": {
+          "spacing_after": 80,
+          "color_role": "secondary",
+          "font_size": 21,
+          "italics": true
+        }
+      },
+      "tracker": {
+        "priority": 1
+      }
+    },
+    "control": {
+      "pptx": {
+        "body_font_size_delta": 0,
+        "body_color_role": "secondary",
+        "visual_fill_role": "primary",
+        "visual_text_role": "primary"
+      },
+      "pdf": {
+        "header_color": "primary",
+        "block_fill": "primary",
+        "block_opacity": 0.18,
+        "callout_fill": "primary",
+        "callout_opacity": 0.25
+      },
+      "tracker": {
+        "priority": 1
+      }
+    },
+    "roadmap": {
+      "pptx": {
+        "body_font_size_delta": -1,
+        "body_color_role": "secondary",
+        "visual_fill_role": "success",
+        "visual_text_role": "success"
+      },
+      "pdf": {
+        "header_color": "secondary"
+      },
+      "tracker": {
+        "priority": 2
+      }
+    },
+    "decision": {
+      "pptx": {
+        "title_align": "center",
+        "body_font_size_delta": 2,
+        "body_color_role": "primary",
+        "visual_fill_role": "accent",
+        "visual_text_role": "accent"
+      },
+      "pdf": {
+        "header_color": "accent"
+      },
+      "tracker": {
+        "priority": 2
+      }
+    },
+    "appendix": {
+      "pptx": {
+        "body_font_size_delta": -1,
+        "body_color_role": "secondary",
+        "visual_fill_role": "background",
+        "visual_text_role": "secondary"
+      },
+      "pdf": {
+        "header_color": "secondary",
+        "body_font_size_delta": -1
+      },
+      "docx": {
+        "heading": {
+          "spacing_before": 100,
+          "spacing_after": 80,
+          "color_role": "secondary",
+          "font_size": 20,
+          "bold": true
+        },
+        "body": {
+          "spacing_after": 60,
+          "color_role": "secondary",
+          "font_size": 20
+        }
+      },
+      "tracker": {
+        "priority": 3
+      }
+    },
+    "signals": {
+      "pptx": {
+        "body_font_size_delta": 0,
+        "body_color_role": "primary",
+        "visual_fill_role": "warning",
+        "visual_text_role": "warning"
+      },
+      "pdf": {
+        "header_color": "primary"
+      },
+      "tracker": {
+        "priority": 0
+      }
+    },
+    "execution": {
+      "pptx": {
+        "body_font_size_delta": 0,
+        "body_color_role": "secondary",
+        "visual_fill_role": "info",
+        "visual_text_role": "info"
+      },
+      "pdf": {
+        "header_color": "primary"
+      },
+      "tracker": {
+        "priority": 1
+      }
+    },
+    "architecture": {
+      "pptx": {
+        "body_font_size_delta": 0,
+        "body_color_role": "secondary",
+        "visual_fill_role": "muted",
+        "visual_text_role": "primary"
+      },
+      "pdf": {
+        "header_color": "primary"
+      },
+      "tracker": {
+        "priority": 2
+      }
+    }
+  },
+  "signal_tones": {
+    "danger": 0,
+    "critical": 0,
+    "high": 0,
+    "warning": 1,
+    "medium": 1,
+    "info": 2,
+    "success": 3,
+    "low": 3
+  }
+}

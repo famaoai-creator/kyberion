@@ -1,0 +1,34 @@
+{
+  "domain": "release-operations",
+  "profiles": {
+    "release-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Release Plan: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "deployment-steps", "title": "Deployment Sequence", "layout_key": "doc-sections" },
+        { "section_id": "rollback", "title": "Rollback Procedure", "layout_key": "risk-controls" },
+        { "section_id": "verification", "title": "Post-Deployment Verification", "layout_key": "doc-sections" }
+      ]
+    },
+    "operation-runbook": {
+      "artifact_family": "document",
+      "document_type": "record",
+      "sections": [
+        { "section_id": "title", "title": "Operation Runbook: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "monitoring", "title": "Monitoring & Alerting", "layout_key": "risk-controls" },
+        { "section_id": "incident-response", "title": "Incident Response Steps", "layout_key": "doc-sections" },
+        { "section_id": "contacts", "title": "On-Call Contacts", "layout_key": "doc-summary" }
+      ]
+    },
+    "disaster-recovery-plan": {
+      "artifact_family": "document",
+      "document_type": "plan",
+      "sections": [
+        { "section_id": "title", "title": "Disaster Recovery Plan", "layout_key": "doc-title" },
+        { "section_id": "rto-rpo", "title": "RTO & RPO Objectives", "layout_key": "evidence-callout" },
+        { "section_id": "recovery-steps", "title": "Recovery Procedures", "layout_key": "doc-sections" }
+      ]
+    }
+  }
+}
