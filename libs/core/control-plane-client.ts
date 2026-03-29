@@ -29,9 +29,36 @@ export interface ControlPlaneMissionSeedRecord {
   title?: string;
   status?: string;
   project_id?: string;
+  track_id?: string;
+  track_name?: string;
   specialist_id?: string;
   mission_type_hint?: string;
   promoted_mission_id?: string;
+  metadata?: {
+    template_ref?: string;
+    skeleton_path?: string;
+  };
+}
+
+export interface ControlPlaneProjectTrackRecord {
+  track_id: string;
+  project_id?: string;
+  name?: string;
+  summary?: string;
+  status?: string;
+  track_type?: string;
+  lifecycle_model?: string;
+  gate_readiness?: {
+    ready_gate_count?: number;
+    total_gate_count?: number;
+    current_gate_id?: string;
+    current_phase?: string;
+    ready?: boolean;
+    next_required_artifacts?: Array<{
+      artifact_id?: string;
+      template_ref?: string;
+    }>;
+  };
 }
 
 export interface ControlPlaneOutcomeRecord {
@@ -55,6 +82,8 @@ export interface ControlPlaneTaskSessionRecord {
 export interface ChronosOverviewRecord {
   accessRole?: string;
   projects?: ControlPlaneProjectRecord[];
+  projectTracks?: ControlPlaneProjectTrackRecord[];
+  gateReadiness?: Array<ControlPlaneProjectTrackRecord["gate_readiness"] & { track_id: string }>;
   missionSeeds?: ControlPlaneMissionSeedRecord[];
   pendingApprovals?: Array<Record<string, unknown>>;
   distillCandidates?: Array<Record<string, unknown>>;
@@ -133,10 +162,9 @@ function sleep(ms: number): Promise<void> {
 
 function inferSurfaceMismatchMessage(surface: ControlPlaneSurface, pathname: string, text: string): string | null {
   const normalized = String(text || '');
-  if (!normalized.includes('Cannot GET')) {
-    return null;
-  }
-  if (!normalized.includes(pathname)) {
+  const isExpressMismatch = normalized.includes('Cannot GET') && normalized.includes(pathname);
+  const isNextNotFound = /404[:\s]/i.test(normalized) && normalized.includes('This page could not be found.');
+  if (!isExpressMismatch && !isNextNotFound) {
     return null;
   }
   return `${surface} surface does not expose ${pathname}. This usually means an older process is still serving the port or the surface was not restarted after the latest build.`;
@@ -281,6 +309,21 @@ export function createControlPlaneClient(surface: ControlPlaneSurface, options?:
       const body = await requestControlPlaneJson(surface, pathname, undefined, options) as any;
       if (surface === 'chronos') {
         return Array.isArray(body?.missionSeeds) ? body.missionSeeds : [];
+      }
+      return Array.isArray(body?.items) ? body.items : [];
+    },
+    async listProjectTracks(): Promise<ControlPlaneProjectTrackRecord[]> {
+      const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/project-tracks';
+      const body = await requestControlPlaneJson(surface, pathname, undefined, options) as any;
+      if (surface === 'chronos') {
+        const tracks = Array.isArray(body?.projectTracks) ? body.projectTracks : [];
+        const readiness = new Map(
+          (Array.isArray(body?.gateReadiness) ? body.gateReadiness : []).map((item: any) => [String(item.track_id || ""), item]),
+        );
+        return tracks.map((track: any) => ({
+          ...track,
+          gate_readiness: track?.gate_readiness || readiness.get(String(track?.track_id || "")),
+        }));
       }
       return Array.isArray(body?.items) ? body.items : [];
     },

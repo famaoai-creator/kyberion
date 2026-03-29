@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
-import { guardRequest, requireChronosAccess } from "../../lib/api-guard";
+import { guardRequest, requireChronosAccess } from "../../../lib/api-guard";
 import { pathResolver, safeExistsSync, safeReadFile } from "@agent/core";
 
 function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
