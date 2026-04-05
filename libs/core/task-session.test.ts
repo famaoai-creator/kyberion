@@ -119,5 +119,8 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.intentId).toBe('incident-informed-review');
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.taskType).toBe('analysis');
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.requirements?.missing || []).toEqual([]);
+    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.intentId).toBe('evolve-agent-harness');
+    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.taskType).toBe('analysis');
+    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.requirements?.missing || []).toEqual([]);
   });
 });
