@@ -44,6 +44,47 @@ interface StandardIntentCatalogFile {
   }>;
 }
 
+interface BoundaryProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['execution_boundary']>;
+}
+
+interface RuntimeDesignProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['runtime_design']>;
+}
+
+interface RoutingMatch {
+  intent_ids?: string[];
+  task_types?: string[];
+  query_types?: string[];
+  shapes?: string[];
+}
+
+interface SpecialistRoutingPolicyFile {
+  rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    specialist_id?: string;
+  }>;
+  fallback_specialist_id?: string;
+}
+
+interface WorkDesignProfileRoutingFile {
+  execution_boundary_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  runtime_design_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  defaults?: {
+    execution_boundary_profile_id?: string;
+    runtime_design_profile_id?: string;
+  };
+}
+
 export interface WorkDesignSummary {
   primary_specialist: SpecialistDefinition | null;
   conversation_agent: string | null;
@@ -155,9 +196,46 @@ function loadStandardIntentCatalog(): StandardIntentCatalogFile['intents'] {
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
+function loadExecutionBoundaryProfiles(): Record<string, OrganizationWorkLoopSummary['execution_boundary']> {
+  const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('public/governance/execution-boundary-profiles.json'));
+  return parsed.profiles || {};
+}
+
+function loadRuntimeDesignProfiles(): Record<string, OrganizationWorkLoopSummary['runtime_design']> {
+  const parsed = loadJson<RuntimeDesignProfileFile>(pathResolver.knowledge('public/governance/runtime-design-profiles.json'));
+  return parsed.profiles || {};
+}
+
+function loadSpecialistRoutingPolicy(): SpecialistRoutingPolicyFile {
+  return loadJson<SpecialistRoutingPolicyFile>(pathResolver.knowledge('public/governance/specialist-routing-rules.json'));
+}
+
+function loadWorkDesignProfileRouting(): WorkDesignProfileRoutingFile {
+  return loadJson<WorkDesignProfileRoutingFile>(pathResolver.knowledge('public/governance/work-design-profile-routing.json'));
+}
+
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
   return loadStandardIntentCatalog().find((intent) => intent?.id === intentId) || null;
+}
+
+function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
+  if (!expected?.length) return true;
+  if (!value) return false;
+  return expected.includes(value);
+}
+
+function ruleMatches(
+  input: { intentId?: string; taskType?: string; queryType?: string; shape?: string },
+  match?: RoutingMatch,
+): boolean {
+  if (!match) return false;
+  return (
+    matchesRoutingValue(input.intentId, match.intent_ids) &&
+    matchesRoutingValue(input.taskType, match.task_types) &&
+    matchesRoutingValue(input.queryType, match.query_types) &&
+    matchesRoutingValue(input.shape, match.shapes)
+  );
 }
 
 function buildProcessDesign(input: {
@@ -193,185 +271,27 @@ function buildProcessDesign(input: {
 function buildExecutionBoundary(input: {
   intentId?: string;
   taskType?: string;
+  queryType?: string;
   shape?: string;
 }): OrganizationWorkLoopSummary['execution_boundary'] {
-  const isHarnessEvolution = input.intentId === 'evolve-agent-harness';
-  const isAnalysis =
-    input.intentId === 'incident-informed-review' ||
-    input.intentId === 'cross-project-remediation' ||
-    input.taskType === 'analysis';
-
-  if (isHarnessEvolution) {
-    return {
-      llm_zone: {
-        allowed: [
-          'normalize_harness_goal',
-          'cluster_benchmark_failures',
-          'propose_one_general_improvement',
-          'summarize_score_delta',
-          'explain_keep_or_discard_judgment',
-        ],
-        forbidden: [
-          'edit_fixed_adapter_boundary_without_approval',
-          'change_success_metric_without_contract_update',
-          'hardcode_benchmark_specific_answers',
-          'declare_a_change_kept_without_baseline_and_rerun_evidence',
-        ],
-      },
-      knowledge_zone: {
-        owns: [
-          'benchmark policy',
-          'protected edit boundaries',
-          'keep_or_discard rules',
-          'specialist routing',
-        ],
-      },
-      compiler_zone: {
-        responsibilities: [
-          'bind_target_harness_and_boundary',
-          'compile_experiment_contract',
-          'prepare_baseline_and_rerun_comparison',
-          'shape_replayable_experiment_ledger',
-        ],
-      },
-      executor_zone: {
-        responsibilities: [
-          'run_benchmark_or_evaluation_suite',
-          'persist_experiment_outputs',
-          'record_keep_or_discard_evidence',
-        ],
-      },
-      rule: 'LLM proposes one general harness improvement at a time; knowledge defines benchmark policy and protected boundaries; compiler binds the experiment; executors run, compare, and persist keep or discard evidence',
-    };
-  }
-
-  if (isAnalysis) {
-    return {
-      llm_zone: {
-        allowed: [
-          'normalize_analysis_request',
-          'draft_findings_language',
-          'summarize_incident_or_requirement_history',
-          'propose_follow_up_work_items',
-        ],
-        forbidden: [
-          'override_governed_process_design',
-          'invent_review_target_bindings',
-          'mutate_repo_or_mission_state_directly',
-          'declare_verification_complete_without_evidence',
-        ],
-      },
-      knowledge_zone: {
-        owns: [
-          'intent definitions',
-          'process_design',
-          'outcome catalog',
-          'specialist routing',
-        ],
-      },
-      compiler_zone: {
-        responsibilities: [
-          'resolve_target_binding',
-          'rank_governed_refs',
-          'classify_impact_bands',
-          'build_finding_candidates_and_execution_contract',
-        ],
-      },
-      executor_zone: {
-        responsibilities: [
-          'persist_analysis_artifact',
-          'create_follow_up_seeds',
-          'preserve_governed_project_track_context',
-        ],
-      },
-      rule: 'LLM drafts findings language; knowledge defines process; compiler binds targets and findings; executors persist artifacts and seeds',
-    };
-  }
-
-  return {
-    llm_zone: {
-      allowed: [
-        'normalize_request',
-        'draft_content_within_governed_slots',
-        'explain_next_action',
-      ],
-      forbidden: [
-        'override_governed_structure',
-        'invent_low_level_execution_contracts',
-        'declare_completion_without_evidence',
-      ],
-    },
-    knowledge_zone: {
-      owns: [
-        'intent definitions',
-        'process_design',
-        'outcome catalog',
-        'specialist routing',
-      ],
-    },
-    compiler_zone: {
-      responsibilities: [
-        'map_intent_to_governed_execution_shape',
-        'prepare_contracts_and_paths',
-      ],
-    },
-    executor_zone: {
-      responsibilities: [
-        'perform_governed_execution',
-        'persist_evidence',
-        'preserve_reproducibility',
-      ],
-    },
-    rule: 'LLM drafts within governed slots; knowledge defines process; compiler shapes execution; executors persist and reproduce',
-  };
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadExecutionBoundaryProfiles();
+  const matched = (routing.execution_boundary_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const defaultProfileId = routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.default_governed_execution;
 }
 
 function buildRuntimeDesign(input: {
   intentId?: string;
   taskType?: string;
+  queryType?: string;
   shape?: string;
 }): OrganizationWorkLoopSummary['runtime_design'] {
-  const isCollaborative =
-    input.shape === 'mission' ||
-    input.shape === 'project_bootstrap' ||
-    input.intentId === 'bootstrap-project' ||
-    input.intentId === 'incident-informed-review' ||
-    input.intentId === 'cross-project-remediation' ||
-    input.taskType === 'analysis';
-
-  if (isCollaborative) {
-    return {
-      owner_model: 'single_owner_multi_worker',
-      assignment_policy: input.shape === 'mission' ? 'dependency_first' : 'lease_aware_capability',
-      coordination: {
-        bus: 'mission_coordination_bus',
-        channels: ['task_contract', 'handoff', 'review', 'runtime_notice'],
-      },
-      memory: {
-        store: 'mission_working_memory',
-        scope: 'mission_local',
-        purpose: [
-          'transient worker coordination',
-          'intermediate findings and review notes',
-          'owner synthesis inputs before durable promotion',
-        ],
-      },
-    };
-  }
-
-  return {
-    owner_model: 'single_actor',
-    assignment_policy: 'direct_specialist',
-    coordination: {
-      bus: 'none',
-      channels: [],
-    },
-    memory: {
-      store: 'none',
-      scope: 'none',
-      purpose: [],
-    },
-  };
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadRuntimeDesignProfiles();
+  const matched = (routing.runtime_design_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const defaultProfileId = routing.defaults?.runtime_design_profile_id || 'single_actor_delivery';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.single_actor_delivery;
 }
 
 function inferExecutionShape(input: {
@@ -380,6 +300,11 @@ function inferExecutionShape(input: {
   shape?: string;
   projectId?: string;
 }): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const catalogShape = intentDefinition?.resolution?.shape;
+  if (catalogShape === 'direct_reply' || catalogShape === 'task_session' || catalogShape === 'mission' || catalogShape === 'project_bootstrap') {
+    return catalogShape;
+  }
   if (input.shape === 'project_bootstrap' || input.intentId === 'bootstrap-project') {
     return 'project_bootstrap';
   }
@@ -414,31 +339,9 @@ function specialistIdForIntent(input: {
   if (typeof intentDefinition?.specialist_id === 'string' && intentDefinition.specialist_id.trim()) {
     return intentDefinition.specialist_id;
   }
-  if (input.intentId === 'bootstrap-project' || input.shape === 'project_bootstrap') {
-    return 'project-lead';
-  }
-  if (input.intentId === 'open-site' || input.intentId === 'browser-step' || input.shape === 'browser_session') {
-    return 'browser-operator';
-  }
-  if (
-    input.intentId === 'generate-presentation' ||
-    input.intentId === 'generate-report' ||
-    input.intentId === 'generate-workbook' ||
-    ['presentation_deck', 'report_document', 'workbook_wbs'].includes(String(input.taskType || ''))
-  ) {
-    return 'document-specialist';
-  }
-  if (input.intentId === 'inspect-service' || input.taskType === 'service_operation') {
-    return 'service-operator';
-  }
-  if (
-    input.intentId === 'knowledge-query' ||
-    input.intentId === 'live-query' ||
-    ['knowledge_search', 'web_search', 'weather', 'location'].includes(String(input.queryType || ''))
-  ) {
-    return 'knowledge-specialist';
-  }
-  return 'surface-concierge';
+  const policy = loadSpecialistRoutingPolicy();
+  const matched = (policy.rules || []).find((rule) => ruleMatches(input, rule.match));
+  return matched?.specialist_id || policy.fallback_specialist_id || 'surface-concierge';
 }
 
 export function resolveWorkDesign(input: {

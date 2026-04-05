@@ -22,6 +22,13 @@
       "downloadable": true,
       "previewable": true
     },
+    "artifact:image": {
+      "label": "Image artifact",
+      "description": "A captured image is generated and can be downloaded or referenced.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
     "artifact:docx": {
       "label": "Document artifact",
       "description": "A report document is generated and can be downloaded.",

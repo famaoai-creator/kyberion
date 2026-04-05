@@ -26,6 +26,25 @@
       }
     },
     {
+      "id": "capture-photo",
+      "category": "surface",
+      "description": "Capture a photo for record keeping, sharing, or OCR source use.",
+      "surface_examples": [
+        "ちょっと写真をとって",
+        "共有用の写真を撮って",
+        "この紙をOCR用に撮影して"
+      ],
+      "plan_outline": ["understand the capture purpose", "capture the governed image artifact", "return the stored result"],
+      "outcome_ids": ["artifact:image"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": ["写真", "撮影", "photo", "picture", "camera", "OCR"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "capture_photo",
+        "result_shape": "artifact"
+      }
+    },
+    {
       "id": "open-site",
       "category": "surface",
       "description": "Open a website or navigate the active browser session to a requested destination.",

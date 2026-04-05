@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "profiles": {
+    "single_actor_delivery": {
+      "owner_model": "single_actor",
+      "assignment_policy": "direct_specialist",
+      "coordination": {
+        "bus": "none",
+        "channels": []
+      },
+      "memory": {
+        "store": "none",
+        "scope": "none",
+        "purpose": []
+      }
+    },
+    "collaborative_analysis": {
+      "owner_model": "single_owner_multi_worker",
+      "assignment_policy": "lease_aware_capability",
+      "coordination": {
+        "bus": "mission_coordination_bus",
+        "channels": ["task_contract", "handoff", "review", "runtime_notice"]
+      },
+      "memory": {
+        "store": "mission_working_memory",
+        "scope": "mission_local",
+        "purpose": [
+          "transient worker coordination",
+          "intermediate findings and review notes",
+          "owner synthesis inputs before durable promotion"
+        ]
+      }
+    },
+    "mission_collaboration": {
+      "owner_model": "single_owner_multi_worker",
+      "assignment_policy": "dependency_first",
+      "coordination": {
+        "bus": "mission_coordination_bus",
+        "channels": ["task_contract", "handoff", "review", "runtime_notice"]
+      },
+      "memory": {
+        "store": "mission_working_memory",
+        "scope": "mission_local",
+        "purpose": [
+          "transient worker coordination",
+          "intermediate execution context",
+          "owner synthesis inputs before durable promotion"
+        ]
+      }
+    }
+  }
+}

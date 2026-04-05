@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/intent-resolution-packet.schema.json",
+  "title": "Intent Resolution Packet",
+  "type": "object",
+  "required": ["kind", "utterance", "candidates"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "intent_resolution_packet"
+    },
+    "utterance": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_intent_id": {
+      "type": "string"
+    },
+    "selected_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "selected_resolution": {
+      "type": "object",
+      "properties": {
+        "shape": { "type": "string" },
+        "task_kind": { "type": "string" },
+        "result_shape": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["intent_id", "confidence", "reasons", "source"],
+        "properties": {
+          "intent_id": { "type": "string" },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": ["catalog", "heuristic", "legacy"]
+          },
+          "matched_keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "reasons": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "resolution": {
+            "type": "object",
+            "properties": {
+              "shape": { "type": "string" },
+              "task_kind": { "type": "string" },
+              "result_shape": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

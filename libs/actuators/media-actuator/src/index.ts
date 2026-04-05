@@ -6,6 +6,7 @@ import {
   safeExistsSync,
   safeReaddir,
   safeLstat,
+  safeStat,
   safeExec,
   derivePipelineStatus,
   pathResolver,
@@ -30,7 +31,6 @@ import {
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import * as fs from 'node:fs'; // Only for fs.statSync in render operations
 import * as excelUtils from '@agent/shared-media';
 import { PDFParse } from 'pdf-parse';
 
@@ -674,7 +674,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
 
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Mermaid rendered at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -697,7 +697,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
 
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] D2 rendered at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -711,7 +711,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const brief = normalizeDiagramDocumentBrief(rawBrief);
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       await renderDiagramDocumentBrief(rootDir, brief, outPath, params, ctx, resolve);
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -723,7 +723,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       await generateNativePptx(protocol, outPath);
 
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -736,7 +736,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       patchPptxText(sourcePath, outPath, replacements);
 
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX patched at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -745,7 +745,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
       await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
-      const xlsxStats = fs.statSync(xlsxOutPath);
+      const xlsxStats = safeStat(xlsxOutPath);
       logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
       break;
     }
@@ -754,7 +754,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const docxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
       await generateNativeDocx(docxProtocol, docxOutPath);
-      const docxStats = fs.statSync(docxOutPath);
+      const docxStats = safeStat(docxOutPath);
       logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
       break;
     }
@@ -763,7 +763,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const pdfOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
       await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
-      const pdfStats = fs.statSync(pdfOutPath);
+      const pdfStats = safeStat(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
       break;
     }
@@ -782,7 +782,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const compiled = compileBriefToDesignProtocol(rootDir, brief);
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       await renderCompiledProtocol(compiled, outPath, params.options);
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Unified document generated at: ${outPath} (${stats.size} bytes).`);
       break;
     }
@@ -797,7 +797,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       }
       ensureParentDir(outPath);
       safeWriteFile(outPath, content);
-      const stats = fs.statSync(outPath);
+      const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Draw.io document written at: ${outPath} (${stats.size} bytes).`);
       break;
     }
