@@ -36,6 +36,13 @@
       "team_roles": ["planner", "reviewer"],
       "capabilities": ["knowledge_query", "live_query", "summarization"]
     },
+    "harness-engineer": {
+      "label": "Harness Engineer",
+      "description": "Improves agent harnesses through benchmark-driven experiments, protected edit boundaries, and governed keep or discard decisions.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["owner", "planner", "implementer", "reviewer"],
+      "capabilities": ["harness_evolution", "benchmark_analysis", "experiment_ledger", "adapter_boundary_guard"]
+    },
     "project-lead": {
       "label": "Project Lead",
       "description": "Bootstraps a new project context, framing the long-lived goal, ownership, and next work items.",

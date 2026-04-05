@@ -388,6 +388,35 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     };
   }
 
+  if (
+    matchesStandardIntent(trimmed, 'evolve-agent-harness') ||
+    /((agent|エージェント|harness|ハーネス).*(benchmark|ベンチマーク|評価|score|verifier|task suite|改善|improv|evolv)|program\.md.*(改善|loop|ループ)|meta-agent|keep\s*or\s*discard|keep\/discard)/i.test(trimmed)
+  ) {
+    const hasHarnessTarget = /(agent|エージェント|harness|ハーネス|agent\.py|program\.md|AGENTS\.md)/i.test(trimmed);
+    const hasEvaluationBasis = /(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks\/|evaluator)/i.test(trimmed);
+    return {
+      taskType: 'analysis',
+      intentId: 'evolve-agent-harness',
+      goal: {
+        summary: 'Improve an agent harness through a benchmark-driven experiment loop',
+        success_condition: 'A governed experiment report captures the baseline, one general improvement, rerun delta, and keep or discard judgment.',
+      },
+      requirements: {
+        missing: [
+          ...(hasHarnessTarget ? [] : ['target_harness']),
+          ...(hasEvaluationBasis ? [] : ['evaluation_corpus']),
+        ],
+        collected: {},
+      },
+      payload: {
+        analysis_kind: 'harness_evolution',
+        target_kind: hasHarnessTarget ? 'agent_harness' : undefined,
+        evaluation_mode: hasEvaluationBasis ? 'benchmark' : undefined,
+        change_policy: /keep\s*or\s*discard|keep\/discard/i.test(trimmed) ? 'benchmark_governed' : 'baseline_first',
+      },
+    };
+  }
+
   if (matchesStandardIntent(trimmed, 'inspect-service') || /(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
     const operation = /再起動|restart/i.test(trimmed)
       ? 'restart'

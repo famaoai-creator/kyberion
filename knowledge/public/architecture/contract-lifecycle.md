@@ -124,6 +124,31 @@ It detects:
 
 It repairs safe structural issues before execution.
 
+## 6.5 Benchmarked Evolution Loops
+
+For harness-improvement work, the lifecycle extends one step further:
+
+```text
+semantic brief
+-> protected boundary
+-> baseline execution
+-> one-change experiment contract
+-> rerun
+-> keep / discard judgment
+-> evidence / replay
+```
+
+This is where the useful `autoagent` idea fits in Kyberion.
+
+The system should not jump from "improve the agent" straight to uncontrolled edits.
+
+It should first commit:
+
+- what is allowed to change
+- how success is measured
+- what counts as a retained improvement
+- what replay evidence must exist before keeping the result
+
 ## 7. Why This Matters
 
 Kyberion should not ask users to write perfect ADF from the beginning.
