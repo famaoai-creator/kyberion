@@ -38,6 +38,35 @@
       ]
     },
     {
+      "intent_id": "capture-photo",
+      "canonical_flow": [
+        "intent normalization",
+        "capture purpose binding",
+        "task session creation",
+        "governed image capture",
+        "artifact handoff"
+      ],
+      "contract_layers": [
+        "intent_resolution_packet",
+        "task_session",
+        "capture payload",
+        "artifact record"
+      ],
+      "primary_outcome_ids": ["artifact:image"],
+      "evidence": [
+        "captured image artifact",
+        "task session payload with capture intent"
+      ],
+      "completion_criteria": [
+        "capture purpose resolves",
+        "image is stored in a governed path",
+        "surface can reference or download the result"
+      ],
+      "follow_up": [
+        "captured image can feed OCR or later document work"
+      ]
+    },
+    {
       "intent_id": "generate-presentation",
       "canonical_flow": [
         "intent normalization",

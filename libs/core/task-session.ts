@@ -5,6 +5,9 @@ import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { resolveAnalysisExecutionContract } from './analysis-contract.js';
+import { resolveApprovalPolicy } from './approval-policy.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type TaskSessionType =
@@ -97,48 +100,6 @@ const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-ses
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
-let standardIntentCache: Array<{
-  id?: string;
-  trigger_keywords?: string[];
-  resolution?: {
-    shape?: string;
-    task_kind?: string;
-  };
-}> | null = null;
-
-function loadStandardIntentCatalog() {
-  if (standardIntentCache) return standardIntentCache;
-  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
-    intents?: Array<{
-      id?: string;
-      trigger_keywords?: string[];
-      resolution?: {
-        shape?: string;
-        task_kind?: string;
-      };
-    }>;
-  };
-  standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
-  return standardIntentCache;
-}
-
-function matchesStandardIntent(utterance: string, intentId: string): boolean {
-  const normalized = utterance.toLowerCase();
-  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
-  const keywords = Array.isArray(intent?.trigger_keywords) ? intent!.trigger_keywords : [];
-  return keywords.some((keyword) => normalized.includes(String(keyword).toLowerCase()));
-}
-
-function isBootstrapProjectUtterance(utterance: string): boolean {
-  if (!matchesStandardIntent(utterance, 'bootstrap-project')) return false;
-  if (matchesStandardIntent(utterance, 'generate-workbook')) return false;
-  if (matchesStandardIntent(utterance, 'generate-presentation')) return false;
-  if (matchesStandardIntent(utterance, 'generate-report')) return false;
-  if (matchesStandardIntent(utterance, 'inspect-service')) return false;
-  return true;
-}
-
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
   taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
@@ -151,6 +112,40 @@ function errorsFrom(validate: ValidateFunction): string[] {
 
 function taskSessionPath(sessionId: string): string {
   return `${TASK_SESSION_DIR}/${sessionId}.json`;
+}
+
+function inferRequiresApproval(input: {
+  requiresApproval?: boolean;
+  requirements?: TaskSession['requirements'];
+  payload?: TaskSession['payload'];
+  workLoop?: OrganizationWorkLoopSummary;
+}): boolean {
+  if (typeof input.requiresApproval === 'boolean') return input.requiresApproval;
+  if (input.workLoop?.authority?.requires_approval === true) return true;
+  if (input.payload?.approval_required === true) return true;
+  return Array.isArray(input.requirements?.missing) && input.requirements.missing.includes('approval_confirmation');
+}
+
+function applyApprovalPolicy(intentId: string, payload: Record<string, unknown>, requirements: TaskSession['requirements']): {
+  payload: Record<string, unknown>;
+  requirements: TaskSession['requirements'];
+} {
+  const policy = resolveApprovalPolicy({ intentId, payload });
+  const nextRequirements = {
+    missing: [...(requirements.missing || [])],
+    collected: { ...(requirements.collected || {}) },
+  };
+  for (const requirement of policy.missingRequirements) {
+    if (!nextRequirements.missing.includes(requirement)) nextRequirements.missing.push(requirement);
+  }
+  return {
+    payload: {
+      ...payload,
+      approval_required: policy.requiresApproval,
+      approval_rule_id: policy.matchedRuleId,
+    },
+    requirements: nextRequirements,
+  };
 }
 
 export function createTaskSession(input: {
@@ -170,6 +165,7 @@ export function createTaskSession(input: {
   workLoop?: OrganizationWorkLoopSummary;
 }): TaskSession {
   const now = new Date().toISOString();
+  const requiresApproval = inferRequiresApproval(input);
   const workLoop = input.workLoop || buildOrganizationWorkLoopSummary({
     intentId: input.intentId,
     taskType: input.taskType,
@@ -182,7 +178,7 @@ export function createTaskSession(input: {
     tier: input.projectContext?.tier,
     locale: input.projectContext?.locale,
     serviceBindings: input.projectContext?.service_bindings,
-    requiresApproval: input.requiresApproval,
+    requiresApproval,
   });
   return {
     session_id: input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -196,7 +192,7 @@ export function createTaskSession(input: {
     requirements: input.requirements,
     control: {
       interruptible: true,
-      requires_approval: Boolean(input.requiresApproval),
+      requires_approval: requiresApproval,
       awaiting_user_input: Boolean(input.requirements?.missing?.length),
     },
     history: [],
@@ -205,124 +201,111 @@ export function createTaskSession(input: {
   };
 }
 
-export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
-  const trimmed = utterance.trim();
-  if (!trimmed) return null;
+type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
 
-  if (isBootstrapProjectUtterance(trimmed)) {
-    return {
-      taskType: 'analysis',
-      intentId: 'bootstrap-project',
-      goal: {
-        summary: 'Bootstrap a governed project context',
-        success_condition: 'A project record, kickoff context, and first work items are prepared.',
-      },
-      requirements: {
-        missing: ['project_brief'],
-        collected: {},
-      },
-      payload: {
-        bootstrap_kind: 'project_bootstrap',
-      },
-    };
-  }
+function analysisContractId(intentId: string): string | undefined {
+  return resolveAnalysisExecutionContract(intentId)?.contract_id;
+}
 
-  if (/(写真|撮影|photo|picture|camera)/i.test(trimmed)) {
-    return {
-      taskType: 'capture_photo',
-      intentId: 'capture-photo',
-      goal: {
-        summary: 'Capture a photo for the requested purpose',
-        success_condition: 'A photo artifact is captured and stored in a governed path.',
-      },
-      requirements: {
-        missing: /(記録用|共有用|reference|record|share|ocr)/i.test(trimmed) ? [] : ['camera_intent'],
-        collected: {},
-      },
-      payload: {
-        camera_intent: /ocr/i.test(trimmed)
-          ? 'ocr_source'
-          : /共有|share/i.test(trimmed)
-            ? 'share'
-            : /記録|record/i.test(trimmed)
-              ? 'record'
-              : 'record',
-      },
-    };
-  }
-
-  if (matchesStandardIntent(trimmed, 'generate-workbook') || /(wbs|work breakdown|エクセル|excel|xlsx|スプレッドシート)/i.test(trimmed)) {
-    return {
-      taskType: 'workbook_wbs',
-      intentId: 'generate-workbook',
-      goal: {
-        summary: 'Create a WBS workbook from the project context',
-        success_condition: 'An XLSX workbook draft is generated in a governed path.',
-      },
-      requirements: {
-        missing: /(プロジェクト|project)/i.test(trimmed) ? [] : ['project_name'],
-        collected: {},
-      },
-      payload: {
-        granularity: /task/i.test(trimmed) ? 'task' : 'work_package',
-      },
-    };
-  }
-
-  if (matchesStandardIntent(trimmed, 'generate-presentation') || /(パワーポイント|powerpoint|pptx|deck|slide|スライド|提案資料|営業資料)/i.test(trimmed)) {
-    return {
-      taskType: 'presentation_deck',
-      intentId: 'generate-presentation',
-      goal: {
-        summary: 'Create a presentation deck from available project context',
-        success_condition: 'A PPTX draft is generated in a governed path.',
-      },
-      requirements: {
-        missing: /(提案|proposal|営業|marketing|社内共有|briefing)/i.test(trimmed) ? [] : ['deck_purpose'],
-        collected: {},
-      },
-      payload: {
-        deck_purpose: /営業|marketing/i.test(trimmed)
-          ? 'marketing'
-          : /社内共有|briefing/i.test(trimmed)
-            ? 'internal_share'
-            : 'proposal',
-        slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
-          ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
-          : undefined,
-      },
-    };
-  }
-
-  if (matchesStandardIntent(trimmed, 'generate-report') || /(レポート|報告書|summary|report|docx|pdf|文書)/i.test(trimmed)) {
-    return {
-      taskType: 'report_document',
-      intentId: 'generate-report',
-      goal: {
-        summary: 'Create a document artifact for the requested audience',
-        success_condition: 'A report document is generated in a governed path.',
-      },
-      requirements: {
-        missing: /(進捗|status|要約|summary|proposal|仕様|spec)/i.test(trimmed) ? [] : ['report_kind'],
-        collected: {},
-      },
-      payload: {
-        report_kind: /仕様|spec/i.test(trimmed)
-          ? 'spec'
-          : /提案|proposal/i.test(trimmed)
-            ? 'proposal'
-            : /進捗|status/i.test(trimmed)
-              ? 'status'
-              : 'summary',
-        format: /pdf/i.test(trimmed) ? 'pdf' : /markdown|md/i.test(trimmed) ? 'markdown' : 'docx',
-      },
-    };
-  }
-
-  if (
-    matchesStandardIntent(trimmed, 'cross-project-remediation') ||
-    /(横断.*(要件定義|仕様|incident|不具合|バグ)|横展開.*(不具合|バグ|修正)|same bug|remediation|propagat(?:e|ion)|requirements?.*(review|sweep)|未展開.*(修正|fix))/i.test(trimmed)
-  ) {
+// Intent resolution decides "what the user means".
+// Task-session builders decide "which runtime bindings and missing inputs are needed".
+const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
+  'bootstrap-project': () => ({
+    taskType: 'analysis',
+    intentId: 'bootstrap-project',
+    goal: {
+      summary: 'Bootstrap a governed project context',
+      success_condition: 'A project record, kickoff context, and first work items are prepared.',
+    },
+    requirements: {
+      missing: ['project_brief'],
+      collected: {},
+    },
+    payload: {
+      bootstrap_kind: 'project_bootstrap',
+    },
+  }),
+  'capture-photo': (trimmed) => ({
+    taskType: 'capture_photo',
+    intentId: 'capture-photo',
+    goal: {
+      summary: 'Capture a photo for the requested purpose',
+      success_condition: 'A photo artifact is captured and stored in a governed path.',
+    },
+    requirements: {
+      missing: /(記録用|共有用|reference|record|share|ocr)/i.test(trimmed) ? [] : ['camera_intent'],
+      collected: {},
+    },
+    payload: {
+      camera_intent: /ocr/i.test(trimmed)
+        ? 'ocr_source'
+        : /共有|share/i.test(trimmed)
+          ? 'share'
+          : /記録|record/i.test(trimmed)
+            ? 'record'
+            : 'record',
+    },
+  }),
+  'generate-workbook': (trimmed) => ({
+    taskType: 'workbook_wbs',
+    intentId: 'generate-workbook',
+    goal: {
+      summary: 'Create a WBS workbook from the project context',
+      success_condition: 'An XLSX workbook draft is generated in a governed path.',
+    },
+    requirements: {
+      missing: /(プロジェクト|project)/i.test(trimmed) ? [] : ['project_name'],
+      collected: {},
+    },
+    payload: {
+      granularity: /task/i.test(trimmed) ? 'task' : 'work_package',
+    },
+  }),
+  'generate-presentation': (trimmed) => ({
+    taskType: 'presentation_deck',
+    intentId: 'generate-presentation',
+    goal: {
+      summary: 'Create a presentation deck from available project context',
+      success_condition: 'A PPTX draft is generated in a governed path.',
+    },
+    requirements: {
+      missing: /(提案|proposal|営業|marketing|社内共有|briefing)/i.test(trimmed) ? [] : ['deck_purpose'],
+      collected: {},
+    },
+    payload: {
+      deck_purpose: /営業|marketing/i.test(trimmed)
+        ? 'marketing'
+        : /社内共有|briefing/i.test(trimmed)
+          ? 'internal_share'
+          : 'proposal',
+      slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
+        ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
+        : undefined,
+    },
+  }),
+  'generate-report': (trimmed) => ({
+    taskType: 'report_document',
+    intentId: 'generate-report',
+    goal: {
+      summary: 'Create a document artifact for the requested audience',
+      success_condition: 'A report document is generated in a governed path.',
+    },
+    requirements: {
+      missing: /(進捗|status|要約|summary|proposal|仕様|spec)/i.test(trimmed) ? [] : ['report_kind'],
+      collected: {},
+    },
+    payload: {
+      report_kind: /仕様|spec/i.test(trimmed)
+        ? 'spec'
+        : /提案|proposal/i.test(trimmed)
+          ? 'proposal'
+          : /進捗|status/i.test(trimmed)
+            ? 'status'
+            : 'summary',
+      format: /pdf/i.test(trimmed) ? 'pdf' : /markdown|md/i.test(trimmed) ? 'markdown' : 'docx',
+    },
+  }),
+  'cross-project-remediation': (trimmed) => {
     const hasSourceCorpus = /(要件定義|仕様|requirements?|incident|障害|不具合|bug)/i.test(trimmed);
     const hasTargetScope = /(横断|横展開|across|cross-project|全体|複数プロジェクト)/i.test(trimmed);
     return {
@@ -341,6 +324,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
       },
       payload: {
         analysis_kind: 'cross_project_remediation',
+        analysis_contract_id: analysisContractId('cross-project-remediation'),
         source_corpus: /(要件定義|requirements?)/i.test(trimmed)
           ? 'requirements'
           : /(incident|障害)/i.test(trimmed)
@@ -352,12 +336,8 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
         action_bias: /(修正|fix)/i.test(trimmed) ? 'remediation' : 'analysis',
       },
     };
-  }
-
-  if (
-    matchesStandardIntent(trimmed, 'incident-informed-review') ||
-    /((過去| prior|known).*(インシデント|障害|incident|failure).*(踏まえて|based on).*(レビュー|review)|postmortem.*review|障害.*振り返り.*レビュー|incident-informed review)/i.test(trimmed)
-  ) {
+  },
+  'incident-informed-review': (trimmed) => {
     const hasIncidentBasis = /(インシデント|障害|incident|failure|postmortem)/i.test(trimmed);
     const hasReviewTarget = /(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)/i.test(trimmed);
     return {
@@ -376,6 +356,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
       },
       payload: {
         analysis_kind: 'incident_informed_review',
+        analysis_contract_id: analysisContractId('incident-informed-review'),
         incident_basis: hasIncidentBasis ? 'incident_history' : undefined,
         review_target_kind: /コード|code|pr|pull request/i.test(trimmed)
           ? 'code_change'
@@ -386,12 +367,8 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
               : 'general_scope',
       },
     };
-  }
-
-  if (
-    matchesStandardIntent(trimmed, 'evolve-agent-harness') ||
-    /((agent|エージェント|harness|ハーネス).*(benchmark|ベンチマーク|評価|score|verifier|task suite|改善|improv|evolv)|program\.md.*(改善|loop|ループ)|meta-agent|keep\s*or\s*discard|keep\/discard)/i.test(trimmed)
-  ) {
+  },
+  'evolve-agent-harness': (trimmed) => {
     const hasHarnessTarget = /(agent|エージェント|harness|ハーネス|agent\.py|program\.md|AGENTS\.md)/i.test(trimmed);
     const hasEvaluationBasis = /(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks\/|evaluator)/i.test(trimmed);
     return {
@@ -410,14 +387,14 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
       },
       payload: {
         analysis_kind: 'harness_evolution',
+        analysis_contract_id: analysisContractId('evolve-agent-harness'),
         target_kind: hasHarnessTarget ? 'agent_harness' : undefined,
         evaluation_mode: hasEvaluationBasis ? 'benchmark' : undefined,
         change_policy: /keep\s*or\s*discard|keep\/discard/i.test(trimmed) ? 'benchmark_governed' : 'baseline_first',
       },
     };
-  }
-
-  if (matchesStandardIntent(trimmed, 'inspect-service') || /(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(trimmed)) {
+  },
+  'inspect-service': (trimmed) => {
     const operation = /再起動|restart/i.test(trimmed)
       ? 'restart'
       : /停止|stop/i.test(trimmed)
@@ -430,8 +407,7 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
     const serviceMatch =
       trimmed.match(/([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i) ||
       trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
-    const requiresApproval = ['restart', 'start', 'stop'].includes(operation);
-    return {
+    const base: TaskSessionIntent = {
       taskType: 'service_operation',
       intentId: 'inspect-service',
       goal: {
@@ -439,21 +415,30 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
         success_condition: 'The requested service operation completes and the result is reported back.',
       },
       requirements: {
-        missing: serviceMatch
-          ? (requiresApproval ? ['approval_confirmation'] : [])
-          : ['service_name'],
+        missing: serviceMatch ? [] : ['service_name'],
         collected: {},
       },
       payload: {
         service_name: serviceMatch?.[1],
         operation,
-        approval_required: requiresApproval,
         log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
       },
     };
-  }
+    const approvalApplied = applyApprovalPolicy(base.intentId, base.payload, base.requirements);
+    return {
+      ...base,
+      requirements: approvalApplied.requirements,
+      payload: approvalApplied.payload,
+    };
+  },
+};
 
-  return null;
+export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
+  const trimmed = utterance.trim();
+  if (!trimmed) return null;
+  const packet = resolveIntentResolutionPacket(trimmed);
+  const builder = packet.selected_intent_id ? TASK_SESSION_INTENT_BUILDERS[packet.selected_intent_id] : undefined;
+  return builder ? builder(trimmed) : null;
 }
 
 export function validateTaskSession(session: unknown): ValidationResult<TaskSession> {

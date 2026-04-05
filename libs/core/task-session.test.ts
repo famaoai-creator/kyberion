@@ -79,6 +79,22 @@ describe('task-session', () => {
     expect(getActiveTaskSession('presence')?.session_id).toBeTruthy();
   });
 
+  it('derives approval-required control state from classified service operations', () => {
+    const classified = classifyTaskSessionIntent('voice-hub を再起動して');
+    expect(classified?.payload?.approval_required).toBe(true);
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-APPROVAL',
+      surface: 'presence',
+      taskType: classified!.taskType,
+      intentId: classified!.intentId,
+      goal: classified!.goal,
+      requirements: classified!.requirements,
+      payload: classified!.payload,
+    });
+    expect(session.control.requires_approval).toBe(true);
+    expect(session.work_loop?.authority.requires_approval).toBe(true);
+  });
+
   it('records history updates', () => {
     const session = createTaskSession({
       sessionId: 'TSK-TEST-HISTORY',
@@ -116,11 +132,14 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.intentId).toBe('cross-project-remediation');
     expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.taskType).toBe('analysis');
     expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.requirements?.missing || []).toEqual([]);
+    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.payload?.analysis_contract_id).toBe('analysis.cross-project-remediation.v1');
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.intentId).toBe('incident-informed-review');
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.taskType).toBe('analysis');
     expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.requirements?.missing || []).toEqual([]);
+    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.payload?.analysis_contract_id).toBe('analysis.incident-informed-review.v1');
     expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.intentId).toBe('evolve-agent-harness');
     expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.taskType).toBe('analysis');
     expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.requirements?.missing || []).toEqual([]);
+    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.payload?.analysis_contract_id).toBe('analysis.evolve-agent-harness.v1');
   });
 });
