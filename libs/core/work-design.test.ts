@@ -104,6 +104,8 @@ describe('work-design', () => {
     expect(summary.resolution.execution_shape).toBe('task_session');
     expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
     expect(summary.process_design.operator_checklist).toContain('confirm the governed output path');
+    expect(summary.runtime_design.owner_model).toBe('single_actor');
+    expect(summary.runtime_design.assignment_policy).toBe('direct_specialist');
     expect(summary.execution_boundary.rule).toContain('knowledge defines process');
     expect(summary.teaming.specialist_id).toBe('document-specialist');
   });
@@ -123,6 +125,9 @@ describe('work-design', () => {
     ]);
     expect(summary.process_design.intake_requirements).toContain('incident basis');
     expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
+    expect(summary.runtime_design.owner_model).toBe('single_owner_multi_worker');
+    expect(summary.runtime_design.assignment_policy).toBe('lease_aware_capability');
+    expect(summary.runtime_design.coordination.bus).toBe('mission_coordination_bus');
     expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('resolve_target_binding');
     expect(summary.execution_boundary.llm_zone.forbidden).toContain('invent_review_target_bindings');
   });

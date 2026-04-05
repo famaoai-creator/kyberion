@@ -14,9 +14,27 @@ import * as path from "node:path";
 
 type SurfaceKind = "presence" | "chronos";
 const ARTIFACT_LIBRARY_INDEX_PATH = "knowledge/public/design-patterns/media-templates/artifact-library/index.json";
+const DESIGN_MD_INDEX_PATH = "knowledge/public/design-patterns/media-templates/design-md-catalog/index.json";
+const DESIGN_MD_THEME_PATH = "knowledge/public/design-patterns/media-templates/themes/design-md-imports.json";
+const DESIGN_MD_SYSTEM_PATH = "knowledge/public/design-patterns/media-templates/media-design-systems/design-md-imports.json";
 
 function loadArtifactLibraryIndex(): any {
   const fullPath = path.resolve(pathResolver.rootDir(), ARTIFACT_LIBRARY_INDEX_PATH);
+  return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+}
+
+function loadDesignMdIndex(): any {
+  const fullPath = path.resolve(pathResolver.rootDir(), DESIGN_MD_INDEX_PATH);
+  return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+}
+
+function loadDesignMdThemes(): any {
+  const fullPath = path.resolve(pathResolver.rootDir(), DESIGN_MD_THEME_PATH);
+  return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
+}
+
+function loadDesignMdSystems(): any {
+  const fullPath = path.resolve(pathResolver.rootDir(), DESIGN_MD_SYSTEM_PATH);
   return JSON.parse(safeReadFile(fullPath, { encoding: "utf8" }) as string);
 }
 
@@ -64,6 +82,69 @@ function resolveArtifactLibraryProfile(profileId: string): any {
     };
   }
   return null;
+}
+
+function searchImportedDesignSystems(query?: string): any[] {
+  const index = loadDesignMdIndex();
+  const normalized = normalizeCatalogQuery(query);
+  const items = asArray(index.systems);
+  if (!normalized) return items;
+  return items.filter((item) => {
+    const haystack = [
+      item.design_system_id,
+      item.theme_id,
+      item.slug,
+      item.name,
+      item.category,
+      item.description,
+    ].map(normalizeCatalogQuery).join(" ");
+    return haystack.includes(normalized);
+  });
+}
+
+function recommendImportedDesignSystems(query?: string): any[] {
+  const normalized = normalizeCatalogQuery(query);
+  if (!normalized) return [];
+  const items = searchImportedDesignSystems();
+  return items
+    .map((item) => {
+      const terms = [
+        item.design_system_id,
+        item.theme_id,
+        item.slug,
+        item.name,
+        item.category,
+        item.description,
+        ...asArray<string>(item.keywords),
+      ].map(normalizeCatalogQuery).filter(Boolean);
+      let score = 0;
+      for (const term of terms) {
+        if (normalized === term) score += 10;
+        else if (normalized.includes(term)) score += Math.min(6, Math.max(2, term.split(" ").length + 1));
+        else if (term.includes(normalized)) score += 1;
+      }
+      return { ...item, recommendation_score: score };
+    })
+    .filter((item) => item.recommendation_score > 0)
+    .sort((left, right) => {
+      if (right.recommendation_score !== left.recommendation_score) return right.recommendation_score - left.recommendation_score;
+      return String(left.design_system_id || "").localeCompare(String(right.design_system_id || ""));
+    })
+    .slice(0, 10);
+}
+
+function resolveImportedDesignSystem(designSystemId: string): any {
+  const normalizedId = String(designSystemId || "").trim();
+  const index = loadDesignMdIndex();
+  const summary = asArray(index.systems).find((item) => item.design_system_id === normalizedId);
+  if (!summary) return null;
+  const themes = loadDesignMdThemes();
+  const systems = loadDesignMdSystems();
+  return {
+    ...summary,
+    theme: themes?.themes?.[summary.theme_id] || null,
+    system: systems?.systems?.[normalizedId] || null,
+  };
 }
 
 interface DoctorCheckResult {
@@ -563,6 +644,41 @@ async function handleCatalog(action: string, args: string[], json: boolean): Pro
     }
     return printJson(item);
   }
+  if (action === "design-systems") {
+    const [query] = args;
+    const items = searchImportedDesignSystems(query);
+    if (json) return printJson(items);
+    return printItems("Imported Design Systems", items, (item) => [
+      `${item.design_system_id} [${item.category || "unknown"}]`,
+      `theme: ${item.theme_id || "-"}`,
+      `source: ${item.source_path || "-"}`,
+    ]);
+  }
+  if (action === "design-system") {
+    const [designSystemId] = args;
+    if (!designSystemId) {
+      throw new Error("Usage: control catalog design-system <designSystemId>");
+    }
+    const item = resolveImportedDesignSystem(designSystemId);
+    if (!item) {
+      throw new Error(`Unknown imported design system: ${designSystemId}`);
+    }
+    return printJson(item);
+  }
+  if (action === "design-recommend") {
+    const query = args.join(" ");
+    if (!query.trim()) {
+      throw new Error("Usage: control catalog design-recommend <query>");
+    }
+    const items = recommendImportedDesignSystems(query);
+    if (json) return printJson(items);
+    return printItems("Recommended Imported Design Systems", items, (item) => [
+      `${item.design_system_id} [score=${item.recommendation_score}]`,
+      `theme: ${item.theme_id || "-"}`,
+      item.category ? `category: ${item.category}` : "",
+      item.description ? `description: ${item.description}` : "",
+    ].filter(Boolean));
+  }
   throw new Error(`Unsupported catalog action: ${action}`);
 }
 
@@ -577,6 +693,9 @@ Usage:
   pnpm control catalog intent <intentId>
   pnpm control catalog profiles [query]
   pnpm control catalog profile <profileId>
+  pnpm control catalog design-systems [query]
+  pnpm control catalog design-system <designSystemId>
+  pnpm control catalog design-recommend <query>
   pnpm control presence projects
   pnpm control presence tracks [projectId]
   pnpm control presence approvals

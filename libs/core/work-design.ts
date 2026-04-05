@@ -83,6 +83,19 @@ export interface OrganizationWorkLoopSummary {
     intake_requirements: string[];
     operator_checklist: string[];
   };
+  runtime_design: {
+    owner_model: 'single_actor' | 'single_owner_multi_worker';
+    assignment_policy: 'direct_specialist' | 'lease_aware_capability' | 'dependency_first';
+    coordination: {
+      bus: 'none' | 'mission_coordination_bus';
+      channels: string[];
+    };
+    memory: {
+      store: 'none' | 'mission_working_memory';
+      scope: 'none' | 'mission_local';
+      purpose: string[];
+    };
+  };
   execution_boundary: {
     llm_zone: {
       allowed: string[];
@@ -268,6 +281,54 @@ function buildExecutionBoundary(input: {
   };
 }
 
+function buildRuntimeDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['runtime_design'] {
+  const isCollaborative =
+    input.shape === 'mission' ||
+    input.shape === 'project_bootstrap' ||
+    input.intentId === 'bootstrap-project' ||
+    input.intentId === 'incident-informed-review' ||
+    input.intentId === 'cross-project-remediation' ||
+    input.taskType === 'analysis';
+
+  if (isCollaborative) {
+    return {
+      owner_model: 'single_owner_multi_worker',
+      assignment_policy: input.shape === 'mission' ? 'dependency_first' : 'lease_aware_capability',
+      coordination: {
+        bus: 'mission_coordination_bus',
+        channels: ['task_contract', 'handoff', 'review', 'runtime_notice'],
+      },
+      memory: {
+        store: 'mission_working_memory',
+        scope: 'mission_local',
+        purpose: [
+          'transient worker coordination',
+          'intermediate findings and review notes',
+          'owner synthesis inputs before durable promotion',
+        ],
+      },
+    };
+  }
+
+  return {
+    owner_model: 'single_actor',
+    assignment_policy: 'direct_specialist',
+    coordination: {
+      bus: 'none',
+      channels: [],
+    },
+    memory: {
+      store: 'none',
+      scope: 'none',
+      purpose: [],
+    },
+  };
+}
+
 function inferExecutionShape(input: {
   intentId?: string;
   taskType?: string;
@@ -426,6 +487,7 @@ export function buildOrganizationWorkLoopSummary(input: {
       labels: design.outcomes.map((outcome) => outcome.label),
     },
     process_design: buildProcessDesign(input),
+    runtime_design: buildRuntimeDesign(input),
     execution_boundary: buildExecutionBoundary(input),
     teaming: {
       specialist_id: design.primary_specialist?.id,

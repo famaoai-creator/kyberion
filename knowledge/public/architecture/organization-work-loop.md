@@ -28,6 +28,7 @@ Intent
 -> Context
 -> Resolution
 -> Outcome Design
+-> Runtime Design
 -> Teaming
 -> Authority
 -> Execution
@@ -117,7 +118,18 @@ Examples:
 - service change
 - delivery record
 
-### 4.5 Teaming
+### 4.5 Runtime Design
+
+This stage defines the light-weight execution primitives beneath the governed contract:
+
+- owner model
+- worker assignment policy
+- coordination bus
+- transient working memory
+
+This is where Kyberion may borrow runtime mechanics from simpler multi-agent frameworks without giving up planning or governance authority.
+
+### 4.6 Teaming
 
 Who should handle the work:
 
@@ -126,7 +138,7 @@ Who should handle the work:
 - external service
 - human approver
 
-### 4.6 Authority
+### 4.7 Authority
 
 What can proceed autonomously and what must be approved.
 
@@ -137,7 +149,7 @@ This stage binds:
 - role boundaries
 - risk controls
 
-### 4.7 Execution
+### 4.8 Execution
 
 The actual work:
 
@@ -146,7 +158,7 @@ The actual work:
 - actuators
 - external deliveries
 
-### 4.8 Accounting
+### 4.9 Accounting
 
 The traceable record of what happened:
 
@@ -156,7 +168,7 @@ The traceable record of what happened:
 - ledger records
 - delivery state
 
-### 4.9 Learning
+### 4.10 Learning
 
 The promotion of completed work into reusable organizational memory:
 
