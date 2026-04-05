@@ -309,6 +309,40 @@
       ]
     },
     {
+      "intent_id": "evolve-agent-harness",
+      "canonical_flow": [
+        "intent normalization",
+        "target harness and protected boundary resolution",
+        "baseline benchmark execution",
+        "failure clustering and one-change experiment selection",
+        "rerun benchmark and compare score delta",
+        "persist experiment ledger and keep or discard judgment"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "experiment contract",
+        "benchmark evidence",
+        "experiment ledger"
+      ],
+      "primary_outcome_ids": ["harness_experiment_report"],
+      "evidence": [
+        "baseline and rerun benchmark outputs",
+        "protected boundary declaration",
+        "experiment report with keep or discard decision"
+      ],
+      "completion_criteria": [
+        "target harness and protected boundary are explicit",
+        "baseline run exists before any retained change",
+        "one general harness improvement is evaluated against the benchmark",
+        "keep or discard judgment is grounded in replayable evidence"
+      ],
+      "follow_up": [
+        "kept changes can promote reusable harness patterns",
+        "discarded runs still contribute failure clusters and future experiment ideas"
+      ]
+    },
+    {
       "intent_id": "live-query",
       "canonical_flow": [
         "intent normalization",

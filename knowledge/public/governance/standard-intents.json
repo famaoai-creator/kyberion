@@ -193,6 +193,31 @@
       }
     },
     {
+      "id": "evolve-agent-harness",
+      "category": "surface",
+      "description": "Improve an agent harness through a benchmark-driven experiment loop with baseline, one-change iteration, and governed keep or discard decisions.",
+      "surface_examples": [
+        "このエージェントのハーネスを benchmark ベースで改善して",
+        "Improve this agent harness against the benchmark and keep only general wins",
+        "program.md 方式で改善ループを定義してハーネスを良くして"
+      ],
+      "plan_outline": [
+        "establish the target harness and protected edit boundary",
+        "run the baseline benchmark or evaluation corpus",
+        "cluster failure modes and choose one general improvement",
+        "rerun evaluation and record keep or discard evidence"
+      ],
+      "intake_requirements": ["target harness", "evaluation corpus or benchmark", "success metric"],
+      "outcome_ids": ["harness_experiment_report"],
+      "specialist_id": "harness-engineer",
+      "trigger_keywords": ["harness", "agent harness", "benchmark", "verifier", "score", "program.md", "meta-agent", "改善ループ", "ハーネス", "ベンチマーク", "評価", "keep", "discard"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "analysis",
+        "result_shape": "report"
+      }
+    },
+    {
       "id": "live-query",
       "category": "surface",
       "description": "Return live information such as weather, location, or web search results.",

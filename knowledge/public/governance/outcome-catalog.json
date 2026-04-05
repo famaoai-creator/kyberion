@@ -71,6 +71,13 @@
       "downloadable": false,
       "previewable": true
     },
+    "harness_experiment_report": {
+      "label": "Harness experiment report",
+      "description": "A governed experiment report captures baseline, benchmark deltas, keep or discard judgment, and replayable evidence for agent harness changes.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
     "live_answer": {
       "label": "Live answer",
       "description": "Live web, weather, or location information is returned.",
