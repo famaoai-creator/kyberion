@@ -93,6 +93,16 @@ They never mutate mission state directly.
    - reviews
    - agent mailboxes
 
+8. `mission-working-memory`
+   - transient mission-local notes
+   - intermediate findings
+   - owner synthesis inputs before durable promotion
+
+9. `worker-assignment-policy`
+   - bounded task-to-worker recommendation
+   - lease-aware capability matching
+   - dependency-first dispatch for blocked mission work
+
 ## 5. Lock vs Lease
 
 ### 5.1 Resource Lock

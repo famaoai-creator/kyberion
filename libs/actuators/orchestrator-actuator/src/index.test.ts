@@ -389,6 +389,10 @@ describe('orchestrator-actuator', () => {
               id: 'job-1',
               actuator: 'media-actuator',
               output_path: 'active/shared/tmp/failing-job.json',
+              rendered_pipeline: {
+                action: 'generate_presentation',
+                params: {},
+              },
             },
           ],
         },
@@ -489,5 +493,114 @@ describe('orchestrator-actuator', () => {
 
     expect(result.context.bundle.kind).toBe('actuator-pipeline-bundle');
     expect(result.context.bundle.status).toBe('ready');
+  });
+
+  it('preflights execution plan sets and repairs pipeline-shaped contracts before execution', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        execution_plan_set: {
+          kind: 'actuator-execution-plan-set',
+          archetype_id: 'structured-delivery',
+          status: 'ready',
+          output_dir: 'active/shared/runtime/generated-pipelines/preflight-demo',
+          jobs: [
+            {
+              id: 'repairable-job',
+              actuator: 'artifact-actuator',
+              rendered_pipeline: {
+                steps: [
+                  {
+                    type: 'apply',
+                    op: 'write_file',
+                    params: {
+                      path: 'active/shared/tmp/test.txt',
+                      from: 'payload',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'preflight_execution_plan_set',
+          params: {
+            from: 'execution_plan_set',
+            export_as: 'preflight',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.preflight.status).toBe('needs_clarification');
+    expect(result.context.preflight.repair_count).toBeGreaterThan(0);
+    expect(result.context.validated_execution_plan_set.jobs[0].output_path).toBe(
+      'active/shared/runtime/generated-pipelines/preflight-demo/repairable-job.json',
+    );
+    expect(result.context.validated_execution_plan_set.jobs[0].rendered_pipeline).toEqual(
+      expect.objectContaining({
+        action: 'pipeline',
+        context: {},
+      }),
+    );
+  });
+
+  it('blocks invalid execution plan sets with unresolved template variables before execution', async () => {
+    mocks.safeExec.mockImplementation(() => {
+      throw new Error('safeExec should not be called for invalid preflight');
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        execution_plan_set: {
+          kind: 'actuator-execution-plan-set',
+          archetype_id: 'structured-delivery',
+          status: 'ready',
+          jobs: [
+            {
+              id: 'invalid-job',
+              actuator: 'artifact-actuator',
+              output_path: 'active/shared/runtime/generated-pipelines/invalid-job.json',
+              rendered_pipeline: {
+                action: 'write_delivery_pack',
+                params: {
+                  packId: '{{delivery_pack_id}}',
+                },
+              },
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'run_execution_plan_set',
+          params: {
+            from: 'execution_plan_set',
+            export_as: 'run_report',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.execution_plan_preflight.status).toBe('invalid');
+    expect(result.context.run_report.status).toBe('failed');
+    expect(result.context.run_report.preflight_report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'unresolved_template_variable',
+        }),
+      ]),
+    );
+    expect(mocks.safeExec).not.toHaveBeenCalled();
   });
 });

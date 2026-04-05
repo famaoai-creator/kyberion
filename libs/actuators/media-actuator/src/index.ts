@@ -909,6 +909,14 @@ function loadMediaDesignSystemsCatalog(rootDir: string): any {
   });
 }
 
+function loadImportedDesignMdIndex(rootDir: string): any {
+  return loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/public/design-patterns/media-templates/design-md-catalog',
+    filePath: 'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json',
+    fallback: { systems: [] },
+  });
+}
+
 function normalizeDesignLookupKey(input: any): string {
   return String(input || '')
     .trim()
@@ -921,6 +929,7 @@ function resolveDesignBindingHints(brief: any): {
   tenant_id?: string;
   client_key?: string;
   design_system_id?: string;
+  design_reference?: string;
   theme?: string;
   branding?: Record<string, any>;
 } {
@@ -928,6 +937,7 @@ function resolveDesignBindingHints(brief: any): {
     tenant_id: String(brief?.tenant_id || brief?.payload?.tenant_id || '').trim() || undefined,
     client_key: String(brief?.client_key || brief?.payload?.client_key || '').trim() || undefined,
     design_system_id: String(brief?.design_system_id || brief?.payload?.design_system_id || '').trim() || undefined,
+    design_reference: String(brief?.design_reference || brief?.payload?.design_reference || '').trim() || undefined,
     theme: String(brief?.theme || brief?.payload?.theme || '').trim() || undefined,
     branding: (brief?.branding && typeof brief.branding === 'object') ? brief.branding : ((brief?.payload?.branding && typeof brief.payload.branding === 'object') ? brief.payload.branding : {}),
   };
@@ -950,6 +960,7 @@ function resolveDesignBindingHints(brief: any): {
     tenant_id: direct.tenant_id || String(projectMeta.tenant_id || bindingMeta.tenant_id || '').trim() || undefined,
     client_key: direct.client_key || String(projectMeta.client_key || bindingMeta.client_key || '').trim() || undefined,
     design_system_id: direct.design_system_id || String(projectMeta.design_system_id || bindingMeta.design_system_id || '').trim() || undefined,
+    design_reference: direct.design_reference || String(projectMeta.design_reference || bindingMeta.design_reference || bindingMeta.design_system_slug || '').trim() || undefined,
     theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
     branding: {
       ...(projectMeta.branding || {}),
@@ -959,9 +970,107 @@ function resolveDesignBindingHints(brief: any): {
   };
 }
 
-function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId: string; system: any; tenantOverride: any; resolvedThemeName: string; branding: any } {
+function resolveImportedDesignReference(rootDir: string, input: any): any | null {
+  const catalog = loadImportedDesignMdIndex(rootDir);
+  const candidates = [
+    input?.design_reference,
+    input?.client_key,
+    input?.tenant_id,
+    input?.client,
+    input?.project_name,
+    input?.project_id,
+  ]
+    .map((value: any) => normalizeDesignLookupKey(value))
+    .filter(Boolean);
+  if (candidates.length === 0) return null;
+  const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
+  return systems.find((entry: any) => {
+    const values = [
+      entry?.design_system_id,
+      entry?.theme_id,
+      entry?.slug,
+      entry?.name,
+      entry?.description,
+      entry?.category,
+      ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
+    ].map(normalizeDesignLookupKey);
+    return candidates.some((candidate) => values.some((value) => {
+      if (!value) return false;
+      if (value === candidate) return true;
+      if (candidate.length >= 4 && value.includes(candidate)) return true;
+      return false;
+    }));
+  }) || null;
+}
+
+function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 3): any[] {
+  const catalog = loadImportedDesignMdIndex(rootDir);
+  const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
+  const haystack = normalizeDesignLookupKey([
+    brief?.design_reference,
+    brief?.client,
+    brief?.client_key,
+    brief?.title,
+    brief?.objective,
+    brief?.summary,
+    brief?.project_name,
+    brief?.project_id,
+    brief?.payload?.title,
+    brief?.payload?.summary,
+    brief?.payload?.client,
+    brief?.story?.core_message,
+    brief?.story?.closing_cta,
+    brief?.payload?.story?.core_message,
+    brief?.audience,
+    brief?.payload?.audience,
+  ].filter(Boolean).join(' '));
+
+  if (!haystack) return [];
+
+  const scored = systems.map((entry: any) => {
+    const terms = [
+      entry?.slug,
+      entry?.name,
+      entry?.category,
+      entry?.description,
+      ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
+    ]
+      .map(normalizeDesignLookupKey)
+      .filter(Boolean);
+    let score = 0;
+    for (const term of terms) {
+      if (!term) continue;
+      if (haystack === term) score += 10;
+      else if (haystack.includes(term)) score += Math.min(6, Math.max(2, term.split(' ').length + 1));
+      else if (term.includes(haystack)) score += 1;
+    }
+    return {
+      ...entry,
+      recommendation_score: score,
+    };
+  })
+    .filter((entry: any) => entry.recommendation_score > 0)
+    .sort((left: any, right: any) => {
+      if (right.recommendation_score !== left.recommendation_score) return right.recommendation_score - left.recommendation_score;
+      return String(left.design_system_id || '').localeCompare(String(right.design_system_id || ''));
+    });
+
+  return scored.slice(0, limit).map((entry: any) => ({
+    design_system_id: entry.design_system_id,
+    theme_id: entry.theme_id,
+    slug: entry.slug,
+    name: entry.name,
+    category: entry.category,
+    description: entry.description,
+    recommendation_score: entry.recommendation_score,
+    source_path: entry.source_path,
+  }));
+}
+
+function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId: string; system: any; tenantOverride: any; resolvedThemeName: string; branding: any; promptGuide: string[]; sourceDesign?: Record<string, any> | null; recommendations: any[] } {
   const catalog = loadMediaDesignSystemsCatalog(rootDir);
   const bindingHints = resolveDesignBindingHints(brief);
+  const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
   const resolveTenantOverride = (system: any) => {
     const tenantKey = normalizeDesignLookupKey(bindingHints.tenant_id || bindingHints.client_key || brief?.client || brief?.payload?.client);
@@ -974,6 +1083,7 @@ function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId
   };
   const buildResult = (designSystemId: string, system: any) => {
     const tenantOverride = resolveTenantOverride(system);
+    const promptGuide = Array.isArray(system?.metadata?.prompt_guide) ? system.metadata.prompt_guide : [];
     return {
       designSystemId,
       system,
@@ -984,10 +1094,29 @@ function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId
         ...(tenantOverride?.branding || {}),
         ...(bindingHints.branding || {}),
       },
+      promptGuide,
+      recommendations,
+      sourceDesign: system?.metadata?.source_type === 'design-md' ? {
+        source_type: system.metadata.source_type,
+        source_repo: system.metadata.source_repo,
+        source_path: system.metadata.source_path,
+        slug: system.metadata.slug,
+        category: system.metadata.category,
+        description: system.metadata.description,
+      } : null,
     };
   };
   if (explicit && catalog.systems?.[explicit]) {
     return buildResult(explicit, catalog.systems[explicit]);
+  }
+  const imported = resolveImportedDesignReference(rootDir, {
+    ...bindingHints,
+    client: brief?.client || brief?.payload?.client,
+    project_name: brief?.project_name || brief?.payload?.project_name || brief?.name || brief?.payload?.name,
+    project_id: brief?.project_id || brief?.payload?.project_id,
+  });
+  if (imported?.design_system_id && catalog.systems?.[imported.design_system_id]) {
+    return buildResult(imported.design_system_id, catalog.systems[imported.design_system_id]);
   }
   const profileId = String(brief?.document_profile || '').trim();
   const matched = Object.entries(catalog.systems || {}).find(([, system]: any) =>
@@ -1037,7 +1166,7 @@ function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
 
 function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profileId: string; preset: any } {
   const catalog = loadDocumentCompositionCatalog(rootDir);
-  const { designSystemId, resolvedThemeName, branding } = resolveMediaDesignSystem(rootDir, brief);
+  const { designSystemId, resolvedThemeName, branding, promptGuide, sourceDesign, recommendations } = resolveMediaDesignSystem(rootDir, brief);
   const profileId = String(
     brief.document_profile ||
     catalog.defaults?.[brief.document_type] ||
@@ -1053,6 +1182,9 @@ function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profil
         design_system_id: designSystemId,
         recommended_theme: resolvedThemeName || 'kyberion-standard',
         branding,
+        prompt_guide: promptGuide,
+        source_design: sourceDesign,
+        design_recommendations: recommendations,
         recommended_layout_template_id: brief.layout_template_id,
         sections: [],
       },
@@ -1068,6 +1200,9 @@ function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profil
         ...(preset.branding || {}),
         ...(branding || {}),
       },
+      prompt_guide: Array.isArray(preset.prompt_guide) && preset.prompt_guide.length > 0 ? preset.prompt_guide : promptGuide,
+      source_design: preset.source_design || sourceDesign,
+      design_recommendations: Array.isArray(preset.design_recommendations) && preset.design_recommendations.length > 0 ? preset.design_recommendations : recommendations,
     },
   };
 }
@@ -1093,6 +1228,9 @@ function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protoc
     metadata: {
       composition: outline,
       generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
+      promptGuide: outline.prompt_guide || [],
+      sourceDesign: outline.source_design || null,
+      designRecommendations: outline.design_recommendations || [],
     },
     canvas,
     theme: {
@@ -1682,6 +1820,9 @@ function buildProposalNarrativeOutline(rootDir: string, brief: any): any {
     document_profile: profileId,
     design_system_id: preset.design_system_id,
     branding: preset.branding || {},
+    prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
+    source_design: preset.source_design || null,
+    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'generic-structured',
     recommended_theme: preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
@@ -1740,6 +1881,9 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
     document_profile: profileId,
     design_system_id: preset.design_system_id,
     branding: preset.branding || {},
+    prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
+    source_design: preset.source_design || null,
+    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'report-standard',
     recommended_theme: preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
@@ -1802,6 +1946,9 @@ function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any): any {
     document_profile: profileId,
     design_system_id: preset.design_system_id,
     branding: preset.branding || {},
+    prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
+    source_design: preset.source_design || null,
+    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'operator-dashboard',
     recommended_theme: preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
@@ -1851,6 +1998,9 @@ function buildDiagramNarrativeOutline(rootDir: string, brief: any): any {
     document_profile: profileId,
     design_system_id: preset.design_system_id,
     branding: preset.branding || {},
+    prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
+    source_design: preset.source_design || null,
+    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'solution-overview',
     recommended_theme: preset.recommended_theme || brief.layout_template_id || 'aws-architecture',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,

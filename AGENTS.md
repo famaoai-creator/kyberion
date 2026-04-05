@@ -17,8 +17,10 @@ These apply in every phase. No exceptions.
 3. **Get user approval for risky changes.**
    Architecture changes and destructive operations require explicit confirmation.
 
-4. **Connect reasoning to execution via ADF.**
-   The interface between agent decisions and Actuator execution is always a human-readable JSON contract (Agentic Data Format).
+4. **Connect reasoning to execution via validated ADF.**
+   The interface between agent decisions and Actuator execution is always a human-readable JSON contract (Agentic Data Format), but raw first-pass ADF is not executable by default. The required lifecycle is:
+   `draft contract -> preflight validation -> auto-repair if safe -> committed executable contract -> execution`.
+   Agents must prefer semantic briefs and governed compilers over writing low-level executable ADF directly.
 
 5. **Enforce 3-tier data isolation.**
    `knowledge/personal/` (private), `knowledge/confidential/` (org-internal), `knowledge/public/` (reusable). No leaks from higher to lower tiers. Project-scoped isolation uses `confidential/{project}/`.
@@ -55,6 +57,7 @@ Interpret user intent and define goals. Do not change code until goals are agree
 ### ④ Execution
 Change one thing at a time, test immediately. If a major obstacle arises, return to ③ to re-align.
 The owner controls mission state. Workers participate via task contracts.
+Before executing generated ADF or execution plans, run contract preflight and only execute validated contracts. Retry should happen after classification and repair, not by repeatedly sending broken contracts to actuators.
 → [phases/execution.md](./knowledge/public/governance/phases/execution.md)
 
 ### ⑤ Review
