@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "contracts": [
+    {
+      "contract_id": "analysis.cross-project-remediation.v1",
+      "intent_id": "cross-project-remediation",
+      "summary": "Search governed requirements and prior evidence, identify propagation gaps, and produce a remediation contract with follow-up scope.",
+      "required_bindings": ["source_corpus", "target_scope"],
+      "compiler_steps": [
+        "resolve governed corpus bindings",
+        "rank related incidents, requirements, and prior fixes",
+        "cluster likely propagation gaps",
+        "compile remediation plan and follow-up work items"
+      ],
+      "evidence_outputs": ["remediation_plan", "affected_scope_index", "follow_up_candidates"]
+    },
+    {
+      "contract_id": "analysis.incident-informed-review.v1",
+      "intent_id": "incident-informed-review",
+      "summary": "Bind incident history and review target, then compile governed findings, risks, and follow-up checks.",
+      "required_bindings": ["incident_basis", "review_target"],
+      "compiler_steps": [
+        "resolve incident and failure history",
+        "bind the current review target",
+        "map prior failure modes onto the target",
+        "compile findings, risk statements, and follow-up checks"
+      ],
+      "evidence_outputs": ["review_findings", "risk_register_delta", "follow_up_checks"]
+    },
+    {
+      "contract_id": "analysis.evolve-agent-harness.v1",
+      "intent_id": "evolve-agent-harness",
+      "summary": "Run a governed benchmark-driven experiment loop with baseline, one bounded change, rerun, and keep or discard evidence.",
+      "required_bindings": ["target_harness", "evaluation_corpus"],
+      "compiler_steps": [
+        "resolve the protected edit boundary",
+        "compile the baseline benchmark contract",
+        "record one general improvement hypothesis",
+        "compile rerun and keep or discard evidence"
+      ],
+      "evidence_outputs": ["harness_experiment_report", "benchmark_delta", "keep_or_discard_judgment"]
+    }
+  ]
+}
