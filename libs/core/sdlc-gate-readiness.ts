@@ -223,6 +223,23 @@ export function buildTrackNextWorkProposal(input: {
         'capture evidence and reusable findings',
       ],
     },
+    runtime_design: {
+      owner_model: 'single_owner_multi_worker',
+      assignment_policy: 'dependency_first',
+      coordination: {
+        bus: 'mission_coordination_bus',
+        channels: ['task_contract', 'handoff', 'review', 'runtime_notice'],
+      },
+      memory: {
+        store: 'mission_working_memory',
+        scope: 'mission_local',
+        purpose: [
+          'track gate coordination',
+          'worker handoffs before owner verification',
+          'intermediate evidence collation',
+        ],
+      },
+    },
     execution_boundary: {
       llm_zone: {
         allowed: [
