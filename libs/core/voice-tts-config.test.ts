@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { getVoiceTtsLanguageConfig, resetVoiceTtsConfigCache } from './voice-tts-config.js';
 
 describe('voice tts config registry', () => {
@@ -13,11 +13,17 @@ describe('voice tts config registry', () => {
     safeRmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('loads fallback japanese profile from governed config defaults', () => {
+  it('loads the governed japanese profile from the default registry', () => {
+    const registry = JSON.parse(
+      safeReadFile(pathResolver.knowledge('public/presence/voice-hub-tts.json'), { encoding: 'utf8' }) as string,
+    ) as {
+      languages?: Record<string, { voice: string; rate: number }>;
+    };
+    const expected = registry.languages?.ja;
     const config = getVoiceTtsLanguageConfig('ja');
 
-    expect(config.voice).toBe('Eddy (日本語（日本）)');
-    expect(config.rate).toBe(185);
+    expect(config.voice).toBe(expected?.voice);
+    expect(config.rate).toBe(expected?.rate);
   });
 
   it('allows overriding the registry path externally', () => {

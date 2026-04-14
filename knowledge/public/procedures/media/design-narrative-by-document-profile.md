@@ -31,10 +31,13 @@ The preset catalog is stored as directory-scanned knowledge packs at:
 - [slide-layout-presets](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/slide-layout-presets/defaults.json)
 - [semantic-render-tokens](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/semantic-render-tokens/defaults.json)
 - [artifact-library](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/artifact-library/project-mgmt-high-fidelity.json)
+- [design-md-catalog](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/design-md-catalog/README.md)
 
 `document-composition-presets` contains the curated default profiles for common Kyberion flows.
 
 `artifact-library` contains the wider high-fidelity profile corpus and is also scanned into the same profile resolver, so domain packs can extend the media catalog without editing code.
+
+`design-md-catalog` contains imported DESIGN.md-derived design systems. These are reference visual systems that can be selected explicitly with `design_system_id`, and they resolve through the same `theme -> design_system -> semantic/layout override` path as native Kyberion systems. When no explicit imported system is selected, Kyberion may still emit `design_recommendations` based on the brief semantics.
 
 ## Current Profiles
 
@@ -60,6 +63,10 @@ The preset catalog is stored as directory-scanned knowledge packs at:
 - `artifact-library/*`
   - high-fidelity PM, requirements, architecture, quality, ops, governance, legal, HR, finance, sales, marketing, and general document profiles
   - scanned together with the curated preset catalog
+- `designmd-*`
+  - imported external visual systems such as `designmd-apple`, `designmd-stripe`, `designmd-vercel`, `designmd-claude`
+  - selected explicitly through `design_system_id` rather than auto-bound to profiles
+  - may also appear in `design_recommendations` when the brief strongly matches their imported keywords and description
 
 ## ADF Usage
 
@@ -129,6 +136,7 @@ The generation rule is:
 The resulting outline or storyline includes:
 
 - `design_system_id`
+- `design_recommendations`
 - `narrative_pattern_id`
 - `recommended_theme`
 - `recommended_layout_template_id`
@@ -181,6 +189,22 @@ Renderers use those semantic tokens to decide things like:
 So Kyberion can change an entire artifact family look-and-feel by switching a governed design system instead of editing code.
 
 Because the loader now scans directories instead of a single monolithic JSON file, profile expansion can happen by adding new domain packs under `artifact-library/` or new focused preset files under the other media-template directories.
+
+Imported DESIGN.md systems can be refreshed with:
+
+```bash
+KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=ecosystem_architect MISSION_ID=MSN-DESIGN-MD-IMPORT \
+  pnpm exec tsx scripts/import_design_md_catalog.ts
+```
+
+And discovered with:
+
+```bash
+pnpm control catalog design-systems
+pnpm control catalog design-systems apple
+pnpm control catalog design-system designmd-apple
+pnpm control catalog design-recommend "premium cinematic consumer launch"
+```
 
 ## Design Intent
 

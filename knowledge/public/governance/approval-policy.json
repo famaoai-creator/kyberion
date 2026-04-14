@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "service-mutation",
+      "intent_ids": ["inspect-service"],
+      "when": {
+        "payload_field": "operation",
+        "any_of": ["restart", "start", "stop"]
+      },
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    }
+  ],
+  "defaults": {
+    "requires_approval": false
+  }
+}

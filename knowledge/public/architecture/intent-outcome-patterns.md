@@ -79,6 +79,28 @@ Done means:
 - findings and execution contracts exist
 - follow-up seeds exist when project context is available
 
+### Benchmark-Driven Harness Evolution
+
+Used by:
+
+- `evolve-agent-harness`
+
+Canonical shape:
+
+1. normalize the harness-improvement request
+2. resolve the target harness and fixed adapter boundary
+3. run the baseline benchmark or evaluation corpus
+4. choose one general improvement
+5. rerun and compare score or pass-rate delta
+6. persist a keep or discard report with replayable evidence
+
+Done means:
+
+- the baseline exists
+- the retained change respects the protected boundary
+- keep or discard is justified by benchmark evidence
+- the experiment report can be replayed or audited later
+
 ### Direct Reply
 
 Used by:

@@ -86,6 +86,172 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
   });
 
+  it('resolves imported DESIGN.md systems as explicit media design systems', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_json: {
+          kind: 'proposal-brief',
+          document_profile: 'executive-proposal',
+          design_system_id: 'designmd-apple',
+          render_target: 'pptx',
+          locale: 'en-US',
+          title: 'Apple Referenced Proposal',
+          objective: 'Validate imported DESIGN.md catalog resolution.',
+          story: {
+            core_message: 'Imported design systems should resolve through the standard loader.',
+            closing_cta: 'Approve the style direction.',
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'document_outline_from_brief',
+          params: { from: 'last_json', export_as: 'document_outline' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.document_outline.design_system_id).toBe('designmd-apple');
+    expect(result.context.document_outline.recommended_theme).toBe('designmd-apple');
+    expect(result.context.document_outline.branding).toEqual(
+      expect.objectContaining({
+        brand_name: 'Apple',
+      }),
+    );
+    expect(result.context.document_outline.prompt_guide).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Primary CTA'),
+      ]),
+    );
+    expect(result.context.document_outline.source_design).toEqual(
+      expect.objectContaining({
+        source_type: 'design-md',
+        slug: 'apple',
+      }),
+    );
+  });
+
+  it('auto-binds imported DESIGN.md systems from service binding design_reference metadata', async () => {
+    saveServiceBindingRecord({
+      binding_id: 'BIND-DESIGN-REF',
+      service_type: 'design-reference',
+      scope: 'project',
+      target: 'design-system',
+      allowed_actions: ['read'],
+      secret_refs: [],
+      approval_policy: { read: 'allowed' },
+      metadata: {
+        design_reference: 'vercel',
+      },
+    });
+    saveProjectRecord({
+      project_id: 'PRJ-DESIGN-REF',
+      name: 'Frontend Refresh',
+      summary: 'Imported DESIGN.md auto-binding test',
+      status: 'active',
+      tier: 'public',
+      service_bindings: ['BIND-DESIGN-REF'],
+      metadata: {},
+    });
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_json: {
+          kind: 'proposal-brief',
+          document_profile: 'executive-proposal',
+          project_id: 'PRJ-DESIGN-REF',
+          render_target: 'pptx',
+          locale: 'en-US',
+          title: 'Vercel Referenced Proposal',
+          objective: 'Resolve imported design system from binding metadata.',
+          story: {
+            core_message: 'Binding metadata should steer design system selection.',
+            closing_cta: 'Continue with implementation.',
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'document_outline_from_brief',
+          params: { from: 'last_json', export_as: 'document_outline' },
+        },
+        {
+          type: 'transform',
+          op: 'brief_to_design_protocol',
+          params: { from: 'last_json', export_as: 'compiled_protocol' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.document_outline.design_system_id).toBe('designmd-vercel');
+    expect(result.context.document_outline.recommended_theme).toBe('designmd-vercel');
+    expect(result.context.compiled_protocol.metadata.sourceDesign).toEqual(
+      expect.objectContaining({
+        slug: 'vercel',
+      }),
+    );
+    expect(result.context.compiled_protocol.metadata.promptGuide).toEqual(
+      expect.arrayContaining([
+        expect.any(String),
+      ]),
+    );
+  });
+
+  it('recommends imported DESIGN.md systems from brief semantics without overriding the active system', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_json: {
+          kind: 'proposal-brief',
+          document_profile: 'executive-proposal',
+          render_target: 'pptx',
+          locale: 'en-US',
+          title: 'Frontend Deployment Platform Launch',
+          objective: 'Prepare a polished launch proposal for a frontend deployment platform with developer infrastructure emphasis.',
+          story: {
+            core_message: 'The experience should feel precise, technical, and product-led for frontend platform teams.',
+            closing_cta: 'Approve the rollout.',
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'document_outline_from_brief',
+          params: { from: 'last_json', export_as: 'document_outline' },
+        },
+        {
+          type: 'transform',
+          op: 'brief_to_design_protocol',
+          params: { from: 'last_json', export_as: 'compiled_protocol' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.document_outline.design_system_id).not.toBe('designmd-vercel');
+    expect(result.context.document_outline.design_recommendations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          design_system_id: 'designmd-vercel',
+        }),
+      ]),
+    );
+    expect(result.context.compiled_protocol.metadata.designRecommendations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          design_system_id: 'designmd-vercel',
+        }),
+      ]),
+    );
+  });
+
   it('resolves high-fidelity artifact-library profiles during outline generation', async () => {
     const result = await handleAction({
       action: 'pipeline',

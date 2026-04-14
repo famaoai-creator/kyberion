@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { resolveSurfaceIntent } from './router-contract.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -559,6 +560,7 @@ export function getActiveBrowserConversationSession(surface?: BrowserConversatio
 export function classifyBrowserConversationCommand(utterance: string): BrowserConversationCommandResolution | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
+  const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed);
 
   if (/^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(trimmed)) {
     return {
@@ -595,6 +597,63 @@ export function classifyBrowserConversationCommand(utterance: string): BrowserCo
     .replace(/(?:ボタン|button)$/i, '')
     .trim();
   const targetRole = /ボタン|button/i.test(trimmed) ? 'button' : undefined;
+
+  if (resolvedSurfaceIntent.intentId === 'open-site') {
+    return {
+      commandType: 'task_command',
+      action: 'navigate',
+      targetHint: {
+        text: targetText,
+        region,
+      },
+    };
+  }
+
+  if (resolvedSurfaceIntent.intentId === 'browser-step') {
+    if (/押して|press|enter/i.test(trimmed) && /(enter|return|エンター)/i.test(trimmed)) {
+      return {
+        commandType: 'step_command',
+        action: 'press',
+        targetHint: {
+          text: targetText,
+          region,
+        },
+      };
+    }
+    if (/入力|入れて|type|fill/i.test(trimmed)) {
+      const inputTextMatch =
+        trimmed.match(/「(.+?)」を.*(?:入力|入れて)/) ||
+        trimmed.match(/"(.+?)".*(?:input|type|fill)/i) ||
+        trimmed.match(/(.+?)\s*と入力/);
+      return {
+        commandType: 'step_command',
+        action: 'fill',
+        inputText: inputTextMatch?.[1]?.trim(),
+        targetHint: {
+          text: targetText,
+          region,
+        },
+      };
+    }
+    if (/スクロール|scroll/i.test(trimmed)) {
+      return {
+        commandType: 'step_command',
+        action: 'scroll',
+        targetHint: {
+          region,
+        },
+      };
+    }
+    return {
+      commandType: 'step_command',
+      action: 'click',
+      targetHint: {
+        text: targetText,
+        region,
+        role: targetRole,
+      },
+    };
+  }
 
   if (/押して|click|tap|クリック/i.test(trimmed) && !/(enter|return|エンター)/i.test(trimmed)) {
     return {
