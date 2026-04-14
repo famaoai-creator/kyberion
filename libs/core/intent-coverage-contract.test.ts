@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
+import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { loadOutcomeCatalog, loadSpecialistCatalog, resolveWorkDesign } from './work-design.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 
@@ -115,6 +116,16 @@ describe('intent coverage contract', () => {
           expect.arrayContaining([outcomeId]),
         );
       }
+    }
+  });
+
+  it('keeps advanced analysis intents mapped to a first-class analysis execution contract', () => {
+    for (const intentId of ['cross-project-remediation', 'incident-informed-review', 'evolve-agent-harness']) {
+      const contract = resolveAnalysisExecutionContract(intentId);
+      expect(contract, `missing analysis contract for ${intentId}`).toBeTruthy();
+      expect(contract?.required_bindings.length || 0, `missing required bindings for ${intentId}`).toBeGreaterThan(0);
+      expect(contract?.compiler_steps.length || 0, `missing compiler steps for ${intentId}`).toBeGreaterThan(0);
+      expect(contract?.evidence_outputs.length || 0, `missing evidence outputs for ${intentId}`).toBeGreaterThan(0);
     }
   });
 });

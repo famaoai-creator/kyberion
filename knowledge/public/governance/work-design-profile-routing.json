@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "execution_boundary_rules": [
+    {
+      "id": "harness-evolution",
+      "match": {
+        "intent_ids": ["evolve-agent-harness"]
+      },
+      "profile_id": "benchmark_harness_evolution"
+    },
+    {
+      "id": "analysis-flows",
+      "match": {
+        "intent_ids": ["cross-project-remediation", "incident-informed-review"],
+        "task_types": ["analysis"]
+      },
+      "profile_id": "analysis_followup_execution"
+    }
+  ],
+  "runtime_design_rules": [
+    {
+      "id": "mission-runtime",
+      "match": {
+        "shapes": ["mission"]
+      },
+      "profile_id": "mission_collaboration"
+    },
+    {
+      "id": "bootstrap-runtime",
+      "match": {
+        "intent_ids": ["bootstrap-project"],
+        "shapes": ["project_bootstrap"]
+      },
+      "profile_id": "collaborative_analysis"
+    },
+    {
+      "id": "analysis-runtime",
+      "match": {
+        "intent_ids": ["cross-project-remediation", "incident-informed-review", "evolve-agent-harness"],
+        "task_types": ["analysis"]
+      },
+      "profile_id": "collaborative_analysis"
+    }
+  ],
+  "defaults": {
+    "execution_boundary_profile_id": "default_governed_execution",
+    "runtime_design_profile_id": "single_actor_delivery"
+  }
+}

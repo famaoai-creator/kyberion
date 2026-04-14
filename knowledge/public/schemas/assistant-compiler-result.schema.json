@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/assistant-compiler-result.schema.json",
+  "title": "Assistant Compiler Result",
+  "type": "object",
+  "required": [
+    "kind",
+    "request_id",
+    "compiled_at",
+    "intent_contract",
+    "work_loop",
+    "source"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["assistant-compiler-result"]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "compiled_at": {
+      "type": "string"
+    },
+    "intent_contract": {
+      "type": "object"
+    },
+    "work_loop": {
+      "type": "object"
+    },
+    "clarification_packet": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object",
+      "required": ["compiler"],
+      "properties": {
+        "compiler": {
+          "type": "string",
+          "enum": ["assistant-subagent"]
+        },
+        "provider": { "type": "string" },
+        "model": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

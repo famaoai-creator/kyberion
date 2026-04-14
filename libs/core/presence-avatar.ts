@@ -19,47 +19,12 @@ interface PresenceAvatarProfileRegistry {
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/presence/avatar-profiles.json');
 
 const DEFAULT_PROFILE: PresenceAvatarProfile = {
-  agentId: 'presence-surface-agent',
-  displayName: 'Kyberion',
+  agentId: 'default-surface-agent',
+  displayName: 'Surface Agent',
   defaultAvatarAssetPath: '/assets/avatars/kyberion-neutral.svg',
   expressionAvatarMap: {
     neutral: '/assets/avatars/kyberion-neutral.svg',
-    joy: '/assets/avatars/kyberion-joy.svg',
-    thinking: '/assets/avatars/kyberion-thinking.svg',
-    listening: '/assets/avatars/kyberion-listening.svg',
   },
-};
-
-const CHRONOS_PROFILE: PresenceAvatarProfile = {
-  agentId: 'chronos-agent',
-  displayName: 'Chronos',
-  defaultAvatarAssetPath: '/assets/avatars/chronos-neutral.svg',
-  expressionAvatarMap: {
-    neutral: '/assets/avatars/chronos-neutral.svg',
-    joy: '/assets/avatars/chronos-joy.svg',
-    thinking: '/assets/avatars/chronos-thinking.svg',
-    listening: '/assets/avatars/chronos-listening.svg',
-  },
-};
-
-const SLACK_SURFACE_PROFILE: PresenceAvatarProfile = {
-  agentId: 'slack-surface-agent',
-  displayName: 'Slack Surface',
-  defaultAvatarAssetPath: '/assets/avatars/slack-neutral.svg',
-  expressionAvatarMap: {
-    neutral: '/assets/avatars/slack-neutral.svg',
-    joy: '/assets/avatars/slack-joy.svg',
-    thinking: '/assets/avatars/slack-thinking.svg',
-    listening: '/assets/avatars/slack-listening.svg',
-  },
-};
-
-const FALLBACK_PROFILES: Record<string, PresenceAvatarProfile> = {
-  'presence-surface-agent': DEFAULT_PROFILE,
-  kyberion: DEFAULT_PROFILE,
-  'chronos-agent': CHRONOS_PROFILE,
-  'chronos-mirror': CHRONOS_PROFILE,
-  'slack-surface-agent': SLACK_SURFACE_PROFILE,
 };
 
 let cachedRegistryPath: string | null = null;
@@ -79,14 +44,9 @@ function buildFallbackRegistry(): {
 } {
   return {
     defaultAgentId: DEFAULT_PROFILE.agentId,
-    aliases: {
-      kyberion: 'presence-surface-agent',
-      'chronos-mirror': 'chronos-agent',
-    },
+    aliases: {},
     profiles: {
-      'presence-surface-agent': DEFAULT_PROFILE,
-      'chronos-agent': CHRONOS_PROFILE,
-      'slack-surface-agent': SLACK_SURFACE_PROFILE,
+      [DEFAULT_PROFILE.agentId]: DEFAULT_PROFILE,
     },
   };
 }
@@ -122,10 +82,11 @@ function loadRegistry(): {
         .filter((profile) => profile && typeof profile.agentId === 'string' && profile.agentId.length > 0)
         .map((profile) => [profile.agentId, profile]),
     );
+    const firstProfileAgentId = Object.keys(profiles)[0];
     const defaultAgentId =
       typeof parsed.defaultAgentId === 'string' && parsed.defaultAgentId in profiles
         ? parsed.defaultAgentId
-        : fallback.defaultAgentId;
+        : firstProfileAgentId || fallback.defaultAgentId;
     const aliases = {
       ...fallback.aliases,
       ...(parsed.aliases || {}),

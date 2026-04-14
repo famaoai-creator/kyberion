@@ -18,19 +18,11 @@ interface VoiceTtsConfigRegistry {
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/presence/voice-hub-tts.json');
 
 const FALLBACK_REGISTRY: { defaultLanguage: string; languages: Record<string, VoiceTtsLanguageConfig> } = {
-  defaultLanguage: 'ja',
+  defaultLanguage: 'en',
   languages: {
-    ja: {
-      voice: 'Eddy (日本語（日本）)',
-      rate: 185,
-      requestIdToken: 'リクエストID',
-      urlToken: 'URL',
-    },
     en: {
-      voice: 'Samantha',
-      rate: 195,
-      requestIdToken: 'request id',
-      urlToken: 'link',
+      voice: 'default',
+      rate: 180,
     },
   },
 };
@@ -67,10 +59,11 @@ function loadRegistry(): { defaultLanguage: string; languages: Record<string, Vo
       ...FALLBACK_REGISTRY.languages,
       ...(parsed.languages || {}),
     };
+    const firstLanguage = Object.keys(languages)[0];
     const defaultLanguage =
       typeof parsed.defaultLanguage === 'string' && parsed.defaultLanguage in languages
         ? parsed.defaultLanguage
-        : FALLBACK_REGISTRY.defaultLanguage;
+        : firstLanguage || FALLBACK_REGISTRY.defaultLanguage;
     cachedRegistryPath = registryPath;
     cachedDefaultLanguage = defaultLanguage;
     cachedLanguages = languages;

@@ -15,6 +15,8 @@ import { a2aBridge } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
 import { buildMissionTeamView, loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
+import { compileUserIntentFlow, formatClarificationPacket } from './intent-contract.js';
+import { logger } from './core.js';
 
 import type {
   SurfaceRole,
@@ -593,15 +595,65 @@ async function routeNerveRoutingProposals(
 }
 
 export async function runSurfaceConversation(input: SurfaceConversationInput): Promise<SurfaceConversationResult> {
+  const compiledFlow = input.forcedReceiver
+    ? null
+    : await compileUserIntentFlow({
+      text: input.query,
+      channel: input.agentId.includes('slack') ? 'slack' : input.agentId.includes('presence') ? 'presence' : 'surface',
+    }).catch((error: any) => {
+      logger.warn(`[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`);
+      return null;
+    });
+
+  if (compiledFlow?.clarificationPacket) {
+    return {
+      text: formatClarificationPacket(compiledFlow.clarificationPacket),
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+      routingProposals: [],
+      missionProposals: [],
+      planningPackets: [],
+    };
+  }
+
+  const computedReceiver = !input.forcedReceiver && compiledFlow
+    ? (
+      compiledFlow.intentContract.resolution.execution_shape === 'mission' ||
+      compiledFlow.workLoop.teaming.conversation_agent === 'nerve-agent' ||
+      compiledFlow.workLoop.resolution.task_type === 'analysis' ||
+      compiledFlow.workLoop.resolution.task_type === 'presentation_deck' ||
+      compiledFlow.workLoop.resolution.task_type === 'report_document' ||
+      compiledFlow.workLoop.resolution.task_type === 'workbook_wbs' ||
+      compiledFlow.workLoop.resolution.task_type === 'service_operation' ||
+      compiledFlow.intentContract.resolution.execution_shape === 'project_bootstrap'
+        ? 'nerve-agent'
+        : undefined
+    )
+    : input.forcedReceiver;
+
+  const structuredQuery = compiledFlow
+    ? [
+      input.query,
+      '',
+      'Governed intent contract:',
+      JSON.stringify(compiledFlow.intentContract, null, 2),
+      '',
+      'Governed work loop:',
+      JSON.stringify(compiledFlow.workLoop, null, 2),
+    ].join('\n')
+    : input.query;
+
   const parsedSlackPrompt =
-    input.agentId === 'slack-surface-agent' && input.forcedReceiver
-      ? parseSlackSurfacePrompt(input.query)
+    input.agentId === 'slack-surface-agent' && computedReceiver
+      ? parseSlackSurfacePrompt(structuredQuery)
       : null;
 
   if (parsedSlackPrompt && parsedSlackPrompt.executionMode === 'conversation') {
     const delegationResults = await routeSlackForcedDelegation(
-      input.forcedReceiver!,
-      input.query,
+      computedReceiver!,
+      structuredQuery,
       input.senderAgentId,
       input.missionId,
     );
@@ -618,10 +670,10 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     };
   }
 
-  if (input.agentId === 'presence-surface-agent' && input.forcedReceiver) {
+  if (input.agentId === 'presence-surface-agent' && computedReceiver) {
     const delegationResults = await routeForcedDelegation(
-      input.forcedReceiver,
-      input.query,
+      computedReceiver,
+      structuredQuery,
       input.senderAgentId,
       input.missionId,
     );
@@ -639,10 +691,10 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
-  const firstResponse = await handle.ask(input.query);
+  const firstResponse = await handle.ask(structuredQuery);
   const firstBlocks = extractSurfaceBlocks(firstResponse);
   let delegationResults: any[] = [];
-  const delegationFallbackText = buildDelegationFallbackText(input.query);
+  const delegationFallbackText = buildDelegationFallbackText(structuredQuery);
 
   if (firstBlocks.a2aMessages.length > 0) {
     delegationResults = await processDelegations(firstBlocks.a2aMessages, input.senderAgentId, delegationFallbackText);
@@ -650,13 +702,13 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     delegationResults = await routeMissionTeamDelegation(
       input.missionId,
       input.teamRole,
-      input.query,
+      structuredQuery,
       input.senderAgentId,
     );
-  } else if (input.forcedReceiver) {
+  } else if (computedReceiver) {
     delegationResults = await routeForcedDelegation(
-      input.forcedReceiver,
-      input.query,
+      computedReceiver,
+      structuredQuery,
       input.senderAgentId,
       input.missionId,
     );

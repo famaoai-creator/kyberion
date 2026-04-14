@@ -2,10 +2,10 @@ import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
- * Loads common project standards from knowledge/common/project_standards.json
+ * Loads common project standards from the governed common knowledge tier.
  */
 export function loadProjectStandards() {
-  const configPath = pathResolver.knowledge('common/project_standards.json');
+  const configPath = pathResolver.knowledge('public/common/project_standards.json');
   try {
     const data = safeReadFile(configPath, { encoding: 'utf8' }) as string;
     return JSON.parse(data);
