@@ -1,0 +1,122 @@
+{
+  "version": "1.0.0",
+  "profiles": {
+    "default_governed_execution": {
+      "llm_zone": {
+        "allowed": [
+          "normalize_request",
+          "draft_content_within_governed_slots",
+          "explain_next_action"
+        ],
+        "forbidden": [
+          "override_governed_structure",
+          "invent_low_level_execution_contracts",
+          "declare_completion_without_evidence"
+        ]
+      },
+      "knowledge_zone": {
+        "owns": [
+          "intent definitions",
+          "process_design",
+          "outcome catalog",
+          "specialist routing"
+        ]
+      },
+      "compiler_zone": {
+        "responsibilities": [
+          "map_intent_to_governed_execution_shape",
+          "prepare_contracts_and_paths"
+        ]
+      },
+      "executor_zone": {
+        "responsibilities": [
+          "perform_governed_execution",
+          "persist_evidence",
+          "preserve_reproducibility"
+        ]
+      },
+      "rule": "LLM drafts within governed slots; knowledge defines process; compiler shapes execution; executors persist and reproduce"
+    },
+    "analysis_followup_execution": {
+      "llm_zone": {
+        "allowed": [
+          "normalize_analysis_request",
+          "draft_findings_language",
+          "summarize_incident_or_requirement_history",
+          "propose_follow_up_work_items"
+        ],
+        "forbidden": [
+          "override_governed_process_design",
+          "invent_review_target_bindings",
+          "mutate_repo_or_mission_state_directly",
+          "declare_verification_complete_without_evidence"
+        ]
+      },
+      "knowledge_zone": {
+        "owns": [
+          "intent definitions",
+          "process_design",
+          "outcome catalog",
+          "specialist routing"
+        ]
+      },
+      "compiler_zone": {
+        "responsibilities": [
+          "resolve_target_binding",
+          "rank_governed_refs",
+          "classify_impact_bands",
+          "build_finding_candidates_and_execution_contract"
+        ]
+      },
+      "executor_zone": {
+        "responsibilities": [
+          "persist_analysis_artifact",
+          "create_follow_up_seeds",
+          "preserve_governed_project_track_context"
+        ]
+      },
+      "rule": "LLM drafts findings language; knowledge defines process; compiler binds targets and findings; executors persist artifacts and seeds"
+    },
+    "benchmark_harness_evolution": {
+      "llm_zone": {
+        "allowed": [
+          "normalize_harness_goal",
+          "cluster_benchmark_failures",
+          "propose_one_general_improvement",
+          "summarize_score_delta",
+          "explain_keep_or_discard_judgment"
+        ],
+        "forbidden": [
+          "edit_fixed_adapter_boundary_without_approval",
+          "change_success_metric_without_contract_update",
+          "hardcode_benchmark_specific_answers",
+          "declare_a_change_kept_without_baseline_and_rerun_evidence"
+        ]
+      },
+      "knowledge_zone": {
+        "owns": [
+          "benchmark policy",
+          "protected edit boundaries",
+          "keep_or_discard rules",
+          "specialist routing"
+        ]
+      },
+      "compiler_zone": {
+        "responsibilities": [
+          "bind_target_harness_and_boundary",
+          "compile_experiment_contract",
+          "prepare_baseline_and_rerun_comparison",
+          "shape_replayable_experiment_ledger"
+        ]
+      },
+      "executor_zone": {
+        "responsibilities": [
+          "run_benchmark_or_evaluation_suite",
+          "persist_experiment_outputs",
+          "record_keep_or_discard_evidence"
+        ]
+      },
+      "rule": "LLM proposes one general harness improvement at a time; knowledge defines benchmark policy and protected boundaries; compiler binds the experiment; executors run, compare, and persist keep or discard evidence"
+    }
+  }
+}

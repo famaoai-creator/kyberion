@@ -159,6 +159,22 @@
       ]
     },
     {
+      "intent_id": "evolve-agent-harness",
+      "status": "partial",
+      "entry_path": "task-session classifier",
+      "work_shape": "task_session",
+      "outcome_ids": ["harness_experiment_report"],
+      "execution_path": [
+        "task-session classifier",
+        "benchmark-driven experiment design",
+        "governed keep or discard reporting"
+      ],
+      "gaps": [
+        "benchmark runner and experiment ledger are not yet first-class runtime actuators",
+        "protected edit boundaries are modeled in work design and docs, but not yet enforced by a dedicated execution contract compiler"
+      ]
+    },
+    {
       "intent_id": "live-query",
       "status": "partial",
       "entry_path": "direct reply route",
@@ -174,14 +190,15 @@
     }
   ],
   "cross_cutting_gaps": [
-    "standard-intents catalog is not yet the single runtime source of truth",
+    "catalog-first resolver now covers task_session and project_bootstrap classification, but browser_session and direct_reply routes still keep route-local resolution logic",
     "outcome catalog normalization is incomplete",
     "super-nerve action taxonomy is still hand-maintained",
     "service-binding-aware execution is partial",
-    "freeform generative image capability is not yet first-class"
+    "freeform generative image capability is not yet first-class",
+    "benchmark and experiment loops are still mostly modeled as governed analysis rather than first-class executable contracts"
   ],
   "next_priorities": [
-    "catalog-first resolver",
+    "unify browser_session and direct_reply paths behind the same catalog-first resolver",
     "outcome catalog normalization",
     "shared op registry for orchestrator routing",
     "binding-aware execution",

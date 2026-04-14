@@ -271,13 +271,32 @@ abstract class BaseACPAdapter implements AgentAdapter {
   }
 }
 
+export interface GeminiAdapterOptions {
+  model?: string;
+}
+
 export class GeminiAdapter extends BaseACPAdapter {
-  constructor() { 
+  private options: GeminiAdapterOptions;
+
+  constructor(options?: GeminiAdapterOptions) { 
     super('gemini', ['--acp'], {
       authenticate: 'authenticate',
       newSession: 'session/new',
       prompt: 'session/prompt'
     }, 'oauth-personal'); 
+    this.options = options || {};
+  }
+
+  public async boot(): Promise<void> {
+    await super.boot();
+    const targetModel = this.options.model || process.env.KYBERION_GEMINI_MODEL || 'gemini-2.5-flash';
+    try {
+      // @ts-ignore
+      await this.connection?.extMethod('session/set_model', {
+        sessionId: this.acpSessionId,
+        modelId: targetModel,
+      });
+    } catch (_) {}
   }
 }
 

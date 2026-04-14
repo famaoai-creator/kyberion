@@ -54,6 +54,17 @@ describe('work-design', () => {
     expect(resolved.outcomes[0]?.id).toBe('review_findings');
   });
 
+  it('resolves a harness engineer for benchmark-driven harness evolution', () => {
+    const resolved = resolveWorkDesign({
+      intentId: 'evolve-agent-harness',
+      taskType: 'analysis',
+      shape: 'task_session',
+      outcomeIds: ['harness_experiment_report'],
+    });
+    expect(resolved.primary_specialist?.id).toBe('harness-engineer');
+    expect(resolved.outcomes[0]?.id).toBe('harness_experiment_report');
+  });
+
   it('prefers standard-intent catalog specialist and outcome definitions', () => {
     const resolved = resolveWorkDesign({
       intentId: 'bootstrap-project',
@@ -104,6 +115,8 @@ describe('work-design', () => {
     expect(summary.resolution.execution_shape).toBe('task_session');
     expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
     expect(summary.process_design.operator_checklist).toContain('confirm the governed output path');
+    expect(summary.runtime_design.owner_model).toBe('single_actor');
+    expect(summary.runtime_design.assignment_policy).toBe('direct_specialist');
     expect(summary.execution_boundary.rule).toContain('knowledge defines process');
     expect(summary.teaming.specialist_id).toBe('document-specialist');
   });
@@ -123,7 +136,30 @@ describe('work-design', () => {
     ]);
     expect(summary.process_design.intake_requirements).toContain('incident basis');
     expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
+    expect(summary.runtime_design.owner_model).toBe('single_owner_multi_worker');
+    expect(summary.runtime_design.assignment_policy).toBe('lease_aware_capability');
+    expect(summary.runtime_design.coordination.bus).toBe('mission_coordination_bus');
     expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('resolve_target_binding');
     expect(summary.execution_boundary.llm_zone.forbidden).toContain('invent_review_target_bindings');
+  });
+
+  it('builds a protected benchmark execution boundary for harness evolution', () => {
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'evolve-agent-harness',
+      taskType: 'analysis',
+      shape: 'task_session',
+      outcomeIds: ['harness_experiment_report'],
+      tier: 'confidential',
+    });
+    expect(summary.process_design.plan_outline).toEqual([
+      'establish the target harness and protected edit boundary',
+      'run the baseline benchmark or evaluation corpus',
+      'cluster failure modes and choose one general improvement',
+      'rerun evaluation and record keep or discard evidence',
+    ]);
+    expect(summary.process_design.intake_requirements).toContain('target harness');
+    expect(summary.execution_boundary.llm_zone.forbidden).toContain('edit_fixed_adapter_boundary_without_approval');
+    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('compile_experiment_contract');
+    expect(summary.teaming.specialist_id).toBe('harness-engineer');
   });
 });

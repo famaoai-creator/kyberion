@@ -3,7 +3,7 @@
   "$id": "https://kyberion.local/schemas/organization-work-loop.schema.json",
   "title": "Organization Work Loop Summary",
   "type": "object",
-  "required": ["intent", "context", "resolution", "outcome_design", "process_design", "execution_boundary", "teaming", "authority", "learning"],
+  "required": ["intent", "context", "resolution", "outcome_design", "process_design", "runtime_design", "execution_boundary", "teaming", "authority", "learning"],
   "properties": {
     "intent": {
       "type": "object",
@@ -75,6 +75,55 @@
         "operator_checklist": {
           "type": "array",
           "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime_design": {
+      "type": "object",
+      "required": ["owner_model", "assignment_policy", "coordination", "memory"],
+      "properties": {
+        "owner_model": {
+          "type": "string",
+          "enum": ["single_actor", "single_owner_multi_worker"]
+        },
+        "assignment_policy": {
+          "type": "string",
+          "enum": ["direct_specialist", "lease_aware_capability", "dependency_first"]
+        },
+        "coordination": {
+          "type": "object",
+          "required": ["bus", "channels"],
+          "properties": {
+            "bus": {
+              "type": "string",
+              "enum": ["none", "mission_coordination_bus"]
+            },
+            "channels": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "memory": {
+          "type": "object",
+          "required": ["store", "scope", "purpose"],
+          "properties": {
+            "store": {
+              "type": "string",
+              "enum": ["none", "mission_working_memory"]
+            },
+            "scope": {
+              "type": "string",
+              "enum": ["none", "mission_local"]
+            },
+            "purpose": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

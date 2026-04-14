@@ -1,11 +1,9 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
 import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
-import { safeWriteFile, safeReadFile } from '@agent/core';
+import { safeWriteFile, safeReadFile, safeUnlink, pathResolver } from '@agent/core';
 import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -110,14 +108,22 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   // Aesthetic uses shared pdf-utils layout analysis (via pdfjs-dist)
   if (mode === 'aesthetic' || mode === 'all') {
     try {
-      // Write buffer to temp file for distillPdfDesign (which takes a file path)
-      const tmpPath = path.join(os.tmpdir(), `pdf-extract-${Date.now()}.pdf`);
-      fs.writeFileSync(tmpPath, buffer);
-      const protocol = await distillPdfDesign(tmpPath, { aesthetic: true });
-      fs.unlinkSync(tmpPath);
+      // Use a governed temp path so extraction stays within Kyberion's write policy.
+      const tmpPath = pathResolver.sharedTmp(`actuators/media-actuator/pdf-extract-${Date.now()}.pdf`);
+      let protocol;
+      try {
+        safeWriteFile(tmpPath, buffer);
+        protocol = await distillPdfDesign(tmpPath, { aesthetic: true });
+      } finally {
+        try {
+          safeUnlink(tmpPath);
+        } catch {
+          // Extraction cleanup should not shadow the primary extraction result.
+        }
+      }
 
       // Map PdfAesthetic to legacy Aesthetic format
-      const aesthetic = protocol.aesthetic;
+      const aesthetic = protocol?.aesthetic;
       result.layers.aesthetic = {
         fonts: aesthetic?.fonts,
         layout: aesthetic?.layout || 'unknown',

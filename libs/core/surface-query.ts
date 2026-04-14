@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
 export interface SurfaceQueryProviderConfig {
   web_search?: {
@@ -97,6 +98,13 @@ export function extractSurfaceKnowledgeQuery(text: string): string | null {
 }
 
 export function classifySurfaceQueryIntent(text: string): SurfaceQueryIntent {
+  const packet = resolveIntentResolutionPacket(text);
+  if (packet.selected_intent_id === 'knowledge-query') return 'knowledge_search';
+  if (packet.selected_intent_id === 'live-query') {
+    if (isSurfaceLocationQuery(text)) return 'location';
+    if (isSurfaceWeatherQuery(text)) return 'weather';
+    if (extractSurfaceWebSearchQuery(text)) return 'web_search';
+  }
   if (isSurfaceLocationQuery(text)) return 'location';
   if (isSurfaceWeatherQuery(text)) return 'weather';
   if (extractSurfaceKnowledgeQuery(text)) return 'knowledge_search';

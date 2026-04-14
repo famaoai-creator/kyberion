@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus, pathResolver, validatePipelineAdf } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -42,6 +42,22 @@ type ExecutionPlanRunResult = {
   skipped_reason?: string;
   output?: unknown;
   error?: string;
+};
+
+type ExecutionPlanPreflightIssue = {
+  job_id: string;
+  level: 'error' | 'warning';
+  code: string;
+  message: string;
+  repair_applied?: string;
+};
+
+type ExecutionPlanPreflightReport = {
+  kind: 'actuator-execution-plan-preflight-report';
+  status: 'ready' | 'needs_clarification' | 'invalid';
+  issue_count: number;
+  repair_count: number;
+  issues: ExecutionPlanPreflightIssue[];
 };
 
 interface OrchestratorAction {
@@ -658,10 +674,31 @@ async function opTransform(op: string, params: any, ctx: any) {
     case 'run_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object') throw new Error('run_execution_plan_set requires execution_plan_set');
-      const runReport = executeExecutionPlanSet(planSet);
+      const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
+      const runReport = report.status === 'invalid'
+        ? {
+            kind: 'actuator-execution-run-report',
+            status: 'failed',
+            total_jobs: 0,
+            preflight_report: report,
+            results: [],
+          }
+        : executeExecutionPlanSet(validatedPlanSet, report);
       return {
         ...ctx,
+        execution_plan_preflight: report,
+        validated_execution_plan_set: validatedPlanSet,
         [params.export_as || 'execution_run_report']: runReport,
+      };
+    }
+    case 'preflight_execution_plan_set': {
+      const planSet = ctx[params.from || 'execution_plan_set'];
+      if (!planSet || typeof planSet !== 'object') throw new Error('preflight_execution_plan_set requires execution_plan_set');
+      const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
+      return {
+        ...ctx,
+        validated_execution_plan_set: validatedPlanSet,
+        [params.export_as || 'execution_plan_preflight']: report,
       };
     }
     default: return ctx;
@@ -1042,7 +1079,146 @@ function renderPipelineBundleJob(job: PipelineBundleJob, variables: Record<strin
   };
 }
 
-function executeExecutionPlanSet(planSet: any) {
+function normalizeOutputPath(planSet: any, job: ExecutionPlanSetJob): { outputPath: string; repairApplied?: string } {
+  const configured = String(job.output_path || '').trim();
+  if (configured) {
+    return configured.endsWith('.json')
+      ? { outputPath: configured }
+      : { outputPath: `${configured}.json`, repairApplied: 'normalized output_path to .json' };
+  }
+  const outputDir = String(planSet?.output_dir || `active/shared/runtime/generated-pipelines/${String(planSet?.archetype_id || 'bundle')}`);
+  return {
+    outputPath: path.posix.join(outputDir, `${String(job.id || 'job')}.json`),
+    repairApplied: 'derived missing output_path from output_dir and job id',
+  };
+}
+
+function repairRenderedPipelineContract(renderedPipeline: Record<string, unknown>): {
+  pipeline: Record<string, unknown>;
+  repairs: string[];
+} {
+  const pipeline = JSON.parse(JSON.stringify(renderedPipeline)) as Record<string, unknown>;
+  const repairs: string[] = [];
+
+  if (typeof pipeline.action !== 'string' && Array.isArray((pipeline as any).steps)) {
+    pipeline.action = 'pipeline';
+    repairs.push('inferred action=pipeline from steps array');
+  }
+  if (pipeline.action === 'pipeline' && (!pipeline.context || typeof pipeline.context !== 'object')) {
+    pipeline.context = {};
+    repairs.push('added empty context for pipeline action');
+  }
+  if (typeof pipeline.action === 'string' && pipeline.action !== 'pipeline' && (!pipeline.params || typeof pipeline.params !== 'object')) {
+    pipeline.params = {};
+    repairs.push('added empty params object for direct actuator action');
+  }
+
+  return { pipeline, repairs };
+}
+
+function validateRenderedPipelineContract(jobId: string, renderedPipeline: Record<string, unknown>): ExecutionPlanPreflightIssue[] {
+  const issues: ExecutionPlanPreflightIssue[] = [];
+  const serialized = JSON.stringify(renderedPipeline);
+
+  if (/\{\{[^}]+\}\}/.test(serialized)) {
+    issues.push({
+      job_id: jobId,
+      level: 'error',
+      code: 'unresolved_template_variable',
+      message: 'Rendered contract still contains unresolved template variables.',
+    });
+  }
+
+  if (typeof renderedPipeline.action !== 'string' || !renderedPipeline.action.trim()) {
+    issues.push({
+      job_id: jobId,
+      level: 'error',
+      code: 'missing_action',
+      message: 'Rendered contract is missing a valid action.',
+    });
+    return issues;
+  }
+
+  if (renderedPipeline.action === 'pipeline') {
+    try {
+      validatePipelineAdf(renderedPipeline);
+    } catch (error) {
+      issues.push({
+        job_id: jobId,
+        level: 'error',
+        code: 'invalid_pipeline_contract',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return issues;
+}
+
+function preflightExecutionPlanSet(planSet: any): { planSet: any; report: ExecutionPlanPreflightReport } {
+  const issues: ExecutionPlanPreflightIssue[] = [];
+  const repairedJobs = Array.isArray(planSet?.jobs)
+    ? planSet.jobs.map((job: ExecutionPlanSetJob) => {
+        if (!job || typeof job !== 'object' || job.skipped_reason) return job;
+        const nextJob: ExecutionPlanSetJob = { ...job };
+        const outputPath = normalizeOutputPath(planSet, nextJob);
+        nextJob.output_path = outputPath.outputPath;
+        if (outputPath.repairApplied) {
+          issues.push({
+            job_id: String(nextJob.id || 'job'),
+            level: 'warning',
+            code: 'output_path_repaired',
+            message: outputPath.repairApplied,
+            repair_applied: outputPath.repairApplied,
+          });
+        }
+
+        if (!nextJob.rendered_pipeline || typeof nextJob.rendered_pipeline !== 'object') {
+          issues.push({
+            job_id: String(nextJob.id || 'job'),
+            level: 'error',
+            code: 'missing_rendered_contract',
+            message: 'Execution plan job does not have a rendered contract.',
+          });
+          return nextJob;
+        }
+
+        const repaired = repairRenderedPipelineContract(nextJob.rendered_pipeline);
+        nextJob.rendered_pipeline = repaired.pipeline;
+        for (const repair of repaired.repairs) {
+          issues.push({
+            job_id: String(nextJob.id || 'job'),
+            level: 'warning',
+            code: 'contract_repaired',
+            message: repair,
+            repair_applied: repair,
+          });
+        }
+
+        issues.push(...validateRenderedPipelineContract(String(nextJob.id || 'job'), repaired.pipeline));
+        return nextJob;
+      })
+    : [];
+
+  const errorCount = issues.filter((issue) => issue.level === 'error').length;
+  const repairCount = issues.filter((issue) => Boolean(issue.repair_applied)).length;
+
+  return {
+    planSet: {
+      ...planSet,
+      jobs: repairedJobs,
+    },
+    report: {
+      kind: 'actuator-execution-plan-preflight-report',
+      status: errorCount > 0 ? 'invalid' : issues.length > 0 ? 'needs_clarification' : 'ready',
+      issue_count: issues.length,
+      repair_count: repairCount,
+      issues,
+    },
+  };
+}
+
+function executeExecutionPlanSet(planSet: any, preflightReport?: ExecutionPlanPreflightReport) {
   const jobs = Array.isArray(planSet.jobs) ? planSet.jobs : [];
   const results: ExecutionPlanRunResult[] = [];
   for (const job of jobs) {
@@ -1095,6 +1271,7 @@ function executeExecutionPlanSet(planSet: any) {
     kind: 'actuator-execution-run-report',
     status: results.every((result) => result.status === 'succeeded') ? 'succeeded' : 'partial',
     total_jobs: results.length,
+    preflight_report: preflightReport,
     results,
   };
 }
@@ -1447,9 +1624,13 @@ async function opApply(op: string, params: any, ctx: any) {
       break;
     case 'log': logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
     case 'write_execution_plan_set': {
-      const planSet = ctx[params.from || 'execution_plan_set'];
+      const planSet = ctx[params.from || 'validated_execution_plan_set'] || ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object') throw new Error('write_execution_plan_set requires execution_plan_set');
-      for (const job of Array.isArray(planSet.jobs) ? planSet.jobs : []) {
+      const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
+      if (report.status === 'invalid') {
+        throw new Error(`write_execution_plan_set blocked by preflight: ${report.issues.map((issue) => issue.message).join('; ')}`);
+      }
+      for (const job of Array.isArray(validatedPlanSet.jobs) ? validatedPlanSet.jobs : []) {
         if (!job?.output_path || !job?.rendered_pipeline || job.skipped_reason) continue;
         const logicalOutputPath = String(job.output_path);
         const logicalOutputDir = path.dirname(logicalOutputPath);

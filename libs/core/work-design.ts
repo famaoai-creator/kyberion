@@ -44,6 +44,47 @@ interface StandardIntentCatalogFile {
   }>;
 }
 
+interface BoundaryProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['execution_boundary']>;
+}
+
+interface RuntimeDesignProfileFile {
+  profiles?: Record<string, OrganizationWorkLoopSummary['runtime_design']>;
+}
+
+interface RoutingMatch {
+  intent_ids?: string[];
+  task_types?: string[];
+  query_types?: string[];
+  shapes?: string[];
+}
+
+interface SpecialistRoutingPolicyFile {
+  rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    specialist_id?: string;
+  }>;
+  fallback_specialist_id?: string;
+}
+
+interface WorkDesignProfileRoutingFile {
+  execution_boundary_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  runtime_design_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    profile_id?: string;
+  }>;
+  defaults?: {
+    execution_boundary_profile_id?: string;
+    runtime_design_profile_id?: string;
+  };
+}
+
 export interface WorkDesignSummary {
   primary_specialist: SpecialistDefinition | null;
   conversation_agent: string | null;
@@ -82,6 +123,19 @@ export interface OrganizationWorkLoopSummary {
     plan_outline: string[];
     intake_requirements: string[];
     operator_checklist: string[];
+  };
+  runtime_design: {
+    owner_model: 'single_actor' | 'single_owner_multi_worker';
+    assignment_policy: 'direct_specialist' | 'lease_aware_capability' | 'dependency_first';
+    coordination: {
+      bus: 'none' | 'mission_coordination_bus';
+      channels: string[];
+    };
+    memory: {
+      store: 'none' | 'mission_working_memory';
+      scope: 'none' | 'mission_local';
+      purpose: string[];
+    };
   };
   execution_boundary: {
     llm_zone: {
@@ -142,9 +196,46 @@ function loadStandardIntentCatalog(): StandardIntentCatalogFile['intents'] {
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
+function loadExecutionBoundaryProfiles(): Record<string, OrganizationWorkLoopSummary['execution_boundary']> {
+  const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('public/governance/execution-boundary-profiles.json'));
+  return parsed.profiles || {};
+}
+
+function loadRuntimeDesignProfiles(): Record<string, OrganizationWorkLoopSummary['runtime_design']> {
+  const parsed = loadJson<RuntimeDesignProfileFile>(pathResolver.knowledge('public/governance/runtime-design-profiles.json'));
+  return parsed.profiles || {};
+}
+
+function loadSpecialistRoutingPolicy(): SpecialistRoutingPolicyFile {
+  return loadJson<SpecialistRoutingPolicyFile>(pathResolver.knowledge('public/governance/specialist-routing-rules.json'));
+}
+
+function loadWorkDesignProfileRouting(): WorkDesignProfileRoutingFile {
+  return loadJson<WorkDesignProfileRoutingFile>(pathResolver.knowledge('public/governance/work-design-profile-routing.json'));
+}
+
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
   return loadStandardIntentCatalog().find((intent) => intent?.id === intentId) || null;
+}
+
+function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
+  if (!expected?.length) return true;
+  if (!value) return false;
+  return expected.includes(value);
+}
+
+function ruleMatches(
+  input: { intentId?: string; taskType?: string; queryType?: string; shape?: string },
+  match?: RoutingMatch,
+): boolean {
+  if (!match) return false;
+  return (
+    matchesRoutingValue(input.intentId, match.intent_ids) &&
+    matchesRoutingValue(input.taskType, match.task_types) &&
+    matchesRoutingValue(input.queryType, match.query_types) &&
+    matchesRoutingValue(input.shape, match.shapes)
+  );
 }
 
 function buildProcessDesign(input: {
@@ -180,92 +271,27 @@ function buildProcessDesign(input: {
 function buildExecutionBoundary(input: {
   intentId?: string;
   taskType?: string;
+  queryType?: string;
   shape?: string;
 }): OrganizationWorkLoopSummary['execution_boundary'] {
-  const isAnalysis =
-    input.intentId === 'incident-informed-review' ||
-    input.intentId === 'cross-project-remediation' ||
-    input.taskType === 'analysis';
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadExecutionBoundaryProfiles();
+  const matched = (routing.execution_boundary_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const defaultProfileId = routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.default_governed_execution;
+}
 
-  if (isAnalysis) {
-    return {
-      llm_zone: {
-        allowed: [
-          'normalize_analysis_request',
-          'draft_findings_language',
-          'summarize_incident_or_requirement_history',
-          'propose_follow_up_work_items',
-        ],
-        forbidden: [
-          'override_governed_process_design',
-          'invent_review_target_bindings',
-          'mutate_repo_or_mission_state_directly',
-          'declare_verification_complete_without_evidence',
-        ],
-      },
-      knowledge_zone: {
-        owns: [
-          'intent definitions',
-          'process_design',
-          'outcome catalog',
-          'specialist routing',
-        ],
-      },
-      compiler_zone: {
-        responsibilities: [
-          'resolve_target_binding',
-          'rank_governed_refs',
-          'classify_impact_bands',
-          'build_finding_candidates_and_execution_contract',
-        ],
-      },
-      executor_zone: {
-        responsibilities: [
-          'persist_analysis_artifact',
-          'create_follow_up_seeds',
-          'preserve_governed_project_track_context',
-        ],
-      },
-      rule: 'LLM drafts findings language; knowledge defines process; compiler binds targets and findings; executors persist artifacts and seeds',
-    };
-  }
-
-  return {
-    llm_zone: {
-      allowed: [
-        'normalize_request',
-        'draft_content_within_governed_slots',
-        'explain_next_action',
-      ],
-      forbidden: [
-        'override_governed_structure',
-        'invent_low_level_execution_contracts',
-        'declare_completion_without_evidence',
-      ],
-    },
-    knowledge_zone: {
-      owns: [
-        'intent definitions',
-        'process_design',
-        'outcome catalog',
-        'specialist routing',
-      ],
-    },
-    compiler_zone: {
-      responsibilities: [
-        'map_intent_to_governed_execution_shape',
-        'prepare_contracts_and_paths',
-      ],
-    },
-    executor_zone: {
-      responsibilities: [
-        'perform_governed_execution',
-        'persist_evidence',
-        'preserve_reproducibility',
-      ],
-    },
-    rule: 'LLM drafts within governed slots; knowledge defines process; compiler shapes execution; executors persist and reproduce',
-  };
+function buildRuntimeDesign(input: {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+  shape?: string;
+}): OrganizationWorkLoopSummary['runtime_design'] {
+  const routing = loadWorkDesignProfileRouting();
+  const profiles = loadRuntimeDesignProfiles();
+  const matched = (routing.runtime_design_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const defaultProfileId = routing.defaults?.runtime_design_profile_id || 'single_actor_delivery';
+  return profiles[matched?.profile_id || defaultProfileId] || profiles.single_actor_delivery;
 }
 
 function inferExecutionShape(input: {
@@ -274,6 +300,11 @@ function inferExecutionShape(input: {
   shape?: string;
   projectId?: string;
 }): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
+  const intentDefinition = findIntentDefinition(input.intentId);
+  const catalogShape = intentDefinition?.resolution?.shape;
+  if (catalogShape === 'direct_reply' || catalogShape === 'task_session' || catalogShape === 'mission' || catalogShape === 'project_bootstrap') {
+    return catalogShape;
+  }
   if (input.shape === 'project_bootstrap' || input.intentId === 'bootstrap-project') {
     return 'project_bootstrap';
   }
@@ -308,31 +339,9 @@ function specialistIdForIntent(input: {
   if (typeof intentDefinition?.specialist_id === 'string' && intentDefinition.specialist_id.trim()) {
     return intentDefinition.specialist_id;
   }
-  if (input.intentId === 'bootstrap-project' || input.shape === 'project_bootstrap') {
-    return 'project-lead';
-  }
-  if (input.intentId === 'open-site' || input.intentId === 'browser-step' || input.shape === 'browser_session') {
-    return 'browser-operator';
-  }
-  if (
-    input.intentId === 'generate-presentation' ||
-    input.intentId === 'generate-report' ||
-    input.intentId === 'generate-workbook' ||
-    ['presentation_deck', 'report_document', 'workbook_wbs'].includes(String(input.taskType || ''))
-  ) {
-    return 'document-specialist';
-  }
-  if (input.intentId === 'inspect-service' || input.taskType === 'service_operation') {
-    return 'service-operator';
-  }
-  if (
-    input.intentId === 'knowledge-query' ||
-    input.intentId === 'live-query' ||
-    ['knowledge_search', 'web_search', 'weather', 'location'].includes(String(input.queryType || ''))
-  ) {
-    return 'knowledge-specialist';
-  }
-  return 'surface-concierge';
+  const policy = loadSpecialistRoutingPolicy();
+  const matched = (policy.rules || []).find((rule) => ruleMatches(input, rule.match));
+  return matched?.specialist_id || policy.fallback_specialist_id || 'surface-concierge';
 }
 
 export function resolveWorkDesign(input: {
@@ -426,6 +435,7 @@ export function buildOrganizationWorkLoopSummary(input: {
       labels: design.outcomes.map((outcome) => outcome.label),
     },
     process_design: buildProcessDesign(input),
+    runtime_design: buildRuntimeDesign(input),
     execution_boundary: buildExecutionBoundary(input),
     teaming: {
       specialist_id: design.primary_specialist?.id,

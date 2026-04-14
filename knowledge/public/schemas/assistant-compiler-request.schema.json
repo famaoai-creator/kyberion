@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/assistant-compiler-request.schema.json",
+  "title": "Assistant Compiler Request",
+  "type": "object",
+  "required": [
+    "kind",
+    "request_id",
+    "created_at",
+    "source",
+    "source_text",
+    "context",
+    "delegation",
+    "expected_output"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["assistant-compiler-request"]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": ["origin"],
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": ["cli", "surface", "agent_runtime"]
+        },
+        "channel": { "type": "string" },
+        "surface": { "type": "string" },
+        "runtime_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "source_text": {
+      "type": "string"
+    },
+    "context": {
+      "type": "object",
+      "required": ["tier", "service_bindings"],
+      "properties": {
+        "locale": { "type": "string" },
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "track_id": { "type": "string" },
+        "track_name": { "type": "string" },
+        "service_bindings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "delegation": {
+      "type": "object",
+      "required": ["mode", "allowed_providers"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["compile_intent"]
+        },
+        "preferred_provider": { "type": "string" },
+        "preferred_model": { "type": "string" },
+        "preferred_model_provider": { "type": "string" },
+        "allowed_providers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["codex", "gemini", "claude"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected_output": {
+      "type": "object",
+      "required": ["contract", "write_back_path"],
+      "properties": {
+        "contract": {
+          "type": "string",
+          "enum": ["intent-bundle"]
+        },
+        "write_back_path": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
