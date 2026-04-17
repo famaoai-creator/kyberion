@@ -9,7 +9,7 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "pnpm tsx scripts/run_baseline_check.ts"
+        "cmd": "node dist/scripts/run_baseline_check.js"
       }
     }
   ]
