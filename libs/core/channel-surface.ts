@@ -19,6 +19,7 @@ import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import { compileUserIntentFlow, formatClarificationPacket, type UserIntentFlow } from './intent-contract.js';
 import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { classifyTaskSessionIntent } from './task-session.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 import type {
@@ -772,17 +773,40 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   },
 ];
 
+function surfaceRoutingText(input: SurfaceConversationInput): { text: string; parsedSlackPrompt: ParsedSlackSurfacePrompt | null } {
+  const parsedSlackPrompt = input.agentId === 'slack-surface-agent'
+    ? parseSlackSurfacePrompt(input.query)
+    : null;
+  return {
+    text: parsedSlackPrompt?.userMessage || input.query,
+    parsedSlackPrompt,
+  };
+}
+
+function shouldCompileSurfaceIntent(input: SurfaceConversationInput, routingText: string, ruleBasedReceiver?: SurfaceDelegationReceiver): boolean {
+  if (input.forcedReceiver || ruleBasedReceiver) return false;
+  const normalized = routingText.trim();
+  if (!normalized) return false;
+  if (input.agentId === 'slack-surface-agent' && !shouldForceSlackDelegation(normalized)) {
+    return false;
+  }
+  if (classifyTaskSessionIntent(normalized)) return true;
+  return normalized.length > 80 || normalized.includes('\n');
+}
+
 export async function runSurfaceConversation(input: SurfaceConversationInput): Promise<SurfaceConversationResult> {
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
-  const compiledFlow = input.forcedReceiver
-    ? null
-    : await compileUserIntentFlow({
-      text: input.query,
+  const routedSurfaceInput = surfaceRoutingText(input);
+  const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routedSurfaceInput.text);
+  const compiledFlow = shouldCompileSurfaceIntent(input, routedSurfaceInput.text, ruleBasedReceiver)
+    ? await compileUserIntentFlow({
+      text: routedSurfaceInput.text,
       channel: input.agentId.includes('slack') ? 'slack' : input.agentId.includes('presence') ? 'presence' : 'surface',
     }).catch((error: any) => {
       logger.warn(`[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`);
       return null;
-    });
+    })
+    : null;
 
   if (compiledFlow?.clarificationPacket) {
     return {
@@ -797,9 +821,11 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     };
   }
 
-  const computedReceiver = !forcedReceiver && compiledFlow
-    ? resolveSurfaceConversationReceiver(undefined, compiledFlow)
-    : forcedReceiver;
+  const computedReceiver = forcedReceiver ||
+    ruleBasedReceiver ||
+    (!forcedReceiver && compiledFlow
+      ? resolveSurfaceConversationReceiver(undefined, compiledFlow)
+      : undefined);
 
   const structuredQuery = compiledFlow
     ? [
@@ -815,7 +841,7 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
 
   const parsedSlackPrompt =
     input.agentId === 'slack-surface-agent' && computedReceiver
-      ? parseSlackSurfacePrompt(structuredQuery)
+      ? routedSurfaceInput.parsedSlackPrompt || parseSlackSurfacePrompt(structuredQuery)
       : null;
 
   const routeContext: SurfaceRuntimeRouteContext = {
