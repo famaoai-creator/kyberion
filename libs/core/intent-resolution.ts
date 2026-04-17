@@ -1,5 +1,13 @@
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge('public/schemas/standard-intents.schema.json');
+const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-resolution-policy.schema.json');
 
 export type StandardIntentDefinition = {
   id?: string;
@@ -7,6 +15,11 @@ export type StandardIntentDefinition = {
   description?: string;
   surface_examples?: string[];
   trigger_keywords?: string[];
+  outcome_ids?: string[];
+  specialist_id?: string;
+  plan_outline?: string[];
+  intake_requirements?: string[];
+  pipeline?: Array<{ op?: string; params?: Record<string, unknown> }>;
   resolution?: {
     shape?: string;
     task_kind?: string;
@@ -40,14 +53,80 @@ export interface IntentResolutionPacket {
   candidates: IntentResolutionCandidate[];
 }
 
+type CatalogScoringPolicy = {
+  exact_intent_id_confidence: number;
+  keyword_base_confidence: number;
+  keyword_increment: number;
+  keyword_max_confidence: number;
+  exact_surface_example_confidence: number;
+  surface_containment_confidence: number;
+  surface_overlap_increment: number;
+  surface_overlap_max_confidence: number;
+  selected_confidence_threshold: number;
+  catalog_intent_category: string;
+};
+
+type LegacyIntentResolutionCandidate = {
+  id: string;
+  intent_id: string;
+  confidence: number;
+  source: 'catalog' | 'heuristic' | 'legacy';
+  reasons: string[];
+  patterns: Array<TextMatchRule | string>;
+  resolution: {
+    shape?: string;
+    task_kind?: string;
+    result_shape?: string;
+  };
+};
+
+type IntentResolutionPolicyFile = {
+  version: string;
+  catalog_scoring: CatalogScoringPolicy;
+  legacy_candidates: LegacyIntentResolutionCandidate[];
+};
+
 let standardIntentCache: StandardIntentDefinition[] | null = null;
+let standardIntentValidateFn: ValidateFunction | null = null;
+let intentResolutionPolicyCache: IntentResolutionPolicyFile | null = null;
+let intentResolutionPolicyValidateFn: ValidateFunction | null = null;
+
+function ensureStandardIntentValidator(): ValidateFunction {
+  if (standardIntentValidateFn) return standardIntentValidateFn;
+  standardIntentValidateFn = compileSchemaFromPath(ajv, STANDARD_INTENTS_SCHEMA_PATH);
+  return standardIntentValidateFn;
+}
+
+function ensureIntentResolutionPolicyValidator(): ValidateFunction {
+  if (intentResolutionPolicyValidateFn) return intentResolutionPolicyValidateFn;
+  intentResolutionPolicyValidateFn = compileSchemaFromPath(ajv, INTENT_RESOLUTION_POLICY_SCHEMA_PATH);
+  return intentResolutionPolicyValidateFn;
+}
 
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
   const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntentDefinition[] };
+  const validate = ensureStandardIntentValidator();
+  if (!validate(parsed)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid standard-intents catalog: ${errors}`);
+  }
   standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
   return standardIntentCache;
+}
+
+function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
+  if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
+  const filePath = pathResolver.knowledge('public/governance/intent-resolution-policy.json');
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentResolutionPolicyFile;
+  const validate = ensureIntentResolutionPolicyValidator();
+  if (!validate(parsed)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid intent-resolution-policy: ${errors}`);
+  }
+  intentResolutionPolicyCache = parsed;
+  return intentResolutionPolicyCache;
 }
 
 function normalizeFreeText(value: string): string {
@@ -66,25 +145,26 @@ function tokenize(value: string): string[] {
 }
 
 function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition): IntentResolutionCandidate | null {
+  const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
   const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => normalized.includes(String(keyword).toLowerCase()));
   const reasons: string[] = [];
   let score = 0;
 
   if (intent.id && (intent.id === utterance || intent.id === normalized)) {
-    score = 1.0;
+    score = policy.exact_intent_id_confidence;
     reasons.push('exact intent id match');
   }
 
   if (matchedKeywords.length > 0) {
-    score = Math.max(score, Math.min(0.55 + matchedKeywords.length * 0.12, 0.92));
+    score = Math.max(score, Math.min(policy.keyword_base_confidence + matchedKeywords.length * policy.keyword_increment, policy.keyword_max_confidence));
     reasons.push(`matched keywords: ${matchedKeywords.join(', ')}`);
   }
 
   const utteranceTokens = tokenize(utterance);
   const exactExample = (intent.surface_examples || []).find((example) => normalizeFreeText(example) === normalized);
   if (exactExample) {
-    score = Math.max(score, 0.98);
+    score = Math.max(score, policy.exact_surface_example_confidence);
     reasons.push(`exact surface example match: ${exactExample}`);
   }
 
@@ -93,14 +173,14 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
     return normalizedExample.length >= 4 && (normalized.includes(normalizedExample) || normalizedExample.includes(normalized));
   });
   if (containingExample) {
-    score = Math.max(score, 0.84);
+    score = Math.max(score, policy.surface_containment_confidence);
     reasons.push(`surface example containment: ${containingExample}`);
   }
 
   const exampleTokens = (intent.surface_examples || []).flatMap((example) => tokenize(example));
   const overlap = utteranceTokens.filter((token) => exampleTokens.includes(token));
   if (overlap.length > 0) {
-    score = Math.max(score, Math.min(score + overlap.length * 0.03, 0.95));
+    score = Math.max(score, Math.min(score + overlap.length * policy.surface_overlap_increment, policy.surface_overlap_max_confidence));
     reasons.push(`surface example overlap: ${overlap.slice(0, 4).join(', ')}`);
   }
 
@@ -116,44 +196,22 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
 }
 
 function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
-  const candidates: IntentResolutionCandidate[] = [];
-
-  if (/(写真|撮影|photo|picture|camera)/i.test(utterance)) {
-    candidates.push({
-      intent_id: 'capture-photo',
-      confidence: 0.88,
-      source: 'legacy',
+  return loadIntentResolutionPolicy().legacy_candidates
+    .filter((candidate) => matchesAnyTextRule(utterance, candidate.patterns))
+    .map((candidate) => ({
+      intent_id: candidate.intent_id,
+      confidence: candidate.confidence,
+      source: candidate.source,
       matched_keywords: [],
-      reasons: ['legacy capture-photo heuristic'],
-      resolution: {
-        shape: 'task_session',
-        task_kind: 'capture_photo',
-        result_shape: 'artifact',
-      },
-    });
-  }
-
-  if (/(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)/i.test(utterance)) {
-    candidates.push({
-      intent_id: 'inspect-service',
-      confidence: 0.86,
-      source: 'heuristic',
-      matched_keywords: [],
-      reasons: ['service operation heuristic'],
-      resolution: {
-        shape: 'task_session',
-        task_kind: 'service_operation',
-        result_shape: 'summary',
-      },
-    });
-  }
-
-  return candidates;
+      reasons: candidate.reasons,
+      resolution: candidate.resolution,
+    }));
 }
 
 export function resolveIntentResolutionPacket(utterance: string): IntentResolutionPacket {
   const trimmed = utterance.trim();
-  const surfaceIntents = loadStandardIntentCatalog().filter((intent) => intent.category === 'surface');
+  const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
+  const surfaceIntents = loadStandardIntentCatalog().filter((intent) => intent.category === scoringPolicy.catalog_intent_category);
   const candidates = [
     ...surfaceIntents
       .map((intent) => scoreCatalogIntent(trimmed, intent))
@@ -170,7 +228,7 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
   }
 
   const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
-  const selected = sorted[0] && sorted[0].confidence >= 0.45 ? sorted[0] : undefined;
+  const selected = sorted[0] && sorted[0].confidence >= scoringPolicy.selected_confidence_threshold ? sorted[0] : undefined;
 
   return {
     kind: 'intent_resolution_packet',

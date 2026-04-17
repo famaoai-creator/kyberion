@@ -1,6 +1,13 @@
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
+import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/work-policy.schema.json');
 
 export interface OutcomeDefinition {
   id: string;
@@ -28,22 +35,6 @@ interface SpecialistCatalogFile {
   specialists?: Record<string, Omit<SpecialistDefinition, 'id'>>;
 }
 
-interface StandardIntentCatalogFile {
-  intents?: Array<{
-    id?: string;
-    category?: string;
-    specialist_id?: string;
-    outcome_ids?: string[];
-    plan_outline?: string[];
-    intake_requirements?: string[];
-    resolution?: {
-      shape?: string;
-      task_kind?: string;
-      result_shape?: string;
-    };
-  }>;
-}
-
 interface BoundaryProfileFile {
   profiles?: Record<string, OrganizationWorkLoopSummary['execution_boundary']>;
 }
@@ -57,6 +48,7 @@ interface RoutingMatch {
   task_types?: string[];
   query_types?: string[];
   shapes?: string[];
+  catalog_shapes?: string[];
 }
 
 interface SpecialistRoutingPolicyFile {
@@ -83,6 +75,75 @@ interface WorkDesignProfileRoutingFile {
     execution_boundary_profile_id?: string;
     runtime_design_profile_id?: string;
   };
+}
+
+interface WorkDesignRulesFile {
+  process_checklist_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    items?: string[];
+  }>;
+  execution_shape_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    shape?: OrganizationWorkLoopSummary['resolution']['execution_shape'];
+  }>;
+  intent_label_rules?: Array<{
+    id?: string;
+    match?: RoutingMatch;
+    label?: string;
+    label_from?: 'intentId' | 'taskType' | 'queryType';
+  }>;
+}
+
+interface ProcessDesignRuleInput {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+}
+
+interface ExecutionShapeRuleInput {
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+  catalogShape?: string;
+}
+
+interface IntentLabelRuleInput {
+  intentId?: string;
+  taskType?: string;
+  queryType?: string;
+}
+
+interface ProcessChecklistRule {
+  items: string[];
+  match?: RoutingMatch;
+}
+
+interface ExecutionShapeRule {
+  match?: RoutingMatch;
+  shape: OrganizationWorkLoopSummary['resolution']['execution_shape'];
+}
+
+interface IntentLabelRule {
+  match?: RoutingMatch;
+  label?: string;
+  label_from?: 'intentId' | 'taskType' | 'queryType';
+}
+
+interface WorkPolicyFile {
+  version: string;
+  specialist_routing: SpecialistRoutingPolicyFile;
+  profile_routing: WorkDesignProfileRoutingFile;
+  design_rules: WorkDesignRulesFile;
+}
+
+let workPolicyValidateFn: ValidateFunction | null = null;
+
+function ensureWorkPolicyValidator(): ValidateFunction {
+  if (workPolicyValidateFn) return workPolicyValidateFn;
+  workPolicyValidateFn = compileSchemaFromPath(ajv, WORK_POLICY_SCHEMA_PATH);
+  return workPolicyValidateFn;
 }
 
 export interface WorkDesignSummary {
@@ -191,11 +252,6 @@ export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
   );
 }
 
-function loadStandardIntentCatalog(): StandardIntentCatalogFile['intents'] {
-  const parsed = loadJson<StandardIntentCatalogFile>(pathResolver.knowledge('public/governance/standard-intents.json'));
-  return Array.isArray(parsed.intents) ? parsed.intents : [];
-}
-
 function loadExecutionBoundaryProfiles(): Record<string, OrganizationWorkLoopSummary['execution_boundary']> {
   const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('public/governance/execution-boundary-profiles.json'));
   return parsed.profiles || {};
@@ -206,17 +262,31 @@ function loadRuntimeDesignProfiles(): Record<string, OrganizationWorkLoopSummary
   return parsed.profiles || {};
 }
 
+function loadWorkPolicy(): WorkPolicyFile {
+  const value = loadJson<WorkPolicyFile>(pathResolver.knowledge('public/governance/work-policy.json'));
+  const validate = ensureWorkPolicyValidator();
+  if (!validate(value)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid work-policy: ${errors}`);
+  }
+  return value;
+}
+
 function loadSpecialistRoutingPolicy(): SpecialistRoutingPolicyFile {
-  return loadJson<SpecialistRoutingPolicyFile>(pathResolver.knowledge('public/governance/specialist-routing-rules.json'));
+  return loadWorkPolicy().specialist_routing;
 }
 
 function loadWorkDesignProfileRouting(): WorkDesignProfileRoutingFile {
-  return loadJson<WorkDesignProfileRoutingFile>(pathResolver.knowledge('public/governance/work-design-profile-routing.json'));
+  return loadWorkPolicy().profile_routing;
+}
+
+function loadWorkDesignRules(): WorkDesignRulesFile {
+  return loadWorkPolicy().design_rules;
 }
 
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
-  return loadStandardIntentCatalog().find((intent) => intent?.id === intentId) || null;
+  return loadStandardIntentCatalog().find((intent: StandardIntentDefinition) => intent?.id === intentId) || null;
 }
 
 function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
@@ -226,15 +296,21 @@ function matchesRoutingValue(value: string | undefined, expected: string[] | und
 }
 
 function ruleMatches(
-  input: { intentId?: string; taskType?: string; queryType?: string; shape?: string },
+  input: { intentId?: string; taskType?: string; queryType?: string; shape?: string; catalogShape?: string },
   match?: RoutingMatch,
 ): boolean {
   if (!match) return false;
+  const wildcardMatches = (value: string | undefined, expected: string[] | undefined): boolean => {
+    if (!expected?.length) return true;
+    if (expected.includes('*')) return Boolean(value);
+    return matchesRoutingValue(value, expected);
+  };
   return (
-    matchesRoutingValue(input.intentId, match.intent_ids) &&
-    matchesRoutingValue(input.taskType, match.task_types) &&
-    matchesRoutingValue(input.queryType, match.query_types) &&
-    matchesRoutingValue(input.shape, match.shapes)
+    wildcardMatches(input.intentId, match.intent_ids) &&
+    wildcardMatches(input.taskType, match.task_types) &&
+    wildcardMatches(input.queryType, match.query_types) &&
+    wildcardMatches(input.shape, match.shapes) &&
+    wildcardMatches(input.catalogShape, match.catalog_shapes)
   );
 }
 
@@ -250,15 +326,18 @@ function buildProcessDesign(input: {
   const intakeRequirements = Array.isArray(intentDefinition?.intake_requirements)
     ? intentDefinition!.intake_requirements.map(String).filter(Boolean)
     : [];
+  const rules = loadWorkDesignRules();
+  const checklistRuleInput = {
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape === 'task_session' || input.taskType ? 'task_session' : input.shape,
+  };
 
   const operatorChecklist = [
     ...planOutline,
-    ...(input.shape === 'task_session' || input.taskType
-      ? ['confirm the governed output path', 'capture evidence and reusable findings']
-      : []),
-    ...(input.shape === 'project_bootstrap'
-      ? ['confirm project root and default track', 'prepare the first governed work items']
-      : []),
+    ...(rules.process_checklist_rules || [])
+      .filter((rule) => ruleMatches(checklistRuleInput, rule.match))
+      .flatMap((rule) => (rule.items || []).map(String)),
   ].filter(Boolean);
 
   return {
@@ -298,23 +377,14 @@ function inferExecutionShape(input: {
   intentId?: string;
   taskType?: string;
   shape?: string;
-  projectId?: string;
 }): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
   const intentDefinition = findIntentDefinition(input.intentId);
   const catalogShape = intentDefinition?.resolution?.shape;
-  if (catalogShape === 'direct_reply' || catalogShape === 'task_session' || catalogShape === 'mission' || catalogShape === 'project_bootstrap') {
-    return catalogShape;
-  }
-  if (input.shape === 'project_bootstrap' || input.intentId === 'bootstrap-project') {
-    return 'project_bootstrap';
-  }
-  if (input.shape === 'mission') {
-    return 'mission';
-  }
-  if (input.taskType) {
-    return 'task_session';
-  }
-  return 'direct_reply';
+  const rules = loadWorkDesignRules();
+  const matchedRule = (rules.execution_shape_rules || []).find((rule) =>
+    Boolean(rule.shape) && ruleMatches({ ...input, catalogShape }, rule.match),
+  );
+  return matchedRule?.shape || 'direct_reply';
 }
 
 function inferIntentLabel(input: {
@@ -322,10 +392,11 @@ function inferIntentLabel(input: {
   taskType?: string;
   queryType?: string;
 }): string {
-  if (input.intentId === 'bootstrap-project') return 'Project bootstrap';
-  if (input.intentId) return input.intentId;
-  if (input.taskType) return input.taskType;
-  if (input.queryType) return input.queryType;
+  const rules = loadWorkDesignRules();
+  const matchedRule = (rules.intent_label_rules || []).find((rule) => ruleMatches(input, rule.match));
+  if (!matchedRule) return 'general_request';
+  if (matchedRule.label) return matchedRule.label;
+  if (matchedRule.label_from) return input[matchedRule.label_from] || 'general_request';
   return 'general_request';
 }
 

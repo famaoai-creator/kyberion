@@ -1,0 +1,169 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "task-session-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "intents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentPolicy" }
+    }
+  },
+  "required": ["version", "intents"],
+  "$defs": {
+    "textRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "contains" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "regex" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "any" },
+            "clauses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "enum": ["contains", "regex"] },
+                  "value": { "type": "string", "minLength": 1 }
+                },
+                "required": ["type", "value"]
+              }
+            }
+          },
+          "required": ["type", "clauses"]
+        }
+      ]
+    },
+    "valueRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/textRule" }
+            ]
+          }
+        },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" }
+          ]
+        }
+      },
+      "required": ["when", "value"]
+    },
+    "payloadField": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "default": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" }
+          ]
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/valueRule" }
+        }
+      },
+      "required": ["field"]
+    },
+    "requirementRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requirement": { "type": "string", "minLength": 1 },
+        "omit_when": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/textRule" }
+            ]
+          }
+        }
+      },
+      "required": ["requirement"]
+    },
+    "intentPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "task_type": { "type": "string", "minLength": 1 },
+        "goal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "summary": { "type": "string", "minLength": 1 },
+            "success_condition": { "type": "string", "minLength": 1 }
+          },
+          "required": ["summary", "success_condition"]
+        },
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default_missing": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "rules": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/requirementRule" }
+            }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "static": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "number" },
+                  { "type": "boolean" }
+                ]
+              }
+            },
+            "fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/payloadField" }
+            }
+          }
+        }
+      },
+      "required": ["id", "task_type", "goal"]
+    }
+  }
+}
