@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/deliveryRule" }
+        }
+      },
+      "required": ["rules"]
+    },
+    "compiler": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relevant_intent_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intent_contract_rules": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "work_loop_rules": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["relevant_intent_limit", "intent_contract_rules", "work_loop_rules"]
+    }
+  },
+  "required": ["version", "delivery", "compiler"],
+  "$defs": {
+    "deliveryRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "mode": {
+          "type": "string",
+          "enum": ["one_shot", "managed_program"]
+        },
+        "shapes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+          }
+        },
+        "text_patterns": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/textRule" }
+            ]
+          }
+        },
+        "min_required_inputs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["mode"]
+    },
+    "textRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "contains" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "regex" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "any" },
+            "clauses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "enum": ["contains", "regex"] },
+                  "value": { "type": "string", "minLength": 1 }
+                },
+                "required": ["type", "value"]
+              }
+            }
+          },
+          "required": ["type", "clauses"]
+        }
+      ]
+    }
+  }
+}

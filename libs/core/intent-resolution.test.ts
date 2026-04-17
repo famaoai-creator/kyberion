@@ -46,4 +46,11 @@ describe('intent-resolution', () => {
     const valid = validate(packet);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
+
+  it('applies governed confidence threshold and legacy fallback policy', () => {
+    const packet = resolveIntentResolutionPacket('voice-hub の状態とログを見せて');
+    expect(packet.selected_intent_id).toBe('inspect-service');
+    expect(packet.selected_confidence || 0).toBeGreaterThan(0.45);
+    expect(packet.candidates.some((candidate) => candidate.reasons.includes('service operation heuristic'))).toBe(true);
+  });
 });

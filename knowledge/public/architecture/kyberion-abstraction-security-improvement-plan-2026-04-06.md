@@ -154,8 +154,7 @@ This pass moved those semantics into knowledge catalogs:
 
 - [knowledge/public/governance/execution-boundary-profiles.json](/Users/famao/kyberion/knowledge/public/governance/execution-boundary-profiles.json)
 - [knowledge/public/governance/runtime-design-profiles.json](/Users/famao/kyberion/knowledge/public/governance/runtime-design-profiles.json)
-- [knowledge/public/governance/specialist-routing-rules.json](/Users/famao/kyberion/knowledge/public/governance/specialist-routing-rules.json)
-- [knowledge/public/governance/work-design-profile-routing.json](/Users/famao/kyberion/knowledge/public/governance/work-design-profile-routing.json)
+- [knowledge/public/governance/work-policy.json](/Users/famaoai/k/d/kyberion/knowledge/public/governance/work-policy.json)
 - [libs/core/work-design.ts](/Users/famao/kyberion/libs/core/work-design.ts)
 
 The remaining gap is narrower:

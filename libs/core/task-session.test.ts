@@ -142,4 +142,16 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.requirements?.missing || []).toEqual([]);
     expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.payload?.analysis_contract_id).toBe('analysis.evolve-agent-harness.v1');
   });
+
+  it('derives task-session payload and requirements from governed policy', () => {
+    const deck = classifyTaskSessionIntent('3枚の要約スライドを作って');
+    expect(deck?.intentId).toBe('generate-presentation');
+    expect(deck?.payload?.deck_purpose).toBe('proposal');
+    expect(deck?.payload?.slide_count_hint).toBe(3);
+
+    const remediation = classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して');
+    expect(remediation?.payload?.source_corpus).toBe('requirements');
+    expect(remediation?.payload?.action_bias).toBe('remediation');
+    expect(remediation?.requirements?.missing || []).toEqual([]);
+  });
 });

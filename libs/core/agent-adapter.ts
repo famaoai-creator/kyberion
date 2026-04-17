@@ -353,6 +353,8 @@ export class CodexAdapter implements AgentAdapter {
   }
 }
 
+type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude';
+
 export interface CodexAppServerAdapterOptions {
   model?: string;
   modelProvider?: string;
@@ -970,23 +972,32 @@ export class ClaudeAdapter implements AgentAdapter {
 }
 
 export class AgentFactory {
-  public static create(provider: 'gemini' | 'codex' | 'claude'): AgentAdapter {
-    switch (provider) {
-      case 'gemini': return new GeminiAdapter();
-      case 'codex': {
-        const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
-        if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
-        return new CodexAppServerAdapter({
-          model: process.env.KYBERION_CODEX_MODEL,
-          modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
-          approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
-        });
-      }
-      case 'claude': return new ClaudeAdapter();
-      default: throw new Error(`Unsupported provider: ${provider}`);
+  public static create(provider: BuiltinAgentProvider): AgentAdapter {
+    const factory = AGENT_ADAPTER_FACTORIES[provider];
+    if (!factory) {
+      throw new Error(`Unsupported provider: ${provider}`);
     }
+    return factory();
   }
 }
+
+type AgentAdapterFactory = () => AgentAdapter;
+
+function createCodexAdapterFromEnv(): AgentAdapter {
+  const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+  if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
+  return new CodexAppServerAdapter({
+    model: process.env.KYBERION_CODEX_MODEL,
+    modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+    approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+  });
+}
+
+const AGENT_ADAPTER_FACTORIES: Record<BuiltinAgentProvider, AgentAdapterFactory> = {
+  gemini: () => new GeminiAdapter(),
+  codex: () => createCodexAdapterFromEnv(),
+  claude: () => new ClaudeAdapter(),
+};
 
 function extractUsageSummary(payload: unknown): Record<string, unknown> | null {
   const queue: unknown[] = [payload];

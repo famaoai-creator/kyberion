@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } from './mission-orchestration-events.js';
@@ -15,8 +16,10 @@ import { a2aBridge } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
 import { buildMissionTeamView, loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
-import { compileUserIntentFlow, formatClarificationPacket } from './intent-contract.js';
+import { compileUserIntentFlow, formatClarificationPacket, type UserIntentFlow } from './intent-contract.js';
 import { logger } from './core.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 import type {
   SurfaceRole,
@@ -72,6 +75,85 @@ export type {
 
 export type { SlackApprovalRequestDraft, SlackApprovalRequestRecord, SlackOutboxMessage } from './channel-surface-types.js';
 
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const SURFACE_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-policy.schema.json');
+
+type SurfaceDelegationReceiver = 'chronos-mirror' | 'nerve-agent';
+
+interface SurfaceRuntimeRouteContext {
+  input: SurfaceConversationInput;
+  compiledFlow: UserIntentFlow | null;
+  computedReceiver?: SurfaceDelegationReceiver;
+  structuredQuery: string;
+  parsedSlackPrompt: ParsedSlackSurfacePrompt | null;
+}
+
+interface SurfaceRuntimeRouteHandler {
+  matches: (context: SurfaceRuntimeRouteContext) => boolean;
+  handle: (context: SurfaceRuntimeRouteContext) => Promise<SurfaceConversationResult>;
+}
+
+interface SurfaceReceiverRule {
+  receiver: SurfaceDelegationReceiver;
+  when: (flow: UserIntentFlow) => boolean;
+}
+
+interface SurfaceRoutingRulesFile {
+  text_routing?: {
+    greeting_patterns?: Array<TextMatchRule | string>;
+    receiver_rules?: Array<{
+      id?: string;
+      receiver?: SurfaceDelegationReceiver;
+      patterns?: Array<TextMatchRule | string>;
+    }>;
+  };
+  compiled_flow_rules?: Array<{
+    id?: string;
+    receiver?: SurfaceDelegationReceiver;
+    execution_shapes?: string[];
+    conversation_agents?: string[];
+    task_types?: string[];
+  }>;
+}
+
+interface SlackIntentRulesFile {
+  version: string;
+  rules?: Array<{
+    id?: string;
+    label?: string;
+    patterns?: Array<TextMatchRule | string>;
+  }>;
+  default_label: string;
+}
+
+interface SlackSurfaceRulesFile {
+  version: string;
+  execution_mode: {
+    feasibility_patterns: Array<TextMatchRule | string>;
+    durable_task_patterns: Array<TextMatchRule | string>;
+  };
+  delegation: {
+    lightweight_patterns: Array<TextMatchRule | string>;
+  };
+}
+
+interface SurfacePolicyFile {
+  version: string;
+  routing: SurfaceRoutingRulesFile;
+  slack: {
+    intent_rules: SlackIntentRulesFile;
+    surface_rules: SlackSurfaceRulesFile;
+  };
+}
+
+let surfacePolicyValidateFn: ValidateFunction | null = null;
+
+function ensureSurfacePolicyValidator(): ValidateFunction {
+  if (surfacePolicyValidateFn) return surfacePolicyValidateFn;
+  surfacePolicyValidateFn = compileSchemaFromPath(ajv, SURFACE_POLICY_SCHEMA_PATH);
+  return surfacePolicyValidateFn;
+}
 
 
 function withSurfaceRole<T>(role: SurfaceRole, fn: () => T): T {
@@ -111,6 +193,30 @@ function emitChronosEvent(stream: string, event: Omit<SurfaceEvent, 'ts' | 'even
     channel: 'chronos',
     ...event,
   });
+}
+
+function loadSurfacePolicy(): SurfacePolicyFile {
+  const value = JSON.parse(
+    safeReadFile(pathResolver.knowledge('public/governance/surface-policy.json'), { encoding: 'utf8' }) as string,
+  ) as SurfacePolicyFile;
+  const validate = ensureSurfacePolicyValidator();
+  if (!validate(value)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid surface policy: ${errors}`);
+  }
+  return value;
+}
+
+function loadSurfaceRoutingRules(): SurfaceRoutingRulesFile {
+  return loadSurfacePolicy().routing;
+}
+
+function loadSlackIntentRules(): SlackIntentRulesFile {
+  return loadSurfacePolicy().slack.intent_rules;
+}
+
+function loadSlackSurfaceRules(): SlackSurfaceRulesFile {
+  return loadSurfacePolicy().slack.surface_rules;
 }
 
 export function prepareSlackSurfaceArtifact(input: SlackSurfaceInput): SlackSurfaceArtifact {
@@ -377,43 +483,60 @@ function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt | null
 export function deriveSlackIntentLabel(text: string): string {
   const normalized = text.trim();
   if (!normalized) return 'general_request';
-  if (/マーケティング|資料|pitch|marketing/i.test(normalized)) return 'request_marketing_material';
-  if (/レビュー|review/i.test(normalized)) return 'request_review';
-  if (/設計|architecture|design/i.test(normalized)) return 'request_design_analysis';
-  if (/デバッグ|bug|error|調査/i.test(normalized)) return 'request_debug_investigation';
-  if (
-    /ミッション|mission|進捗|状況|状態|ステータス|status|進んで|進めて|対応|修正|直した|完了|done|fixed|resolved|deploy|release/i.test(normalized)
-  ) {
-    return 'request_mission_work';
-  }
-  return 'request_deeper_reasoning';
+  const rules = loadSlackIntentRules();
+  const matchedRule = (rules.rules || []).find((rule) => matchesAnyTextRule(normalized, rule.patterns));
+  return matchedRule?.label || rules.default_label || 'request_deeper_reasoning';
 }
 
 export function deriveSurfaceDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
   const normalized = text.trim();
   if (!normalized) return undefined;
 
-  if (/^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$/i.test(normalized)) {
+  const rules = loadSurfaceRoutingRules();
+  if (matchesAnyTextRule(normalized, rules.text_routing?.greeting_patterns)) {
     return undefined;
   }
-
-  if (
-    /ミッション一覧|mission list|current mission|今のミッション|system status|システム状態|runtime status|runtime health|runtime list|ランタイム状況|ランタイム一覧|health check|system health|ヘルスチェック|agent runtime|outbox status|chronos status/i.test(normalized)
-  ) {
-    return 'chronos-mirror';
-  }
-
-  if (
-    /レビュー|review|設計|architecture|design|デバッグ|bug|error|調査|investigate|分析|analysis|評価|evaluate|戦略|strategy|実装|implement|修正|fix|計画|plan|プラン|refactor|監査|audit/i.test(normalized)
-  ) {
-    return 'nerve-agent';
-  }
-
-  return undefined;
+  const matchedRule = (rules.text_routing?.receiver_rules || []).find((rule) =>
+    matchesAnyTextRule(normalized, rule.patterns),
+  );
+  return matchedRule?.receiver;
 }
 
 export function deriveSlackDelegationReceiver(text: string): 'chronos-mirror' | 'nerve-agent' | undefined {
   return deriveSurfaceDelegationReceiver(text);
+}
+
+function normalizeSurfaceDelegationReceiver(value?: string): SurfaceDelegationReceiver | undefined {
+  return value === 'chronos-mirror' || value === 'nerve-agent' ? value : undefined;
+}
+
+function buildSurfaceReceiverRules(): SurfaceReceiverRule[] {
+  const rules = loadSurfaceRoutingRules();
+  return (rules.compiled_flow_rules || [])
+    .filter((rule): rule is NonNullable<SurfaceRoutingRulesFile['compiled_flow_rules']>[number] & { receiver: SurfaceDelegationReceiver } => Boolean(rule?.receiver))
+    .map((rule) => ({
+      receiver: rule.receiver,
+      when: (flow: UserIntentFlow) => {
+        const executionShape = flow.intentContract.resolution.execution_shape;
+        const conversationAgent = flow.workLoop.teaming.conversation_agent;
+        const taskType = flow.workLoop.resolution.task_type;
+        return Boolean(
+          (rule.execution_shapes || []).includes(executionShape) ||
+          (conversationAgent && (rule.conversation_agents || []).includes(conversationAgent)) ||
+          (taskType && (rule.task_types || []).includes(taskType)),
+        );
+      },
+    }));
+}
+
+export function resolveSurfaceConversationReceiver(
+  forcedReceiver?: SurfaceDelegationReceiver,
+  compiledFlow?: UserIntentFlow | null,
+): SurfaceDelegationReceiver | undefined {
+  if (forcedReceiver) return forcedReceiver;
+  if (!compiledFlow) return undefined;
+  const surfaceReceiverRules = buildSurfaceReceiverRules();
+  return surfaceReceiverRules.find((rule) => rule.when(compiledFlow))?.receiver;
 }
 
 function normalizeDelegationPayload(payload: any, fallbackText: string): any {
@@ -594,7 +717,63 @@ async function routeNerveRoutingProposals(
   return results;
 }
 
+async function handleSlackConversationBypass(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+  const delegationResults = await routeSlackForcedDelegation(
+    context.computedReceiver!,
+    context.structuredQuery,
+    context.input.senderAgentId,
+    context.input.missionId,
+  );
+  const successful = delegationResults.filter((result) => !result.error);
+  const firstResponse = successful[0]?.response || '';
+  const parsed = extractSurfaceBlocks(firstResponse);
+  return {
+    text: firstResponse,
+    a2uiMessages: [],
+    a2aMessages: [],
+    delegationResults,
+    approvalRequests: [],
+    routingProposals: [],
+    missionProposals: parsed.missionProposals || [],
+    planningPackets: parsed.planningPackets || [],
+  };
+}
+
+async function handlePresenceForcedBypass(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+  const delegationResults = await routeForcedDelegation(
+    context.computedReceiver!,
+    context.structuredQuery,
+    context.input.senderAgentId,
+    context.input.missionId,
+  );
+  const successful = delegationResults.filter((result) => !result.error);
+  const firstResponse = successful[0]?.response || '';
+  const parsed = extractSurfaceBlocks(firstResponse);
+  return {
+    text: firstResponse,
+    a2uiMessages: [],
+    a2aMessages: [],
+    delegationResults,
+    approvalRequests: [],
+    routingProposals: [],
+    missionProposals: parsed.missionProposals || [],
+    planningPackets: parsed.planningPackets || [],
+  };
+}
+
+const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
+  {
+    matches: (context) => Boolean(context.parsedSlackPrompt && context.parsedSlackPrompt.executionMode === 'conversation' && context.computedReceiver),
+    handle: handleSlackConversationBypass,
+  },
+  {
+    matches: (context) => context.input.agentId === 'presence-surface-agent' && Boolean(context.computedReceiver),
+    handle: handlePresenceForcedBypass,
+  },
+];
+
 export async function runSurfaceConversation(input: SurfaceConversationInput): Promise<SurfaceConversationResult> {
+  const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const compiledFlow = input.forcedReceiver
     ? null
     : await compileUserIntentFlow({
@@ -618,20 +797,9 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     };
   }
 
-  const computedReceiver = !input.forcedReceiver && compiledFlow
-    ? (
-      compiledFlow.intentContract.resolution.execution_shape === 'mission' ||
-      compiledFlow.workLoop.teaming.conversation_agent === 'nerve-agent' ||
-      compiledFlow.workLoop.resolution.task_type === 'analysis' ||
-      compiledFlow.workLoop.resolution.task_type === 'presentation_deck' ||
-      compiledFlow.workLoop.resolution.task_type === 'report_document' ||
-      compiledFlow.workLoop.resolution.task_type === 'workbook_wbs' ||
-      compiledFlow.workLoop.resolution.task_type === 'service_operation' ||
-      compiledFlow.intentContract.resolution.execution_shape === 'project_bootstrap'
-        ? 'nerve-agent'
-        : undefined
-    )
-    : input.forcedReceiver;
+  const computedReceiver = !forcedReceiver && compiledFlow
+    ? resolveSurfaceConversationReceiver(undefined, compiledFlow)
+    : forcedReceiver;
 
   const structuredQuery = compiledFlow
     ? [
@@ -650,44 +818,16 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
       ? parseSlackSurfacePrompt(structuredQuery)
       : null;
 
-  if (parsedSlackPrompt && parsedSlackPrompt.executionMode === 'conversation') {
-    const delegationResults = await routeSlackForcedDelegation(
-      computedReceiver!,
-      structuredQuery,
-      input.senderAgentId,
-      input.missionId,
-    );
-    const successful = delegationResults.filter((result) => !result.error);
-    return {
-      text: successful[0]?.response || '',
-      a2uiMessages: [],
-      a2aMessages: [],
-      delegationResults,
-      approvalRequests: [],
-      routingProposals: [],
-      missionProposals: extractSurfaceBlocks(successful[0]?.response || '').missionProposals || [],
-      planningPackets: extractSurfaceBlocks(successful[0]?.response || '').planningPackets || [],
-    };
-  }
-
-  if (input.agentId === 'presence-surface-agent' && computedReceiver) {
-    const delegationResults = await routeForcedDelegation(
-      computedReceiver,
-      structuredQuery,
-      input.senderAgentId,
-      input.missionId,
-    );
-    const successful = delegationResults.filter((result) => !result.error);
-    return {
-      text: successful[0]?.response || '',
-      a2uiMessages: [],
-      a2aMessages: [],
-      delegationResults,
-      approvalRequests: [],
-      routingProposals: [],
-      missionProposals: extractSurfaceBlocks(successful[0]?.response || '').missionProposals || [],
-      planningPackets: extractSurfaceBlocks(successful[0]?.response || '').planningPackets || [],
-    };
+  const routeContext: SurfaceRuntimeRouteContext = {
+    input,
+    compiledFlow,
+    computedReceiver,
+    structuredQuery,
+    parsedSlackPrompt,
+  };
+  const matchedRouteHandler = SURFACE_RUNTIME_ROUTE_HANDLERS.find((handler) => handler.matches(routeContext));
+  if (matchedRouteHandler) {
+    return matchedRouteHandler.handle(routeContext);
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
@@ -768,27 +908,11 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
 export function deriveSlackExecutionMode(text: string): SlackExecutionMode {
   const normalized = text.trim();
   if (!normalized) return 'conversation';
-
-  const feasibilityPatterns = [
-    /可能[?？。]?$|可能かな|可能ですか|できますか|できる[?？。]?$/i,
-    /お願いしても良い|お願いできますか|どうですか|いけますか/i,
-    /can you|is it possible|would it be possible|could you/i,
-  ];
-
-  if (feasibilityPatterns.some((pattern) => pattern.test(normalized))) {
+  const rules = loadSlackSurfaceRules();
+  if (matchesAnyTextRule(normalized, rules.execution_mode.feasibility_patterns)) {
     return 'conversation';
   }
-
-  const durableTaskPatterns = [
-    /ミッション.*(開始|作成)/i,
-    /mission.*(start|create)/i,
-    /保存して|save (it|this|that)?|write (it|this|that)?/i,
-    /実装して|implement\b/i,
-    /作成して|作って\b|draft it|create it/i,
-    /ファイル.*(作成|保存)/i,
-  ];
-
-  return durableTaskPatterns.some((pattern) => pattern.test(normalized))
+  return matchesAnyTextRule(normalized, rules.execution_mode.durable_task_patterns)
     ? 'task'
     : 'conversation';
 }
@@ -817,19 +941,8 @@ export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
 export function shouldForceSlackDelegation(text: string): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
-
-  const lightweightPatterns = [
-    /^ping[!.?]?$/,
-    /^test[!.?]?$/,
-    /^hello[!.?]?$/,
-    /^hi[!.?]?$/,
-    /^thanks?[!.?]?$/,
-    /^ありがとう[。！!]?$/,
-    /^了解です?[。！!]?$/,
-    /^ok[!.?]?$/,
-  ];
-
-  return !lightweightPatterns.some((pattern) => pattern.test(normalized));
+  const rules = loadSlackSurfaceRules();
+  return !matchesAnyTextRule(normalized, rules.delegation.lightweight_patterns);
 }
 
 export function recordSlackDelivery(

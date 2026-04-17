@@ -13,6 +13,9 @@ import {
 import * as path from "node:path";
 
 type SurfaceKind = "presence" | "chronos";
+type ControlPlaneClient = ReturnType<typeof createControlPlaneClient>;
+type SurfaceActionHandler = (client: ControlPlaneClient, args: string[], json: boolean) => Promise<void>;
+type CatalogActionHandler = (args: string[], json: boolean) => Promise<void>;
 const ARTIFACT_LIBRARY_INDEX_PATH = pathResolver.knowledge("public/design-patterns/media-templates/artifact-library/index.json");
 const ARTIFACT_LIBRARY_DIR = pathResolver.knowledge("public/design-patterns/media-templates/artifact-library");
 const DESIGN_MD_INDEX_PATH = pathResolver.knowledge("public/design-patterns/media-templates/design-md-catalog/index.json");
@@ -243,6 +246,34 @@ function isKnowledgePath(logicalPath: string): boolean {
   return /^knowledge\//.test(String(logicalPath || "").trim());
 }
 
+async function executeSurfaceAction(
+  surface: Exclude<SurfaceKind | "catalog", "catalog">,
+  action: string,
+  args: string[],
+  json: boolean,
+  handlers: Record<string, SurfaceActionHandler>,
+): Promise<void> {
+  const handler = handlers[action];
+  if (!handler) {
+    throw new Error(`Unsupported ${surface} action: ${action}`);
+  }
+  const client = createControlPlaneClient(surface, { timeoutMs: 5000, retryCount: 1 });
+  await handler(client, args, json);
+}
+
+async function executeCatalogAction(
+  action: string,
+  args: string[],
+  json: boolean,
+  handlers: Record<string, CatalogActionHandler>,
+): Promise<void> {
+  const handler = handlers[action];
+  if (!handler) {
+    throw new Error(`Unsupported catalog action: ${action}`);
+  }
+  await handler(args, json);
+}
+
 async function runDoctor(input: { json: boolean; verbose: boolean; fix: boolean; surface?: SurfaceKind }): Promise<void> {
   const checks: DoctorCheckResult[] = [];
   const surfaces: Array<{ surface: SurfaceKind; run: () => Promise<unknown>; baseUrl: string }> = [
@@ -342,42 +373,42 @@ async function runDoctor(input: { json: boolean; verbose: boolean; fix: boolean;
 }
 
 async function handlePresence(action: string, args: string[], json: boolean): Promise<void> {
-  const client = createControlPlaneClient("presence", { timeoutMs: 5000, retryCount: 1 });
-  if (action === "projects") {
-    const items = await client.listProjects();
-    if (json) return printJson(items);
-    return printItems("Projects", items, (item) => [
+  const handlers: Record<string, SurfaceActionHandler> = {
+    projects: async (client, _args, outputJson) => {
+      const items = await client.listProjects();
+      if (outputJson) return printJson(items);
+      return printItems("Projects", items, (item) => [
       `${item.name || item.project_id} [${item.status || "unknown"}]`,
       `id: ${item.project_id || "unknown"}`,
       `tier: ${item.tier || "unknown"} · locale: ${item.primary_locale || "n/a"}`,
       `missions: ${asArray(item.active_missions).length} · bindings: ${asArray(item.service_bindings).length}`,
     ]);
-  }
-  if (action === "bindings") {
-    const body = await client.getJson("/api/service-bindings");
-    if (json) return printJson(body.items || []);
-    return printItems("Service Bindings", asArray(body.items), (item) => [
+    },
+    bindings: async (client, _args, outputJson) => {
+      const body = await client.getJson("/api/service-bindings");
+      if (outputJson) return printJson(body.items || []);
+      return printItems("Service Bindings", asArray(body.items), (item) => [
       `${item.binding_id || "binding"} [${item.service_type || "service"}]`,
       `target: ${item.target || "unknown"}`,
       `scope: ${item.scope || "unknown"}`,
       `actions: ${asArray(item.allowed_actions).join(", ") || "n/a"}`,
     ]);
-  }
-  if (action === "mission-seeds") {
-    const items = await client.listMissionSeeds();
-    if (json) return printJson(items);
-    return printItems("Mission Seeds", items, (item) => [
+    },
+    "mission-seeds": async (client, _args, outputJson) => {
+      const items = await client.listMissionSeeds();
+      if (outputJson) return printJson(items);
+      return printItems("Mission Seeds", items, (item) => [
       `${item.title || item.seed_id} [${item.status || "unknown"}]`,
       `project: ${item.project_id || "standalone"} · specialist: ${item.specialist_id || "unknown"}`,
       `type: ${item.mission_type_hint || "general"} · source: ${item.source_work_id || "-"}`,
       item.promoted_mission_id ? `mission: ${item.promoted_mission_id}` : "mission: -",
     ]);
-  }
-  if (action === "tracks") {
-    const [projectId] = args;
-    const items = filterByProjectId(await client.listProjectTracks(), projectId);
-    if (json) return printJson(items);
-    return printItems("Project Tracks", items, (item) => [
+    },
+    tracks: async (client, currentArgs, outputJson) => {
+      const [projectId] = currentArgs;
+      const items = filterByProjectId(await client.listProjectTracks(), projectId);
+      if (outputJson) return printJson(items);
+      return printItems("Project Tracks", items, (item) => [
       `${item.name || item.track_id} [${item.status || "unknown"}]`,
       `track: ${item.track_id} · project: ${item.project_id || "unknown"}`,
       `type: ${item.track_type || "unknown"} · lifecycle: ${item.lifecycle_model || "unknown"}`,
@@ -388,111 +419,110 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
         ? `next required: ${asArray(item.gate_readiness?.next_required_artifacts).map((entry) => entry.artifact_id || "artifact").join(", ")}`
         : "next required: -",
     ]);
-  }
-  if (action === "approvals") {
-    const items = await client.listApprovals();
-    if (json) return printJson(items);
-    return printItems("Approvals", items, (item) => [
+    },
+    approvals: async (client, _args, outputJson) => {
+      const items = await client.listApprovals();
+      if (outputJson) return printJson(items);
+      return printItems("Approvals", items, (item) => [
       `${item.title || item.id} [${item.status || "pending"}]`,
       `id: ${item.id}`,
       `risk: ${item.risk?.level || item.severity || "unknown"} · requested by: ${item.requestedBy || "system"}`,
       item.expected_outcome ? `expected outcome: ${item.expected_outcome}` : "expected outcome: -",
     ]);
-  }
-  if (action === "approve") {
-    const [requestId, decision] = args;
-    if (!requestId || !["approved", "rejected"].includes(String(decision))) {
-      throw new Error("Usage: control presence approve <requestId> <approved|rejected>");
-    }
-    const body = await client.postJson(`/api/approvals/${encodeURIComponent(requestId)}/decision`, { decision });
-    return printJson(body);
-  }
-  if (action === "outcomes") {
-    const items = await client.listOutcomes();
-    if (json) return printJson(items);
-    return printItems("Latest Outcomes", items, (item) => [
+    },
+    approve: async (client, currentArgs) => {
+      const [requestId, decision] = currentArgs;
+      if (!requestId || !["approved", "rejected"].includes(String(decision))) {
+        throw new Error("Usage: control presence approve <requestId> <approved|rejected>");
+      }
+      const body = await client.postJson(`/api/approvals/${encodeURIComponent(requestId)}/decision`, { decision });
+      return printJson(body);
+    },
+    outcomes: async (client, _args, outputJson) => {
+      const items = await client.listOutcomes();
+      if (outputJson) return printJson(items);
+      return printItems("Latest Outcomes", items, (item) => [
       `${item.preview_text || item.kind || "outcome"} [${item.kind || "artifact"}]`,
       `artifact: ${item.artifact_id || "unknown"} · project: ${item.project_id || "standalone"}`,
       `storage: ${item.storage_class || "unknown"}`,
       asArray(item.promoted_refs).length ? `promoted: ${asArray(item.promoted_refs).join(", ")}` : "promoted: -",
     ]);
-  }
-  if (action === "tasks") {
-    const items = await client.listTaskSessions();
-    if (json) return printJson(items);
-    return printItems("Requested Work", items, (item) => [
+    },
+    tasks: async (client, _args, outputJson) => {
+      const items = await client.listTaskSessions();
+      if (outputJson) return printJson(items);
+      return printItems("Requested Work", items, (item) => [
       `${item.goal?.summary || item.session_id} [${item.status || "unknown"}]`,
       `id: ${item.session_id}`,
       `type: ${item.task_type || "unknown"} · project: ${item.project_context?.project_id || "standalone"}`,
       `result: ${item.artifact?.preview_text || "pending"}`,
     ]);
-  }
-  if (action === "task") {
-    const [sessionId] = args;
-    if (!sessionId) {
-      throw new Error("Usage: control presence task <sessionId>");
-    }
-    const body = await client.getJson(`/api/task-sessions/${encodeURIComponent(sessionId)}`);
-    return printJson(body.item || body);
-  }
-  if (action === "memory") {
-    const [logicalPath] = args;
-    if (!logicalPath) {
-      throw new Error("Usage: control presence memory <knowledge/logical/path.md>");
-    }
-    const text = await client.getText(`/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`);
-    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
-    return;
-  }
-  if (action === "ref") {
-    const [logicalPath] = args;
-    if (!logicalPath) {
-      throw new Error("Usage: control presence ref <knowledge/...|active/projects/...>");
-    }
-    const pathname = isKnowledgePath(logicalPath)
-      ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
-      : `/api/runtime-ref?path=${encodeURIComponent(logicalPath)}`;
-    const text = await client.getText(pathname);
-    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
-    return;
-  }
-  throw new Error(`Unsupported presence action: ${action}`);
+    },
+    task: async (client, currentArgs) => {
+      const [sessionId] = currentArgs;
+      if (!sessionId) {
+        throw new Error("Usage: control presence task <sessionId>");
+      }
+      const body = await client.getJson(`/api/task-sessions/${encodeURIComponent(sessionId)}`);
+      return printJson(body.item || body);
+    },
+    memory: async (client, currentArgs) => {
+      const [logicalPath] = currentArgs;
+      if (!logicalPath) {
+        throw new Error("Usage: control presence memory <knowledge/logical/path.md>");
+      }
+      const text = await client.getText(`/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`);
+      process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    },
+    ref: async (client, currentArgs) => {
+      const [logicalPath] = currentArgs;
+      if (!logicalPath) {
+        throw new Error("Usage: control presence ref <knowledge/...|active/projects/...>");
+      }
+      const pathname = isKnowledgePath(logicalPath)
+        ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
+        : `/api/runtime-ref?path=${encodeURIComponent(logicalPath)}`;
+      const text = await client.getText(pathname);
+      process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    },
+  };
+
+  await executeSurfaceAction("presence", action, args, json, handlers);
 }
 
 async function handleChronos(action: string, args: string[], json: boolean): Promise<void> {
-  const client = createControlPlaneClient("chronos", { timeoutMs: 5000, retryCount: 1 });
-  if (action === "overview") {
-    const body = await client.getChronosOverview();
-    if (json) return printJson(body);
-    process.stdout.write(`Chronos overview\n`);
-    process.stdout.write(`- access: ${body.accessRole}\n`);
-    process.stdout.write(`- projects: ${asArray(body.projects).length}\n`);
-    process.stdout.write(`- mission seeds: ${asArray(body.missionSeeds).length}\n`);
-    process.stdout.write(`- approvals: ${asArray(body.pendingApprovals).length}\n`);
-    process.stdout.write(`- distill candidates: ${asArray(body.distillCandidates).length}\n`);
-    return;
-  }
-  if (action === "approvals") {
-    const items = await client.listApprovals();
-    if (json) return printJson(items);
-    return printItems("Chronos Approvals", items, (item) => [
+  const handlers: Record<string, SurfaceActionHandler> = {
+    overview: async (client, _args, outputJson) => {
+      const body = await client.getChronosOverview();
+      if (outputJson) return printJson(body);
+      process.stdout.write(`Chronos overview\n`);
+      process.stdout.write(`- access: ${body.accessRole}\n`);
+      process.stdout.write(`- projects: ${asArray(body.projects).length}\n`);
+      process.stdout.write(`- mission seeds: ${asArray(body.missionSeeds).length}\n`);
+      process.stdout.write(`- approvals: ${asArray(body.pendingApprovals).length}\n`);
+      process.stdout.write(`- distill candidates: ${asArray(body.distillCandidates).length}\n`);
+    },
+    approvals: async (client, _args, outputJson) => {
+      const items = await client.listApprovals();
+      if (outputJson) return printJson(items);
+      return printItems("Chronos Approvals", items, (item) => [
       `${item.title || item.id} [${item.riskLevel || "unknown"}]`,
       `id: ${item.id} · channel: ${item.channel || "unknown"} · storage: ${item.storageChannel || "unknown"}`,
       `mission: ${item.missionId || "-"} · service: ${item.serviceId || "-"}`,
     ]);
-  }
-  if (action === "approve") {
-    const [requestId, storageChannel, channel, decision] = args;
-    if (!requestId || !storageChannel || !channel || !["approved", "rejected"].includes(String(decision))) {
-      throw new Error("Usage: control chronos approve <requestId> <storageChannel> <channel> <approved|rejected>");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "approval_decision", requestId, storageChannel, channel, decision });
-    return printJson(body);
-  }
-  if (action === "mission-seeds") {
-    const items = await client.listMissionSeeds();
-    if (json) return printJson(items);
-    return printItems("Mission Seeds", items, (item) => [
+    },
+    approve: async (client, currentArgs) => {
+      const [requestId, storageChannel, channel, decision] = currentArgs;
+      if (!requestId || !storageChannel || !channel || !["approved", "rejected"].includes(String(decision))) {
+        throw new Error("Usage: control chronos approve <requestId> <storageChannel> <channel> <approved|rejected>");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "approval_decision", requestId, storageChannel, channel, decision });
+      return printJson(body);
+    },
+    "mission-seeds": async (client, _args, outputJson) => {
+      const items = await client.listMissionSeeds();
+      if (outputJson) return printJson(items);
+      return printItems("Mission Seeds", items, (item) => [
       `${item.title || item.seed_id} [${item.status || "unknown"}]`,
       `seed: ${item.seed_id} · project: ${item.project_id || "standalone"} · track: ${item.track_name || item.track_id || "-"}`,
       `specialist: ${item.specialist_id || "unknown"} · type: ${item.mission_type_hint || "general"}`,
@@ -503,12 +533,12 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
         ? `execution: ${String((item.metadata.execution_contract as any).recommended_action || "-")} -> ${String((item.metadata.execution_contract as any).review_target || (item.metadata.execution_contract as any).repository_id || "-")}`
         : "execution: -",
     ]);
-  }
-  if (action === "tracks") {
-    const [projectId] = args;
-    const items = filterByProjectId(await client.listProjectTracks(), projectId);
-    if (json) return printJson(items);
-    return printItems("Chronos Tracks", items, (item) => [
+    },
+    tracks: async (client, currentArgs, outputJson) => {
+      const [projectId] = currentArgs;
+      const items = filterByProjectId(await client.listProjectTracks(), projectId);
+      if (outputJson) return printJson(items);
+      return printItems("Chronos Tracks", items, (item) => [
       `${item.name || item.track_id} [${item.status || "unknown"}]`,
       `track: ${item.track_id} · project: ${item.project_id || "unknown"}`,
       `type: ${item.track_type || "unknown"} · lifecycle: ${item.lifecycle_model || "unknown"}`,
@@ -523,160 +553,164 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           }).join(", ")}`
         : "next required: -",
     ]);
-  }
-  if (action === "seed-track") {
-    const [trackId, artifactId] = args;
-    if (!trackId) {
-      throw new Error("Usage: control chronos seed-track <trackId> [artifactId]");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "create_track_seed", trackId, artifactId });
-    return printJson(body);
-  }
-  if (action === "promote-seed") {
-    const [seedId] = args;
-    if (!seedId) {
-      throw new Error("Usage: control chronos promote-seed <seedId>");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "promote_mission_seed", seedId });
-    return printJson(body);
-  }
-  if (action === "distill-candidates") {
-    const body = await client.getJson("/api/intelligence");
-    const items = asArray(body.distillCandidates);
-    if (json) return printJson(items);
-    return printItems("Distill Candidates", items, (item) => [
+    },
+    "seed-track": async (client, currentArgs) => {
+      const [trackId, artifactId] = currentArgs;
+      if (!trackId) {
+        throw new Error("Usage: control chronos seed-track <trackId> [artifactId]");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "create_track_seed", trackId, artifactId });
+      return printJson(body);
+    },
+    "promote-seed": async (client, currentArgs) => {
+      const [seedId] = currentArgs;
+      if (!seedId) {
+        throw new Error("Usage: control chronos promote-seed <seedId>");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "promote_mission_seed", seedId });
+      return printJson(body);
+    },
+    "distill-candidates": async (client, _args, outputJson) => {
+      const body = await client.getJson("/api/intelligence");
+      const items = asArray(body.distillCandidates);
+      if (outputJson) return printJson(items);
+      return printItems("Distill Candidates", items, (item) => [
       `${item.title || item.candidate_id} [${item.status || "proposed"}]`,
       `candidate: ${item.candidate_id} · kind: ${item.target_kind || "unknown"} · tier: ${item.tier || "unknown"}`,
       `project: ${item.project_id || "standalone"} · mission: ${item.mission_id || "-"} · task: ${item.task_session_id || "-"}`,
       item.promoted_ref ? `promoted: ${item.promoted_ref}` : "promoted: -",
     ]);
-  }
-  if (action === "distill") {
-    const [candidateId, decision] = args;
-    if (!candidateId || !["promote", "archive"].includes(String(decision))) {
-      throw new Error("Usage: control chronos distill <candidateId> <promote|archive>");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "distill_candidate_decision", candidateId, decision });
-    return printJson(body);
-  }
-  if (action === "mission-control") {
-    const [missionId, operation] = args;
-    if (!missionId || !operation) {
-      throw new Error("Usage: control chronos mission-control <missionId> <resume|refresh_team|prewarm_team|staff_team|finish>");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "mission_control", missionId, operation });
-    return printJson(body);
-  }
-  if (action === "surface-control") {
-    const [operation, surfaceId] = args;
-    if (!operation) {
-      throw new Error("Usage: control chronos surface-control <reconcile|status|start|stop> [surfaceId]");
-    }
-    const body = await client.postJson("/api/intelligence", { action: "surface_control", operation, surfaceId });
-    return printJson(body);
-  }
-  if (action === "ref") {
-    const [logicalPath] = args;
-    if (!logicalPath) {
-      throw new Error("Usage: control chronos ref <knowledge/...|active/projects/...>");
-    }
-    const pathname = isKnowledgePath(logicalPath)
-      ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
-      : `/api/runtime-file?path=${encodeURIComponent(logicalPath)}`;
-    const text = await client.getText(pathname);
-    process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
-    return;
-  }
-  throw new Error(`Unsupported chronos action: ${action}`);
+    },
+    distill: async (client, currentArgs) => {
+      const [candidateId, decision] = currentArgs;
+      if (!candidateId || !["promote", "archive"].includes(String(decision))) {
+        throw new Error("Usage: control chronos distill <candidateId> <promote|archive>");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "distill_candidate_decision", candidateId, decision });
+      return printJson(body);
+    },
+    "mission-control": async (client, currentArgs) => {
+      const [missionId, operation] = currentArgs;
+      if (!missionId || !operation) {
+        throw new Error("Usage: control chronos mission-control <missionId> <resume|refresh_team|prewarm_team|staff_team|finish>");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "mission_control", missionId, operation });
+      return printJson(body);
+    },
+    "surface-control": async (client, currentArgs) => {
+      const [operation, surfaceId] = currentArgs;
+      if (!operation) {
+        throw new Error("Usage: control chronos surface-control <reconcile|status|start|stop> [surfaceId]");
+      }
+      const body = await client.postJson("/api/intelligence", { action: "surface_control", operation, surfaceId });
+      return printJson(body);
+    },
+    ref: async (client, currentArgs) => {
+      const [logicalPath] = currentArgs;
+      if (!logicalPath) {
+        throw new Error("Usage: control chronos ref <knowledge/...|active/projects/...>");
+      }
+      const pathname = isKnowledgePath(logicalPath)
+        ? `/api/knowledge-ref?path=${encodeURIComponent(logicalPath)}`
+        : `/api/runtime-file?path=${encodeURIComponent(logicalPath)}`;
+      const text = await client.getText(pathname);
+      process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    },
+  };
+
+  await executeSurfaceAction("chronos", action, args, json, handlers);
 }
 
 async function handleCatalog(action: string, args: string[], json: boolean): Promise<void> {
-  if (action === "intents") {
-    const [query] = args;
-    const normalized = normalizeCatalogQuery(query);
-    const items = loadIntentOutcomePatterns().filter((item) => {
-      if (!normalized) return true;
-      const haystack = [
-        item.intent_id,
-        ...(item.primary_outcome_ids || []),
-        ...(item.contract_layers || []),
-      ].map(normalizeCatalogQuery).join(" ");
-      return haystack.includes(normalized);
-    });
-    if (json) return printJson(items);
-    return printItems("Intent Outcome Patterns", items, (item) => [
+  const handlers: Record<string, CatalogActionHandler> = {
+    intents: async (currentArgs, outputJson) => {
+      const [query] = currentArgs;
+      const normalized = normalizeCatalogQuery(query);
+      const items = loadIntentOutcomePatterns().filter((item) => {
+        if (!normalized) return true;
+        const haystack = [
+          item.intent_id,
+          ...(item.primary_outcome_ids || []),
+          ...(item.contract_layers || []),
+        ].map(normalizeCatalogQuery).join(" ");
+        return haystack.includes(normalized);
+      });
+      if (outputJson) return printJson(items);
+      return printItems("Intent Outcome Patterns", items, (item) => [
       `${item.intent_id}`,
       `outcomes: ${(item.primary_outcome_ids || []).join(", ") || "-"}`,
       `flow: ${(item.canonical_flow || []).slice(0, 3).join(" -> ") || "-"}`,
     ]);
-  }
-  if (action === "intent") {
-    const [intentId] = args;
-    if (!intentId) {
-      throw new Error("Usage: control catalog intent <intentId>");
-    }
-    const item = findIntentOutcomePattern(intentId);
-    if (!item) {
-      throw new Error(`Unknown intent-outcome pattern: ${intentId}`);
-    }
-    return printJson(item);
-  }
-  if (action === "profiles") {
-    const [query] = args;
-    const items = searchArtifactLibraryProfiles(query);
-    if (json) return printJson(items);
-    return printItems("Artifact Library Profiles", items, (item) => [
+    },
+    intent: async (currentArgs) => {
+      const [intentId] = currentArgs;
+      if (!intentId) {
+        throw new Error("Usage: control catalog intent <intentId>");
+      }
+      const item = findIntentOutcomePattern(intentId);
+      if (!item) {
+        throw new Error(`Unknown intent-outcome pattern: ${intentId}`);
+      }
+      return printJson(item);
+    },
+    profiles: async (currentArgs, outputJson) => {
+      const [query] = currentArgs;
+      const items = searchArtifactLibraryProfiles(query);
+      if (outputJson) return printJson(items);
+      return printItems("Artifact Library Profiles", items, (item) => [
       `${item.profile_id} [${item.domain || "unknown"}]`,
       `pack: ${item.file || "-"}`,
     ]);
-  }
-  if (action === "profile") {
-    const [profileId] = args;
-    if (!profileId) {
-      throw new Error("Usage: control catalog profile <profileId>");
-    }
-    const item = resolveArtifactLibraryProfile(profileId);
-    if (!item) {
-      throw new Error(`Unknown artifact-library profile: ${profileId}`);
-    }
-    return printJson(item);
-  }
-  if (action === "design-systems") {
-    const [query] = args;
-    const items = searchImportedDesignSystems(query);
-    if (json) return printJson(items);
-    return printItems("Imported Design Systems", items, (item) => [
+    },
+    profile: async (currentArgs) => {
+      const [profileId] = currentArgs;
+      if (!profileId) {
+        throw new Error("Usage: control catalog profile <profileId>");
+      }
+      const item = resolveArtifactLibraryProfile(profileId);
+      if (!item) {
+        throw new Error(`Unknown artifact-library profile: ${profileId}`);
+      }
+      return printJson(item);
+    },
+    "design-systems": async (currentArgs, outputJson) => {
+      const [query] = currentArgs;
+      const items = searchImportedDesignSystems(query);
+      if (outputJson) return printJson(items);
+      return printItems("Imported Design Systems", items, (item) => [
       `${item.design_system_id} [${item.category || "unknown"}]`,
       `theme: ${item.theme_id || "-"}`,
       `source: ${item.source_path || "-"}`,
     ]);
-  }
-  if (action === "design-system") {
-    const [designSystemId] = args;
-    if (!designSystemId) {
-      throw new Error("Usage: control catalog design-system <designSystemId>");
-    }
-    const item = resolveImportedDesignSystem(designSystemId);
-    if (!item) {
-      throw new Error(`Unknown imported design system: ${designSystemId}`);
-    }
-    return printJson(item);
-  }
-  if (action === "design-recommend") {
-    const query = args.join(" ");
-    if (!query.trim()) {
-      throw new Error("Usage: control catalog design-recommend <query>");
-    }
-    const items = recommendImportedDesignSystems(query);
-    if (json) return printJson(items);
-    return printItems("Recommended Imported Design Systems", items, (item) => [
+    },
+    "design-system": async (currentArgs) => {
+      const [designSystemId] = currentArgs;
+      if (!designSystemId) {
+        throw new Error("Usage: control catalog design-system <designSystemId>");
+      }
+      const item = resolveImportedDesignSystem(designSystemId);
+      if (!item) {
+        throw new Error(`Unknown imported design system: ${designSystemId}`);
+      }
+      return printJson(item);
+    },
+    "design-recommend": async (currentArgs, outputJson) => {
+      const query = currentArgs.join(" ");
+      if (!query.trim()) {
+        throw new Error("Usage: control catalog design-recommend <query>");
+      }
+      const items = recommendImportedDesignSystems(query);
+      if (outputJson) return printJson(items);
+      return printItems("Recommended Imported Design Systems", items, (item) => [
       `${item.design_system_id} [score=${item.recommendation_score}]`,
       `theme: ${item.theme_id || "-"}`,
       item.category ? `category: ${item.category}` : "",
       item.description ? `description: ${item.description}` : "",
     ].filter(Boolean));
-  }
-  throw new Error(`Unsupported catalog action: ${action}`);
+    },
+  };
+
+  await executeCatalogAction(action, args, json, handlers);
 }
 
 function printHelp(): void {

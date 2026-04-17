@@ -162,4 +162,17 @@ describe('work-design', () => {
     expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('compile_experiment_contract');
     expect(summary.teaming.specialist_id).toBe('harness-engineer');
   });
+
+  it('applies project bootstrap checklist and label through rule tables', () => {
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'bootstrap-project',
+      shape: 'project_bootstrap',
+      tier: 'confidential',
+    });
+
+    expect(summary.intent.label).toBe('Project bootstrap');
+    expect(summary.resolution.execution_shape).toBe('project_bootstrap');
+    expect(summary.process_design.operator_checklist).toContain('confirm project root and default track');
+    expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
+  });
 });
