@@ -1,5 +1,5 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
 
 async function main() {
   const strategy = `
@@ -20,13 +20,13 @@ async function main() {
 - 100% audit trail for all AI-driven decisions.
   `;
 
-  const outputDir = '/Users/famaoai/k/d/kyberion/active/missions/STRATEGY-PILOT-01/evidence/';
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+  const outputDir = pathResolver.missionEvidenceDir('STRATEGY-PILOT-01') || pathResolver.active('missions/STRATEGY-PILOT-01/evidence');
+  if (!safeExistsSync(outputDir)) {
+    safeMkdir(outputDir, { recursive: true });
   }
-  
+
   const outputPath = path.join(outputDir, 'gtm_strategy.md');
-  fs.writeFileSync(outputPath, strategy.trim());
+  safeWriteFile(outputPath, strategy.trim());
   console.log(`✅ Strategy successfully distilled and saved to: ${outputPath}`);
 }
 
