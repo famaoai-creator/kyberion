@@ -1,6 +1,5 @@
-import { generateNativePptx, pathResolver } from '@agent/core';
+import { generateNativePptx, pathResolver, safeExistsSync, safeMkdir } from '@agent/core';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '../libs/core/src/types/pptx-protocol.js';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 type SlideSpec = {
@@ -227,7 +226,10 @@ function buildProtocol(): PptxDesignProtocol {
 async function main() {
   const protocol = buildProtocol();
   const outputPath = pathResolver.sharedTmp('media/accounting-nfr-aws-deck.pptx');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const outputDir = path.dirname(outputPath);
+  if (!safeExistsSync(outputDir)) {
+    safeMkdir(outputDir, { recursive: true });
+  }
   await generateNativePptx(protocol, outputPath);
   console.log(JSON.stringify({
     outputPath,
