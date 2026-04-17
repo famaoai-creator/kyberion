@@ -378,6 +378,12 @@ function inferExecutionShape(input: {
   taskType?: string;
   shape?: string;
 }): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
+  if (input.shape) {
+    if (input.shape === 'project_bootstrap' || input.shape === 'mission' || input.shape === 'task_session') {
+      return input.shape;
+    }
+    return 'direct_reply';
+  }
   const intentDefinition = findIntentDefinition(input.intentId);
   const catalogShape = intentDefinition?.resolution?.shape;
   const rules = loadWorkDesignRules();
