@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerAdapter } from './agent-adapter.js';
+import { AgentFactory, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
 
 describe('CodexAppServerAdapter', () => {
   afterEach(() => {
@@ -47,5 +47,22 @@ describe('CodexAppServerAdapter', () => {
       }),
       expect.any(Number)
     );
+  });
+
+  it('creates provider adapters through the registry-based factory', () => {
+    const codexMode = process.env.KYBERION_CODEX_MODE;
+    process.env.KYBERION_CODEX_MODE = 'exec';
+
+    try {
+      expect(AgentFactory.create('gemini').constructor.name).toBe('GeminiAdapter');
+      expect(AgentFactory.create('codex')).toBeInstanceOf(CodexAdapter);
+      expect(AgentFactory.create('claude')).toBeInstanceOf(ClaudeAdapter);
+    } finally {
+      if (codexMode === undefined) {
+        delete process.env.KYBERION_CODEX_MODE;
+      } else {
+        process.env.KYBERION_CODEX_MODE = codexMode;
+      }
+    }
   });
 });

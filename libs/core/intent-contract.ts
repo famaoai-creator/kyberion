@@ -6,6 +6,8 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
+import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -13,6 +15,8 @@ const ajv = new Ajv({ allErrors: true });
 
 const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-contract.schema.json');
 const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge('public/schemas/organization-work-loop.schema.json');
+const INTENT_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-policy.schema.json');
+const INTENT_POLICY_PATH = pathResolver.knowledge('public/governance/intent-policy.json');
 
 type ExecutionShape = 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
@@ -75,6 +79,31 @@ interface ValidationResult<T> {
   value?: T;
 }
 
+interface DeliveryModeRuleContext {
+  text: string;
+  shape: ExecutionShape;
+  requiredInputs: string[];
+}
+
+interface DeliveryModeDecisionRule {
+  mode: IntentDeliveryMode;
+  shapes?: ExecutionShape[];
+  text_patterns?: Array<TextMatchRule | string>;
+  min_required_inputs?: number;
+}
+
+interface IntentPolicyFile {
+  version: string;
+  delivery: {
+    rules: DeliveryModeDecisionRule[];
+  };
+  compiler: {
+    relevant_intent_limit: number;
+    intent_contract_rules: string[];
+    work_loop_rules: string[];
+  };
+}
+
 interface LlmCompileOptions {
   askFn?: (prompt: string) => Promise<string>;
   provider?: IntentCompilerProvider;
@@ -90,6 +119,7 @@ export interface IntentCompilerTarget {
 
 let intentContractValidateFn: ValidateFunction | null = null;
 let workLoopValidateFn: ValidateFunction | null = null;
+let intentPolicyValidateFn: ValidateFunction | null = null;
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
@@ -101,6 +131,12 @@ function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
   workLoopValidateFn = compileSchemaFromPath(ajv, WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
+}
+
+function ensureIntentPolicyValidator(): ValidateFunction {
+  if (intentPolicyValidateFn) return intentPolicyValidateFn;
+  intentPolicyValidateFn = compileSchemaFromPath(ajv, INTENT_POLICY_SCHEMA_PATH);
+  return intentPolicyValidateFn;
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
@@ -144,47 +180,15 @@ function parseJsonObject<T>(text: string): T | null {
   }
 }
 
-function loadStandardIntents(): Array<{
-  id?: string;
-  description?: string;
-  trigger_keywords?: string[];
-  outcome_ids?: string[];
-  specialist_id?: string;
-  resolution?: { shape?: string; task_kind?: string; result_shape?: string };
-  intake_requirements?: string[];
-  plan_outline?: string[];
-}> {
-  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
-    intents?: Array<{
-      id?: string;
-      description?: string;
-      trigger_keywords?: string[];
-      outcome_ids?: string[];
-      specialist_id?: string;
-      resolution?: { shape?: string; task_kind?: string; result_shape?: string };
-      intake_requirements?: string[];
-      plan_outline?: string[];
-    }>;
-  };
-  return Array.isArray(parsed.intents) ? parsed.intents : [];
-}
-
 function summarizeRelevantIntents(text: string): string {
-  const tokens = text.toLowerCase().split(/\s+/).filter(Boolean);
-  const intents = loadStandardIntents();
-  const scored = intents
-    .map((intent) => {
-      const keywords = Array.isArray(intent.trigger_keywords) ? intent.trigger_keywords : [];
-      const score = keywords.reduce((acc, keyword) => {
-        return acc + (tokens.some((token) => String(keyword).toLowerCase().includes(token) || token.includes(String(keyword).toLowerCase())) ? 1 : 0);
-      }, 0);
-      return { intent, score };
-    })
-    .filter((entry) => entry.score > 0)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 6)
-    .map(({ intent }) => ({
+  const policy = loadIntentPolicy();
+  const intents = loadStandardIntentCatalog();
+  const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
+  const scored = resolveIntentResolutionPacket(text).candidates
+    .slice(0, policy.compiler.relevant_intent_limit)
+    .map((candidate) => catalogById.get(candidate.intent_id))
+    .filter((intent): intent is NonNullable<typeof intent> => Boolean(intent))
+    .map((intent) => ({
       id: intent.id,
       description: intent.description,
       resolution: intent.resolution,
@@ -203,15 +207,26 @@ function normalizeShape(shape?: string): ExecutionShape {
   return 'task_session';
 }
 
-function inferDeliveryMode(text: string, shape: ExecutionShape, requiredInputs: string[]): IntentDeliveryMode {
-  if (shape === 'project_bootstrap' || shape === 'mission') return 'managed_program';
-  if (/(継続|長期|運行管理|運用管理|project|プロジェクト|program|プログラム|track|トラック|ロードマップ|継続改善)/i.test(text)) {
-    return 'managed_program';
+function loadIntentPolicy(): IntentPolicyFile {
+  const value = JSON.parse(safeReadFile(INTENT_POLICY_PATH, { encoding: 'utf8' }) as string) as IntentPolicyFile;
+  const validate = ensureIntentPolicyValidator();
+  if (!validate(value)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid intent-policy: ${errors}`);
   }
-  if (requiredInputs.length >= 3 && /(定義書|基本設計|詳細設計|方針|計画)/i.test(text)) {
-    return 'managed_program';
-  }
-  return 'one_shot';
+  return value;
+}
+
+function deliveryRuleMatches(context: DeliveryModeRuleContext, rule: DeliveryModeDecisionRule): boolean {
+  const shapeMatch = !rule.shapes?.length || rule.shapes.includes(context.shape);
+  const minRequiredInputsMatch = rule.min_required_inputs === undefined || context.requiredInputs.length >= rule.min_required_inputs;
+  const textMatch = !rule.text_patterns?.length || matchesAnyTextRule(context.text, rule.text_patterns);
+  return shapeMatch && minRequiredInputsMatch && textMatch;
+}
+
+export function inferGovernedDeliveryMode(text: string, shape: ExecutionShape, requiredInputs: string[]): IntentDeliveryMode {
+  const context: DeliveryModeRuleContext = { text, shape, requiredInputs };
+  return loadIntentPolicy().delivery.rules.find((rule) => deliveryRuleMatches(context, rule))?.mode || 'one_shot';
 }
 
 function buildFallbackIntentContract(input: CompileUserIntentFlowInput): IntentContract {
@@ -232,7 +247,7 @@ function buildFallbackIntentContract(input: CompileUserIntentFlowInput): IntentC
       approval: {
         requires_approval: Boolean(classified.payload?.approval_required),
       },
-      delivery_mode: shape === 'project_bootstrap' ? 'managed_program' : inferDeliveryMode(input.text, normalizeShape(shape), classified.requirements?.missing || []),
+      delivery_mode: shape === 'project_bootstrap' ? 'managed_program' : inferGovernedDeliveryMode(input.text, normalizeShape(shape), classified.requirements?.missing || []),
       clarification_needed: Boolean(classified.requirements?.missing?.length),
       confidence: 0.55,
       why: 'Fallback classifier mapped the request to the nearest governed task session contract.',
@@ -255,7 +270,7 @@ function buildFallbackIntentContract(input: CompileUserIntentFlowInput): IntentC
     approval: {
       requires_approval: false,
     },
-    delivery_mode: inferDeliveryMode(input.text, 'direct_reply', ['goal_or_target']),
+    delivery_mode: inferGovernedDeliveryMode(input.text, 'direct_reply', ['goal_or_target']),
     clarification_needed: true,
     confidence: 0.25,
     why: 'Fallback could not derive a safe execution contract from the current request.',
@@ -263,19 +278,14 @@ function buildFallbackIntentContract(input: CompileUserIntentFlowInput): IntentC
 }
 
 function buildIntentContractPrompt(input: CompileUserIntentFlowInput): string {
+  const policy = loadIntentPolicy();
   return [
     'You are the Kyberion Intent Contract Compiler.',
     'Convert the user request into a governed JSON contract.',
     'Return JSON only. No markdown. No prose.',
     '',
     'Rules:',
-    '- Choose execution_shape from: direct_reply, task_session, mission, project_bootstrap.',
-    '- Use task_session for browser or document work instead of inventing new shapes.',
-    '- Choose delivery_mode=managed_program when the request implies long-running operation, recurring revisions, project/track/mission management, or multiple staged outcomes.',
-    '- Choose delivery_mode=one_shot when a direct deliverable can be produced without durable project governance.',
-    '- Set clarification_needed=true when required_inputs is non-empty.',
-    '- Keep outcome_ids aligned to governed catalog when possible.',
-    '- Do not invent low-level actuator steps.',
+    ...policy.compiler.intent_contract_rules.map((rule) => `- ${rule}`),
     '',
     'Output schema:',
     JSON.stringify({
@@ -312,16 +322,14 @@ function buildIntentContractPrompt(input: CompileUserIntentFlowInput): string {
 }
 
 function buildWorkLoopPrompt(input: CompileUserIntentFlowInput, contract: IntentContract): string {
+  const policy = loadIntentPolicy();
   return [
     'You are the Kyberion Work Loop Compiler.',
     'Produce a governed Organization Work Loop Summary JSON.',
     'Return JSON only. No markdown. No prose.',
     '',
     'Rules:',
-    '- Preserve the intent contract execution shape.',
-    '- Use the contract required_inputs as intake requirements when they are still needed.',
-    '- Do not invent unauthorized execution capabilities.',
-    '- Keep team_roles and specialist routing aligned to governed intent metadata when possible.',
+    ...policy.compiler.work_loop_rules.map((rule) => `- ${rule}`),
     '',
     'Intent contract:',
     JSON.stringify(contract, null, 2),
@@ -506,15 +514,49 @@ export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDe
   const managedProgram = contract.delivery_mode === 'managed_program';
   const askHumanToConfirm = managedProgram && contract.resolution.execution_shape === 'task_session' && !contract.clarification_needed;
 
+  const decisionRules: Array<{
+    when: () => boolean;
+    rationale: string;
+    decision: Omit<IntentDeliveryDecision, 'mode' | 'rationale'>;
+  }> = [
+    {
+      when: () => askHumanToConfirm,
+      rationale: 'The request implies durable program management, but the current execution shape still needs a human confirmation before bootstrap.',
+      decision: {
+        shouldBootstrapProject: true,
+        shouldStartMission: true,
+        shouldDeliverDirectOutcome: false,
+        askHumanToConfirm: true,
+      },
+    },
+    {
+      when: () => managedProgram,
+      rationale: 'The request appears to require durable governance across revisions, work items, or staged outcomes.',
+      decision: {
+        shouldBootstrapProject: contract.resolution.execution_shape === 'project_bootstrap',
+        shouldStartMission: true,
+        shouldDeliverDirectOutcome: false,
+        askHumanToConfirm: false,
+      },
+    },
+    {
+      when: () => true,
+      rationale: 'The request appears satisfiable as a single direct outcome without durable project scaffolding.',
+      decision: {
+        shouldBootstrapProject: false,
+        shouldStartMission: false,
+        shouldDeliverDirectOutcome: !durableShape,
+        askHumanToConfirm: false,
+      },
+    },
+  ];
+
+  const matchedRule = decisionRules.find((rule) => rule.when())!;
+
   return {
     mode: contract.delivery_mode,
-    shouldBootstrapProject: contract.resolution.execution_shape === 'project_bootstrap' || askHumanToConfirm,
-    shouldStartMission: contract.resolution.execution_shape === 'mission' || managedProgram,
-    shouldDeliverDirectOutcome: contract.delivery_mode === 'one_shot' && !durableShape,
-    askHumanToConfirm,
-    rationale: managedProgram
-      ? 'The request appears to require durable governance across revisions, work items, or staged outcomes.'
-      : 'The request appears satisfiable as a single direct outcome without durable project scaffolding.',
+    ...matchedRule.decision,
+    rationale: matchedRule.rationale,
   };
 }
 
