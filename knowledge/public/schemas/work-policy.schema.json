@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "work-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "specialist_routing": { "$ref": "#/$defs/specialistRouting" },
+    "profile_routing": { "$ref": "#/$defs/profileRouting" },
+    "design_rules": { "$ref": "#/$defs/designRules" }
+  },
+  "required": ["version", "specialist_routing", "profile_routing", "design_rules"],
+  "$defs": {
+    "routingMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "intent_ids": { "type": "array", "items": { "type": "string" } },
+        "task_types": { "type": "array", "items": { "type": "string" } },
+        "query_types": { "type": "array", "items": { "type": "string" } },
+        "shapes": { "type": "array", "items": { "type": "string" } },
+        "catalog_shapes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "specialistRouting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "match": { "$ref": "#/$defs/routingMatch" },
+              "specialist_id": { "type": "string" }
+            },
+            "required": ["match", "specialist_id"]
+          }
+        },
+        "fallback_specialist_id": { "type": "string" }
+      },
+      "required": ["rules", "fallback_specialist_id"]
+    },
+    "profileRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "match": { "$ref": "#/$defs/routingMatch" },
+        "profile_id": { "type": "string" }
+      },
+      "required": ["match", "profile_id"]
+    },
+    "profileRouting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "execution_boundary_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/profileRule" }
+        },
+        "runtime_design_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/profileRule" }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "execution_boundary_profile_id": { "type": "string" },
+            "runtime_design_profile_id": { "type": "string" }
+          },
+          "required": ["execution_boundary_profile_id", "runtime_design_profile_id"]
+        }
+      },
+      "required": ["defaults"]
+    },
+    "checklistRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "match": { "$ref": "#/$defs/routingMatch" },
+        "items": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["match", "items"]
+    },
+    "executionShapeRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "match": { "$ref": "#/$defs/routingMatch" },
+        "shape": {
+          "type": "string",
+          "enum": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+        }
+      },
+      "required": ["match", "shape"]
+    },
+    "intentLabelRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "match": { "$ref": "#/$defs/routingMatch" },
+        "label": { "type": "string" },
+        "label_from": {
+          "type": "string",
+          "enum": ["intentId", "taskType", "queryType"]
+        }
+      },
+      "required": ["match"],
+      "oneOf": [
+        { "required": ["label"] },
+        { "required": ["label_from"] }
+      ]
+    },
+    "designRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "process_checklist_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/checklistRule" }
+        },
+        "execution_shape_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executionShapeRule" }
+        },
+        "intent_label_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/intentLabelRule" }
+        }
+      },
+      "required": ["process_checklist_rules", "execution_shape_rules", "intent_label_rules"]
+    }
+  }
+}

@@ -2,7 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeWriteFile } from './secure-io.js';
-import { type IntentCompilerProvider, type IntentContract } from './intent-contract.js';
+import { inferGovernedDeliveryMode, type IntentCompilerProvider, type IntentContract } from './intent-contract.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
@@ -171,11 +171,7 @@ function inferIntentId(text: string, rawIntentId?: unknown): string {
 
 function inferDeliveryModeFromRaw(text: string, rawDeliveryMode: unknown, requiredInputs: string[]): 'one_shot' | 'managed_program' {
   if (rawDeliveryMode === 'managed_program' || rawDeliveryMode === 'one_shot') return rawDeliveryMode;
-  if (/(継続|長期|運行管理|運用管理|project|プロジェクト|program|プログラム|track|トラック|継続改善)/i.test(text)) {
-    return 'managed_program';
-  }
-  if (requiredInputs.length >= 3 && /(定義書|基本設計|詳細設計|方針|計画)/i.test(text)) return 'managed_program';
-  return 'one_shot';
+  return inferGovernedDeliveryMode(text, 'task_session', requiredInputs);
 }
 
 function normalizeIntentContractFromRaw(

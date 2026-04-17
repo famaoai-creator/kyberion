@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-resolution-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "catalog_scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exact_intent_id_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "keyword_base_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "keyword_increment": { "type": "number", "minimum": 0, "maximum": 1 },
+        "keyword_max_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "exact_surface_example_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "surface_containment_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "surface_overlap_increment": { "type": "number", "minimum": 0, "maximum": 1 },
+        "surface_overlap_max_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selected_confidence_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "catalog_intent_category": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "exact_intent_id_confidence",
+        "keyword_base_confidence",
+        "keyword_increment",
+        "keyword_max_confidence",
+        "exact_surface_example_confidence",
+        "surface_containment_confidence",
+        "surface_overlap_increment",
+        "surface_overlap_max_confidence",
+        "selected_confidence_threshold",
+        "catalog_intent_category"
+      ]
+    },
+    "legacy_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/legacyCandidate" }
+    }
+  },
+  "required": ["version", "catalog_scoring", "legacy_candidates"],
+  "$defs": {
+    "textRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "contains" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "regex" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "any" },
+            "clauses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "enum": ["contains", "regex"] },
+                  "value": { "type": "string", "minLength": 1 }
+                },
+                "required": ["type", "value"]
+              }
+            }
+          },
+          "required": ["type", "clauses"]
+        }
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shape": { "type": "string" },
+        "task_kind": { "type": "string" },
+        "result_shape": { "type": "string" }
+      }
+    },
+    "legacyCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "intent_id": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "source": { "type": "string", "enum": ["catalog", "heuristic", "legacy"] },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/textRule" }
+            ]
+          }
+        },
+        "resolution": { "$ref": "#/$defs/resolution" }
+      },
+      "required": ["id", "intent_id", "confidence", "source", "reasons", "patterns", "resolution"]
+    }
+  }
+}

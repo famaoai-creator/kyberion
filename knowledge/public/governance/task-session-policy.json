@@ -1,0 +1,324 @@
+{
+  "version": "1.0.0",
+  "intents": [
+    {
+      "id": "bootstrap-project",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Bootstrap a governed project context",
+        "success_condition": "A project record, kickoff context, and first work items are prepared."
+      },
+      "requirements": {
+        "default_missing": ["project_brief"]
+      },
+      "payload": {
+        "static": {
+          "bootstrap_kind": "project_bootstrap"
+        }
+      }
+    },
+    {
+      "id": "capture-photo",
+      "task_type": "capture_photo",
+      "goal": {
+        "summary": "Capture a photo for the requested purpose",
+        "success_condition": "A photo artifact is captured and stored in a governed path."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "camera_intent",
+            "omit_when": [
+              { "type": "regex", "value": "(記録用|共有用|reference|record|share|ocr)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "camera_intent",
+            "default": "record",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "ocr" }], "value": "ocr_source" },
+              { "when": [{ "type": "regex", "value": "(共有|share)" }], "value": "share" },
+              { "when": [{ "type": "regex", "value": "(記録|record)" }], "value": "record" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "generate-workbook",
+      "task_type": "workbook_wbs",
+      "goal": {
+        "summary": "Create a WBS workbook from the project context",
+        "success_condition": "An XLSX workbook draft is generated in a governed path."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "project_name",
+            "omit_when": [
+              { "type": "regex", "value": "(プロジェクト|project)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "granularity",
+            "default": "work_package",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "task" }], "value": "task" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "generate-presentation",
+      "task_type": "presentation_deck",
+      "goal": {
+        "summary": "Create a presentation deck from available project context",
+        "success_condition": "A PPTX draft is generated in a governed path."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "deck_purpose",
+            "omit_when": [
+              { "type": "regex", "value": "(提案|proposal|営業|marketing|社内共有|briefing)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "deck_purpose",
+            "default": "proposal",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(営業|marketing)" }], "value": "marketing" },
+              { "when": [{ "type": "regex", "value": "(社内共有|briefing)" }], "value": "internal_share" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "generate-report",
+      "task_type": "report_document",
+      "goal": {
+        "summary": "Create a document artifact for the requested audience",
+        "success_condition": "A report document is generated in a governed path."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "report_kind",
+            "omit_when": [
+              { "type": "regex", "value": "(進捗|status|要約|summary|proposal|仕様|spec)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "report_kind",
+            "default": "summary",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(仕様|spec)" }], "value": "spec" },
+              { "when": [{ "type": "regex", "value": "(提案|proposal)" }], "value": "proposal" },
+              { "when": [{ "type": "regex", "value": "(進捗|status)" }], "value": "status" }
+            ]
+          },
+          {
+            "field": "format",
+            "default": "docx",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "pdf" }], "value": "pdf" },
+              { "when": [{ "type": "regex", "value": "(markdown|md)" }], "value": "markdown" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "cross-project-remediation",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Find where a known issue or requirement gap has not been propagated and prepare a remediation plan",
+        "success_condition": "A governed remediation plan identifies affected scope, follow-up fixes, and verification targets."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "source_corpus",
+            "omit_when": [
+              { "type": "regex", "value": "(要件定義|仕様|requirements?|incident|障害|不具合|bug)" }
+            ]
+          },
+          {
+            "requirement": "target_scope",
+            "omit_when": [
+              { "type": "regex", "value": "(横断|横展開|across|cross-project|全体|複数プロジェクト)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "static": {
+          "analysis_kind": "cross_project_remediation"
+        },
+        "fields": [
+          {
+            "field": "source_corpus",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(要件定義|requirements?)" }], "value": "requirements" },
+              { "when": [{ "type": "regex", "value": "(incident|障害)" }], "value": "incidents" },
+              { "when": [{ "type": "regex", "value": "(不具合|bug)" }], "value": "bug_history" }
+            ]
+          },
+          {
+            "field": "propagation_mode",
+            "default": "cross_project_review",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(横展開|propagat(?:e|ion))" }], "value": "propagation_gap_review" }
+            ]
+          },
+          {
+            "field": "action_bias",
+            "default": "analysis",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(修正|fix)" }], "value": "remediation" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "incident-informed-review",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Review the current scope against prior incidents and known failures",
+        "success_condition": "A governed review captures findings, risks, and required follow-up checks informed by prior incidents."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "incident_basis",
+            "omit_when": [
+              { "type": "regex", "value": "(インシデント|障害|incident|failure|postmortem)" }
+            ]
+          },
+          {
+            "requirement": "review_target",
+            "omit_when": [
+              { "type": "regex", "value": "(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "static": {
+          "analysis_kind": "incident_informed_review"
+        },
+        "fields": [
+          {
+            "field": "incident_basis",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(インシデント|障害|incident|failure|postmortem)" }], "value": "incident_history" }
+            ]
+          },
+          {
+            "field": "review_target_kind",
+            "default": "general_scope",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(コード|code|pr|pull request)" }], "value": "code_change" },
+              { "when": [{ "type": "regex", "value": "(設計|design)" }], "value": "design" },
+              { "when": [{ "type": "regex", "value": "(delivery|変更|change)" }], "value": "delivery_scope" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "evolve-agent-harness",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Improve an agent harness through a benchmark-driven experiment loop",
+        "success_condition": "A governed experiment report captures the baseline, one general improvement, rerun delta, and keep or discard judgment."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "target_harness",
+            "omit_when": [
+              { "type": "regex", "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)" }
+            ]
+          },
+          {
+            "requirement": "evaluation_corpus",
+            "omit_when": [
+              { "type": "regex", "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)" }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "static": {
+          "analysis_kind": "harness_evolution"
+        },
+        "fields": [
+          {
+            "field": "target_kind",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)" }], "value": "agent_harness" }
+            ]
+          },
+          {
+            "field": "evaluation_mode",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)" }], "value": "benchmark" }
+            ]
+          },
+          {
+            "field": "change_policy",
+            "default": "baseline_first",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(keep\\s*or\\s*discard|keep/discard)" }], "value": "benchmark_governed" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "inspect-service",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Operate or inspect a managed service",
+        "success_condition": "The requested service operation completes and the result is reported back."
+      },
+      "requirements": {
+        "default_missing": ["service_name"]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "operation",
+            "default": "start",
+            "rules": [
+              { "when": [{ "type": "regex", "value": "(再起動|restart)" }], "value": "restart" },
+              { "when": [{ "type": "regex", "value": "(停止|stop)" }], "value": "stop" },
+              { "when": [{ "type": "regex", "value": "(ログ|logs?)" }], "value": "logs" },
+              { "when": [{ "type": "regex", "value": "(status|状態)" }], "value": "status" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

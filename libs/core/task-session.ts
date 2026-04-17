@@ -8,6 +8,7 @@ import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } fr
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type TaskSessionType =
@@ -97,13 +98,59 @@ interface ValidationResult<T> {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-session.schema.json');
+const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-session-policy.schema.json');
+const TASK_SESSION_POLICY_PATH = pathResolver.knowledge('public/governance/task-session-policy.json');
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
+let taskSessionPolicyValidateFn: ValidateFunction | null = null;
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
   taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
   return taskSessionValidateFn;
+}
+
+type PolicyScalar = string | number | boolean;
+type RequirementRule = {
+  requirement: string;
+  omit_when?: Array<TextMatchRule | string>;
+};
+type PayloadFieldRule = {
+  field: string;
+  default?: PolicyScalar;
+  rules?: Array<{ when: Array<TextMatchRule | string>; value: PolicyScalar }>;
+};
+type TaskSessionIntentPolicy = {
+  id: string;
+  task_type: TaskSessionType;
+  goal: TaskSession['goal'];
+  requirements?: {
+    default_missing?: string[];
+    rules?: RequirementRule[];
+  };
+  payload?: {
+    static?: Record<string, PolicyScalar>;
+    fields?: PayloadFieldRule[];
+  };
+};
+type TaskSessionPolicyFile = {
+  version: string;
+  intents: TaskSessionIntentPolicy[];
+};
+
+function ensureTaskSessionPolicyValidator(): ValidateFunction {
+  if (taskSessionPolicyValidateFn) return taskSessionPolicyValidateFn;
+  taskSessionPolicyValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_POLICY_SCHEMA_PATH);
+  return taskSessionPolicyValidateFn;
+}
+
+function loadTaskSessionPolicy(): TaskSessionPolicyFile {
+  const value = JSON.parse(safeReadFile(TASK_SESSION_POLICY_PATH, { encoding: 'utf8' }) as string) as TaskSessionPolicyFile;
+  const validate = ensureTaskSessionPolicyValidator();
+  if (!validate(value)) {
+    throw new Error(`Invalid task-session-policy: ${errorsFrom(validate).join('; ')}`);
+  }
+  return value;
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
@@ -207,226 +254,120 @@ function analysisContractId(intentId: string): string | undefined {
   return resolveAnalysisExecutionContract(intentId)?.contract_id;
 }
 
+function findTaskSessionIntentPolicy(intentId: string): TaskSessionIntentPolicy {
+  const policy = loadTaskSessionPolicy().intents.find((entry) => entry.id === intentId);
+  if (!policy) throw new Error(`Missing task-session policy for intent: ${intentId}`);
+  return policy;
+}
+
+function inferMissingRequirements(trimmed: string, policy: TaskSessionIntentPolicy): string[] {
+  const missing = [...(policy.requirements?.default_missing || [])];
+  for (const rule of policy.requirements?.rules || []) {
+    if (!rule.omit_when?.length || !matchesAnyTextRule(trimmed, rule.omit_when)) {
+      if (!missing.includes(rule.requirement)) missing.push(rule.requirement);
+    }
+  }
+  return missing;
+}
+
+function inferPolicyPayload(trimmed: string, policy: TaskSessionIntentPolicy): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...(policy.payload?.static || {}) };
+  for (const field of policy.payload?.fields || []) {
+    let value: PolicyScalar | undefined = field.default;
+    for (const rule of field.rules || []) {
+      if (matchesAnyTextRule(trimmed, rule.when)) {
+        value = rule.value;
+        break;
+      }
+    }
+    if (value !== undefined) payload[field.field] = value;
+  }
+  return payload;
+}
+
+function buildPolicyBackedIntent(intentId: string, trimmed: string): TaskSessionIntent {
+  const policy = findTaskSessionIntentPolicy(intentId);
+  return {
+    taskType: policy.task_type,
+    intentId,
+    goal: policy.goal,
+    requirements: {
+      missing: inferMissingRequirements(trimmed, policy),
+      collected: {},
+    },
+    payload: inferPolicyPayload(trimmed, policy),
+  };
+}
+
 // Intent resolution decides "what the user means".
 // Task-session builders decide "which runtime bindings and missing inputs are needed".
 const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
-  'bootstrap-project': () => ({
-    taskType: 'analysis',
-    intentId: 'bootstrap-project',
-    goal: {
-      summary: 'Bootstrap a governed project context',
-      success_condition: 'A project record, kickoff context, and first work items are prepared.',
-    },
-    requirements: {
-      missing: ['project_brief'],
-      collected: {},
-    },
-    payload: {
-      bootstrap_kind: 'project_bootstrap',
-    },
-  }),
-  'capture-photo': (trimmed) => ({
-    taskType: 'capture_photo',
-    intentId: 'capture-photo',
-    goal: {
-      summary: 'Capture a photo for the requested purpose',
-      success_condition: 'A photo artifact is captured and stored in a governed path.',
-    },
-    requirements: {
-      missing: /(記録用|共有用|reference|record|share|ocr)/i.test(trimmed) ? [] : ['camera_intent'],
-      collected: {},
-    },
-    payload: {
-      camera_intent: /ocr/i.test(trimmed)
-        ? 'ocr_source'
-        : /共有|share/i.test(trimmed)
-          ? 'share'
-          : /記録|record/i.test(trimmed)
-            ? 'record'
-            : 'record',
-    },
-  }),
-  'generate-workbook': (trimmed) => ({
-    taskType: 'workbook_wbs',
-    intentId: 'generate-workbook',
-    goal: {
-      summary: 'Create a WBS workbook from the project context',
-      success_condition: 'An XLSX workbook draft is generated in a governed path.',
-    },
-    requirements: {
-      missing: /(プロジェクト|project)/i.test(trimmed) ? [] : ['project_name'],
-      collected: {},
-    },
-    payload: {
-      granularity: /task/i.test(trimmed) ? 'task' : 'work_package',
-    },
-  }),
-  'generate-presentation': (trimmed) => ({
-    taskType: 'presentation_deck',
-    intentId: 'generate-presentation',
-    goal: {
-      summary: 'Create a presentation deck from available project context',
-      success_condition: 'A PPTX draft is generated in a governed path.',
-    },
-    requirements: {
-      missing: /(提案|proposal|営業|marketing|社内共有|briefing)/i.test(trimmed) ? [] : ['deck_purpose'],
-      collected: {},
-    },
-    payload: {
-      deck_purpose: /営業|marketing/i.test(trimmed)
-        ? 'marketing'
-        : /社内共有|briefing/i.test(trimmed)
-          ? 'internal_share'
-          : 'proposal',
-      slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
-        ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
-        : undefined,
-    },
-  }),
-  'generate-report': (trimmed) => ({
-    taskType: 'report_document',
-    intentId: 'generate-report',
-    goal: {
-      summary: 'Create a document artifact for the requested audience',
-      success_condition: 'A report document is generated in a governed path.',
-    },
-    requirements: {
-      missing: /(進捗|status|要約|summary|proposal|仕様|spec)/i.test(trimmed) ? [] : ['report_kind'],
-      collected: {},
-    },
-    payload: {
-      report_kind: /仕様|spec/i.test(trimmed)
-        ? 'spec'
-        : /提案|proposal/i.test(trimmed)
-          ? 'proposal'
-          : /進捗|status/i.test(trimmed)
-            ? 'status'
-            : 'summary',
-      format: /pdf/i.test(trimmed) ? 'pdf' : /markdown|md/i.test(trimmed) ? 'markdown' : 'docx',
-    },
-  }),
-  'cross-project-remediation': (trimmed) => {
-    const hasSourceCorpus = /(要件定義|仕様|requirements?|incident|障害|不具合|bug)/i.test(trimmed);
-    const hasTargetScope = /(横断|横展開|across|cross-project|全体|複数プロジェクト)/i.test(trimmed);
+  'bootstrap-project': (trimmed) => buildPolicyBackedIntent('bootstrap-project', trimmed),
+  'capture-photo': (trimmed) => buildPolicyBackedIntent('capture-photo', trimmed),
+  'generate-workbook': (trimmed) => buildPolicyBackedIntent('generate-workbook', trimmed),
+  'generate-presentation': (trimmed) => {
+    const base = buildPolicyBackedIntent('generate-presentation', trimmed);
     return {
-      taskType: 'analysis',
-      intentId: 'cross-project-remediation',
-      goal: {
-        summary: 'Find where a known issue or requirement gap has not been propagated and prepare a remediation plan',
-        success_condition: 'A governed remediation plan identifies affected scope, follow-up fixes, and verification targets.',
-      },
-      requirements: {
-        missing: [
-          ...(hasSourceCorpus ? [] : ['source_corpus']),
-          ...(hasTargetScope ? [] : ['target_scope']),
-        ],
-        collected: {},
-      },
+      ...base,
       payload: {
-        analysis_kind: 'cross_project_remediation',
+        ...(base.payload || {}),
+        slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
+          ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
+          : undefined,
+      },
+    };
+  },
+  'generate-report': (trimmed) => buildPolicyBackedIntent('generate-report', trimmed),
+  'cross-project-remediation': (trimmed) => {
+    const base = buildPolicyBackedIntent('cross-project-remediation', trimmed);
+    return {
+      ...base,
+      payload: {
+        ...(base.payload || {}),
         analysis_contract_id: analysisContractId('cross-project-remediation'),
-        source_corpus: /(要件定義|requirements?)/i.test(trimmed)
-          ? 'requirements'
-          : /(incident|障害)/i.test(trimmed)
-            ? 'incidents'
-            : /(不具合|bug)/i.test(trimmed)
-              ? 'bug_history'
-              : undefined,
-        propagation_mode: /横展開|propagat(?:e|ion)/i.test(trimmed) ? 'propagation_gap_review' : 'cross_project_review',
-        action_bias: /(修正|fix)/i.test(trimmed) ? 'remediation' : 'analysis',
       },
     };
   },
   'incident-informed-review': (trimmed) => {
-    const hasIncidentBasis = /(インシデント|障害|incident|failure|postmortem)/i.test(trimmed);
-    const hasReviewTarget = /(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)/i.test(trimmed);
+    const base = buildPolicyBackedIntent('incident-informed-review', trimmed);
     return {
-      taskType: 'analysis',
-      intentId: 'incident-informed-review',
-      goal: {
-        summary: 'Review the current scope against prior incidents and known failures',
-        success_condition: 'A governed review captures findings, risks, and required follow-up checks informed by prior incidents.',
-      },
-      requirements: {
-        missing: [
-          ...(hasIncidentBasis ? [] : ['incident_basis']),
-          ...(hasReviewTarget ? [] : ['review_target']),
-        ],
-        collected: {},
-      },
+      ...base,
       payload: {
-        analysis_kind: 'incident_informed_review',
+        ...(base.payload || {}),
         analysis_contract_id: analysisContractId('incident-informed-review'),
-        incident_basis: hasIncidentBasis ? 'incident_history' : undefined,
-        review_target_kind: /コード|code|pr|pull request/i.test(trimmed)
-          ? 'code_change'
-          : /設計|design/i.test(trimmed)
-            ? 'design'
-            : /delivery|変更|change/i.test(trimmed)
-              ? 'delivery_scope'
-              : 'general_scope',
       },
     };
   },
   'evolve-agent-harness': (trimmed) => {
-    const hasHarnessTarget = /(agent|エージェント|harness|ハーネス|agent\.py|program\.md|AGENTS\.md)/i.test(trimmed);
-    const hasEvaluationBasis = /(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks\/|evaluator)/i.test(trimmed);
+    const base = buildPolicyBackedIntent('evolve-agent-harness', trimmed);
     return {
-      taskType: 'analysis',
-      intentId: 'evolve-agent-harness',
-      goal: {
-        summary: 'Improve an agent harness through a benchmark-driven experiment loop',
-        success_condition: 'A governed experiment report captures the baseline, one general improvement, rerun delta, and keep or discard judgment.',
-      },
-      requirements: {
-        missing: [
-          ...(hasHarnessTarget ? [] : ['target_harness']),
-          ...(hasEvaluationBasis ? [] : ['evaluation_corpus']),
-        ],
-        collected: {},
-      },
+      ...base,
       payload: {
-        analysis_kind: 'harness_evolution',
+        ...(base.payload || {}),
         analysis_contract_id: analysisContractId('evolve-agent-harness'),
-        target_kind: hasHarnessTarget ? 'agent_harness' : undefined,
-        evaluation_mode: hasEvaluationBasis ? 'benchmark' : undefined,
-        change_policy: /keep\s*or\s*discard|keep\/discard/i.test(trimmed) ? 'benchmark_governed' : 'baseline_first',
       },
     };
   },
   'inspect-service': (trimmed) => {
-    const operation = /再起動|restart/i.test(trimmed)
-      ? 'restart'
-      : /停止|stop/i.test(trimmed)
-        ? 'stop'
-        : /ログ|logs?/i.test(trimmed)
-          ? 'logs'
-          : /status|状態/i.test(trimmed)
-            ? 'status'
-            : 'start';
+    const base = buildPolicyBackedIntent('inspect-service', trimmed);
     const serviceMatch =
       trimmed.match(/([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i) ||
       trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
-    const base: TaskSessionIntent = {
-      taskType: 'service_operation',
-      intentId: 'inspect-service',
-      goal: {
-        summary: 'Operate or inspect a managed service',
-        success_condition: 'The requested service operation completes and the result is reported back.',
-      },
+    const intent: TaskSessionIntent = {
+      ...base,
       requirements: {
         missing: serviceMatch ? [] : ['service_name'],
         collected: {},
       },
       payload: {
+        ...(base.payload || {}),
         service_name: serviceMatch?.[1],
-        operation,
         log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
       },
     };
-    const approvalApplied = applyApprovalPolicy(base.intentId, base.payload, base.requirements);
+    const approvalApplied = applyApprovalPolicy(intent.intentId!, intent.payload || {}, intent.requirements!);
     return {
-      ...base,
+      ...intent,
       requirements: approvalApplied.requirements,
       payload: approvalApplied.payload,
     };
