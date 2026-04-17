@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileUserIntentFlow, deriveIntentDeliveryDecision, formatClarificationPacket, resolveIntentCompilerTarget } from './intent-contract.js';
+import { compileUserIntentFlow, deriveIntentDeliveryDecision, formatClarificationPacket, inferGovernedDeliveryMode, resolveIntentCompilerTarget } from './intent-contract.js';
 
 describe('intent-contract compiler', () => {
   it('accepts LLM-produced contract and work loop JSON when valid', async () => {
@@ -129,6 +129,36 @@ describe('intent-contract compiler', () => {
     expect(decision.shouldStartMission).toBe(true);
   });
 
+  it('asks for human confirmation when managed delivery is inferred on a task session', () => {
+    const decision = deriveIntentDeliveryDecision({
+      kind: 'intent-contract',
+      source_text: 'この定義書を継続改善しながら進めたい',
+      intent_id: 'refine-definition',
+      goal: {
+        summary: 'Refine the definition document',
+        success_condition: 'The document is maintained over time.',
+      },
+      resolution: {
+        execution_shape: 'task_session',
+        task_type: 'document_work',
+      },
+      required_inputs: [],
+      outcome_ids: ['artifact:doc'],
+      approval: {
+        requires_approval: false,
+      },
+      delivery_mode: 'managed_program',
+      clarification_needed: false,
+      confidence: 0.8,
+      why: 'Durable improvement is requested.',
+    });
+
+    expect(decision.askHumanToConfirm).toBe(true);
+    expect(decision.shouldBootstrapProject).toBe(true);
+    expect(decision.shouldStartMission).toBe(true);
+    expect(decision.shouldDeliverDirectOutcome).toBe(false);
+  });
+
   it('resolves generic provider and model hints without codex-only defaults', () => {
     const target = resolveIntentCompilerTarget({
       provider: 'gemini',
@@ -139,5 +169,10 @@ describe('intent-contract compiler', () => {
       provider: 'gemini',
       model: 'gemini-2.5-pro',
     });
+  });
+
+  it('infers delivery mode from governed rules', () => {
+    expect(inferGovernedDeliveryMode('この要件定義を長期的に継続改善したい', 'task_session', [])).toBe('managed_program');
+    expect(inferGovernedDeliveryMode('提案資料を作って', 'task_session', [])).toBe('one_shot');
   });
 });

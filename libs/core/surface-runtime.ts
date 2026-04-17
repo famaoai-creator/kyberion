@@ -1,8 +1,14 @@
+import AjvModule, { type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge('public/schemas/runtime-surface-manifest.schema.json');
 
 export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
 
@@ -69,6 +75,13 @@ export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
 const DEFAULT_MANIFEST_PATH = 'knowledge/public/governance/active-surfaces.json';
 const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
+let surfaceManifestValidateFn: ValidateFunction | null = null;
+
+function ensureSurfaceManifestValidator(): ValidateFunction {
+  if (surfaceManifestValidateFn) return surfaceManifestValidateFn;
+  surfaceManifestValidateFn = compileSchemaFromPath(ajv, SURFACE_MANIFEST_SCHEMA_PATH);
+  return surfaceManifestValidateFn;
+}
 
 function ensureParentDir(filePath: string): void {
   const dir = path.dirname(filePath);
@@ -93,7 +106,13 @@ export function surfaceResourceId(surfaceId: string): string {
 }
 
 export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
-  return JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
+  const value = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
+  const validate = ensureSurfaceManifestValidator();
+  if (!validate(value)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid surface manifest: ${errors}`);
+  }
+  return value;
 }
 
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {

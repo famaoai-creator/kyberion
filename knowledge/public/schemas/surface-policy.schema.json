@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "routing": { "$ref": "#/$defs/routingPolicy" },
+    "slack": { "$ref": "#/$defs/slackPolicy" }
+  },
+  "required": ["version", "routing", "slack"],
+  "$defs": {
+    "textRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "contains" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "regex" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "any" },
+            "clauses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "enum": ["contains", "regex"] },
+                  "value": { "type": "string", "minLength": 1 }
+                },
+                "required": ["type", "value"]
+              }
+            }
+          },
+          "required": ["type", "clauses"]
+        }
+      ]
+    },
+    "routingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "greeting_patterns": {
+              "type": "array",
+              "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+            },
+            "receiver_rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string" },
+                  "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+                  "patterns": {
+                    "type": "array",
+                    "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+                  }
+                },
+                "required": ["receiver", "patterns"]
+              }
+            }
+          },
+          "required": ["greeting_patterns", "receiver_rules"]
+        },
+        "compiled_flow_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+              "execution_shapes": { "type": "array", "items": { "type": "string" } },
+              "conversation_agents": { "type": "array", "items": { "type": "string" } },
+              "task_types": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["receiver"]
+          }
+        }
+      },
+      "required": ["text_routing", "compiled_flow_rules"]
+    },
+    "slackIntentRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string", "minLength": 1 },
+              "patterns": {
+                "type": "array",
+                "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+              }
+            },
+            "required": ["label", "patterns"]
+          }
+        },
+        "default_label": { "type": "string", "minLength": 1 }
+      },
+      "required": ["rules", "default_label"]
+    },
+    "slackSurfaceRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "execution_mode": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "feasibility_patterns": {
+              "type": "array",
+              "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+            },
+            "durable_task_patterns": {
+              "type": "array",
+              "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+            }
+          },
+          "required": ["feasibility_patterns", "durable_task_patterns"]
+        },
+        "delegation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lightweight_patterns": {
+              "type": "array",
+              "items": { "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }] }
+            }
+          },
+          "required": ["lightweight_patterns"]
+        }
+      },
+      "required": ["execution_mode", "delegation"]
+    },
+    "slackPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "intent_rules": { "$ref": "#/$defs/slackIntentRules" },
+        "surface_rules": { "$ref": "#/$defs/slackSurfaceRules" }
+      },
+      "required": ["intent_rules", "surface_rules"]
+    }
+  }
+}

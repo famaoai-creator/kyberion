@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "delivery": {
+    "rules": [
+      {
+        "id": "durable-shapes",
+        "mode": "managed_program",
+        "shapes": ["project_bootstrap", "mission"]
+      },
+      {
+        "id": "durable-keywords",
+        "mode": "managed_program",
+        "text_patterns": [
+          { "type": "contains", "value": "継続" },
+          { "type": "contains", "value": "長期" },
+          { "type": "contains", "value": "運行管理" },
+          { "type": "contains", "value": "運用管理" },
+          { "type": "contains", "value": "project" },
+          { "type": "contains", "value": "プロジェクト" },
+          { "type": "contains", "value": "program" },
+          { "type": "contains", "value": "プログラム" },
+          { "type": "contains", "value": "track" },
+          { "type": "contains", "value": "トラック" },
+          { "type": "contains", "value": "ロードマップ" },
+          { "type": "contains", "value": "継続改善" }
+        ]
+      },
+      {
+        "id": "document-heavy-missing-inputs",
+        "mode": "managed_program",
+        "min_required_inputs": 3,
+        "text_patterns": [
+          { "type": "contains", "value": "定義書" },
+          { "type": "contains", "value": "基本設計" },
+          { "type": "contains", "value": "詳細設計" },
+          { "type": "contains", "value": "方針" },
+          { "type": "contains", "value": "計画" }
+        ]
+      },
+      {
+        "id": "default-one-shot",
+        "mode": "one_shot"
+      }
+    ]
+  },
+  "compiler": {
+    "relevant_intent_limit": 6,
+    "intent_contract_rules": [
+      "Choose execution_shape from: direct_reply, task_session, mission, project_bootstrap.",
+      "Use task_session for browser or document work instead of inventing new shapes.",
+      "Choose delivery_mode=managed_program when the request implies long-running operation, recurring revisions, project/track/mission management, or multiple staged outcomes.",
+      "Choose delivery_mode=one_shot when a direct deliverable can be produced without durable project governance.",
+      "Set clarification_needed=true when required_inputs is non-empty.",
+      "Keep outcome_ids aligned to governed catalog when possible.",
+      "Do not invent low-level actuator steps."
+    ],
+    "work_loop_rules": [
+      "Preserve the intent contract execution shape.",
+      "Use the contract required_inputs as intake requirements when they are still needed.",
+      "Do not invent unauthorized execution capabilities.",
+      "Keep team_roles and specialist routing aligned to governed intent metadata when possible."
+    ]
+  }
+}

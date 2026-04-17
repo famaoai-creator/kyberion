@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "catalog_scoring": {
+    "exact_intent_id_confidence": 1,
+    "keyword_base_confidence": 0.55,
+    "keyword_increment": 0.12,
+    "keyword_max_confidence": 0.92,
+    "exact_surface_example_confidence": 0.98,
+    "surface_containment_confidence": 0.84,
+    "surface_overlap_increment": 0.03,
+    "surface_overlap_max_confidence": 0.95,
+    "selected_confidence_threshold": 0.45,
+    "catalog_intent_category": "surface"
+  },
+  "legacy_candidates": [
+    {
+      "id": "capture-photo-heuristic",
+      "intent_id": "capture-photo",
+      "confidence": 0.88,
+      "source": "legacy",
+      "reasons": ["legacy capture-photo heuristic"],
+      "patterns": [
+        { "type": "regex", "value": "(写真|撮影|photo|picture|camera)" }
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "capture_photo",
+        "result_shape": "artifact"
+      }
+    },
+    {
+      "id": "inspect-service-heuristic",
+      "intent_id": "inspect-service",
+      "confidence": 0.86,
+      "source": "heuristic",
+      "reasons": ["service operation heuristic"],
+      "patterns": [
+        { "type": "regex", "value": "(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)" }
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      }
+    }
+  ]
+}
