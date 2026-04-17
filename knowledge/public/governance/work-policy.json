@@ -1,0 +1,227 @@
+{
+  "version": "1.0.0",
+  "specialist_routing": {
+    "rules": [
+      {
+        "id": "project-bootstrap",
+        "match": {
+          "intent_ids": ["bootstrap-project"],
+          "shapes": ["project_bootstrap"]
+        },
+        "specialist_id": "project-lead"
+      },
+      {
+        "id": "browser-routing",
+        "match": {
+          "intent_ids": ["open-site", "browser-step"],
+          "shapes": ["browser_session"]
+        },
+        "specialist_id": "browser-operator"
+      },
+      {
+        "id": "document-delivery",
+        "match": {
+          "intent_ids": ["generate-presentation", "generate-report", "generate-workbook"],
+          "task_types": ["presentation_deck", "report_document", "workbook_wbs"]
+        },
+        "specialist_id": "document-specialist"
+      },
+      {
+        "id": "service-operations",
+        "match": {
+          "intent_ids": ["inspect-service"],
+          "task_types": ["service_operation"]
+        },
+        "specialist_id": "service-operator"
+      },
+      {
+        "id": "knowledge-queries",
+        "match": {
+          "intent_ids": ["knowledge-query", "live-query"],
+          "query_types": ["knowledge_search", "web_search", "weather", "location"]
+        },
+        "specialist_id": "knowledge-specialist"
+      },
+      {
+        "id": "analysis-work",
+        "match": {
+          "intent_ids": ["cross-project-remediation", "incident-informed-review"],
+          "task_types": ["analysis"]
+        },
+        "specialist_id": "knowledge-specialist"
+      },
+      {
+        "id": "harness-evolution",
+        "match": {
+          "intent_ids": ["evolve-agent-harness"]
+        },
+        "specialist_id": "harness-engineer"
+      }
+    ],
+    "fallback_specialist_id": "surface-concierge"
+  },
+  "profile_routing": {
+    "execution_boundary_rules": [
+      {
+        "id": "harness-evolution",
+        "match": {
+          "intent_ids": ["evolve-agent-harness"]
+        },
+        "profile_id": "benchmark_harness_evolution"
+      },
+      {
+        "id": "analysis-flows",
+        "match": {
+          "intent_ids": ["cross-project-remediation", "incident-informed-review"],
+          "task_types": ["analysis"]
+        },
+        "profile_id": "analysis_followup_execution"
+      }
+    ],
+    "runtime_design_rules": [
+      {
+        "id": "mission-runtime",
+        "match": {
+          "shapes": ["mission"]
+        },
+        "profile_id": "mission_collaboration"
+      },
+      {
+        "id": "bootstrap-runtime",
+        "match": {
+          "intent_ids": ["bootstrap-project"],
+          "shapes": ["project_bootstrap"]
+        },
+        "profile_id": "collaborative_analysis"
+      },
+      {
+        "id": "analysis-runtime",
+        "match": {
+          "intent_ids": ["cross-project-remediation", "incident-informed-review", "evolve-agent-harness"],
+          "task_types": ["analysis"]
+        },
+        "profile_id": "collaborative_analysis"
+      }
+    ],
+    "defaults": {
+      "execution_boundary_profile_id": "default_governed_execution",
+      "runtime_design_profile_id": "single_actor_delivery"
+    }
+  },
+  "design_rules": {
+    "process_checklist_rules": [
+      {
+        "id": "task-session-checklist",
+        "match": {
+          "task_types": ["*"]
+        },
+        "items": [
+          "confirm the governed output path",
+          "capture evidence and reusable findings"
+        ]
+      },
+      {
+        "id": "project-bootstrap-checklist",
+        "match": {
+          "shapes": ["project_bootstrap"]
+        },
+        "items": [
+          "confirm project root and default track",
+          "prepare the first governed work items"
+        ]
+      }
+    ],
+    "execution_shape_rules": [
+      {
+        "id": "catalog-direct-reply",
+        "match": {
+          "catalog_shapes": ["direct_reply"]
+        },
+        "shape": "direct_reply"
+      },
+      {
+        "id": "catalog-task-session",
+        "match": {
+          "catalog_shapes": ["task_session"]
+        },
+        "shape": "task_session"
+      },
+      {
+        "id": "catalog-mission",
+        "match": {
+          "catalog_shapes": ["mission"]
+        },
+        "shape": "mission"
+      },
+      {
+        "id": "catalog-project-bootstrap",
+        "match": {
+          "catalog_shapes": ["project_bootstrap"]
+        },
+        "shape": "project_bootstrap"
+      },
+      {
+        "id": "bootstrap-project-shape",
+        "match": {
+          "intent_ids": ["bootstrap-project"],
+          "shapes": ["project_bootstrap"]
+        },
+        "shape": "project_bootstrap"
+      },
+      {
+        "id": "mission-shape",
+        "match": {
+          "shapes": ["mission"]
+        },
+        "shape": "mission"
+      },
+      {
+        "id": "task-type-default-shape",
+        "match": {
+          "task_types": ["*"]
+        },
+        "shape": "task_session"
+      },
+      {
+        "id": "direct-reply-fallback",
+        "match": {},
+        "shape": "direct_reply"
+      }
+    ],
+    "intent_label_rules": [
+      {
+        "id": "bootstrap-project-label",
+        "match": {
+          "intent_ids": ["bootstrap-project"]
+        },
+        "label": "Project bootstrap"
+      },
+      {
+        "id": "intent-id-label",
+        "match": {
+          "intent_ids": ["*"]
+        },
+        "label_from": "intentId"
+      },
+      {
+        "id": "task-type-label",
+        "match": {
+          "task_types": ["*"]
+        },
+        "label_from": "taskType"
+      },
+      {
+        "id": "query-type-label",
+        "match": {
+          "query_types": ["*"]
+        },
+        "label_from": "queryType"
+      },
+      {
+        "id": "general-request-label",
+        "match": {},
+        "label": "general_request"
+      }
+    ]
+  }
+}

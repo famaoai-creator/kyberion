@@ -1,0 +1,200 @@
+{
+  "version": "1.0.0",
+  "routing": {
+    "text_routing": {
+      "greeting_patterns": [
+        {
+          "type": "regex",
+          "value": "^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$"
+        }
+      ],
+      "receiver_rules": [
+        {
+          "id": "chronos-status-queries",
+          "receiver": "chronos-mirror",
+          "patterns": [
+            { "type": "contains", "value": "ミッション一覧" },
+            { "type": "contains", "value": "mission list" },
+            { "type": "contains", "value": "current mission" },
+            { "type": "contains", "value": "今のミッション" },
+            { "type": "contains", "value": "system status" },
+            { "type": "contains", "value": "システム状態" },
+            { "type": "contains", "value": "runtime status" },
+            { "type": "contains", "value": "runtime health" },
+            { "type": "contains", "value": "runtime list" },
+            { "type": "contains", "value": "ランタイム状況" },
+            { "type": "contains", "value": "ランタイム一覧" },
+            { "type": "contains", "value": "health check" },
+            { "type": "contains", "value": "system health" },
+            { "type": "contains", "value": "ヘルスチェック" },
+            { "type": "contains", "value": "agent runtime" },
+            { "type": "contains", "value": "outbox status" },
+            { "type": "contains", "value": "chronos status" }
+          ]
+        },
+        {
+          "id": "heavy-reasoning-queries",
+          "receiver": "nerve-agent",
+          "patterns": [
+            { "type": "contains", "value": "レビュー" },
+            { "type": "contains", "value": "review" },
+            { "type": "contains", "value": "設計" },
+            { "type": "contains", "value": "architecture" },
+            { "type": "contains", "value": "design" },
+            { "type": "contains", "value": "デバッグ" },
+            { "type": "contains", "value": "bug" },
+            { "type": "contains", "value": "error" },
+            { "type": "contains", "value": "調査" },
+            { "type": "contains", "value": "investigate" },
+            { "type": "contains", "value": "分析" },
+            { "type": "contains", "value": "analysis" },
+            { "type": "contains", "value": "評価" },
+            { "type": "contains", "value": "evaluate" },
+            { "type": "contains", "value": "戦略" },
+            { "type": "contains", "value": "strategy" },
+            { "type": "contains", "value": "実装" },
+            { "type": "contains", "value": "implement" },
+            { "type": "contains", "value": "修正" },
+            { "type": "contains", "value": "fix" },
+            { "type": "contains", "value": "計画" },
+            { "type": "contains", "value": "plan" },
+            { "type": "contains", "value": "プラン" },
+            { "type": "contains", "value": "refactor" },
+            { "type": "contains", "value": "監査" },
+            { "type": "contains", "value": "audit" }
+          ]
+        }
+      ]
+    },
+    "compiled_flow_rules": [
+      {
+        "id": "mission-shapes",
+        "receiver": "nerve-agent",
+        "execution_shapes": ["mission", "project_bootstrap"]
+      },
+      {
+        "id": "nerve-conversation-agent",
+        "receiver": "nerve-agent",
+        "conversation_agents": ["nerve-agent"]
+      },
+      {
+        "id": "heavy-task-types",
+        "receiver": "nerve-agent",
+        "task_types": ["analysis", "presentation_deck", "report_document", "workbook_wbs", "service_operation"]
+      }
+    ]
+  },
+  "slack": {
+    "intent_rules": {
+      "rules": [
+        {
+          "id": "marketing-material",
+          "label": "request_marketing_material",
+          "patterns": [
+            { "type": "contains", "value": "マーケティング" },
+            { "type": "contains", "value": "資料" },
+            { "type": "contains", "value": "pitch" },
+            { "type": "contains", "value": "marketing" }
+          ]
+        },
+        {
+          "id": "review-work",
+          "label": "request_review",
+          "patterns": [
+            { "type": "contains", "value": "レビュー" },
+            { "type": "contains", "value": "review" }
+          ]
+        },
+        {
+          "id": "design-analysis",
+          "label": "request_design_analysis",
+          "patterns": [
+            { "type": "contains", "value": "設計" },
+            { "type": "contains", "value": "architecture" },
+            { "type": "contains", "value": "design" }
+          ]
+        },
+        {
+          "id": "debug-investigation",
+          "label": "request_debug_investigation",
+          "patterns": [
+            { "type": "contains", "value": "デバッグ" },
+            { "type": "contains", "value": "bug" },
+            { "type": "contains", "value": "error" },
+            { "type": "contains", "value": "調査" }
+          ]
+        },
+        {
+          "id": "mission-work",
+          "label": "request_mission_work",
+          "patterns": [
+            { "type": "contains", "value": "ミッション" },
+            { "type": "contains", "value": "mission" },
+            { "type": "contains", "value": "進捗" },
+            { "type": "contains", "value": "状況" },
+            { "type": "contains", "value": "状態" },
+            { "type": "contains", "value": "ステータス" },
+            { "type": "contains", "value": "status" },
+            { "type": "contains", "value": "進んで" },
+            { "type": "contains", "value": "進めて" },
+            { "type": "contains", "value": "対応" },
+            { "type": "contains", "value": "修正" },
+            { "type": "contains", "value": "直した" },
+            { "type": "contains", "value": "完了" },
+            { "type": "contains", "value": "done" },
+            { "type": "contains", "value": "fixed" },
+            { "type": "contains", "value": "resolved" },
+            { "type": "contains", "value": "deploy" },
+            { "type": "contains", "value": "release" }
+          ]
+        }
+      ],
+      "default_label": "request_deeper_reasoning"
+    },
+    "surface_rules": {
+      "execution_mode": {
+        "feasibility_patterns": [
+          { "type": "regex", "value": "可能[?？。]?$|可能かな|可能ですか|できますか|できる[?？。]?$" },
+          { "type": "contains", "value": "お願いしても良い" },
+          { "type": "contains", "value": "お願いできますか" },
+          { "type": "contains", "value": "どうですか" },
+          { "type": "contains", "value": "いけますか" },
+          { "type": "contains", "value": "can you" },
+          { "type": "contains", "value": "is it possible" },
+          { "type": "contains", "value": "would it be possible" },
+          { "type": "contains", "value": "could you" }
+        ],
+        "durable_task_patterns": [
+          { "type": "regex", "value": "ミッション.*(開始|作成)" },
+          { "type": "regex", "value": "mission.*(start|create)" },
+          { "type": "contains", "value": "保存して" },
+          { "type": "contains", "value": "save it" },
+          { "type": "contains", "value": "save this" },
+          { "type": "contains", "value": "save that" },
+          { "type": "contains", "value": "write it" },
+          { "type": "contains", "value": "write this" },
+          { "type": "contains", "value": "write that" },
+          { "type": "contains", "value": "実装して" },
+          { "type": "regex", "value": "implement\\b" },
+          { "type": "contains", "value": "作成して" },
+          { "type": "contains", "value": "作って" },
+          { "type": "contains", "value": "draft it" },
+          { "type": "contains", "value": "create it" },
+          { "type": "regex", "value": "ファイル.*(作成|保存)" }
+        ]
+      },
+      "delegation": {
+        "lightweight_patterns": [
+          { "type": "regex", "value": "^ping[!.?]?$" },
+          { "type": "regex", "value": "^test[!.?]?$" },
+          { "type": "regex", "value": "^hello[!.?]?$" },
+          { "type": "regex", "value": "^hi[!.?]?$" },
+          { "type": "regex", "value": "^thanks?[!.?]?$" },
+          { "type": "regex", "value": "^ありがとう[。！!]?$" },
+          { "type": "regex", "value": "^了解です?[。！!]?$" },
+          { "type": "regex", "value": "^ok[!.?]?$" }
+        ]
+      }
+    }
+  }
+}
