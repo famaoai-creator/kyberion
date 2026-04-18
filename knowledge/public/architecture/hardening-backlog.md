@@ -39,6 +39,13 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 - reject host-native integrations that do not expose approval hooks, evidence shape, and fallback behavior
 - measure complexity directly through clarification count, contract size, routing branch count, and concept count
 
+### Security And Maintainability Review (2026-04-18)
+
+- tighten permissive read-only auto-approval matching to avoid keyword false positives in tool titles
+- enforce additive enhancer option merge so one enhancer cannot silently drop prior execution options
+- avoid full prompt logging in adapter runtime logs; keep short summaries to reduce accidental sensitive context exposure
+- keep deterministic wisdom context load order to reduce run-to-run drift and improve reproducibility
+
 ## Priority 1
 
 ### Intent Normalization
