@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "required_sections": [
+    "intent",
+    "deliverable",
+    "missing_inputs",
+    "approval",
+    "execution",
+    "status"
+  ],
+  "clarification": {
+    "max_blocking_questions_per_turn": 2,
+    "must_explain_missing_inputs": true
+  },
+  "compactness": {
+    "max_interpreted_goal_chars": 160,
+    "max_next_action_chars": 120
+  },
+  "approval_binding": {
+    "require_policy_refs_when_approval_required": true,
+    "require_reason_when_approval_required": true
+  },
+  "routing_binding": {
+    "allowed_modes": ["one_shot", "managed_program"],
+    "allowed_routing": ["local_only", "host_only", "dual_path"]
+  }
+}
