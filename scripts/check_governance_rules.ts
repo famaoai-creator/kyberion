@@ -82,6 +82,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/voice-engine-registry.json',
   },
   {
+    id: 'voice-sample-ingestion-policy',
+    schemaPath: 'knowledge/public/schemas/voice-sample-ingestion-policy.schema.json',
+    dataPath: 'knowledge/public/governance/voice-sample-ingestion-policy.json',
+  },
+  {
     id: 'video-composition-template-registry',
     schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
     dataPath: 'knowledge/public/governance/video-composition-template-registry.json',
@@ -590,6 +595,47 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       if (fallbackId && fallbackId === engineId) {
         violations.push(`voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`);
       }
+    }
+  }
+
+  if (check.id === 'voice-sample-ingestion-policy') {
+    const typed = data as {
+      sample_limits?: {
+        min_samples?: number;
+        max_samples?: number;
+        min_sample_bytes?: number;
+        max_sample_bytes?: number;
+        allowed_extensions?: string[];
+      };
+      profile_rules?: {
+        allowed_tiers?: string[];
+        require_unique_sample_paths?: boolean;
+        require_language_coverage?: boolean;
+      };
+    };
+    if ((typed.sample_limits?.min_samples || 0) < 1) {
+      violations.push('voice-sample-ingestion-policy: sample_limits.min_samples must be >= 1');
+    }
+    if ((typed.sample_limits?.max_samples || 0) < (typed.sample_limits?.min_samples || 0)) {
+      violations.push('voice-sample-ingestion-policy: sample_limits.max_samples must be >= sample_limits.min_samples');
+    }
+    if ((typed.sample_limits?.min_sample_bytes || 0) < 1024) {
+      violations.push('voice-sample-ingestion-policy: sample_limits.min_sample_bytes must be >= 1024');
+    }
+    if ((typed.sample_limits?.max_sample_bytes || 0) < (typed.sample_limits?.min_sample_bytes || 0)) {
+      violations.push('voice-sample-ingestion-policy: sample_limits.max_sample_bytes must be >= sample_limits.min_sample_bytes');
+    }
+    if (!(typed.sample_limits?.allowed_extensions || []).length) {
+      violations.push('voice-sample-ingestion-policy: sample_limits.allowed_extensions must not be empty');
+    }
+    if (!(typed.profile_rules?.allowed_tiers || []).length) {
+      violations.push('voice-sample-ingestion-policy: profile_rules.allowed_tiers must not be empty');
+    }
+    if (typed.profile_rules?.require_unique_sample_paths === undefined) {
+      violations.push('voice-sample-ingestion-policy: profile_rules.require_unique_sample_paths must be defined');
+    }
+    if (typed.profile_rules?.require_language_coverage === undefined) {
+      violations.push('voice-sample-ingestion-policy: profile_rules.require_language_coverage must be defined');
     }
   }
 
