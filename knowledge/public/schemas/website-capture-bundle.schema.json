@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "website-capture-bundle.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "source_url", "captured_at", "artifacts"],
+  "properties": {
+    "kind": { "type": "string", "const": "website-capture-bundle" },
+    "source_url": { "type": "string", "minLength": 1 },
+    "captured_at": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenshots_dir": { "type": "string", "minLength": 1 },
+        "tokens_path": { "type": "string", "minLength": 1 },
+        "visible_text_path": { "type": "string", "minLength": 1 },
+        "asset_catalog_path": { "type": "string", "minLength": 1 },
+        "asset_descriptions_path": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

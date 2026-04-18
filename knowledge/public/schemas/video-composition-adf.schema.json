@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "video-composition-adf.schema.json",
+  "title": "Kyberion Video Composition ADF",
+  "description": "Governed contract for deterministic composed-video bundles prior to backend rendering.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "composition", "scenes", "output"],
+  "properties": {
+    "kind": { "type": "string", "const": "video-composition-adf" },
+    "version": { "type": "string", "minLength": 1 },
+    "intent": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duration_sec", "fps", "width", "height"],
+      "properties": {
+        "duration_sec": { "type": "number", "minimum": 1, "maximum": 600 },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "width": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "height": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "background_color": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$" },
+        "aspect_ratio": { "type": "string", "minLength": 3 }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "narration_ref": { "type": "string", "minLength": 1 },
+        "music_ref": { "type": "string", "minLength": 1 },
+        "captions_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scene_id", "start_sec", "duration_sec", "template_ref", "content"],
+        "properties": {
+          "scene_id": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "enum": ["hook", "feature", "proof", "cta", "outro", "generic"] },
+          "start_sec": { "type": "number", "minimum": 0 },
+          "duration_sec": { "type": "number", "minimum": 0.1, "maximum": 300 },
+          "template_ref": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["template_id"],
+            "properties": {
+              "template_id": { "type": "string", "minLength": 1 },
+              "variant_id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "headline": { "type": "string" },
+              "body": { "type": "string" },
+              "eyebrow": { "type": "string" },
+              "cta": { "type": "string" },
+              "stat_value": { "type": "string" },
+              "stat_label": { "type": "string" }
+            }
+          },
+          "asset_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["asset_id", "path"],
+              "properties": {
+                "asset_id": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1 },
+                "role": { "type": "string", "enum": ["background", "hero", "logo", "overlay", "supporting"] }
+              }
+            }
+          },
+          "transition": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enter": { "type": "string", "minLength": 1 },
+              "exit": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format"],
+      "properties": {
+        "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
+        "target_path": { "type": "string", "minLength": 1 },
+        "bundle_dir": { "type": "string", "minLength": 1 },
+        "emit_progress_packets": { "type": "boolean" },
+        "await_completion": { "type": "boolean" }
+      }
+    }
+  }
+}

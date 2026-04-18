@@ -32,9 +32,14 @@ function registerSchema(ajv: Ajv, schemaPath: string, visited: Set<string>): any
     if (/^[a-z]+:/i.test(ref)) continue;
     registerSchema(ajv, path.resolve(path.dirname(normalized), ref), visited);
   }
-  const schemaId = typeof schema.$id === 'string' ? schema.$id : normalized;
-  if (!ajv.getSchema(schemaId)) {
-    ajv.addSchema(schema, schemaId);
+  const schemaIds = new Set<string>([normalized]);
+  if (typeof schema.$id === 'string' && schema.$id) {
+    schemaIds.add(schema.$id);
+  }
+  for (const schemaId of schemaIds) {
+    if (!ajv.getSchema(schemaId)) {
+      ajv.addSchema(schema, schemaId);
+    }
   }
   return schema;
 }
