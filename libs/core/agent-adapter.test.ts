@@ -138,6 +138,7 @@ describe('CodexAppServerAdapter', () => {
       expect.objectContaining({
         input: [{ type: 'text', text: 'Reply with exactly OK\n#contract', text_elements: [] }],
         model: 'gpt-5.4-mini',
+        cwd: '/tmp/alt',
       }),
       expect.any(Number)
     );
