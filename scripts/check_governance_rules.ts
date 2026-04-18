@@ -66,6 +66,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
     dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
   },
+  {
+    id: 'voice-profile-registry',
+    schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
+    dataPath: 'knowledge/public/governance/voice-profile-registry.json',
+  },
+  {
+    id: 'voice-runtime-policy',
+    schemaPath: 'knowledge/public/schemas/voice-runtime-policy.schema.json',
+    dataPath: 'knowledge/public/governance/voice-runtime-policy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -428,6 +438,76 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.routing_binding?.allowed_routing || []).length) {
       violations.push('execution-receipt-policy: routing_binding.allowed_routing must not be empty');
+    }
+  }
+
+  if (check.id === 'voice-profile-registry') {
+    const typed = data as {
+      default_profile_id?: string;
+      profiles?: Array<{
+        profile_id?: string;
+        status?: string;
+        languages?: string[];
+        tier?: string;
+      }>;
+    };
+    if (!(typed.profiles || []).length) {
+      violations.push('voice-profile-registry: profiles must not be empty');
+      return;
+    }
+    const profileIds = new Set<string>();
+    for (const profile of typed.profiles || []) {
+      const profileId = String(profile.profile_id || '');
+      if (!profileId) {
+        violations.push('voice-profile-registry: every profile must define profile_id');
+        continue;
+      }
+      if (profileIds.has(profileId)) {
+        violations.push(`voice-profile-registry: duplicate profile_id detected (${profileId})`);
+      }
+      profileIds.add(profileId);
+      if (!(profile.languages || []).length) {
+        violations.push(`voice-profile-registry: ${profileId} must define at least one language`);
+      }
+      if (!String(profile.tier || '')) {
+        violations.push(`voice-profile-registry: ${profileId} must define tier`);
+      }
+    }
+    if (!String(typed.default_profile_id || '')) {
+      violations.push('voice-profile-registry: default_profile_id must not be empty');
+      return;
+    }
+    if (!profileIds.has(String(typed.default_profile_id || ''))) {
+      violations.push('voice-profile-registry: default_profile_id must reference an existing profile_id');
+    }
+    if (!(typed.profiles || []).some((profile) => profile.status === 'active')) {
+      violations.push('voice-profile-registry: at least one active profile is required');
+    }
+  }
+
+  if (check.id === 'voice-runtime-policy') {
+    const typed = data as {
+      queue?: { concurrency?: number; cancellation?: string };
+      chunking?: {
+        default_max_chunk_chars?: number;
+        default_crossfade_ms?: number;
+      };
+      progress?: { throttle_ms?: number; min_percent_delta?: number };
+    };
+    if ((typed.queue?.concurrency || 0) < 1) {
+      violations.push('voice-runtime-policy: queue.concurrency must be >= 1');
+    }
+    if ((typed.chunking?.default_max_chunk_chars || 0) < 100) {
+      violations.push('voice-runtime-policy: chunking.default_max_chunk_chars must be >= 100');
+    }
+    if ((typed.chunking?.default_crossfade_ms || 0) > 500) {
+      violations.push('voice-runtime-policy: chunking.default_crossfade_ms must be <= 500');
+    }
+    if ((typed.progress?.throttle_ms || 0) < 50) {
+      violations.push('voice-runtime-policy: progress.throttle_ms must be >= 50');
+    }
+    if ((typed.progress?.min_percent_delta || 0) < 0) {
+      violations.push('voice-runtime-policy: progress.min_percent_delta must be >= 0');
     }
   }
 
