@@ -4,6 +4,9 @@
   "description": "Single voice request or lightweight voice pipeline envelope.",
   "anyOf": [
     {
+      "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
+    },
+    {
       "type": "object",
       "required": ["action", "params"],
       "properties": {
@@ -20,11 +23,19 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["action", "params"],
-            "properties": {
-              "action": { "enum": ["speak_local", "list_voices"] },
-              "params": { "type": "object" }
-            }
+            "anyOf": [
+              {
+                "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "enum": ["speak_local", "list_voices"] },
+                  "params": { "type": "object" }
+                }
+              }
+            ]
           }
         }
       }
