@@ -61,6 +61,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
     dataPath: 'knowledge/public/governance/harness-capability-registry.json',
   },
+  {
+    id: 'execution-receipt-policy',
+    schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
+    dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -375,6 +380,54 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.capabilities || []).some((capability) => capability.status === 'active')) {
       violations.push('harness-capability-registry: at least one active capability is required');
+    }
+  }
+
+  if (check.id === 'execution-receipt-policy') {
+    const typed = data as {
+      required_sections?: string[];
+      clarification?: {
+        max_blocking_questions_per_turn?: number;
+        must_explain_missing_inputs?: boolean;
+      };
+      compactness?: {
+        max_interpreted_goal_chars?: number;
+        max_next_action_chars?: number;
+      };
+      approval_binding?: {
+        require_policy_refs_when_approval_required?: boolean;
+        require_reason_when_approval_required?: boolean;
+      };
+      routing_binding?: {
+        allowed_modes?: string[];
+        allowed_routing?: string[];
+      };
+    };
+    const requiredSections = new Set(typed.required_sections || []);
+    for (const key of ['intent', 'deliverable', 'missing_inputs', 'approval', 'execution', 'status']) {
+      if (!requiredSections.has(key)) {
+        violations.push(`execution-receipt-policy: required_sections must include ${key}`);
+      }
+    }
+    if ((typed.clarification?.max_blocking_questions_per_turn || 0) > 3) {
+      violations.push('execution-receipt-policy: clarification.max_blocking_questions_per_turn must be <= 3');
+    }
+    if ((typed.compactness?.max_next_action_chars || 0) > (typed.compactness?.max_interpreted_goal_chars || 0)) {
+      violations.push('execution-receipt-policy: compactness.max_next_action_chars must be <= compactness.max_interpreted_goal_chars');
+    }
+    if (
+      typed.approval_binding?.require_policy_refs_when_approval_required &&
+      !typed.approval_binding?.require_reason_when_approval_required
+    ) {
+      violations.push(
+        'execution-receipt-policy: approval reason is required when policy refs are required for approval'
+      );
+    }
+    if (!(typed.routing_binding?.allowed_modes || []).length) {
+      violations.push('execution-receipt-policy: routing_binding.allowed_modes must not be empty');
+    }
+    if (!(typed.routing_binding?.allowed_routing || []).length) {
+      violations.push('execution-receipt-policy: routing_binding.allowed_routing must not be empty');
     }
   }
 
