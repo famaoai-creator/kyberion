@@ -1,9 +1,9 @@
 import { execSync } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeMkdir, safeWriteFile } from '@agent/core';
 
 const outDir = 'active/shared/tmp/ceo_simulation';
-fs.mkdirSync(outDir, { recursive: true });
+safeMkdir(outDir, { recursive: true });
 
 const pipelines = {
   '1-strategic-alignment': {
@@ -81,7 +81,7 @@ let report = '# CEO Intent Simulation Report\n\n';
 
 for (const [id, pipeline] of Object.entries(pipelines)) {
   const filePath = path.join(outDir, `${id}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(pipeline, null, 2));
+  safeWriteFile(filePath, JSON.stringify(pipeline, null, 2));
   
   console.log(`Running ${id}...`);
   try {
@@ -92,5 +92,5 @@ for (const [id, pipeline] of Object.entries(pipelines)) {
   }
 }
 
-fs.writeFileSync(path.join(outDir, 'REPORT.md'), report);
+safeWriteFile(path.join(outDir, 'REPORT.md'), report);
 console.log('Simulation complete. Report generated.');

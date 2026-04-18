@@ -65,4 +65,39 @@ describe('CodexAppServerAdapter', () => {
       }
     }
   });
+
+  it('applies codex enhancers before turn/start', async () => {
+    const adapter = new CodexAppServerAdapter({
+      cwd: '/tmp/kyberion-test',
+      approvalMode: 'relaxed',
+    }) as any;
+
+    adapter.threadId = 'thread-1';
+    adapter.enhancers = [];
+    adapter.addEnhancer({
+      name: 'test-enhancer',
+      async onBeforeAsk(prompt: string) {
+        return { prompt: `${prompt}\n#enhanced` };
+      },
+    });
+
+    const sendRequest = vi.spyOn(adapter, 'sendRequest').mockImplementation(async (method: string, params: any) => {
+      if (method === 'turn/start') {
+        return { turn: { id: 'turn-1' } };
+      }
+      throw new Error(`Unexpected method: ${method}`);
+    });
+
+    adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
+    const result = await adapter.ask('Reply with exactly OK');
+
+    expect(result).toEqual({ text: 'OK', stopReason: 'completed' });
+    expect(sendRequest).toHaveBeenCalledWith(
+      'turn/start',
+      expect.objectContaining({
+        input: [{ type: 'text', text: 'Reply with exactly OK\n#enhanced', text_elements: [] }],
+      }),
+      expect.any(Number)
+    );
+  });
 });
