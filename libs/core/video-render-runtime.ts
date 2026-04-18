@@ -67,13 +67,14 @@ export class VideoRenderRuntime {
     return this.packets.get(jobId) || null;
   }
 
-  public cancel(jobId: string): 'queued' | 'running' | null {
+  public cancel(jobId: string, options: { reason?: string } = {}): 'queued' | 'running' | null {
+    const reason = options.reason && options.reason.trim() ? options.reason.trim() : undefined;
     const queuedIndex = this.queue.findIndex((entry) => entry.spec.jobId === jobId);
     if (queuedIndex >= 0) {
       this.queue.splice(queuedIndex, 1);
       const packet = this.buildPacket(jobId, 'cancelled', {
         progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
-        message: 'cancelled before execution',
+        message: reason ? `cancelled before execution: ${reason}` : 'cancelled before execution',
       });
       this.packets.set(jobId, packet);
       this.notify(packet, true);
@@ -88,7 +89,7 @@ export class VideoRenderRuntime {
     runningJob.cancelled = true;
     const packet = this.buildPacket(jobId, 'cancelled', {
       progress: this.packets.get(jobId)?.progress || { current: 0, total: 1, percent: 0, unit: 'steps' },
-      message: 'cancellation requested',
+      message: reason ? `cancellation requested: ${reason}` : 'cancellation requested',
     });
     this.packets.set(jobId, packet);
     this.notify(packet, true);

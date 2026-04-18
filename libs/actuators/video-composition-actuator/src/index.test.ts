@@ -235,6 +235,7 @@ describe('video-composition-actuator', () => {
       job_id: 'missing-job',
       cancellation: null,
       packet: null,
+      diagnostics: null,
     });
   });
 
@@ -249,7 +250,14 @@ describe('video-composition-actuator', () => {
     mocks.renderVideoCompositionBundleAsync.mockImplementationOnce(async (_plan: any, _policy: any, options: any) => {
       const startedAt = Date.now();
       while (Date.now() - startedAt < 500) {
-        if (options?.isCancelled?.()) throw new Error('video render cancelled');
+        if (options?.isCancelled?.()) {
+          const error: any = new Error('video render cancelled');
+          error.cancelled = true;
+          error.timed_out = false;
+          error.signal = 'SIGTERM';
+          error.exit_code = null;
+          throw error;
+        }
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
       return {
@@ -291,28 +299,37 @@ describe('video-composition-actuator', () => {
 
     const cancelled = await handleAction({
       action: 'cancel_video_composition_job',
-      params: { job_id: queued.job_id },
+      params: { job_id: queued.job_id, reason: 'operator-requested stop' },
     } as any);
     expect(cancelled).toEqual(expect.objectContaining({
       status: 'succeeded',
       cancellation: 'running',
       job_id: queued.job_id,
     }));
+    expect(cancelled.diagnostics).toEqual(expect.objectContaining({
+      cancellation_reason: 'operator-requested stop',
+    }));
 
-    const status = await waitForCancelledStatus(handleAction, queued.job_id);
+    const status = await waitForCancelledStatusWithSignal(handleAction, queued.job_id);
     expect(status.packet.status).toBe('cancelled');
+    expect(status.packet.message).toContain('operator-requested stop');
+    expect(status.diagnostics).toEqual(expect.objectContaining({
+      cancellation_reason: 'operator-requested stop',
+      backend_exit_signal: 'SIGTERM',
+      backend_cancelled: true,
+    }));
   });
 });
 
-async function waitForCancelledStatus(handleAction: any, jobId: string) {
+async function waitForCancelledStatusWithSignal(handleAction: any, jobId: string) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 5000) {
     const status = await handleAction({
       action: 'get_video_composition_job_status',
       params: { job_id: jobId },
     } as any);
-    if (status?.packet?.status === 'cancelled') return status;
+    if (status?.packet?.status === 'cancelled' && status?.diagnostics?.backend_exit_signal) return status;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  throw new Error(`timed out waiting for cancelled packet: ${jobId}`);
+  throw new Error(`timed out waiting for cancelled packet with signal: ${jobId}`);
 }
