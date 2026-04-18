@@ -65,7 +65,33 @@ const mocks = vi.hoisted(() => ({
   })),
   safeExec: vi.fn(() => ''),
   safeMkdir: vi.fn(),
+  safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
+  getVoiceSampleIngestionPolicy: vi.fn(() => ({
+    version: 'test',
+    sample_limits: {
+      min_samples: 3,
+      max_samples: 20,
+      min_sample_bytes: 4096,
+      max_sample_bytes: 26214400,
+      allowed_extensions: ['wav', 'aiff'],
+    },
+    profile_rules: {
+      allowed_tiers: ['personal', 'confidential'],
+      require_unique_sample_paths: true,
+      require_language_coverage: true,
+      strict_personal_voice_registration: true,
+    },
+  })),
+  validateVoiceProfileRegistration: vi.fn(() => ({
+    ok: true,
+    violations: [],
+    summary: {
+      sample_count: 3,
+      total_sample_bytes: 12345,
+      strict_personal_voice: true,
+    },
+  })),
   splitVoiceTextIntoChunks: vi.fn((text: string) => [text.slice(0, 5), text.slice(5)]),
   randomUUID: vi.fn(() => 'job-123'),
 }));
@@ -82,7 +108,10 @@ vi.mock('@agent/core', async () => {
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
     safeMkdir: mocks.safeMkdir,
+    safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
+    getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
+    validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
     splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
     pathResolver: {
       ...actual.pathResolver,
@@ -168,5 +197,67 @@ describe('voice actuator', () => {
       'say',
       ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.aiff', 'hello world'],
     );
+  });
+
+  it('blocks profile registration when validation fails', async () => {
+    mocks.validateVoiceProfileRegistration.mockReturnValueOnce({
+      ok: false,
+      violations: ['missing sample language coverage for ja'],
+      summary: {
+        sample_count: 1,
+        total_sample_bytes: 2048,
+        strict_personal_voice: true,
+      },
+    });
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'register_voice_profile',
+      request_id: 'reg-1',
+      profile: {
+        profile_id: 'user-ja-voice',
+        display_name: 'User JA',
+        tier: 'personal',
+        languages: ['ja'],
+        default_engine_id: 'open_voice_clone',
+      },
+      samples: [{ sample_id: 's1', path: 'active/shared/tmp/sample.wav', language: 'en' }],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'blocked',
+      action: 'register_voice_profile',
+      request_id: 'reg-1',
+      violations: ['missing sample language coverage for ja'],
+    }));
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('creates registration receipt when validation succeeds', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'register_voice_profile',
+      request_id: 'reg-2',
+      profile: {
+        profile_id: 'user-ja-voice',
+        display_name: 'User JA',
+        tier: 'personal',
+        languages: ['ja'],
+        default_engine_id: 'open_voice_clone',
+      },
+      samples: [
+        { sample_id: 's1', path: 'active/shared/tmp/sample-1.wav', language: 'ja' },
+        { sample_id: 's2', path: 'active/shared/tmp/sample-2.wav', language: 'ja' },
+        { sample_id: 's3', path: 'active/shared/tmp/sample-3.wav', language: 'ja' },
+      ],
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      action: 'register_voice_profile',
+      request_id: 'reg-2',
+      registration_receipt_path: '/tmp/voice-profile-registration/reg-2.json',
+    }));
+    expect(mocks.safeMkdir).toHaveBeenCalledWith('/tmp/voice-profile-registration', { recursive: true });
+    expect(mocks.safeWriteFile).toHaveBeenCalled();
   });
 });
