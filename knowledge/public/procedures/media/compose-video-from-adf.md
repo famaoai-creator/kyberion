@@ -46,6 +46,7 @@ node dist/libs/actuators/video-composition-actuator/src/index.js \
 
 - bundle artifact refs
 - progress packets for validation/template resolution/bundle assembly
+- queued packets include `queue` metadata (position, queued count, running count, concurrency)
 - governed source bundle under `active/shared/tmp/video-composition/`
 
 ## 6. Design Rule
