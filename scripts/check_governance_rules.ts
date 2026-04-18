@@ -81,6 +81,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/voice-engine-registry.schema.json',
     dataPath: 'knowledge/public/governance/voice-engine-registry.json',
   },
+  {
+    id: 'video-composition-template-registry',
+    schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
+    dataPath: 'knowledge/public/governance/video-composition-template-registry.json',
+  },
+  {
+    id: 'video-render-runtime-policy',
+    schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
+    dataPath: 'knowledge/public/governance/video-render-runtime-policy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -580,6 +590,78 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       if (fallbackId && fallbackId === engineId) {
         violations.push(`voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`);
       }
+    }
+  }
+
+  if (check.id === 'video-composition-template-registry') {
+    const typed = data as {
+      default_template_id?: string;
+      templates?: Array<{
+        template_id?: string;
+        status?: string;
+        supported_roles?: string[];
+        required_content_fields?: string[];
+        supported_output_formats?: string[];
+      }>;
+    };
+    if (!(typed.templates || []).length) {
+      violations.push('video-composition-template-registry: templates must not be empty');
+      return;
+    }
+    const templateIds = new Set<string>();
+    for (const template of typed.templates || []) {
+      const templateId = String(template.template_id || '');
+      if (!templateId) {
+        violations.push('video-composition-template-registry: every template must define template_id');
+        continue;
+      }
+      if (templateIds.has(templateId)) {
+        violations.push(`video-composition-template-registry: duplicate template_id detected (${templateId})`);
+      }
+      templateIds.add(templateId);
+      if (!(template.supported_roles || []).length) {
+        violations.push(`video-composition-template-registry: ${templateId} must define supported_roles`);
+      }
+      if (!(template.required_content_fields || []).length) {
+        violations.push(`video-composition-template-registry: ${templateId} must define required_content_fields`);
+      }
+      if (!(template.supported_output_formats || []).length) {
+        violations.push(`video-composition-template-registry: ${templateId} must define supported_output_formats`);
+      }
+    }
+    if (!String(typed.default_template_id || '')) {
+      violations.push('video-composition-template-registry: default_template_id must not be empty');
+      return;
+    }
+    if (!templateIds.has(String(typed.default_template_id || ''))) {
+      violations.push('video-composition-template-registry: default_template_id must reference an existing template_id');
+    }
+    if (!(typed.templates || []).some((template) => template.status === 'active')) {
+      violations.push('video-composition-template-registry: at least one active template is required');
+    }
+  }
+
+  if (check.id === 'video-render-runtime-policy') {
+    const typed = data as {
+      queue?: { concurrency?: number };
+      progress?: { throttle_ms?: number; min_percent_delta?: number };
+      bundle?: { default_bundle_root?: string };
+      render?: { allowed_output_formats?: string[] };
+    };
+    if ((typed.queue?.concurrency || 0) < 1) {
+      violations.push('video-render-runtime-policy: queue.concurrency must be >= 1');
+    }
+    if ((typed.progress?.throttle_ms || 0) < 50) {
+      violations.push('video-render-runtime-policy: progress.throttle_ms must be >= 50');
+    }
+    if ((typed.progress?.min_percent_delta || 0) < 0) {
+      violations.push('video-render-runtime-policy: progress.min_percent_delta must be >= 0');
+    }
+    if (!String(typed.bundle?.default_bundle_root || '')) {
+      violations.push('video-render-runtime-policy: bundle.default_bundle_root must not be empty');
+    }
+    if (!(typed.render?.allowed_output_formats || []).length) {
+      violations.push('video-render-runtime-policy: render.allowed_output_formats must not be empty');
     }
   }
 
