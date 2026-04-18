@@ -75,6 +75,37 @@ function registerEnhancer(enhancers: AgentEnhancer[], enhancer: AgentEnhancer): 
   logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
 }
 
+function summarizePromptForLog(prompt: string, maxChars = 200): string {
+  const oneLine = prompt.replace(/\s+/g, ' ').trim();
+  if (oneLine.length <= maxChars) return oneLine;
+  return `${oneLine.slice(0, maxChars)}...`;
+}
+
+function isSafeReadOnlyPermissionTitle(title: string): boolean {
+  const normalized = title.toLowerCase();
+  const allowPatterns = [
+    /\bread\b/,
+    /\bsearch\b/,
+    /\blist\b/,
+    /\bview\b/,
+    /\binspect\b/,
+    /\bfetch\b/,
+  ];
+  const denyPatterns = [
+    /\bwrite\b/,
+    /\bedit\b/,
+    /\bdelete\b/,
+    /\bremove\b/,
+    /\bcreate\b/,
+    /\bexecute\b/,
+    /\brun\b/,
+    /\bapply\b/,
+    /\bpatch\b/,
+  ];
+  if (denyPatterns.some((pattern) => pattern.test(normalized))) return false;
+  return allowPatterns.some((pattern) => pattern.test(normalized));
+}
+
 async function applyEnhancersBeforeAsk(
   enhancers: AgentEnhancer[],
   prompt: string,
@@ -86,7 +117,7 @@ async function applyEnhancersBeforeAsk(
     if (!enhancer.onBeforeAsk) continue;
     const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
     currentPrompt = enhanced.prompt;
-    currentOptions = { ...(enhanced.options || currentOptions) };
+    currentOptions = { ...currentOptions, ...(enhanced.options || {}) };
   }
   return { prompt: currentPrompt, options: currentOptions };
 }
@@ -211,9 +242,8 @@ abstract class BaseACPAdapter implements AgentAdapter {
           findContent(params);
         },
         async requestPermission(params) {
-          const safeOps = ['read', 'search', 'list', 'view', 'get'];
           const title = (params.toolCall?.title || '').toLowerCase();
-          if (safeOps.some(op => title.includes(op))) {
+          if (isSafeReadOnlyPermissionTitle(title)) {
             return { outcome: 'approved' as const };
           }
           logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
@@ -372,8 +402,11 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
     try {
       if (safeExistsSync(wisdomDir)) {
         const files = safeReaddir(wisdomDir);
-        // Load latest 5 lessons to avoid over-filling context if not Gemini Pro
-        const mdFiles = files.filter(f => f.endsWith('.md')).slice(0, 5); 
+        // Keep deterministic lesson order to avoid response drift between runs.
+        const mdFiles = files
+          .filter((f) => f.endsWith('.md'))
+          .sort((a, b) => a.localeCompare(b))
+          .slice(-5);
         
         for (const file of mdFiles) {
           const content = safeReadFile(path.join(wisdomDir, file), { encoding: 'utf8' }) as string;
@@ -477,7 +510,7 @@ export class CodexAdapter implements AgentAdapter {
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
-    logger.info(`[UAA] Codex Executing: "${enhanced.prompt}"`);
+    logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
     const { spawnSync } = await import('node:child_process');
     
     try {
