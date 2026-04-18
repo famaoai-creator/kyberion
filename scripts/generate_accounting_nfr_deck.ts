@@ -1,5 +1,5 @@
 import { generateNativePptx, pathResolver, safeExistsSync, safeMkdir } from '@agent/core';
-import type { PptxDesignProtocol, PptxElement, PptxSlide } from '../libs/core/src/types/pptx-protocol.js';
+import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
 import * as path from 'node:path';
 
 type SlideSpec = {
