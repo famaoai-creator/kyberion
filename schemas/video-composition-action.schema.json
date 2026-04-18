@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Video Composition Actuator Request",
+  "description": "Compile governed composed-video bundles from a video-composition-adf contract.",
+  "anyOf": [
+    {
+      "$ref": "../knowledge/public/schemas/video-composition-adf.schema.json"
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "enum": ["prepare_video_composition", "list_video_composition_templates"] },
+        "params": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "anyOf": [
+              {
+                "$ref": "../knowledge/public/schemas/video-composition-adf.schema.json"
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "enum": ["prepare_video_composition", "list_video_composition_templates"] },
+                  "params": { "type": "object" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

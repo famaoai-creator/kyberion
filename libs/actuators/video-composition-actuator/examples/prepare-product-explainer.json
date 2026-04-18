@@ -1,0 +1,63 @@
+{
+  "action": "prepare_video_composition",
+  "params": {
+    "video_composition_adf": {
+      "kind": "video-composition-adf",
+      "version": "1.0.0",
+      "intent": "product explainer bundle",
+      "title": "Product Explainer Bundle",
+      "composition": {
+        "duration_sec": 9,
+        "fps": 30,
+        "width": 1920,
+        "height": 1080,
+        "background_color": "#07111f"
+      },
+      "audio": {
+        "narration_ref": "active/shared/exports/narration.wav"
+      },
+      "scenes": [
+        {
+          "scene_id": "hook",
+          "role": "hook",
+          "start_sec": 0,
+          "duration_sec": 3,
+          "template_ref": { "template_id": "basic-title-card" },
+          "content": {
+            "eyebrow": "Deterministic Video",
+            "headline": "Governed HTML bundles before rendering",
+            "body": "Kyberion prepares composed-video artifacts with explicit templates and timing."
+          }
+        },
+        {
+          "scene_id": "feature",
+          "role": "feature",
+          "start_sec": 3,
+          "duration_sec": 4,
+          "template_ref": { "template_id": "split-highlight" },
+          "content": {
+            "headline": "Template-backed scenes",
+            "body": "Reusable layout packs stay governed instead of becoming raw prompt glue."
+          }
+        },
+        {
+          "scene_id": "outro",
+          "role": "outro",
+          "start_sec": 7,
+          "duration_sec": 2,
+          "template_ref": { "template_id": "logo-outro" },
+          "content": {
+            "headline": "Ready for renderer integration",
+            "body": "This bundle is the stable source artifact for a future deterministic backend."
+          }
+        }
+      ],
+      "output": {
+        "format": "mp4",
+        "bundle_dir": "active/shared/tmp/video-composition/product-explainer-demo",
+        "emit_progress_packets": true,
+        "await_completion": true
+      }
+    }
+  }
+}

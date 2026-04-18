@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "queue": {
+    "concurrency": 1,
+    "cancellation": "queued_or_running"
+  },
+  "progress": {
+    "throttle_ms": 250,
+    "min_percent_delta": 2,
+    "emit_heartbeat": true
+  },
+  "bundle": {
+    "default_bundle_root": "active/shared/tmp/video-composition",
+    "copy_declared_assets": false
+  },
+  "render": {
+    "allowed_output_formats": ["mp4", "mov", "webm"],
+    "enable_backend_rendering": false
+  }
+}

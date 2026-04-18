@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "default_template_id": "basic-title-card",
+  "templates": [
+    {
+      "template_id": "basic-title-card",
+      "display_name": "Basic Title Card",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["hook", "generic", "cta"],
+      "required_content_fields": ["headline"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Centered headline/body composition for openers and concise CTA scenes."
+    },
+    {
+      "template_id": "split-highlight",
+      "display_name": "Split Highlight",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["feature", "proof", "generic"],
+      "required_content_fields": ["headline", "body"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Left text, right supporting asset for product and proof scenes."
+    },
+    {
+      "template_id": "logo-outro",
+      "display_name": "Logo Outro",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["outro", "cta"],
+      "required_content_fields": ["headline"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Final brand scene with logo placement and CTA lockup."
+    }
+  ]
+}
