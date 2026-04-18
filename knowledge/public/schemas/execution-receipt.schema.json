@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "execution-receipt.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "receipt_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw_request": { "type": "string", "minLength": 1 },
+        "interpreted_goal": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["raw_request", "interpreted_goal", "confidence"]
+    },
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "direct_reply",
+            "code_change",
+            "commit_pr_merge",
+            "artifact_bundle",
+            "governance_update",
+            "task_session"
+          ]
+        },
+        "success_condition": { "type": "string", "minLength": 1 }
+      },
+      "required": ["kind", "success_condition"]
+    },
+    "missing_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "blocking": { "type": "boolean" }
+        },
+        "required": ["field", "reason", "blocking"]
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["required", "reasons", "policy_refs"]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["one_shot", "managed_program"] },
+        "routing": { "type": "string", "enum": ["local_only", "host_only", "dual_path"] },
+        "next_action": { "type": "string", "minLength": 1 }
+      },
+      "required": ["mode", "routing", "next_action"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "needs_clarification",
+        "awaiting_approval",
+        "ready_to_execute",
+        "executed",
+        "failed"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "receipt_id",
+    "created_at",
+    "intent",
+    "deliverable",
+    "missing_inputs",
+    "approval",
+    "execution",
+    "status"
+  ]
+}
