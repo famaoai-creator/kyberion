@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "capability-drift-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "report_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "baseline": { "$ref": "#/$defs/stackRef" },
+    "candidate": { "$ref": "#/$defs/stackRef" },
+    "summary": { "type": "string", "minLength": 1 },
+    "drifts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/driftEntry" }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "required": ["report_id", "generated_at", "baseline", "candidate", "summary", "drifts", "recommendations"],
+  "$defs": {
+    "stackRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "harness_version": { "type": "string", "minLength": 1 }
+      },
+      "required": ["model_id", "harness_version"]
+    },
+    "driftEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "type": "string",
+          "enum": [
+            "contract_validity",
+            "policy_obedience",
+            "latency",
+            "cost",
+            "tool_overreach",
+            "handoff_accuracy",
+            "browser_interaction",
+            "computer_use",
+            "plugin_skill_invocation",
+            "agent_delegation"
+          ]
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["improved", "regressed", "unchanged"]
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "notes": { "type": "string" }
+      },
+      "required": ["dimension", "direction", "impact", "evidence_refs"]
+    }
+  }
+}

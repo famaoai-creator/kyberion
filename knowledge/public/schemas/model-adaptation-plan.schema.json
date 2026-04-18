@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "model-adaptation-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "approved", "executing", "completed", "rolled_back"]
+    },
+    "baseline": { "$ref": "#/$defs/stackRef" },
+    "candidate": { "$ref": "#/$defs/stackRef" },
+    "observed_drift": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proposed_changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/changeItem" }
+    },
+    "affected_surfaces": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "affected_compiler_prompts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "affected_policies": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "affected_harness_adapters": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "capability_ownership_changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ownershipChange" }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/metricThreshold" }
+    }
+  },
+  "required": [
+    "run_id",
+    "created_at",
+    "status",
+    "baseline",
+    "candidate",
+    "proposed_changes",
+    "acceptance_criteria"
+  ],
+  "$defs": {
+    "stackRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "harness_version": { "type": "string", "minLength": 1 }
+      },
+      "required": ["model_id", "harness_version"]
+    },
+    "changeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "type": "string",
+          "enum": [
+            "model_registry",
+            "harness_registry",
+            "routing_policy",
+            "prompt_overlay",
+            "compiler_rule",
+            "surface_ux",
+            "concept_map"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "required": ["area", "summary"]
+    },
+    "ownershipChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "enum": ["local_only", "host_only", "dual_path"] },
+        "to": { "type": "string", "enum": ["local_only", "host_only", "dual_path"] },
+        "rationale": { "type": "string", "minLength": 1 }
+      },
+      "required": ["capability_id", "from", "to", "rationale"]
+    },
+    "metricThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "operator": { "type": "string", "enum": [">=", "<=", "=="] },
+        "threshold": { "type": "number" }
+      },
+      "required": ["name", "operator", "threshold"]
+    }
+  }
+}

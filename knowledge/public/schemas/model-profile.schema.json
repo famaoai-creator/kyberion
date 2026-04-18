@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "model-profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "model_id": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "profiled_at": { "type": "string", "format": "date-time" },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "structured_output": { "$ref": "#/$defs/confidenceBand" },
+        "tool_use": { "$ref": "#/$defs/confidenceBand" },
+        "multilingual": { "$ref": "#/$defs/confidenceBand" },
+        "reasoning": { "$ref": "#/$defs/confidenceBand" }
+      },
+      "required": ["structured_output", "tool_use", "multilingual", "reasoning"]
+    },
+    "benchmark_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contract_validity_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "policy_obedience_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "clarification_precision_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": [
+        "contract_validity_rate",
+        "policy_obedience_rate",
+        "clarification_precision_rate"
+      ]
+    },
+    "recommended_roles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "notes": { "type": "string" }
+  },
+  "required": [
+    "model_id",
+    "provider",
+    "profiled_at",
+    "strengths",
+    "weaknesses",
+    "risks",
+    "confidence",
+    "benchmark_summary",
+    "recommended_roles"
+  ],
+  "$defs": {
+    "confidenceBand": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "default_model_id": "openai:gpt-5.4",
+  "models": [
+    {
+      "model_id": "openai:gpt-5.4",
+      "provider": "openai",
+      "family": "gpt-5",
+      "status": "approved",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "structured_output",
+        "tool_use",
+        "multi_step_reasoning",
+        "multilingual"
+      ],
+      "notes": "Default production model for governed intent compilation and surface orchestration."
+    },
+    {
+      "model_id": "openai:gpt-5.4-mini",
+      "provider": "openai",
+      "family": "gpt-5",
+      "status": "candidate",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "medium",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": [
+        "fast_iteration",
+        "tool_first_execution",
+        "surface_reply"
+      ],
+      "notes": "Candidate for low-latency surfaces and lightweight delegation."
+    },
+    {
+      "model_id": "anthropic:claude-sonnet-4.5",
+      "provider": "anthropic",
+      "family": "claude-sonnet",
+      "status": "candidate",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "secondary",
+        "analysis": "primary",
+        "coding": "secondary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "long_context_analysis",
+        "strategy_review",
+        "artifact_planning"
+      ],
+      "notes": "Candidate for shadow evaluation in analysis-heavy flows."
+    }
+  ]
+}

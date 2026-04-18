@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "model-adaptation-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "lifecycle": { "$ref": "#/$defs/lifecyclePolicy" },
+    "triggers": { "$ref": "#/$defs/triggerPolicy" },
+    "benchmark_suites": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/benchmarkSuite" }
+    },
+    "promotion_gates": { "$ref": "#/$defs/promotionGates" },
+    "integration_decision_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/integrationDecisionRule" }
+    },
+    "rollback": { "$ref": "#/$defs/rollbackPolicy" }
+  },
+  "required": [
+    "version",
+    "lifecycle",
+    "triggers",
+    "benchmark_suites",
+    "promotion_gates",
+    "integration_decision_rules",
+    "rollback"
+  ],
+  "$defs": {
+    "metricThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "operator": { "type": "string", "enum": [">=", "<=", "=="] },
+        "threshold": { "type": "number" }
+      },
+      "required": ["name", "operator", "threshold"]
+    },
+    "lifecyclePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["detect", "profile", "evaluate", "adapt", "shadow", "promote_or_rollback"]
+          }
+        }
+      },
+      "required": ["steps"]
+    },
+    "severityRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "signal": {
+          "type": "string",
+          "enum": [
+            "default_model_change",
+            "model_family_change",
+            "contract_validity_drop",
+            "latency_regression",
+            "cost_regression",
+            "harness_capability_change",
+            "host_local_overlap_detected"
+          ]
+        },
+        "threshold": { "type": "number" },
+        "severity": { "type": "string", "enum": ["patch", "minor", "major"] }
+      },
+      "required": ["id", "signal", "severity"]
+    },
+    "triggerPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_full_cycle_when": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "default_model_change",
+              "model_family_change",
+              "contract_validity_drop",
+              "harness_capability_change",
+              "host_local_overlap_detected"
+            ]
+          }
+        },
+        "severity_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/severityRule" }
+        }
+      },
+      "required": ["require_full_cycle_when", "severity_rules"]
+    },
+    "benchmarkSuite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/metricThreshold" }
+        }
+      },
+      "required": ["id", "label", "required", "metrics"]
+    },
+    "promotionGates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_suites": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "hard_fail_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/metricThreshold" }
+        },
+        "allow_cost_regression_with_rationale": { "type": "boolean" }
+      },
+      "required": ["required_suites", "hard_fail_metrics", "allow_cost_regression_with_rationale"]
+    },
+    "integrationDecisionRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "capability_kind": {
+              "type": "string",
+              "enum": ["reasoning", "interactive_tooling", "delegated_execution", "deterministic_utility"]
+            },
+            "workflow_shape": {
+              "type": "string",
+              "enum": ["direct_reply", "task_session", "mission", "project_bootstrap", "any"]
+            },
+            "replayability": {
+              "type": "string",
+              "enum": ["deterministic", "partial", "opaque", "any"]
+            },
+            "risk_class": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical", "any"]
+            }
+          },
+          "required": ["capability_kind"]
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["local_only", "host_only", "dual_path", "defer"]
+        }
+      },
+      "required": ["id", "when", "decision"]
+    },
+    "rollbackPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_rollback_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "min_signal_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["auto_rollback_conditions", "min_signal_count"]
+    }
+  }
+}

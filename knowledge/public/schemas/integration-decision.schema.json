@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "integration-decision.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "capability_id": { "type": "string", "minLength": 1 },
+    "baseline_path": { "$ref": "#/$defs/pathMode" },
+    "candidate_path": { "$ref": "#/$defs/pathMode" },
+    "final_decision": { "$ref": "#/$defs/pathMode" },
+    "status": {
+      "type": "string",
+      "enum": ["approved", "deferred", "rejected"]
+    },
+    "rationale": { "type": "string", "minLength": 1 },
+    "required_controls": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rollback_plan": { "type": "string", "minLength": 1 },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "decision_id",
+    "capability_id",
+    "baseline_path",
+    "candidate_path",
+    "final_decision",
+    "status",
+    "rationale",
+    "required_controls",
+    "rollback_plan",
+    "approved_by",
+    "approved_at"
+  ],
+  "$defs": {
+    "pathMode": {
+      "type": "string",
+      "enum": ["local_only", "host_only", "dual_path", "defer"]
+    }
+  }
+}
