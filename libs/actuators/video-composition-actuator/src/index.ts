@@ -5,7 +5,7 @@ import {
   getVideoRenderRuntimePolicy,
   logger,
   pathResolver,
-  renderVideoCompositionBundle,
+  renderVideoCompositionBundleAsync,
   safeReadFile,
   VideoRenderRuntime,
   writeVideoCompositionBundle,
@@ -171,6 +171,7 @@ async function prepareVideoComposition(params: {
       let backendOutputPath: string | undefined;
 
       if (policy.render.enable_backend_rendering) {
+        if (api.isCancelled()) throw new Error('video composition job cancelled');
         api.report({
           status: 'rendering',
           progress: { current: 4, total: totalSteps, percent: (4 / totalSteps) * 100, unit: 'steps' },
@@ -178,12 +179,15 @@ async function prepareVideoComposition(params: {
           artifact_refs: artifactRefs,
         });
 
-        const backendResult = renderVideoCompositionBundle(plan, policy);
+        const backendResult = await renderVideoCompositionBundleAsync(plan, policy, {
+          isCancelled: api.isCancelled,
+        });
         if (backendResult.output_path) {
           backendOutputPath = backendResult.output_path;
           artifactRefs = [...artifactRefs, backendOutputPath];
         }
 
+        if (api.isCancelled()) throw new Error('video composition job cancelled');
         api.report({
           status: 'encoding',
           progress: { current: 5, total: totalSteps, percent: 100, unit: 'steps' },
