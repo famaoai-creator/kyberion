@@ -23,6 +23,13 @@ interface RunningJob {
   cancelled: boolean;
 }
 
+export interface VideoRenderQueueSnapshot {
+  queued_total: number;
+  running: number;
+  concurrency: number;
+  jobs: Array<{ job_id: string; position: number; queued_ahead: number }>;
+}
+
 export class VideoRenderRuntime {
   private readonly queue: EnqueuedJob[] = [];
   private readonly packets = new Map<string, VideoRenderProgressPacket>();
@@ -38,13 +45,15 @@ export class VideoRenderRuntime {
     if (this.packets.has(spec.jobId)) {
       throw new Error(`video render job already exists: ${spec.jobId}`);
     }
+    this.queue.push({ spec, cancelled: false });
     const packet = this.buildPacket(spec.jobId, 'queued', {
       progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
       message: 'queued',
+      queue: this.buildQueueData(spec.jobId),
     });
     this.packets.set(spec.jobId, packet);
-    this.queue.push({ spec, cancelled: false });
     this.notify(packet, true);
+    this.refreshQueuedPackets(true);
     void this.pump();
     return packet;
   }
@@ -59,15 +68,16 @@ export class VideoRenderRuntime {
   }
 
   public cancel(jobId: string): 'queued' | 'running' | null {
-    const queuedJob = this.queue.find((entry) => entry.spec.jobId === jobId);
-    if (queuedJob) {
-      queuedJob.cancelled = true;
+    const queuedIndex = this.queue.findIndex((entry) => entry.spec.jobId === jobId);
+    if (queuedIndex >= 0) {
+      this.queue.splice(queuedIndex, 1);
       const packet = this.buildPacket(jobId, 'cancelled', {
         progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
         message: 'cancelled before execution',
       });
       this.packets.set(jobId, packet);
       this.notify(packet, true);
+      this.refreshQueuedPackets(true);
       return 'queued';
     }
 
@@ -82,7 +92,22 @@ export class VideoRenderRuntime {
     });
     this.packets.set(jobId, packet);
     this.notify(packet, true);
+    this.refreshQueuedPackets(true);
     return 'running';
+  }
+
+  public getQueueSnapshot(): VideoRenderQueueSnapshot {
+    const activeQueue = this.queue.filter((entry) => !entry.cancelled);
+    return {
+      queued_total: activeQueue.length,
+      running: this.running.size,
+      concurrency: this.policy.queue.concurrency,
+      jobs: activeQueue.map((entry, index) => ({
+        job_id: entry.spec.jobId,
+        position: index + 1,
+        queued_ahead: index,
+      })),
+    };
   }
 
   private async pump(): Promise<void> {
@@ -94,6 +119,7 @@ export class VideoRenderRuntime {
         if (!next) break;
         const runningJob: RunningJob = { spec: next.spec, cancelled: false };
         this.running.set(next.spec.jobId, runningJob);
+        this.refreshQueuedPackets(true);
         void this.execute(runningJob);
       }
     } finally {
@@ -141,6 +167,7 @@ export class VideoRenderRuntime {
       }
     } finally {
       this.running.delete(jobId);
+      this.refreshQueuedPackets(true);
       void this.pump();
     }
   }
@@ -155,6 +182,7 @@ export class VideoRenderRuntime {
       progress: update.progress || current.progress,
       message: update.message === undefined ? current.message : update.message,
       artifact_refs: update.artifact_refs === undefined ? current.artifact_refs : update.artifact_refs,
+      queue: update.queue === undefined ? current.queue : update.queue,
     });
     this.packets.set(jobId, packet);
     this.notify(packet, false);
@@ -164,7 +192,7 @@ export class VideoRenderRuntime {
   private buildPacket(
     jobId: string,
     status: VideoRenderJobStatus,
-    data: Pick<VideoRenderProgressPacket, 'progress'> & Partial<Pick<VideoRenderProgressPacket, 'message' | 'artifact_refs'>>,
+    data: Pick<VideoRenderProgressPacket, 'progress'> & Partial<Pick<VideoRenderProgressPacket, 'message' | 'artifact_refs' | 'queue'>>,
   ): VideoRenderProgressPacket {
     return {
       kind: 'video_render_progress_packet',
@@ -176,8 +204,44 @@ export class VideoRenderRuntime {
       },
       message: data.message,
       artifact_refs: data.artifact_refs,
+      queue: data.queue,
       updated_at: new Date().toISOString(),
     };
+  }
+
+  private buildQueueData(jobId: string): VideoRenderProgressPacket['queue'] | undefined {
+    const snapshot = this.getQueueSnapshot();
+    const index = snapshot.jobs.findIndex((entry) => entry.job_id === jobId);
+    if (index < 0) return undefined;
+    return {
+      position: snapshot.jobs[index].position,
+      queued_ahead: snapshot.jobs[index].queued_ahead,
+      queued_total: snapshot.queued_total,
+      running: snapshot.running,
+      concurrency: snapshot.concurrency,
+    };
+  }
+
+  private refreshQueuedPackets(force: boolean): void {
+    const snapshot = this.getQueueSnapshot();
+    for (const job of snapshot.jobs) {
+      const current = this.packets.get(job.job_id);
+      if (!current || current.status !== 'queued') continue;
+      const packet = this.buildPacket(job.job_id, 'queued', {
+        progress: current.progress,
+        message: current.message,
+        artifact_refs: current.artifact_refs,
+        queue: {
+          position: job.position,
+          queued_ahead: job.queued_ahead,
+          queued_total: snapshot.queued_total,
+          running: snapshot.running,
+          concurrency: snapshot.concurrency,
+        },
+      });
+      this.packets.set(job.job_id, packet);
+      this.notify(packet, force);
+    }
   }
 
   private notify(packet: VideoRenderProgressPacket, force: boolean): void {
