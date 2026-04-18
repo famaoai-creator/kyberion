@@ -153,10 +153,13 @@ export class VoiceGenerationRuntime {
     try {
       const result = await job.spec.run(api);
       if (!job.cancelled) {
+        const artifactRefs = result && typeof result === 'object' && 'artifactRefs' in result
+          ? result.artifactRefs
+          : undefined;
         const packet = this.buildPacket(jobId, 'completed', {
           progress: { current: 1, total: 1, percent: 100, unit: 'steps' },
           message: 'completed',
-          artifact_refs: result?.artifactRefs,
+          artifact_refs: artifactRefs,
         });
         this.packets.set(jobId, packet);
         this.notify(packet, true);

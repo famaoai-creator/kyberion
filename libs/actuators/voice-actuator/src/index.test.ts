@@ -33,6 +33,32 @@ const mocks = vi.hoisted(() => ({
       create_processed_version: false,
     },
   })),
+  getVoiceEngineRecord: vi.fn(() => ({
+    engine_id: 'local_say',
+    display_name: 'Local System TTS',
+    kind: 'native_local',
+    provider: 'system_tts',
+    status: 'active',
+    platforms: ['darwin', 'linux', 'win32'],
+    supports: {
+      list_voices: true,
+      playback: true,
+      artifact_formats: ['wav', 'aiff'],
+    },
+  })),
+  resolveVoiceEngineForPlatform: vi.fn(() => ({
+    engine_id: 'local_say',
+    display_name: 'Local System TTS',
+    kind: 'native_local',
+    provider: 'system_tts',
+    status: 'active',
+    platforms: ['darwin', 'linux', 'win32'],
+    supports: {
+      list_voices: true,
+      playback: true,
+      artifact_formats: ['wav', 'aiff'],
+    },
+  })),
   getVoiceTtsLanguageConfig: vi.fn(() => ({
     voice: 'Kyoko',
     rate: 180,
@@ -51,6 +77,8 @@ vi.mock('@agent/core', async () => {
     compileSchemaFromPath: mocks.compileSchemaFromPath,
     getVoiceProfileRecord: mocks.getVoiceProfileRecord,
     getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
+    getVoiceEngineRecord: mocks.getVoiceEngineRecord,
+    resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
     safeMkdir: mocks.safeMkdir,
@@ -96,6 +124,7 @@ describe('voice actuator', () => {
       language: 'ja',
       voice: 'Kyoko',
       rate: 180,
+      resolved_engine_id: 'local_say',
     }));
     expect(mocks.safeExec).toHaveBeenCalledWith('say', ['-v', 'Kyoko', '-r', '180', 'hello world']);
   });
@@ -128,6 +157,8 @@ describe('voice actuator', () => {
     expect(result).toEqual(expect.objectContaining({
       status: 'succeeded',
       request_id: 'req-1',
+      engine_id: 'local_say',
+      resolved_engine_id: 'local_say',
       chunks: 2,
       delivery_mode: 'artifact_and_playback',
     }));
