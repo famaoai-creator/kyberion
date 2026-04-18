@@ -118,6 +118,13 @@ export interface VideoRenderProgressPacket {
   };
   message?: string;
   artifact_refs?: string[];
+  queue?: {
+    position: number;
+    queued_ahead: number;
+    queued_total: number;
+    running: number;
+    concurrency: number;
+  };
   updated_at: string;
 }
 
