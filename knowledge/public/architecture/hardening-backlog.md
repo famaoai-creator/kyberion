@@ -13,6 +13,32 @@ last_updated: 2026-04-18
 
 Preserve Kyberion's governance strictness while making execution easier to operate.
 
+## Priority 0
+
+### Concept Compression
+
+- publish one canonical operating path: `intent -> contract -> governed execution -> evidence`
+- reduce overlapping artifact names and keep only a small stable contract family
+- define which decisions belong to LLM, contract compiler, actuator, and host harness with no shared ambiguity
+
+### Instruction Precision
+
+- require a compact execution receipt for every request: interpreted goal, expected deliverable, missing inputs, approval gates
+- strengthen normalization for terse operator commands such as `commit & pr & merge`, `same as gemini`, and cross-machine sync requests
+- add regression scenarios for multilingual shorthand, omitted subjects, and implied follow-up actions
+
+### Provider Adapter Parity
+
+- define one shared enhancer contract for Gemini, Codex, and future host adapters instead of provider-specific prompt shaping logic
+- add parity tests so the same intent and approval expectations produce equivalent behavior across adapters
+- keep provider-specific prompt augmentation isolated from Kyberion core concepts and execution contracts
+
+### Capability Admission Discipline
+
+- require every new skill, plugin, agent, browser path, or computer-use path to declare why it exists, when it is preferred, and what replaces it if removed
+- reject host-native integrations that do not expose approval hooks, evidence shape, and fallback behavior
+- measure complexity directly through clarification count, contract size, routing branch count, and concept count
+
 ## Priority 1
 
 ### Intent Normalization
@@ -75,5 +101,6 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 
 Reference:
 
+- [LLM Execution Boundary](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
 - [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
 - [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
