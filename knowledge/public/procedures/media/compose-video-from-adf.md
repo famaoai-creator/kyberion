@@ -42,6 +42,14 @@ node dist/libs/actuators/video-composition-actuator/src/index.js \
   --input libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json
 ```
 
+Job control actions (for long-running mode in the same actuator process):
+
+- `get_video_composition_job_status` (`params.job_id` required)
+- `cancel_video_composition_job` (`params.job_id` required)
+- `get_video_composition_queue`
+
+Set `video_composition_adf.output.await_completion = false` to enqueue and return immediately.
+
 ## 5. Expected Output
 
 - bundle artifact refs

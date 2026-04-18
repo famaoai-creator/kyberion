@@ -10,7 +10,15 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "enum": ["prepare_video_composition", "list_video_composition_templates"] },
+        "action": {
+          "enum": [
+            "prepare_video_composition",
+            "list_video_composition_templates",
+            "get_video_composition_job_status",
+            "cancel_video_composition_job",
+            "get_video_composition_queue"
+          ]
+        },
         "params": { "type": "object" }
       }
     },
@@ -31,7 +39,15 @@
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "enum": ["prepare_video_composition", "list_video_composition_templates"] },
+                  "action": {
+                    "enum": [
+                      "prepare_video_composition",
+                      "list_video_composition_templates",
+                      "get_video_composition_job_status",
+                      "cancel_video_composition_job",
+                      "get_video_composition_queue"
+                    ]
+                  },
                   "params": { "type": "object" }
                 }
               }

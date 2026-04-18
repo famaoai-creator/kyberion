@@ -160,4 +160,81 @@ describe('video-composition-actuator', () => {
     }));
     expect(result.artifact_refs).toContain('/tmp/video-composition/output.mp4');
   });
+
+  it('supports async enqueue and status/queue inspection', async () => {
+    const { handleAction } = await import('./index.js');
+    const queued = await handleAction({
+      action: 'prepare_video_composition',
+      params: {
+        video_composition_adf: {
+          kind: 'video-composition-adf',
+          version: '1.0.0',
+          composition: {
+            duration_sec: 3,
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          },
+          scenes: [
+            {
+              scene_id: 'hook',
+              start_sec: 0,
+              duration_sec: 3,
+              template_ref: { template_id: 'basic-title-card' },
+              content: { headline: 'queue me' },
+            },
+          ],
+          output: {
+            format: 'mp4',
+            await_completion: false,
+          },
+        },
+      },
+    } as any);
+
+    expect(queued).toEqual(expect.objectContaining({
+      status: 'queued',
+      await_completion: false,
+      output_format: 'mp4',
+    }));
+    expect(typeof queued.job_id).toBe('string');
+
+    const queue = await handleAction({
+      action: 'get_video_composition_queue',
+      params: {},
+    } as any);
+    expect(queue).toEqual(expect.objectContaining({
+      status: 'succeeded',
+    }));
+    expect(queue.queue).toEqual(expect.objectContaining({
+      concurrency: 1,
+    }));
+
+    const status = await handleAction({
+      action: 'get_video_composition_job_status',
+      params: { job_id: queued.job_id },
+    } as any);
+    expect(status).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      job_id: queued.job_id,
+    }));
+    expect(status.packet).toEqual(expect.objectContaining({
+      job_id: queued.job_id,
+    }));
+  });
+
+  it('returns not_found when cancelling unknown job', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'cancel_video_composition_job',
+      params: { job_id: 'missing-job' },
+    } as any);
+
+    expect(result).toEqual({
+      status: 'not_found',
+      job_id: 'missing-job',
+      cancellation: null,
+      packet: null,
+    });
+  });
 });
