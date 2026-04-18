@@ -29,6 +29,11 @@ type VideoCompositionAction =
   | Record<string, any>;
 
 interface VideoCompositionJobDiagnostics {
+  created_at?: string;
+  started_at?: string;
+  finished_at?: string;
+  duration_ms?: number;
+  terminal_status?: 'completed' | 'failed' | 'cancelled';
   cancellation_reason?: string;
   cancellation_requested_at?: string;
   backend_exit_signal?: string | null;
@@ -42,6 +47,7 @@ const runtime = new VideoRenderRuntime();
 const packetHistory = new Map<string, any[]>();
 const jobDiagnostics = new Map<string, VideoCompositionJobDiagnostics>();
 runtime.subscribe((packet) => {
+  trackLifecycleDiagnostics(packet);
   const history = packetHistory.get(packet.job_id) || [];
   history.push(packet);
   if (history.length > 200) history.shift();
@@ -166,7 +172,7 @@ async function prepareVideoComposition(params: {
   const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
   const awaitCompletion = adf.output.await_completion !== false;
-  upsertJobDiagnostics(jobId, {});
+  upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
 
   runtime.enqueue({
     jobId,
@@ -297,6 +303,33 @@ function upsertJobDiagnostics(jobId: string, patch: Partial<VideoCompositionJobD
   const next = { ...current, ...patch };
   jobDiagnostics.set(jobId, next);
   return next;
+}
+
+function trackLifecycleDiagnostics(packet: any): void {
+  const current = jobDiagnostics.get(packet.job_id) || {};
+  const patch: Partial<VideoCompositionJobDiagnostics> = {};
+
+  if (!current.created_at) {
+    patch.created_at = packet.updated_at;
+  }
+  if (!current.started_at && packet.status !== 'queued') {
+    patch.started_at = packet.updated_at;
+  }
+  if (['completed', 'failed', 'cancelled'].includes(packet.status)) {
+    patch.finished_at = packet.updated_at;
+    patch.terminal_status = packet.status;
+    const startedMs = Date.parse(current.started_at || patch.started_at || packet.updated_at);
+    const finishedMs = Date.parse(packet.updated_at);
+    if (Number.isFinite(startedMs) && Number.isFinite(finishedMs)) {
+      patch.duration_ms = Math.max(0, finishedMs - startedMs);
+    }
+    if (packet.status === 'failed' && packet.message) {
+      patch.last_error = String(packet.message);
+    }
+  }
+  if (Object.keys(patch).length > 0) {
+    upsertJobDiagnostics(packet.job_id, patch);
+  }
 }
 
 function extractBackendTerminationState(error: any): Partial<VideoCompositionJobDiagnostics> | null {

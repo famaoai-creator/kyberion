@@ -110,6 +110,13 @@ describe('video-composition-actuator', () => {
       artifact_refs: ['/tmp/video-composition/index.html', '/tmp/video-composition/render-plan.json'],
       backend_rendering_enabled: false,
     }));
+    expect(result.diagnostics).toEqual(expect.objectContaining({
+      terminal_status: 'completed',
+    }));
+    expect(typeof result.diagnostics.created_at).toBe('string');
+    expect(typeof result.diagnostics.started_at).toBe('string');
+    expect(typeof result.diagnostics.finished_at).toBe('string');
+    expect(typeof result.diagnostics.duration_ms).toBe('number');
   });
 
   it('runs backend rendering when policy enables it', async () => {
@@ -314,10 +321,12 @@ describe('video-composition-actuator', () => {
     expect(status.packet.status).toBe('cancelled');
     expect(status.packet.message).toContain('operator-requested stop');
     expect(status.diagnostics).toEqual(expect.objectContaining({
+      terminal_status: 'cancelled',
       cancellation_reason: 'operator-requested stop',
       backend_exit_signal: 'SIGTERM',
       backend_cancelled: true,
     }));
+    expect(typeof status.diagnostics.duration_ms).toBe('number');
   });
 });
 
