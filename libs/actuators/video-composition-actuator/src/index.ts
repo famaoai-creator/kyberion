@@ -23,7 +23,19 @@ type VideoCompositionAction =
   | VideoCompositionADF
   | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
+  | { action: 'get_video_composition_job_status'; params: { job_id: string } }
+  | { action: 'cancel_video_composition_job'; params: { job_id: string } }
+  | { action: 'get_video_composition_queue'; params?: Record<string, unknown> }
   | Record<string, any>;
+
+const runtime = new VideoRenderRuntime();
+const packetHistory = new Map<string, any[]>();
+runtime.subscribe((packet) => {
+  const history = packetHistory.get(packet.job_id) || [];
+  history.push(packet);
+  if (history.length > 200) history.shift();
+  packetHistory.set(packet.job_id, history);
+});
 
 export async function handleSingleAction(input: VideoCompositionAction) {
   if ((input as any).kind === 'video-composition-adf') {
@@ -37,6 +49,15 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   }
   if (action === 'list_video_composition_templates') {
     return listVideoCompositionTemplates();
+  }
+  if (action === 'get_video_composition_job_status') {
+    return getVideoCompositionJobStatus(((input as any).params || {}));
+  }
+  if (action === 'cancel_video_composition_job') {
+    return cancelVideoCompositionJob(((input as any).params || {}));
+  }
+  if (action === 'get_video_composition_queue') {
+    return getVideoCompositionQueue();
   }
   throw new Error(`Unsupported video composition action: ${String((input as any)?.action || (input as any)?.kind)}`);
 }
@@ -72,6 +93,45 @@ async function listVideoCompositionTemplates() {
   };
 }
 
+async function getVideoCompositionJobStatus(params: { job_id?: string }) {
+  const jobId = String(params.job_id || '');
+  if (!jobId) throw new Error('get_video_composition_job_status requires params.job_id');
+  const packet = runtime.getPacket(jobId);
+  if (!packet) {
+    return {
+      status: 'not_found',
+      job_id: jobId,
+      packet: null,
+      progress_packets: [],
+    };
+  }
+  return {
+    status: 'succeeded',
+    job_id: jobId,
+    packet,
+    progress_packets: packetHistory.get(jobId) || [],
+  };
+}
+
+async function cancelVideoCompositionJob(params: { job_id?: string }) {
+  const jobId = String(params.job_id || '');
+  if (!jobId) throw new Error('cancel_video_composition_job requires params.job_id');
+  const cancellation = runtime.cancel(jobId);
+  return {
+    status: cancellation ? 'succeeded' : 'not_found',
+    job_id: jobId,
+    cancellation,
+    packet: runtime.getPacket(jobId),
+  };
+}
+
+async function getVideoCompositionQueue() {
+  return {
+    status: 'succeeded',
+    queue: runtime.getQueueSnapshot(),
+  };
+}
+
 async function prepareVideoComposition(params: {
   video_composition_adf?: VideoCompositionADF;
   job_id?: string;
@@ -84,11 +144,7 @@ async function prepareVideoComposition(params: {
   const adf = params.video_composition_adf;
   const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
-  const runtime = new VideoRenderRuntime();
-  const progressPackets: any[] = [];
-  runtime.subscribe((packet) => {
-    progressPackets.push(packet);
-  });
+  const awaitCompletion = adf.output.await_completion !== false;
 
   runtime.enqueue({
     jobId,
@@ -149,6 +205,19 @@ async function prepareVideoComposition(params: {
     },
   });
 
+  if (!awaitCompletion) {
+    return {
+      status: 'queued',
+      job_id: jobId,
+      await_completion: false,
+      packet: runtime.getPacket(jobId),
+      queue: runtime.getQueueSnapshot(),
+      output_format: adf.output.format,
+      backend_rendering_enabled: policy.render.enable_backend_rendering,
+      backend_render_backend: policy.render.backend,
+    };
+  }
+
   const finalPacket = await waitForRenderJob(runtime, jobId);
   const renderedOutputPath = (finalPacket.artifact_refs || []).find((ref: string) => ref.endsWith(`.${adf.output.format}`));
   const backendRendered = Boolean(policy.render.enable_backend_rendering && renderedOutputPath);
@@ -156,7 +225,7 @@ async function prepareVideoComposition(params: {
     status: finalPacket.status === 'completed' ? 'succeeded' : finalPacket.status,
     job_id: jobId,
     artifact_refs: finalPacket.artifact_refs || [],
-    progress_packets: progressPackets,
+    progress_packets: packetHistory.get(jobId) || [],
     output_format: adf.output.format,
     backend_rendering_enabled: policy.render.enable_backend_rendering,
     backend_render_backend: policy.render.backend,
