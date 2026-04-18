@@ -82,7 +82,7 @@ let report = '# CEO Intent Simulation Report\n\n';
 for (const [id, pipeline] of Object.entries(pipelines)) {
   const filePath = path.join(outDir, `${id}.json`);
   safeWriteFile(filePath, JSON.stringify(pipeline, null, 2));
-  
+
   console.log(`Running ${id}...`);
   try {
     const output = execSync(`node dist/scripts/run_pipeline.js --input ${filePath}`, { encoding: 'utf8', stdio: 'pipe' });
