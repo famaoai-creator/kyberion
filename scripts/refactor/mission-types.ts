@@ -7,7 +7,15 @@ export interface MissionState {
   mission_id: string;
   mission_type?: string;
   tier: 'personal' | 'confidential' | 'public';
-  status: 'planned' | 'active' | 'validating' | 'distilling' | 'completed' | 'paused' | 'failed' | 'archived';
+  status:
+    | 'planned'
+    | 'active'
+    | 'validating'
+    | 'distilling'
+    | 'completed'
+    | 'paused'
+    | 'failed'
+    | 'archived';
   execution_mode: 'local' | 'delegated';
   relationships?: {
     prerequisites?: string[];
@@ -25,7 +33,15 @@ export interface MissionState {
     track?: {
       track_id?: string;
       track_name?: string;
-      track_type?: 'delivery' | 'release' | 'change' | 'incident' | 'operations' | 'governance' | 'compliance' | 'research';
+      track_type?:
+        | 'delivery'
+        | 'release'
+        | 'change'
+        | 'incident'
+        | 'operations'
+        | 'governance'
+        | 'compliance'
+        | 'research';
       lifecycle_model?: string;
       relationship_type: 'belongs_to' | 'supports' | 'governs' | 'independent';
       traceability_refs?: string[];
@@ -54,7 +70,14 @@ export interface MissionState {
 
 export type MissionRelationships = NonNullable<MissionState['relationships']>;
 
-export const BOOLEAN_FLAGS = new Set(['--ephemeral', '--refresh', '--seal', '--force', '--execute', '--dry-run']);
+export const BOOLEAN_FLAGS = new Set([
+  '--ephemeral',
+  '--refresh',
+  '--seal',
+  '--force',
+  '--execute',
+  '--dry-run',
+]);
 export const VALUE_FLAGS = new Set([
   '--persona',
   '--tenant',
@@ -66,6 +89,8 @@ export const VALUE_FLAGS = new Set([
   '--relationships',
   '--relationships-json',
   '--relationships-file',
+  '--mission',
+  '--mission-id',
   '--project-id',
   '--project-path',
   '--project-relationship',

@@ -1,0 +1,192 @@
+{
+  "action": "pipeline",
+  "session_id": "moppy-rakuten-travel-simulation",
+  "description": "Headed Chrome simulation for routing from Moppy to Rakuten Travel with an authenticated dedicated Chrome profile. It clicks only the Moppy advertiser handoff and does not confirm reservations or execute payment.",
+  "options": {
+    "headless": false,
+    "keep_alive": false,
+    "lease_ms": 900000,
+    "browser_channel": "chrome",
+    "user_data_dir": "active/shared/runtime/browser/profiles/moppy-rakuten-travel"
+  },
+  "context": {
+    "booking_route": {
+      "usecase_ref": "knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
+      "points_portal": "moppy",
+      "merchant": "rakuten_travel",
+      "mode": "simulation",
+      "auth_strategy": {
+        "type": "dedicated_browser_profile",
+        "browser_profile_ref": "active/shared/runtime/browser/profiles/moppy-rakuten-travel",
+        "approval_required": true
+      },
+      "blocked_actions": [
+        "reservation_confirmation",
+        "payment_execution",
+        "cancellation",
+        "profile_mutation",
+        "credential_export",
+        "session_handoff_export"
+      ],
+      "evidence_required": [
+        "portal_name",
+        "merchant_page",
+        "reward_rate",
+        "terms_snapshot",
+        "timestamp",
+        "portal_detail_screenshot",
+        "moppy_clickout_confirmation",
+        "tabs_before_clickout",
+        "tabs_after_landing",
+        "final_booking_site",
+        "merchant_landing_snapshot",
+        "merchant_landing_screenshot",
+        "network_after_landing",
+        "exported_adf",
+        "rakuten_travel_landing_page",
+        "tracking_warning"
+      ],
+      "landing_match": {
+        "url_includes": "travel.rakuten.co.jp",
+        "title_includes": "楽天トラベル"
+      },
+      "success_criteria": {
+        "landing_url_includes": "travel.rakuten.co.jp",
+        "landing_title_includes": "楽天トラベル",
+        "handoff_export_absent": true,
+        "blocked_actions_not_executed": true,
+        "merchant_landing_captured": true
+      },
+      "artifact_policy": {
+        "forbid_session_handoff_export": true,
+        "allowed_artifact_roots": ["active/shared/tmp/browser", "active/shared/runtime/browser"],
+        "retain_browser_profile": true,
+        "delete_continue_files": true
+      },
+      "preflight": {
+        "require_clickout_selector": true,
+        "require_landing_match": true,
+        "require_blocked_actions": true,
+        "deny_ops": [
+          "export_session_handoff",
+          "payment_execution",
+          "reservation_confirmation",
+          "profile_mutation"
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "https://pc.moppy.jp/",
+        "waitUntil": "domcontentloaded"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "moppy_initial_snapshot",
+        "max_elements": 120
+      }
+    },
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "https://pc.moppy.jp/shopping/detail.php?site_id=903&track_ref=sea",
+        "waitUntil": "domcontentloaded"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "tabs",
+      "params": {
+        "export_as": "tabs_before_moppy_clickout"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "moppy_ad_detail_snapshot",
+        "max_elements": 260
+      }
+    },
+    {
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/browser/moppy-rakuten-travel-moppy-detail.png",
+        "export_as": "moppy_detail_screenshot_path",
+        "fullPage": true
+      }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": {
+        "selector": "form#toClient > button:nth-of-type(1)",
+        "timeout": 10000
+      }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": {
+        "duration": 8000
+      }
+    },
+    {
+      "type": "control",
+      "op": "select_tab_matching",
+      "params": {
+        "url_includes": "travel.rakuten.co.jp",
+        "title_includes": "楽天トラベル"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "tabs",
+      "params": {
+        "export_as": "tabs_after_rakuten_landing"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "snapshot",
+      "params": {
+        "export_as": "rakuten_landing_snapshot",
+        "max_elements": 260
+      }
+    },
+    {
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/browser/moppy-rakuten-travel-rakuten-landing.png",
+        "export_as": "rakuten_landing_screenshot_path",
+        "fullPage": true
+      }
+    },
+    {
+      "type": "capture",
+      "op": "network",
+      "params": {
+        "export_as": "network_after_rakuten_landing",
+        "limit": 180
+      }
+    },
+    {
+      "type": "transform",
+      "op": "export_adf",
+      "params": {
+        "path": "active/shared/tmp/browser/moppy-rakuten-travel-simulation.adf.json",
+        "export_as": "adf_path"
+      }
+    }
+  ]
+}

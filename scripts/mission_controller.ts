@@ -38,6 +38,7 @@ import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
+  getOptionValue,
 } from './refactor/mission-cli-args.js';
 import { getGitHash, initMissionRepo, getCurrentBranch } from './refactor/mission-git.js';
 import {
@@ -48,7 +49,10 @@ import {
   loadState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import { createMission as _createMission, startMission as _startMission } from './refactor/mission-creation.js';
+import {
+  createMission as _createMission,
+  startMission as _startMission,
+} from './refactor/mission-creation.js';
 import {
   syncProjectLedger as _syncProjectLedger,
   syncProjectLedgerIfLinked as _syncProjectLedgerIfLinked,
@@ -69,17 +73,27 @@ import {
   recordTask as _recordTask,
   resumeMission as _resumeMission,
 } from './refactor/mission-maintenance.js';
-import { dispatchNextQueuedMission, enqueueMission as _enqueueMission } from './refactor/mission-queue.js';
+import {
+  dispatchNextQueuedMission,
+  enqueueMission as _enqueueMission,
+} from './refactor/mission-queue.js';
 import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
-import { prewarmMissionTeam as _prewarmMissionTeam, showMissionTeam as _showMissionTeam, staffMissionTeam as _staffMissionTeam } from './refactor/mission-runtime.js';
+import {
+  prewarmMissionTeam as _prewarmMissionTeam,
+  showMissionTeam as _showMissionTeam,
+  staffMissionTeam as _staffMissionTeam,
+} from './refactor/mission-runtime.js';
 import { distillMission as _distillMission } from './refactor/mission-distill.js';
 import { sealMission as _sealMission } from './refactor/mission-seal.js';
-import {
-  recordAgentRuntimeEvent,
-} from './refactor/mission-governance.js';
+import { recordAgentRuntimeEvent } from './refactor/mission-governance.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
-export { extractMissionControllerPositionalArgs, extractProjectRelationshipOptionsFromArgv, extractMissionStartCreateOptionsFromArgv, assertCanGrantMissionAuthority };
+export {
+  extractMissionControllerPositionalArgs,
+  extractProjectRelationshipOptionsFromArgv,
+  extractMissionStartCreateOptionsFromArgv,
+  assertCanGrantMissionAuthority,
+};
 
 export interface ResolvedMissionCliInput {
   tier?: 'personal' | 'confidential' | 'public';
@@ -94,7 +108,9 @@ export interface ResolvedMissionCliInput {
   };
 }
 
-export function resolveMissionStartCreateInputFromArgv(argv: string[] = process.argv): ResolvedMissionCliInput {
+export function resolveMissionStartCreateInputFromArgv(
+  argv: string[] = process.argv
+): ResolvedMissionCliInput {
   const positionalArgs = extractMissionControllerPositionalArgs(argv);
   const arg2 = positionalArgs[2];
   const arg3 = positionalArgs[3];
@@ -105,7 +121,7 @@ export function resolveMissionStartCreateInputFromArgv(argv: string[] = process.
   const namedStartCreateOptions = extractMissionStartCreateOptionsFromArgv(argv);
   const relationships = normalizeRelationships(
     JSON.parse(arg7 || '{}'),
-    namedStartCreateOptions.relationships || {},
+    namedStartCreateOptions.relationships || {}
   );
   if (relationships?.project?.project_id && !relationships.track?.track_id) {
     const projectRecord = loadProjectRecord(relationships.project.project_id);
@@ -145,7 +161,7 @@ export function resolveMissionStartCreateInputFromArgv(argv: string[] = process.
 export function validateMissionStartCreateInput(
   actionName: 'create' | 'start',
   missionId?: string,
-  argv: string[] = process.argv,
+  argv: string[] = process.argv
 ): ResolvedMissionCliInput {
   const input = resolveMissionStartCreateInputFromArgv(argv);
   if (!missionId) return input;
@@ -164,13 +180,13 @@ export function validateMissionStartCreateInput(
     const markdownGuard = validateWritePermission(input.ledgerTargets.markdown);
     if (!markdownGuard.allowed) {
       throw new Error(
-        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.markdown)}' is not writable under current authority. ${markdownGuard.reason}`,
+        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.markdown)}' is not writable under current authority. ${markdownGuard.reason}`
       );
     }
     const jsonGuard = validateWritePermission(input.ledgerTargets.json);
     if (!jsonGuard.allowed) {
       throw new Error(
-        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.json)}' is not writable under current authority. ${jsonGuard.reason}`,
+        `${actionName} ${missionId}: project ledger target '${path.relative(ROOT_DIR, input.ledgerTargets.json)}' is not writable under current authority. ${jsonGuard.reason}`
       );
     }
   }
@@ -182,7 +198,9 @@ const ROOT_DIR = pathResolver.rootDir();
 const ARCHIVE_DIR = pathResolver.active('archive/missions');
 const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
-const AGENT_RUNTIME_EVENT_PATH = pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl');
+const AGENT_RUNTIME_EVENT_PATH = pathResolver.shared(
+  'observability/mission-control/agent-runtime-events.jsonl'
+);
 
 // ─── Focus helpers (thin wrappers binding MISSION_FOCUS_PATH) ────────────────
 function readFocusedMissionId(): string | null {
@@ -211,8 +229,6 @@ async function distillMission(id: string): Promise<void> {
   return _distillMission(id, ROOT_DIR);
 }
 
-
-
 /**
  * Mission Commands
  */
@@ -222,15 +238,30 @@ async function enqueueMission(id: string, tier: string, priority: number = 5, de
 }
 
 async function dispatchNextMission() {
-  await dispatchNextQueuedMission(
-    QUEUE_PATH,
-    checkDependencies,
-    async (missionId, tier) => startMission(missionId, tier as any),
+  await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
+    startMission(missionId, tier as any)
   );
 }
 
-async function createMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, persona: string = 'Ecosystem Architect', relationships: any = {}) {
-  return _createMission({ id, tier, tenantId, missionType, visionRef, persona, relationships, rootDir: ROOT_DIR });
+async function createMission(
+  id: string,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential',
+  tenantId: string = 'default',
+  missionType: string = 'development',
+  visionRef?: string,
+  persona: string = 'Ecosystem Architect',
+  relationships: any = {}
+) {
+  return _createMission({
+    id,
+    tier,
+    tenantId,
+    missionType,
+    visionRef,
+    persona,
+    relationships,
+    rootDir: ROOT_DIR,
+  });
 }
 
 /**
@@ -238,8 +269,30 @@ async function createMission(id: string, tier: 'personal' | 'confidential' | 'pu
  * Returns only the active tier directories (personal, confidential, public)
  * from mission-management-config.json — excludes archive, exports, and ledger paths.
  */
-async function startMission(id: string, tier: 'personal' | 'confidential' | 'public' = 'confidential', persona: string = 'Ecosystem Architect', tenantId: string = 'default', missionType: string = 'development', visionRef?: string, relationships: any = {}) {
-  return _startMission({ id, tier, persona, tenantId, missionType, visionRef, relationships, rootDir: ROOT_DIR });
+async function startMission(
+  id: string,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential',
+  persona: string = 'Ecosystem Architect',
+  tenantId: string = 'default',
+  missionType: string = 'development',
+  visionRef?: string,
+  relationships: any = {}
+) {
+  await _startMission({
+    id,
+    tier,
+    persona,
+    tenantId,
+    missionType,
+    visionRef,
+    relationships,
+    rootDir: ROOT_DIR,
+  });
+  const targetId = id.toUpperCase();
+  const state = loadState(targetId);
+  if (state?.status === 'active') {
+    writeFocusedMissionId(targetId);
+  }
 }
 
 // syncProjectLedger and syncProjectLedgerIfLinked are defined as wrappers
@@ -262,9 +315,6 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 //   - scripts/refactor/mission-distill.ts (distillMission, helpers)
 //   - scripts/refactor/mission-llm.ts (LLM resolution)
 //   - scripts/refactor/mission-seal.ts (sealMission)
-
-
-
 
 async function finishMission(id: string, seal: boolean = false) {
   return _finishMission(id, seal, {
@@ -323,8 +373,20 @@ function listMissions(filterStatus?: string) {
   console.log(header);
   console.log('-'.repeat(header.length + 10));
   for (const m of missions) {
-    const statusIcon = { active: '🟢', planned: '⚪', completed: '✅', paused: '⏸️ ', failed: '❌', validating: '🔍', distilling: '🧠', archived: '📦' }[m.status] || '  ';
-    console.log(`${m.id.padEnd(30)} ${statusIcon} ${m.status.padEnd(10)} ${m.tier.padEnd(14)} ${String(m.checkpoints).padStart(3)} ${m.lastEvent}`);
+    const statusIcon =
+      {
+        active: '🟢',
+        planned: '⚪',
+        completed: '✅',
+        paused: '⏸️ ',
+        failed: '❌',
+        validating: '🔍',
+        distilling: '🧠',
+        archived: '📦',
+      }[m.status] || '  ';
+    console.log(
+      `${m.id.padEnd(30)} ${statusIcon} ${m.status.padEnd(10)} ${m.tier.padEnd(14)} ${String(m.checkpoints).padStart(3)} ${m.lastEvent}`
+    );
   }
   console.log('');
   logger.info(`${missions.length} mission(s) found.`);
@@ -358,7 +420,9 @@ function showMissionStatus(id: string) {
   }
 
   if (state.delegation) {
-    console.log(`  Delegated:   ${state.delegation.agent_id} (${state.delegation.verification_status})`);
+    console.log(
+      `  Delegated:   ${state.delegation.agent_id} (${state.delegation.verification_status})`
+    );
   }
 
   if (state.relationships?.prerequisites?.length) {
@@ -397,7 +461,9 @@ Usage: node dist/scripts/mission_controller.js <command> [args]
 Lifecycle Commands:
   create   <ID>                  Create a new mission (status: planned)
   start    <ID>                  Activate a mission (planned/paused/failed → active)
-  checkpoint [task_id] [note]    Record a checkpoint on the current active mission
+  checkpoint [task_id] [note]    Record a checkpoint on the focused mission
+  checkpoint <ID> <task_id> <note>
+                                 Record a checkpoint on an explicit mission
   verify   <ID> <verified|rejected> <note>
                                  Verify a mission (active → distilling or back to active)
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
@@ -442,6 +508,7 @@ Mission Input Contract:
     --dry-run
     --relationships <JSON>
     --relationships-file <PATH>
+    --mission-id <ID>            Explicit mission target for checkpoint
 
   Validation:
     Linked project missions must point to a project_path whose 04_control ledger
@@ -516,66 +583,140 @@ async function main() {
     case 'create': {
       const input = validateMissionStartCreateInput('create', arg1);
       if (hasDryRun) {
-        console.log(JSON.stringify({
-          action: 'create',
-          mission_id: arg1,
-          input,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              action: 'create',
+              mission_id: arg1,
+              input,
+            },
+            null,
+            2
+          )
+        );
         break;
       }
-      await createMission(arg1, input.tier as any, input.tenantId, input.missionType, input.visionRef, input.persona, input.relationships);
+      await createMission(
+        arg1,
+        input.tier as any,
+        input.tenantId,
+        input.missionType,
+        input.visionRef,
+        input.persona,
+        input.relationships
+      );
       break;
     }
     case 'start': {
       const input = validateMissionStartCreateInput('start', arg1);
       if (hasDryRun) {
-        console.log(JSON.stringify({
-          action: 'start',
-          mission_id: arg1,
-          input,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              action: 'start',
+              mission_id: arg1,
+              input,
+            },
+            null,
+            2
+          )
+        );
         break;
       }
-      await startMission(arg1, input.tier as any, input.persona, input.tenantId, input.missionType, input.visionRef, input.relationships);
+      await startMission(
+        arg1,
+        input.tier as any,
+        input.persona,
+        input.tenantId,
+        input.missionType,
+        input.visionRef,
+        input.relationships
+      );
       break;
     }
-    case 'grant': await grantMissionAccess(arg1, arg2, arg3 ? parseInt(arg3) : undefined); break;
-    case 'sudo': await grantMissionSudo(arg1, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined); break;
+    case 'grant':
+      await grantMissionAccess(arg1, arg2, arg3 ? parseInt(arg3) : undefined);
+      break;
+    case 'sudo':
+      await grantMissionSudo(arg1, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined);
+      break;
     case 'checkpoint':
-      if (arg3) {
-        await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
-      } else {
-        await createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
+      {
+        const explicitMissionId = getOptionValue('--mission-id') || getOptionValue('--mission');
+        if (explicitMissionId) {
+          await createCheckpoint(arg1 || 'manual', arg2 || 'progress update', explicitMissionId);
+        } else if (arg3) {
+          await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
+        } else {
+          await createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
+        }
       }
       break;
-    case 'delegate': await delegateMission(arg1, arg2, arg3); break;
-    case 'import': await importMission(arg1, arg2); break;
-    case 'verify': await verifyMission(arg1, arg2 as any, arg3); break;
-    case 'distill': await distillMission(arg1); break;
-    case 'seal': await sealMission(arg1); break;
-    case 'enqueue': await enqueueMission(arg1, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []); break;
-    case 'dispatch': await dispatchNextMission(); break;
-    case 'finish': await finishMission(arg1, process.argv.includes('--seal')); break;
-    case 'resume': await resumeMission(arg1); break;
-    case 'record-task': await recordTask(arg1, arg2, JSON.parse(positionalArgs[3] || '{}')); break;
-    case 'purge': await purgeMissions(!process.argv.includes('--execute')); break;
-    case 'list': listMissions(arg1); break;
-    case 'status': showMissionStatus(arg1); break;
-    case 'sync-project-ledger': await syncProjectLedger(arg1); break;
-    case 'team': showMissionTeam(arg1, hasRefresh); break;
-    case 'staff': await staffMissionTeam(arg1); break;
-    case 'prewarm': await prewarmMissionTeam(arg1, arg2); break;
+    case 'delegate':
+      await delegateMission(arg1, arg2, arg3);
+      break;
+    case 'import':
+      await importMission(arg1, arg2);
+      break;
+    case 'verify':
+      await verifyMission(arg1, arg2 as any, arg3);
+      break;
+    case 'distill':
+      await distillMission(arg1);
+      break;
+    case 'seal':
+      await sealMission(arg1);
+      break;
+    case 'enqueue':
+      await enqueueMission(arg1, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []);
+      break;
+    case 'dispatch':
+      await dispatchNextMission();
+      break;
+    case 'finish':
+      await finishMission(arg1, process.argv.includes('--seal'));
+      break;
+    case 'resume':
+      await resumeMission(arg1);
+      break;
+    case 'record-task':
+      await recordTask(arg1, arg2, JSON.parse(positionalArgs[3] || '{}'));
+      break;
+    case 'purge':
+      await purgeMissions(!process.argv.includes('--execute'));
+      break;
+    case 'list':
+      listMissions(arg1);
+      break;
+    case 'status':
+      showMissionStatus(arg1);
+      break;
+    case 'sync-project-ledger':
+      await syncProjectLedger(arg1);
+      break;
+    case 'team':
+      showMissionTeam(arg1, hasRefresh);
+      break;
+    case 'staff':
+      await staffMissionTeam(arg1);
+      break;
+    case 'prewarm':
+      await prewarmMissionTeam(arg1, arg2);
+      break;
     case 'sync':
-        logger.info('Syncing mission registry...');
-        break;
-    case 'help': case '--help': case '-h':
-        showHelp(); break;
+      logger.info('Syncing mission registry...');
+      break;
+    case 'help':
+    case '--help':
+    case '-h':
+      showHelp();
+      break;
     default:
       showHelp();
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   logger.error(err.message);
   process.exit(1);
 });

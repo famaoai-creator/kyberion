@@ -1,0 +1,327 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/booking-preference-profile.schema.json",
+  "title": "Booking Preference Profile",
+  "description": "Personal or organizational booking preferences for login method selection, payment policy, points-portal routing, and approval gates. Secrets must be referenced, not embedded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "profile_id",
+    "security_boundaries",
+    "preferred_booking_sites",
+    "payment_policy"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["booking-preference-profile"]
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["personal_travel", "business_travel", "restaurant", "hotel", "default"],
+      "default": "personal_travel"
+    },
+    "security_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forbid_inline_secrets", "approval_required_for"],
+      "properties": {
+        "forbid_inline_secrets": {
+          "type": "boolean",
+          "const": true
+        },
+        "approval_required_for": {
+          "type": "array",
+          "minItems": 1,
+          "contains": {
+            "type": "string",
+            "enum": ["payment_execution"]
+          },
+          "items": {
+            "type": "string",
+            "enum": [
+              "new_site_login",
+              "points_portal_redirect",
+              "reservation_hold",
+              "booking_confirmation",
+              "payment_execution",
+              "cancellation",
+              "profile_mutation",
+              "credential_use"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "preferred_booking_sites": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/bookingSite"
+      }
+    },
+    "login_methods": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/loginMethod"
+      }
+    },
+    "payment_policy": {
+      "$ref": "#/definitions/paymentPolicy"
+    },
+    "points_portal_policy": {
+      "$ref": "#/definitions/pointsPortalPolicy"
+    },
+    "receipt_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "default_usage": {
+          "type": "string",
+          "enum": ["personal", "business", "mixed"]
+        },
+        "recipient_ref": {
+          "type": "string",
+          "pattern": "^(personal|confidential)/[A-Za-z0-9_./-]+$"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "bookingSite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["site", "priority"],
+      "properties": {
+        "site": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["hotel", "restaurant", "flight", "rail", "activity", "package"]
+          },
+          "uniqueItems": true
+        },
+        "reason": {
+          "type": "string"
+        },
+        "prefer_official_when_equal": {
+          "type": "boolean"
+        }
+      }
+    },
+    "loginMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["site", "preferred_method"],
+      "properties": {
+        "site": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferred_method": {
+          "type": "string",
+          "enum": [
+            "email",
+            "google",
+            "apple",
+            "line",
+            "rakuten_id",
+            "hotel_member_id",
+            "restaurant_account",
+            "manual",
+            "none"
+          ]
+        },
+        "credential_ref": {
+          "type": "string",
+          "pattern": "^(secret://|browser://|manual://)[A-Za-z0-9_./:@-]+$"
+        },
+        "approval_required": {
+          "type": "boolean",
+          "default": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "paymentPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefer", "allow_prepaid", "require_confirmation_if"],
+      "properties": {
+        "prefer": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "onsite_payment",
+              "free_cancellation",
+              "points_earning",
+              "prepaid_discount",
+              "hotel_member_benefits",
+              "airline_miles",
+              "receipt_support"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "allow_prepaid": {
+          "type": "boolean"
+        },
+        "payment_method_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(secret://wallet/|wallet://|manual://)[A-Za-z0-9_./:@-]+$"
+          },
+          "uniqueItems": true
+        },
+        "require_confirmation_if": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "nonrefundable",
+              "total_amount_over_budget",
+              "new_site_login",
+              "payment_execution",
+              "card_change",
+              "points_terms_unclear",
+              "no_free_cancellation"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "pointsPortalPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "preferred_portals",
+        "routing_rules",
+        "require_confirmation_if",
+        "evidence_required",
+        "fallback_rule"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "preferred_portals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["portal", "priority"],
+            "properties": {
+              "portal": {
+                "type": "string",
+                "minLength": 1
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "login_method_ref": {
+                "type": "string",
+                "pattern": "^(personal|confidential)/[A-Za-z0-9_./-]+$"
+              }
+            }
+          }
+        },
+        "routing_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["merchant", "use_points_portal"],
+            "properties": {
+              "merchant": {
+                "type": "string",
+                "minLength": 1
+              },
+              "use_points_portal": {
+                "type": "boolean"
+              },
+              "min_expected_reward": {
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?%$"
+              },
+              "clickout_usecase_ref": {
+                "type": "string",
+                "pattern": "^(knowledge/public/schemas/|personal/|confidential/)[A-Za-z0-9_./:@-]+\\.json$"
+              },
+              "preferred_execution_mode": {
+                "type": "string",
+                "enum": ["simulation", "assisted_booking"]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "require_confirmation_if": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "reward_rate_unknown",
+              "tracking_cookie_blocked",
+              "merchant_not_listed",
+              "terms_changed",
+              "nonrefundable_booking",
+              "payment_execution",
+              "coupon_conflict",
+              "app_transition_required"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "evidence_required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "portal_name",
+              "merchant_page",
+              "reward_rate",
+              "terms_snapshot",
+              "timestamp",
+              "final_booking_site",
+              "clickout_confirmation",
+              "tracking_warning"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "fallback_rule": {
+          "type": "string",
+          "enum": ["direct_booking", "manual_review", "skip_candidate"]
+        }
+      }
+    }
+  }
+}

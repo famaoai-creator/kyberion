@@ -593,6 +593,43 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         tab_id: tabId,
       });
     }
+    case 'select_tab_matching': {
+      const urlIncludes = params.url_includes ? String(resolve(params.url_includes)) : undefined;
+      const titleIncludes = params.title_includes ? String(resolve(params.title_includes)) : undefined;
+      if (!urlIncludes && !titleIncludes) {
+        throw new Error('select_tab_matching requires url_includes or title_includes');
+      }
+
+      let selected: { tabId: string; page: Page; url: string; title: string } | undefined;
+      for (const [tabId, page] of runtime.tabs.entries()) {
+        if (typeof page.isClosed === 'function' && page.isClosed()) continue;
+        const url = page.url();
+        const title = await page.title();
+        if (urlIncludes && !url.includes(urlIncludes)) continue;
+        if (titleIncludes && !title.includes(titleIncludes)) continue;
+        selected = { tabId, page, url, title };
+        break;
+      }
+
+      if (!selected) {
+        throw new Error(`No browser tab matched url_includes=${urlIncludes || '*'} title_includes=${titleIncludes || '*'}`);
+      }
+
+      runtime.activeTabId = selected.tabId;
+      if (typeof (selected.page as any).bringToFront === 'function') {
+        await (selected.page as any).bringToFront();
+      }
+      return recordBrowserAction({
+        ...ctx,
+        active_tab_id: runtime.activeTabId,
+        browser_tabs: await summarizeTabs(runtime),
+      }, {
+        kind: 'control',
+        op: 'select_tab_matching',
+        tab_id: selected.tabId,
+        url: selected.url,
+      });
+    }
     case 'close_session':
       return recordBrowserAction({
         ...ctx,
@@ -1651,6 +1688,12 @@ function createBrowserRuntime(context: BrowserContext): BrowserRuntime {
     registerBrowserPage(runtime, page, `tab-${index + 1}`);
   }
   if (pages.length > 0) runtime.activeTabId = pageIds.get(pages[0]) || 'tab-1';
+  context.on('page', (page) => {
+    if (runtime.pageIds.has(page)) return;
+    const tabId = `tab-${runtime.tabs.size + 1}`;
+    registerBrowserPage(runtime, page, tabId);
+    runtime.activeTabId = tabId;
+  });
   return runtime;
 }
 
