@@ -1,0 +1,9 @@
+[
+  {
+    "id": "prepare-product-explainer",
+    "title": "Prepare Product Explainer Bundle",
+    "path": "libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json",
+    "description": "Compiles a governed video-composition-adf into a deterministic source bundle for later rendering.",
+    "tags": ["video", "composition", "deterministic", "bundle", "example"]
+  }
+]
