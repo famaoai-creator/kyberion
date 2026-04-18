@@ -4,7 +4,7 @@ category: Architecture
 tags: [hardening, backlog, governance, usability]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-29
+last_updated: 2026-04-18
 ---
 
 # Hardening Backlog
@@ -63,3 +63,17 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 
 - keep Presence, Chronos, and CLI on the same vocabulary
 - avoid route-specific drift in control-plane behavior
+
+## Priority 4
+
+### Model And Harness Adaptation Governance
+
+- define a governed adaptation cycle for LLM and host CLI harness upgrades
+- add model registry, harness capability registry, adaptation policy, and promotion gates
+- benchmark candidate models and host-native capabilities on contract validity, policy obedience, clarification quality, and local-versus-host routing quality
+- require explicit architecture review before changing Kyberion concepts or capability ownership boundaries
+
+Reference:
+
+- [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
+- [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)

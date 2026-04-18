@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.browser_interactive",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "browser-interactive-loop",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "high_risk_only"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["browser-step", "open-site"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "browser-actuator"
+      },
+      "status": "active",
+      "notes": "Preferred for exploratory browsing and observation-heavy loops."
+    },
+    {
+      "capability_id": "cli.native.computer_use",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "computer-use-runtime",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "critical",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["browser-step", "inspect-service"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/browser-session-simulation.json"
+      },
+      "status": "experimental",
+      "notes": "Use with approval-aware boundaries for high-risk UI actions."
+    },
+    {
+      "capability_id": "cli.native.delegated_agent_worker",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "codex-cli",
+        "name": "delegated-worker-agent",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission", "project_bootstrap"],
+        "intents": ["evolve-agent-harness", "generate-report", "generate-presentation"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "Prefer for bounded sidecar execution with explicit task contracts."
+    },
+    {
+      "capability_id": "cli.plugin.skill_executor",
+      "source": {
+        "type": "plugin",
+        "provider": "codex-cli",
+        "name": "plugin-skill-executor",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session"],
+        "intents": ["knowledge-query", "live-query"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Use for deterministic utility operations exposed by managed plugins."
+    }
+  ]
+}

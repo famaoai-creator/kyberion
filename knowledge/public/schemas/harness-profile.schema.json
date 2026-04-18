@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "harness-profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "harness_id": { "type": "string", "minLength": 1 },
+    "profiled_at": { "type": "string", "format": "date-time" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/capabilityProfile" }
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "known_regressions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "notes": { "type": "string" }
+  },
+  "required": ["harness_id", "profiled_at", "capabilities", "constraints", "known_regressions"],
+  "$defs": {
+    "capabilityProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["reasoning", "interactive_tooling", "delegated_execution", "deterministic_utility"]
+        },
+        "interaction_mode": {
+          "type": "string",
+          "enum": ["request_response", "interactive_loop", "delegated_task", "deterministic_task"]
+        },
+        "replayability": {
+          "type": "string",
+          "enum": ["deterministic", "partial", "opaque"]
+        },
+        "risk_class": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": [
+        "capability_id",
+        "kind",
+        "interaction_mode",
+        "replayability",
+        "risk_class",
+        "constraints"
+      ]
+    }
+  }
+}

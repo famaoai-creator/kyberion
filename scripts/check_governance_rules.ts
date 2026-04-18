@@ -46,6 +46,21 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/surface-policy.schema.json',
     dataPath: 'knowledge/public/governance/surface-policy.json',
   },
+  {
+    id: 'model-registry',
+    schemaPath: 'knowledge/public/schemas/model-registry.schema.json',
+    dataPath: 'knowledge/public/governance/model-registry.json',
+  },
+  {
+    id: 'model-adaptation-policy',
+    schemaPath: 'knowledge/public/schemas/model-adaptation-policy.schema.json',
+    dataPath: 'knowledge/public/governance/model-adaptation-policy.json',
+  },
+  {
+    id: 'harness-capability-registry',
+    schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
+    dataPath: 'knowledge/public/governance/harness-capability-registry.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -248,6 +263,118 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.surfaces || []).some((surface) => surface.enabled !== false)) {
       violations.push('active-surfaces: at least one surface must be enabled');
+    }
+  }
+
+  if (check.id === 'model-registry') {
+    const typed = data as {
+      default_model_id?: string;
+      models?: Array<{ model_id?: string; status?: string }>;
+    };
+    if (!(typed.models || []).length) {
+      violations.push('model-registry: models must not be empty');
+      return;
+    }
+    const modelIds = new Set<string>();
+    for (const model of typed.models || []) {
+      const modelId = String(model.model_id || '');
+      if (!modelId) {
+        violations.push('model-registry: every model must define model_id');
+        continue;
+      }
+      if (modelIds.has(modelId)) {
+        violations.push(`model-registry: duplicate model_id detected (${modelId})`);
+      }
+      modelIds.add(modelId);
+    }
+    if (!typed.default_model_id) {
+      violations.push('model-registry: default_model_id must not be empty');
+      return;
+    }
+    const defaultModel = (typed.models || []).find((model) => model.model_id === typed.default_model_id);
+    if (!defaultModel) {
+      violations.push('model-registry: default_model_id must reference an existing model_id');
+      return;
+    }
+    if (defaultModel.status !== 'approved') {
+      violations.push('model-registry: default_model_id must point to an approved model');
+    }
+    if (!(typed.models || []).some((model) => model.status === 'candidate')) {
+      violations.push('model-registry: at least one candidate model is required for shadow adaptation');
+    }
+  }
+
+  if (check.id === 'model-adaptation-policy') {
+    const typed = data as {
+      lifecycle?: { steps?: string[] };
+      benchmark_suites?: Array<{ id?: string }>;
+      promotion_gates?: { required_suites?: string[] };
+      integration_decision_rules?: Array<{ id?: string }>;
+      rollback?: { min_signal_count?: number };
+    };
+    const lifecycleSteps = typed.lifecycle?.steps || [];
+    const requiredLifecycleSteps = ['detect', 'profile', 'evaluate', 'adapt', 'shadow', 'promote_or_rollback'];
+    for (const step of requiredLifecycleSteps) {
+      if (!lifecycleSteps.includes(step)) {
+        violations.push(`model-adaptation-policy: lifecycle.steps must include ${step}`);
+      }
+    }
+    const benchmarkIds = new Set((typed.benchmark_suites || []).map((suite) => String(suite.id || '')));
+    if (!benchmarkIds.size) {
+      violations.push('model-adaptation-policy: benchmark_suites must not be empty');
+    }
+    for (const suiteId of typed.promotion_gates?.required_suites || []) {
+      if (!benchmarkIds.has(suiteId)) {
+        violations.push(`model-adaptation-policy: promotion_gates.required_suites contains unknown suite id (${suiteId})`);
+      }
+    }
+    const decisionRuleIds = new Set<string>();
+    for (const rule of typed.integration_decision_rules || []) {
+      const id = String(rule.id || '');
+      if (!id) {
+        violations.push('model-adaptation-policy: every integration_decision_rule must define id');
+        continue;
+      }
+      if (decisionRuleIds.has(id)) {
+        violations.push(`model-adaptation-policy: duplicate integration_decision_rule id (${id})`);
+      }
+      decisionRuleIds.add(id);
+    }
+    if ((typed.rollback?.min_signal_count || 0) < 1) {
+      violations.push('model-adaptation-policy: rollback.min_signal_count must be >= 1');
+    }
+  }
+
+  if (check.id === 'harness-capability-registry') {
+    const typed = data as {
+      capabilities?: Array<{
+        capability_id?: string;
+        status?: string;
+        fallback_path?: { mode?: string; target?: string };
+      }>;
+    };
+    if (!(typed.capabilities || []).length) {
+      violations.push('harness-capability-registry: capabilities must not be empty');
+      return;
+    }
+    const capabilityIds = new Set<string>();
+    for (const capability of typed.capabilities || []) {
+      const capabilityId = String(capability.capability_id || '');
+      if (!capabilityId) {
+        violations.push('harness-capability-registry: every capability must define capability_id');
+        continue;
+      }
+      if (capabilityIds.has(capabilityId)) {
+        violations.push(`harness-capability-registry: duplicate capability_id detected (${capabilityId})`);
+      }
+      capabilityIds.add(capabilityId);
+
+      if (capability.status === 'active' && capability.fallback_path?.mode !== 'none' && !String(capability.fallback_path?.target || '')) {
+        violations.push(`harness-capability-registry: active capability ${capabilityId} must define fallback_path.target when fallback is enabled`);
+      }
+    }
+    if (!(typed.capabilities || []).some((capability) => capability.status === 'active')) {
+      violations.push('harness-capability-registry: at least one active capability is required');
     }
   }
 
