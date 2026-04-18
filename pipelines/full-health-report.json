@@ -1,0 +1,19 @@
+{
+  "action": "pipeline",
+  "name": "Full System Health and Report",
+  "description": "Comprehensive health check and report generation.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🏥 Starting Full System Health Audit..." } },
+    { "op": "system:shell", "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json", "export_as": "vital_results" } },
+    { "op": "system:shell", "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json", "export_as": "diag_results" } },
+    { "op": "system:shell", "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/dev-productivity-audit.json", "export_as": "prod_results" } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo '# Kyberion System Health Report\n\nGenerated on: $(date)\n\n## Vital Check\n```\n{{vital_results}}\n```\n\n## Diagnostics\n```\n{{diag_results}}\n```\n\n## Productivity Audit\n```\n{{prod_results}}\n```' > HEALTH_REPORT.md",
+        "export_as": "report_status"
+      }
+    },
+    { "op": "system:log", "params": { "message": "✅ Full health report generated: HEALTH_REPORT.md" } }
+  ]
+}

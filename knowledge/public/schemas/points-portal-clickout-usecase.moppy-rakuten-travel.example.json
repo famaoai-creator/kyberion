@@ -1,0 +1,81 @@
+{
+  "kind": "points-portal-clickout-usecase",
+  "usecase_id": "moppy-rakuten-travel",
+  "mode": "simulation",
+  "points_portal": {
+    "id": "moppy",
+    "display_name": "Moppy",
+    "account_ref": "personal/points/moppy"
+  },
+  "merchant": {
+    "id": "rakuten_travel",
+    "display_name": "Rakuten Travel",
+    "account_ref": "personal/booking/rakuten-travel"
+  },
+  "auth_strategy": {
+    "type": "dedicated_browser_profile",
+    "browser_profile_ref": "active/shared/runtime/browser/profiles/moppy-rakuten-travel",
+    "approval_required": true,
+    "notes": "Use a dedicated authenticated browser profile. Do not export cookies or storage."
+  },
+  "portal_detail_url": "https://pc.moppy.jp/shopping/detail.php?site_id=903&track_ref=sea",
+  "clickout": {
+    "selector": "form#toClient > button:nth-of-type(1)",
+    "selector_strategy": "css",
+    "button_text_hint": "POINT GET!",
+    "operator_confirmation_required": true
+  },
+  "landing_match": {
+    "url_includes": "travel.rakuten.co.jp",
+    "title_includes": "楽天トラベル"
+  },
+  "blocked_actions": [
+    "reservation_confirmation",
+    "payment_execution",
+    "cancellation",
+    "profile_mutation",
+    "credential_export",
+    "session_handoff_export"
+  ],
+  "evidence_required": [
+    "portal_name",
+    "merchant_page",
+    "reward_rate",
+    "terms_snapshot",
+    "timestamp",
+    "portal_detail_screenshot",
+    "clickout_confirmation",
+    "tabs_before_clickout",
+    "tabs_after_landing",
+    "merchant_landing_snapshot",
+    "merchant_landing_screenshot",
+    "network_after_landing",
+    "exported_adf",
+    "tracking_warning"
+  ],
+  "success_criteria": {
+    "landing_url_includes": "travel.rakuten.co.jp",
+    "landing_title_includes": "楽天トラベル",
+    "handoff_export_absent": true,
+    "blocked_actions_not_executed": true,
+    "merchant_landing_captured": true
+  },
+  "artifact_policy": {
+    "forbid_session_handoff_export": true,
+    "allowed_artifact_roots": ["active/shared/tmp/browser", "active/shared/runtime/browser"],
+    "retain_browser_profile": true,
+    "delete_continue_files": true
+  },
+  "preflight": {
+    "require_clickout_selector": true,
+    "require_landing_match": true,
+    "require_blocked_actions": true,
+    "deny_ops": [
+      "export_session_handoff",
+      "payment_execution",
+      "reservation_confirmation",
+      "profile_mutation"
+    ]
+  },
+  "notes": "This use case validates clickout and landing evidence only. Actual booking and payment require a separate approved contract."
+}

@@ -33,3 +33,5 @@ node dist/libs/actuators/browser-actuator/src/index.js --input libs/actuators/br
   ローカル起動中の Web app から current browser session を handoff artifact として export する
 - `web-runtime-session-handoff-import.json`:
   Web runtime handoff artifact を import して browser 側で round-trip export する
+- `moppy-rakuten-travel-simulation.json`:
+  `points-portal-clickout-usecase` の実行例。専用 Chrome プロファイルで Moppy から楽天トラベルへの導線を検証し、Moppy 広告詳細と楽天トラベル着地の証跡を保存する。予約確定・決済・session handoff export は行わない

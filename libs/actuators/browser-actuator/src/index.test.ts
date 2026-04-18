@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => {
   const context = {
     pages: vi.fn(() => [page]),
     newPage: vi.fn(async () => page2),
+    on: vi.fn(),
     clearCookies: vi.fn(async () => undefined),
     newCDPSession: vi.fn(async () => ({
       send: vi.fn(async (method: string) => {
@@ -568,6 +569,24 @@ describe('browser-actuator v3 contract', () => {
 
     Object.defineProperty(process.stdin, 'isTTY', { value: stdinIsTTY, configurable: true });
     expect(fs.existsSync(continueFile)).toBe(true);
+  });
+
+  it('selects a tab by URL pattern before capture', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-select-tab-matching',
+      steps: [
+        { type: 'control', op: 'open_tab', params: { tab_id: 'rakuten-tab', url: 'https://travel.rakuten.co.jp/', waitUntil: 'domcontentloaded' } },
+        { type: 'control', op: 'select_tab_matching', params: { url_includes: 'travel.rakuten.co.jp' } },
+        { type: 'capture', op: 'tabs', params: { export_as: 'tabs' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.context.active_tab_id).toBe('rakuten-tab');
+    expect(result.context.tabs.find((tab: any) => tab.tab_id === 'rakuten-tab')?.active).toBe(true);
   });
 
   it('passes existing chrome profile launch options to playwright persistent context', async () => {

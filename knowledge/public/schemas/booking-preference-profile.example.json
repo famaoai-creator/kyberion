@@ -1,0 +1,77 @@
+{
+  "kind": "booking-preference-profile",
+  "profile_id": "travel-points-routing-example",
+  "scope": "personal_travel",
+  "security_boundaries": {
+    "forbid_inline_secrets": true,
+    "approval_required_for": [
+      "credential_use",
+      "points_portal_redirect",
+      "booking_confirmation",
+      "payment_execution"
+    ]
+  },
+  "preferred_booking_sites": [
+    {
+      "site": "rakuten_travel",
+      "priority": 1,
+      "categories": ["hotel", "package"],
+      "reason": "Use Rakuten Travel for travel booking while preserving points-portal routing evidence."
+    }
+  ],
+  "login_methods": [
+    {
+      "site": "rakuten_travel",
+      "preferred_method": "rakuten_id",
+      "credential_ref": "browser://profile/rakuten-travel",
+      "approval_required": true
+    }
+  ],
+  "payment_policy": {
+    "prefer": ["points_earning", "free_cancellation", "onsite_payment"],
+    "allow_prepaid": true,
+    "payment_method_refs": ["secret://wallet/main-card"],
+    "require_confirmation_if": [
+      "nonrefundable",
+      "total_amount_over_budget",
+      "points_terms_unclear",
+      "payment_execution"
+    ]
+  },
+  "points_portal_policy": {
+    "enabled": true,
+    "preferred_portals": [
+      {
+        "portal": "moppy",
+        "priority": 1
+      }
+    ],
+    "routing_rules": [
+      {
+        "merchant": "rakuten_travel",
+        "use_points_portal": true,
+        "clickout_usecase_ref": "knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
+        "preferred_execution_mode": "simulation"
+      }
+    ],
+    "require_confirmation_if": [
+      "reward_rate_unknown",
+      "tracking_cookie_blocked",
+      "terms_changed",
+      "coupon_conflict",
+      "app_transition_required",
+      "payment_execution"
+    ],
+    "evidence_required": [
+      "portal_name",
+      "merchant_page",
+      "reward_rate",
+      "terms_snapshot",
+      "timestamp",
+      "final_booking_site",
+      "clickout_confirmation",
+      "tracking_warning"
+    ],
+    "fallback_rule": "manual_review"
+  }
+}

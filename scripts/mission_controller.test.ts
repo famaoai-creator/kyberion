@@ -11,8 +11,12 @@ import {
 
 describe('mission_controller argument parsing', () => {
   beforeEach(() => {
-    safeRmSync(pathResolver.shared('runtime/project-registry/PRJ-TEST-AUTO-TRACK.json'), { force: true });
-    safeRmSync(pathResolver.shared('runtime/project-tracks/TRK-TEST-AUTO-TRACK.json'), { force: true });
+    safeRmSync(pathResolver.shared('runtime/project-registry/PRJ-TEST-AUTO-TRACK.json'), {
+      force: true,
+    });
+    safeRmSync(pathResolver.shared('runtime/project-tracks/TRK-TEST-AUTO-TRACK.json'), {
+      force: true,
+    });
   });
 
   it('removes project traceability flags and their values from positional arguments', () => {
@@ -79,6 +83,20 @@ describe('mission_controller argument parsing', () => {
     ]);
 
     expect(positionalArgs).toEqual(['start', 'MSN-2B']);
+  });
+
+  it('treats checkpoint --mission-id as a named option instead of a positional argument', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'checkpoint',
+      '--mission-id',
+      'MSN-2C',
+      'step-1',
+      'Progress note',
+    ]);
+
+    expect(positionalArgs).toEqual(['checkpoint', 'step-1', 'Progress note']);
   });
 
   it('extracts project relationship options into a normalized relationship payload', () => {
@@ -235,8 +253,12 @@ describe('mission_controller argument parsing', () => {
     ]);
 
     expect(input.relationships?.project?.project_path).toBe('projects/sample');
-    expect(input.ledgerTargets?.markdown.endsWith('projects/sample/04_control/mission-ledger.md')).toBe(true);
-    expect(input.ledgerTargets?.json.endsWith('projects/sample/04_control/mission-ledger.json')).toBe(true);
+    expect(
+      input.ledgerTargets?.markdown.endsWith('projects/sample/04_control/mission-ledger.md')
+    ).toBe(true);
+    expect(
+      input.ledgerTargets?.json.endsWith('projects/sample/04_control/mission-ledger.json')
+    ).toBe(true);
   });
 
   it('inherits the project default track when project linkage is provided without explicit track flags', () => {
@@ -291,39 +313,31 @@ describe('mission_controller argument parsing', () => {
     process.env.KYBERION_SUDO = 'false';
 
     expect(() =>
-      validateMissionStartCreateInput(
+      validateMissionStartCreateInput('start', 'MSN-8', [
+        'node',
+        'dist/scripts/mission_controller.js',
         'start',
         'MSN-8',
-        [
-          'node',
-          'dist/scripts/mission_controller.js',
-          'start',
-          'MSN-8',
-          '--project-id',
-          'PRJ-3',
-          '--project-path',
-          'libs/core',
-          '--project-relationship',
-          'governs',
-        ],
-      ),
+        '--project-id',
+        'PRJ-3',
+        '--project-path',
+        'libs/core',
+        '--project-relationship',
+        'governs',
+      ])
     ).toThrow("project ledger target 'libs/core/04_control/mission-ledger.md' is not writable");
   });
 
   it('requires a project relationship when track linkage is provided', () => {
     expect(() =>
-      validateMissionStartCreateInput(
+      validateMissionStartCreateInput('start', 'MSN-8B', [
+        'node',
+        'dist/scripts/mission_controller.js',
         'start',
         'MSN-8B',
-        [
-          'node',
-          'dist/scripts/mission_controller.js',
-          'start',
-          'MSN-8B',
-          '--track-id',
-          'TRK-REL-2',
-        ],
-      ),
+        '--track-id',
+        'TRK-REL-2',
+      ])
     ).toThrow('start MSN-8B: --track-id requires --project-id');
   });
 

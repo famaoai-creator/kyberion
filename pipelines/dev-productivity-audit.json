@@ -1,0 +1,41 @@
+{
+  "action": "pipeline",
+  "name": "Developer Productivity Audit",
+  "description": "Analyzes codebase metrics and quality signals.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "📈 Starting Productivity Audit..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "find libs src -name '*.ts' | wc -l",
+        "export_as": "ts_file_count"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "find tests libs -name '*.test.ts' -o -name '*.spec.ts' | wc -l",
+        "export_as": "test_file_count"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "grep -r 'FIXME' libs src 2>/dev/null | wc -l",
+        "export_as": "fixme_count"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📊 Metrics Summary:" } },
+    { "op": "system:log", "params": { "message": "  - Source Files (.ts): {{ts_file_count}}" } },
+    { "op": "system:log", "params": { "message": "  - Test Files: {{test_file_count}}" } },
+    { "op": "system:log", "params": { "message": "  - FIXME items: {{fixme_count}}" } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node -e \"const ts = parseInt('{{ts_file_count}}'); const tests = parseInt('{{test_file_count}}'); const fixme = parseInt('{{fixme_count}}'); console.log(Math.round((tests / ts) * 100 - fixme))\"",
+        "export_as": "productivity_score"
+      }
+    },
+    { "op": "system:log", "params": { "message": "🚀 Calculated Productivity Score: {{productivity_score}}" } }
+  ]
+}

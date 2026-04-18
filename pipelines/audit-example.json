@@ -1,0 +1,41 @@
+{
+  "action": "pipeline",
+  "name": "Sovereign Security & Quality Audit",
+  "description": "Performs a quick security and quality audit of the workspace.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🛡️ Starting Sovereign Audit..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "find . -name '.env*' -not -path '*/node_modules/*' | wc -l",
+        "export_as": "env_file_count"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "grep -r 'TODO' libs src 2>/dev/null | wc -l",
+        "export_as": "todo_count"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "grep -i 'Kyberion' README.md > /dev/null && echo 'YES' || echo 'NO'",
+        "export_as": "has_kyberion_in_readme"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📊 Audit Results:" } },
+    { "op": "system:log", "params": { "message": "  - .env files found: {{env_file_count}}" } },
+    { "op": "system:log", "params": { "message": "  - TODO comments: {{todo_count}}" } },
+    { "op": "system:log", "params": { "message": "  - Kyberion in README: {{has_kyberion_in_readme}}" } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "mkdir -p active/shared/tmp && echo '{\"env_files\": \"{{env_file_count}}\", \"todos\": \"{{todo_count}}\", \"readme_ok\": \"{{has_kyberion_in_readme}}\"}' > active/shared/tmp/audit-report.json",
+        "export_as": "report_save_status"
+      }
+    },
+    { "op": "system:log", "params": { "message": "✅ Audit report saved to active/shared/tmp/audit-report.json" } }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "context": {
+    "target_file": "active/shared/tmp/license-test.ts",
+    "header": "// (c) 2026 Kyberion Sovereign Ecosystem. All rights reserved.\n"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "read_file",
+      "params": {
+        "path": "{{target_file}}",
+        "export_as": "content"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "run_js",
+      "params": {
+        "code": "if (!ctx.content.includes('(c) 2026 Kyberion')) { ctx.new_content = ctx.header + ctx.content; } else { ctx.new_content = ctx.content; }"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "write_file",
+      "params": {
+        "path": "{{target_file}}",
+        "from": "new_content"
+      }
+    }
+  ]
+}

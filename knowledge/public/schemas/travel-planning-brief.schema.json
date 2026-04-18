@@ -1,0 +1,223 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/travel-planning-brief.schema.json",
+  "title": "Travel Planning Brief",
+  "description": "High-level planning contract for leisure or business travel before it is compiled into executable ADF.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "destination",
+    "dates",
+    "travelers",
+    "planning_goal",
+    "constraints",
+    "desired_output"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["travel-planning-brief"]
+    },
+    "destination": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dates": {
+      "$ref": "#/definitions/dateRange"
+    },
+    "travelers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/traveler"
+      }
+    },
+    "occasion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planning_goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pace": {
+          "type": "string",
+          "enum": ["relaxed", "balanced", "dense"]
+        },
+        "mood": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "food": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "weather_risk_tolerance": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "avoid": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["no_booking_without_approval", "no_payment_without_approval"],
+      "properties": {
+        "no_booking_without_approval": {
+          "type": "boolean",
+          "const": true
+        },
+        "no_payment_without_approval": {
+          "type": "boolean",
+          "const": true
+        },
+        "avoid_closed_facilities": {
+          "type": "boolean"
+        },
+        "include_weather_backup": {
+          "type": "boolean"
+        },
+        "require_evidence_for_dynamic_facts": {
+          "type": "boolean"
+        },
+        "max_budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "currency"],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            }
+          }
+        }
+      }
+    },
+    "booking_profile_ref": {
+      "type": "string",
+      "pattern": "^(personal|confidential|public)/[A-Za-z0-9_./-]+$"
+    },
+    "approval_required_for": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "login",
+          "points_portal_redirect",
+          "reservation_hold",
+          "booking_confirmation",
+          "payment",
+          "cancellation",
+          "profile_mutation",
+          "personal_data_storage"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "freshness": {
+          "type": "string",
+          "enum": ["same_day", "within_24h", "within_7d", "stable_sources_ok"]
+        },
+        "evidence_required": {
+          "type": "boolean"
+        },
+        "preferred_source_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["official", "primary", "reputable_secondary", "operator_supplied"]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "desired_output": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "recommended_itinerary",
+          "ranked_candidates",
+          "backup_plan",
+          "booking_priority",
+          "birthday_touchpoints",
+          "budget_summary",
+          "source_summary",
+          "approval_preview"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "definitions": {
+    "dateRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    },
+    "traveler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["user", "spouse", "partner", "friend", "family", "child", "colleague", "other"]
+        },
+        "birthday": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "relationship_note": {
+          "type": "string"
+        },
+        "sensitivity": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"],
+          "default": "personal"
+        }
+      }
+    }
+  }
+}

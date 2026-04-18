@@ -1,0 +1,31 @@
+{
+  "action": "pipeline",
+  "name": "Daily Summary for Presence",
+  "description": "Aggregates daily status and prepares a summary for notification.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🌤️ Preparing Daily Summary..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "pnpm capabilities | grep '✅' | wc -l",
+        "export_as": "total_capabilities"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "ls active/missions | wc -l",
+        "export_as": "mission_count"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo '{\"summary\": \"Kyberion Status: {{total_capabilities}} capabilities active across {{mission_count}} missions.\", \"timestamp\": \"$(date)\"}'",
+        "export_as": "presence_payload"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📡 Presence Payload Prepared: {{presence_payload}}" } },
+    { "op": "system:log", "params": { "message": "✅ Daily summary complete." } }
+  ]
+}

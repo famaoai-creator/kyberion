@@ -21,17 +21,15 @@ import {
 } from '@agent/core';
 import { getActiveMissionSearchDirs, loadState, saveState } from './mission-state.js';
 
-export async function createCheckpoint(
-  args: {
-    taskId: string;
-    note: string;
-    explicitMissionId?: string;
-    readFocusedMissionId: () => string | null;
-    writeFocusedMissionId: (missionId: string) => void;
-    getGitHash: (cwd: string) => string;
-    syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
-  },
-): Promise<void> {
+export async function createCheckpoint(args: {
+  taskId: string;
+  note: string;
+  explicitMissionId?: string;
+  readFocusedMissionId: () => string | null;
+  writeFocusedMissionId: (missionId: string) => void;
+  getGitHash: (cwd: string) => string;
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
+}): Promise<void> {
   const { explicitMissionId, readFocusedMissionId } = args;
   if (explicitMissionId) {
     const targetMissionId = explicitMissionId.toUpperCase();
@@ -40,7 +38,9 @@ export async function createCheckpoint(
     if (explicitState?.status === 'active' && explicitPath) {
       return recordCheckpointForMission(targetMissionId, explicitPath, args);
     }
-    logger.error(`Mission ${targetMissionId} is not active or could not be found. Checkpoint aborted.`);
+    logger.error(
+      `Mission ${targetMissionId} is not active or could not be found. Checkpoint aborted.`
+    );
     return;
   }
 
@@ -53,8 +53,7 @@ export async function createCheckpoint(
     }
   }
 
-  let activeMissionId: string | null = null;
-  let missionPath: string | null = null;
+  const activeMissions: Array<{ missionId: string; missionPath: string }> = [];
 
   for (const dir of getActiveMissionSearchDirs()) {
     if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
@@ -68,22 +67,33 @@ export async function createCheckpoint(
     for (const missionId of missions) {
       const state = loadState(missionId);
       if (state?.status === 'active') {
-        activeMissionId = missionId;
-        missionPath = path.join(dir, missionId);
-        break;
+        activeMissions.push({ missionId, missionPath: path.join(dir, missionId) });
       }
     }
-    if (activeMissionId) break;
   }
 
-  if (!activeMissionId || !missionPath) {
+  if (activeMissions.length === 0) {
     logger.error('No active mission found. Checkpoint aborted.');
     logger.info('  To activate a mission:  mission_controller start <MISSION_ID>');
     logger.info('  To see all missions:    mission_controller list');
     return;
   }
 
-  return recordCheckpointForMission(activeMissionId, missionPath, args);
+  if (activeMissions.length > 1) {
+    logger.error(
+      'Multiple active missions found. Checkpoint aborted to avoid writing to the wrong mission.'
+    );
+    logger.info(
+      '  Specify the target mission explicitly: mission_controller checkpoint <MISSION_ID> <TASK_ID> "<NOTE>"'
+    );
+    logger.info(
+      '  Or use: mission_controller checkpoint --mission-id <MISSION_ID> <TASK_ID> "<NOTE>"'
+    );
+    return;
+  }
+
+  const [activeMission] = activeMissions;
+  return recordCheckpointForMission(activeMission.missionId, activeMission.missionPath, args);
 }
 
 async function recordCheckpointForMission(
@@ -95,7 +105,7 @@ async function recordCheckpointForMission(
     writeFocusedMissionId: (missionId: string) => void;
     getGitHash: (cwd: string) => string;
     syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
-  },
+  }
 ): Promise<void> {
   const { taskId, note, writeFocusedMissionId, getGitHash, syncProjectLedgerIfLinked } = args;
   writeFocusedMissionId(activeMissionId);
@@ -110,7 +120,9 @@ async function recordCheckpointForMission(
 
       let commitCreated = true;
       try {
-        safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], { cwd: missionPath });
+        safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], {
+          cwd: missionPath,
+        });
       } catch (_) {
         logger.info('No new changes in mission repo — recording state-only checkpoint.');
         commitCreated = false;
@@ -119,10 +131,16 @@ async function recordCheckpointForMission(
       const hash = getGitHash(missionPath);
       const currentState = loadState(activeMissionId)!;
       currentState.git.latest_commit = hash;
-      currentState.git.checkpoints.push({ task_id: taskId, commit_hash: hash, ts: new Date().toISOString() });
+      currentState.git.checkpoints.push({
+        task_id: taskId,
+        commit_hash: hash,
+        ts: new Date().toISOString(),
+      });
       await saveState(activeMissionId, currentState, { alreadyLocked: true });
 
-      logger.success(`✅ Recorded checkpoint ${hash} in mission repo${commitCreated ? '' : ' (state-only)'}.`);
+      logger.success(
+        `✅ Recorded checkpoint ${hash} in mission repo${commitCreated ? '' : ' (state-only)'}.`
+      );
     });
     await syncProjectLedgerIfLinked(activeMissionId);
   } catch (err: any) {
@@ -137,7 +155,7 @@ export async function resumeMission(
     writeFocusedMissionId: (missionId: string) => void;
     getCurrentBranch: (cwd: string) => string;
     syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
-  },
+  }
 ): Promise<void> {
   let targetId = id?.toUpperCase();
 
@@ -184,24 +202,39 @@ export async function resumeMission(
     logger.info('Please verify the physical state and continue from this point.');
   }
 
-  state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Session re-established.' });
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'RESUME',
+    note: 'Session re-established.',
+  });
   await saveState(targetId, state);
   await args.syncProjectLedgerIfLinked(targetId);
   args.writeFocusedMissionId(targetId);
   logger.success(`✅ Mission ${targetId} is back in focus.`);
 }
 
-export async function recordTask(missionId: string, description: string, details: any = {}): Promise<void> {
+export async function recordTask(
+  missionId: string,
+  description: string,
+  details: any = {}
+): Promise<void> {
   const upperId = missionId.toUpperCase();
   const missionDir = findMissionPath(upperId);
   if (!missionDir) throw new Error(`Mission ${upperId} not found.`);
 
   const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
-  safeWriteFile(flightRecorderPath, JSON.stringify({
-    ts: new Date().toISOString(),
-    description,
-    details,
-  }, null, 2));
+  safeWriteFile(
+    flightRecorderPath,
+    JSON.stringify(
+      {
+        ts: new Date().toISOString(),
+        description,
+        details,
+      },
+      null,
+      2
+    )
+  );
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
 }
 
@@ -213,7 +246,12 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
   }
 
   const adf = JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string);
-  const candidates: Array<{ mission: string; missionDir: string; targetPath: string; policyName: string }> = [];
+  const candidates: Array<{
+    mission: string;
+    missionDir: string;
+    targetPath: string;
+    policyName: string;
+  }> = [];
 
   for (const dir of getActiveMissionSearchDirs()) {
     if (!safeExistsSync(dir)) continue;
@@ -243,8 +281,13 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
 
         let targetPath = policy.target_dir;
         const now = new Date();
-        targetPath = targetPath.replace('{YYYY-MM}', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-        targetPath = pathResolver.rootResolve(path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission)));
+        targetPath = targetPath.replace(
+          '{YYYY-MM}',
+          `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        );
+        targetPath = pathResolver.rootResolve(
+          path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission))
+        );
         candidates.push({ mission, missionDir, targetPath, policyName: policy.name });
         break;
       }
@@ -260,7 +303,9 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
   console.log(`  Missions matching purge policies: ${candidates.length}`);
   console.log('');
   for (const candidate of candidates) {
-    console.log(`    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`);
+    console.log(
+      `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
+    );
   }
   console.log('');
 
@@ -270,7 +315,9 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
   }
 
   for (const candidate of candidates) {
-    logger.info(`Archiving mission ${candidate.mission} to ${candidate.targetPath} (Policy: ${candidate.policyName})`);
+    logger.info(
+      `Archiving mission ${candidate.mission} to ${candidate.targetPath} (Policy: ${candidate.policyName})`
+    );
     if (!safeExistsSync(path.dirname(candidate.targetPath))) {
       safeMkdir(path.dirname(candidate.targetPath), { recursive: true });
     }

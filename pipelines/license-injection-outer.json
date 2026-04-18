@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "name": "Automated License Header Injection",
+  "description": "Injects a license header into a target file if it's missing.",
+  "context": {
+    "target_file": "active/shared/tmp/license-test.ts",
+    "header": "// (c) 2026 Kyberion Sovereign Ecosystem. All rights reserved.\n"
+  },
+  "steps": [
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo 'console.log(\"Hello world\");' > active/shared/tmp/license-test.ts",
+        "export_as": "init_status"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📄 Processing {{target_file}}..." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/code-actuator/src/index.js --input pipelines/license-injection-inner.json",
+        "export_as": "inner_status"
+      }
+    },
+    { "op": "system:log", "params": { "message": "✅ License injection attempted." } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "cat active/shared/tmp/license-test.ts",
+        "export_as": "file_content"
+      }
+    },
+    { "op": "system:log", "params": { "message": "📝 Resulting content:\n{{file_content}}" } }
+  ]
+}

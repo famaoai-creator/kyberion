@@ -1,0 +1,24 @@
+{
+  "action": "pipeline",
+  "name": "Automated Artifact Collector",
+  "description": "Collects pipeline definitions and generates a manifest.",
+  "steps": [
+    { "op": "system:log", "params": { "message": "📦 Collecting artifacts..." } },
+    { "op": "system:shell", "params": { "cmd": "mkdir -p active/shared/tmp/artifacts" } },
+    { "op": "system:shell", "params": { "cmd": "cp pipelines/*.json active/shared/tmp/artifacts/" } },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "ls active/shared/tmp/artifacts/*.json | xargs -n 1 basename | jq -R . | jq -s '{\"artifacts\": .}'",
+        "export_as": "manifest_json"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo '{{manifest_json}}' > active/shared/tmp/artifacts/MANIFEST.json"
+      }
+    },
+    { "op": "system:log", "params": { "message": "✅ Artifacts collected and MANIFEST.json generated in active/shared/tmp/artifacts/" } }
+  ]
+}

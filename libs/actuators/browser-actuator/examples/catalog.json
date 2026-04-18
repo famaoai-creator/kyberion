@@ -70,6 +70,22 @@
       "path": "libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json",
       "description": "Imports a governed Web session handoff artifact and re-exports a round-trip artifact for follow-up assertions.",
       "tags": ["browser", "web", "session-handoff", "import", "example"]
+    },
+    {
+      "id": "moppy-rakuten-travel-simulation",
+      "title": "Moppy To Rakuten Travel Simulation",
+      "path": "libs/actuators/browser-actuator/examples/moppy-rakuten-travel-simulation.json",
+      "description": "Uses a points-portal-clickout use case and a dedicated headed Chrome profile to validate Moppy to Rakuten Travel routing without confirming reservations, payment, or session handoff export.",
+      "tags": [
+        "browser",
+        "travel",
+        "points-portal",
+        "points-portal-clickout",
+        "moppy",
+        "rakuten-travel",
+        "authenticated-profile",
+        "evidence"
+      ]
     }
   ]
 }

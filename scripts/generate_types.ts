@@ -116,6 +116,18 @@ const targets: GenerationTarget[] = [
     schemaPath: 'knowledge/public/schemas/operator-interaction-packet.schema.json',
     outputPath: 'libs/core/src/types/operator-interaction-packet.ts',
   },
+  {
+    schemaPath: 'knowledge/public/schemas/travel-planning-brief.schema.json',
+    outputPath: 'libs/core/src/types/travel-planning-brief.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/booking-preference-profile.schema.json',
+    outputPath: 'libs/core/src/types/booking-preference-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/points-portal-clickout-usecase.schema.json',
+    outputPath: 'libs/core/src/types/points-portal-clickout-usecase.ts',
+  },
 ];
 
 async function main(): Promise<void> {
