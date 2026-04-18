@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "harness-adapter-profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_id": { "type": "string", "minLength": 1 },
+    "capability_id": { "type": "string", "minLength": 1 },
+    "contract_kind": { "type": "string", "minLength": 1 },
+    "observation_kind": { "type": "string", "minLength": 1 },
+    "result_kind": { "type": "string", "minLength": 1 },
+    "approval_behavior": {
+      "type": "string",
+      "enum": ["none", "pre_action", "pre_and_post"]
+    },
+    "replayability": {
+      "type": "string",
+      "enum": ["deterministic", "partial", "opaque"]
+    },
+    "fallback_contract": { "type": "string", "minLength": 1 },
+    "enabled": { "type": "boolean" },
+    "owner": { "type": "string", "minLength": 1 },
+    "notes": { "type": "string" }
+  },
+  "required": [
+    "adapter_id",
+    "capability_id",
+    "contract_kind",
+    "observation_kind",
+    "result_kind",
+    "approval_behavior",
+    "replayability",
+    "fallback_contract",
+    "enabled",
+    "owner"
+  ]
+}
