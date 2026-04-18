@@ -1,11 +1,13 @@
 import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
+  getVoiceEngineRecord,
   getVoiceProfileRecord,
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
   logger,
   pathResolver,
+  resolveVoiceEngineForPlatform,
   safeExec,
   safeMkdir,
   safeReadFile,
@@ -63,6 +65,11 @@ function validateVoiceAction(input: unknown): void {
 }
 
 async function listVoices(): Promise<any> {
+  const engine = resolveVoiceEngineForPlatform();
+  if (!engine.supports.list_voices) {
+    return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
+  }
+
   if (process.platform === 'darwin') {
     const output = safeExec('say', ['-v', '?']);
     const voices = output
@@ -73,13 +80,14 @@ async function listVoices(): Promise<any> {
         const voice = line.split(/\s+/)[0];
         return { id: voice, display_name: voice, provider: 'say' };
       });
-    return { status: 'succeeded', voices };
+    return { status: 'succeeded', voices, engine_id: engine.engine_id };
   }
 
   if (process.platform === 'linux') {
     return {
       status: 'succeeded',
       voices: [{ id: 'espeak-default', display_name: 'espeak default', provider: 'espeak' }],
+      engine_id: engine.engine_id,
     };
   }
 
@@ -87,10 +95,11 @@ async function listVoices(): Promise<any> {
     return {
       status: 'succeeded',
       voices: [{ id: 'windows-default', display_name: 'Windows Speech Synthesizer', provider: 'sapi' }],
+      engine_id: engine.engine_id,
     };
   }
 
-  return { status: 'succeeded', voices: [] };
+  return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
 }
 
 async function speakLocal(params: Record<string, unknown>): Promise<any> {
@@ -101,12 +110,16 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
   const defaults = getVoiceTtsLanguageConfig(language);
   const voice = typeof params.voice === 'string' && params.voice.trim() ? params.voice.trim() : defaults.voice;
   const rate = Number.isFinite(params.rate) ? Number(params.rate) : defaults.rate;
+  const requestedEngineId = String(params.engine_id || 'local_say').trim() || 'local_say';
+  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
 
-  await performPlayback(text, { language, voice, rate });
+  await performPlayback(text, { language, voice, rate, engineId: engine.engine_id });
   return {
     status: 'succeeded',
     mode: 'playback',
-    engine: 'native_local',
+    engine: engine.kind,
+    engine_id: requestedEngineId,
+    resolved_engine_id: engine.engine_id,
     language,
     voice,
     rate,
@@ -124,6 +137,9 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   const chunks = splitVoiceTextIntoChunks(String(input.text || ''), maxChunkChars);
   const deliveryMode = String(input.delivery?.mode || 'playback');
   const requestedFormat = String(input.delivery?.format || policy.delivery.default_format) as VoiceArtifactFormat;
+  const requestedEngineId = String(input.engine?.engine_id || profile.default_engine_id || '').trim() || profile.default_engine_id;
+  const defaultEngine = getVoiceEngineRecord(profile.default_engine_id);
+  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
   const runtime = new VoiceGenerationRuntime(policy);
   const progress_packets: any[] = [];
   runtime.subscribe((packet) => {
@@ -141,7 +157,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
       api.report({
         status: 'loading_model',
         progress: { current: 2, total: 4, percent: 50, unit: 'steps' },
-        message: `using engine ${input.engine?.engine_id || profile.default_engine_id}`,
+        message: `using engine ${engine.engine_id} (requested: ${requestedEngineId || defaultEngine.engine_id})`,
       });
 
       let artifactRefs: string[] = [];
@@ -151,6 +167,8 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
           voice: defaults.voice,
           rate: defaults.rate,
           format: requestedFormat,
+          engineId: engine.engine_id,
+          supportsFormats: engine.supports.artifact_formats,
           outputPath: input.delivery?.artifact_path,
         });
         artifactRefs = [artifactRef];
@@ -180,6 +198,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             language,
             voice: defaults.voice,
             rate: defaults.rate,
+            engineId: engine.engine_id,
           });
         }
       }
@@ -200,7 +219,8 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
     request_id: jobId,
     profile_id: profile.profile_id,
     language,
-    engine_id: String(input.engine?.engine_id || profile.default_engine_id),
+    engine_id: requestedEngineId,
+    resolved_engine_id: engine.engine_id,
     chunks: chunks.length,
     progress_packets,
     artifact_refs: finalPacket.artifact_refs || [],
@@ -211,8 +231,13 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
 
 async function performPlayback(
   text: string,
-  options: { language: string; voice: string; rate: number },
+  options: { language: string; voice: string; rate: number; engineId: string },
 ): Promise<void> {
+  const engine = resolveVoiceEngineForPlatform(options.engineId);
+  if (!engine.supports.playback) {
+    throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
+  }
+
   if (process.platform === 'darwin') {
     safeExec('say', ['-v', options.voice, '-r', String(options.rate), text]);
     return;
@@ -239,9 +264,14 @@ function renderNativeArtifact(
     voice: string;
     rate: number;
     format: VoiceArtifactFormat;
+    engineId: string;
+    supportsFormats: VoiceArtifactFormat[];
     outputPath?: string;
   },
 ): string {
+  if (!options.supportsFormats.includes(options.format)) {
+    throw new Error(`Voice engine ${options.engineId} does not support artifact format ${options.format}`);
+  }
   const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });

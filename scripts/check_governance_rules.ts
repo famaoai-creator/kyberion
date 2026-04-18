@@ -76,6 +76,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/voice-runtime-policy.schema.json',
     dataPath: 'knowledge/public/governance/voice-runtime-policy.json',
   },
+  {
+    id: 'voice-engine-registry',
+    schemaPath: 'knowledge/public/schemas/voice-engine-registry.schema.json',
+    dataPath: 'knowledge/public/governance/voice-engine-registry.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -449,6 +454,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         status?: string;
         languages?: string[];
         tier?: string;
+        default_engine_id?: string;
       }>;
     };
     if (!(typed.profiles || []).length) {
@@ -472,6 +478,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       if (!String(profile.tier || '')) {
         violations.push(`voice-profile-registry: ${profileId} must define tier`);
       }
+      if (!String(profile.default_engine_id || '')) {
+        violations.push(`voice-profile-registry: ${profileId} must define default_engine_id`);
+      }
     }
     if (!String(typed.default_profile_id || '')) {
       violations.push('voice-profile-registry: default_profile_id must not be empty');
@@ -482,6 +491,18 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.profiles || []).some((profile) => profile.status === 'active')) {
       violations.push('voice-profile-registry: at least one active profile is required');
+    }
+
+    const engineRegistry = readJson<{ engines?: Array<{ engine_id?: string }> }>(
+      'knowledge/public/governance/voice-engine-registry.json'
+    );
+    const engineIds = new Set((engineRegistry.engines || []).map((engine) => String(engine.engine_id || '')));
+    for (const profile of typed.profiles || []) {
+      const profileId = String(profile.profile_id || 'unknown');
+      const engineId = String(profile.default_engine_id || '');
+      if (engineId && !engineIds.has(engineId)) {
+        violations.push(`voice-profile-registry: ${profileId} references unknown default_engine_id (${engineId})`);
+      }
     }
   }
 
@@ -508,6 +529,57 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if ((typed.progress?.min_percent_delta || 0) < 0) {
       violations.push('voice-runtime-policy: progress.min_percent_delta must be >= 0');
+    }
+  }
+
+  if (check.id === 'voice-engine-registry') {
+    const typed = data as {
+      default_engine_id?: string;
+      engines?: Array<{
+        engine_id?: string;
+        status?: string;
+        fallback_engine_id?: string;
+        supports?: { playback?: boolean; artifact_formats?: string[] };
+      }>;
+    };
+    if (!(typed.engines || []).length) {
+      violations.push('voice-engine-registry: engines must not be empty');
+      return;
+    }
+    const engineIds = new Set<string>();
+    for (const engine of typed.engines || []) {
+      const engineId = String(engine.engine_id || '');
+      if (!engineId) {
+        violations.push('voice-engine-registry: every engine must define engine_id');
+        continue;
+      }
+      if (engineIds.has(engineId)) {
+        violations.push(`voice-engine-registry: duplicate engine_id detected (${engineId})`);
+      }
+      engineIds.add(engineId);
+      if (engine.supports?.playback === false && (engine.supports?.artifact_formats || []).length === 0) {
+        violations.push(`voice-engine-registry: ${engineId} must support playback or at least one artifact format`);
+      }
+    }
+    if (!String(typed.default_engine_id || '')) {
+      violations.push('voice-engine-registry: default_engine_id must not be empty');
+      return;
+    }
+    if (!engineIds.has(String(typed.default_engine_id || ''))) {
+      violations.push('voice-engine-registry: default_engine_id must reference an existing engine_id');
+    }
+    if (!(typed.engines || []).some((engine) => engine.status === 'active')) {
+      violations.push('voice-engine-registry: at least one active engine is required');
+    }
+    for (const engine of typed.engines || []) {
+      const engineId = String(engine.engine_id || '');
+      const fallbackId = String(engine.fallback_engine_id || '');
+      if (fallbackId && !engineIds.has(fallbackId)) {
+        violations.push(`voice-engine-registry: ${engineId} references unknown fallback_engine_id (${fallbackId})`);
+      }
+      if (fallbackId && fallbackId === engineId) {
+        violations.push(`voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`);
+      }
     }
   }
 
