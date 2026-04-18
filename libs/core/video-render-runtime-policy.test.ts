@@ -30,6 +30,9 @@ describe('video render runtime policy', () => {
         render: {
           allowed_output_formats: ['mp4', 'webm'],
           enable_backend_rendering: true,
+          backend: 'hyperframes_cli',
+          quality: 'high',
+          command_timeout_ms: 120000,
         },
       }),
     );
@@ -39,5 +42,6 @@ describe('video render runtime policy', () => {
     expect(policy.version).toBe('test');
     expect(policy.queue.concurrency).toBe(2);
     expect(policy.render.enable_backend_rendering).toBe(true);
+    expect(policy.render.backend).toBe('hyperframes_cli');
   });
 });
