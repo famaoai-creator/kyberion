@@ -24,12 +24,23 @@ type VideoCompositionAction =
   | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
-  | { action: 'cancel_video_composition_job'; params: { job_id: string } }
+  | { action: 'cancel_video_composition_job'; params: { job_id: string; reason?: string } }
   | { action: 'get_video_composition_queue'; params?: Record<string, unknown> }
   | Record<string, any>;
 
+interface VideoCompositionJobDiagnostics {
+  cancellation_reason?: string;
+  cancellation_requested_at?: string;
+  backend_exit_signal?: string | null;
+  backend_exit_code?: number | null;
+  backend_cancelled?: boolean;
+  backend_timed_out?: boolean;
+  last_error?: string;
+}
+
 const runtime = new VideoRenderRuntime();
 const packetHistory = new Map<string, any[]>();
+const jobDiagnostics = new Map<string, VideoCompositionJobDiagnostics>();
 runtime.subscribe((packet) => {
   const history = packetHistory.get(packet.job_id) || [];
   history.push(packet);
@@ -103,6 +114,7 @@ async function getVideoCompositionJobStatus(params: { job_id?: string }) {
       job_id: jobId,
       packet: null,
       progress_packets: [],
+      diagnostics: null,
     };
   }
   return {
@@ -110,18 +122,27 @@ async function getVideoCompositionJobStatus(params: { job_id?: string }) {
     job_id: jobId,
     packet,
     progress_packets: packetHistory.get(jobId) || [],
+    diagnostics: jobDiagnostics.get(jobId) || null,
   };
 }
 
-async function cancelVideoCompositionJob(params: { job_id?: string }) {
+async function cancelVideoCompositionJob(params: { job_id?: string; reason?: string }) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('cancel_video_composition_job requires params.job_id');
-  const cancellation = runtime.cancel(jobId);
+  const reason = params.reason && String(params.reason).trim() ? String(params.reason).trim() : undefined;
+  if (reason) {
+    upsertJobDiagnostics(jobId, {
+      cancellation_reason: reason,
+      cancellation_requested_at: new Date().toISOString(),
+    });
+  }
+  const cancellation = runtime.cancel(jobId, { reason });
   return {
     status: cancellation ? 'succeeded' : 'not_found',
     job_id: jobId,
     cancellation,
     packet: runtime.getPacket(jobId),
+    diagnostics: jobDiagnostics.get(jobId) || null,
   };
 }
 
@@ -145,6 +166,7 @@ async function prepareVideoComposition(params: {
   const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
   const awaitCompletion = adf.output.await_completion !== false;
+  upsertJobDiagnostics(jobId, {});
 
   runtime.enqueue({
     jobId,
@@ -179,9 +201,27 @@ async function prepareVideoComposition(params: {
           artifact_refs: artifactRefs,
         });
 
-        const backendResult = await renderVideoCompositionBundleAsync(plan, policy, {
-          isCancelled: api.isCancelled,
-        });
+        let backendResult: any;
+        try {
+          backendResult = await renderVideoCompositionBundleAsync(plan, policy, {
+            isCancelled: api.isCancelled,
+          });
+        } catch (error: any) {
+          const backendState = extractBackendTerminationState(error);
+          if (backendState) {
+            upsertJobDiagnostics(jobId, backendState);
+          }
+          if (api.isCancelled() || backendState?.backend_cancelled) {
+            api.report({
+              status: 'cancelled',
+              progress: { current: 4, total: totalSteps, percent: (4 / totalSteps) * 100, unit: 'steps' },
+              message: formatCancellationMessage(jobId),
+              artifact_refs: artifactRefs,
+            });
+            throw new Error('video composition job cancelled');
+          }
+          throw error;
+        }
         if (backendResult.output_path) {
           backendOutputPath = backendResult.output_path;
           artifactRefs = [...artifactRefs, backendOutputPath];
@@ -216,6 +256,7 @@ async function prepareVideoComposition(params: {
       await_completion: false,
       packet: runtime.getPacket(jobId),
       queue: runtime.getQueueSnapshot(),
+      diagnostics: jobDiagnostics.get(jobId) || null,
       output_format: adf.output.format,
       backend_rendering_enabled: policy.render.enable_backend_rendering,
       backend_render_backend: policy.render.backend,
@@ -230,6 +271,7 @@ async function prepareVideoComposition(params: {
     job_id: jobId,
     artifact_refs: finalPacket.artifact_refs || [],
     progress_packets: packetHistory.get(jobId) || [],
+    diagnostics: jobDiagnostics.get(jobId) || null,
     output_format: adf.output.format,
     backend_rendering_enabled: policy.render.enable_backend_rendering,
     backend_render_backend: policy.render.backend,
@@ -248,6 +290,39 @@ async function waitForRenderJob(runtime: VideoRenderRuntime, jobId: string): Pro
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`video composition job timed out: ${jobId}`);
+}
+
+function upsertJobDiagnostics(jobId: string, patch: Partial<VideoCompositionJobDiagnostics>): VideoCompositionJobDiagnostics {
+  const current = jobDiagnostics.get(jobId) || {};
+  const next = { ...current, ...patch };
+  jobDiagnostics.set(jobId, next);
+  return next;
+}
+
+function extractBackendTerminationState(error: any): Partial<VideoCompositionJobDiagnostics> | null {
+  if (!error || typeof error !== 'object') return null;
+  const hasSignal = Object.prototype.hasOwnProperty.call(error, 'signal');
+  const hasExitCode = Object.prototype.hasOwnProperty.call(error, 'exit_code');
+  const hasCancelled = Object.prototype.hasOwnProperty.call(error, 'cancelled');
+  const hasTimedOut = Object.prototype.hasOwnProperty.call(error, 'timed_out');
+  if (!hasSignal && !hasExitCode && !hasCancelled && !hasTimedOut) return null;
+  return {
+    backend_exit_signal: hasSignal ? (error.signal as string | null) : undefined,
+    backend_exit_code: hasExitCode ? (error.exit_code as number | null) : undefined,
+    backend_cancelled: hasCancelled ? Boolean(error.cancelled) : undefined,
+    backend_timed_out: hasTimedOut ? Boolean(error.timed_out) : undefined,
+    last_error: error.message ? String(error.message) : undefined,
+  };
+}
+
+function formatCancellationMessage(jobId: string): string {
+  const diagnostic = jobDiagnostics.get(jobId);
+  const reason = diagnostic?.cancellation_reason;
+  const signal = diagnostic?.backend_exit_signal;
+  if (reason && signal) return `cancelled: ${reason} (backend signal=${signal})`;
+  if (reason) return `cancelled: ${reason}`;
+  if (signal) return `cancelled (backend signal=${signal})`;
+  return 'cancelled';
 }
 
 const main = async () => {
