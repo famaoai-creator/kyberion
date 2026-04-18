@@ -49,23 +49,55 @@ export interface AgentResponse {
   stopReason: string;
 }
 
+export type AgentAskOptions = Record<string, unknown>;
+
 /**
  * Interface for model-specific enhancements (Add-ons).
  * Allows modifying prompts or adding context before execution.
  */
 export interface AgentEnhancer {
   name: string;
-  onBeforeAsk?(prompt: string, options?: any): Promise<{ prompt: string; options?: any }>;
+  onBeforeAsk?(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }>;
   onAfterAsk?(response: AgentResponse): Promise<AgentResponse>;
 }
 
 export interface AgentAdapter {
   boot(): Promise<void>;
-  ask(prompt: string, options?: any): Promise<AgentResponse>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   shutdown(): Promise<void>;
   getRuntimeInfo?(): Record<string, unknown>;
   refreshContext?(): Promise<{ mode: 'soft' | 'stateless'; sessionId?: string | null; threadId?: string | null }>;
   addEnhancer?(enhancer: AgentEnhancer): void;
+}
+
+function registerEnhancer(enhancers: AgentEnhancer[], enhancer: AgentEnhancer): void {
+  enhancers.push(enhancer);
+  logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+}
+
+async function applyEnhancersBeforeAsk(
+  enhancers: AgentEnhancer[],
+  prompt: string,
+  options?: AgentAskOptions
+): Promise<{ prompt: string; options: AgentAskOptions }> {
+  let currentPrompt = prompt;
+  let currentOptions: AgentAskOptions = { ...(options || {}) };
+  for (const enhancer of enhancers) {
+    if (!enhancer.onBeforeAsk) continue;
+    const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
+    currentPrompt = enhanced.prompt;
+    currentOptions = { ...(enhanced.options || currentOptions) };
+  }
+  return { prompt: currentPrompt, options: currentOptions };
+}
+
+async function applyEnhancersAfterAsk(enhancers: AgentEnhancer[], response: AgentResponse): Promise<AgentResponse> {
+  let next = response;
+  for (const enhancer of enhancers) {
+    if (!enhancer.onAfterAsk) continue;
+    next = await enhancer.onAfterAsk(next);
+  }
+  return next;
 }
 
 interface ACPDialect {
@@ -92,8 +124,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   ) {}
 
   public addEnhancer(enhancer: AgentEnhancer): void {
-    this.enhancers.push(enhancer);
-    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+    registerEnhancer(this.enhancers, enhancer);
   }
 
   public async boot(): Promise<void> {
@@ -226,20 +257,10 @@ abstract class BaseACPAdapter implements AgentAdapter {
     } catch (e) {}
   }
 
-  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
+  public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.connection || !this.acpSessionId) throw new Error('Agent not booted.');
 
-    let currentPrompt = prompt;
-    let currentOptions = { ...options };
-
-    // Apply pre-ask enhancements
-    for (const enhancer of this.enhancers) {
-      if (enhancer.onBeforeAsk) {
-        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
-        currentPrompt = enhanced.prompt;
-        currentOptions = enhanced.options;
-      }
-    }
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
 
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
@@ -248,10 +269,10 @@ abstract class BaseACPAdapter implements AgentAdapter {
     const response: any = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
-      prompt: [{ type: 'text', text: currentPrompt }],
-      content: [{ type: 'text', text: currentPrompt }],
-      input: [{ type: 'text', text: currentPrompt }],
-      ...currentOptions
+      prompt: [{ type: 'text', text: enhanced.prompt }],
+      content: [{ type: 'text', text: enhanced.prompt }],
+      input: [{ type: 'text', text: enhanced.prompt }],
+      ...enhanced.options
     });
     this.usageSummary = extractUsageSummary(response);
 
@@ -266,20 +287,12 @@ abstract class BaseACPAdapter implements AgentAdapter {
         .join('\n');
     }
 
-    let agentResponse: AgentResponse = {
+    const agentResponse: AgentResponse = {
       text: finalText,
       thought: this.accumulatedThought,
       stopReason: (response as any).stopReason || 'completed'
     };
-
-    // Apply post-ask enhancements
-    for (const enhancer of this.enhancers) {
-      if (enhancer.onAfterAsk) {
-        agentResponse = await enhancer.onAfterAsk(agentResponse);
-      }
-    }
-
-    return agentResponse;
+    return applyEnhancersAfterAsk(this.enhancers, agentResponse);
   }
 
   public async shutdown(): Promise<void> {
@@ -352,7 +365,7 @@ export class GeminiAdapter extends BaseACPAdapter {
 export class GeminiWisdomEnhancer implements AgentEnhancer {
   public name = 'GeminiWisdomEnhancer';
 
-  public async onBeforeAsk(prompt: string, options?: any): Promise<{ prompt: string; options?: any }> {
+  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
     const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/public/evolution');
     let wisdomContext = '';
 
@@ -403,7 +416,7 @@ export class CodexExecutionEnhancer implements AgentEnhancer {
 
   constructor(private options: CodexExecutionEnhancerOptions = {}) {}
 
-  public async onBeforeAsk(prompt: string, options?: any): Promise<{ prompt: string; options?: any }> {
+  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
     const context = this.loadExecutionContext();
     if (!context) return { prompt, options };
 
@@ -455,32 +468,21 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public addEnhancer(enhancer: AgentEnhancer): void {
-    this.enhancers.push(enhancer);
-    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+    registerEnhancer(this.enhancers, enhancer);
   }
 
   public async boot(): Promise<void> {
     logger.info('[UAA] Codex (Exec mode) ready.');
   }
 
-  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
-    let currentPrompt = prompt;
-    let currentOptions = { ...options };
-
-    for (const enhancer of this.enhancers) {
-      if (enhancer.onBeforeAsk) {
-        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
-        currentPrompt = enhanced.prompt;
-        currentOptions = enhanced.options;
-      }
-    }
-
-    logger.info(`[UAA] Codex Executing: "${currentPrompt}"`);
+  public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
+    logger.info(`[UAA] Codex Executing: "${enhanced.prompt}"`);
     const { spawnSync } = await import('node:child_process');
     
     try {
       // Pass the text as a single argument to npx/codex exec
-      const res = spawnSync('npx', ['codex', 'exec', '--json', currentPrompt], {
+      const res = spawnSync('npx', ['codex', 'exec', '--json', enhanced.prompt], {
         encoding: 'utf8',
         env: safeEnv(),
         shell: false 
@@ -494,17 +496,12 @@ export class CodexAdapter implements AgentAdapter {
       }
 
       const parsed = JSON.parse(res.stdout);
-      let agentResponse: AgentResponse = {
+      const agentResponse: AgentResponse = {
         text: parsed.message || parsed.content || res.stdout,
         thought: parsed.thought,
         stopReason: 'completed'
       };
-      for (const enhancer of this.enhancers) {
-        if (enhancer.onAfterAsk) {
-          agentResponse = await enhancer.onAfterAsk(agentResponse);
-        }
-      }
-      return agentResponse;
+      return applyEnhancersAfterAsk(this.enhancers, agentResponse);
     } catch (e: any) {
       logger.error(`[UAA] Codex Exec failed: ${e.message}`);
       return { text: '', stopReason: 'error' };
@@ -567,8 +564,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public addEnhancer(enhancer: AgentEnhancer): void {
-    this.enhancers.push(enhancer);
-    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+    registerEnhancer(this.enhancers, enhancer);
   }
 
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
@@ -677,31 +673,23 @@ export class CodexAppServerAdapter implements AgentAdapter {
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
   }
 
-  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
+  public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
 
-    let currentPrompt = prompt;
-    let currentOptions = { ...options };
-    for (const enhancer of this.enhancers) {
-      if (enhancer.onBeforeAsk) {
-        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
-        currentPrompt = enhanced.prompt;
-        currentOptions = enhanced.options;
-      }
-    }
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
 
     this.accumulatedText = '';
     this.sawAgentDelta = false;
-    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: currentPrompt });
+    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: enhanced.prompt });
 
     const turnRes: any = await this.sendRequest('turn/start', {
       threadId: this.threadId,
-      input: [{ type: 'text', text: currentPrompt, text_elements: [] }],
+      input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
       model: this.options.model ?? undefined,
       cwd: this.options.cwd ?? undefined,
       sandboxPolicy: this.buildSandboxPolicy(),
-      ...currentOptions,
+      ...enhanced.options,
     }, this.options.timeoutMs ?? 20000);
 
     const turnId = turnRes?.turn?.id || turnRes?.turnId;
@@ -714,7 +702,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const early = this.earlyTurnResults.get(turnId);
     if (early) {
       this.earlyTurnResults.delete(turnId);
-      return this.applyPostAskEnhancers({ text: early.text, stopReason: early.stopReason });
+      return applyEnhancersAfterAsk(this.enhancers, { text: early.text, stopReason: early.stopReason });
     }
 
     const timeoutMs = this.options.timeoutMs ?? 300000;
@@ -725,7 +713,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }, timeoutMs);
       this.pendingTurn = { turnId, resolve, reject, timeout };
     });
-    return this.applyPostAskEnhancers(raw);
+    return applyEnhancersAfterAsk(this.enhancers, raw);
   }
 
   public async shutdown(): Promise<void> {
@@ -1009,15 +997,6 @@ export class CodexAppServerAdapter implements AgentAdapter {
     return resolved.startsWith(root + path.sep);
   }
 
-  private async applyPostAskEnhancers(response: AgentResponse): Promise<AgentResponse> {
-    let next = response;
-    for (const enhancer of this.enhancers) {
-      if (enhancer.onAfterAsk) {
-        next = await enhancer.onAfterAsk(next);
-      }
-    }
-    return next;
-  }
 }
 
 /**
