@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-generation-adf.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": { "const": "generate_voice" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "text": { "type": "string", "minLength": 1, "maxLength": 50000 },
+    "profile_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": { "type": "string", "minLength": 1 },
+        "sample_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "required": ["profile_id"]
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "engine_id": { "type": "string", "minLength": 1 },
+        "model_size": { "type": "string", "minLength": 1 },
+        "supports_instruct": { "type": "boolean" }
+      },
+      "required": ["engine_id"]
+    },
+    "rendering": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": { "type": "string", "minLength": 2 },
+        "seed": { "type": "integer" },
+        "instruct": { "type": "string", "minLength": 1 },
+        "normalize": { "type": "boolean" },
+        "chunking": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_chunk_chars": { "type": "integer", "minimum": 100, "maximum": 5000 },
+            "crossfade_ms": { "type": "integer", "minimum": 0, "maximum": 500 },
+            "preserve_paralinguistic_tags": { "type": "boolean" }
+          },
+          "required": ["max_chunk_chars", "crossfade_ms", "preserve_paralinguistic_tags"]
+        }
+      },
+      "required": ["language", "chunking"]
+    },
+    "postprocess": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effects_preset_id": { "type": "string", "minLength": 1 },
+        "retain_original_version": { "type": "boolean" },
+        "create_processed_version": { "type": "boolean" }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_path": { "type": "string", "minLength": 1 },
+        "format": { "type": "string", "enum": ["wav", "mp3", "ogg"] },
+        "emit_progress_packets": { "type": "boolean" }
+      },
+      "required": ["format", "emit_progress_packets"]
+    }
+  },
+  "required": ["action", "request_id", "text", "profile_ref", "engine", "rendering", "delivery"]
+}

@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "queue": {
+    "concurrency": 1,
+    "cancellation": "queued_or_running"
+  },
+  "chunking": {
+    "default_max_chunk_chars": 800,
+    "default_crossfade_ms": 50,
+    "preserve_paralinguistic_tags": true
+  },
+  "progress": {
+    "throttle_ms": 500,
+    "min_percent_delta": 1,
+    "emit_heartbeat": true
+  },
+  "delivery": {
+    "default_format": "wav",
+    "retain_original_version": true,
+    "create_processed_version": false
+  }
+}
