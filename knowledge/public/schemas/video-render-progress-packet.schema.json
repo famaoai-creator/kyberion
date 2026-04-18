@@ -27,6 +27,18 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "queued_ahead", "queued_total", "running", "concurrency"],
+      "properties": {
+        "position": { "type": "integer", "minimum": 1 },
+        "queued_ahead": { "type": "integer", "minimum": 0 },
+        "queued_total": { "type": "integer", "minimum": 1 },
+        "running": { "type": "integer", "minimum": 0 },
+        "concurrency": { "type": "integer", "minimum": 1 }
+      }
+    },
     "updated_at": { "type": "string", "minLength": 1 }
   }
 }
