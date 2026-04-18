@@ -179,6 +179,7 @@ export * from './voice-stt.js';
 export * from './voice-tts-config.js';
 export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';
+export * from './voice-engine-registry.js';
 export * from './voice-text-chunking.js';
 export * from './voice-generation-runtime.js';
 export * from './surface-action-routing.js';
