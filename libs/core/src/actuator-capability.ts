@@ -15,7 +15,7 @@ export interface ActuatorCapability {
   available: boolean;
   reason?: string;              // why unavailable
   prerequisites?: string[];     // what's needed to make it available
-  cost?: 'free' | 'api_call' | 'compute_intensive';
+  cost?: 'free' | 'api_call' | 'compute_light' | 'compute_intensive';
 }
 
 export interface ActuatorStatus {

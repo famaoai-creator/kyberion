@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-engine-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_engine_id": { "type": "string", "minLength": 1 },
+    "engines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["native_local", "voice_clone_service"] },
+          "provider": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
+          },
+          "supports": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "list_voices": { "type": "boolean" },
+              "playback": { "type": "boolean" },
+              "artifact_formats": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["wav", "mp3", "ogg", "aiff"] }
+              }
+            },
+            "required": ["list_voices", "playback", "artifact_formats"]
+          },
+          "fallback_engine_id": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        },
+        "required": ["engine_id", "display_name", "kind", "provider", "status", "platforms", "supports"]
+      }
+    }
+  },
+  "required": ["version", "default_engine_id", "engines"]
+}
