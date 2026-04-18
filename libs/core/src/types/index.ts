@@ -23,6 +23,7 @@ export * from './operator-interaction-packet.js';
 export * from './travel-planning-brief.js';
 export * from './booking-preference-profile.js';
 export * from './points-portal-clickout-usecase.js';
+export * from './pptx-protocol.js';
 export * from './bridge-request.js';
 export * from './diagram-adf.js';
 export * from './mission-contract.js';
