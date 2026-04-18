@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-sample-ingestion-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "sample_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_samples": { "type": "integer", "minimum": 1 },
+        "max_samples": { "type": "integer", "minimum": 1 },
+        "min_sample_bytes": { "type": "integer", "minimum": 1 },
+        "max_sample_bytes": { "type": "integer", "minimum": 1 },
+        "allowed_extensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 2 }
+        }
+      },
+      "required": ["min_samples", "max_samples", "min_sample_bytes", "max_sample_bytes", "allowed_extensions"]
+    },
+    "profile_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_tiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["personal", "confidential", "public"] }
+        },
+        "require_unique_sample_paths": { "type": "boolean" },
+        "require_language_coverage": { "type": "boolean" },
+        "strict_personal_voice_registration": { "type": "boolean" }
+      },
+      "required": [
+        "allowed_tiers",
+        "require_unique_sample_paths",
+        "require_language_coverage",
+        "strict_personal_voice_registration"
+      ]
+    }
+  },
+  "required": ["version", "sample_limits", "profile_rules"]
+}

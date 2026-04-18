@@ -7,10 +7,13 @@
       "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
     },
     {
+      "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
+    },
+    {
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "enum": ["speak_local", "list_voices"] },
+        "action": { "enum": ["speak_local", "list_voices", "register_voice_profile"] },
         "params": { "type": "object" }
       }
     },
@@ -28,10 +31,13 @@
                 "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
               },
               {
+                "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
+              },
+              {
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "enum": ["speak_local", "list_voices"] },
+                  "action": { "enum": ["speak_local", "list_voices", "register_voice_profile"] },
                   "params": { "type": "object" }
                 }
               }
