@@ -646,7 +646,12 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       queue?: { concurrency?: number };
       progress?: { throttle_ms?: number; min_percent_delta?: number };
       bundle?: { default_bundle_root?: string };
-      render?: { allowed_output_formats?: string[] };
+      render?: {
+        allowed_output_formats?: string[];
+        backend?: string;
+        quality?: string;
+        command_timeout_ms?: number;
+      };
     };
     if ((typed.queue?.concurrency || 0) < 1) {
       violations.push('video-render-runtime-policy: queue.concurrency must be >= 1');
@@ -662,6 +667,15 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.render?.allowed_output_formats || []).length) {
       violations.push('video-render-runtime-policy: render.allowed_output_formats must not be empty');
+    }
+    if (!['none', 'hyperframes_cli'].includes(String(typed.render?.backend || ''))) {
+      violations.push('video-render-runtime-policy: render.backend must be one of none|hyperframes_cli');
+    }
+    if (!['draft', 'standard', 'high'].includes(String(typed.render?.quality || ''))) {
+      violations.push('video-render-runtime-policy: render.quality must be one of draft|standard|high');
+    }
+    if ((typed.render?.command_timeout_ms || 0) < 1000) {
+      violations.push('video-render-runtime-policy: render.command_timeout_ms must be >= 1000');
     }
   }
 

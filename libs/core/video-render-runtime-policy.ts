@@ -24,6 +24,9 @@ const FALLBACK_POLICY: VideoRenderRuntimePolicy = {
   render: {
     allowed_output_formats: ['mp4', 'mov', 'webm'],
     enable_backend_rendering: false,
+    backend: 'none',
+    quality: 'standard',
+    command_timeout_ms: 300000,
   },
 };
 
