@@ -187,6 +187,7 @@ export * from './video-composition-template-registry.js';
 export * from './video-render-runtime-policy.js';
 export * from './video-render-runtime.js';
 export * from './video-composition-compiler.js';
+export * from './video-render-backend.js';
 export * from './surface-action-routing.js';
 export * from './platform.js';
 export { terminalBridge } from './terminal-bridge.js';
