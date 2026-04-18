@@ -1,6 +1,7 @@
 export type VideoCompositionSceneRole = 'hook' | 'feature' | 'proof' | 'cta' | 'outro' | 'generic';
 export type VideoCompositionOutputFormat = 'mp4' | 'mov' | 'webm';
 export type VideoTemplateStatus = 'active' | 'shadow' | 'disabled';
+export type VideoRenderBackend = 'none' | 'hyperframes_cli';
 export type VideoRenderJobStatus =
   | 'queued'
   | 'validating_contract'
@@ -99,6 +100,9 @@ export interface VideoRenderRuntimePolicy {
   render: {
     allowed_output_formats: VideoCompositionOutputFormat[];
     enable_backend_rendering: boolean;
+    backend: VideoRenderBackend;
+    quality: 'draft' | 'standard' | 'high';
+    command_timeout_ms: number;
   };
 }
 
@@ -142,6 +146,7 @@ export interface VideoCompositionRenderPlan {
   height: number;
   background_color: string;
   output_format: VideoCompositionOutputFormat;
+  output_target_path?: string;
   bundle_dir: string;
   index_html: string;
   scenes: CompiledVideoCompositionScene[];

@@ -2,8 +2,10 @@ import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
   getVideoCompositionTemplateRegistry,
+  getVideoRenderRuntimePolicy,
   logger,
   pathResolver,
+  renderVideoCompositionBundle,
   safeReadFile,
   VideoRenderRuntime,
   writeVideoCompositionBundle,
@@ -80,6 +82,7 @@ async function prepareVideoComposition(params: {
   }
 
   const adf = params.video_composition_adf;
+  const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
   const runtime = new VideoRenderRuntime();
   const progressPackets: any[] = [];
@@ -90,44 +93,75 @@ async function prepareVideoComposition(params: {
   runtime.enqueue({
     jobId,
     async run(api) {
+      const totalSteps = policy.render.enable_backend_rendering ? 5 : 4;
       api.report({
         status: 'validating_contract',
-        progress: { current: 1, total: 4, percent: 25, unit: 'steps' },
+        progress: { current: 1, total: totalSteps, percent: (1 / totalSteps) * 100, unit: 'steps' },
         message: 'validated video composition contract',
       });
       api.report({
         status: 'resolving_templates',
-        progress: { current: 2, total: 4, percent: 50, unit: 'steps' },
+        progress: { current: 2, total: totalSteps, percent: (2 / totalSteps) * 100, unit: 'steps' },
         message: `resolved ${adf.scenes.length} scene template(s)`,
       });
       api.report({
         status: 'assembling_bundle',
-        progress: { current: 3, total: 4, percent: 75, unit: 'steps' },
+        progress: { current: 3, total: totalSteps, percent: (3 / totalSteps) * 100, unit: 'steps' },
         message: 'assembling deterministic composition bundle',
       });
 
       const plan = writeVideoCompositionBundle(adf, { bundleDir: params.bundle_dir });
-      const artifactRefs = plan.artifact_refs;
+      let artifactRefs = [...plan.artifact_refs];
+      let backendOutputPath: string | undefined;
 
-      api.report({
-        status: 'rendering',
-        progress: { current: 4, total: 4, percent: 100, unit: 'steps' },
-        message: 'bundle prepared; backend rendering remains disabled by policy',
-        artifact_refs: artifactRefs,
-      });
+      if (policy.render.enable_backend_rendering) {
+        api.report({
+          status: 'rendering',
+          progress: { current: 4, total: totalSteps, percent: (4 / totalSteps) * 100, unit: 'steps' },
+          message: `rendering composed video via backend ${policy.render.backend}`,
+          artifact_refs: artifactRefs,
+        });
 
-      return { artifactRefs };
+        const backendResult = renderVideoCompositionBundle(plan, policy);
+        if (backendResult.output_path) {
+          backendOutputPath = backendResult.output_path;
+          artifactRefs = [...artifactRefs, backendOutputPath];
+        }
+
+        api.report({
+          status: 'encoding',
+          progress: { current: 5, total: totalSteps, percent: 100, unit: 'steps' },
+          message: backendResult.executed
+            ? 'backend render completed'
+            : (backendResult.reason || 'backend skipped'),
+          artifact_refs: artifactRefs,
+        });
+      } else {
+        api.report({
+          status: 'rendering',
+          progress: { current: 4, total: totalSteps, percent: 100, unit: 'steps' },
+          message: 'bundle prepared; backend rendering remains disabled by policy',
+          artifact_refs: artifactRefs,
+        });
+      }
+
+      return { artifactRefs, backendOutputPath };
     },
   });
 
   const finalPacket = await waitForRenderJob(runtime, jobId);
+  const renderedOutputPath = (finalPacket.artifact_refs || []).find((ref: string) => ref.endsWith(`.${adf.output.format}`));
+  const backendRendered = Boolean(policy.render.enable_backend_rendering && renderedOutputPath);
   return {
     status: finalPacket.status === 'completed' ? 'succeeded' : finalPacket.status,
     job_id: jobId,
     artifact_refs: finalPacket.artifact_refs || [],
     progress_packets: progressPackets,
     output_format: adf.output.format,
-    backend_rendering_enabled: false,
+    backend_rendering_enabled: policy.render.enable_backend_rendering,
+    backend_render_backend: policy.render.backend,
+    backend_rendered: backendRendered,
+    rendered_output_path: renderedOutputPath,
   };
 }
 

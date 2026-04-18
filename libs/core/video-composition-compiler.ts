@@ -50,6 +50,7 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     height: adf.composition.height,
     background_color: backgroundColor,
     output_format: adf.output.format,
+    output_target_path: adf.output.target_path,
     bundle_dir: bundleDir,
     index_html: indexHtml,
     scenes: compiledScenes,
