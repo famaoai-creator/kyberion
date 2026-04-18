@@ -1,5 +1,5 @@
 import { logger } from './core.js';
-import { safeExistsSync } from './secure-io.js';
+import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
@@ -49,12 +49,23 @@ export interface AgentResponse {
   stopReason: string;
 }
 
+/**
+ * Interface for model-specific enhancements (Add-ons).
+ * Allows modifying prompts or adding context before execution.
+ */
+export interface AgentEnhancer {
+  name: string;
+  onBeforeAsk?(prompt: string, options?: any): Promise<{ prompt: string; options?: any }>;
+  onAfterAsk?(response: AgentResponse): Promise<AgentResponse>;
+}
+
 export interface AgentAdapter {
   boot(): Promise<void>;
-  ask(prompt: string): Promise<AgentResponse>;
+  ask(prompt: string, options?: any): Promise<AgentResponse>;
   shutdown(): Promise<void>;
   getRuntimeInfo?(): Record<string, unknown>;
   refreshContext?(): Promise<{ mode: 'soft' | 'stateless'; sessionId?: string | null; threadId?: string | null }>;
+  addEnhancer?(enhancer: AgentEnhancer): void;
 }
 
 interface ACPDialect {
@@ -71,6 +82,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   protected accumulatedThought: string = '';
   protected runtimeResourceId: string | null = null;
   protected usageSummary: Record<string, unknown> | null = null;
+  protected enhancers: AgentEnhancer[] = [];
 
   constructor(
     protected bootCommand: string,
@@ -78,6 +90,11 @@ abstract class BaseACPAdapter implements AgentAdapter {
     protected dialect: ACPDialect,
     protected authMethod: string = 'oauth-personal'
   ) {}
+
+  public addEnhancer(enhancer: AgentEnhancer): void {
+    this.enhancers.push(enhancer);
+    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+  }
 
   public async boot(): Promise<void> {
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
@@ -209,8 +226,21 @@ abstract class BaseACPAdapter implements AgentAdapter {
     } catch (e) {}
   }
 
-  public async ask(text: string): Promise<AgentResponse> {
+  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
     if (!this.connection || !this.acpSessionId) throw new Error('Agent not booted.');
+
+    let currentPrompt = prompt;
+    let currentOptions = { ...options };
+
+    // Apply pre-ask enhancements
+    for (const enhancer of this.enhancers) {
+      if (enhancer.onBeforeAsk) {
+        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
+        currentPrompt = enhanced.prompt;
+        currentOptions = enhanced.options;
+      }
+    }
+
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
     
@@ -218,9 +248,10 @@ abstract class BaseACPAdapter implements AgentAdapter {
     const response: any = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
-      prompt: [{ type: 'text', text }],
-      content: [{ type: 'text', text }],
-      input: [{ type: 'text', text }]
+      prompt: [{ type: 'text', text: currentPrompt }],
+      content: [{ type: 'text', text: currentPrompt }],
+      input: [{ type: 'text', text: currentPrompt }],
+      ...currentOptions
     });
     this.usageSummary = extractUsageSummary(response);
 
@@ -235,11 +266,20 @@ abstract class BaseACPAdapter implements AgentAdapter {
         .join('\n');
     }
 
-    return {
+    let agentResponse: AgentResponse = {
       text: finalText,
       thought: this.accumulatedThought,
       stopReason: (response as any).stopReason || 'completed'
     };
+
+    // Apply post-ask enhancements
+    for (const enhancer of this.enhancers) {
+      if (enhancer.onAfterAsk) {
+        agentResponse = await enhancer.onAfterAsk(agentResponse);
+      }
+    }
+
+    return agentResponse;
   }
 
   public async shutdown(): Promise<void> {
@@ -285,6 +325,11 @@ export class GeminiAdapter extends BaseACPAdapter {
       prompt: 'session/prompt'
     }, 'oauth-personal'); 
     this.options = options || {};
+
+    // Auto-apply Gemini Wisdom Enhancer as default for Gemini Pro or if no model specified
+    if (this.options.model?.includes('pro') || !this.options.model) {
+      this.addEnhancer(new GeminiWisdomEnhancer());
+    }
   }
 
   public async boot(): Promise<void> {
@@ -301,20 +346,141 @@ export class GeminiAdapter extends BaseACPAdapter {
 }
 
 /**
+ * Gemini-specific Add-on: Loads "Wisdom" from the evolution history 
+ * to leverage Gemini's large context window for self-improvement.
+ */
+export class GeminiWisdomEnhancer implements AgentEnhancer {
+  public name = 'GeminiWisdomEnhancer';
+
+  public async onBeforeAsk(prompt: string, options?: any): Promise<{ prompt: string; options?: any }> {
+    const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/public/evolution');
+    let wisdomContext = '';
+
+    try {
+      if (safeExistsSync(wisdomDir)) {
+        const files = safeReaddir(wisdomDir);
+        // Load latest 5 lessons to avoid over-filling context if not Gemini Pro
+        const mdFiles = files.filter(f => f.endsWith('.md')).slice(0, 5); 
+        
+        for (const file of mdFiles) {
+          const content = safeReadFile(path.join(wisdomDir, file), { encoding: 'utf8' }) as string;
+          wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
+        }
+      }
+    } catch (e) {
+      logger.warn(`[GeminiEnhancer] Failed to load wisdom: ${e}`);
+    }
+
+    if (wisdomContext) {
+      const enhancedPrompt = `
+<wisdom_context>
+The following are lessons learned from previous evolutions and missions. 
+Use these to avoid past mistakes and align with the ecosystem standards:
+${wisdomContext}
+</wisdom_context>
+
+User Request:
+${prompt}`;
+      
+      return { prompt: enhancedPrompt, options };
+    }
+
+    return { prompt, options };
+  }
+}
+
+export interface CodexExecutionEnhancerOptions {
+  maxContractChars?: number;
+}
+
+/**
+ * Codex-specific Add-on: injects repository execution contract context.
+ * Codex tends to perform better on coding tasks when concrete repo rules are explicit.
+ */
+export class CodexExecutionEnhancer implements AgentEnhancer {
+  public name = 'CodexExecutionEnhancer';
+  private cachedContext: string | null = null;
+
+  constructor(private options: CodexExecutionEnhancerOptions = {}) {}
+
+  public async onBeforeAsk(prompt: string, options?: any): Promise<{ prompt: string; options?: any }> {
+    const context = this.loadExecutionContext();
+    if (!context) return { prompt, options };
+
+    const enhancedPrompt = `
+<codex_execution_context>
+${context}
+</codex_execution_context>
+
+User Request:
+${prompt}`;
+    return { prompt: enhancedPrompt, options };
+  }
+
+  private loadExecutionContext(): string {
+    if (this.cachedContext !== null) return this.cachedContext;
+    const maxChars = this.options.maxContractChars || 4000;
+    const agentsPath = path.join(PROJECT_ROOT, 'AGENTS.md');
+    if (!safeExistsSync(agentsPath)) {
+      this.cachedContext = '';
+      return this.cachedContext;
+    }
+    try {
+      const agents = safeReadFile(agentsPath, { encoding: 'utf8' }) as string;
+      const header = [
+        'Repository execution contract (excerpt):',
+        '- Follow AGENTS.md repository rules.',
+        '- Prefer non-destructive deterministic operations.',
+        '- Preserve existing unrelated changes.',
+      ].join('\n');
+      const excerpt = agents.slice(0, maxChars).trim();
+      this.cachedContext = `${header}\n\n${excerpt}`;
+      return this.cachedContext;
+    } catch (error: any) {
+      logger.warn(`[CodexEnhancer] Failed to load AGENTS.md context: ${error?.message || String(error)}`);
+      this.cachedContext = '';
+      return this.cachedContext;
+    }
+  }
+}
+
+/**
  * Non-ACP implementation for Codex using stable CLI 'exec' mode.
  */
 export class CodexAdapter implements AgentAdapter {
+  protected enhancers: AgentEnhancer[] = [];
+
+  constructor() {
+    this.addEnhancer(new CodexExecutionEnhancer());
+  }
+
+  public addEnhancer(enhancer: AgentEnhancer): void {
+    this.enhancers.push(enhancer);
+    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
+  }
+
   public async boot(): Promise<void> {
     logger.info('[UAA] Codex (Exec mode) ready.');
   }
 
-  public async ask(text: string): Promise<AgentResponse> {
-    logger.info(`[UAA] Codex Executing: "${text}"`);
+  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
+    let currentPrompt = prompt;
+    let currentOptions = { ...options };
+
+    for (const enhancer of this.enhancers) {
+      if (enhancer.onBeforeAsk) {
+        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
+        currentPrompt = enhanced.prompt;
+        currentOptions = enhanced.options;
+      }
+    }
+
+    logger.info(`[UAA] Codex Executing: "${currentPrompt}"`);
     const { spawnSync } = await import('node:child_process');
     
     try {
       // Pass the text as a single argument to npx/codex exec
-      const res = spawnSync('npx', ['codex', 'exec', '--json', text], {
+      const res = spawnSync('npx', ['codex', 'exec', '--json', currentPrompt], {
         encoding: 'utf8',
         env: safeEnv(),
         shell: false 
@@ -328,11 +494,17 @@ export class CodexAdapter implements AgentAdapter {
       }
 
       const parsed = JSON.parse(res.stdout);
-      return {
+      let agentResponse: AgentResponse = {
         text: parsed.message || parsed.content || res.stdout,
         thought: parsed.thought,
         stopReason: 'completed'
       };
+      for (const enhancer of this.enhancers) {
+        if (enhancer.onAfterAsk) {
+          agentResponse = await enhancer.onAfterAsk(agentResponse);
+        }
+      }
+      return agentResponse;
     } catch (e: any) {
       logger.error(`[UAA] Codex Exec failed: ${e.message}`);
       return { text: '', stopReason: 'error' };
@@ -387,9 +559,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
   private projectRoot: string = PROJECT_ROOT;
   private usageSummary: Record<string, unknown> | null = null;
+  private enhancers: AgentEnhancer[] = [];
 
   constructor(options?: CodexAppServerAdapterOptions) {
     this.options = options || {};
+    this.addEnhancer(new CodexExecutionEnhancer());
+  }
+
+  public addEnhancer(enhancer: AgentEnhancer): void {
+    this.enhancers.push(enhancer);
+    logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
   }
 
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
@@ -498,20 +677,31 @@ export class CodexAppServerAdapter implements AgentAdapter {
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
   }
 
-  public async ask(text: string): Promise<AgentResponse> {
+  public async ask(prompt: string, options?: any): Promise<AgentResponse> {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
 
+    let currentPrompt = prompt;
+    let currentOptions = { ...options };
+    for (const enhancer of this.enhancers) {
+      if (enhancer.onBeforeAsk) {
+        const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
+        currentPrompt = enhanced.prompt;
+        currentOptions = enhanced.options;
+      }
+    }
+
     this.accumulatedText = '';
     this.sawAgentDelta = false;
-    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: currentPrompt });
 
     const turnRes: any = await this.sendRequest('turn/start', {
       threadId: this.threadId,
-      input: [{ type: 'text', text, text_elements: [] }],
+      input: [{ type: 'text', text: currentPrompt, text_elements: [] }],
       model: this.options.model ?? undefined,
       cwd: this.options.cwd ?? undefined,
       sandboxPolicy: this.buildSandboxPolicy(),
+      ...currentOptions,
     }, this.options.timeoutMs ?? 20000);
 
     const turnId = turnRes?.turn?.id || turnRes?.turnId;
@@ -524,17 +714,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const early = this.earlyTurnResults.get(turnId);
     if (early) {
       this.earlyTurnResults.delete(turnId);
-      return { text: early.text, stopReason: early.stopReason };
+      return this.applyPostAskEnhancers({ text: early.text, stopReason: early.stopReason });
     }
 
     const timeoutMs = this.options.timeoutMs ?? 300000;
-    return await new Promise<AgentResponse>((resolve, reject) => {
+    const raw = await new Promise<AgentResponse>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingTurn = null;
         reject(new Error('Codex app-server turn timed out.'));
       }, timeoutMs);
       this.pendingTurn = { turnId, resolve, reject, timeout };
     });
+    return this.applyPostAskEnhancers(raw);
   }
 
   public async shutdown(): Promise<void> {
@@ -816,6 +1007,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const resolved = path.resolve(targetPath);
     if (resolved === root) return true;
     return resolved.startsWith(root + path.sep);
+  }
+
+  private async applyPostAskEnhancers(response: AgentResponse): Promise<AgentResponse> {
+    let next = response;
+    for (const enhancer of this.enhancers) {
+      if (enhancer.onAfterAsk) {
+        next = await enhancer.onAfterAsk(next);
+      }
+    }
+    return next;
   }
 }
 
