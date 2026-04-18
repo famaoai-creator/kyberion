@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-runtime-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "cancellation": { "type": "string", "enum": ["queued_only", "queued_or_running"] }
+      },
+      "required": ["concurrency", "cancellation"]
+    },
+    "chunking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_max_chunk_chars": { "type": "integer", "minimum": 100, "maximum": 5000 },
+        "default_crossfade_ms": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "preserve_paralinguistic_tags": { "type": "boolean" }
+      },
+      "required": ["default_max_chunk_chars", "default_crossfade_ms", "preserve_paralinguistic_tags"]
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "throttle_ms": { "type": "integer", "minimum": 50, "maximum": 5000 },
+        "min_percent_delta": { "type": "number", "minimum": 0, "maximum": 100 },
+        "emit_heartbeat": { "type": "boolean" }
+      },
+      "required": ["throttle_ms", "min_percent_delta", "emit_heartbeat"]
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_format": { "type": "string", "enum": ["wav", "mp3", "ogg"] },
+        "retain_original_version": { "type": "boolean" },
+        "create_processed_version": { "type": "boolean" }
+      },
+      "required": ["default_format", "retain_original_version", "create_processed_version"]
+    }
+  },
+  "required": ["version", "queue", "chunking", "progress", "delivery"]
+}

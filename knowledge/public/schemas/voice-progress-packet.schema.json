@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-progress-packet.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "const": "voice_progress_packet" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "loading_profile", "loading_model", "generating", "postprocessing", "persisting", "completed", "failed", "cancelled"]
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "current": { "type": "number", "minimum": 0 },
+        "total": { "type": "number", "minimum": 0 },
+        "percent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "unit": { "type": "string", "enum": ["bytes", "chunks", "steps", "percent"] }
+      },
+      "required": ["current", "total", "percent", "unit"]
+    },
+    "message": { "type": "string" },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["kind", "job_id", "status", "progress", "updated_at"]
+}
