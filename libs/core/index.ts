@@ -75,6 +75,7 @@ export { parseData, stringifyData } from './data-utils.js'; // Explicitly avoid 
 export * from './detectors.js';
 export * from './validators.js';
 export * from './mobile-profile-validators.js';
+export * from './schema-loader.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';

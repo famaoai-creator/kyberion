@@ -113,23 +113,23 @@ registerCapabilityProbe('browser-actuator', async () => {
 
 // Voice actuator: check if TTS server is reachable
 registerCapabilityProbe('voice-actuator', async () => {
-  const caps: ActuatorCapability[] = [];
   try {
-    const net = await import('net');
-    const available = await new Promise<boolean>((resolve) => {
-      const socket = new (net.Socket)();
-      socket.setTimeout(1000);
-      socket.on('connect', () => { socket.destroy(); resolve(true); });
-      socket.on('timeout', () => { socket.destroy(); resolve(false); });
-      socket.on('error', () => { resolve(false); });
-      socket.connect(5000, '127.0.0.1');
-    });
-    caps.push({ op: 'speak_local', available, reason: available ? undefined : 'Style-Bert-VITS2 not running on localhost:5000', cost: 'compute_intensive' });
-    caps.push({ op: 'list_voices', available, reason: available ? undefined : 'TTS server not reachable' });
+    const { platform } = await import('../platform.js');
+    const capabilities = await platform.getCapabilities();
+    const available = capabilities.hasSpeech;
+    const reason = available ? undefined : 'No native speech binary is available on this host';
+    return [
+      { op: 'speak_local', available, reason, cost: 'free' },
+      { op: 'list_voices', available, reason },
+      { op: 'generate_voice', available, reason, cost: 'compute_light' },
+    ];
   } catch {
-    caps.push({ op: 'speak_local', available: false, reason: 'probe failed' });
+    return [
+      { op: 'speak_local', available: false, reason: 'probe failed' },
+      { op: 'list_voices', available: false, reason: 'probe failed' },
+      { op: 'generate_voice', available: false, reason: 'probe failed' },
+    ];
   }
-  return caps;
 });
 
 // Vision actuator: check platform
