@@ -16,6 +16,27 @@ export interface VideoRenderBackendExecutionOptions {
   poll_interval_ms?: number;
 }
 
+export class VideoRenderBackendCommandError extends Error {
+  public readonly cancelled: boolean;
+  public readonly timed_out: boolean;
+  public readonly signal: string | null;
+  public readonly exit_code: number | null;
+
+  constructor(message: string, options: {
+    cancelled?: boolean;
+    timed_out?: boolean;
+    signal?: string | null;
+    exit_code?: number | null;
+  } = {}) {
+    super(message);
+    this.name = 'VideoRenderBackendCommandError';
+    this.cancelled = Boolean(options.cancelled);
+    this.timed_out = Boolean(options.timed_out);
+    this.signal = options.signal ?? null;
+    this.exit_code = options.exit_code ?? null;
+  }
+}
+
 export function renderVideoCompositionBundle(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
@@ -148,7 +169,12 @@ async function runCancellableCommand(
   },
 ): Promise<void> {
   if (options.is_cancelled?.()) {
-    throw new Error('video render cancelled');
+    throw new VideoRenderBackendCommandError('video render cancelled', {
+      cancelled: true,
+      timed_out: false,
+      signal: null,
+      exit_code: null,
+    });
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -163,6 +189,7 @@ async function runCancellableCommand(
     let timeoutHandle: NodeJS.Timeout | null = null;
     let pollHandle: NodeJS.Timeout | null = null;
     let cancelled = false;
+    let timedOut = false;
 
     const finish = (err?: Error) => {
       if (settled) return;
@@ -184,7 +211,12 @@ async function runCancellableCommand(
 
     child.on('close', (code, signal) => {
       if (cancelled) {
-        finish(new Error('video render cancelled'));
+        finish(new VideoRenderBackendCommandError('video render cancelled', {
+          cancelled: true,
+          timed_out: timedOut,
+          signal: signal || null,
+          exit_code: code,
+        }));
         return;
       }
       if (code === 0) {
@@ -193,11 +225,20 @@ async function runCancellableCommand(
       }
       const tail = stderr.trim();
       const detail = tail ? `: ${tail.split('\n').slice(-1)[0]}` : '';
-      finish(new Error(`video render backend command failed (code=${String(code)}, signal=${String(signal)})${detail}`));
+      finish(new VideoRenderBackendCommandError(
+        `video render backend command failed (code=${String(code)}, signal=${String(signal)})${detail}`,
+        {
+          cancelled: false,
+          timed_out: false,
+          signal: signal || null,
+          exit_code: code,
+        },
+      ));
     });
 
     timeoutHandle = setTimeout(() => {
       cancelled = true;
+      timedOut = true;
       child.kill('SIGTERM');
       setTimeout(() => child.kill('SIGKILL'), 1000);
     }, options.timeout_ms);
