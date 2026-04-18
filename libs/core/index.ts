@@ -180,6 +180,7 @@ export * from './voice-tts-config.js';
 export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';
 export * from './voice-engine-registry.js';
+export * from './voice-sample-ingestion-policy.js';
 export * from './voice-text-chunking.js';
 export * from './voice-generation-runtime.js';
 export * from './video-composition-contract.js';

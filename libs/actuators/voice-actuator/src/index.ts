@@ -1,6 +1,7 @@
 import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
+  getVoiceSampleIngestionPolicy,
   getVoiceEngineRecord,
   getVoiceProfileRecord,
   getVoiceRuntimePolicy,
@@ -11,6 +12,8 @@ import {
   safeExec,
   safeMkdir,
   safeReadFile,
+  safeWriteFile,
+  validateVoiceProfileRegistration,
   VoiceGenerationRuntime,
   splitVoiceTextIntoChunks,
 } from '@agent/core';
@@ -25,19 +28,39 @@ const voiceActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve(
 type VoiceAction =
   | { action: 'speak_local'; params: Record<string, unknown> }
   | { action: 'list_voices'; params: Record<string, unknown> }
+  | {
+    action: 'register_voice_profile';
+    request_id: string;
+    profile: {
+      profile_id: string;
+      display_name: string;
+      tier: 'personal' | 'confidential' | 'public';
+      languages: string[];
+      default_engine_id: string;
+      notes?: string;
+    };
+    samples: Array<{ sample_id: string; path: string; language?: string }>;
+    policy?: { strict_personal_voice?: boolean };
+  }
   | Record<string, any>;
 
 type VoiceArtifactFormat = 'wav' | 'mp3' | 'ogg' | 'aiff';
 
 export async function handleSingleAction(input: VoiceAction) {
   if (input.action === 'speak_local') {
-    return speakLocal(input.params || {});
+    return speakLocal(((input as any).params || {}));
   }
   if (input.action === 'list_voices') {
     return listVoices();
   }
   if (input.action === 'generate_voice') {
     return generateVoice(input);
+  }
+  if (input.action === 'register_voice_profile') {
+    const payload = (input as any).params
+      ? { action: 'register_voice_profile', ...((input as any).params || {}) }
+      : input;
+    return registerVoiceProfile(payload as any);
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
 }
@@ -226,6 +249,67 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
     artifact_refs: finalPacket.artifact_refs || [],
     delivery_mode: deliveryMode,
     format: requestedFormat,
+  };
+}
+
+async function registerVoiceProfile(input: {
+  action: 'register_voice_profile';
+  request_id: string;
+  profile: {
+    profile_id: string;
+    display_name: string;
+    tier: 'personal' | 'confidential' | 'public';
+    languages: string[];
+    default_engine_id: string;
+    notes?: string;
+  };
+  samples: Array<{ sample_id: string; path: string; language?: string }>;
+  policy?: { strict_personal_voice?: boolean };
+}): Promise<any> {
+  if (!String(input.request_id || '').trim()) {
+    throw new Error('register_voice_profile requires request_id');
+  }
+  const policy = getVoiceSampleIngestionPolicy();
+  const validation = validateVoiceProfileRegistration(input, policy);
+  if (!validation.ok) {
+    return {
+      status: 'blocked',
+      action: 'register_voice_profile',
+      request_id: input.request_id,
+      policy_version: policy.version,
+      violations: validation.violations,
+      summary: validation.summary,
+    };
+  }
+
+  const receiptDir = pathResolver.sharedTmp('voice-profile-registration');
+  safeMkdir(receiptDir, { recursive: true });
+  const receiptPath = path.join(receiptDir, `${input.request_id}.json`);
+  safeWriteFile(
+    receiptPath,
+    JSON.stringify(
+      {
+        kind: 'voice_profile_registration_receipt',
+        created_at: new Date().toISOString(),
+        status: 'validated_pending_promotion',
+        request_id: input.request_id,
+        profile: input.profile,
+        samples: input.samples,
+        summary: validation.summary,
+        policy_version: policy.version,
+      },
+      null,
+      2,
+    ),
+  );
+
+  return {
+    status: 'succeeded',
+    action: 'register_voice_profile',
+    request_id: input.request_id,
+    registration_receipt_path: receiptPath,
+    summary: validation.summary,
+    next_step: 'governance review and profile promotion required',
   };
 }
 
