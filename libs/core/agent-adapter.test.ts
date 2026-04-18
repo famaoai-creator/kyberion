@@ -100,4 +100,46 @@ describe('CodexAppServerAdapter', () => {
       expect.any(Number)
     );
   });
+
+  it('applies enhancer option overrides and post-ask transforms', async () => {
+    const adapter = new CodexAppServerAdapter({
+      cwd: '/tmp/kyberion-test',
+      approvalMode: 'relaxed',
+    }) as any;
+
+    adapter.threadId = 'thread-1';
+    adapter.enhancers = [];
+    adapter.addEnhancer({
+      name: 'before-after-enhancer',
+      async onBeforeAsk(prompt: string, options?: Record<string, unknown>) {
+        return {
+          prompt: `${prompt}\n#contract`,
+          options: { ...(options || {}), model: 'gpt-5.4-mini' },
+        };
+      },
+      async onAfterAsk(response) {
+        return { ...response, text: `${response.text}\n#post` };
+      },
+    });
+
+    const sendRequest = vi.spyOn(adapter, 'sendRequest').mockImplementation(async (method: string) => {
+      if (method === 'turn/start') {
+        return { turn: { id: 'turn-1' } };
+      }
+      throw new Error(`Unexpected method: ${method}`);
+    });
+
+    adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
+    const result = await adapter.ask('Reply with exactly OK', { cwd: '/tmp/alt' });
+
+    expect(result).toEqual({ text: 'OK\n#post', stopReason: 'completed' });
+    expect(sendRequest).toHaveBeenCalledWith(
+      'turn/start',
+      expect.objectContaining({
+        input: [{ type: 'text', text: 'Reply with exactly OK\n#contract', text_elements: [] }],
+        model: 'gpt-5.4-mini',
+      }),
+      expect.any(Number)
+    );
+  });
 });
