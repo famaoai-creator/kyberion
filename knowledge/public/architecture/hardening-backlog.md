@@ -46,6 +46,13 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 - avoid full prompt logging in adapter runtime logs; keep short summaries to reduce accidental sensitive context exposure
 - keep deterministic wisdom context load order to reduce run-to-run drift and improve reproducibility
 
+### Governed Voice Generation
+
+- add a canonical `voice-generation-adf` instead of relying on ad hoc voice service parameters
+- govern voice profiles, chunking defaults, and progress packet behavior through knowledge-owned policy
+- keep voice generation as a contract-first actuator/runtime capability, not a studio-shaped product mode
+- reuse serial queue, long-text chunking, and artifact lineage patterns for narrated delivery and voice ingress
+
 ## Priority 1
 
 ### Intent Normalization
@@ -109,5 +116,6 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 Reference:
 
 - [LLM Execution Boundary](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
+- [Voice Generation Absorption Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/voice-generation-absorption-plan.md)
 - [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
 - [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
