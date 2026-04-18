@@ -53,6 +53,14 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 - keep voice generation as a contract-first actuator/runtime capability, not a studio-shaped product mode
 - reuse serial queue, long-text chunking, and artifact lineage patterns for narrated delivery and voice ingress
 
+### Personal Voice Narrated Movie Delivery
+
+- add governed voice-profile registration so `use my voice` can fail clearly or execute honestly instead of silently falling back
+- add strict clone-routing policy so personal-voice requests do not downgrade to generic system TTS without explicit approval
+- compile narrated intro movies from design-system and brand inputs rather than hand-authored scene JSON
+- replace short synchronous backend waits with an async render producer that can complete long movie jobs reliably
+- add one canonical end-to-end scenario covering personal voice registration, narration, storyboard, composition, render, and delivery evidence
+
 ## Priority 1
 
 ### Intent Normalization
@@ -117,5 +125,6 @@ Reference:
 
 - [LLM Execution Boundary](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
 - [Voice Generation Absorption Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/voice-generation-absorption-plan.md)
+- [Personal Voice Narrated Video Delivery Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/personal-voice-narrated-video-delivery-plan.md)
 - [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
 - [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
