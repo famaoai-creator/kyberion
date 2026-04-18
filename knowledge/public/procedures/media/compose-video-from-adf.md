@@ -50,6 +50,7 @@ Job control actions (for long-running mode in the same actuator process):
 
 Set `video_composition_adf.output.await_completion = false` to enqueue and return immediately.
 `get_video_composition_job_status` includes `diagnostics` (e.g., cancellation reason, backend exit signal/code).
+`diagnostics` also includes lifecycle fields: `created_at`, `started_at`, `finished_at`, `duration_ms`, `terminal_status`.
 
 ## 5. Expected Output
 
