@@ -181,6 +181,7 @@ describe('video-composition-actuator', () => {
           output: {
             format: 'mp4',
             target_path: '/tmp/video-composition/output.mp4',
+            await_completion: true,
           },
         },
       },
@@ -258,6 +259,53 @@ describe('video-composition-actuator', () => {
     }));
   });
 
+  it('defaults to queued when backend rendering is enabled and await_completion is omitted', async () => {
+    mocks.getVideoRenderRuntimePolicy.mockReturnValue({
+      version: 'test',
+      queue: { concurrency: 1, cancellation: 'queued_or_running' },
+      progress: { throttle_ms: 0, min_percent_delta: 0, emit_heartbeat: true },
+      bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
+      render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'prepare_video_composition',
+      params: {
+        video_composition_adf: {
+          kind: 'video-composition-adf',
+          version: '1.0.0',
+          composition: {
+            duration_sec: 3,
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          },
+          scenes: [
+            {
+              scene_id: 'hook',
+              start_sec: 0,
+              duration_sec: 3,
+              template_ref: { template_id: 'basic-title-card' },
+              content: { headline: 'queue by default' },
+            },
+          ],
+          output: {
+            format: 'mp4',
+          },
+        },
+      },
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'queued',
+      await_completion: false,
+      backend_rendering_enabled: true,
+      backend_render_backend: 'hyperframes_cli',
+    }));
+    expect(String(result.await_completion_reason)).toContain('default asynchronous mode');
+  });
+
   it('returns not_found when cancelling unknown job', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -272,6 +320,67 @@ describe('video-composition-actuator', () => {
       packet: null,
       diagnostics: null,
     });
+  });
+
+  it('returns timeout for await action when job does not finish in time', async () => {
+    mocks.getVideoRenderRuntimePolicy.mockReturnValue({
+      version: 'test',
+      queue: { concurrency: 1, cancellation: 'queued_or_running' },
+      progress: { throttle_ms: 0, min_percent_delta: 0, emit_heartbeat: true },
+      bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
+      render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
+    });
+    mocks.renderVideoCompositionBundleAsync.mockImplementationOnce(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return {
+        executed: true,
+        backend: 'hyperframes_cli',
+        output_path: '/tmp/video-composition/output.mp4',
+      };
+    });
+
+    const { handleAction } = await import('./index.js');
+    const queued = await handleAction({
+      action: 'prepare_video_composition',
+      params: {
+        video_composition_adf: {
+          kind: 'video-composition-adf',
+          version: '1.0.0',
+          composition: {
+            duration_sec: 3,
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          },
+          scenes: [
+            {
+              scene_id: 'hook',
+              start_sec: 0,
+              duration_sec: 3,
+              template_ref: { template_id: 'basic-title-card' },
+              content: { headline: 'await timeout' },
+            },
+          ],
+          output: {
+            format: 'mp4',
+            await_completion: false,
+          },
+        },
+      },
+    } as any);
+
+    const awaited = await handleAction({
+      action: 'await_video_composition_job',
+      params: {
+        job_id: queued.job_id,
+        timeout_ms: 20,
+      },
+    } as any);
+
+    expect(awaited).toEqual(expect.objectContaining({
+      status: 'timeout',
+      job_id: queued.job_id,
+    }));
   });
 
   it('cancels a running backend render job', async () => {
@@ -332,6 +441,7 @@ describe('video-composition-actuator', () => {
       },
     } as any);
 
+    await waitForPacketStatus(handleAction, queued.job_id, 'rendering');
     const cancelled = await handleAction({
       action: 'cancel_video_composition_job',
       params: { job_id: queued.job_id, reason: 'operator-requested stop' },
@@ -369,4 +479,17 @@ async function waitForCancelledStatusWithSignal(handleAction: any, jobId: string
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error(`timed out waiting for cancelled packet with signal: ${jobId}`);
+}
+
+async function waitForPacketStatus(handleAction: any, jobId: string, expectedStatus: string) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 5000) {
+    const status = await handleAction({
+      action: 'get_video_composition_job_status',
+      params: { job_id: jobId },
+    } as any);
+    if (status?.packet?.status === expectedStatus) return status;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`timed out waiting for packet status ${expectedStatus}: ${jobId}`);
 }
