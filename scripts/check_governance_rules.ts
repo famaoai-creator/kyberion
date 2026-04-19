@@ -96,6 +96,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
     dataPath: 'knowledge/public/governance/video-render-runtime-policy.json',
   },
+  {
+    id: 'mission-classification-policy',
+    schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
+    dataPath: 'knowledge/public/governance/mission-classification-policy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -270,6 +275,31 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       if (!String(intent.goal?.success_condition || '')) {
         violations.push(`task-session-policy: ${String(intent.id || 'unknown')} must define goal.success_condition`);
       }
+    }
+  }
+
+  if (check.id === 'mission-classification-policy') {
+    const typed = data as {
+      stage_progression?: string[];
+      mission_class_rules?: unknown[];
+      delivery_shape_rules?: unknown[];
+      risk_profile_rules?: unknown[];
+      stage_rules?: unknown[];
+    };
+    if (!(typed.stage_progression || []).length) {
+      violations.push('mission-classification-policy: stage_progression must not be empty');
+    }
+    if (!(typed.mission_class_rules || []).length) {
+      violations.push('mission-classification-policy: mission_class_rules must not be empty');
+    }
+    if (!(typed.delivery_shape_rules || []).length) {
+      violations.push('mission-classification-policy: delivery_shape_rules must not be empty');
+    }
+    if (!(typed.risk_profile_rules || []).length) {
+      violations.push('mission-classification-policy: risk_profile_rules must not be empty');
+    }
+    if (!(typed.stage_rules || []).length) {
+      violations.push('mission-classification-policy: stage_rules must not be empty');
     }
   }
 

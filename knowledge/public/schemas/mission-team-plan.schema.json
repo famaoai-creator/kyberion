@@ -8,6 +8,9 @@
     "tier": { "type": "string" },
     "template": { "type": "string" },
     "assigned_persona": { "type": "string" },
+    "mission_classification": {
+      "$ref": "./mission-classification.schema.json"
+    },
     "generated_at": { "type": "string" },
     "assignments": {
       "type": "array",
