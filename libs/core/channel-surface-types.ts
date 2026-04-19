@@ -148,6 +148,7 @@ export interface PlanningPacketTask {
   team_role: string;
   description: string;
   deliverable?: string;
+  target_path?: string;
 }
 
 export interface PlanningPacket {

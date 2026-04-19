@@ -126,6 +126,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
     dataPath: 'knowledge/public/governance/mission-review-gate-registry.json',
   },
+  {
+    id: 'path-scope-policy',
+    schemaPath: 'knowledge/public/schemas/path-scope-policy.schema.json',
+    dataPath: 'knowledge/public/governance/path-scope-policy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -359,6 +364,25 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.mode_rules || []).length) {
       violations.push('mission-review-gate-registry: mode_rules must not be empty');
+    }
+  }
+
+  if (check.id === 'path-scope-policy') {
+    const typed = data as {
+      defaults?: { unknown_scope_behavior?: string };
+      scope_classes?: Record<string, { allow_prefixes?: unknown[] }>;
+    };
+    if (!String(typed.defaults?.unknown_scope_behavior || '')) {
+      violations.push('path-scope-policy: defaults.unknown_scope_behavior must not be empty');
+    }
+    const scopeClasses = typed.scope_classes || {};
+    if (!Object.keys(scopeClasses).length) {
+      violations.push('path-scope-policy: scope_classes must not be empty');
+    }
+    for (const [scopeClass, config] of Object.entries(scopeClasses)) {
+      if (!(config.allow_prefixes || []).length) {
+        violations.push(`path-scope-policy: ${scopeClass} must define allow_prefixes`);
+      }
     }
   }
 

@@ -200,7 +200,66 @@ describe('mission-orchestration-worker', () => {
         assigned_to: { role: 'operator' },
         description: 'Collect current mission registry',
         deliverable: 'artifacts/current-missions.md',
+        target_path: undefined,
       },
     ]);
+  });
+
+  it('blocks delegated tasks when preflight path policy fails', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([
+      {
+        task_id: 'task-blocked',
+        status: 'planned',
+        assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+        description: 'Attempt disallowed write',
+        target_path: 'knowledge/public/architecture/disallowed.md',
+        deliverable: 'knowledge/public/architecture/disallowed.md',
+      },
+    ], null, 2));
+    safeWriteFile(`${missionPath}/TASK_BOARD.md`, [
+      '# TASK_BOARD: MSN-FOLLOWUP',
+      '',
+      '## Status: Planning Ready',
+      '',
+      '### 🛠️ Execution Phase',
+      '- [x] Step 1: Research and Strategy',
+      '- [ ] Step 2: Implementation',
+      '- [ ] Step 3: Validation',
+      '',
+    ].join('\n'));
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: {
+        mission_id: 'MSN-FOLLOWUP',
+        assignments: [],
+      },
+    });
+    mocks.resolveMissionTeamPlan.mockReturnValue({ mission_id: 'MSN-FOLLOWUP', mission_type: 'product_development' });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'implementation-architect',
+      authority_role: 'ecosystem_architect',
+      delegation_contract: {
+        ownership_scope: 'bounded implementation',
+        allowed_delegate_team_roles: [],
+        escalation_parent_team_role: 'planner',
+        required_scope_classes: ['codebase_core'],
+        resolved_scope_classes: ['codebase_core'],
+        allowed_write_scopes: ['libs/core/', 'scripts/'],
+      },
+    });
+
+    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    expect(dispatched).toEqual([]);
+    expect(mocks.route).not.toHaveBeenCalled();
+
+    const stored = JSON.parse(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string);
+    expect(stored[0]?.status).toBe('blocked');
   });
 });
