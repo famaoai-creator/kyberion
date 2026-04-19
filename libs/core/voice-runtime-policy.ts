@@ -24,6 +24,10 @@ export interface VoiceRuntimePolicy {
     retain_original_version: boolean;
     create_processed_version: boolean;
   };
+  routing: {
+    default_personal_voice_mode: 'allow_fallback' | 'require_personal_voice';
+    enforce_clone_engine_for_personal_tier: boolean;
+  };
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('public/governance/voice-runtime-policy.json');
@@ -48,6 +52,10 @@ const FALLBACK_POLICY: VoiceRuntimePolicy = {
     default_format: 'wav',
     retain_original_version: true,
     create_processed_version: false,
+  },
+  routing: {
+    default_personal_voice_mode: 'allow_fallback',
+    enforce_clone_engine_for_personal_tier: true,
   },
 };
 
