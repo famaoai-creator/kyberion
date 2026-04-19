@@ -113,6 +113,8 @@ describe('work-design', () => {
     });
     expect(summary.context.project_id).toBe('PRJ-123');
     expect(summary.resolution.execution_shape).toBe('task_session');
+    expect(summary.workflow_design.workflow_id).toBe('single-track-default');
+    expect(summary.workflow_design.pattern).toBe('single_track_execution');
     expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
     expect(summary.process_design.operator_checklist).toContain('confirm the governed output path');
     expect(summary.runtime_design.owner_model).toBe('single_actor');
@@ -134,6 +136,7 @@ describe('work-design', () => {
       'review the current target against those lessons',
       'return governed findings and follow-up checks',
     ]);
+    expect(summary.workflow_design.pattern).toBe('single_track_execution');
     expect(summary.process_design.intake_requirements).toContain('incident basis');
     expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
     expect(summary.runtime_design.owner_model).toBe('single_owner_multi_worker');
@@ -157,6 +160,7 @@ describe('work-design', () => {
       'cluster failure modes and choose one general improvement',
       'rerun evaluation and record keep or discard evidence',
     ]);
+    expect(summary.workflow_design.workflow_id).toBe('single-track-default');
     expect(summary.process_design.intake_requirements).toContain('target harness');
     expect(summary.execution_boundary.llm_zone.forbidden).toContain('edit_fixed_adapter_boundary_without_approval');
     expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('compile_experiment_contract');
@@ -172,6 +176,8 @@ describe('work-design', () => {
 
     expect(summary.intent.label).toBe('Project bootstrap');
     expect(summary.resolution.execution_shape).toBe('project_bootstrap');
+    expect(summary.workflow_design.workflow_id).toBe('stage-gated-high-stakes');
+    expect(summary.workflow_design.pattern).toBe('stage_gated_delivery');
     expect(summary.process_design.operator_checklist).toContain('confirm project root and default track');
     expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
   });

@@ -202,6 +202,13 @@ export function buildTrackNextWorkProposal(input: {
       execution_shape: 'mission',
       task_type: 'track_gate_artifact',
     },
+    workflow_design: {
+      workflow_id: 'coordinated-multi-track',
+      pattern: 'coordinated_multi_track_execution',
+      stage: 'planning',
+      phases: ['intake', 'classification', 'planning', 'contract_authoring', 'execution', 'verification', 'delivery'],
+      rationale: 'Track gate artifact work spans multiple dependent steps and is coordinated by the track owner.',
+    },
     outcome_design: {
       outcome_ids: [target.artifact_id],
       labels: [target.artifact_id],

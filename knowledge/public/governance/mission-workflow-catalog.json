@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "workflow_id": "single-track-default"
+  },
+  "patterns": {
+    "single_track_execution": {
+      "description": "Single owner executes one bounded track and returns one primary result."
+    },
+    "coordinated_multi_track_execution": {
+      "description": "One owner coordinates multiple domain tracks and integrates outputs."
+    },
+    "stage_gated_delivery": {
+      "description": "Progression is gated by explicit review/approval checkpoints."
+    },
+    "exploratory_to_deterministic_conversion": {
+      "description": "Start with exploration, then compile stable governed contracts for deterministic execution."
+    }
+  },
+  "templates": [
+    {
+      "id": "stage-gated-high-stakes",
+      "pattern": "stage_gated_delivery",
+      "description": "High-stakes work requiring explicit checkpoint gates.",
+      "match": {
+        "risk_profiles": ["high_stakes", "approval_required"],
+        "execution_shapes": ["mission", "project_bootstrap"]
+      },
+      "phases": ["intake", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
+    },
+    {
+      "id": "explore-then-govern",
+      "pattern": "exploratory_to_deterministic_conversion",
+      "description": "Use exploration before deterministic governed execution.",
+      "match": {
+        "delivery_shapes": ["interactive_exploration"]
+      },
+      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
+    },
+    {
+      "id": "coordinated-multi-track",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "Cross-system work requiring a coordinated owner and delegated specialists.",
+      "match": {
+        "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
+        "execution_shapes": ["mission", "project_bootstrap", "task_session"]
+      },
+      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
+    },
+    {
+      "id": "single-track-default",
+      "pattern": "single_track_execution",
+      "description": "Default workflow for straightforward bounded work.",
+      "match": {
+        "delivery_shapes": ["single_artifact", "long_running_job", "*"],
+        "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+      },
+      "phases": ["intake", "planning", "execution", "verification", "delivery"]
+    }
+  ]
+}

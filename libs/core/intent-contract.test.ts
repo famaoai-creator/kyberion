@@ -36,6 +36,13 @@ describe('intent-contract compiler', () => {
           execution_shape: 'task_session',
           task_type: 'presentation_deck',
         },
+        workflow_design: {
+          workflow_id: 'single-track-default',
+          pattern: 'single_track_execution',
+          stage: 'planning',
+          phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
+          rationale: 'Default workflow for straightforward bounded work.',
+        },
         outcome_design: {
           outcome_ids: ['artifact:pptx'],
           labels: ['Presentation artifact'],

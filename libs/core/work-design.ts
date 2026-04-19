@@ -4,6 +4,8 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
+import { resolveMissionClassification } from './mission-classification.js';
+import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -175,6 +177,13 @@ export interface OrganizationWorkLoopSummary {
   resolution: {
     execution_shape: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
     task_type?: string;
+  };
+  workflow_design: {
+    workflow_id: string;
+    pattern: string;
+    stage: string;
+    phases: string[];
+    rationale: string;
   };
   outcome_design: {
     outcome_ids: string[];
@@ -471,6 +480,10 @@ export function buildOrganizationWorkLoopSummary(input: {
   taskType?: string;
   queryType?: string;
   shape?: string;
+  missionTypeHint?: string;
+  utterance?: string;
+  artifactPaths?: string[];
+  progressSignals?: string[];
   outcomeIds?: string[];
   tier?: 'personal' | 'confidential' | 'public';
   projectId?: string;
@@ -482,6 +495,25 @@ export function buildOrganizationWorkLoopSummary(input: {
   requiresApproval?: boolean;
 }): OrganizationWorkLoopSummary {
   const tier = normalizeKnowledgeTier(input.tier);
+  const executionShape = inferExecutionShape(input);
+  const missionClassification = resolveMissionClassification({
+    missionTypeHint: input.missionTypeHint,
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: executionShape,
+    utterance: input.utterance,
+    artifactPaths: input.artifactPaths,
+    progressSignals: input.progressSignals,
+  });
+  const workflowDesign = resolveMissionWorkflowDesign({
+    missionClass: missionClassification.mission_class,
+    deliveryShape: missionClassification.delivery_shape,
+    riskProfile: missionClassification.risk_profile,
+    stage: missionClassification.stage,
+    executionShape,
+    intentId: input.intentId,
+    taskType: input.taskType,
+  });
   const design = resolveWorkDesign({
     intentId: input.intentId,
     taskType: input.taskType,
@@ -504,9 +536,10 @@ export function buildOrganizationWorkLoopSummary(input: {
       service_bindings: Array.isArray(input.serviceBindings) ? input.serviceBindings : [],
     },
     resolution: {
-      execution_shape: inferExecutionShape(input),
+      execution_shape: executionShape,
       task_type: input.taskType,
     },
+    workflow_design: workflowDesign,
     outcome_design: {
       outcome_ids: design.outcomes.map((outcome) => outcome.id),
       labels: design.outcomes.map((outcome) => outcome.label),

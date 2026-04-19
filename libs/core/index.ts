@@ -232,6 +232,7 @@ export * from './managed-process.js';
 export * from './mission-seed-registry.js';
 export * from './mission-working-memory.js';
 export * from './mission-classification.js';
+export * from './mission-workflow-catalog.js';
 export * from './mission-coordination-bus.js';
 export * from './mission-team-composer.js';
 export * from './mission-team-orchestrator.js';
