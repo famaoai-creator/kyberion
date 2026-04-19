@@ -3,7 +3,7 @@
   "$id": "https://kyberion.local/schemas/organization-work-loop.schema.json",
   "title": "Organization Work Loop Summary",
   "type": "object",
-  "required": ["intent", "context", "resolution", "outcome_design", "process_design", "runtime_design", "execution_boundary", "teaming", "authority", "learning"],
+  "required": ["intent", "context", "resolution", "workflow_design", "outcome_design", "process_design", "runtime_design", "execution_boundary", "teaming", "authority", "learning"],
   "properties": {
     "intent": {
       "type": "object",
@@ -57,6 +57,21 @@
           "type": "array",
           "items": { "type": "string" }
         }
+      },
+      "additionalProperties": false
+    },
+    "workflow_design": {
+      "type": "object",
+      "required": ["workflow_id", "pattern", "stage", "phases", "rationale"],
+      "properties": {
+        "workflow_id": { "type": "string" },
+        "pattern": { "type": "string" },
+        "stage": { "type": "string" },
+        "phases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rationale": { "type": "string" }
       },
       "additionalProperties": false
     },

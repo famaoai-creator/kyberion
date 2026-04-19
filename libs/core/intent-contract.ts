@@ -446,6 +446,7 @@ function buildFallbackWorkLoop(input: CompileUserIntentFlowInput, contract: Inte
     intentId: contract.intent_id,
     taskType: contract.resolution.task_type,
     shape: contract.resolution.execution_shape,
+    utterance: input.text,
     outcomeIds: contract.outcome_ids,
     tier: input.tier,
     projectId: input.projectId,
