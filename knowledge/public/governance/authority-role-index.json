@@ -15,24 +15,28 @@
         "active/audit/",
         "registry.json"
       ],
+      "scope_classes": ["mission_state", "coordination_runtime", "observability", "audit"],
       "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
       "tier_access": ["public", "confidential", "personal"]
     },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
       "write_scopes": ["knowledge/", "libs/core/", "libs/actuators/", "scripts/", "pipelines/", "schemas/", "active/missions/"],
+      "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],
       "allowed_actuators": ["code-actuator", "orchestrator-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
     "software_developer": {
       "description": "Implementation authority for test and product code paths.",
       "write_scopes": ["active/projects/", "tests/", "libs/actuators/"],
+      "scope_classes": ["project_delivery", "codebase_core", "quality_validation"],
       "allowed_actuators": ["code-actuator", "file-actuator", "system-actuator"],
       "tier_access": ["public", "confidential"]
     },
     "knowledge_steward": {
       "description": "Knowledge maintenance authority across governed knowledge trees.",
       "write_scopes": ["knowledge/"],
+      "scope_classes": ["knowledge_core"],
       "allowed_actuators": ["wisdom-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
@@ -46,6 +50,7 @@
         "active/shared/observability/mission-control/",
         "active/audit/"
       ],
+      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
       "tier_access": ["public", "confidential"]
     },
@@ -59,12 +64,14 @@
         "active/shared/runtime/terminal/",
         "active/audit/"
       ],
+      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "operations_runtime", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
     "chronos_operator": {
       "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
       "write_scopes": [],
+      "scope_classes": ["communication_surface"],
       "allowed_actuators": ["presence-actuator"],
       "tier_access": ["public", "confidential"]
     },
@@ -78,6 +85,7 @@
         "active/shared/runtime/",
         "active/audit/"
       ],
+      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "operations_runtime", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
       "tier_access": ["public", "confidential"]
     },
@@ -88,12 +96,14 @@
         "active/shared/logs/surfaces/",
         "active/audit/"
       ],
+      "scope_classes": ["communication_surface", "operations_runtime", "audit"],
       "allowed_actuators": ["presence-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
     "sovereign_concierge": {
       "description": "Personal onboarding and identity synchronization authority.",
       "write_scopes": ["knowledge/personal/", "active/missions/", "active/projects/onboarding/"],
+      "scope_classes": ["knowledge_core", "mission_state", "project_delivery", "communication_surface"],
       "allowed_actuators": ["artifact-actuator", "approval-actuator", "presence-actuator"],
       "tier_access": ["personal", "confidential", "public"]
     }

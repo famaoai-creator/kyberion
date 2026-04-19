@@ -8,10 +8,11 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["description", "write_scopes", "allowed_actuators", "tier_access"],
+        "required": ["description", "write_scopes", "scope_classes", "allowed_actuators", "tier_access"],
         "properties": {
           "description": { "type": "string" },
           "write_scopes": { "type": "array", "items": { "type": "string" } },
+          "scope_classes": { "type": "array", "items": { "type": "string" } },
           "allowed_actuators": { "type": "array", "items": { "type": "string" } },
           "tier_access": { "type": "array", "items": { "type": "string" } }
         }
