@@ -16,6 +16,7 @@
             "compile_narrated_video_brief",
             "list_video_composition_templates",
             "get_video_composition_job_status",
+            "await_video_composition_job",
             "cancel_video_composition_job",
             "get_video_composition_queue"
           ]
@@ -63,6 +64,7 @@
                       "compile_narrated_video_brief",
                       "list_video_composition_templates",
                       "get_video_composition_job_status",
+                      "await_video_composition_job",
                       "cancel_video_composition_job",
                       "get_video_composition_queue"
                     ]

@@ -6,6 +6,7 @@
     { "op": "prepare_video_composition", "platforms": ["darwin", "linux", "win32"] },
     { "op": "compile_narrated_video_brief", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_video_composition_templates", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "await_video_composition_job", "platforms": ["darwin", "linux", "win32"] },
     { "op": "pipeline", "platforms": ["darwin", "linux", "win32"] }
   ],
   "entrypoint": "src/index.ts"
