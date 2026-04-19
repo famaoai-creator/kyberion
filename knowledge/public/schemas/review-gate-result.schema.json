@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_mode", "overall_verdict", "gate_results"],
+  "properties": {
+    "review_mode": { "type": "string", "enum": ["lean", "standard", "strict"] },
+    "overall_verdict": { "type": "string", "enum": ["ready", "concerns", "blocked"] },
+    "gate_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate_id", "verdict"],
+        "properties": {
+          "gate_id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["ready", "concerns", "blocked"] },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

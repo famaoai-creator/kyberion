@@ -121,6 +121,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
     dataPath: 'knowledge/public/governance/mission-workflow-catalog.json',
   },
+  {
+    id: 'mission-review-gate-registry',
+    schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
+    dataPath: 'knowledge/public/governance/mission-review-gate-registry.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -337,6 +342,23 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.templates || []).length) {
       violations.push('mission-workflow-catalog: templates must not be empty');
+    }
+  }
+
+  if (check.id === 'mission-review-gate-registry') {
+    const typed = data as {
+      defaults?: { review_mode?: string };
+      gates?: unknown[];
+      mode_rules?: unknown[];
+    };
+    if (!String(typed.defaults?.review_mode || '')) {
+      violations.push('mission-review-gate-registry: defaults.review_mode must not be empty');
+    }
+    if (!(typed.gates || []).length) {
+      violations.push('mission-review-gate-registry: gates must not be empty');
+    }
+    if (!(typed.mode_rules || []).length) {
+      violations.push('mission-review-gate-registry: mode_rules must not be empty');
     }
   }
 

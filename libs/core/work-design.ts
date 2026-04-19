@@ -6,6 +6,7 @@ import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
 import { resolveMissionClassification } from './mission-classification.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
+import { resolveMissionReviewDesign } from './mission-review-gates.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -183,6 +184,12 @@ export interface OrganizationWorkLoopSummary {
     pattern: string;
     stage: string;
     phases: string[];
+    rationale: string;
+  };
+  review_design: {
+    review_mode: 'lean' | 'standard' | 'strict';
+    required_gate_ids: string[];
+    all_gate_ids: string[];
     rationale: string;
   };
   outcome_design: {
@@ -514,6 +521,13 @@ export function buildOrganizationWorkLoopSummary(input: {
     intentId: input.intentId,
     taskType: input.taskType,
   });
+  const reviewDesign = resolveMissionReviewDesign({
+    missionClass: missionClassification.mission_class,
+    deliveryShape: missionClassification.delivery_shape,
+    riskProfile: missionClassification.risk_profile,
+    workflowPattern: workflowDesign.pattern,
+    stage: missionClassification.stage,
+  });
   const design = resolveWorkDesign({
     intentId: input.intentId,
     taskType: input.taskType,
@@ -540,6 +554,7 @@ export function buildOrganizationWorkLoopSummary(input: {
       task_type: input.taskType,
     },
     workflow_design: workflowDesign,
+    review_design: reviewDesign,
     outcome_design: {
       outcome_ids: design.outcomes.map((outcome) => outcome.id),
       labels: design.outcomes.map((outcome) => outcome.label),
