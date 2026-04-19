@@ -115,6 +115,8 @@ describe('work-design', () => {
     expect(summary.resolution.execution_shape).toBe('task_session');
     expect(summary.workflow_design.workflow_id).toBe('single-track-default');
     expect(summary.workflow_design.pattern).toBe('single_track_execution');
+    expect(summary.review_design.review_mode).toBe('standard');
+    expect(summary.review_design.required_gate_ids).toContain('CONTRACT_VALID');
     expect(summary.outcome_design.outcome_ids).toContain('artifact:pptx');
     expect(summary.process_design.operator_checklist).toContain('confirm the governed output path');
     expect(summary.runtime_design.owner_model).toBe('single_actor');
@@ -137,6 +139,7 @@ describe('work-design', () => {
       'return governed findings and follow-up checks',
     ]);
     expect(summary.workflow_design.pattern).toBe('single_track_execution');
+    expect(summary.review_design.review_mode).toBe('standard');
     expect(summary.process_design.intake_requirements).toContain('incident basis');
     expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
     expect(summary.runtime_design.owner_model).toBe('single_owner_multi_worker');
@@ -178,6 +181,8 @@ describe('work-design', () => {
     expect(summary.resolution.execution_shape).toBe('project_bootstrap');
     expect(summary.workflow_design.workflow_id).toBe('stage-gated-high-stakes');
     expect(summary.workflow_design.pattern).toBe('stage_gated_delivery');
+    expect(summary.review_design.review_mode).toBe('strict');
+    expect(summary.review_design.required_gate_ids).toContain('SECURITY_READY');
     expect(summary.process_design.operator_checklist).toContain('confirm project root and default track');
     expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
   });

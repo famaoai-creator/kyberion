@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "review_mode": "standard"
+  },
+  "gates": [
+    {
+      "gate_id": "CONTRACT_VALID",
+      "description": "Validate contract completeness and schema conformance before execution.",
+      "required_in_modes": ["lean", "standard", "strict"]
+    },
+    {
+      "gate_id": "QA_READY",
+      "description": "Confirm validation strategy and regression coverage are sufficient.",
+      "required_in_modes": ["standard", "strict"]
+    },
+    {
+      "gate_id": "ARCHITECTURE_READY",
+      "description": "Check architecture compatibility and boundary safety for cross-domain work.",
+      "required_in_modes": ["strict"],
+      "applies_to": {
+        "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
+        "workflow_patterns": ["coordinated_multi_track_execution", "stage_gated_delivery"]
+      }
+    },
+    {
+      "gate_id": "SECURITY_READY",
+      "description": "Require explicit security and policy review for high-risk operations.",
+      "required_in_modes": ["strict"],
+      "applies_to": {
+        "risk_profiles": ["approval_required", "high_stakes"]
+      }
+    },
+    {
+      "gate_id": "RELEASE_READY",
+      "description": "Ensure release and delivery evidence is complete for operations workflows.",
+      "required_in_modes": ["strict"],
+      "applies_to": {
+        "mission_classes": ["operations_and_release"]
+      }
+    }
+  ],
+  "mode_rules": [
+    {
+      "id": "mode-strict-risk",
+      "review_mode": "strict",
+      "match": {
+        "risk_profiles": ["high_stakes", "approval_required"]
+      }
+    },
+    {
+      "id": "mode-strict-stage-gated",
+      "review_mode": "strict",
+      "match": {
+        "workflow_patterns": ["stage_gated_delivery"]
+      }
+    },
+    {
+      "id": "mode-standard-review-required",
+      "review_mode": "standard",
+      "match": {
+        "risk_profiles": ["review_required"]
+      }
+    },
+    {
+      "id": "mode-lean-low-risk",
+      "review_mode": "lean",
+      "match": {
+        "risk_profiles": ["low"]
+      }
+    }
+  ]
+}
