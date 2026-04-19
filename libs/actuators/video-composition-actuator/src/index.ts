@@ -26,6 +26,7 @@ type VideoCompositionAction =
   | { action: 'compile_narrated_video_brief'; params: { narrated_video_brief: Record<string, unknown> } }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
+  | { action: 'await_video_composition_job'; params: { job_id: string; timeout_ms?: number } }
   | { action: 'cancel_video_composition_job'; params: { job_id: string; reason?: string } }
   | { action: 'get_video_composition_queue'; params?: Record<string, unknown> }
   | Record<string, any>;
@@ -74,6 +75,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   }
   if (action === 'get_video_composition_job_status') {
     return getVideoCompositionJobStatus(((input as any).params || {}));
+  }
+  if (action === 'await_video_composition_job') {
+    return awaitVideoCompositionJob(((input as any).params || {}));
   }
   if (action === 'cancel_video_composition_job') {
     return cancelVideoCompositionJob(((input as any).params || {}));
@@ -149,6 +153,29 @@ async function getVideoCompositionJobStatus(params: { job_id?: string }) {
   };
 }
 
+async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: number }) {
+  const jobId = String(params.job_id || '');
+  if (!jobId) throw new Error('await_video_composition_job requires params.job_id');
+  const timeoutMs = normalizeAwaitTimeoutMs(params.timeout_ms);
+  const packet = await waitForRenderJob(runtime, jobId, timeoutMs, true);
+  if (!packet) {
+    return {
+      status: 'timeout',
+      job_id: jobId,
+      timeout_ms: timeoutMs,
+      packet: runtime.getPacket(jobId),
+      diagnostics: jobDiagnostics.get(jobId) || null,
+    };
+  }
+  return {
+    status: 'succeeded',
+    job_id: jobId,
+    packet,
+    diagnostics: jobDiagnostics.get(jobId) || null,
+    progress_packets: packetHistory.get(jobId) || [],
+  };
+}
+
 async function cancelVideoCompositionJob(params: { job_id?: string; reason?: string }) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('cancel_video_composition_job requires params.job_id');
@@ -188,7 +215,7 @@ async function prepareVideoComposition(params: {
   const adf = params.video_composition_adf;
   const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
-  const awaitCompletion = adf.output.await_completion !== false;
+  const awaitCompletion = resolveAwaitCompletion(adf, policy);
   upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
 
   runtime.enqueue({
@@ -277,6 +304,9 @@ async function prepareVideoComposition(params: {
       status: 'queued',
       job_id: jobId,
       await_completion: false,
+      await_completion_reason: policy.render.enable_backend_rendering
+        ? 'backend rendering enabled: default asynchronous mode'
+        : 'operator selected asynchronous mode',
       packet: runtime.getPacket(jobId),
       queue: runtime.getQueueSnapshot(),
       diagnostics: jobDiagnostics.get(jobId) || null,
@@ -286,7 +316,19 @@ async function prepareVideoComposition(params: {
     };
   }
 
-  const finalPacket = await waitForRenderJob(runtime, jobId);
+  const finalPacket = await waitForRenderJob(runtime, jobId, computeAwaitTimeoutMs(policy));
+  if (!finalPacket) {
+    return {
+      status: 'timeout',
+      job_id: jobId,
+      timeout_ms: computeAwaitTimeoutMs(policy),
+      packet: runtime.getPacket(jobId),
+      diagnostics: jobDiagnostics.get(jobId) || null,
+      output_format: adf.output.format,
+      backend_rendering_enabled: policy.render.enable_backend_rendering,
+      backend_render_backend: policy.render.backend,
+    };
+  }
   const renderedOutputPath = (finalPacket.artifact_refs || []).find((ref: string) => ref.endsWith(`.${adf.output.format}`));
   const backendRendered = Boolean(policy.render.enable_backend_rendering && renderedOutputPath);
   return {
@@ -303,16 +345,38 @@ async function prepareVideoComposition(params: {
   };
 }
 
-async function waitForRenderJob(runtime: VideoRenderRuntime, jobId: string): Promise<any> {
+async function waitForRenderJob(
+  runtime: VideoRenderRuntime,
+  jobId: string,
+  timeoutMs = 30_000,
+  returnNullOnTimeout = false,
+): Promise<any> {
   const startedAt = Date.now();
-  while (Date.now() - startedAt < 30_000) {
+  while (Date.now() - startedAt < timeoutMs) {
     const packet = runtime.getPacket(jobId);
     if (packet && ['completed', 'failed', 'cancelled'].includes(packet.status)) {
       return packet;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  if (returnNullOnTimeout) return null;
   throw new Error(`video composition job timed out: ${jobId}`);
+}
+
+function resolveAwaitCompletion(adf: VideoCompositionADF, policy: ReturnType<typeof getVideoRenderRuntimePolicy>): boolean {
+  if (adf.output.await_completion === true) return true;
+  if (adf.output.await_completion === false) return false;
+  return !policy.render.enable_backend_rendering;
+}
+
+function computeAwaitTimeoutMs(policy: ReturnType<typeof getVideoRenderRuntimePolicy>): number {
+  return Math.max(30_000, Number(policy.render.command_timeout_ms || 0) + 60_000);
+}
+
+function normalizeAwaitTimeoutMs(value: unknown): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return 30_000;
+  return Math.max(10, Math.min(3_600_000, Math.floor(raw)));
 }
 
 function upsertJobDiagnostics(jobId: string, patch: Partial<VideoCompositionJobDiagnostics>): VideoCompositionJobDiagnostics {
