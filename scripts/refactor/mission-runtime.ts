@@ -7,6 +7,7 @@ import {
   enqueueMissionTeamPrewarmRequest,
   ensureMissionTeamRuntimeViaSupervisor,
   findMissionPath,
+  initializeMissionTeamBindings,
   loadMissionTeamPlan,
   logger,
   resolveMissionTeamPlan,
@@ -43,6 +44,7 @@ export function showMissionTeam(id: string, refresh = false): void {
       assignedPersona: state.assigned_persona,
     });
     writeMissionTeamPlan(missionPath, plan);
+    initializeMissionTeamBindings(missionPath, plan);
   }
 
   console.log(JSON.stringify(plan, null, 2));
