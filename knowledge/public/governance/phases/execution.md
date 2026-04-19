@@ -19,9 +19,11 @@ Accomplish physical changes with absolute validation and micro-tasking.
 At each significant milestone or task completion, the owner agent MUST record progress through the mission controller. Worker agents should report through mission-local coordination artifacts for owner acceptance.
 
 - **Command**: `node dist/scripts/mission_controller.js checkpoint <MISSION_ID> <TASK_ID> "<NOTE>"`
+- **Post-verification evidence**: `node dist/scripts/mission_controller.js record-evidence <MISSION_ID> <TASK_ID> "<NOTE>" --evidence <CSV>`
 - **Validation**:
   - Transactional integrity through git commit checkpoints.
   - Recording of commit hashes in `mission-state.json`.
+  - Evidence records append to `execution-ledger.jsonl` and refresh `git.latest_commit`.
 
 ---
 *Status: Mandated by AGENTS.md*

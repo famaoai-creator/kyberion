@@ -99,6 +99,27 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['checkpoint', 'step-1', 'Progress note']);
   });
 
+  it('treats record-evidence metadata options as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'record-evidence',
+      'MSN-2D',
+      'review',
+      'Evidence recorded',
+      '--team-role',
+      'reviewer',
+      '--actor-id',
+      'implementation-architect',
+      '--actor-type',
+      'agent',
+      '--evidence',
+      'evidence/report.json,evidence/screenshot.png',
+    ]);
+
+    expect(positionalArgs).toEqual(['record-evidence', 'MSN-2D', 'review', 'Evidence recorded']);
+  });
+
   it('extracts project relationship options into a normalized relationship payload', () => {
     const relationships = extractProjectRelationshipOptionsFromArgv([
       'node',
