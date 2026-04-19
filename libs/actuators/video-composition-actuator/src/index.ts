@@ -1,5 +1,6 @@
 import AjvModule from 'ajv';
 import {
+  compileNarratedVideoBriefToCompositionADF,
   compileSchemaFromPath,
   getVideoCompositionTemplateRegistry,
   getVideoRenderRuntimePolicy,
@@ -22,6 +23,7 @@ const videoCompositionActionValidate = compileSchemaFromPath(ajv, pathResolver.r
 type VideoCompositionAction =
   | VideoCompositionADF
   | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
+  | { action: 'compile_narrated_video_brief'; params: { narrated_video_brief: Record<string, unknown> } }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
   | { action: 'cancel_video_composition_job'; params: { job_id: string; reason?: string } }
@@ -63,6 +65,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   const action = (input as any).action;
   if (action === 'prepare_video_composition') {
     return prepareVideoComposition(((input as any).params || {}));
+  }
+  if (action === 'compile_narrated_video_brief') {
+    return compileNarratedVideoBrief(((input as any).params || {}));
   }
   if (action === 'list_video_composition_templates') {
     return listVideoCompositionTemplates();
@@ -107,6 +112,18 @@ async function listVideoCompositionTemplates() {
     status: 'succeeded',
     default_template_id: registry.default_template_id,
     templates: registry.templates,
+  };
+}
+
+async function compileNarratedVideoBrief(params: { narrated_video_brief?: Record<string, unknown> }) {
+  if (!params.narrated_video_brief) {
+    throw new Error('compile_narrated_video_brief requires params.narrated_video_brief');
+  }
+  const adf = compileNarratedVideoBriefToCompositionADF(params.narrated_video_brief as any);
+  return {
+    status: 'succeeded',
+    kind: 'compiled_video_composition_adf',
+    video_composition_adf: adf,
   };
 }
 
