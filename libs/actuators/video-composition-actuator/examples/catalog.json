@@ -12,5 +12,12 @@
     "path": "libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json",
     "description": "Compiles a narrated-video-brief with design-system inputs into a governed video-composition-adf.",
     "tags": ["video", "brief", "design-system", "narration", "compiler", "example"]
+  },
+  {
+    "id": "create-kyberion-intro-movie",
+    "title": "Create Kyberion Intro Movie",
+    "path": "libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json",
+    "description": "Runs narrated-video-brief compilation and video composition job enqueue as a single scenario action.",
+    "tags": ["video", "scenario", "narration", "design-system", "example"]
   }
 ]

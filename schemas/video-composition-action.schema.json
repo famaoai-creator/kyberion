@@ -14,6 +14,7 @@
           "enum": [
             "prepare_video_composition",
             "compile_narrated_video_brief",
+            "create_narrated_intro_movie",
             "list_video_composition_templates",
             "get_video_composition_job_status",
             "await_video_composition_job",
@@ -43,6 +44,25 @@
     },
     {
       "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "create_narrated_intro_movie" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["narrated_video_brief"],
+          "properties": {
+            "narrated_video_brief": {
+              "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+            },
+            "job_id": { "type": "string", "minLength": 1 },
+            "bundle_dir": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
       "required": ["action", "steps"],
       "properties": {
         "action": { "const": "pipeline" },
@@ -62,6 +82,7 @@
                     "enum": [
                       "prepare_video_composition",
                       "compile_narrated_video_brief",
+                      "create_narrated_intro_movie",
                       "list_video_composition_templates",
                       "get_video_composition_job_status",
                       "await_video_composition_job",
@@ -85,6 +106,25 @@
                       "narrated_video_brief": {
                         "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
                       }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "create_narrated_intro_movie" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["narrated_video_brief"],
+                    "properties": {
+                      "narrated_video_brief": {
+                        "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+                      },
+                      "job_id": { "type": "string", "minLength": 1 },
+                      "bundle_dir": { "type": "string", "minLength": 1 }
                     }
                   }
                 }

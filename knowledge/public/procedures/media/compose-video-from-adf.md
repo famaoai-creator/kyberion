@@ -6,6 +6,10 @@ Prepare a governed composed-video bundle from a `video-composition-adf` contract
 
 This path is for deterministic scene composition, not prompt-led model generation.
 
+For single-action scenario execution (`brief -> compile -> prepare`), use:
+
+- [`create-narrated-intro-movie.md`](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
+
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
