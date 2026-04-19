@@ -163,6 +163,25 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   const requestedEngineId = String(input.engine?.engine_id || profile.default_engine_id || '').trim() || profile.default_engine_id;
   const defaultEngine = getVoiceEngineRecord(profile.default_engine_id);
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
+  const personalVoiceMode = String(input.routing?.personal_voice_mode || policy.routing.default_personal_voice_mode);
+  const fallbackDetected = engine.engine_id !== requestedEngineId;
+  const requiresPersonalVoice = personalVoiceMode === 'require_personal_voice'
+    || (policy.routing.enforce_clone_engine_for_personal_tier && profile.tier === 'personal');
+  if (requiresPersonalVoice && (engine.kind !== 'voice_clone_service' || fallbackDetected)) {
+    return {
+      status: 'blocked',
+      request_id: jobId,
+      profile_id: profile.profile_id,
+      profile_tier: profile.tier,
+      engine_id: requestedEngineId,
+      resolved_engine_id: engine.engine_id,
+      fallback_detected: fallbackDetected,
+      personal_voice_mode: personalVoiceMode,
+      reason: fallbackDetected
+        ? `personal voice required but engine resolved to fallback (${engine.engine_id})`
+        : `personal voice required but resolved engine is not clone-capable (${engine.engine_id})`,
+    };
+  }
   const runtime = new VoiceGenerationRuntime(policy);
   const progress_packets: any[] = [];
   runtime.subscribe((packet) => {
