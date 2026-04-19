@@ -24,6 +24,14 @@ type VideoCompositionAction =
   | VideoCompositionADF
   | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
   | { action: 'compile_narrated_video_brief'; params: { narrated_video_brief: Record<string, unknown> } }
+  | {
+    action: 'create_narrated_intro_movie';
+    params: {
+      narrated_video_brief: Record<string, unknown>;
+      job_id?: string;
+      bundle_dir?: string;
+    };
+  }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
   | { action: 'await_video_composition_job'; params: { job_id: string; timeout_ms?: number } }
@@ -69,6 +77,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   }
   if (action === 'compile_narrated_video_brief') {
     return compileNarratedVideoBrief(((input as any).params || {}));
+  }
+  if (action === 'create_narrated_intro_movie') {
+    return createNarratedIntroMovie(((input as any).params || {}));
   }
   if (action === 'list_video_composition_templates') {
     return listVideoCompositionTemplates();
@@ -128,6 +139,28 @@ async function compileNarratedVideoBrief(params: { narrated_video_brief?: Record
     status: 'succeeded',
     kind: 'compiled_video_composition_adf',
     video_composition_adf: adf,
+  };
+}
+
+async function createNarratedIntroMovie(params: {
+  narrated_video_brief?: Record<string, unknown>;
+  job_id?: string;
+  bundle_dir?: string;
+}) {
+  if (!params.narrated_video_brief) {
+    throw new Error('create_narrated_intro_movie requires params.narrated_video_brief');
+  }
+  const adf = compileNarratedVideoBriefToCompositionADF(params.narrated_video_brief as any);
+  const execution = await prepareVideoComposition({
+    video_composition_adf: adf,
+    job_id: params.job_id,
+    bundle_dir: params.bundle_dir,
+  });
+  return {
+    status: execution.status,
+    kind: 'narrated_intro_movie_run',
+    video_composition_adf: adf,
+    execution,
   };
 }
 
