@@ -1,0 +1,36 @@
+{
+  "action": "compile_narrated_video_brief",
+  "params": {
+    "narrated_video_brief": {
+      "kind": "narrated-video-brief",
+      "version": "1.0.0",
+      "intent": "kyberion narrated intro from design system",
+      "title": "Kyberion Intro",
+      "language": "ja",
+      "script": {
+        "hook": "Intent to Execution",
+        "feature": "Kyberion connects planning, execution, and evidence through governed contracts.",
+        "cta": "Operate reliably with Kyberion."
+      },
+      "narration": {
+        "artifact_ref": "active/shared/exports/kyberion-sim-narration.aiff"
+      },
+      "design_system": {
+        "brand_name": "Kyberion",
+        "theme_tokens": {
+          "background_color": "#07111f"
+        },
+        "assets": {
+          "hero_path": "active/shared/assets/kyberion-hero.png",
+          "logo_path": "active/shared/assets/kyberion-logo.png"
+        }
+      },
+      "output": {
+        "format": "mp4",
+        "target_path": "active/shared/exports/kyberion-intro-from-brief.mp4",
+        "bundle_dir": "active/shared/tmp/video-composition/kyberion-intro-from-brief",
+        "await_completion": true
+      }
+    }
+  }
+}
