@@ -289,6 +289,7 @@ function normalizeWorkLoopFromRaw(
     intentId: contract.intent_id,
     taskType: contract.resolution.task_type,
     shape: contract.resolution.execution_shape,
+    utterance: request.source_text,
     outcomeIds: contract.outcome_ids,
     tier: request.context.tier,
     projectId: request.context.project_id,

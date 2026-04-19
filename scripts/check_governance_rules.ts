@@ -116,6 +116,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
     dataPath: 'knowledge/public/orchestration/agent-profile-index.json',
   },
+  {
+    id: 'mission-workflow-catalog',
+    schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/mission-workflow-catalog.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -315,6 +320,23 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.stage_rules || []).length) {
       violations.push('mission-classification-policy: stage_rules must not be empty');
+    }
+  }
+
+  if (check.id === 'mission-workflow-catalog') {
+    const typed = data as {
+      patterns?: Record<string, unknown>;
+      templates?: unknown[];
+      defaults?: { workflow_id?: string };
+    };
+    if (!String(typed.defaults?.workflow_id || '')) {
+      violations.push('mission-workflow-catalog: defaults.workflow_id must not be empty');
+    }
+    if (!typed.patterns || !Object.keys(typed.patterns).length) {
+      violations.push('mission-workflow-catalog: patterns must not be empty');
+    }
+    if (!(typed.templates || []).length) {
+      violations.push('mission-workflow-catalog: templates must not be empty');
     }
   }
 
