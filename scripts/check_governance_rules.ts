@@ -529,6 +529,10 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         default_crossfade_ms?: number;
       };
       progress?: { throttle_ms?: number; min_percent_delta?: number };
+      routing?: {
+        default_personal_voice_mode?: string;
+        enforce_clone_engine_for_personal_tier?: boolean;
+      };
     };
     if ((typed.queue?.concurrency || 0) < 1) {
       violations.push('voice-runtime-policy: queue.concurrency must be >= 1');
@@ -544,6 +548,12 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if ((typed.progress?.min_percent_delta || 0) < 0) {
       violations.push('voice-runtime-policy: progress.min_percent_delta must be >= 0');
+    }
+    if (!['allow_fallback', 'require_personal_voice'].includes(String(typed.routing?.default_personal_voice_mode || ''))) {
+      violations.push('voice-runtime-policy: routing.default_personal_voice_mode must be allow_fallback or require_personal_voice');
+    }
+    if (typed.routing?.enforce_clone_engine_for_personal_tier === undefined) {
+      violations.push('voice-runtime-policy: routing.enforce_clone_engine_for_personal_tier must be defined');
     }
   }
 

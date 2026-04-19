@@ -69,6 +69,17 @@
         "emit_progress_packets": { "type": "boolean" }
       },
       "required": ["mode", "format", "emit_progress_packets"]
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "personal_voice_mode": {
+          "type": "string",
+          "enum": ["allow_fallback", "require_personal_voice"]
+        }
+      },
+      "required": ["personal_voice_mode"]
     }
   },
   "required": ["action", "request_id", "text", "profile_ref", "engine", "rendering", "delivery"]

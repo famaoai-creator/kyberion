@@ -43,7 +43,16 @@
         "create_processed_version": { "type": "boolean" }
       },
       "required": ["default_format", "retain_original_version", "create_processed_version"]
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_personal_voice_mode": { "type": "string", "enum": ["allow_fallback", "require_personal_voice"] },
+        "enforce_clone_engine_for_personal_tier": { "type": "boolean" }
+      },
+      "required": ["default_personal_voice_mode", "enforce_clone_engine_for_personal_tier"]
     }
   },
-  "required": ["version", "queue", "chunking", "progress", "delivery"]
+  "required": ["version", "queue", "chunking", "progress", "delivery", "routing"]
 }
