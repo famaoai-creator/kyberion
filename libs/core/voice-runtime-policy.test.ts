@@ -33,6 +33,10 @@ describe('voice runtime policy', () => {
           retain_original_version: true,
           create_processed_version: true,
         },
+        routing: {
+          default_personal_voice_mode: 'require_personal_voice',
+          enforce_clone_engine_for_personal_tier: true,
+        },
       }),
     );
     process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH = overridePath;
@@ -41,5 +45,6 @@ describe('voice runtime policy', () => {
     expect(policy.version).toBe('test');
     expect(policy.chunking.default_max_chunk_chars).toBe(640);
     expect(policy.delivery.default_format).toBe('mp3');
+    expect(policy.routing.default_personal_voice_mode).toBe('require_personal_voice');
   });
 });

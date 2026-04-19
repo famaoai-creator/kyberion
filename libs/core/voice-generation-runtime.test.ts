@@ -21,6 +21,10 @@ describe('voice generation runtime', () => {
         retain_original_version: true,
         create_processed_version: false,
       },
+      routing: {
+        default_personal_voice_mode: 'allow_fallback',
+        enforce_clone_engine_for_personal_tier: true,
+      },
     });
 
     const executionOrder: string[] = [];
@@ -77,6 +81,10 @@ describe('voice generation runtime', () => {
         default_format: 'wav',
         retain_original_version: true,
         create_processed_version: false,
+      },
+      routing: {
+        default_personal_voice_mode: 'allow_fallback',
+        enforce_clone_engine_for_personal_tier: true,
       },
     });
 
