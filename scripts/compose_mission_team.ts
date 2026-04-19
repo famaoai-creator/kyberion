@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import {
+  composeMissionTeamBrief,
   createStandardYargs,
   composeMissionTeamPlan,
   findMissionPath,
@@ -11,7 +12,24 @@ import {
 async function main() {
   const argv = await createStandardYargs()
     .option('mission-id', { type: 'string', demandOption: true })
-    .option('mission-type', { type: 'string', default: 'development' })
+    .option('mission-type', { type: 'string' })
+    .option('request', { type: 'string', description: 'Free-form user request to compile team composition brief' })
+    .option('intent-id', { type: 'string' })
+    .option('task-type', { type: 'string' })
+    .option('shape', { type: 'string' })
+    .option('execution-shape', {
+      type: 'string',
+      choices: ['direct_reply', 'task_session', 'mission', 'project_bootstrap'] as const,
+      default: 'mission',
+    })
+    .option('artifacts', {
+      type: 'string',
+      description: 'Comma-separated artifact paths used as evidence for classification',
+    })
+    .option('signals', {
+      type: 'string',
+      description: 'Comma-separated progress signals used for stage detection',
+    })
     .option('persona', { type: 'string' })
     .option('write', { type: 'boolean', default: false })
     .parse();
@@ -30,19 +48,52 @@ async function main() {
     assignedPersona = assignedPersona || state.assigned_persona;
   }
 
+  const artifactPaths = String(argv.artifacts || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const progressSignals = String(argv.signals || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const missionTypeArg = argv['mission-type'] ? String(argv['mission-type']) : undefined;
+  const request = argv.request ? String(argv.request) : '';
+
   const plan = composeMissionTeamPlan({
     missionId,
-    missionType: String(argv['mission-type']),
+    missionType: missionTypeArg,
+    intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
+    taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
+    shape: argv.shape ? String(argv.shape) : undefined,
+    utterance: request || undefined,
+    artifactPaths,
+    progressSignals,
     tier,
     assignedPersona,
   });
+
+  const brief = request
+    ? composeMissionTeamBrief({
+      missionId,
+      missionType: missionTypeArg,
+      request,
+      intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
+      taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
+      shape: argv.shape ? String(argv.shape) : undefined,
+      artifactPaths,
+      progressSignals,
+      tier,
+      assignedPersona,
+      executionShape: argv['execution-shape'] as 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap',
+    })
+    : null;
 
   if (argv.write) {
     const targetDir = missionPath || missionDir(missionId, tier);
     writeMissionTeamPlan(targetDir, plan);
   }
 
-  console.log(JSON.stringify(plan, null, 2));
+  console.log(JSON.stringify(brief || plan, null, 2));
 }
 
 main().catch((error) => {

@@ -30,6 +30,28 @@ The correct target is:
 - not `many agents for their own sake`
 - but `goal-shaped multi-agent coordination with explicit governance`
 
+## Implementation Status (2026-04-19)
+
+Implemented foundation:
+
+- mission classification and stage detection (`mission-classification-policy`)
+- role registry with delegation contracts (`authority-role-index`, `team-role-index`)
+- mission workflow catalog and review gate registry
+- path-scope preflight enforcement for delegated tasks
+- scenario-pack evaluator for orchestration regressions
+- request-driven team composition brief (`composeMissionTeamBrief`) to convert user goals into:
+  - mission classification
+  - workflow design
+  - review design
+  - team plan
+  - missing input diagnostics
+
+Remaining optimization tasks:
+
+- bind `composeMissionTeamBrief` to all surfaces (Slack, Chronos, CLI chat) as a first-pass intake response
+- persist team-composition briefs as mission evidence artifacts for audit and replay
+- add approval checkpoints for high-stakes auto-team-expansion before runtime prewarm
+
 ## Source Reviewed
 
 Analyzed from the cloned repository `active/shared/tmp/Claude-Code-Game-Studios` on 2026-04-19.
