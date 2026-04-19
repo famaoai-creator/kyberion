@@ -33,6 +33,14 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 - add parity tests so the same intent and approval expectations produce equivalent behavior across adapters
 - keep provider-specific prompt augmentation isolated from Kyberion core concepts and execution contracts
 
+### Mission Team Orchestration
+
+- add mission classification so Kyberion can detect project shape and current stage from artifacts and contracts
+- define a compact role registry with explicit delegation rights, writable scopes, and escalation parents
+- publish a workflow catalog for multi-agent patterns instead of improvising cross-domain coordination on each run
+- externalize reusable review gates and record their verdicts in mission state and execution receipts
+- compile hook and path-scope governance into runtime enforcement for delegated work
+
 ### Capability Admission Discipline
 
 - require every new skill, plugin, agent, browser path, or computer-use path to declare why it exists, when it is preferred, and what replaces it if removed
@@ -128,3 +136,4 @@ Reference:
 - [Personal Voice Narrated Video Delivery Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/personal-voice-narrated-video-delivery-plan.md)
 - [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
 - [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
+- [Studio Agent Orchestration Absorption Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/studio-agent-orchestration-absorption-plan.md)

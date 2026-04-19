@@ -1,0 +1,198 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "defaults",
+    "stage_progression",
+    "mission_class_rules",
+    "delivery_shape_rules",
+    "risk_profile_rules",
+    "stage_rules"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mission_class", "delivery_shape", "risk_profile", "stage"],
+      "properties": {
+        "mission_class": {
+          "type": "string",
+          "enum": [
+            "product_delivery",
+            "code_change",
+            "research_and_absorption",
+            "content_and_media",
+            "operations_and_release",
+            "environment_and_recovery"
+          ]
+        },
+        "delivery_shape": {
+          "type": "string",
+          "enum": [
+            "single_artifact",
+            "multi_artifact_pipeline",
+            "long_running_job",
+            "interactive_exploration",
+            "cross_system_change"
+          ]
+        },
+        "risk_profile": {
+          "type": "string",
+          "enum": ["low", "review_required", "approval_required", "high_stakes"]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "intake",
+            "classification",
+            "planning",
+            "contract_authoring",
+            "preflight",
+            "execution",
+            "verification",
+            "delivery",
+            "retrospective"
+          ]
+        }
+      }
+    },
+    "stage_progression": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "intake",
+          "classification",
+          "planning",
+          "contract_authoring",
+          "preflight",
+          "execution",
+          "verification",
+          "delivery",
+          "retrospective"
+        ]
+      },
+      "minItems": 1
+    },
+    "mission_class_rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ruleForMissionClass" },
+      "minItems": 1
+    },
+    "delivery_shape_rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ruleForDeliveryShape" },
+      "minItems": 1
+    },
+    "risk_profile_rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ruleForRiskProfile" },
+      "minItems": 1
+    },
+    "stage_rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/stageRule" },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "routingMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mission_type_hints": { "type": "array", "items": { "type": "string" } },
+        "intent_ids": { "type": "array", "items": { "type": "string" } },
+        "task_types": { "type": "array", "items": { "type": "string" } },
+        "shapes": { "type": "array", "items": { "type": "string" } },
+        "utterance_patterns": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ruleForMissionClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mission_class"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "match": { "$ref": "#/definitions/routingMatch" },
+        "mission_class": {
+          "type": "string",
+          "enum": [
+            "product_delivery",
+            "code_change",
+            "research_and_absorption",
+            "content_and_media",
+            "operations_and_release",
+            "environment_and_recovery"
+          ]
+        }
+      }
+    },
+    "ruleForDeliveryShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "delivery_shape"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "match": { "$ref": "#/definitions/routingMatch" },
+        "delivery_shape": {
+          "type": "string",
+          "enum": [
+            "single_artifact",
+            "multi_artifact_pipeline",
+            "long_running_job",
+            "interactive_exploration",
+            "cross_system_change"
+          ]
+        }
+      }
+    },
+    "ruleForRiskProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "risk_profile"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "match": { "$ref": "#/definitions/routingMatch" },
+        "risk_profile": {
+          "type": "string",
+          "enum": ["low", "review_required", "approval_required", "high_stakes"]
+        }
+      }
+    },
+    "stageRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "stage"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "intake",
+            "classification",
+            "planning",
+            "contract_authoring",
+            "preflight",
+            "execution",
+            "verification",
+            "delivery",
+            "retrospective"
+          ]
+        },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "artifacts_any": { "type": "array", "items": { "type": "string" } },
+            "artifacts_all": { "type": "array", "items": { "type": "string" } },
+            "signals_any": { "type": "array", "items": { "type": "string" } },
+            "signals_all": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}
