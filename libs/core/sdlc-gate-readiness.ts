@@ -209,6 +209,12 @@ export function buildTrackNextWorkProposal(input: {
       phases: ['intake', 'classification', 'planning', 'contract_authoring', 'execution', 'verification', 'delivery'],
       rationale: 'Track gate artifact work spans multiple dependent steps and is coordinated by the track owner.',
     },
+    review_design: {
+      review_mode: 'standard',
+      required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+      all_gate_ids: ['CONTRACT_VALID', 'QA_READY', 'ARCHITECTURE_READY'],
+      rationale: 'Track gate artifact synthesis should pass contract and validation checks before execution.',
+    },
     outcome_design: {
       outcome_ids: [target.artifact_id],
       labels: [target.artifact_id],

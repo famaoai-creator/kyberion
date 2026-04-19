@@ -43,6 +43,12 @@ describe('intent-contract compiler', () => {
           phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
           rationale: 'Default workflow for straightforward bounded work.',
         },
+        review_design: {
+          review_mode: 'standard',
+          required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          all_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          rationale: 'Standard mode requires contract and QA gates.',
+        },
         outcome_design: {
           outcome_ids: ['artifact:pptx'],
           labels: ['Presentation artifact'],
