@@ -45,6 +45,50 @@ describe('voice sample ingestion policy', () => {
     expect(policy.sample_limits.min_samples).toBe(1);
   });
 
+  it('blocks strict personal registration when engine is not clone-capable', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(overridePath, JSON.stringify({
+      version: 'test',
+      sample_limits: {
+        min_samples: 3,
+        max_samples: 10,
+        min_sample_bytes: 10,
+        max_sample_bytes: 1000000,
+        allowed_extensions: ['wav'],
+      },
+      profile_rules: {
+        allowed_tiers: ['personal', 'confidential'],
+        require_unique_sample_paths: true,
+        require_language_coverage: true,
+        strict_personal_voice_registration: true,
+      },
+    }));
+    process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = overridePath;
+    safeWriteFile(samplePath, Buffer.from('12345678901234567890'));
+    safeWriteFile(samplePath2, Buffer.from('12345678901234567890'));
+    safeWriteFile(samplePath3, Buffer.from('12345678901234567890'));
+
+    const result = validateVoiceProfileRegistration({
+      action: 'register_voice_profile',
+      request_id: 'req-strict',
+      profile: {
+        profile_id: 'personal-voice-req-strict',
+        display_name: 'Personal Voice Strict',
+        tier: 'personal',
+        languages: ['ja'],
+        default_engine_id: 'local_say',
+      },
+      samples: [
+        { sample_id: 's1', path: samplePath, language: 'ja' },
+        { sample_id: 's2', path: samplePath2, language: 'ja' },
+        { sample_id: 's3', path: samplePath3, language: 'ja' },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.violations.join(' ')).toContain('clone-capable');
+  });
+
   it('validates registration samples against policy limits', () => {
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(overridePath, JSON.stringify({

@@ -32,6 +32,10 @@ const mocks = vi.hoisted(() => ({
       retain_original_version: true,
       create_processed_version: false,
     },
+    routing: {
+      default_personal_voice_mode: 'allow_fallback',
+      enforce_clone_engine_for_personal_tier: true,
+    },
   })),
   getVoiceEngineRecord: vi.fn(() => ({
     engine_id: 'local_say',
@@ -196,6 +200,65 @@ describe('voice actuator', () => {
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'say',
       ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.aiff', 'hello world'],
+    );
+  });
+
+  it('blocks generate_voice when personal voice is required but engine falls back', async () => {
+    mocks.getVoiceProfileRecord.mockReturnValueOnce({
+      profile_id: 'user-ja-voice',
+      display_name: 'User Japanese Voice',
+      tier: 'personal',
+      languages: ['ja'],
+      default_engine_id: 'open_voice_clone',
+      status: 'active',
+    });
+    mocks.resolveVoiceEngineForPlatform.mockReturnValueOnce({
+      engine_id: 'local_say',
+      display_name: 'Local System TTS',
+      kind: 'native_local',
+      provider: 'system_tts',
+      status: 'active',
+      platforms: ['darwin', 'linux', 'win32'],
+      supports: {
+        list_voices: true,
+        playback: true,
+        artifact_formats: ['wav', 'aiff'],
+      },
+    });
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_voice',
+      request_id: 'req-strict',
+      text: 'hello world',
+      profile_ref: { profile_id: 'user-ja-voice' },
+      engine: { engine_id: 'open_voice_clone' },
+      rendering: {
+        language: 'ja',
+        chunking: {
+          max_chunk_chars: 20,
+          crossfade_ms: 50,
+          preserve_paralinguistic_tags: true,
+        },
+      },
+      routing: { personal_voice_mode: 'require_personal_voice' },
+      delivery: {
+        mode: 'artifact',
+        format: 'wav',
+        emit_progress_packets: true,
+      },
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'blocked',
+      request_id: 'req-strict',
+      engine_id: 'open_voice_clone',
+      resolved_engine_id: 'local_say',
+      fallback_detected: true,
+      personal_voice_mode: 'require_personal_voice',
+    }));
+    expect(mocks.safeExec).not.toHaveBeenCalledWith(
+      'say',
+      expect.arrayContaining(['hello world']),
     );
   });
 
