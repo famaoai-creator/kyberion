@@ -131,6 +131,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/path-scope-policy.schema.json',
     dataPath: 'knowledge/public/governance/path-scope-policy.json',
   },
+  {
+    id: 'mission-orchestration-scenario-pack',
+    schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
+    dataPath: 'knowledge/public/governance/mission-orchestration-scenario-pack.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -382,6 +387,30 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     for (const [scopeClass, config] of Object.entries(scopeClasses)) {
       if (!(config.allow_prefixes || []).length) {
         violations.push(`path-scope-policy: ${scopeClass} must define allow_prefixes`);
+      }
+    }
+  }
+
+  if (check.id === 'mission-orchestration-scenario-pack') {
+    const typed = data as {
+      scenarios?: Array<{ scenario_id?: string; scenario_class?: string }>;
+    };
+    if (!(typed.scenarios || []).length) {
+      violations.push('mission-orchestration-scenario-pack: scenarios must not be empty');
+    }
+    const ids = new Set<string>();
+    for (const scenario of typed.scenarios || []) {
+      const id = String(scenario.scenario_id || '');
+      if (!id) {
+        violations.push('mission-orchestration-scenario-pack: every scenario must define scenario_id');
+        continue;
+      }
+      if (ids.has(id)) {
+        violations.push(`mission-orchestration-scenario-pack: duplicated scenario_id: ${id}`);
+      }
+      ids.add(id);
+      if (!['golden', 'controlled-failure'].includes(String(scenario.scenario_class || ''))) {
+        violations.push(`mission-orchestration-scenario-pack: ${id} has invalid scenario_class`);
       }
     }
   }
