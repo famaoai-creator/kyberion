@@ -235,6 +235,7 @@ export * from './mission-classification.js';
 export * from './mission-workflow-catalog.js';
 export * from './mission-review-gates.js';
 export * from './delegation-preflight.js';
+export * from './mission-orchestration-evaluator.js';
 export * from './mission-coordination-bus.js';
 export * from './mission-team-composer.js';
 export * from './mission-team-orchestrator.js';
