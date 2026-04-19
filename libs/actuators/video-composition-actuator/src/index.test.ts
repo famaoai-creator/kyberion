@@ -101,6 +101,39 @@ describe('video-composition-actuator', () => {
     expect(result.video_composition_adf.kind).toBe('video-composition-adf');
   });
 
+  it('creates narrated intro movie in a single action', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'create_narrated_intro_movie',
+      params: {
+        narrated_video_brief: {
+          kind: 'narrated-video-brief',
+          version: '1.0.0',
+          script: {
+            hook: 'Intent to Execution',
+            feature: 'Contracts connect planning and execution.',
+            cta: 'Operate with Kyberion.',
+          },
+          narration: {
+            artifact_ref: 'active/shared/exports/narration.aiff',
+          },
+          design_system: {
+            brand_name: 'Kyberion',
+          },
+        },
+      },
+    } as any);
+
+    expect(mocks.compileNarratedVideoBriefToCompositionADF).toHaveBeenCalled();
+    expect(mocks.writeVideoCompositionBundle).toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      kind: 'narrated_intro_movie_run',
+    }));
+    expect(result.execution).toEqual(expect.objectContaining({
+      status: 'succeeded',
+    }));
+  });
+
   it('prepares a composed-video bundle from an adf', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
