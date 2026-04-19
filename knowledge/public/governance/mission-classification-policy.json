@@ -1,0 +1,302 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "mission_class": "code_change",
+    "delivery_shape": "single_artifact",
+    "risk_profile": "review_required",
+    "stage": "intake"
+  },
+  "stage_progression": [
+    "intake",
+    "classification",
+    "planning",
+    "contract_authoring",
+    "preflight",
+    "execution",
+    "verification",
+    "delivery",
+    "retrospective"
+  ],
+  "mission_class_rules": [
+    {
+      "id": "class-environment-recovery",
+      "match": {
+        "mission_type_hints": ["incident"]
+      },
+      "mission_class": "environment_and_recovery"
+    },
+    {
+      "id": "class-environment-recovery-utterance",
+      "match": {
+        "utterance_patterns": ["recover", "recovery", "resume", "復旧", "再開"]
+      },
+      "mission_class": "environment_and_recovery"
+    },
+    {
+      "id": "class-operations-release",
+      "match": {
+        "task_types": ["service_operation"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-operations-release-hint",
+      "match": {
+        "mission_type_hints": ["operations"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-research-absorption",
+      "match": {
+        "task_types": ["analysis"]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-research-absorption-intent",
+      "match": {
+        "intent_ids": ["cross-project-remediation", "incident-informed-review", "evolve-agent-harness"]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-content-media",
+      "match": {
+        "task_types": ["presentation_deck", "report_document", "document_generation", "capture_photo"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-content-media-intent",
+      "match": {
+        "intent_ids": ["generate-presentation", "generate-report"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-product-delivery",
+      "match": {
+        "shapes": ["project_bootstrap"]
+      },
+      "mission_class": "product_delivery"
+    },
+    {
+      "id": "class-product-delivery-intent",
+      "match": {
+        "intent_ids": ["bootstrap-project"]
+      },
+      "mission_class": "product_delivery"
+    }
+  ],
+  "delivery_shape_rules": [
+    {
+      "id": "delivery-interactive-exploration",
+      "match": {
+        "task_types": ["browser"]
+      },
+      "delivery_shape": "interactive_exploration"
+    },
+    {
+      "id": "delivery-long-running",
+      "match": {
+        "task_types": ["service_operation"]
+      },
+      "delivery_shape": "long_running_job"
+    },
+    {
+      "id": "delivery-long-running-intent",
+      "match": {
+        "intent_ids": ["inspect-service"]
+      },
+      "delivery_shape": "long_running_job"
+    },
+    {
+      "id": "delivery-pipeline",
+      "match": {
+        "task_types": ["document_generation"]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
+    {
+      "id": "delivery-pipeline-bootstrap",
+      "match": {
+        "shapes": ["project_bootstrap"]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
+    {
+      "id": "delivery-cross-system",
+      "match": {
+        "mission_type_hints": ["incident"]
+      },
+      "delivery_shape": "cross_system_change"
+    },
+    {
+      "id": "delivery-cross-system-intent",
+      "match": {
+        "intent_ids": ["cross-project-remediation"]
+      },
+      "delivery_shape": "cross_system_change"
+    },
+    {
+      "id": "delivery-single-artifact",
+      "match": {
+        "task_types": ["presentation_deck", "report_document", "capture_photo"]
+      },
+      "delivery_shape": "single_artifact"
+    }
+  ],
+  "risk_profile_rules": [
+    {
+      "id": "risk-high-stakes",
+      "match": {
+        "mission_type_hints": ["incident"]
+      },
+      "risk_profile": "high_stakes"
+    },
+    {
+      "id": "risk-high-stakes-utterance",
+      "match": {
+        "utterance_patterns": ["outage", "security", "breach", "緊急", "障害"]
+      },
+      "risk_profile": "high_stakes"
+    },
+    {
+      "id": "risk-approval-required",
+      "match": {
+        "task_types": ["service_operation"]
+      },
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "risk-approval-required-bootstrap",
+      "match": {
+        "intent_ids": ["bootstrap-project"]
+      },
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "risk-review-required",
+      "match": {
+        "task_types": ["analysis", "document_generation"],
+        "shapes": ["task_session", "mission"]
+      },
+      "risk_profile": "review_required"
+    }
+  ],
+  "stage_rules": [
+    {
+      "id": "stage-classification",
+      "stage": "classification",
+      "when": {
+        "signals_any": ["classified"]
+      }
+    },
+    {
+      "id": "stage-classification-artifact",
+      "stage": "classification",
+      "when": {
+        "artifacts_any": ["intent-resolution-packet.json"]
+      }
+    },
+    {
+      "id": "stage-planning",
+      "stage": "planning",
+      "when": {
+        "signals_any": ["plan_ready"]
+      }
+    },
+    {
+      "id": "stage-planning-artifact",
+      "stage": "planning",
+      "when": {
+        "artifacts_any": ["plan", "workflow-catalog"]
+      }
+    },
+    {
+      "id": "stage-contract-authoring",
+      "stage": "contract_authoring",
+      "when": {
+        "signals_any": ["draft_contract_ready"]
+      }
+    },
+    {
+      "id": "stage-contract-authoring-artifact",
+      "stage": "contract_authoring",
+      "when": {
+        "artifacts_any": ["contract", "adf"]
+      }
+    },
+    {
+      "id": "stage-preflight",
+      "stage": "preflight",
+      "when": {
+        "signals_any": ["preflight_passed"]
+      }
+    },
+    {
+      "id": "stage-preflight-artifact",
+      "stage": "preflight",
+      "when": {
+        "artifacts_any": ["preflight-report", "validation-report"]
+      }
+    },
+    {
+      "id": "stage-execution",
+      "stage": "execution",
+      "when": {
+        "signals_any": ["execution_started"]
+      }
+    },
+    {
+      "id": "stage-execution-artifact",
+      "stage": "execution",
+      "when": {
+        "artifacts_any": ["execution-receipt", "runtime/"]
+      }
+    },
+    {
+      "id": "stage-verification",
+      "stage": "verification",
+      "when": {
+        "signals_any": ["verification_passed"]
+      }
+    },
+    {
+      "id": "stage-verification-artifact",
+      "stage": "verification",
+      "when": {
+        "artifacts_any": ["verification", "test-report"]
+      }
+    },
+    {
+      "id": "stage-delivery",
+      "stage": "delivery",
+      "when": {
+        "signals_any": ["delivery_ready"]
+      }
+    },
+    {
+      "id": "stage-delivery-artifact",
+      "stage": "delivery",
+      "when": {
+        "artifacts_any": ["delivery-pack", "exports/"]
+      }
+    },
+    {
+      "id": "stage-retrospective",
+      "stage": "retrospective",
+      "when": {
+        "signals_any": ["retrospective_captured"]
+      }
+    },
+    {
+      "id": "stage-retrospective-artifact",
+      "stage": "retrospective",
+      "when": {
+        "artifacts_any": ["retrospective", "knowledge-hint", "feedback-loop"]
+      }
+    }
+  ]
+}
