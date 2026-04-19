@@ -29,6 +29,13 @@ const mocks = vi.hoisted(() => ({
     render: { allowed_output_formats: ['mp4'], enable_backend_rendering: false, backend: 'none', quality: 'standard', command_timeout_ms: 300000 },
   })),
   safeReadFile: vi.fn(),
+  compileNarratedVideoBriefToCompositionADF: vi.fn(() => ({
+    kind: 'video-composition-adf',
+    version: '1.0.0',
+    composition: { duration_sec: 9, fps: 30, width: 1920, height: 1080 },
+    scenes: [],
+    output: { format: 'mp4' },
+  })),
   renderVideoCompositionBundleAsync: vi.fn(async () => ({
     executed: true,
     backend: 'hyperframes_cli',
@@ -49,6 +56,7 @@ vi.mock('@agent/core', async () => {
     compileSchemaFromPath: mocks.compileSchemaFromPath,
     getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
     getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
+    compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
     safeReadFile: mocks.safeReadFile,
     renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
     writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
@@ -71,6 +79,26 @@ describe('video-composition-actuator', () => {
       status: 'succeeded',
       default_template_id: 'basic-title-card',
     }));
+  });
+
+  it('compiles narrated video brief into composition adf', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'compile_narrated_video_brief',
+      params: {
+        narrated_video_brief: {
+          kind: 'narrated-video-brief',
+          version: '1.0.0',
+        },
+      },
+    } as any);
+
+    expect(mocks.compileNarratedVideoBriefToCompositionADF).toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      kind: 'compiled_video_composition_adf',
+    }));
+    expect(result.video_composition_adf.kind).toBe('video-composition-adf');
   });
 
   it('prepares a composed-video bundle from an adf', async () => {

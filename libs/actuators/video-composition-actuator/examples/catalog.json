@@ -5,5 +5,12 @@
     "path": "libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json",
     "description": "Compiles a governed video-composition-adf into a deterministic source bundle for later rendering.",
     "tags": ["video", "composition", "deterministic", "bundle", "example"]
+  },
+  {
+    "id": "compile-kyberion-intro-brief",
+    "title": "Compile Kyberion Intro Brief",
+    "path": "libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json",
+    "description": "Compiles a narrated-video-brief with design-system inputs into a governed video-composition-adf.",
+    "tags": ["video", "brief", "design-system", "narration", "compiler", "example"]
   }
 ]

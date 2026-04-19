@@ -13,6 +13,7 @@
         "action": {
           "enum": [
             "prepare_video_composition",
+            "compile_narrated_video_brief",
             "list_video_composition_templates",
             "get_video_composition_job_status",
             "cancel_video_composition_job",
@@ -20,6 +21,23 @@
           ]
         },
         "params": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "compile_narrated_video_brief" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["narrated_video_brief"],
+          "properties": {
+            "narrated_video_brief": {
+              "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+            }
+          }
+        }
       }
     },
     {
@@ -42,6 +60,7 @@
                   "action": {
                     "enum": [
                       "prepare_video_composition",
+                      "compile_narrated_video_brief",
                       "list_video_composition_templates",
                       "get_video_composition_job_status",
                       "cancel_video_composition_job",
@@ -49,6 +68,23 @@
                     ]
                   },
                   "params": { "type": "object" }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "compile_narrated_video_brief" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["narrated_video_brief"],
+                    "properties": {
+                      "narrated_video_brief": {
+                        "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+                      }
+                    }
+                  }
                 }
               }
             ]

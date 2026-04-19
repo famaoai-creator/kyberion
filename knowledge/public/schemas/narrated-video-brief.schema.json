@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "narrated-video-brief.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "type": "string", "const": "narrated-video-brief" },
+    "version": { "type": "string", "minLength": 1 },
+    "intent": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 2 },
+    "script": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hook": { "type": "string", "minLength": 1 },
+        "feature": { "type": "string", "minLength": 1 },
+        "cta": { "type": "string", "minLength": 1 }
+      },
+      "required": ["hook", "feature", "cta"]
+    },
+    "narration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": { "type": "string", "minLength": 1 }
+      },
+      "required": ["artifact_ref"]
+    },
+    "design_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brand_name": { "type": "string", "minLength": 1 },
+        "theme_tokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "background_color": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$" }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logo_path": { "type": "string", "minLength": 1 },
+            "hero_path": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "required": ["brand_name"]
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
+        "target_path": { "type": "string", "minLength": 1 },
+        "bundle_dir": { "type": "string", "minLength": 1 },
+        "await_completion": { "type": "boolean" }
+      }
+    }
+  },
+  "required": ["kind", "version", "script", "narration", "design_system"]
+}

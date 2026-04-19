@@ -10,6 +10,7 @@ This path is for deterministic scene composition, not prompt-led model generatio
 
 - **Actuator**: `video-composition-actuator`
 - **Schema**: [`video-composition-adf.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
+- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
 - **Governance**:
   - [`video-composition-template-registry.json`](/Users/famaoai/k/d/kyberion/knowledge/public/governance/video-composition-template-registry.json)
   - [`video-render-runtime-policy.json`](/Users/famaoai/k/d/kyberion/knowledge/public/governance/video-render-runtime-policy.json)
@@ -34,12 +35,20 @@ The current implementation prepares deterministic source artifacts:
 Example input:
 
 - [`prepare-product-explainer.json`](/Users/famaoai/k/d/kyberion/libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
+- [`compile-kyberion-intro-brief.json`](/Users/famaoai/k/d/kyberion/libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
 
 Run the actuator directly:
 
 ```bash
 node dist/libs/actuators/video-composition-actuator/src/index.js \
   --input libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json
+```
+
+Compile a narrated brief first:
+
+```bash
+node dist/libs/actuators/video-composition-actuator/src/index.js \
+  --input libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json
 ```
 
 Job control actions (for long-running mode in the same actuator process):
