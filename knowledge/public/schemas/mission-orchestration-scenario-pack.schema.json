@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scenarios"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "scenario_class",
+          "mission_class",
+          "delivery_shape",
+          "workflow_pattern",
+          "prompt",
+          "expected_signals"
+        ],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "scenario_class": {
+            "type": "string",
+            "enum": ["golden", "controlled-failure"]
+          },
+          "mission_class": { "type": "string", "minLength": 1 },
+          "delivery_shape": { "type": "string", "minLength": 1 },
+          "workflow_pattern": { "type": "string", "minLength": 1 },
+          "prompt": { "type": "string", "minLength": 1 },
+          "expected_signals": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
