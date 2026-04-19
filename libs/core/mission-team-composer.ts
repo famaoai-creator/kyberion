@@ -1,6 +1,11 @@
 import * as path from 'node:path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import {
+  mapMissionClassToMissionTypeTemplate,
+  resolveMissionClassification,
+  type MissionClassification,
+} from './mission-classification.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -51,6 +56,7 @@ export interface MissionTeamPlan {
   tier: string;
   template: string;
   assigned_persona?: string;
+  mission_classification?: MissionClassification;
   generated_at: string;
   assignments: MissionTeamAssignment[];
 }
@@ -58,6 +64,12 @@ export interface MissionTeamPlan {
 export interface ResolveMissionTeamOptions {
   missionId: string;
   missionType?: string;
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+  utterance?: string;
+  artifactPaths?: string[];
+  progressSignals?: string[];
   tier?: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
 }
@@ -137,10 +149,25 @@ function selectAgentForTeamRole(
 export function composeMissionTeamPlan(input: {
   missionId: string;
   missionType?: string;
+  intentId?: string;
+  taskType?: string;
+  shape?: string;
+  utterance?: string;
+  artifactPaths?: string[];
+  progressSignals?: string[];
   tier: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
 }): MissionTeamPlan {
-  const missionType = input.missionType || 'development';
+  const missionClassification = resolveMissionClassification({
+    missionTypeHint: input.missionType,
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape,
+    utterance: input.utterance,
+    artifactPaths: input.artifactPaths,
+    progressSignals: input.progressSignals,
+  });
+  const missionType = input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
   const templates = loadMissionTeamTemplates();
   const teamRoles = loadTeamRoleIndex();
   const agents = loadAgentProfileIndex();
@@ -180,6 +207,7 @@ export function composeMissionTeamPlan(input: {
     tier: input.tier,
     template: templates[missionType] ? missionType : 'default',
     assigned_persona: input.assignedPersona,
+    mission_classification: missionClassification,
     generated_at: new Date().toISOString(),
     assignments,
   };
@@ -211,6 +239,12 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
   return composeMissionTeamPlan({
     missionId,
     missionType: input.missionType,
+    intentId: input.intentId,
+    taskType: input.taskType,
+    shape: input.shape,
+    utterance: input.utterance,
+    artifactPaths: input.artifactPaths,
+    progressSignals: input.progressSignals,
     tier: input.tier || 'public',
     assignedPersona: input.assignedPersona,
   });
