@@ -23,6 +23,25 @@
           "status": { "enum": ["assigned", "unfilled"] },
           "agent_id": { "type": ["string", "null"] },
           "authority_role": { "type": ["string", "null"] },
+          "delegation_contract": {
+            "type": ["object", "null"],
+            "required": [
+              "ownership_scope",
+              "allowed_delegate_team_roles",
+              "escalation_parent_team_role",
+              "required_scope_classes",
+              "resolved_scope_classes",
+              "allowed_write_scopes"
+            ],
+            "properties": {
+              "ownership_scope": { "type": "string" },
+              "allowed_delegate_team_roles": { "type": "array", "items": { "type": "string" } },
+              "escalation_parent_team_role": { "type": ["string", "null"] },
+              "required_scope_classes": { "type": "array", "items": { "type": "string" } },
+              "resolved_scope_classes": { "type": "array", "items": { "type": "string" } },
+              "allowed_write_scopes": { "type": "array", "items": { "type": "string" } }
+            }
+          },
           "provider": { "type": ["string", "null"] },
           "modelId": { "type": ["string", "null"] },
           "required_capabilities": { "type": "array", "items": { "type": "string" } },
