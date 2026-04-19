@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults", "scope_classes"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unknown_scope_behavior"],
+      "properties": {
+        "unknown_scope_behavior": {
+          "type": "string",
+          "enum": ["allow_with_warning", "block"]
+        }
+      }
+    },
+    "scope_classes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["allow_prefixes"],
+        "properties": {
+          "allow_prefixes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

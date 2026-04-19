@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "unknown_scope_behavior": "allow_with_warning"
+  },
+  "scope_classes": {
+    "mission_state": {
+      "description": "Mission control state and orchestration records.",
+      "allow_prefixes": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/shared/coordination/",
+        "active/shared/runtime/mission_queue.jsonl"
+      ]
+    },
+    "knowledge_core": {
+      "description": "Governed knowledge and architecture assets.",
+      "allow_prefixes": [
+        "knowledge/"
+      ]
+    },
+    "codebase_core": {
+      "description": "Core implementation and automation code.",
+      "allow_prefixes": [
+        "libs/core/",
+        "libs/actuators/",
+        "scripts/",
+        "schemas/",
+        "pipelines/",
+        "tests/"
+      ]
+    },
+    "project_delivery": {
+      "description": "Project-local delivery artifacts and outputs.",
+      "allow_prefixes": [
+        "active/projects/",
+        "active/shared/exports/"
+      ]
+    },
+    "communication_surface": {
+      "description": "Surface/gateway communication channels and runtime state.",
+      "allow_prefixes": [
+        "presence/bridge/runtime/",
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/"
+      ]
+    },
+    "operations_runtime": {
+      "description": "Operational runtime state and terminal resources.",
+      "allow_prefixes": [
+        "active/shared/runtime/",
+        "active/shared/logs/"
+      ]
+    },
+    "observability": {
+      "description": "Observability and metrics traces.",
+      "allow_prefixes": [
+        "active/shared/observability/"
+      ]
+    },
+    "audit": {
+      "description": "Audit and governance traces.",
+      "allow_prefixes": [
+        "active/audit/"
+      ]
+    }
+  }
+}

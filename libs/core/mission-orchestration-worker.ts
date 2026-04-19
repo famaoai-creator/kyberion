@@ -1,5 +1,6 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { buildMissionTeamView, resolveMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
+import { validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import {
   emitChannelSurfaceEvent,
   enqueueChronosOutboxMessage,
@@ -55,6 +56,7 @@ interface PlannedNextTask {
   };
   description?: string;
   deliverable?: string;
+  target_path?: string;
 }
 
 const TASK_EVENT_STATUS_MAP: Partial<Record<NonNullable<PlannedNextTask['status']>, 'task_reviewed' | 'task_completed' | 'task_accepted'>> = {
@@ -163,6 +165,7 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
     },
     description: task.description,
     deliverable: task.deliverable,
+    target_path: task.target_path,
   }));
   safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(nextTasks, null, 2));
 }
@@ -323,6 +326,35 @@ export async function dispatchMissionNextTasks(missionId: string): Promise<Array
     if (!teamRole) continue;
     const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
     if (!assignment?.agent_id) continue;
+    const preflight = validateDelegatedTaskPreflight({
+      task: {
+        task_id: task.task_id,
+        team_role: teamRole,
+        deliverable: task.deliverable,
+        target_path: task.target_path,
+      },
+      assignment,
+    });
+    emitMissionOrchestrationObservation({
+      decision: preflight.allowed ? 'delegation_preflight_passed' : 'delegation_preflight_blocked',
+      event_type: 'delegation_preflight_checked',
+      requested_by: 'mission_orchestration_worker',
+      mission_id: missionId,
+      resource_id: task.task_id,
+      operation: preflight.allowed ? 'allow' : 'block',
+      why: preflight.reason,
+      evidence: preflight.target_path ? [preflight.target_path] : [],
+      payload: {
+        team_role: teamRole,
+        target_path: preflight.target_path,
+        target_scope_class: preflight.target_scope_class,
+        warnings: preflight.warnings,
+      },
+    });
+    if (!preflight.allowed) {
+      task.status = 'blocked';
+      continue;
+    }
 
     await a2aBridge.route({
       a2a_version: '1.0',
@@ -340,6 +372,7 @@ export async function dispatchMissionNextTasks(missionId: string): Promise<Array
           `Assigned team role: ${teamRole}.`,
           `Description: ${task.description || ''}`,
           `Deliverable: ${task.deliverable || ''}`,
+          `Target path: ${task.target_path || preflight.target_path || '(unspecified)'}`,
           '',
           'Mission team context:',
           JSON.stringify({
