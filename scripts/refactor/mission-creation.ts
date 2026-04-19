@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import {
   composeMissionTeamPlan,
   findMissionPath,
+  initializeMissionTeamBindings,
   ledger,
   logger,
   missionDir as resolveMissionDir,
@@ -90,6 +91,7 @@ export async function createMission(
     assignedPersona: persona,
   });
   writeMissionTeamPlan(missionDir, teamPlan);
+  initializeMissionTeamBindings(missionDir, teamPlan);
 
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) {
