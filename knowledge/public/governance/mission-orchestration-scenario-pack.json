@@ -1,0 +1,55 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "scenario_id": "golden-code-change-reviewed",
+      "scenario_class": "golden",
+      "mission_class": "code_change",
+      "delivery_shape": "single_artifact",
+      "workflow_pattern": "single_track_execution",
+      "prompt": "このモジュールのバグを修正してテストまで完了してください",
+      "expected_signals": ["contract_valid", "qa_ready", "delivery_ready"],
+      "notes": "Single-track change with explicit test completion."
+    },
+    {
+      "scenario_id": "golden-research-to-plan",
+      "scenario_class": "golden",
+      "mission_class": "research_and_absorption",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "coordinated_multi_track_execution",
+      "prompt": "外部リポジトリを分析して吸収ポイントと実装計画を作成してください",
+      "expected_signals": ["classification", "planning", "contract_authoring", "delivery_ready"],
+      "notes": "Research absorption should compile into governed plan artifacts."
+    },
+    {
+      "scenario_id": "golden-voice-video-pipeline",
+      "scenario_class": "golden",
+      "mission_class": "content_and_media",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "coordinated_multi_track_execution",
+      "prompt": "声登録から紹介動画作成までを完遂してください",
+      "expected_signals": ["contract_valid", "execution_started", "verification_passed", "delivery_ready"],
+      "notes": "Multi-track media pipeline with dependent artifacts."
+    },
+    {
+      "scenario_id": "golden-release-merge-flow",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "変更を commit して PR を作成し main へマージしてください",
+      "expected_signals": ["architecture_ready", "security_ready", "release_ready", "delivery_ready"],
+      "notes": "High-risk release sequence requiring strict review mode."
+    },
+    {
+      "scenario_id": "failure-delegation-path-violation",
+      "scenario_class": "controlled-failure",
+      "mission_class": "code_change",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "実装担当ロールに knowledge/ 配下を書き換えさせる",
+      "expected_signals": ["delegation_preflight_blocked"],
+      "notes": "Delegation preflight should block scope violations."
+    }
+  ]
+}

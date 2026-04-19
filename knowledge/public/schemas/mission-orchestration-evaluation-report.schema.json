@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "evaluated_at", "summary", "mode_metrics", "scenario_deltas"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "mission-orchestration-evaluation-report"
+    },
+    "evaluated_at": { "type": "string", "minLength": 1 },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orchestrated_completion_rate_delta",
+        "orchestrated_policy_violations_delta",
+        "orchestrated_clarification_count_delta",
+        "orchestrated_contract_validity_delta",
+        "orchestrated_operator_correction_rate_delta"
+      ],
+      "properties": {
+        "orchestrated_completion_rate_delta": { "type": "number" },
+        "orchestrated_policy_violations_delta": { "type": "number" },
+        "orchestrated_clarification_count_delta": { "type": "number" },
+        "orchestrated_contract_validity_delta": { "type": "number" },
+        "orchestrated_operator_correction_rate_delta": { "type": "number" }
+      }
+    },
+    "mode_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "orchestrated"],
+      "properties": {
+        "baseline": { "$ref": "#/definitions/modeMetric" },
+        "orchestrated": { "$ref": "#/definitions/modeMetric" }
+      }
+    },
+    "scenario_deltas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "completion_improved", "policy_violations_delta", "clarification_count_delta", "contract_validity_delta", "operator_correction_rate_delta"],
+        "properties": {
+          "scenario_id": { "type": "string" },
+          "completion_improved": { "type": "boolean" },
+          "policy_violations_delta": { "type": "number" },
+          "clarification_count_delta": { "type": "number" },
+          "contract_validity_delta": { "type": "number" },
+          "operator_correction_rate_delta": { "type": "number" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "modeMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_count", "completion_rate", "policy_violations_per_run", "clarification_count_per_run", "contract_validity_rate", "operator_correction_rate"],
+      "properties": {
+        "run_count": { "type": "number" },
+        "completion_rate": { "type": "number" },
+        "policy_violations_per_run": { "type": "number" },
+        "clarification_count_per_run": { "type": "number" },
+        "contract_validity_rate": { "type": "number" },
+        "operator_correction_rate": { "type": "number" }
+      }
+    }
+  }
+}
