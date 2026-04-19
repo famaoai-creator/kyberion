@@ -10,6 +10,7 @@ import {
 export interface AuthorityRoleRecord {
   description: string;
   write_scopes: string[];
+  scope_classes: string[];
   allowed_actuators: string[];
   tier_access: string[];
 }
@@ -18,6 +19,10 @@ export interface TeamRoleRecord {
   description: string;
   required_capabilities: string[];
   compatible_authority_roles: string[];
+  allowed_delegate_team_roles: string[];
+  escalation_parent_team_role: string | null;
+  required_scope_classes: string[];
+  ownership_scope: string;
   preferred_agents: string[];
   preferred_models: string[];
   autonomy_level: 'low' | 'medium' | 'high';
@@ -44,6 +49,14 @@ export interface MissionTeamAssignment {
   status: 'assigned' | 'unfilled';
   agent_id: string | null;
   authority_role: string | null;
+  delegation_contract: {
+    ownership_scope: string;
+    allowed_delegate_team_roles: string[];
+    escalation_parent_team_role: string | null;
+    required_scope_classes: string[];
+    resolved_scope_classes: string[];
+    allowed_write_scopes: string[];
+  } | null;
   provider: string | null;
   modelId: string | null;
   required_capabilities: string[];
@@ -109,6 +122,7 @@ export function loadMissionTeamTemplates(): Record<string, MissionTeamTemplate> 
 function selectAgentForTeamRole(
   teamRole: string,
   teamRoleRecord: TeamRoleRecord,
+  authorityRoles: Record<string, AuthorityRoleRecord>,
   agents: Record<string, AgentProfileRecord>,
 ): MissionTeamAssignment {
   for (const preferredAgent of teamRoleRecord.preferred_agents) {
@@ -119,6 +133,12 @@ function selectAgentForTeamRole(
       teamRoleRecord.compatible_authority_roles.includes(role),
     );
     if (!authorityRole) continue;
+    const authorityRecord = authorityRoles[authorityRole];
+    if (!authorityRecord) continue;
+    const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
+    const resolvedScopes = new Set(authorityRecord.scope_classes || []);
+    const missingScope = Array.from(requiredScopes).find((scopeClass) => !resolvedScopes.has(scopeClass));
+    if (missingScope) continue;
 
     return {
       team_role: teamRole,
@@ -126,6 +146,14 @@ function selectAgentForTeamRole(
       status: 'assigned',
       agent_id: preferredAgent,
       authority_role: authorityRole,
+      delegation_contract: {
+        ownership_scope: teamRoleRecord.ownership_scope,
+        allowed_delegate_team_roles: teamRoleRecord.allowed_delegate_team_roles,
+        escalation_parent_team_role: teamRoleRecord.escalation_parent_team_role,
+        required_scope_classes: teamRoleRecord.required_scope_classes,
+        resolved_scope_classes: authorityRecord.scope_classes || [],
+        allowed_write_scopes: authorityRecord.write_scopes || [],
+      },
       provider: profile.provider,
       modelId: profile.modelId,
       required_capabilities: teamRoleRecord.required_capabilities,
@@ -139,6 +167,7 @@ function selectAgentForTeamRole(
     status: 'unfilled',
     agent_id: null,
     authority_role: null,
+    delegation_contract: null,
     provider: null,
     modelId: null,
     required_capabilities: teamRoleRecord.required_capabilities,
@@ -170,6 +199,7 @@ export function composeMissionTeamPlan(input: {
   const missionType = input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
   const templates = loadMissionTeamTemplates();
   const teamRoles = loadTeamRoleIndex();
+  const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();
   const template = templates[missionType] || templates.default;
   const assignments: MissionTeamAssignment[] = [];
@@ -183,6 +213,7 @@ export function composeMissionTeamPlan(input: {
         status: 'unfilled',
         agent_id: null,
         authority_role: null,
+        delegation_contract: null,
         provider: null,
         modelId: null,
         required_capabilities: [],
@@ -190,13 +221,13 @@ export function composeMissionTeamPlan(input: {
       });
       continue;
     }
-    assignments.push(selectAgentForTeamRole(role, roleRecord, agents));
+    assignments.push(selectAgentForTeamRole(role, roleRecord, authorityRoles, agents));
   }
 
   for (const role of template.optional_roles) {
     const roleRecord = teamRoles[role];
     if (!roleRecord) continue;
-    const assignment = selectAgentForTeamRole(role, roleRecord, agents);
+    const assignment = selectAgentForTeamRole(role, roleRecord, authorityRoles, agents);
     assignment.required = false;
     assignments.push(assignment);
   }

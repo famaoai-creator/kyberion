@@ -101,6 +101,21 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
     dataPath: 'knowledge/public/governance/mission-classification-policy.json',
   },
+  {
+    id: 'authority-role-index',
+    schemaPath: 'knowledge/public/schemas/authority-role-index.schema.json',
+    dataPath: 'knowledge/public/governance/authority-role-index.json',
+  },
+  {
+    id: 'team-role-index',
+    schemaPath: 'knowledge/public/schemas/team-role-index.schema.json',
+    dataPath: 'knowledge/public/orchestration/team-role-index.json',
+  },
+  {
+    id: 'agent-profile-index',
+    schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
+    dataPath: 'knowledge/public/orchestration/agent-profile-index.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
