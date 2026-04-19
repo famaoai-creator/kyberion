@@ -40,3 +40,23 @@ Each mission receives a `team-composition.json` file containing:
 - required capabilities per role
 
 This artifact is advisory for Nerve-driven staffing and makes team assembly explainable before delegation begins.
+
+## Runtime Binding Artifacts
+
+To keep planning and execution explicit, mission team data is split into three artifacts:
+
+- `team-blueprint.json`
+  - logical role design and delegation boundaries
+  - independent from who currently performs each role
+- `staffing-assignments.json`
+  - current role-to-actor mapping (`team_role -> actor_id`)
+  - actor metadata such as authority role, provider, and model
+- `execution-ledger.jsonl`
+  - append-only record of actual execution events
+  - always includes both logical role (`team_role`) and execution actor (`actor_id`)
+
+Relationship with project and mission layers:
+
+- project: holds long-term goals and multiple missions
+- mission: owns one blueprint and active staffing assignments
+- task execution: appends fact records into execution ledger for audit and replay

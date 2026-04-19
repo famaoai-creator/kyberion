@@ -4,6 +4,7 @@ import {
   createStandardYargs,
   composeMissionTeamPlan,
   findMissionPath,
+  initializeMissionTeamBindings,
   missionDir,
   safeReadFile,
   writeMissionTeamPlan,
@@ -91,6 +92,7 @@ async function main() {
   if (argv.write) {
     const targetDir = missionPath || missionDir(missionId, tier);
     writeMissionTeamPlan(targetDir, plan);
+    initializeMissionTeamBindings(targetDir, plan);
   }
 
   console.log(JSON.stringify(brief || plan, null, 2));
