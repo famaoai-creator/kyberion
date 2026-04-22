@@ -93,6 +93,7 @@ export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
+export { protocolToMarkdown, pdfToMarkdown, docxToMarkdown, xlsxToMarkdown, pptxToMarkdown, extractTablesFromPage } from './src/protocol-to-markdown.js';
 export type {
   XlsxCell,
   XlsxCellStyle,
@@ -160,7 +161,7 @@ export { compileMusicGenerationADF } from './music-workflow-compiler.js';
 export { compileImageGenerationADF, compileVideoGenerationADF } from './visual-workflow-compiler.js';
 
 export * as secretGuard from './secret-guard.js';
-export { getSecret, getActiveSecrets, grantAccess, isSecretPath } from './secret-guard.js';
+export { getSecret, getActiveSecrets, grantAccess, grantAccessGuarded, isSecretPath } from './secret-guard.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
@@ -226,6 +227,237 @@ export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
+export { enforceApprovalGate } from './approval-gate.js';
+export type { ApprovalGateParams, ApprovalGateResult } from './approval-gate.js';
+export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
+export type { RequireApprovalParams, RiskyOpId } from './risky-op-registry.js';
+export {
+  DEFAULT_THRESHOLDS as INTENT_DRIFT_THRESHOLDS,
+  classifyDrift,
+  computeIntentDelta,
+  goalSimilarity,
+  isBlockingDrift,
+} from './intent-delta.js';
+export type {
+  DriftThresholds,
+  DriftVerdict,
+  IntentBody,
+  IntentDelta,
+  IntentDeltaChanges,
+  IntentSnapshot,
+} from './intent-delta.js';
+export {
+  emitIntentSnapshot,
+  evaluateIntentDriftGate,
+  latestSnapshot,
+  listSnapshots,
+  mapStageToLoopPhase,
+  reclassifyDrift,
+} from './intent-snapshot-store.js';
+export type {
+  EmitSnapshotParams,
+  IntentDriftGateResult,
+} from './intent-snapshot-store.js';
+export {
+  getTrustLevel,
+  listNgTopics,
+  readNode as readRelationshipNode,
+  recordInteraction,
+  suggestFieldUpdate,
+} from './relationship-graph-store.js';
+export {
+  listHeuristics,
+  readHeuristic,
+  scoreValidity,
+  summarizeHeuristics,
+  validateHeuristic,
+} from './heuristic-feedback.js';
+export {
+  evaluateCustomerSignoffGate,
+  evaluateRequirementsCompletenessGate,
+  readRequirementsDraft,
+  recordCustomerSignoff,
+  saveRequirementsDraft,
+} from './requirements-draft-store.js';
+export type {
+  GateResult as RequirementsGateResult,
+  RecordSignoffParams,
+  RequirementsDraft,
+  SaveRequirementsDraftParams,
+  SignoffChannel,
+  StakeholderSignoff,
+} from './requirements-draft-store.js';
+export {
+  evaluateArchitectureReadyGate,
+  evaluateQaReadyGate,
+  evaluateTaskPlanReadyGate,
+  readDesignSpec,
+  readTaskPlan,
+  readTestPlan,
+  saveDesignSpec,
+  saveTaskPlan,
+  saveTestPlan,
+} from './sdlc-artifact-store.js';
+export { executeTaskPlan } from './task-executor.js';
+export type {
+  ExecuteTaskPlanParams,
+  ExecuteTaskPlanResult,
+  TaskExecutionRecord,
+  TaskExecutionStatus,
+} from './task-executor.js';
+export {
+  getDeploymentAdapter,
+  installShellDeploymentAdapterIfAvailable,
+  registerDeploymentAdapter,
+  resetDeploymentAdapter,
+  ShellDeploymentAdapter,
+  stubDeploymentAdapter,
+} from './deployment-adapter.js';
+export type {
+  DeployInput,
+  DeployResult,
+  DeploymentAdapter,
+  ShellDeploymentAdapterOptions,
+} from './deployment-adapter.js';
+export {
+  ChainAuditForwarder,
+  getAuditForwarder,
+  HttpAuditForwarder,
+  installAuditForwarderIfAvailable,
+  registerAuditForwarder,
+  resetAuditForwarder,
+  ShellAuditForwarder,
+  stubAuditForwarder,
+} from './audit-forwarder.js';
+export type {
+  AuditForwarder,
+  HttpAuditForwarderOptions,
+  ShellAuditForwarderOptions,
+} from './audit-forwarder.js';
+export {
+  ChainSecretResolver,
+  getSecretResolver,
+  installSecretResolverIfAvailable,
+  registerSecretResolver,
+  resetSecretResolver,
+  resolveSecretAsync,
+  resolveSecretSync,
+  ShellSecretResolver,
+} from './secret-resolver.js';
+export type {
+  ResolveSecretInput,
+  SecretResolver,
+  ShellSecretResolverOptions,
+} from './secret-resolver.js';
+export type {
+  DesignSpec,
+  GateResult as SdlcGateResult,
+  SaveDesignSpecParams,
+  SaveTaskPlanParams,
+  SaveTestPlanParams,
+  TaskPlan,
+  TestPlan,
+} from './sdlc-artifact-store.js';
+export {
+  getReasoningBackend,
+  registerReasoningBackend,
+  resetReasoningBackend,
+  stubReasoningBackend,
+} from './reasoning-backend.js';
+export { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
+export type { AnthropicReasoningBackendOptions } from './anthropic-reasoning-backend.js';
+export {
+  getIntentExtractor,
+  registerIntentExtractor,
+  resetIntentExtractor,
+  stubIntentExtractor,
+} from './intent-extractor.js';
+export type { ExtractIntentInput, IntentExtractor } from './intent-extractor.js';
+export { AnthropicIntentExtractor } from './anthropic-intent-extractor.js';
+export type { AnthropicIntentExtractorOptions } from './anthropic-intent-extractor.js';
+export { AnthropicVoiceBridge } from './anthropic-voice-bridge.js';
+export type { AnthropicVoiceBridgeOptions } from './anthropic-voice-bridge.js';
+export { CodexCliReasoningBackend, buildCodexCliBackendFromEnv } from './codex-cli-reasoning-backend.js';
+export type { CodexCliReasoningBackendOptions } from './codex-cli-reasoning-backend.js';
+export { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
+export type { CodexCliIntentExtractorOptions } from './codex-cli-intent-extractor.js';
+export { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
+export type { CodexCliVoiceBridgeOptions } from './codex-cli-voice-bridge.js';
+export { runCodexCliQuery, buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
+export type { CodexCliQueryOptions, RunCodexCliQueryParams } from './codex-cli-query.js';
+export { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
+export type { ClaudeAgentReasoningBackendOptions } from './claude-agent-reasoning-backend.js';
+export { ClaudeAgentIntentExtractor } from './claude-agent-intent-extractor.js';
+export type { ClaudeAgentIntentExtractorOptions } from './claude-agent-intent-extractor.js';
+export { ClaudeAgentVoiceBridge } from './claude-agent-voice-bridge.js';
+export type { ClaudeAgentVoiceBridgeOptions } from './claude-agent-voice-bridge.js';
+export { runClaudeAgentQuery, ClaudeAgentQueryError } from './claude-agent-query.js';
+export type { ClaudeAgentQueryParams, ClaudeAgentQueryResult } from './claude-agent-query.js';
+export {
+  getSpeechToTextBridge,
+  installShellSpeechToTextBridgeIfAvailable,
+  registerSpeechToTextBridge,
+  resetSpeechToTextBridge,
+  ShellSpeechToTextBridge,
+  stubSpeechToTextBridge,
+} from './speech-to-text-bridge.js';
+export type {
+  ShellSpeechToTextBridgeOptions,
+  SpeechToTextBridge,
+  TranscribeInput,
+  TranscribeResult,
+} from './speech-to-text-bridge.js';
+export {
+  installReasoningBackends,
+  installAnthropicBackendsIfAvailable,
+  resetReasoningBootstrap,
+  getInstalledReasoningMode,
+} from './reasoning-bootstrap.js';
+export type { InstallAnthropicOptions, InstallReasoningOptions, ReasoningBackendMode } from './reasoning-bootstrap.js';
+export type {
+  BranchForkInput,
+  CritiqueInput,
+  CritiqueResult,
+  DivergeHypothesisInput,
+  ForkedBranch,
+  HypothesisSketch,
+  PersonaLabel,
+  PersonaSynthesisInput,
+  ReasoningBackend,
+  SimulationInput,
+  SimulationResult,
+  SynthesizedPersona,
+} from './reasoning-backend.js';
+export {
+  getVoiceBridge,
+  registerVoiceBridge,
+  resetVoiceBridge,
+  stubVoiceBridge,
+} from './voice-bridge.js';
+export type {
+  OneOnOneSessionInput,
+  OneOnOneSessionResult,
+  RoleplaySessionInput,
+  RoleplaySessionResult,
+  RoleplayTurn,
+  VoiceBridge,
+} from './voice-bridge.js';
+export type {
+  HeuristicEntry,
+  HeuristicReport,
+  HeuristicValidation,
+  MissionOutcome,
+  ValidateParams as ValidateHeuristicParams,
+} from './heuristic-feedback.js';
+export type {
+  InteractionEntry,
+  PendingSuggestion,
+  RecordInteractionParams,
+  RelationshipIdentity,
+  RelationshipNode,
+  RelationshipSource,
+  SuggestFieldUpdateParams,
+} from './relationship-graph-store.js';
 export * from './distill-candidate-registry.js';
 export * from './promoted-memory.js';
 export * from './managed-process.js';

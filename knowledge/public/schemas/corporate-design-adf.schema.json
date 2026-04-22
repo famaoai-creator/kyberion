@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Corporate Design ADF",
+  "description": "Renderer-neutral corporate design system contract. Enables automated generation of branded presentations, documents, and media.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "client", "slide_size", "color_scheme", "typography", "layouts"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["corporate-design-adf"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "client": {
+      "type": "object",
+      "required": ["name", "short_name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "Full legal or display name" },
+        "short_name": { "type": "string", "description": "Abbreviation used in filenames and references" },
+        "copyright": { "type": "string" },
+        "confidentiality": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "restricted"]
+        }
+      }
+    },
+    "slide_size": {
+      "type": "object",
+      "required": ["width_emu", "height_emu", "aspect_ratio"],
+      "additionalProperties": false,
+      "properties": {
+        "width_emu": { "type": "integer" },
+        "height_emu": { "type": "integer" },
+        "aspect_ratio": { "type": "string", "enum": ["16:9", "4:3", "16:10"] }
+      }
+    },
+    "color_scheme": {
+      "type": "object",
+      "required": ["primary", "background", "text_primary"],
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "$ref": "#/$defs/color", "description": "Brand primary color (headers, accents)" },
+        "secondary": { "$ref": "#/$defs/color" },
+        "background": { "$ref": "#/$defs/color" },
+        "text_primary": { "$ref": "#/$defs/color" },
+        "text_secondary": { "$ref": "#/$defs/color" },
+        "text_on_primary": { "$ref": "#/$defs/color", "description": "Text color when placed on primary-colored backgrounds" },
+        "accent": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/color" },
+          "description": "Ordered accent palette for charts, tags, etc."
+        },
+        "semantic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "success": { "$ref": "#/$defs/color" },
+            "warning": { "$ref": "#/$defs/color" },
+            "danger": { "$ref": "#/$defs/color" },
+            "info": { "$ref": "#/$defs/color" }
+          }
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["title", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/font_spec" },
+        "body": { "$ref": "#/$defs/font_spec" },
+        "caption": { "$ref": "#/$defs/font_spec" },
+        "code": { "$ref": "#/$defs/font_spec" },
+        "bullet": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "font": { "type": "string" },
+            "char": { "type": "string" }
+          }
+        }
+      }
+    },
+    "layouts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/layout" },
+      "description": "Ordered list of slide layout definitions"
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logo": { "$ref": "#/$defs/asset" },
+        "logo_white": { "$ref": "#/$defs/asset" },
+        "cover_background": { "$ref": "#/$defs/asset" },
+        "icon_set": { "$ref": "#/$defs/asset" }
+      }
+    },
+    "render_hints": {
+      "type": "object",
+      "description": "Engine-specific overrides (pptxgenjs, google-slides, etc.)",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$",
+      "description": "Hex color code"
+    },
+    "font_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family_ja": { "type": "string" },
+        "family_latin": { "type": "string" },
+        "family_fallback": { "type": "string" },
+        "size_pt": { "type": "number" },
+        "weight": { "type": "string", "enum": ["normal", "bold"] },
+        "line_spacing_pct": { "type": "integer", "description": "Line spacing as percentage (e.g. 150 = 150%)" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "required": ["id", "name", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": {
+          "type": "string",
+          "enum": ["cover", "section", "content", "content_two_col", "blank", "closing"],
+          "description": "Semantic role of this layout"
+        },
+        "description": { "type": "string" },
+        "elements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/element" }
+        }
+      }
+    },
+    "element": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "shape", "image", "text", "placeholder",
+            "logo", "copyright", "page_number", "confidential_label"
+          ]
+        },
+        "description": { "type": "string" },
+        "placeholder_type": {
+          "type": "string",
+          "enum": ["title", "subtitle", "body", "custom"]
+        },
+        "shape": { "type": "string", "description": "Shape type (rect, trapezoid, etc.)" },
+        "fill_color": { "$ref": "#/$defs/color" },
+        "font_size_pt": { "type": "number" },
+        "font_color": { "$ref": "#/$defs/color" },
+        "font_weight": { "type": "string", "enum": ["normal", "bold"] },
+        "align": { "type": "string", "enum": ["left", "center", "right"] },
+        "valign": { "type": "string", "enum": ["top", "middle", "bottom"] },
+        "border": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "color": { "$ref": "#/$defs/color" },
+            "width_pt": { "type": "number" }
+          }
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x_emu": { "type": "integer" },
+            "y_emu": { "type": "integer" },
+            "w_emu": { "type": "integer" },
+            "h_emu": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "description": "Relative path from the ADF file" },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

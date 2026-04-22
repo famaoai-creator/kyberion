@@ -60,7 +60,28 @@ class AuditChainImpl {
     // Persist
     this.appendToFile(fullEntry);
 
+    // Fan-out to the registered audit forwarder (SIEM / log sink). Dynamic
+    // import to keep the forwarder optional and break the circular type
+    // dependency (forwarder imports AuditEntry from this module).
+    void this.fanOutToForwarder(fullEntry);
+
     return fullEntry;
+  }
+
+  private fanOutToForwarder(entry: AuditEntry): void {
+    import('./audit-forwarder.js')
+      .then(async ({ getAuditForwarder }) => {
+        const forwarder = getAuditForwarder();
+        if (forwarder.name === 'stub') return;
+        try {
+          await forwarder.publish(entry);
+        } catch (err: any) {
+          logger.warn(`[audit-chain] forwarder ${forwarder.name} threw for ${entry.id}: ${err?.message ?? err}`);
+        }
+      })
+      .catch((err) => {
+        logger.warn(`[audit-chain] failed to load audit-forwarder: ${err?.message ?? err}`);
+      });
   }
 
   /**

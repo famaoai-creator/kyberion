@@ -21,8 +21,7 @@ At mission completion, the agent MUST execute the finalization protocol.
 - **Validation**:
   - Automatic purging of governed runtime temp files.
   - Archiving the mission directory to `active/archive/missions/`.
-  - Transitioning through `completed` before archive.
-  - Verifying `mission-state.json` `git.latest_commit` matches the mission repository HEAD before finalization.
+  - Setting status to `completed` in the mission state.
 
 ---
 *Status: Mandated by AGENTS.md*

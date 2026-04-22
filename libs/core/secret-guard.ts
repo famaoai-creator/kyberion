@@ -1,7 +1,7 @@
-import { 
-  safeReadFile, 
-  safeWriteFile, 
-  safeReaddir, 
+import {
+  safeReadFile,
+  safeWriteFile,
+  safeReaddir,
   safeStat,
   safeFsyncFile,
   safeExistsSync
@@ -10,6 +10,7 @@ import { logger } from './core.js';
 import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
+import { resolveSecretSync } from './secret-resolver.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -97,6 +98,9 @@ _loadPersonalSecrets();
 
 /**
  * Issued by Orchestrator to authorize a secret or authority for a limited time.
+ *
+ * Use `grantAccessGuarded` instead for operations that must pass through
+ * the approval gate (e.g. SUDO authority grants, long-TTL grants).
  */
 export const grantAccess = (missionId: string, serviceIdOrAuth: string, ttlMinutes = 15, isAuthority = false): void => {
   const grants = _loadGrants();
@@ -113,6 +117,63 @@ export const grantAccess = (missionId: string, serviceIdOrAuth: string, ttlMinut
 
   grants.push(grant);
   _saveGrants(grants);
+};
+
+/**
+ * Grant access gated through the approval gate. Throws if the approval
+ * gate denies the request (no approval found or pending).
+ *
+ * Intended for high-risk grants such as:
+ *   - Authority grants (isAuthority=true, especially SUDO)
+ *   - Long-TTL service grants (> 60 min)
+ *
+ * The normal `grantAccess` path remains available for low-risk,
+ * short-TTL, pre-approved service grants.
+ */
+export const grantAccessGuarded = async (
+  missionId: string,
+  serviceIdOrAuth: string,
+  ttlMinutes = 15,
+  isAuthority = false,
+  options: {
+    agentId?: string;
+    correlationId?: string;
+    channel?: string;
+  } = {},
+): Promise<void> => {
+  // Dynamic import to avoid circular dependency between secret-guard and
+  // risky-op-registry/approval-gate (which imports governance readers that
+  // indirectly import secret-guard).
+  const [{ requireApprovalForOp, RISKY_OPS }] = await Promise.all([
+    import('./risky-op-registry.js'),
+  ]);
+
+  const opId = isAuthority ? RISKY_OPS.AUTH_GRANT_AUTHORITY : RISKY_OPS.SECRET_GRANT_ACCESS;
+  const decision = requireApprovalForOp({
+    opId,
+    agentId: options.agentId ?? 'mission_controller',
+    correlationId: options.correlationId ?? `${missionId}:${serviceIdOrAuth}`,
+    channel: options.channel ?? 'system',
+    payload: {
+      missionId,
+      target: serviceIdOrAuth,
+      ttlMinutes,
+      isAuthority,
+    },
+    draft: {
+      title: `${isAuthority ? 'Authority' : 'Service'} grant requested: ${serviceIdOrAuth}`,
+      summary: `Mission ${missionId} requests ${isAuthority ? 'authority' : 'service'} "${serviceIdOrAuth}" for ${ttlMinutes} minutes.`,
+      severity: isAuthority ? 'high' : 'medium',
+    },
+  });
+
+  if (!decision.allowed) {
+    throw new Error(
+      `[secret-guard] grantAccess blocked by approval gate for ${missionId}:${serviceIdOrAuth} — ${decision.message ?? decision.status}`,
+    );
+  }
+
+  grantAccess(missionId, serviceIdOrAuth, ttlMinutes, isAuthority);
 };
 
 /**
@@ -153,6 +214,15 @@ export const getSecret = (key: string, scope?: string): string | null => {
 
   if (scope && !key.toUpperCase().startsWith(scope.toUpperCase() + '_')) {
     throw new Error(`SHIELD_VIOLATION: Key "${key}" does not match authorized scope "${scope}".`);
+  }
+
+  // 0. Upstream resolver (external KMS — AWS Secrets Manager, Vault, etc.)
+  //    consulted first if one is registered. Returns null on miss; missing
+  //    resolver falls through to the local vault chain below.
+  const upstream = resolveSecretSync({ key, scope });
+  if (upstream && upstream.length > 0) {
+    if (upstream.length > 8) _activeSecrets.add(upstream);
+    return upstream;
   }
 
   let value = process.env[key];
@@ -243,6 +313,7 @@ export const secretGuard = {
   getSecret,
   getActiveSecrets,
   grantAccess,
+  grantAccessGuarded,
   checkAuthority,
   isSecretPath,
   loadConnectionDocument,

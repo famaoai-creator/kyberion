@@ -16,7 +16,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/orchestrator.ts',
   'libs/core/doctor_core.ts',
   'libs/core/src/pfc/PhysicalLayer.ts',
-  'libs/core/video-render-backend.ts',
   'libs/actuators/browser-actuator/src/index.ts',
   'libs/actuators/code-actuator/src/index.ts',
   'libs/actuators/modeling-actuator/src/index.ts',

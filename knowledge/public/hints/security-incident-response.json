@@ -1,0 +1,27 @@
+{
+  "topic": "Security incident detection, investigation, and response",
+  "description": "End-to-end security incident response: alert detection via log/sensor monitoring, investigation through system analysis, approval-gated response execution, and post-incident reporting.",
+  "tags": ["security", "incident", "alert", "セキュリティ", "インシデント", "アラート", "脆弱性", "vulnerability"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Detect alert from log-watcher or monitoring dashboard",
+      "Investigate by collecting logs, system state, and affected scope",
+      "Classify severity and determine response actions",
+      "Execute approved response (isolate, revoke, patch)",
+      "Generate incident report"
+    ],
+    "actuator": "system-actuator",
+    "ops": ["shell", "run_js"],
+    "secondary_actuators": ["browser-actuator", "media-actuator"],
+    "use_cases": [
+      "セキュリティアラート対応",
+      "不正アクセス調査",
+      "脆弱性対応",
+      "インシデントレポート生成"
+    ],
+    "keywords": ["security", "incident", "alert", "breach", "vulnerability", "セキュリティ", "インシデント", "アラート", "不正", "脆弱性"],
+    "pattern": "C",
+    "_comment": "Pattern C: investigation is automated, but response actions (credential revocation, system isolation) require human approval via approval-gate."
+  }
+}

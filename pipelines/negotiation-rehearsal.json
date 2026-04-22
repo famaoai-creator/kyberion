@@ -1,0 +1,34 @@
+{
+  "action": "pipeline",
+  "name": "negotiation-rehearsal",
+  "description": "Generates a counterparty persona from the relationship graph (STUB), runs a short role-play (STUB), then records a debrief artifact. No updates to the real relationship node — the persona is synthetic. See knowledge/public/orchestration/rehearsal-protocol.md.",
+  "context": {
+    "mission_id": "",
+    "counterparty_ref": "",
+    "session_objective": "",
+    "time_budget_minutes": 15
+  },
+  "steps": [
+    {
+      "id": "build_persona",
+      "type": "transform",
+      "op": "wisdom:synthesize_counterparty_persona",
+      "params": {
+        "source": "{{counterparty_ref}}",
+        "fidelity": "high",
+        "export_as": "persona_spec"
+      }
+    },
+    {
+      "id": "role_play",
+      "type": "apply",
+      "op": "wisdom:a2a_roleplay",
+      "params": {
+        "persona_from": "persona_spec",
+        "objective": "{{session_objective}}",
+        "time_budget_minutes": "{{time_budget_minutes}}",
+        "output_path": "active/missions/{{mission_id}}/evidence/rehearsal-transcript.json"
+      }
+    }
+  ]
+}

@@ -1,10 +1,26 @@
-import { logger, safeExec, resolveVars, evaluateCondition } from '@agent/core';
+import { logger, safeExec, resolveVars, evaluateCondition, capabilityEntry, findMissionPath, missionEvidenceDir } from '@agent/core';
 import { rootResolve } from '@agent/core/path-resolver';
+import * as nodePath from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
 import { derivePipelineStatus, type PipelineAdfStep, validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+type WisdomDispatch = (op: string, params: any, ctx: Record<string, unknown>) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
+
+let wisdomDispatchCache: WisdomDispatch | null = null;
+
+async function loadWisdomDispatch(): Promise<WisdomDispatch> {
+  if (wisdomDispatchCache) return wisdomDispatchCache;
+  const entry = capabilityEntry('wisdom-actuator');
+  const mod = await import(pathToFileURL(entry).href);
+  if (typeof mod.dispatchDecisionOp !== 'function') {
+    throw new Error('wisdom-actuator does not export dispatchDecisionOp — rebuild required');
+  }
+  wisdomDispatchCache = mod.dispatchDecisionOp;
+  return wisdomDispatchCache;
+}
 
 export function normalizePipelineOp(op: string): string {
   if (op.includes(':')) return op;
@@ -43,6 +59,13 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
           ctx = nested.context;
           results.push(...nested.results);
         }
+      } else if (domain === 'wisdom') {
+        const dispatch = await loadWisdomDispatch();
+        const decision = await dispatch(action, params, ctx);
+        if (!decision.handled) {
+          throw new Error(`Unsupported pipeline op: ${step.op}`);
+        }
+        ctx = decision.ctx;
       } else {
         throw new Error(`Unsupported pipeline op: ${step.op}`);
       }
@@ -60,18 +83,51 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
 export async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
+    .option('context', { alias: 'c', type: 'string', describe: 'JSON string merged into pipeline.context (overrides)' })
     .parseSync();
 
   const inputPath = rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const pipeline = validatePipelineAdf(JSON.parse(inputContent));
 
+  const baseContext = (pipeline.context || {}) as Record<string, unknown>;
+  let overrideContext: Record<string, unknown> = {};
+  if (argv.context) {
+    try {
+      overrideContext = JSON.parse(argv.context as string);
+    } catch (err: any) {
+      logger.error(`❌ [PIPELINE] Invalid --context JSON: ${err.message}`);
+      process.exit(1);
+    }
+  }
+  // Auto-inject mission path vars when MISSION_ID env is set or context carries mission_id.
+  const firstNonEmpty = (...candidates: (string | undefined)[]): string | undefined =>
+    candidates.find((v): v is string => typeof v === 'string' && v.length > 0);
+  const missionId = firstNonEmpty(
+    overrideContext.mission_id as string | undefined,
+    baseContext.mission_id as string | undefined,
+    process.env.MISSION_ID,
+  );
+  const autoContext: Record<string, unknown> = {};
+  if (missionId) {
+    const missionPath = findMissionPath(missionId);
+    const evidenceDir = missionEvidenceDir(missionId);
+    if (missionPath) {
+      autoContext.mission_dir = nodePath.relative(process.cwd(), missionPath) || missionPath;
+      autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
+    }
+    if (evidenceDir) {
+      autoContext.mission_evidence_dir = nodePath.relative(process.cwd(), evidenceDir) || evidenceDir;
+    }
+  }
+  const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
+
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
-  
+
   try {
     const result = await runSteps(
       (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
-      (pipeline.context || {}) as Record<string, unknown>
+      mergedContext,
     );
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);

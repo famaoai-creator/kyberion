@@ -1,4 +1,4 @@
-import { logger, resolveServiceBinding, safeReadFile, validatePresenceTimeline } from '@agent/core';
+import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
@@ -19,9 +19,9 @@ const getPtyEngine = () => {
 export type MessagingMode = 'emitter' | 'listener' | 'conversational';
 
 interface PresenceAction {
-  action: 'dispatch' | 'status' | 'receive_event' | 'dispatch_timeline';
+  action: 'dispatch' | 'status' | 'receive_event' | 'dispatch_timeline' | 'record_interaction';
   params: {
-    channel: string; 
+    channel: string;
     mode?: MessagingMode;
     payload: {
       text?: string;
@@ -32,6 +32,11 @@ interface PresenceAction {
       event_type?: string;
       event_data?: any;
       timeline?: any;
+      // record_interaction params
+      person_slug?: string;
+      org?: string;
+      summary?: string;
+      tone_shifts?: string[];
     };
   };
 }
@@ -125,6 +130,26 @@ export async function handleAction(input: PresenceAction) {
       }
       const body = await response.json();
       return { status: 'timeline_dispatched', ...body };
+    }
+
+    case 'record_interaction': {
+      const { person_slug, org, summary, tone_shifts } = params.payload;
+      if (!person_slug || !org || !summary) {
+        throw new Error('[PRESENCE] record_interaction requires person_slug, org, and summary');
+      }
+      const node = recordInteraction({
+        personSlug: person_slug,
+        org,
+        source: 'presence-actuator',
+        interaction: {
+          at: new Date().toISOString(),
+          summary,
+          channel: params.channel,
+          ...(tone_shifts ? { tone_shifts } : {}),
+        },
+      });
+      logger.info(`[PRESENCE] recorded interaction with ${org}/${person_slug} (${node.history.length} entries)`);
+      return { status: 'interaction_recorded', person_slug, org, history_length: node.history.length };
     }
 
     default:

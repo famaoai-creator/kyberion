@@ -1,0 +1,46 @@
+{
+  "action": "pipeline",
+  "name": "counterfactual-branch",
+  "description": "Forks the current mission into N short-horizon simulations (STUB), one per surviving hypothesis. Results merge back as meta-evidence only. See knowledge/public/orchestration/counterfactual-simulation-protocol.md.",
+  "context": {
+    "mission_id": "",
+    "hypothesis_tree_ref": "",
+    "cost_cap_tokens": 20000,
+    "max_steps_per_branch": 10
+  },
+  "steps": [
+    {
+      "id": "fork",
+      "type": "apply",
+      "op": "wisdom:fork_branches",
+      "params": {
+        "source": "{{hypothesis_tree_ref}}",
+        "execution_profile": "counterfactual",
+        "cost_cap_tokens": "{{cost_cap_tokens}}",
+        "max_steps_per_branch": "{{max_steps_per_branch}}",
+        "output_dir": "{{mission_evidence_dir}}/counterfactual-branches/"
+      }
+    },
+    {
+      "id": "simulate",
+      "type": "apply",
+      "op": "wisdom:simulate_all",
+      "params": {
+        "manifest_path": "{{mission_evidence_dir}}/counterfactual-branches/branches.manifest.json",
+        "goal": "Reach first failure mode OR first success mode, whichever comes first.",
+        "output_dir": "{{mission_evidence_dir}}/counterfactual-branches/"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "type": "apply",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{mission_evidence_dir}}/counterfactual-branches/simulation-summary.json",
+        "append_to": "{{mission_evidence_dir}}/dissent-log.json",
+        "mission_id": "{{mission_id}}",
+        "topic": "counterfactual-summary"
+      }
+    }
+  ]
+}

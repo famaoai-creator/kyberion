@@ -1,0 +1,23 @@
+{
+  "topic": "CRM data entry and quote generation",
+  "description": "Automates CRM activity logging (CRM 活動記録) and quote creation (見積書作成). Navigates to the CRM system, locates the target record, adds activity entries, and updates deal stages or generates quotes.",
+  "tags": ["CRM", "商談", "活動", "見積", "Salesforce", "HubSpot", "quote", "deal"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to CRM system (e.g. Salesforce, HubSpot)",
+      "Find the target account or deal record",
+      "Add activity log or meeting notes",
+      "Update deal stage or generate a quote"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref"],
+    "use_cases": [
+      "CRM への活動記録",
+      "見積書の作成と送付"
+    ],
+    "keywords": ["CRM", "商談", "活動", "見積", "Salesforce", "HubSpot", "quote", "deal"],
+    "pattern": "B",
+    "_comment": "Pattern B: authentication-then-automate. CRM login may require human auth; subsequent data entry is fully automated."
+  }
+}

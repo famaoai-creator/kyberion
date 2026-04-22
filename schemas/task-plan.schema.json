@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/task-plan.schema.json",
+  "title": "Task Plan",
+  "description": "Lightweight implementation plan — a roadmap of tasks that together fulfill a requirements draft and conform to a design spec. Each entry can be expanded into a full task-contract when it's time to execute.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project_name", "generated_at", "tasks"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "project_name": { "type": "string", "minLength": 1 },
+    "source_refs": { "type": "array", "items": { "type": "string" } },
+    "strategy_summary": { "type": "string" },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "title", "summary", "priority", "estimate"],
+        "properties": {
+          "task_id": { "type": "string", "pattern": "^T-[0-9A-Z-]+$" },
+          "title": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "fulfills_requirements": {
+            "type": "array",
+            "items": { "type": "string", "description": "FR / NFR ids satisfied." }
+          },
+          "design_refs": {
+            "type": "array",
+            "items": { "type": "string", "description": "Component / interface ids from design-spec." }
+          },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string", "description": "Other task_ids that must complete first." }
+          },
+          "inputs": { "type": "array", "items": { "type": "string" } },
+          "deliverables": { "type": "array", "items": { "type": "string" } },
+          "test_criteria": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "string", "enum": ["must", "should", "could", "wont"] },
+          "estimate": { "type": "string", "enum": ["XS", "S", "M", "L", "XL"] },
+          "assigned_role": {
+            "type": "string",
+            "enum": ["implementer", "reviewer", "tester", "planner", "operator", "experience_designer", "product_strategist", "owner"]
+          }
+        }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "generated_by": { "type": "string" }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "github-task-watcher",
+  "name": "ADF GitHub Watcher",
+  "type": "polling",
+  "interval_ms": 300000,
+  "action": {
+    "actuator": "service-actuator",
+    "command": "gh",
+    "args": ["issue", "list", "--assignee", "@me", "--json", "id,title"]
+  },
+  "on_change": {
+    "intent": "TASK_ASSIGNED",
+    "priority": 7
+  }
+}

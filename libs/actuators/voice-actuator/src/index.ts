@@ -8,6 +8,7 @@ import {
   getVoiceTtsLanguageConfig,
   logger,
   pathResolver,
+  recordInteraction,
   resolveVoiceEngineForPlatform,
   safeExec,
   safeMkdir,
@@ -61,6 +62,25 @@ export async function handleSingleAction(input: VoiceAction) {
       ? { action: 'register_voice_profile', ...((input as any).params || {}) }
       : input;
     return registerVoiceProfile(payload as any);
+  }
+  if ((input as any).action === 'record_interaction') {
+    const p = (input as any).params ?? {};
+    if (!p.person_slug || !p.org || !p.summary) {
+      throw new Error('[VOICE] record_interaction requires person_slug, org, and summary');
+    }
+    const node = recordInteraction({
+      personSlug: p.person_slug,
+      org: p.org,
+      source: 'voice-actuator',
+      interaction: {
+        at: new Date().toISOString(),
+        summary: p.summary,
+        channel: p.channel ?? 'voice',
+        ...(p.tone_shifts ? { tone_shifts: p.tone_shifts } : {}),
+      },
+    });
+    logger.info(`[VOICE] recorded interaction with ${p.org}/${p.person_slug} (${node.history.length} entries)`);
+    return { status: 'interaction_recorded', person_slug: p.person_slug, org: p.org, history_length: node.history.length };
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
 }

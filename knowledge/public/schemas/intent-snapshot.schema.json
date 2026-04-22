@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-snapshot.schema.json",
+  "title": "Intent Snapshot",
+  "description": "Structured summary of a mission's current intent interpretation at a lifecycle transition. Used to detect intent drift between stages.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["snapshot_id", "mission_id", "stage", "created_at", "source", "intent"],
+  "properties": {
+    "snapshot_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "stage": {
+      "type": "string",
+      "description": "Intent-loop stage at snapshot time: receive | clarify | preserve | execute | verify | learn. Kyberion mission stages (intake / classification / ... / retrospective) map onto these.",
+      "minLength": 1
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "string",
+      "enum": ["user_prompt", "mission_state", "gate_evaluation", "worker_transition", "manual"]
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goal"],
+      "properties": {
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One-line statement of the outcome the mission aims to achieve."
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Must-hold conditions (time, cost, quality, scope)."
+        },
+        "deliverables": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts or decisions the mission must produce."
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicitly out-of-scope items."
+        },
+        "stakeholders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Person slugs whose approval / alignment the mission depends on."
+        }
+      }
+    },
+    "trace_ref": {
+      "type": "string",
+      "description": "Optional pointer to the upstream snapshot or user prompt this snapshot derives from."
+    }
+  }
+}

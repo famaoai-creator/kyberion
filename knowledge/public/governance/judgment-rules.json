@@ -12,5 +12,29 @@
     "auto_distill_on_completion": true,
     "vault_path": "knowledge/evolution/latent-wisdom",
     "require_learnings_md": true
+  },
+  "dissent_quorum": {
+    "enabled": true,
+    "min_recorded_alternatives": 1,
+    "applies_to_mission_types": ["hypothesis-tree", "negotiation", "development"],
+    "priority_threshold": 5,
+    "schema": "schemas/dissent-log.schema.json",
+    "rationale": "Every non-trivial decision must preserve at least one rejected alternative with explicit reasoning. Prevents anchoring and creates a revisit trail."
+  },
+  "counterfactual": {
+    "auto_trigger_priority_threshold": 8,
+    "cost_cap_tokens": 20000,
+    "max_steps_per_branch": 10,
+    "execution_profile": "counterfactual",
+    "schema_ref": "knowledge/public/orchestration/counterfactual-simulation-protocol.md"
+  },
+  "intuition_capture": {
+    "enabled": true,
+    "triggers": ["five_second_rule", "explicit_gut_flag", "tonal_detection"],
+    "max_questions_per_capture": 3,
+    "storage": "knowledge/confidential/heuristics/",
+    "distillation_cadence_days": 7,
+    "summary_cadence_days": 180,
+    "tier": "personal"
   }
 }

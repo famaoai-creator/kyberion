@@ -4,7 +4,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
-import { validateWritePermission, validateReadPermission } from './tier-guard.js';
+import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
+import { policyEngine } from './policy-engine.js';
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
@@ -136,6 +137,8 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
   return fs.readFileSync(resolved, { encoding });
 }
 
+let _policyCheckInProgress = false;
+
 /**
  * Write a file safely using atomic operations (write to temp -> rename).
  */
@@ -146,6 +149,29 @@ export function safeWriteFile(filePath: string, data: string | Buffer, options: 
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) {
     throw new Error(guard.reason);
+  }
+
+  // Policy engine gate (with re-entrancy guard to avoid infinite loop
+  // since policyEngine.evaluate -> loadFromFile -> safeReadFile)
+  if (!_policyCheckInProgress) {
+    _policyCheckInProgress = true;
+    try {
+      const policyDecision = policyEngine.evaluate({
+        agentId: process.env.KYBERION_PERSONA || 'unknown',
+        operation: 'file_write',
+        target_tier: detectTier(resolved),
+        message: `Write to ${resolved}`,
+      });
+      if (!policyDecision.allowed) {
+        throw new Error(`[POLICY_BLOCKED] Write to ${resolved} denied: ${policyDecision.message || 'policy violation'}`);
+      }
+    } catch (err: any) {
+      // Only re-throw if it's an actual policy block, not a load/parse failure
+      if (err?.message?.includes('[POLICY_BLOCKED]')) throw err;
+      // Policy engine unavailable (no policy file, parse error, etc.) — allow by default
+    } finally {
+      _policyCheckInProgress = false;
+    }
   }
 
   const dir = path.dirname(resolved);
