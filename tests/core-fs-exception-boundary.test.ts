@@ -12,6 +12,7 @@ const allowedCoreFsImports = [
   'libs/core/secure-io.branch.test.ts',
   'libs/core/secure-io.test.ts',
   'libs/core/secure-io.ts',
+  'libs/core/security-boundary.contract.test.ts',
   'libs/core/src/actuator-capability.test.ts',
   'libs/core/src/feedback-loop.test.ts',
   'libs/core/src/knowledge-index.test.ts',

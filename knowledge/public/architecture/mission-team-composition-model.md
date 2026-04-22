@@ -22,6 +22,7 @@ Kyberion separates two kinds of roles:
 3. Match each `team_role` against candidate agent profiles
 4. Validate that the chosen agent exposes a compatible `authority_role`
 5. Emit a `team-composition.json` artifact into the mission directory
+6. When writing from CLI, execute with mission authority context. `scripts/compose_mission_team.ts --write` resolves the mission's assigned persona and applies it for governed writes.
 
 ## Indexes
 
@@ -54,6 +55,7 @@ To keep planning and execution explicit, mission team data is split into three a
 - `execution-ledger.jsonl`
   - append-only record of actual execution events
   - always includes both logical role (`team_role`) and execution actor (`actor_id`)
+  - post-verification evidence can be appended with `mission_controller record-evidence <MISSION_ID> <TASK_ID> "<NOTE>" --team-role <ROLE> --actor-id <ACTOR> --evidence <CSV>`
 
 Relationship with project and mission layers:
 
