@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scan } from './check_tier_hygiene';
+import { scan } from './check_tier_hygiene.js';
 
 /**
  * Regression test for the tier-hygiene checker. Instead of driving the
