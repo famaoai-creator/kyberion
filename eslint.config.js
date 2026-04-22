@@ -139,4 +139,30 @@ export default [
       ],
     },
   },
+  {
+    files: ["libs/actuators/**/*.ts", "satellites/**/*.ts", "presence/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/fs-primitives*"],
+              message: "fs-primitives is foundation-only. Use @agent/core/secure-io instead.",
+            },
+          ],
+          paths: [
+            {
+              name: "fs",
+              message: "Use @agent/core/secure-io instead of direct fs access.",
+            },
+            {
+              name: "node:fs",
+              message: "Use @agent/core/secure-io instead of direct node:fs access.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

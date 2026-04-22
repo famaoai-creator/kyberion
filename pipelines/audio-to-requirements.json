@@ -1,0 +1,60 @@
+{
+  "action": "pipeline",
+  "name": "audio-to-requirements",
+  "description": "End-to-end customer_engagement pipeline: transcribe a meeting recording via the registered SpeechToTextBridge, then run extract_requirements on the resulting transcript. Stub bridge accepts a pre-baked <audio>.transcript.txt sidecar when no real STT backend is available.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "audio_path": "active/missions/{{mission_id}}/evidence/call-recording.wav",
+    "transcript_path": "active/missions/{{mission_id}}/evidence/call-recording.wav.transcript.txt",
+    "language": "ja",
+    "customer_name": "",
+    "customer_person_slug": "",
+    "customer_org": ""
+  },
+  "steps": [
+    {
+      "id": "transcribe",
+      "type": "transform",
+      "op": "wisdom:transcribe_audio",
+      "params": {
+        "audio_path": "{{audio_path}}",
+        "language": "{{language}}",
+        "output_path": "{{transcript_path}}",
+        "export_as": "transcript"
+      }
+    },
+    {
+      "id": "log_transcription",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Transcribed via {{transcript.backend}} → {{transcript.written_to}} (synthetic={{transcript.synthetic}})"
+      }
+    },
+    {
+      "id": "extract",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_path}}",
+        "source_type": "call_transcript",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_person_slug": "{{customer_person_slug}}",
+        "customer_org": "{{customer_org}}",
+        "export_as": "extraction"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Extracted requirements v{{extraction.version}} at {{extraction.draft_path}} (completeness passed={{extraction.completeness.passed}})"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "topic": "GitHub PR and issue management via CLI",
+  "description": "Manages GitHub pull requests and issues using gh CLI through system-actuator. Lists PRs, reviews code changes, adds comments, approves or requests changes, and merges PRs.",
+  "tags": ["github", "pr", "pull request", "issue", "review", "merge", "PR", "レビュー", "マージ"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "List open PRs with gh pr list",
+      "View PR details and diff with gh pr view and gh pr diff",
+      "Review and comment with gh pr review",
+      "Merge with gh pr merge if approved"
+    ],
+    "actuator": "system-actuator",
+    "ops": ["shell"],
+    "use_cases": [
+      "PR一覧の確認",
+      "コードレビューとコメント",
+      "PRのマージ判断",
+      "Issue の確認と対応"
+    ],
+    "keywords": ["github", "pr", "pull request", "issue", "review", "merge", "PR", "レビュー", "マージ", "プルリクエスト"],
+    "pattern": "B",
+    "_comment": "Pattern B: gh CLI authentication may require initial human setup, then subsequent operations are fully automated."
+  }
+}

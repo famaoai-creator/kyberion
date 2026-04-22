@@ -1,12 +1,45 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.0.0",
-  "description": "Knowledge-tier search, injection, import, and export actuator",
+  "version": "1.1.0",
+  "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "schemas/wisdom-action.schema.json",
   "capabilities": [
     { "op": "knowledge_search", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_inject", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_export", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "knowledge_import", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "knowledge_import", "platforms": ["darwin", "linux", "win32"] },
+
+    { "op": "stakeholder_grid_sort", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "protocol_ref": "knowledge/public/orchestration/stakeholder-consensus-protocol.md" },
+    { "op": "find_slides_by_owner", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Select slides owned by label (footer/footer-text). Use with media-actuator pptx_slide_text + pptx_filter_slides." },
+    { "op": "pptx_diff", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Structured diff between two pptx_slide_text outputs." },
+    { "op": "emit_dissent_log", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "protocol_ref": "knowledge/public/orchestration/hypothesis-tree-protocol.md" },
+    { "op": "compute_readiness_matrix", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "protocol_ref": "knowledge/public/orchestration/stakeholder-consensus-protocol.md" },
+    { "op": "recommend", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "protocol_ref": "knowledge/public/orchestration/stakeholder-consensus-protocol.md" },
+    { "op": "adjust_proposal", "platforms": ["darwin", "linux", "win32"], "implementation": "partial", "note": "Append-only — semantic rewrite requires LLM integration." },
+
+    { "op": "a2a_fanout", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/hypothesis-tree-protocol.md" },
+    { "op": "cross_critique", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/hypothesis-tree-protocol.md" },
+    { "op": "synthesize_counterparty_persona", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/rehearsal-protocol.md" },
+    { "op": "a2a_roleplay", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/rehearsal-protocol.md" },
+    { "op": "conduct_1on1", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/stakeholder-consensus-protocol.md" },
+    { "op": "extract_dissent_signals", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/stakeholder-consensus-protocol.md" },
+    { "op": "fork_branches", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/counterfactual-simulation-protocol.md" },
+    { "op": "simulate_all", "platforms": ["darwin", "linux", "win32"], "implementation": "stub", "protocol_ref": "knowledge/public/orchestration/counterfactual-simulation-protocol.md" },
+
+    { "op": "capture_intuition", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "protocol_ref": "knowledge/public/orchestration/intuition-capture-protocol.md" },
+    { "op": "extract_requirements", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Customer_engagement missions: transcript → ExtractedRequirements → requirements-draft.json. Runs through the registered ReasoningBackend." },
+    { "op": "evaluate_requirements_completeness", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "REQUIREMENTS_COMPLETENESS gate evaluator." },
+    { "op": "evaluate_customer_signoff", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "CUSTOMER_SIGNOFF gate evaluator." },
+
+    { "op": "extract_design_spec", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "SDLC design phase: requirements-draft.json → design-spec.json via the registered ReasoningBackend." },
+    { "op": "evaluate_architecture_ready", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "ARCHITECTURE_READY gate evaluator — checks design spec completeness and blocking open_decisions." },
+    { "op": "extract_test_plan", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "SDLC test phase: requirements (+ optional design) → test-plan.json (test-case-adf-compatible)." },
+    { "op": "evaluate_qa_ready", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "QA_READY gate evaluator — verifies test coverage of must-have FRs." },
+    { "op": "decompose_into_tasks", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "SDLC implementation-planning phase: requirements (+ optional design) → task-plan.json." },
+    { "op": "evaluate_task_plan_ready", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Task plan validator: dependency integrity, cycle check, must-priority tasks have test_criteria." },
+
+    { "op": "transcribe_audio", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Drives the SpeechToTextBridge. Stub falls back to a <audio>.transcript.txt sidecar; register ShellSpeechToTextBridge (via KYBERION_STT_COMMAND) for real decoding." },
+    { "op": "execute_task_plan", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Topologically orders a mission's task-plan.json and spawns a Claude Code sub-agent per task with full claude_code tool preset. Records each run to task-execution-log.jsonl; skips dependents on failure." },
+    { "op": "deploy_release", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Drives DeploymentAdapter under the config:update approval gate. Stub=dry-run; register ShellDeploymentAdapter via KYBERION_DEPLOY_COMMAND for real CI/CD dispatch." }
   ]
 }

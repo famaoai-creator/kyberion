@@ -437,16 +437,9 @@ describe.sequential('Channel surface agents', () => {
   });
 
   it('fills missing slack a2a payload text from the original surface prompt', async () => {
-    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
-    const ask = vi.fn()
-      .mockResolvedValueOnce(
-        '```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"intent":"slack_request","text":"original request and relevant Slack context"}}\n```'
-      )
-      .mockResolvedValueOnce('final slack reply');
-
     const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
       agentId: 'slack-surface-agent',
-      ask,
+      ask: vi.fn(),
       shutdown: async () => {},
       getRecord: () => ({ status: 'ready' } as any),
     } as any);
@@ -468,13 +461,18 @@ describe.sequential('Channel surface agents', () => {
         channelType: 'im',
       }),
       senderAgentId: 'kyberion:slack-bridge',
+      forcedReceiver: 'nerve-agent',
       delegationSummaryInstruction: 'Summarize for Slack.',
     });
 
+    expect(spawnSpy).not.toHaveBeenCalled();
     expect(routeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
           text: 'Kyberionのマーケティング資料を作ってほしい',
+          context: expect.objectContaining({
+            execution_mode: 'conversation',
+          }),
         }),
       }),
     );

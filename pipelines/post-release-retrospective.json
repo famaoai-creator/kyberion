@@ -1,0 +1,37 @@
+{
+  "action": "pipeline",
+  "name": "post-release-retrospective",
+  "description": "SDLC retrospective phase: bundle the mission's intent drift history, heuristic feedback report, dissent log, and requirements/design artifacts under a single retrospective packet. Read-only summary — closes the intent loop's learn phase explicitly after a release.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "evidence_dir": "active/missions/{{mission_id}}/evidence",
+    "retrospective_output": "active/missions/{{mission_id}}/evidence/retrospective.md"
+  },
+  "steps": [
+    {
+      "id": "snapshot_intent_deltas",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "if [ -f {{evidence_dir}}/intent-deltas.jsonl ]; then wc -l {{evidence_dir}}/intent-deltas.jsonl; else echo 'no intent-deltas.jsonl'; fi"
+      }
+    },
+    {
+      "id": "assemble_retro",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "printf '# Retrospective — %s\\n\\nGenerated: %s\\nMission: %s\\n\\n## Artifacts\\n\\n- requirements-draft.json: %s\\n- design-spec.json: %s\\n- test-plan.json: %s\\n- task-plan.json: %s\\n- dissent-log.json: %s\\n- intent-snapshots.jsonl: %s\\n- intent-deltas.jsonl: %s\\n- heuristic-feedback-report.json: %s\\n\\n## Intent Drift\\n\\nSee intent-deltas.jsonl for per-transition drift scores.\\n\\n## Heuristic Feedback\\n\\nSee heuristic-feedback-report.json for validated intuition scores.\\n\\n## Outstanding Dissent\\n\\nSee dissent-log.json for any surviving concerns raised during review cycles.\\n' '{{project_name}}' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" '{{mission_id}}' \"$(test -f {{evidence_dir}}/requirements-draft.json && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/design-spec.json && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/test-plan.json && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/task-plan.json && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/dissent-log.json && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/intent-snapshots.jsonl && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/intent-deltas.jsonl && echo present || echo absent)\" \"$(test -f {{evidence_dir}}/heuristic-feedback-report.json && echo present || echo absent)\" > {{retrospective_output}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Retrospective written to {{retrospective_output}}"
+      }
+    }
+  ]
+}

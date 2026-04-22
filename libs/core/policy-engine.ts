@@ -81,6 +81,7 @@ class PolicyEngineImpl {
     const decisions: { policy: string; rule: PolicyRule; result: boolean }[] = [];
 
     for (const policy of this.policies) {
+      if (!Array.isArray(policy.rules)) continue;
       for (const rule of policy.rules) {
         // Check conditional (if present)
         if (rule.condition_field) {

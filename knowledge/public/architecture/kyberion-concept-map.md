@@ -167,7 +167,37 @@ Internally, the system may still use:
 
 The recommended path for understanding the overall model is:
 
-1. [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
-2. [`docs/COMPONENT_MAP.md`](../../../docs/COMPONENT_MAP.md)
-3. [`llm-execution-boundary.md`](llm-execution-boundary.md)
-4. [`project-operating-system.md`](../orchestration/project-operating-system.md)
+1. [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md)
+2. [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+3. [`docs/COMPONENT_MAP.md`](../../../docs/COMPONENT_MAP.md)
+4. [`llm-execution-boundary.md`](llm-execution-boundary.md)
+5. [`project-operating-system.md`](../orchestration/project-operating-system.md)
+
+## Cross-Cutting: The Intent Loop
+
+The five layers above describe *where concepts live*. A second, orthogonal view
+— the **intent loop** — describes *how intent moves through the system*:
+
+```
+receive → clarify → preserve → execute → verify → learn
+```
+
+See [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md) for the
+full definition. The loop is the one non-replaceable primitive: reasoning
+models, CLI hosts, actuator implementations, and schema names are all
+replaceable, but the loop closure is not.
+
+Mapping loop stages onto the five layers:
+
+| Loop Stage | Primary Layer(s) | Example Artifacts |
+|---|---|---|
+| receive | Intent | request, operator interaction packet |
+| clarify | Intent → Control | clarification packet, classification record, hypothesis tree |
+| preserve | Control + Knowledge | mission state, execution brief, negotiation state, relationship graph |
+| execute | Execution | pipeline run, actuator invocation, decision-ops call |
+| verify | Control | review gate verdict, intent-drift gate, golden scenario evaluation |
+| learn | Memory → Knowledge | distillation, run report, heuristic entry, hardening backlog |
+
+Intent drift at any stage is a loop failure — mechanisms such as classification
+preflight, review gates, execution receipts, and `INTENT_DRIFT` are the detail
+instruments that keep the loop closed.

@@ -1,9 +1,13 @@
 {
   "actuator_id": "media-actuator",
-  "version": "1.0.0",
-  "description": "Document and asset generation engine",
+  "version": "1.1.0",
+  "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
   "contract_schema": "schemas/media-pipeline.schema.json",
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/media-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
-  ]
+  ],
+  "pipeline_ops": {
+    "capture": ["pptx_slide_text"],
+    "apply": ["pptx_filter_slides"]
+  }
 }

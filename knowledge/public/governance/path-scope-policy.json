@@ -63,6 +63,18 @@
       "allow_prefixes": [
         "active/audit/"
       ]
+    },
+    "confidential_heuristics": {
+      "description": "Personal judgment heuristics captured by intuition-capture missions. Intended writers: decision_support missions with subtype=intuition_capture. Mission-aware enforcement deferred to preflight layer.",
+      "allow_prefixes": [
+        "knowledge/confidential/heuristics/"
+      ]
+    },
+    "confidential_relationships": {
+      "description": "Structured relationship-graph nodes (trust_level, history, communication_style, ng_topics, outstanding_asks). Intended writers: presence-actuator and voice-actuator hooks only. Actuator-aware enforcement deferred to runtime.",
+      "allow_prefixes": [
+        "knowledge/confidential/relationships/"
+      ]
     }
   }
 }

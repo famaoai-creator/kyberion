@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "rules": [
     {
       "id": "service-mutation",
@@ -10,6 +10,34 @@
       },
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "secret-grant-access",
+      "intent_ids": ["secret:grant_access"],
+      "requires_approval": true,
+      "missing_requirements": ["dual_key_confirmation"]
+    },
+    {
+      "id": "auth-grant-authority",
+      "intent_ids": ["auth:grant_authority"],
+      "requires_approval": true,
+      "missing_requirements": ["dual_key_confirmation"]
+    },
+    {
+      "id": "config-policy-update",
+      "intent_ids": ["config:update"],
+      "when": {
+        "payload_field": "scope",
+        "any_of": ["governance", "policy", "review_gate"]
+      },
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "vault-direct-write",
+      "intent_ids": ["vault:write"],
+      "requires_approval": true,
+      "missing_requirements": ["dual_key_confirmation"]
     }
   ],
   "defaults": {

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/negotiation-state.schema.json",
+  "title": "Negotiation Mission State Block",
+  "description": "The `negotiation` block embedded in mission-state.json for missions of type='negotiation'. See negotiation-protocol.md.",
+  "type": "object",
+  "required": ["counterparty_ref", "objective", "our_batna", "zopa", "red_lines"],
+  "properties": {
+    "counterparty_ref": {
+      "type": "string",
+      "description": "Path to the relationship-graph node (relative)."
+    },
+    "objective": { "type": "string", "description": "The outcome we want." },
+    "our_batna": { "type": "string", "description": "Best alternative if no agreement is reached." },
+    "their_batna_estimate": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "zopa": {
+      "type": "object",
+      "description": "Zone of Possible Agreement.",
+      "properties": {
+        "floor": { "type": "string", "description": "Minimum we will accept." },
+        "ceiling": { "type": "string", "description": "Best realistic outcome." },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "concession_ladder": {
+      "type": "array",
+      "description": "Planned sequence of give/get trades.",
+      "items": {
+        "type": "object",
+        "required": ["step", "give", "get"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1 },
+          "give": { "type": "string" },
+          "get": { "type": "string" },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] }
+        }
+      }
+    },
+    "information_asymmetry": {
+      "type": "object",
+      "properties": {
+        "they_know_we_dont": { "type": "array", "items": { "type": "string" } },
+        "we_know_they_dont": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "red_lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Absolute non-negotiables. Must include at least one."
+    },
+    "nemawashi_readiness_ref": {
+      "type": "string",
+      "description": "Optional path to the nemawashi readiness matrix if pre-alignment was performed."
+    }
+  }
+}

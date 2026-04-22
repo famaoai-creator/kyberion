@@ -18,6 +18,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
+import { dispatchDecisionOp } from './decision-ops.js';
 
 /**
  * Wisdom-Actuator v2.2.0 [DYNAMIC KNOWLEDGE ENABLED]
@@ -207,7 +208,10 @@ async function opTransform(op: string, params: any, ctx: any) {
       }).length;
       return { ...ctx, [params.export_as]: count };
     }
-    default: return ctx;
+    default: {
+      const decision = await dispatchDecisionOp(op, params, ctx);
+      return decision.handled ? decision.ctx : ctx;
+    }
   }
 }
 
@@ -295,6 +299,14 @@ async function opApply(op: string, params: any, ctx: any) {
       
       logger.success(`📥 [Wisdom] Imported knowledge from ${pkg.metadata.origin_agent_id} to ${targetFile}`);
       break;
+
+    default: {
+      const decision = await dispatchDecisionOp(op, params, ctx);
+      if (!decision.handled) {
+        logger.warn(`[WISDOM] Unknown apply op: ${op}`);
+      }
+      break;
+    }
   }
 }
 
@@ -340,3 +352,4 @@ if (entrypoint && modulePath === entrypoint) {
 }
 
 export { handleAction };
+export { dispatchDecisionOp } from './decision-ops.js';

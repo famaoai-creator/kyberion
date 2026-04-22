@@ -2,13 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
-[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D22.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
 
 Kyberion is an Organization Work Loop engine.
 
 It turns organizational intent into governed execution, evidence, and reusable memory.
 
-For the top-level architecture, see [knowledge/public/architecture/organization-work-loop.md](/Users/famao/kyberion/knowledge/public/architecture/organization-work-loop.md).
+For the top-level architecture, see [knowledge/public/architecture/organization-work-loop.md](knowledge/public/architecture/organization-work-loop.md).
 
 The intended user experience is simple:
 
@@ -19,7 +19,7 @@ The intended user experience is simple:
 
 Internally, Kyberion uses missions, task sessions, actuators, ADF pipelines, runtime supervision, and governed knowledge. Those are implementation details of a durable execution model, not the interface you should have to think about first.
 
-For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md).
+For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md).
 
 CLI operators can also follow the same governed control path directly:
 
@@ -246,15 +246,7 @@ It is to make the mission model feel invisible until the user needs it.
 Actuators are Kyberion's execution body.
 ADF is the structured contract used to connect reasoning and execution.
 
-Examples of actuator families:
-
-- browser
-- media
-- system
-- service
-- file
-- terminal
-- wisdom
+Kyberion ships with 25+ actuators covering browser automation, media processing, system operations, file handling, voice, vision, code generation, agent orchestration, and more. The full list lives in `libs/actuators/`, each with a `manifest.json` declaring its capabilities.
 
 Examples of ADF-backed work:
 
@@ -306,8 +298,8 @@ pnpm surfaces:reconcile
 
 Fastest daily-use docs:
 
-- [docs/QUICKSTART.md](/Users/famao/kyberion/docs/QUICKSTART.md)
-- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
+- [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md)
 
 ## Local Control Plane
 
@@ -335,10 +327,12 @@ They are not the primary user-facing interface.
 
 ## Documents Worth Reading
 
-- [docs/QUICKSTART.md](/Users/famao/kyberion/docs/QUICKSTART.md)
-- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
-- [docs/GLOSSARY.md](/Users/famao/kyberion/docs/GLOSSARY.md)
-- [docs/COMPONENT_MAP.md](/Users/famao/kyberion/docs/COMPONENT_MAP.md)
-- [CAPABILITIES_GUIDE.md](/Users/famao/kyberion/CAPABILITIES_GUIDE.md)
-- [knowledge/public/architecture/kyberion-surface-ux-architecture.md](/Users/famao/kyberion/knowledge/public/architecture/kyberion-surface-ux-architecture.md)
-- [knowledge/public/architecture/agent-mission-control-model.md](/Users/famao/kyberion/knowledge/public/architecture/agent-mission-control-model.md)
+- [docs/USE_CASES.md](docs/USE_CASES.md) — 業務自動化ユースケース集
+- [docs/CEO_SCENARIOS.md](docs/CEO_SCENARIOS.md) — CEO 業務シナリオ評価（実行パス検証済み）
+- [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md)
+- [docs/GLOSSARY.md](docs/GLOSSARY.md)
+- [docs/COMPONENT_MAP.md](docs/COMPONENT_MAP.md)
+- [CAPABILITIES_GUIDE.md](CAPABILITIES_GUIDE.md)
+- [knowledge/public/architecture/kyberion-surface-ux-architecture.md](knowledge/public/architecture/kyberion-surface-ux-architecture.md)
+- [knowledge/public/architecture/agent-mission-control-model.md](knowledge/public/architecture/agent-mission-control-model.md)

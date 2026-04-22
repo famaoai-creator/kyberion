@@ -1,0 +1,84 @@
+{
+  "pipeline_id": "pptx-template-inherit",
+  "version": "1.1.0",
+  "description": "Read a multi-owner PPTX template, auto-detect the slides belonging to the specified owner labels (footer match), apply text replacements, and emit a submission-ready file. Use case: monthly reporting decks where each contributor returns only their own slide(s).",
+  "action": "pipeline",
+  "context": {
+    "source_pptx": "active/shared/tmp/pptx-input/template.pptx",
+    "output_pptx": "active/shared/tmp/pptx-output/submission.pptx",
+    "owner_labels": ["owner_name_goes_here"],
+    "run_replacements": {},
+    "paragraph_replacements": []
+  },
+  "steps": [
+    {
+      "id": "inspect_source",
+      "type": "capture",
+      "op": "pptx_slide_text",
+      "params": {
+        "path": "{{source_pptx}}",
+        "export_as": "source_slides"
+      }
+    },
+    {
+      "id": "find_owner_slides",
+      "type": "transform",
+      "op": "find_slides_by_owner",
+      "params": {
+        "slides_from": "source_slides",
+        "owner_labels_from": "owner_labels",
+        "match_mode": "substring",
+        "export_as": "owner_match"
+      }
+    },
+    {
+      "id": "filter_to_owner_slides",
+      "type": "apply",
+      "op": "pptx_filter_slides",
+      "params": {
+        "source": "{{source_pptx}}",
+        "path": "active/shared/tmp/pptx-output/_stage1_filtered.pptx",
+        "keep_indices": "{{owner_match.indices}}"
+      }
+    },
+    {
+      "id": "apply_run_replacements",
+      "type": "apply",
+      "op": "pptx_patch",
+      "params": {
+        "source": "active/shared/tmp/pptx-output/_stage1_filtered.pptx",
+        "path": "active/shared/tmp/pptx-output/_stage2_patched.pptx",
+        "replacements": "{{run_replacements}}"
+      }
+    },
+    {
+      "id": "apply_paragraph_replacements",
+      "type": "apply",
+      "op": "pptx_patch_paragraphs",
+      "params": {
+        "source": "active/shared/tmp/pptx-output/_stage2_patched.pptx",
+        "path": "{{output_pptx}}",
+        "paragraph_replacements": "{{paragraph_replacements}}"
+      }
+    },
+    {
+      "id": "verify_output",
+      "type": "capture",
+      "op": "pptx_slide_text",
+      "params": {
+        "path": "{{output_pptx}}",
+        "export_as": "output_slides"
+      }
+    },
+    {
+      "id": "diff_report",
+      "type": "transform",
+      "op": "pptx_diff",
+      "params": {
+        "before_from": "source_slides",
+        "after_from": "output_slides",
+        "export_as": "change_report"
+      }
+    }
+  ]
+}

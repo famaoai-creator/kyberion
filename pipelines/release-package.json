@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "name": "release-package",
+  "description": "SDLC release-packaging phase: collect the commit range, generate CHANGELOG.md and release-notes.md fragments under the mission evidence dir. Pure shell-driven — the resulting markdown files land in active/missions/<id>/evidence/ and can be reviewed before the RELEASE_READY gate flips.",
+  "context": {
+    "mission_id": "",
+    "from_ref": "main",
+    "to_ref": "HEAD",
+    "project_name": "",
+    "output_dir": "active/missions/{{mission_id}}/evidence"
+  },
+  "steps": [
+    {
+      "id": "collect_commits",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git log --pretty=format:'- %s (%h)' {{from_ref}}..{{to_ref}} > {{output_dir}}/commit-range.txt && wc -l < {{output_dir}}/commit-range.txt",
+        "export_as": "commit_count"
+      }
+    },
+    {
+      "id": "render_changelog",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "printf '# CHANGELOG (%s..%s)\\n\\nProject: %s\\nGenerated: %s\\n\\n## Commits\\n\\n' '{{from_ref}}' '{{to_ref}}' '{{project_name}}' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > {{output_dir}}/CHANGELOG.md && cat {{output_dir}}/commit-range.txt >> {{output_dir}}/CHANGELOG.md"
+      }
+    },
+    {
+      "id": "render_release_notes",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "printf '# Release Notes — %s\\n\\n## Summary\\n\\n_Fill in after review._\\n\\n## Changes\\n\\n' '{{project_name}}' > {{output_dir}}/release-notes.md && cat {{output_dir}}/commit-range.txt >> {{output_dir}}/release-notes.md && printf '\\n## Upgrade Steps\\n\\n_Fill in after review._\\n\\n## Known Issues\\n\\n_Fill in after review._\\n' >> {{output_dir}}/release-notes.md"
+      }
+    },
+    {
+      "id": "log_done",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Release package drafted for {{project_name}} ({{from_ref}}..{{to_ref}}) — CHANGELOG.md and release-notes.md at {{output_dir}}"
+      }
+    }
+  ]
+}
