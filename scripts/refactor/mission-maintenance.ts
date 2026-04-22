@@ -18,6 +18,8 @@ import {
   safeStat,
   safeWriteFile,
   withLock,
+  appendMissionExecutionLedgerEntry,
+  type MissionActorType,
 } from '@agent/core';
 import { getActiveMissionSearchDirs, loadState, saveState } from './mission-state.js';
 
@@ -236,6 +238,69 @@ export async function recordTask(
     )
   );
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
+}
+
+export async function recordEvidence(args: {
+  missionId: string;
+  taskId: string;
+  note: string;
+  evidence?: string[];
+  teamRole?: string;
+  actorId?: string;
+  actorType?: MissionActorType;
+  getGitHash: (cwd: string) => string;
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
+}): Promise<void> {
+  const upperId = args.missionId.toUpperCase();
+  const missionPath = findMissionPath(upperId);
+  if (!missionPath) throw new Error(`Mission ${upperId} not found.`);
+
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} state not found.`);
+  if (state.status === 'archived') {
+    throw new Error(`Mission ${upperId} is archived. Evidence cannot be recorded.`);
+  }
+
+  logger.info(`🧾 Evidence for ${upperId}: ${args.taskId}...`);
+
+  await withLock(`mission-${upperId}`, async () => {
+    appendMissionExecutionLedgerEntry({
+      mission_id: upperId,
+      mission_path_hint: missionPath,
+      event_type: 'evidence_recorded',
+      task_id: args.taskId,
+      team_role: args.teamRole,
+      actor_id: args.actorId,
+      actor_type: args.actorType || (args.actorId ? 'agent' : undefined),
+      decision: args.note,
+      evidence: args.evidence || [],
+      payload: {
+        mission_status: state.status,
+      },
+    });
+
+    safeExec('git', ['add', '.'], { cwd: missionPath });
+    try {
+      safeExec('git', ['commit', '-m', `evidence(${upperId}): ${args.taskId} - ${args.note}`], {
+        cwd: missionPath,
+      });
+    } catch (_) {
+      logger.info('No new changes in mission repo after evidence record.');
+    }
+
+    const hash = args.getGitHash(missionPath);
+    const currentState = loadState(upperId)!;
+    currentState.git.latest_commit = hash;
+    currentState.history.push({
+      ts: new Date().toISOString(),
+      event: 'EVIDENCE',
+      note: `${args.taskId}: ${args.note}`,
+    });
+    await saveState(upperId, currentState, { alreadyLocked: true });
+  });
+
+  await args.syncProjectLedgerIfLinked(upperId);
+  logger.success(`✅ Recorded evidence for ${upperId}.`);
 }
 
 export async function purgeMissions(rootDir: string, dryRun = false): Promise<void> {
