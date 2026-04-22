@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/heuristic-entry.schema.json",
+  "title": "Heuristic Entry",
+  "description": "A single captured instance of a Sovereign's gut decision, extracted via the 3-question Intuition Capture Protocol. Stored under knowledge/confidential/heuristics/.",
+  "type": "object",
+  "required": ["id", "captured_at", "decision", "anchor", "analogy"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique ID, ULID or timestamp-based." },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "mission_id": {
+      "type": "string",
+      "description": "Mission that surfaced this decision, if any."
+    },
+    "decision": {
+      "type": "string",
+      "description": "The decision the Sovereign made (short summary, <= 200 chars)."
+    },
+    "trigger": {
+      "type": "string",
+      "enum": ["five_second_rule", "explicit_gut_flag", "tonal_detection"]
+    },
+    "anchor": {
+      "type": "string",
+      "description": "First word / name / number that surfaced in the Sovereign's mind (Q1)."
+    },
+    "vetoed_options": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Options that briefly appeared and were immediately dismissed (Q2)."
+    },
+    "analogy": {
+      "type": "string",
+      "description": "What past situation did this feel similar to (Q3)."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form tags for later clustering (e.g., hiring, funding, architecture)."
+    },
+    "outcome_ref": {
+      "type": "string",
+      "description": "Once the decision plays out, link to the outcome record for retrospective validation."
+    }
+  }
+}

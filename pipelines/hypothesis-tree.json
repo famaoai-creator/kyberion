@@ -1,0 +1,60 @@
+{
+  "action": "pipeline",
+  "name": "hypothesis-tree",
+  "description": "Divergence-before-convergence decision pipeline. Runs at least 3 conflicting personas in isolation (STUB), forces cross-critique (STUB), then preserves rejected hypotheses in dissent-log.json (FULL). See knowledge/public/orchestration/hypothesis-tree-protocol.md.",
+  "context": {
+    "mission_id": "",
+    "topic": "",
+    "evidence_refs": [],
+    "personas": [
+      "Visionary Inventor",
+      "Ruthless Auditor",
+      "red-team-adversary"
+    ],
+    "min_hypotheses_per_persona": 2
+  },
+  "steps": [
+    {
+      "id": "diverge",
+      "type": "apply",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas": "{{personas}}",
+        "min_hypotheses_per_persona": "{{min_hypotheses_per_persona}}",
+        "topic": "{{topic}}",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree-raw.json"
+      }
+    },
+    {
+      "id": "critique",
+      "type": "apply",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{mission_evidence_dir}}/hypothesis-tree-raw.json",
+        "personas": "{{personas}}",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree.json"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "type": "apply",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{mission_evidence_dir}}/hypothesis-tree.json",
+        "output_path": "{{mission_evidence_dir}}/dissent-log.json",
+        "mission_id": "{{mission_id}}",
+        "topic": "{{topic}}"
+      }
+    },
+    {
+      "id": "render_report",
+      "type": "apply",
+      "op": "wisdom:render_hypothesis_report",
+      "params": {
+        "source": "{{mission_evidence_dir}}/hypothesis-tree.json",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree-report.md",
+        "title": "Hypothesis Tree — {{topic}}"
+      }
+    }
+  ]
+}

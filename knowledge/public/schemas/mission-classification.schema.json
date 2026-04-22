@@ -12,7 +12,10 @@
         "research_and_absorption",
         "content_and_media",
         "operations_and_release",
-        "environment_and_recovery"
+        "environment_and_recovery",
+        "decision_support",
+        "customer_engagement",
+        "platform_onboarding"
       ]
     },
     "delivery_shape": {

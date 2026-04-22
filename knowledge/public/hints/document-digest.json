@@ -1,0 +1,23 @@
+{
+  "topic": "Document digest and summarization",
+  "description": "Extracts and summarizes document content for LLM understanding using protocolToMarkdown. Supports PDFs, Office documents, and other formats by converting them to markdown digests for analysis.",
+  "tags": ["読んで", "要約", "確認", "内容", "digest", "summarize", "understand", "read"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Extract document content from source file",
+      "Convert to markdown digest via protocolToMarkdown",
+      "Analyze and summarize the extracted content"
+    ],
+    "actuator": "media-actuator",
+    "ops": ["document_digest"],
+    "use_cases": [
+      "ドキュメント要約・理解",
+      "PDF/Office 文書の内容確認",
+      "長文資料の要点抽出"
+    ],
+    "keywords": ["読んで", "要約", "確認", "内容", "digest", "summarize", "understand", "read"],
+    "pattern": "A",
+    "_comment": "Pattern A: fully automatable. No browser interaction needed; media-actuator handles document extraction directly."
+  }
+}

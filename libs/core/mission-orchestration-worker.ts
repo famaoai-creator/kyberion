@@ -12,7 +12,8 @@ import { ensureMissionTeamRuntimeViaSupervisor, shutdownAllAgentRuntimes } from 
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { buildExecutionEnv } from './authority.js';
-import { missionDir } from './path-resolver.js';
+import { missionDir, missionEvidenceDir } from './path-resolver.js';
+import * as nodePath from 'node:path';
 import { safeExec, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
@@ -22,6 +23,73 @@ import {
   startMissionOrchestrationWorker,
   type MissionOrchestrationEvent,
 } from './mission-orchestration-events.js';
+import { emitIntentSnapshot, mapStageToLoopPhase } from './intent-snapshot-store.js';
+import { summarizeHeuristics } from './heuristic-feedback.js';
+import { getIntentExtractor } from './intent-extractor.js';
+import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
+
+// Install Anthropic-backed reasoning + intent extractor at worker import.
+// No-op when ANTHROPIC_API_KEY is unset (stubs remain active).
+installAnthropicBackendsIfAvailable();
+
+/**
+ * Emit a lifecycle intent snapshot for a worker-driven stage transition.
+ * Failures are swallowed so the worker's main work path is never blocked
+ * by an evidence-writing mishap (e.g. mission evidence dir still being
+ * created). The snapshot produces an append-only trail in
+ * active/missions/<id>/evidence/intent-snapshots.jsonl and, as soon as
+ * two snapshots exist, paired deltas in intent-deltas.jsonl.
+ */
+function emitWorkerTransitionSnapshot(
+  missionId: string,
+  stageKey: string,
+  goalHint?: string,
+): void {
+  if (!missionId) return;
+  try {
+    emitIntentSnapshot({
+      missionId,
+      stage: stageKey,
+      source: 'worker_transition',
+      intent: {
+        goal: goalHint ?? `Mission ${missionId} progressing through ${mapStageToLoopPhase(stageKey)}`,
+      },
+    });
+  } catch (err: any) {
+    // evidence dir may not yet exist on very first events; keep worker non-blocking
+    logger.warn(`[worker] intent snapshot skipped for ${missionId}/${stageKey}: ${err?.message ?? err}`);
+  }
+}
+
+/**
+ * Like `emitWorkerTransitionSnapshot` but pulls a real IntentBody out of the
+ * Slack payload text via the registered IntentExtractor. Use on the entry
+ * transition (`intake`) where the user's original utterance is available —
+ * this is the baseline against which later snapshots are compared for drift.
+ */
+async function emitWorkerKickoffSnapshot(
+  missionId: string,
+  payload: SlackPayload,
+): Promise<void> {
+  if (!missionId) return;
+  const text = (payload as any)?.text;
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    emitWorkerTransitionSnapshot(missionId, 'intake', `Mission ${missionId} kickoff requested`);
+    return;
+  }
+  try {
+    const intent = await getIntentExtractor().extract({ text });
+    emitIntentSnapshot({
+      missionId,
+      stage: 'intake',
+      source: 'user_prompt',
+      intent,
+    });
+  } catch (err: any) {
+    logger.warn(`[worker] kickoff intent extraction failed for ${missionId}: ${err?.message ?? err}`);
+    emitWorkerTransitionSnapshot(missionId, 'intake', `Mission ${missionId} kickoff requested`);
+  }
+}
 
 const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
 
@@ -523,6 +591,7 @@ async function handleMissionTeamPrewarmRequested(event: MissionOrchestrationEven
 async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
+  await emitWorkerKickoffSnapshot(missionId, payload);
   const env = buildExecutionEnv(process.env, 'mission_controller');
 
   runMissionController(env, [
@@ -609,6 +678,7 @@ async function handleMissionKickoffRequested(event: MissionOrchestrationEvent<Sl
 async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
+  emitWorkerTransitionSnapshot(missionId, 'execution', `Mission ${missionId} follow-up dispatched`);
   emitSlackMissionEvent(payload, missionId, 'mission_followup_requested', 'Planner artifacts were reconciled and follow-up delegation started.');
   const dispatched = await dispatchMissionNextTasks(missionId);
   emitSlackMissionEvent(payload, missionId, 'mission_followup_dispatched', 'Planner-produced follow-up tasks were delegated.', {
@@ -629,6 +699,7 @@ async function handleMissionFollowupRequested(event: MissionOrchestrationEvent<S
 async function handleMissionReconciliationRequested(event: MissionOrchestrationEvent<SlackPayload>) {
   const payload = event.payload;
   const missionId = event.mission_id;
+  emitWorkerTransitionSnapshot(missionId, 'verification', `Mission ${missionId} reconciling outcomes`);
   reconcileMissionProgress(missionId);
   emitSlackMissionEvent(payload, missionId, 'mission_reconciliation_completed', 'Mission task outcomes were reconciled into mission state.');
   const summary = summarizeMissionTaskOutcomes(missionId);
@@ -668,6 +739,89 @@ async function handleMissionReconciliationRequested(event: MissionOrchestrationE
       `Completed: ${summary.completedCount}`,
       `Requested: ${summary.requestedCount}`,
     ].join('\n'),
+  });
+  // Continue lifecycle: enqueue distillation
+  const nextEvent = enqueueMissionOrchestrationEvent({
+    eventType: 'mission_distillation_requested',
+    missionId,
+    requestedBy: 'mission_orchestration_worker',
+    correlationId: event.correlation_id || event.event_id,
+    causationId: event.event_id,
+    payload,
+  });
+  startMissionOrchestrationWorker(nextEvent);
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
+}
+
+async function handleMissionDistillationRequested(event: MissionOrchestrationEvent<SlackPayload>) {
+  const payload = event.payload;
+  const missionId = event.mission_id;
+  emitWorkerTransitionSnapshot(missionId, 'retrospective', `Mission ${missionId} distilling knowledge`);
+
+  // Capture a heuristic validation snapshot alongside CLI distillation so
+  // the retrospective phase closes the intent-loop "learn" stage even if
+  // no heuristics have been validated yet.
+  try {
+    const report = summarizeHeuristics(10);
+    const evidenceDir = missionEvidenceDir(missionId);
+    if (evidenceDir) {
+      safeWriteFile(
+        nodePath.join(evidenceDir, 'heuristic-feedback-report.json'),
+        `${JSON.stringify(report, null, 2)}\n`,
+        { mkdir: true },
+      );
+    }
+  } catch (err: any) {
+    logger.warn(`[worker] heuristic summary skipped for ${missionId}: ${err?.message ?? err}`);
+  }
+
+  // Run distillation via mission controller CLI
+  const env = buildExecutionEnv(process.env, 'mission_controller');
+  try {
+    runMissionController(env, ['distill', missionId]);
+    emitSlackMissionEvent(payload, missionId, 'mission_distillation_completed', 'Mission knowledge was distilled into reusable learnings.');
+  } catch (error: any) {
+    emitSlackMissionEvent(payload, missionId, 'mission_distillation_failed', `Distillation failed: ${error.message}. Manual review recommended.`);
+  }
+
+  // Continue to completion
+  const nextEvent2 = enqueueMissionOrchestrationEvent({
+    eventType: 'mission_completion_requested',
+    missionId,
+    requestedBy: 'mission_orchestration_worker',
+    correlationId: event.correlation_id || event.event_id,
+    causationId: event.event_id,
+    payload,
+  });
+  startMissionOrchestrationWorker(nextEvent2);
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
+}
+
+async function handleMissionCompletionRequested(event: MissionOrchestrationEvent<SlackPayload>) {
+  const payload = event.payload;
+  const missionId = event.mission_id;
+  emitWorkerTransitionSnapshot(missionId, 'delivery', `Mission ${missionId} completing lifecycle`);
+
+  const env = buildExecutionEnv(process.env, 'mission_controller');
+  try {
+    runMissionController(env, ['finish', missionId]);
+    emitSlackMissionEvent(payload, missionId, 'mission_completed', 'Mission lifecycle completed. Artifacts and learnings are archived.');
+  } catch (error: any) {
+    emitSlackMissionEvent(payload, missionId, 'mission_completion_failed', `Completion failed: ${error.message}. Manual intervention required.`);
+  }
+
+  enqueueSlackOutboxMessage({
+    correlationId: missionId,
+    channel: payload.channel,
+    threadTs: payload.threadTs,
+    source: 'system',
+    text: `Mission ${missionId} lifecycle completed.`,
+  });
+  enqueueChronosOutboxMessage({
+    correlationId: missionId,
+    threadTs: missionId,
+    source: 'system',
+    text: `Mission ${missionId} lifecycle completed.`,
   });
   await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
@@ -758,6 +912,12 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
         break;
       case 'mission_reconciliation_requested':
         await handleMissionReconciliationRequested(event);
+        break;
+      case 'mission_distillation_requested':
+        await handleMissionDistillationRequested(event);
+        break;
+      case 'mission_completion_requested':
+        await handleMissionCompletionRequested(event);
         break;
       case 'mission_control_requested':
         await handleMissionControlRequested(event as unknown as MissionOrchestrationEvent<MissionControlPayload>);

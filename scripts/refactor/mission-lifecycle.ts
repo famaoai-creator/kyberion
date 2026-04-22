@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import {
   findMissionPath,
   grantAccess,
+  grantAccessGuarded,
   ledger,
   logger,
   pathResolver,
@@ -277,7 +278,13 @@ export async function grantMissionSudo(missionId: string, on = true, ttl = 15): 
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
   if (on) {
-    grantAccess(upperId, 'SUDO', ttl, true);
+    // Authority grants pass through the approval gate (auth:grant_authority).
+    // Without an approved request on file this call throws, protecting against
+    // unilateral SUDO escalation by agents.
+    await grantAccessGuarded(upperId, 'SUDO', ttl, true, {
+      agentId: 'mission_controller',
+      correlationId: `${upperId}:SUDO`,
+    });
     logger.warn(`⚠️ [SUDO] Full system authority granted to mission ${upperId} for ${ttl} minutes!`);
   } else {
     logger.info('[SUDO] Sudo will expire naturally or can be revoked by clearing auth-grants.json.');

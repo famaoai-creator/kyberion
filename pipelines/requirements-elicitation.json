@@ -1,0 +1,60 @@
+{
+  "action": "pipeline",
+  "name": "requirements-elicitation",
+  "description": "Customer-engagement mission: given a transcript (or text notes) from a customer meeting, extract structured requirements, persist them as requirements-draft.json, run the REQUIREMENTS_COMPLETENESS gate, and log the outcome. Customer signoff (CUSTOMER_SIGNOFF gate) is recorded via a separate op after the operator confirms with the customer.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "transcript_path": "active/missions/{{mission_id}}/evidence/call-transcript.txt",
+    "source_type": "call_transcript",
+    "language": "ja",
+    "customer_name": "",
+    "customer_person_slug": "",
+    "customer_org": "",
+    "prior_draft_ref": ""
+  },
+  "steps": [
+    {
+      "id": "extract",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_path}}",
+        "source_type": "{{source_type}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_person_slug": "{{customer_person_slug}}",
+        "customer_org": "{{customer_org}}",
+        "prior_draft_ref": "{{prior_draft_ref}}",
+        "export_as": "extraction"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Extracted requirements v{{extraction.version}} at {{extraction.draft_path}}"
+      }
+    },
+    {
+      "id": "check_completeness",
+      "type": "apply",
+      "op": "wisdom:evaluate_requirements_completeness",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "export_as": "completeness"
+      }
+    },
+    {
+      "id": "log_completeness",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "REQUIREMENTS_COMPLETENESS passed={{completeness.passed}} reasons={{completeness.reasons}}"
+      }
+    }
+  ]
+}

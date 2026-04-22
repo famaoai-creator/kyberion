@@ -1,0 +1,72 @@
+{
+  "action": "pipeline",
+  "name": "platform-onboarding",
+  "description": "Platform onboarding mission: drive the organization-integration flow end-to-end — discovery transcript → requirements draft → design spec → test plan → task plan → (operator runs execute-task-plan separately). The pipeline itself is a single-shot orchestration of the 4 artifact-producing steps; task execution and deploy run downstream pipelines with their own approval gates.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "transcript_path": "active/missions/{{mission_id}}/evidence/integration-interview.txt",
+    "source_type": "meeting_notes",
+    "language": "ja",
+    "customer_name": "内部 IT 部門",
+    "customer_org": "",
+    "app_id": ""
+  },
+  "steps": [
+    {
+      "id": "requirements",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_path}}",
+        "source_type": "{{source_type}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_org": "{{customer_org}}",
+        "export_as": "requirements"
+      }
+    },
+    {
+      "id": "design",
+      "type": "apply",
+      "op": "wisdom:extract_design_spec",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "additional_context": "Kyberion を組織固有環境（CI/CD / STT / 音声エンジン / 承認チャネル / SIEM / シークレット管理）に統合するための design。必ず SpeechToTextBridge / DeploymentAdapter / AuditForwarder / SecretResolver の 4 契約ポイントへの adapter 対応を components に含める。",
+        "export_as": "design"
+      }
+    },
+    {
+      "id": "test_plan",
+      "type": "apply",
+      "op": "wisdom:extract_test_plan",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "app_id": "{{app_id}}",
+        "export_as": "test_plan"
+      }
+    },
+    {
+      "id": "task_plan",
+      "type": "apply",
+      "op": "wisdom:decompose_into_tasks",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "export_as": "task_plan"
+      }
+    },
+    {
+      "id": "summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Onboarding artifacts for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks). Next: pnpm pipeline --input pipelines/execute-task-plan.json"
+      }
+    }
+  ]
+}

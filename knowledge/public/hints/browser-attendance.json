@@ -1,0 +1,23 @@
+{
+  "topic": "Attendance management automation",
+  "description": "Automates attendance operations including clock-in/out (出退勤打刻), paid leave requests (有給申請), and monthly attendance closing (勤怠締め). Navigates to the attendance system, performs the target action, and verifies the result.",
+  "tags": ["出勤", "退勤", "打刻", "勤怠", "有給", "attendance", "clock-in", "clock-out"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to attendance system login page",
+      "Click clock-in or clock-out button",
+      "Verify the recorded timestamp"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref"],
+    "use_cases": [
+      "出退勤の打刻",
+      "有給申請・承認",
+      "勤怠締め処理"
+    ],
+    "keywords": ["出勤", "退勤", "打刻", "勤怠", "有給", "attendance", "clock-in", "clock-out"],
+    "pattern": "A",
+    "_comment": "Pattern A: fully automatable once authenticated. Can be scheduled for daily execution at start/end of business hours."
+  }
+}

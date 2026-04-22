@@ -17,6 +17,10 @@ vi.mock('./path-resolver.js', () => ({
   resolve: (p: string) => p,
 }));
 
+vi.mock('./policy-engine.js', () => ({
+  policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
+}));
+
 describe('secure-io branch coverage', () => {
   let tmpDir = '';
 

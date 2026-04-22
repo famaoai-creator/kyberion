@@ -1,0 +1,48 @@
+{
+  "action": "pipeline",
+  "name": "code-review-cycle",
+  "description": "SDLC code review phase: treat a diff (or changed-files list) as the review topic, run 3 adversarial personas (senior-dev / security-auditor / red-team) via a2a_fanout + cross_critique, and persist surviving concerns to dissent-log.json so the reviewer role can triage.",
+  "context": {
+    "mission_id": "",
+    "review_topic": "Review the changes below for correctness, security, and risk.",
+    "diff_input_path": "active/missions/{{mission_id}}/evidence/diff.patch",
+    "hypotheses_output": "active/missions/{{mission_id}}/evidence/code-review-raw.json",
+    "critique_output": "active/missions/{{mission_id}}/evidence/code-review-critique.json",
+    "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
+    "personas": ["Senior Developer", "Security Auditor", "Red Team Adversary"]
+  },
+  "steps": [
+    {
+      "id": "diverge_review",
+      "type": "apply",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas_from": "personas",
+        "min_hypotheses_per_persona": 2,
+        "topic": "{{review_topic}} Diff at {{diff_input_path}}.",
+        "output_path": "{{hypotheses_output}}"
+      }
+    },
+    {
+      "id": "cross_critique",
+      "type": "apply",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{hypotheses_output}}",
+        "personas_from": "personas",
+        "output_path": "{{critique_output}}"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "type": "apply",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{critique_output}}",
+        "output_path": "{{dissent_output}}",
+        "mission_id": "{{mission_id}}",
+        "topic": "code-review"
+      }
+    }
+  ]
+}

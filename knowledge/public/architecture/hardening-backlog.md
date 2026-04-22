@@ -120,6 +120,27 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 - keep Presence, Chronos, and CLI on the same vocabulary
 - avoid route-specific drift in control-plane behavior
 
+## Priority 3.5
+
+### Decision-Support Integration
+
+Hardening the decision-support layer (judgment, consensus, rehearsal) so it participates in the same governance infrastructure as other mission classes. Detail tasks and status live in [`docs/CONCEPT_INTEGRATION_BACKLOG.md`](../../../docs/CONCEPT_INTEGRATION_BACKLOG.md).
+
+- Register `decision_support` mission class across classification, workflow catalog, review gates, team roles, scenario pack, and path scope (P1-1..P1-6)
+- Generalize `nemawashi-protocol` into `stakeholder-consensus-protocol` with culture variants (P1-2b)
+- Add intent-delta instrumentation and `INTENT_DRIFT` review gate so intent loop closure is measurable during execution (P1-7)
+- Replace stub decision-ops with host-CLI-delegated reasoning implementations per the CLI harness coordination model (P2-1)
+- Wire voice actuator into rehearsal and stakeholder 1-on-1 sessions (P2-2)
+- Emit presence/voice hooks that curate the confidential relationship-graph (P2-3)
+- Migrate heuristic-entry tier from personal to confidential to keep CEO succession viable (P2-4)
+- Close the heuristic feedback loop by correlating captured intuitions with mission outcomes (P2-5)
+- Wire `enforceApprovalGate` into risky-op call sites (P2-6)
+
+Reference:
+
+- [Decision-Support Design Rationale](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/decision-support-design-rationale.md)
+- [Intent Loop Concept](/Users/famaoai/k/d/kyberion/docs/INTENT_LOOP_CONCEPT.md)
+
 ## Priority 4
 
 ### Model And Harness Adaptation Governance

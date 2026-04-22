@@ -1,0 +1,24 @@
+{
+  "topic": "Browser-based approval workflow automation",
+  "description": "Automates browser-based approval workflows for ringi (稟議), expense reports (経費), and invoice approvals (請求書). Navigates to the approval system, lists pending items, reviews content, and approves or rejects.",
+  "tags": ["承認", "稟議", "経費", "請求書", "approve", "approval", "expense", "invoice"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to approval system login page",
+      "List pending approval items",
+      "Review each item's content and details",
+      "Approve or reject based on policy criteria"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref"],
+    "use_cases": [
+      "稟議承認の自動化",
+      "経費精算の承認",
+      "請求書の確認と承認"
+    ],
+    "keywords": ["承認", "稟議", "経費", "請求書", "approve", "approval", "expense", "invoice"],
+    "pattern": "C",
+    "_comment": "Pattern C: judgment-branching workflow. High-value items require human confirmation; low-value items can be auto-approved per policy."
+  }
+}

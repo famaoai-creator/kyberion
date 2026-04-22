@@ -9,6 +9,8 @@ export type MissionOrchestrationEventType =
   | 'mission_kickoff_requested'
   | 'mission_followup_requested'
   | 'mission_reconciliation_requested'
+  | 'mission_distillation_requested'
+  | 'mission_completion_requested'
   | 'mission_control_requested'
   | 'surface_control_requested';
 

@@ -1,0 +1,24 @@
+{
+  "topic": "Multi-site dashboard data collection",
+  "description": "Automates multi-site dashboard patrol for daily report collection (日次レポート収集), monitoring dashboard rounds (監視ダッシュボード巡回), and competitive observation (競合観測). Navigates to each dashboard, captures data, aggregates results, and exports.",
+  "tags": ["レポート", "ダッシュボード", "巡回", "監視", "report", "dashboard", "patrol", "monitoring"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to each target dashboard",
+      "Capture data and screenshots from each site",
+      "Aggregate collected data into a unified view",
+      "Export results to Slack, Excel, or PDF"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref"],
+    "use_cases": [
+      "日次レポートの収集と要約",
+      "サーバー監視ダッシュボードの巡回",
+      "競合サイトの定点観測"
+    ],
+    "keywords": ["レポート", "ダッシュボード", "巡回", "監視", "report", "dashboard", "patrol", "monitoring"],
+    "pattern": "D",
+    "_comment": "Pattern D: multi-site cross-cutting data aggregation. Visits multiple systems and produces a single consolidated output."
+  }
+}

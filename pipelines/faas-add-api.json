@@ -1,0 +1,82 @@
+{
+  "action": "pipeline",
+  "name": "faas-add-api",
+  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, a task plan, executes the plan via Claude Code sub-agent (full claude_code tool preset, cwd pinned to the project), and reports gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
+  "context": {
+    "mission_id": "",
+    "api_description": "",
+    "api_name_hint": "",
+    "project_name": "FaaS Platform API",
+    "cwd": "projects/faas-platform",
+    "transcript_path": "active/missions/{{mission_id}}/evidence/faas-api-request.txt",
+    "language": "ja",
+    "customer_name": "platform-operator",
+    "customer_org": "internal",
+    "source_type": "meeting_notes"
+  },
+  "steps": [
+    {
+      "id": "record_request",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "mkdir -p active/missions/{{mission_id}}/evidence && printf '%s\\n' '{{api_description}}' > {{transcript_path}}"
+      }
+    },
+    {
+      "id": "requirements",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_path}}",
+        "source_type": "{{source_type}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_org": "{{customer_org}}",
+        "export_as": "requirements"
+      }
+    },
+    {
+      "id": "design",
+      "type": "apply",
+      "op": "wisdom:extract_design_spec",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "additional_context": "Target project: FaaS platform (projects/faas-platform). Every API is a Lambda (Node.js 22) behind API Gateway HTTP API, with Aurora Global MySQL for state and the faas-runtime layer for shared concerns. Produce a design that names exactly one Lambda handler, at most one migration file (additive-only), and the CDK binding update. Respect the api-spec.schema.json contract. Components should include COMP-HANDLER, COMP-MIGRATION (if needed), COMP-REGISTRY_WRITE (always), COMP-CDK_BINDING. Open decisions must flag blocking=true when the request is ambiguous about auth_policy, data mode (read/write), or rate limits.",
+        "export_as": "design"
+      }
+    },
+    {
+      "id": "task_plan",
+      "type": "apply",
+      "op": "wisdom:decompose_into_tasks",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "export_as": "task_plan"
+      }
+    },
+    {
+      "id": "execute",
+      "type": "apply",
+      "op": "wisdom:execute_task_plan",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "cwd": "{{cwd}}",
+        "halt_on_failure": true,
+        "export_as": "execution"
+      }
+    },
+    {
+      "id": "gate_summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "faas-add-api done: requirements v{{requirements.version}} / design v{{design.version}} (architecture_ready={{design.architecture_ready.passed}}) / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks, ready={{task_plan.task_plan_ready.passed}}) / execution succeeded={{execution.succeeded}}/{{execution.total_tasks}}. Next: pipelines/code-review-cycle.json → pipelines/release-package.json → pipelines/deploy-release.json."
+      }
+    }
+  ]
+}

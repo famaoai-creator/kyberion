@@ -48,6 +48,33 @@
       "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
     },
     {
+      "id": "decision-support-exploratory",
+      "pattern": "exploratory_to_deterministic_conversion",
+      "description": "Decision-support missions start interactive (stakeholder 1-on-1s, hypothesis divergence, rehearsal) and end producing governed evidence artifacts (readiness_matrix / dissent-log / heuristic-entry).",
+      "match": {
+        "mission_classes": ["decision_support"]
+      },
+      "phases": ["intake", "classification", "planning", "execution", "verification", "delivery", "retrospective"]
+    },
+    {
+      "id": "customer-engagement-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Customer-facing missions (requirements elicitation, discovery, kickoff) route through stage-gated delivery so the transcript → draft → review → customer signoff sequence is explicit.",
+      "match": {
+        "mission_classes": ["customer_engagement"]
+      },
+      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery", "retrospective"]
+    },
+    {
+      "id": "platform-onboarding-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Platform onboarding missions (organization integration, secrets rotation, adapter registration) route through strict stage gates — cross_system_change delivery, SECURITY_READY and ARCHITECTURE_READY required, because these touch governance-scope config.",
+      "match": {
+        "mission_classes": ["platform_onboarding"]
+      },
+      "phases": ["intake", "classification", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
+    },
+    {
       "id": "single-track-default",
       "pattern": "single_track_execution",
       "description": "Default workflow for straightforward bounded work.",

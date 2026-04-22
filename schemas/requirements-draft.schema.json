@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/requirements-draft.schema.json",
+  "title": "Requirements Draft",
+  "description": "Structured requirements draft produced by the requirements_elicitation mission — typically derived from a customer meeting transcript + supporting documents. Reviewed via REQUIREMENTS_COMPLETENESS and CUSTOMER_SIGNOFF gates before becoming an authoritative requirements document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project_name", "generated_at", "functional_requirements"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "project_name": { "type": "string", "minLength": 1 },
+    "customer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "person_slug": { "type": "string", "description": "Relationship-graph node identifier." },
+        "org": { "type": "string" }
+      }
+    },
+    "elicitation_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["call_recording", "call_transcript", "meeting_notes", "document_pack", "chat_log", "mixed"]
+        },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Evidence paths or URIs."
+        },
+        "language": { "type": "string" }
+      }
+    },
+    "functional_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/functionalRequirement" }
+    },
+    "non_functional_requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonFunctionalRequirement" }
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/constraint" }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/assumption" }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/openQuestion" }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in_scope": { "type": "array", "items": { "type": "string" } },
+        "out_of_scope": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stakeholder_signoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["customer_signed_off"],
+      "properties": {
+        "customer_signed_off": { "type": "boolean" },
+        "signed_at": { "type": "string", "format": "date-time" },
+        "signed_by": { "type": "string" },
+        "channel": {
+          "type": "string",
+          "enum": ["in_meeting", "email", "docusign", "slack", "other"]
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "generated_by": { "type": "string", "description": "Reasoning backend name (stub | anthropic | claude-agent)." }
+  },
+  "$defs": {
+    "priority": {
+      "type": "string",
+      "enum": ["must", "should", "could", "wont"]
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string" },
+        "quote": { "type": "string", "description": "Excerpt from the elicitation source." },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "functionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "priority"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^FR-[0-9A-Z]+$" },
+        "description": { "type": "string", "minLength": 1 },
+        "priority": { "$ref": "#/$defs/priority" },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceRef" }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "nonFunctionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^NFR-[0-9A-Z]+$" },
+        "category": {
+          "type": "string",
+          "enum": ["performance", "security", "availability", "usability", "compatibility", "maintainability", "compliance", "cost", "other"]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "description": "Quantitative or qualitative target (e.g. 'p99 < 300ms')." },
+        "priority": { "$ref": "#/$defs/priority" },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceRef" }
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "description"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["budget", "timeline", "technical", "legal", "organizational", "other"]
+        },
+        "description": { "type": "string" },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceRef" }
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string" },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceRef" }
+        }
+      }
+    },
+    "openQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": {
+        "question": { "type": "string" },
+        "raised_by": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["open", "answered", "deferred"]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceRef" }
+        }
+      }
+    }
+  }
+}

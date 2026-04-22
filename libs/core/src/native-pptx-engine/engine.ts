@@ -442,6 +442,89 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
 }
 
 /**
+ * Patch paragraphs in an existing PPTX by matching on the paragraph's
+ * concatenated text and rewriting it wholesale. Useful when the text is
+ * split across multiple <a:t> runs (bold fragments, formatting changes) so
+ * patchPptxText's run-level match would not catch it.
+ *
+ * Matching modes:
+ *   - 'exact'       (default): paragraph's combined text must match exactly
+ *   - 'contains'  : paragraph contains the `original` as a substring
+ *
+ * The replacement text is placed into the first run; all other runs in that
+ * paragraph are emptied. Run-level formatting of the first run is preserved,
+ * formatting of emptied runs is lost (acceptable tradeoff — the alternative
+ * would require tokenization of the new string against original run boundaries,
+ * which cannot be done safely without a full rich-text diff).
+ */
+export function patchPptxParagraphs(
+  sourcePath: string,
+  outputPath: string,
+  paragraphReplacements: Array<{ original: string; replacement: string; mode?: 'exact' | 'contains' }>,
+): { modified_slides: string[]; match_count: number } {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`patchPptxParagraphs: source file does not exist: ${sourcePath}`);
+  }
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    throw new Error(`patchPptxParagraphs: output directory does not exist: ${dir}`);
+  }
+
+  const zip = new AdmZip(sourcePath);
+  const modifiedSlides = new Set<string>();
+  let matchCount = 0;
+
+  const slideEntries = zip.getEntries().filter(e =>
+    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'),
+  );
+
+  for (const entry of slideEntries) {
+    let xml = entry.getData().toString('utf8');
+    let slideModified = false;
+
+    const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+    for (const para of paragraphs) {
+      const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
+      if (!textParts || textParts.length === 0) continue;
+      const combined = textParts
+        .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')))
+        .join('');
+
+      for (const { original, replacement, mode = 'exact' } of paragraphReplacements) {
+        const match =
+          mode === 'exact' ? combined === original :
+          mode === 'contains' ? combined.includes(original) :
+          false;
+        if (!match) continue;
+
+        const newCombined = mode === 'contains'
+          ? combined.split(original).join(replacement)
+          : replacement;
+        const escapedNew = escapeXml(newCombined);
+
+        let firstRun = true;
+        const newPara = para.replace(/<a:t>[^<]*<\/a:t>/g, () => {
+          if (firstRun) { firstRun = false; return `<a:t>${escapedNew}</a:t>`; }
+          return '<a:t></a:t>';
+        });
+        xml = xml.replace(para, newPara);
+        slideModified = true;
+        matchCount++;
+        break;  // one replacement per paragraph per pass
+      }
+    }
+
+    if (slideModified) {
+      zip.updateFile(entry.entryName, Buffer.from(xml, 'utf8'));
+      modifiedSlides.add(entry.entryName);
+    }
+  }
+
+  zip.writeZip(outputPath);
+  return { modified_slides: Array.from(modifiedSlides), match_count: matchCount };
+}
+
+/**
  * Patch text content in an existing PPTX without reconstruction.
  * Clones the original ZIP and only modifies <a:t> text nodes in slide XMLs.
  * This preserves all masters, layouts, themes, media, fonts, and structure perfectly.
@@ -561,4 +644,229 @@ function extractTextFromSlideXml(xml: string): string[] {
     if (combined.trim()) results.push(combined);
   }
   return results;
+}
+
+export interface ExtractedSlide {
+  slide_index: number;        // 1-based, matches slide file name
+  entry_name: string;         // e.g., "ppt/slides/slide4.xml"
+  text_runs: string[];        // every <a:t> text node in document order
+  shapes_text: string[];      // one concatenated string per text-bearing shape
+  concatenated: string;       // all text joined with newlines
+}
+
+/**
+ * Read a PPTX and return per-slide text data. Read-only.
+ * Slide ordering follows the slide{N}.xml numeric suffix.
+ */
+export function extractPptxSlides(sourcePath: string): ExtractedSlide[] {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`extractPptxSlides: source file does not exist: ${sourcePath}`);
+  }
+  const zip = new AdmZip(sourcePath);
+  const slideEntries = zip.getEntries()
+    .filter(e => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'))
+    .sort((a, b) => {
+      const aNum = parseInt(a.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
+      const bNum = parseInt(b.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
+      return aNum - bNum;
+    });
+
+  const results: ExtractedSlide[] = [];
+  for (const entry of slideEntries) {
+    const xml = entry.getData().toString('utf8');
+    const idxMatch = entry.entryName.match(/slide(\d+)\.xml$/);
+    const slideIndex = idxMatch ? parseInt(idxMatch[1], 10) : results.length + 1;
+
+    const runs = (xml.match(/<a:t>([^<]*)<\/a:t>/g) || [])
+      .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')));
+    const shapesText = extractTextFromSlideXml(xml);
+    const concatenated = shapesText.join('\n');
+
+    results.push({
+      slide_index: slideIndex,
+      entry_name: entry.entryName,
+      text_runs: runs,
+      shapes_text: shapesText,
+      concatenated,
+    });
+  }
+  return results;
+}
+
+/**
+ * Write a new PPTX containing only the specified slides (by 1-based index).
+ * Preserves masters, layouts, themes, and media. Updates the presentation
+ * index, presentation rels, content types, and drops orphaned slide rels.
+ *
+ * Slides are emitted in the order specified by `keepIndices`, so this can
+ * also be used to reorder.
+ */
+export function filterPptxSlides(
+  sourcePath: string,
+  outputPath: string,
+  keepIndices: number[],
+): void {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`filterPptxSlides: source file does not exist: ${sourcePath}`);
+  }
+  if (!Array.isArray(keepIndices) || keepIndices.length === 0) {
+    throw new Error('filterPptxSlides: keepIndices must be a non-empty array of 1-based indices');
+  }
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    throw new Error(`filterPptxSlides: output directory does not exist: ${dir}`);
+  }
+
+  const zip = new AdmZip(sourcePath);
+
+  // Locate source slide entries, keyed by original index
+  const slideEntries = zip.getEntries().filter(e =>
+    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'),
+  );
+  const byIndex = new Map<number, typeof slideEntries[number]>();
+  for (const e of slideEntries) {
+    const m = e.entryName.match(/slide(\d+)\.xml$/);
+    if (m) byIndex.set(parseInt(m[1], 10), e);
+  }
+
+  // Validate requested indices
+  for (const idx of keepIndices) {
+    if (!byIndex.has(idx)) {
+      throw new Error(`filterPptxSlides: slide ${idx} not found (source has ${slideEntries.length} slides)`);
+    }
+  }
+
+  // Plan renumber: keep[0]→slide1.xml, keep[1]→slide2.xml, ...
+  interface PlanRow {
+    oldIdx: number;
+    newIdx: number;
+    oldEntry: string;
+    newEntry: string;
+    oldRelsEntry: string;
+    newRelsEntry: string;
+  }
+  const plan: PlanRow[] = keepIndices.map((oldIdx, i) => ({
+    oldIdx,
+    newIdx: i + 1,
+    oldEntry: `ppt/slides/slide${oldIdx}.xml`,
+    newEntry: `ppt/slides/slide${i + 1}.xml`,
+    oldRelsEntry: `ppt/slides/_rels/slide${oldIdx}.xml.rels`,
+    newRelsEntry: `ppt/slides/_rels/slide${i + 1}.xml.rels`,
+  }));
+
+  const keepOldEntries = new Set(plan.map(p => p.oldEntry));
+  const keepOldRels = new Set(plan.map(p => p.oldRelsEntry));
+
+  // Snapshot of content we must carry forward, then delete all slide artifacts
+  // from the zip before re-inserting with new numbering. We cannot do in-place
+  // rename (adm-zip doesn't support it) so we copy buffers first.
+  const preserved: { entryName: string; data: Buffer }[] = [];
+  for (const p of plan) {
+    const slideEntry = zip.getEntry(p.oldEntry);
+    if (slideEntry) preserved.push({ entryName: p.newEntry, data: slideEntry.getData() });
+    const relsEntry = zip.getEntry(p.oldRelsEntry);
+    if (relsEntry) preserved.push({ entryName: p.newRelsEntry, data: relsEntry.getData() });
+  }
+
+  // Remove every original slide + its rels (both those we keep and drop;
+  // we will re-add the kept ones under their new names).
+  for (const entry of zip.getEntries()) {
+    if (entry.entryName.startsWith('ppt/slides/slide') && entry.entryName.endsWith('.xml')) {
+      zip.deleteFile(entry.entryName);
+    } else if (entry.entryName.startsWith('ppt/slides/_rels/slide') && entry.entryName.endsWith('.xml.rels')) {
+      zip.deleteFile(entry.entryName);
+    }
+  }
+  // Re-add preserved content under renumbered names
+  for (const { entryName, data } of preserved) {
+    zip.addFile(entryName, data);
+  }
+
+  // --- Update ppt/presentation.xml ---
+  const presEntry = zip.getEntry('ppt/presentation.xml');
+  if (!presEntry) throw new Error('filterPptxSlides: ppt/presentation.xml is missing');
+  let presXml = presEntry.getData().toString('utf8');
+  const sldIdListMatch = presXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
+  if (!sldIdListMatch) {
+    throw new Error('filterPptxSlides: <p:sldIdLst> not found in presentation.xml');
+  }
+  const sldIdEntries = sldIdListMatch[1].match(/<p:sldId[^/]*\/>/g) || [];
+  if (sldIdEntries.length < Math.max(...keepIndices)) {
+    throw new Error(`filterPptxSlides: presentation.xml lists ${sldIdEntries.length} slides, insufficient for requested indices`);
+  }
+  // Pick in the user's order, renumber ids to keep them unique-and-monotonic
+  let nextId = 256;
+  const newSldIdEntries = keepIndices.map(oldIdx => {
+    const entry = sldIdEntries[oldIdx - 1];
+    const idBump = (nextId++).toString();
+    return entry.replace(/\sid="\d+"/, ` id="${idBump}"`);
+  });
+  const newSldIdList = `<p:sldIdLst>${newSldIdEntries.join('')}</p:sldIdLst>`;
+  presXml = presXml.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, newSldIdList);
+  zip.updateFile('ppt/presentation.xml', Buffer.from(presXml, 'utf8'));
+
+  // --- Update ppt/_rels/presentation.xml.rels ---
+  // Strategy: map old slide targets to new targets, drop unreferenced slide rels.
+  const presRelsEntry = zip.getEntry('ppt/_rels/presentation.xml.rels');
+  if (!presRelsEntry) throw new Error('filterPptxSlides: presentation.xml.rels is missing');
+  let relsXml = presRelsEntry.getData().toString('utf8');
+  // Remove existing slide Relationships and collect their attributes.
+  const slideRelRegex = /<Relationship[^>]*Target="slides\/slide(\d+)\.xml"[^>]*\/>/g;
+  const slideRels: { raw: string; oldIdx: number; rid: string }[] = [];
+  let relMatch: RegExpExecArray | null;
+  while ((relMatch = slideRelRegex.exec(relsXml)) !== null) {
+    const oldIdx = parseInt(relMatch[1], 10);
+    const ridMatch = relMatch[0].match(/Id="(rId\d+)"/);
+    slideRels.push({ raw: relMatch[0], oldIdx, rid: ridMatch ? ridMatch[1] : '' });
+  }
+  // Sanity check: every kept slide must have a matching rel entry.
+  for (const idx of keepIndices) {
+    if (!slideRels.some(r => r.oldIdx === idx)) {
+      throw new Error(`filterPptxSlides: presentation.xml.rels has no rel for slide ${idx}`);
+    }
+  }
+  // Drop all existing slide rels from the XML
+  relsXml = relsXml.replace(slideRelRegex, '');
+  // Find the highest existing rId so we can append kept slides deterministically
+  const allRidMatches = relsXml.match(/Id="rId(\d+)"/g) || [];
+  let maxRid = 0;
+  for (const m of allRidMatches) {
+    const n = parseInt(m.match(/rId(\d+)/)![1], 10);
+    if (n > maxRid) maxRid = n;
+  }
+  const newSlideRels = plan.map(p => {
+    const ridNum = ++maxRid;
+    return `<Relationship Id="rId${ridNum}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${p.newIdx}.xml"/>`;
+  }).join('');
+  relsXml = relsXml.replace(/<\/Relationships>\s*$/, `${newSlideRels}</Relationships>`);
+  zip.updateFile('ppt/_rels/presentation.xml.rels', Buffer.from(relsXml, 'utf8'));
+
+  // The rIds in presentation.xml's <p:sldIdLst> are now stale (they still
+  // reference the pre-rewrite rIds). Rewrite them to match the newly emitted rels.
+  let presXmlSecond = zip.getEntry('ppt/presentation.xml')!.getData().toString('utf8');
+  const sldIdListMatch2 = presXmlSecond.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
+  if (sldIdListMatch2) {
+    const firstKeptRid = maxRid - plan.length + 1;
+    const updatedEntries = keepIndices.map((_, i) => {
+      const idBump = 256 + i;
+      const rid = `rId${firstKeptRid + i}`;
+      return `<p:sldId id="${idBump}" r:id="${rid}"/>`;
+    }).join('');
+    presXmlSecond = presXmlSecond.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, `<p:sldIdLst>${updatedEntries}</p:sldIdLst>`);
+    zip.updateFile('ppt/presentation.xml', Buffer.from(presXmlSecond, 'utf8'));
+  }
+
+  // --- Update [Content_Types].xml ---
+  const ctEntry = zip.getEntry('[Content_Types].xml');
+  if (!ctEntry) throw new Error('filterPptxSlides: [Content_Types].xml is missing');
+  let ctXml = ctEntry.getData().toString('utf8');
+  // Drop every slide Override, then add one per kept slide.
+  ctXml = ctXml.replace(/<Override[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g, '');
+  const slideCt = plan.map(p =>
+    `<Override PartName="/ppt/slides/slide${p.newIdx}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
+  ).join('');
+  ctXml = ctXml.replace(/<\/Types>\s*$/, `${slideCt}</Types>`);
+  zip.updateFile('[Content_Types].xml', Buffer.from(ctXml, 'utf8'));
+
+  zip.writeZip(outputPath);
 }

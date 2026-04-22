@@ -30,6 +30,8 @@ describe('promoted-memory', () => {
     if (record.kind !== 'sop_candidate') throw new Error('expected sop_candidate');
     expect(record.procedure_steps.length).toBeGreaterThan(0);
     expect(record.safety_notes.length).toBeGreaterThan(0);
+    // Explicit shape hint wins — inferExecutionShape honors it verbatim
+    // (work-design.ts commit 80f40d53 made caller intent authoritative).
     expect(record.work_loop?.resolution.execution_shape).toBe('mission');
   });
 

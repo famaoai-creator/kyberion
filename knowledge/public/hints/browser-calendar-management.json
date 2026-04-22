@@ -1,0 +1,25 @@
+{
+  "topic": "Calendar management via browser automation",
+  "description": "Manages calendar operations (view schedule, create events, reschedule, check availability) through browser-based interaction with Google Calendar, Outlook, or other web calendar systems.",
+  "tags": ["カレンダー", "スケジュール", "予定", "面接", "会議", "calendar", "schedule", "meeting", "interview", "appointment"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to calendar web interface",
+      "Snapshot current schedule to understand availability",
+      "Create or modify events by interacting with UI elements",
+      "Confirm event details and send invitations"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref", "press_ref"],
+    "use_cases": [
+      "採用面接のスケジュール管理",
+      "会議の調整",
+      "空き時間の確認",
+      "予定の作成・変更・キャンセル"
+    ],
+    "keywords": ["カレンダー", "スケジュール", "予定", "面接", "会議", "calendar", "schedule", "meeting", "interview", "appointment", "空き", "availability"],
+    "pattern": "B",
+    "_comment": "Pattern B: Initial calendar login requires human authentication, then subsequent schedule operations are automated via browser interaction."
+  }
+}

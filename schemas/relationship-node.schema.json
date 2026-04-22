@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/relationship-node.schema.json",
+  "title": "Relationship Graph Node",
+  "description": "Per-person structured memory stored under knowledge/confidential/relationships/{org}/{person}.json. See relationship-graph-protocol.md.",
+  "type": "object",
+  "required": ["identity", "trust_level", "history", "updated_at"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["name", "org"],
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "org": { "type": "string" },
+        "person_slug": { "type": "string", "description": "Stable identifier used in mission refs." },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "email": { "type": "string" },
+            "phone": { "type": "string" },
+            "preferred_channel": { "type": "string", "enum": ["email", "phone", "slack", "in_person", "other"] }
+          }
+        }
+      }
+    },
+    "trust_level": {
+      "type": "object",
+      "required": ["current", "updated_at"],
+      "properties": {
+        "current": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": { "type": "integer", "minimum": 1, "maximum": 5 },
+              "at": { "type": "string", "format": "date-time" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "communication_style": {
+      "type": "object",
+      "properties": {
+        "honne_tatemae_tendency": { "type": "string", "enum": ["direct", "mixed", "highly_implicit"] },
+        "preferred_medium": { "type": "string" },
+        "disliked_topics": { "type": "array", "items": { "type": "string" } },
+        "tempo": { "type": "string", "enum": ["slow", "balanced", "fast"] }
+      }
+    },
+    "known_interests": {
+      "type": "object",
+      "properties": {
+        "public": { "type": "array", "items": { "type": "string" } },
+        "estimated_private": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Inferred, must be treated with extra care. Never surface in group contexts."
+        }
+      }
+    },
+    "history": {
+      "type": "array",
+      "maxItems": 20,
+      "description": "Rolling log of recent interactions. Older entries are summarized into long_term_summary.",
+      "items": {
+        "type": "object",
+        "required": ["at", "summary"],
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "summary": { "type": "string" },
+          "channel": { "type": "string" },
+          "tone_shifts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "long_term_summary": {
+      "type": "string",
+      "description": "Compressed summary of interactions older than 90 days."
+    },
+    "outstanding_asks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["raised_at", "content"],
+        "properties": {
+          "raised_at": { "type": "string", "format": "date-time" },
+          "content": { "type": "string" },
+          "status": { "type": "string", "enum": ["open", "addressed", "declined"] }
+        }
+      }
+    },
+    "ng_topics": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Landmines. Approach with care or avoid."
+    },
+    "pending_suggestions": {
+      "type": "array",
+      "description": "Automated proposals awaiting manual review before merging into the main fields.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string", "enum": ["presence-actuator", "voice-actuator", "manual"] },
+          "field_path": { "type": "string" },
+          "proposed_value": {},
+          "detected_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

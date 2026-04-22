@@ -1,0 +1,22 @@
+{
+  "id": "log-watcher-adf",
+  "name": "Kyberion Log Sentinel (ADF)",
+  "type": "event-driven",
+  "assigned_role": "infrastructure_sentinel",
+  "interval_ms": 10000,
+  "source": {
+    "path": "active/shared/logs",
+    "pattern": "*.log"
+  },
+  "action": {
+    "actuator": "file-actuator",
+    "command": "tail-and-scan",
+    "params": {
+      "keywords": ["ERROR", "CRITICAL", "FAILED", "crashed"]
+    }
+  },
+  "on_change": {
+    "intent": "alert",
+    "priority": 9
+  }
+}

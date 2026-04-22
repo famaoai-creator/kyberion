@@ -38,6 +38,51 @@
       "applies_to": {
         "mission_classes": ["operations_and_release"]
       }
+    },
+    {
+      "gate_id": "STAKEHOLDER_ALIGNMENT",
+      "description": "Verify readiness_matrix reaches the required consensus score before proceeding to formal proposal.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["decision_support"]
+      }
+    },
+    {
+      "gate_id": "DISSENT_RESOLUTION",
+      "description": "Verify unresolved items in dissent-log do not match active revisit_triggers before mission completion.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["decision_support"]
+      }
+    },
+    {
+      "gate_id": "REHEARSAL_READINESS",
+      "description": "Verify rehearsal debrief captures no critical weakness for the target counterparty before a live session.",
+      "required_in_modes": ["strict"],
+      "applies_to": {
+        "mission_classes": ["decision_support"]
+      }
+    },
+    {
+      "gate_id": "INTENT_DRIFT",
+      "description": "Verify the mission's current intent interpretation has not drifted beyond the configured threshold from the originating user intent (drift_verdict must not be 'blocking').",
+      "required_in_modes": ["standard", "strict"]
+    },
+    {
+      "gate_id": "REQUIREMENTS_COMPLETENESS",
+      "description": "Verify the requirements draft has at least one functional requirement, explicit acceptance_criteria on every must-have, and no blocking open_questions. Applies to customer_engagement missions producing requirements artifacts.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["customer_engagement"]
+      }
+    },
+    {
+      "gate_id": "CUSTOMER_SIGNOFF",
+      "description": "Verify stakeholder_signoff.customer_signed_off=true on the requirements draft before the mission delivers. Deferred signoff is surfaced to the operator; the gate blocks delivery, not authoring.",
+      "required_in_modes": ["strict"],
+      "applies_to": {
+        "mission_classes": ["customer_engagement"]
+      }
     }
   ],
   "mode_rules": [
@@ -67,6 +112,27 @@
       "review_mode": "lean",
       "match": {
         "risk_profiles": ["low"]
+      }
+    },
+    {
+      "id": "mode-standard-decision-support",
+      "review_mode": "standard",
+      "match": {
+        "mission_classes": ["decision_support"]
+      }
+    },
+    {
+      "id": "mode-strict-customer-engagement",
+      "review_mode": "strict",
+      "match": {
+        "mission_classes": ["customer_engagement"]
+      }
+    },
+    {
+      "id": "mode-strict-platform-onboarding",
+      "review_mode": "strict",
+      "match": {
+        "mission_classes": ["platform_onboarding"]
       }
     }
   ]

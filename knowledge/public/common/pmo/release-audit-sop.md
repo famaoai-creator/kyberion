@@ -24,8 +24,9 @@ Confluence のリリース計画書 (HTML同期済み) から、監査の「実�
   # GitHub PR の抽出
   grep -oE "https://github.com/[a-zA-Z0-9._/-]+/pull/[0-9]+" <plan_html_path> | sort | uniq
   
-  # Jira チケット (要件・試験証跡) の抽出
-  grep -oE "https://examplecorp.atlassian.net/browse/[A-Z]+-[0-9]+" <plan_html_path> | sort | uniq
+  # Jira チケット (要件・試験証跡) の抽出。${ATLASSIAN_BASE_URL} は
+  # 組織ごとに knowledge/confidential/{org}/endpoints.json で解決される。
+  grep -oE "${ATLASSIAN_BASE_URL}/browse/[A-Z]+-[0-9]+" <plan_html_path> | sort | uniq
   ```
 
 ### Step 2: 要件と試験証跡の検証 (Requirement & Evidence Check)
@@ -42,11 +43,11 @@ service binding 経由で Jira チケットの内容を確認する。
 GitHub CLI (`gh`) を使用し、PR の中身を「重点チェック観点」に照らしてスキャンする。
 - **実行コマンド**:
   ```bash
-  # PR の概要とファイルリストの確認
-  gh pr view <PR_NUMBER> --repo example_org/<REPO_NAME> --json title,body,files
-  
+  # PR の概要とファイルリストの確認 (${GITHUB_ORG} は confidential tier で設定)
+  gh pr view <PR_NUMBER> --repo ${GITHUB_ORG}/<REPO_NAME> --json title,body,files
+
   # 意味的な Diff 監査 (インフラ変更、パッチ混入の有無)
-  gh pr diff <PR_NUMBER> --repo example_org/<REPO_NAME>
+  gh pr diff <PR_NUMBER> --repo ${GITHUB_ORG}/<REPO_NAME>
   ```
 
 ## 3. インシデント駆動型：重点チェック観点 (Critical Checkpoints)
@@ -57,8 +58,8 @@ GitHub CLI (`gh`) を使用し、PR の中身を「重点チェック観点」�
 - **[V3] 入力バリデーション**: `transfer` 等で全角・半角スペースの `trim()` があるか。
 
 ### B. マルチテナント保護 (Tenant Purity)
-- **他行ワークフロー干渉**: 対象外の銀行（福島・愛媛等）のファイル変更がないか。
-- **設定誤混入**: 特定行の PR に他行の設定が紛れ込んでいないか。
+- **他テナント ワークフロー干渉**: 対象外のテナント（ブランド・リージョン・顧客）のファイル変更がないか。具体的なテナント一覧は confidential tier で管理する。
+- **設定誤混入**: 特定テナントの PR に他テナントの設定が紛れ込んでいないか。
 
 ### C. 基盤・インフラ防御 (Code Purity)
 - **隠れた CI 変更**: 計画外の `.github/workflows/` の変更は厳禁。
