@@ -39,6 +39,7 @@ import {
   extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
   getOptionValue,
+  parseCsvOption,
 } from './refactor/mission-cli-args.js';
 import { getGitHash, initMissionRepo, getCurrentBranch } from './refactor/mission-git.js';
 import {
@@ -71,6 +72,7 @@ import {
   createCheckpoint as _createCheckpoint,
   purgeMissions as _purgeMissions,
   recordTask as _recordTask,
+  recordEvidence as _recordEvidence,
   resumeMission as _resumeMission,
 } from './refactor/mission-maintenance.js';
 import {
@@ -352,6 +354,28 @@ async function recordTask(missionId: string, description: string, details: any =
   return _recordTask(missionId, description, details);
 }
 
+async function recordEvidence(
+  missionId: string,
+  taskId: string,
+  note: string,
+  evidence?: string[],
+  teamRole?: string,
+  actorId?: string,
+  actorType?: 'agent' | 'human' | 'service'
+) {
+  return _recordEvidence({
+    missionId,
+    taskId,
+    note,
+    evidence,
+    teamRole,
+    actorId,
+    actorType,
+    getGitHash,
+    syncProjectLedgerIfLinked,
+  });
+}
+
 async function purgeMissions(dryRun: boolean = false) {
   return _purgeMissions(ROOT_DIR, dryRun);
 }
@@ -490,6 +514,8 @@ Visibility Commands:
 
 Maintenance Commands:
   record-task <ID> <description> Record a task intention (flight recorder)
+  record-evidence <ID> <task_id> <note>
+                                 Append an execution-ledger evidence entry and commit it
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
   sync                           Sync mission registry
 
@@ -681,6 +707,17 @@ async function main() {
       break;
     case 'record-task':
       await recordTask(arg1, arg2, JSON.parse(positionalArgs[3] || '{}'));
+      break;
+    case 'record-evidence':
+      await recordEvidence(
+        arg1,
+        arg2 || 'manual',
+        arg3 || 'evidence recorded',
+        parseCsvOption('--evidence'),
+        getOptionValue('--team-role'),
+        getOptionValue('--actor-id'),
+        getOptionValue('--actor-type') as any
+      );
       break;
     case 'purge':
       await purgeMissions(!process.argv.includes('--execute'));
