@@ -5,7 +5,7 @@
       "description": "Mission owner with final accountability, checkpoint, verify, and finish authority.",
       "required_capabilities": ["reasoning", "coordination", "analysis"],
       "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
-      "allowed_delegate_team_roles": ["planner", "implementer", "reviewer", "tester", "product_strategist", "experience_designer", "operator", "surface_liaison"],
+      "allowed_delegate_team_roles": ["planner", "implementer", "reviewer", "tester", "product_strategist", "experience_designer", "operator", "surface_liaison", "devils_advocate", "counterparty_persona", "facilitator", "relationship_curator"],
       "escalation_parent_team_role": null,
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns end-to-end mission objective, integration, and final acceptance.",
@@ -107,6 +107,54 @@
       "ownership_scope": "Owns user-facing updates, handoff clarity, and interaction continuity.",
       "preferred_agents": ["slack-surface-agent", "chronos-mirror", "onboarding-surface-agent"],
       "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"],
+      "autonomy_level": "low"
+    },
+    "devils_advocate": {
+      "description": "Argues the opposite position to force divergence before convergence in decision-support missions.",
+      "required_capabilities": ["reasoning", "critique", "analysis"],
+      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": ["mission_state"],
+      "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
+      "preferred_agents": ["sovereign-brain", "nerve-agent"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "high"
+    },
+    "counterparty_persona": {
+      "description": "Synthesizes a counterparty persona for negotiation or stakeholder rehearsal without touching real relationship nodes.",
+      "required_capabilities": ["reasoning", "role_play", "persona_modeling"],
+      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": ["mission_state"],
+      "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
+      "preferred_agents": ["sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "facilitator": {
+      "description": "Runs stakeholder consensus 1-on-1s (nemawashi / round_table / pre_read_memo variants) and aggregates readiness_matrix evidence.",
+      "required_capabilities": ["facilitation", "listening", "coordination"],
+      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+      "allowed_delegate_team_roles": ["relationship_curator"],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": ["mission_state"],
+      "ownership_scope": "Owns session orchestration, dissent signal extraction, and readiness_matrix assembly.",
+      "preferred_agents": ["nerve-agent", "sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
+      "autonomy_level": "medium"
+    },
+    "relationship_curator": {
+      "description": "Maintains the confidential relationship-graph: trust_level, history, outstanding_asks, ng_topics.",
+      "required_capabilities": ["memory_management", "privacy", "curation"],
+      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "facilitator",
+      "required_scope_classes": ["knowledge_core"],
+      "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
+      "preferred_agents": ["sovereign-brain"],
+      "preferred_models": ["auto-gemini-3"],
       "autonomy_level": "low"
     }
   }

@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-delta.schema.json",
+  "title": "Intent Delta",
+  "description": "Computed difference between two intent snapshots. Drives intent_drift_gate decisions and is accumulated on the execution receipt as a mission-quality indicator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["delta_id", "mission_id", "from_snapshot", "to_snapshot", "computed_at", "changes", "drift_score"],
+  "properties": {
+    "delta_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "from_snapshot": { "type": "string", "minLength": 1 },
+    "to_snapshot": { "type": "string", "minLength": 1 },
+    "computed_at": { "type": "string", "format": "date-time" },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal_changed": { "type": "boolean" },
+        "goal_similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Token-set Jaccard similarity between from/to goal strings."
+        },
+        "constraints_added": { "type": "array", "items": { "type": "string" } },
+        "constraints_removed": { "type": "array", "items": { "type": "string" } },
+        "deliverables_added": { "type": "array", "items": { "type": "string" } },
+        "deliverables_removed": { "type": "array", "items": { "type": "string" } },
+        "excluded_added": { "type": "array", "items": { "type": "string" } },
+        "excluded_removed": { "type": "array", "items": { "type": "string" } },
+        "stakeholders_added": { "type": "array", "items": { "type": "string" } },
+        "stakeholders_removed": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["goal_changed", "goal_similarity"]
+    },
+    "drift_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "0 = identical intent, 1 = complete semantic replacement. Weighted combination of goal_similarity and field-level change volume."
+    },
+    "drift_verdict": {
+      "type": "string",
+      "enum": ["none", "minor", "significant", "blocking"],
+      "description": "Classification derived from drift_score against configured thresholds."
+    },
+    "notes": { "type": "string" }
+  }
+}

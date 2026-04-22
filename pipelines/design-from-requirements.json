@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "name": "design-from-requirements",
+  "description": "SDLC design phase: read the mission's requirements-draft.json, derive an architectural design-spec.json via the registered ReasoningBackend, and evaluate the ARCHITECTURE_READY gate. Blocks downstream work when open_decisions[].blocking=true remain.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "requirements_draft_path": "active/missions/{{mission_id}}/evidence/requirements-draft.json",
+    "additional_context": ""
+  },
+  "steps": [
+    {
+      "id": "extract",
+      "type": "apply",
+      "op": "wisdom:extract_design_spec",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "requirements_draft_path": "{{requirements_draft_path}}",
+        "additional_context": "{{additional_context}}",
+        "export_as": "design_extraction"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Design spec v{{design_extraction.version}} produced at {{design_extraction.draft_path}} (ARCHITECTURE_READY passed={{design_extraction.architecture_ready.passed}})"
+      }
+    }
+  ]
+}

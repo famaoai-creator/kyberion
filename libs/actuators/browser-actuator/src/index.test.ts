@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 
 const mocks = vi.hoisted(() => {
   const pageHandlers = new Map<string, Record<string, Function>>();
@@ -268,11 +268,11 @@ describe('browser-actuator v3 contract', () => {
   it('records action trails and exports playwright/adf artifacts', async () => {
     const { handleAction } = await import('./index');
     const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
-    fs.mkdirSync(outDir, { recursive: true });
+    safeMkdir(outDir, { recursive: true });
     const specPath = path.join(outDir, 'browser-test-playwright.spec.ts');
     const adfPath = path.join(outDir, 'browser-test-pipeline.json');
-    if (fs.existsSync(specPath)) fs.rmSync(specPath, { force: true });
-    if (fs.existsSync(adfPath)) fs.rmSync(adfPath, { force: true });
+    if (safeExistsSync(specPath)) safeRmSync(specPath, { force: true });
+    if (safeExistsSync(adfPath)) safeRmSync(adfPath, { force: true });
 
     const result = await handleAction({
       action: 'pipeline',
@@ -296,7 +296,7 @@ describe('browser-actuator v3 contract', () => {
     ]);
     expect(result.context.spec_path).toBe(specPath);
     expect(result.context.adf_path).toBe(adfPath);
-    const spec = fs.readFileSync(specPath, 'utf8');
+    const spec = safeReadFile(specPath, { encoding: 'utf8' }) as string;
     expect(spec).toContain('await expect(page).toHaveURL("https://example.com");');
     expect(spec).toContain('await expect(page).toHaveTitle("Test Page");');
     expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
@@ -304,7 +304,7 @@ describe('browser-actuator v3 contract', () => {
     expect(spec).toContain('await page.fill("button:nth-of-type(1)", "hello");');
     expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toHaveValue("hello");');
     expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toContainText("content");');
-    expect(JSON.parse(fs.readFileSync(adfPath, 'utf8'))).toMatchObject({
+    expect(JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string)).toMatchObject({
       action: 'pipeline',
       session_id: 'browser-test',
       steps: [
@@ -550,14 +550,14 @@ describe('browser-actuator v3 contract', () => {
   it('pauses for operator continuation using a continue file in non-tty mode', async () => {
     const { handleAction } = await import('./index');
     const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
-    fs.mkdirSync(outDir, { recursive: true });
+    safeMkdir(outDir, { recursive: true });
     const continueFile = path.join(outDir, 'browser-operator.continue');
-    if (fs.existsSync(continueFile)) fs.rmSync(continueFile, { force: true });
+    if (safeExistsSync(continueFile)) safeRmSync(continueFile, { force: true });
 
     const stdinIsTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
     setTimeout(() => {
-      fs.writeFileSync(continueFile, 'continue\n');
+      safeWriteFile(continueFile, 'continue\n');
     }, 25);
 
     await handleAction({
@@ -568,7 +568,7 @@ describe('browser-actuator v3 contract', () => {
     });
 
     Object.defineProperty(process.stdin, 'isTTY', { value: stdinIsTTY, configurable: true });
-    expect(fs.existsSync(continueFile)).toBe(true);
+    expect(safeExistsSync(continueFile)).toBe(true);
   });
 
   it('selects a tab by URL pattern before capture', async () => {
@@ -640,8 +640,8 @@ describe('browser-actuator v3 contract', () => {
     const sessionId = 'browser-cdp-reconnect';
     await resetBrowserRuntimeLeasesForTest();
     const metadataPath = path.resolve(process.cwd(), 'active/shared/runtime/browser/sessions', `${sessionId}.json`);
-    fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
-    fs.writeFileSync(metadataPath, JSON.stringify({
+    safeMkdir(path.dirname(metadataPath), { recursive: true });
+    safeWriteFile(metadataPath, JSON.stringify({
       session_id: sessionId,
       user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
       active_tab_id: 'tab-1',

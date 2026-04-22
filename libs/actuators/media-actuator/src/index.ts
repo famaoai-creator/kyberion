@@ -21,11 +21,15 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   distillPdfDesign,
+  extractPptxSlides,
+  filterPptxSlides,
   generateNativeDocx,
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
   patchPptxText,
+  patchPptxParagraphs,
+  protocolToMarkdown,
   type PdfDesignProtocol,
 } from '@agent/core/media-contracts';
 import * as path from 'node:path';
@@ -314,6 +318,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
       return { ...ctx, [params.export_as || 'last_pptx_design']: design, last_assets_dir: assetsDir };
     }
+    case 'pptx_slide_text': {
+      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const slides = extractPptxSlides(sourcePath);
+      return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
+    }
     case 'xlsx_extract': {
       const xlsxPath = path.resolve(rootDir, resolve(params.path));
       const xlsxDesign = await xlsxUtils.distillXlsxDesign(xlsxPath);
@@ -334,6 +343,47 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         logger.warn(`[MEDIA_CAPTURE] pdf_extract cleaner text fallback unavailable: ${error.message}`);
       }
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
+    }
+    case 'document_digest': {
+      // Extract a document and return concise LLM-friendly Markdown.
+      // Supports: pdf, pptx, xlsx, docx (auto-detected from extension).
+      // params: { path: string, export_as?: string }
+      // If a pre-extracted protocol exists in context via params.from, use that directly.
+      const exportKey = params.export_as || 'last_document_digest';
+      if (params.from && ctx[params.from]) {
+        const md = protocolToMarkdown(ctx[params.from]);
+        return { ...ctx, [exportKey]: md };
+      }
+      const filePath = path.resolve(rootDir, resolve(params.path));
+      const ext = path.extname(filePath).toLowerCase();
+      let protocol: any;
+      switch (ext) {
+        case '.pdf': {
+          protocol = await distillPdfDesign(filePath, { aesthetic: false });
+          try {
+            const extractedText = await extractCleanerPdfText(filePath);
+            protocol = mergeCleanerPdfText(protocol, extractedText);
+          } catch { /* fallback to native extraction */ }
+          break;
+        }
+        case '.pptx': {
+          const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/digest_${Date.now()}`);
+          protocol = await pptxUtils.distillPptxDesign(filePath, assetsDir);
+          break;
+        }
+        case '.xlsx': {
+          protocol = await xlsxUtils.distillXlsxDesign(filePath);
+          break;
+        }
+        case '.docx': {
+          protocol = await docxUtils.distillDocxDesign(filePath);
+          break;
+        }
+        default:
+          throw new Error(`document_digest: unsupported format "${ext}"`);
+      }
+      const md = protocolToMarkdown(protocol);
+      return { ...ctx, [exportKey]: md };
     }
     default: return ctx;
   }
@@ -738,6 +788,32 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX patched at: ${outPath} (${stats.size} bytes).`);
+      break;
+    }
+    case 'pptx_filter_slides': {
+      const sourcePath = path.resolve(rootDir, resolve(params.source));
+      const outPath = path.resolve(rootDir, resolve(params.path));
+      const keepIndices: number[] = params.keep_indices || ctx[params.keep_indices_from || 'last_keep_indices'] || [];
+
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+
+      filterPptxSlides(sourcePath, outPath, keepIndices);
+
+      const stats = safeStat(outPath);
+      logger.info(`✅ [MEDIA] PPTX filtered to slides [${keepIndices.join(',')}] at: ${outPath} (${stats.size} bytes).`);
+      break;
+    }
+    case 'pptx_patch_paragraphs': {
+      const sourcePath = path.resolve(rootDir, resolve(params.source));
+      const outPath = path.resolve(rootDir, resolve(params.path));
+      const replacements = params.paragraph_replacements || ctx[params.replacements_from || 'last_paragraph_replacements'] || [];
+
+      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+
+      const result = patchPptxParagraphs(sourcePath, outPath, replacements);
+
+      const stats = safeStat(outPath);
+      logger.info(`✅ [MEDIA] PPTX paragraph-patched (${result.match_count} matches across ${result.modified_slides.length} slide(s)) at: ${outPath} (${stats.size} bytes).`);
       break;
     }
     case 'xlsx_render': {

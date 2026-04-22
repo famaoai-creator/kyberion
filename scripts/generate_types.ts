@@ -85,6 +85,10 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/src/types/proposal-storyline-adf.ts',
   },
   {
+    schemaPath: 'knowledge/public/schemas/corporate-design-adf.schema.json',
+    outputPath: 'libs/core/src/types/corporate-design-adf.ts',
+  },
+  {
     schemaPath: 'knowledge/public/schemas/document-brief.schema.json',
     outputPath: 'libs/core/src/types/document-brief.ts',
   },

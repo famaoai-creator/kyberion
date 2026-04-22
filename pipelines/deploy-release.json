@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "name": "deploy-release",
+  "description": "SDLC deploy phase: trigger the registered DeploymentAdapter to promote a release to a named environment. Always gated through the approval gate (config:update rule). Stub adapter dry-runs; ShellDeploymentAdapter (KYBERION_DEPLOY_COMMAND) runs a real CI/CD trigger.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "version": "",
+    "environment": "staging",
+    "release_notes_path": "active/missions/{{mission_id}}/evidence/release-notes.md"
+  },
+  "steps": [
+    {
+      "id": "trigger",
+      "type": "apply",
+      "op": "wisdom:deploy_release",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "version": "{{version}}",
+        "environment": "{{environment}}",
+        "release_notes_path": "{{release_notes_path}}",
+        "export_as": "deploy_result"
+      }
+    },
+    {
+      "id": "log_result",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Deploy {{deploy_result.adapter}} status={{deploy_result.status}} — {{deploy_result.message}}"
+      }
+    }
+  ]
+}

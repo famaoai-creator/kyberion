@@ -87,6 +87,69 @@
         "intent_ids": ["bootstrap-project"]
       },
       "mission_class": "product_delivery"
+    },
+    {
+      "id": "class-decision-support",
+      "match": {
+        "task_types": ["decision_support", "consensus_building", "hypothesis_exploration", "counterfactual_analysis", "negotiation_prep", "rehearsal", "intuition_capture"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-utterance",
+      "match": {
+        "utterance_patterns": ["迷って", "落とし所", "反対され", "根回し", "nemawashi", "リハーサル", "意思決定", "交渉準備", "直観", "もしこうしていたら", "decision", "dilemma", "rehearse", "counterfactual"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-intent",
+      "match": {
+        "intent_ids": ["explore-hypotheses", "build-stakeholder-consensus", "prepare-negotiation", "rehearse-session", "capture-intuition", "analyze-counterfactual"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-customer-engagement",
+      "match": {
+        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-customer-engagement-utterance",
+      "match": {
+        "utterance_patterns": ["要件定義", "要件ヒアリング", "要件整理", "顧客ヒアリング", "お客さん.*打ち合わせ", "お客様.*打ち合わせ", "客先ミーティング", "kickoff meeting", "discovery call", "elicit requirements", "requirements gathering", "customer interview"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-customer-engagement-intent",
+      "match": {
+        "intent_ids": ["elicit-requirements", "run-customer-meeting", "draft-requirements", "schedule-customer-followup"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-platform-onboarding",
+      "match": {
+        "task_types": ["platform_onboarding", "organization_setup", "integration_setup", "secrets_rotation", "governance_configuration"]
+      },
+      "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-platform-onboarding-utterance",
+      "match": {
+        "utterance_patterns": ["組織統合", "組織導入", "Kyberion を.*導入", "Kyberion を.*入れる", "前提条件を整える", "前提整備", "オンボーディング設定", "組織固有.*設定", "CI/CD.*連携", "CI/CD.*統合", "SIEM.*連携", "シークレット.*整備", "platform onboarding", "organization setup", "integration setup", "wire up.*CI", "configure.*(secrets|STT|voice engine)"]
+      },
+      "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-platform-onboarding-intent",
+      "match": {
+        "intent_ids": ["onboard-organization", "configure-integrations", "rotate-secrets", "register-adapter"]
+      },
+      "mission_class": "platform_onboarding"
     }
   ],
   "delivery_shape_rules": [
@@ -145,6 +208,34 @@
         "task_types": ["presentation_deck", "report_document", "capture_photo"]
       },
       "delivery_shape": "single_artifact"
+    },
+    {
+      "id": "delivery-decision-support-interactive",
+      "match": {
+        "task_types": ["consensus_building", "negotiation_prep", "rehearsal"]
+      },
+      "delivery_shape": "interactive_exploration"
+    },
+    {
+      "id": "delivery-decision-support-artifact",
+      "match": {
+        "task_types": ["hypothesis_exploration", "counterfactual_analysis", "intuition_capture"]
+      },
+      "delivery_shape": "single_artifact"
+    },
+    {
+      "id": "delivery-customer-engagement",
+      "match": {
+        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+      },
+      "delivery_shape": "single_artifact"
+    },
+    {
+      "id": "delivery-platform-onboarding",
+      "match": {
+        "task_types": ["platform_onboarding", "organization_setup", "integration_setup", "secrets_rotation", "governance_configuration"]
+      },
+      "delivery_shape": "cross_system_change"
     }
   ],
   "risk_profile_rules": [
@@ -183,6 +274,27 @@
         "shapes": ["task_session", "mission"]
       },
       "risk_profile": "review_required"
+    },
+    {
+      "id": "risk-decision-support-consensus",
+      "match": {
+        "task_types": ["consensus_building", "negotiation_prep"]
+      },
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "risk-customer-engagement",
+      "match": {
+        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+      },
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "risk-platform-onboarding",
+      "match": {
+        "task_types": ["platform_onboarding", "organization_setup", "secrets_rotation"]
+      },
+      "risk_profile": "high_stakes"
     }
   ],
   "stage_rules": [

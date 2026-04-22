@@ -1,0 +1,23 @@
+{
+  "topic": "SaaS account and license management",
+  "description": "Automates SaaS account audits (アカウント棚卸し) and license management (ライセンス管理). Navigates to each SaaS admin console, lists users, and compares against HR master data to detect stale accounts and permission drift.",
+  "tags": ["SaaS", "アカウント", "棚卸し", "ライセンス", "account", "license", "audit"],
+  "confidence": 0.8,
+  "hints": {
+    "steps_hint": [
+      "Navigate to each SaaS admin console",
+      "List all active users and their roles",
+      "Compare user lists with HR master data",
+      "Flag stale accounts, permission drift, and unused licenses"
+    ],
+    "actuator": "browser-actuator",
+    "ops": ["goto", "snapshot", "click_ref", "fill_ref"],
+    "use_cases": [
+      "SaaS アカウントの棚卸し",
+      "ライセンス更新・支払い確認"
+    ],
+    "keywords": ["SaaS", "アカウント", "棚卸し", "ライセンス", "account", "license", "audit"],
+    "pattern": "D",
+    "_comment": "Pattern D: cross-system data collection and reconciliation. Visits multiple admin consoles and produces a consolidated audit report."
+  }
+}
