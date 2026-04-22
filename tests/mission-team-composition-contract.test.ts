@@ -59,6 +59,10 @@ describe('Mission team composition contract', () => {
 
   it('validates the composed team plan against schema', () => {
     const ajv = new Ajv({ allErrors: true });
+    ajv.addSchema(
+      loadJson('knowledge/public/schemas/mission-classification.schema.json'),
+      'mission-classification.schema.json',
+    );
     const validate = ajv.compile(loadJson('knowledge/public/schemas/mission-team-plan.schema.json'));
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-TEAM-PLAN',

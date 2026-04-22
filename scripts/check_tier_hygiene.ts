@@ -7,9 +7,9 @@
  * Invoke: pnpm check:tier-hygiene
  */
 
-import { pathResolver, safeReadFile } from '@agent/core';
-import * as fs from 'node:fs';
+import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface DeniedPattern {
   name: string;
@@ -106,26 +106,33 @@ function globToRegex(glob: string): RegExp {
 }
 
 function walk(root: string, current: string, collected: string[]): void {
-  let entries: fs.Dirent[];
+  let entries: string[];
   try {
-    entries = fs.readdirSync(path.join(root, current), { withFileTypes: true });
+    entries = safeReaddir(path.join(root, current));
   } catch {
     return;
   }
   for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist') {
+    if (entry.startsWith('.') || entry === 'node_modules' || entry === 'dist') {
       continue;
     }
-    const rel = current ? `${current}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
+    const rel = current ? `${current}/${entry}` : entry;
+    const fullPath = path.join(root, rel);
+    let stat;
+    try {
+      stat = safeLstat(fullPath);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
       walk(root, rel, collected);
-    } else if (entry.isFile()) {
+    } else if (stat.isFile()) {
       collected.push(rel);
     }
   }
 }
 
-async function scan(): Promise<Violation[]> {
+export async function scan(): Promise<Violation[]> {
   const policy = await loadPolicy();
   const root = pathResolver.rootDir();
 
@@ -203,7 +210,7 @@ async function scan(): Promise<Violation[]> {
   return violations;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const violations = await scan();
   if (violations.length === 0) {
     console.log('[check:tier-hygiene] OK');
@@ -222,7 +229,13 @@ async function main(): Promise<void> {
   process.exit(1);
 }
 
-main().catch((err) => {
-  console.error(`[check:tier-hygiene] fatal: ${err?.message ?? err}`);
-  process.exit(2);
-});
+const isDirectExecution =
+  process.argv[1] != null &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectExecution) {
+  main().catch((err) => {
+    console.error(`[check:tier-hygiene] fatal: ${err?.message ?? err}`);
+    process.exit(2);
+  });
+}

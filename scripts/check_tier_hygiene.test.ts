@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scan } from './check_tier_hygiene';
 
 /**
  * Regression test for the tier-hygiene checker. Instead of driving the
@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.resolve(HERE, 'check_tier_hygiene.ts');
 const PROJECT_ROOT = path.resolve(HERE, '..');
 
 function writePublicFile(relPath: string, body: string): string {
@@ -22,66 +21,47 @@ function writePublicFile(relPath: string, body: string): string {
   return abs;
 }
 
-function runChecker(): { code: number; stdout: string; stderr: string } {
-  try {
-    const stdout = execFileSync('pnpm', ['tsx', SCRIPT], {
-      cwd: PROJECT_ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { code: 0, stdout, stderr: '' };
-  } catch (err: any) {
-    return {
-      code: err.status ?? 1,
-      stdout: err.stdout?.toString() ?? '',
-      stderr: err.stderr?.toString() ?? '',
-    };
-  }
-}
-
 describe('check_tier_hygiene', () => {
-  it('passes on the current tree (baseline)', () => {
-    const result = runChecker();
-    expect(result.code).toBe(0);
+  it('passes on the current tree (baseline)', async () => {
+    const violations = await scan();
+    expect(violations).toEqual([]);
   });
 
-  it('detects an injected internal Atlassian subdomain', () => {
+  it('detects an injected internal Atlassian subdomain', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe_${process.pid}.md`,
       '# Temp probe\nReference: https://acme-internal.atlassian.net/browse/ABC-123\n',
     );
     try {
-      const result = runChecker();
-      expect(result.code).toBe(1);
-      expect(result.stderr).toMatch(/internal-atlassian-subdomain/u);
-      expect(result.stderr).toMatch(/acme-internal\.atlassian\.net/u);
+      const violations = await scan();
+      expect(violations.some((entry) => entry.pattern === 'internal-atlassian-subdomain')).toBe(true);
+      expect(violations.some((entry) => entry.matched.includes('acme-internal.atlassian.net'))).toBe(true);
     } finally {
       fs.unlinkSync(temp);
     }
   });
 
-  it('detects an injected denied substring', () => {
+  it('detects an injected denied substring', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe2_${process.pid}.md`,
       '# Temp probe\nRepository: example_org/demo-repo.\n',
     );
     try {
-      const result = runChecker();
-      expect(result.code).toBe(1);
-      expect(result.stderr).toMatch(/substring:example_org/u);
+      const violations = await scan();
+      expect(violations.some((entry) => entry.pattern === 'substring:example_org')).toBe(true);
     } finally {
       fs.unlinkSync(temp);
     }
   });
 
-  it('allows framework placeholders and industry-standard terms', () => {
+  it('allows framework placeholders and industry-standard terms', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe3_${process.pid}.md`,
       '# Temp probe\n${ATLASSIAN_BASE_URL}, <REPO_NAME>, kyberion.local, SBI Model.\n',
     );
     try {
-      const result = runChecker();
-      expect(result.code).toBe(0);
+      const violations = await scan();
+      expect(violations).toEqual([]);
     } finally {
       fs.unlinkSync(temp);
     }

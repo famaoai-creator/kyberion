@@ -18,8 +18,15 @@ describe('Governed temp hierarchy', () => {
       .filter((relPath) => /\.(ts|tsx|js|jsx|mjs|cjs|md|json)$/.test(relPath))
       .filter((relPath) => safeExistsSync(path.join(rootDir, relPath)))
       .filter((relPath) => {
-        const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
-        return content.includes('scratch/');
+        try {
+          const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
+          return content.includes('scratch/');
+        } catch (error: any) {
+          if (String(error?.message || '').includes('File not found:')) {
+            return false;
+          }
+          throw error;
+        }
       })
       .filter((relPath) => !relPath.startsWith('knowledge/public/'))
       .filter((relPath) => !relPath.startsWith('knowledge/confidential/'))
