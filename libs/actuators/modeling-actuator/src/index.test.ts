@@ -1,7 +1,6 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { safeMkdir, safeWriteFile } from '@agent/core';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core';
 import { handleAction } from './index.js';
 
 describe('modeling-actuator terraform_to_architecture_adf', () => {
@@ -36,7 +35,7 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
     expect(result.context.existing).toBe('kept');
     expect(result.context.payload).toEqual({ count: 2 });
 
-    const persisted = JSON.parse(fs.readFileSync(contextPath, 'utf8'));
+    const persisted = JSON.parse(safeReadFile(contextPath, { encoding: 'utf8' }) as string);
     expect(persisted.existing).toBe('kept');
     expect(persisted.payload).toEqual({ count: 2 });
   });
@@ -207,11 +206,11 @@ resource "aws_db_instance" "from_symlink" {}
 `);
 
     try {
-      fs.symlinkSync(linkedDir, symlinkPath, 'dir');
+      safeSymlinkSync(linkedDir, symlinkPath, 'dir');
     } catch (error: any) {
       if (error?.code === 'EEXIST') {
-        fs.rmSync(symlinkPath, { force: true, recursive: true });
-        fs.symlinkSync(linkedDir, symlinkPath, 'dir');
+        safeRmSync(symlinkPath, { force: true, recursive: true });
+        safeSymlinkSync(linkedDir, symlinkPath, 'dir');
       } else {
         throw error;
       }

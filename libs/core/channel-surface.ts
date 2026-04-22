@@ -938,6 +938,14 @@ export function deriveSlackExecutionMode(text: string): SlackExecutionMode {
   if (matchesAnyTextRule(normalized, rules.execution_mode.feasibility_patterns)) {
     return 'conversation';
   }
+  // Treat soft, exploratory "can you make X?" phrasing as conversation unless
+  // the user explicitly asks for durable side effects like saving or implementation.
+  const softRequestConversation =
+    /(作って|作成して).*(ください|下さい|ほしい|欲しい|くれない|もらえます|もらえる|お願い)/u.test(normalized) &&
+    !/(保存|実装|ファイル|ミッション|mission)/iu.test(normalized);
+  if (softRequestConversation) {
+    return 'conversation';
+  }
   return matchesAnyTextRule(normalized, rules.execution_mode.durable_task_patterns)
     ? 'task'
     : 'conversation';
