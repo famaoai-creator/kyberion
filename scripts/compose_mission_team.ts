@@ -10,6 +10,25 @@ import {
   writeMissionTeamPlan,
 } from '@agent/core';
 
+function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
+  const previousRole = process.env.MISSION_ROLE;
+  const previousPersona = process.env.KYBERION_PERSONA;
+
+  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!process.env.KYBERION_PERSONA && assignedPersona) {
+    process.env.KYBERION_PERSONA = assignedPersona;
+  }
+
+  try {
+    return fn();
+  } finally {
+    if (previousRole === undefined) delete process.env.MISSION_ROLE;
+    else process.env.MISSION_ROLE = previousRole;
+    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = previousPersona;
+  }
+}
+
 async function main() {
   const argv = await createStandardYargs()
     .option('mission-id', { type: 'string', demandOption: true })
@@ -91,8 +110,10 @@ async function main() {
 
   if (argv.write) {
     const targetDir = missionPath || missionDir(missionId, tier);
-    writeMissionTeamPlan(targetDir, plan);
-    initializeMissionTeamBindings(targetDir, plan);
+    withMissionWriteContext(assignedPersona, () => {
+      writeMissionTeamPlan(targetDir, plan);
+      initializeMissionTeamBindings(targetDir, plan);
+    });
   }
 
   console.log(JSON.stringify(brief || plan, null, 2));

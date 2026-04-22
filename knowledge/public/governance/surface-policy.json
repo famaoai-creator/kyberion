@@ -61,7 +61,10 @@
             { "type": "contains", "value": "プラン" },
             { "type": "contains", "value": "refactor" },
             { "type": "contains", "value": "監査" },
-            { "type": "contains", "value": "audit" }
+            { "type": "contains", "value": "audit" },
+            { "type": "contains", "value": "資料" },
+            { "type": "contains", "value": "marketing" },
+            { "type": "contains", "value": "マーケティング" }
           ]
         }
       ]
@@ -177,7 +180,6 @@
           { "type": "contains", "value": "実装して" },
           { "type": "regex", "value": "implement\\b" },
           { "type": "contains", "value": "作成して" },
-          { "type": "contains", "value": "作って" },
           { "type": "contains", "value": "draft it" },
           { "type": "contains", "value": "create it" },
           { "type": "regex", "value": "ファイル.*(作成|保存)" }

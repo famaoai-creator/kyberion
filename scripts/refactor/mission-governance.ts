@@ -10,6 +10,7 @@ import {
   logger,
   pathResolver,
   safeAppendFileSync,
+  safeExec,
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
@@ -77,6 +78,17 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
     logger.info('🧪 [QualityCheck] Verification required: require_test_success=true');
     if (state.status !== 'distilling' && state.status !== 'validating' && state.status !== 'completed') {
       return { ok: false, reason: 'Mission must pass validation/verification before finishing.' };
+    }
+  }
+
+  const missionPath = findMissionPath(id);
+  if (missionPath) {
+    const head = safeExec('git', ['rev-parse', 'HEAD'], { cwd: missionPath }).trim();
+    if (state.git.latest_commit !== head) {
+      return {
+        ok: false,
+        reason: `Mission state latest_commit (${state.git.latest_commit.slice(0, 8)}) does not match mission repo HEAD (${head.slice(0, 8)}). Record a checkpoint or evidence entry before finishing.`,
+      };
     }
   }
 

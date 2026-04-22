@@ -105,6 +105,10 @@ export const VALUE_FLAGS = new Set([
   '--track-relationship',
   '--track-traceability-refs',
   '--track-note',
+  '--team-role',
+  '--actor-id',
+  '--actor-type',
+  '--evidence',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];
