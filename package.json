@@ -60,6 +60,8 @@
     "surfaces:start": "node dist/scripts/surface_runtime.js --action start",
     "surfaces:stop": "node dist/scripts/surface_runtime.js --action stop",
     "generation:schedule": "node dist/scripts/run_generation_schedule.js",
+    "voice:conversation:turn": "node dist/scripts/run_realtime_voice_conversation.js",
+    "voice:profile:promote": "node dist/scripts/promote_voice_profile.js",
     "slack:bridge": "node dist/satellites/slack-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
     "chronos:lint": "pnpm --dir presence/displays/chronos-mirror-v2 lint",

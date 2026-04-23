@@ -6,6 +6,8 @@
 
 import type { ApprovalRequestDraft, ApprovalRequestRecord } from './approval-store.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
+import type { A2AMessage } from './a2a-bridge.js';
+import type { A2UIMessage } from './a2ui.js';
 
 export type SurfaceRole = GovernedArtifactRole;
 
@@ -159,10 +161,40 @@ export interface PlanningPacket {
 }
 
 // ─── A2A / Conversation ───────────────────────────────────────────────────────
-export interface SurfaceConversationInput {
+export interface SlackSurfaceMetadata {
+  surface: 'slack';
+  user?: string;
+  team?: string;
+  channel: string;
+  threadTs: string;
+  channelType?: string;
+  execution_mode?: SlackExecutionMode;
+}
+
+export interface ChronosSurfaceMetadata {
+  surface: 'chronos';
+  actorId?: string;
+  channel: string;
+  threadTs: string;
+}
+
+export interface PresenceSurfaceMetadata {
+  surface: 'presence';
+  actorId?: string;
+  channel: string;
+  threadTs: string;
+}
+
+export type SurfaceConversationMetadata =
+  | SlackSurfaceMetadata
+  | ChronosSurfaceMetadata
+  | PresenceSurfaceMetadata;
+
+interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
+  surfaceText?: string;
   cwd?: string;
   delegationSummaryInstruction?: string;
   forcedReceiver?: string;
@@ -170,15 +202,68 @@ export interface SurfaceConversationInput {
   teamRole?: string;
 }
 
+export type SurfaceConversationInput =
+  | (SurfaceConversationInputBase & { surface: 'slack'; surfaceMetadata?: SlackSurfaceMetadata })
+  | (SurfaceConversationInputBase & { surface: 'chronos'; surfaceMetadata?: ChronosSurfaceMetadata })
+  | (SurfaceConversationInputBase & { surface: 'presence'; surfaceMetadata?: PresenceSurfaceMetadata })
+  | (SurfaceConversationInputBase & { surface?: SurfaceAsyncChannel; surfaceMetadata?: SurfaceConversationMetadata });
+
+interface SurfaceConversationMessageInputBase {
+  text: string;
+  correlationId?: string;
+  messageId?: string;
+  receivedAt?: string;
+  senderAgentId: string;
+  agentId?: string;
+  cwd?: string;
+  delegationSummaryInstruction?: string;
+  forcedReceiver?: string;
+  missionId?: string;
+  teamRole?: string;
+}
+
+export type SurfaceConversationMessageInput =
+  | (SurfaceConversationMessageInputBase & {
+      surface: 'slack';
+      channel: string;
+      threadTs: string;
+      actorId?: string;
+      metadata?: Omit<SlackSurfaceMetadata, 'surface' | 'channel' | 'threadTs'>;
+    })
+  | (SurfaceConversationMessageInputBase & {
+      surface: 'chronos';
+      channel?: string;
+      threadTs: string;
+      actorId?: string;
+      metadata?: Omit<ChronosSurfaceMetadata, 'surface' | 'channel' | 'threadTs'>;
+    })
+  | (SurfaceConversationMessageInputBase & {
+      surface: 'presence';
+      channel?: string;
+      threadTs?: string;
+      actorId?: string;
+      metadata?: Omit<PresenceSurfaceMetadata, 'surface' | 'channel' | 'threadTs'>;
+    });
+
 export interface SurfaceConversationResult {
   text: string;
-  a2uiMessages: any[];
-  a2aMessages: any[];
-  delegationResults: any[];
+  a2uiMessages: A2UIMessage[];
+  a2aMessages: A2AMessage[];
+  delegationResults: SurfaceDelegationResult[];
   approvalRequests: SlackApprovalRequestDraft[];
   routingProposals?: NerveRoutingProposal[];
   missionProposals?: MissionProposal[];
   planningPackets?: PlanningPacket[];
+}
+
+export interface SurfaceDelegationResult {
+  receiver?: string;
+  response?: string;
+  error?: string;
+  bypassedSurfaceAgent?: boolean;
+  missionId?: string;
+  teamRole?: string;
+  authorityRole?: string;
 }
 
 export type SurfaceAsyncChannel = 'slack' | 'chronos' | 'presence';

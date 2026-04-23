@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "voice-sample-recording.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": { "const": "record_voice_sample" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "sample_id": { "type": "string", "minLength": 1 },
+    "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+    "language": { "type": "string", "minLength": 2 },
+    "prompt_text": { "type": "string" },
+    "output_path": { "type": "string", "minLength": 1 }
+  },
+  "required": ["action", "request_id", "sample_id", "duration_sec"]
+}

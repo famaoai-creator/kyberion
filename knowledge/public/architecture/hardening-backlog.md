@@ -65,6 +65,7 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 
 - add governed voice-profile registration so `use my voice` can fail clearly or execute honestly instead of silently falling back
 - add strict clone-routing policy so personal-voice requests do not downgrade to generic system TTS without explicit approval
+- add realtime voice conversation runtime so registered active profiles can be used in governed turn-based dialogue, not only narration
 - compile narrated intro movies from design-system and brand inputs rather than hand-authored scene JSON
 - replace short synchronous backend waits with an async render producer that can complete long movie jobs reliably
 - add one canonical end-to-end scenario covering personal voice registration, narration, storyboard, composition, render, and delivery evidence

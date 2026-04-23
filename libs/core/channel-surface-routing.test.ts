@@ -3,24 +3,25 @@ import { deriveSlackExecutionMode, deriveSlackIntentLabel, deriveSurfaceDelegati
 
 describe('channel-surface routing helpers', () => {
   it('routes mission and system queries to chronos-mirror', () => {
-    expect(deriveSurfaceDelegationReceiver('ミッション一覧を教えて')).toBe('chronos-mirror');
-    expect(deriveSurfaceDelegationReceiver('システム状態を教えて')).toBe('chronos-mirror');
-    expect(deriveSurfaceDelegationReceiver('runtime status please')).toBe('chronos-mirror');
+    expect(deriveSurfaceDelegationReceiver('ミッション一覧を教えて', 'slack')).toBe('chronos-mirror');
+    expect(deriveSurfaceDelegationReceiver('システム状態を教えて', 'presence')).toBe('chronos-mirror');
+    expect(deriveSurfaceDelegationReceiver('runtime status please', 'presence')).toBe('chronos-mirror');
   });
 
   it('routes deeper reasoning requests to nerve-agent', () => {
-    expect(deriveSurfaceDelegationReceiver('この設計をレビューして')).toBe('nerve-agent');
+    expect(deriveSurfaceDelegationReceiver('この設計をレビューして', 'slack')).toBe('nerve-agent');
+    expect(deriveSurfaceDelegationReceiver('この設計をレビューして', 'chronos')).toBe('nerve-agent');
   });
 
   it('keeps lightweight greetings local', () => {
-    expect(deriveSurfaceDelegationReceiver('こんにちは')).toBeUndefined();
-    expect(deriveSurfaceDelegationReceiver('thanks')).toBeUndefined();
+    expect(deriveSurfaceDelegationReceiver('こんにちは', 'slack')).toBeUndefined();
+    expect(deriveSurfaceDelegationReceiver('thanks', 'slack')).toBeUndefined();
   });
 
   it('keeps casual informational questions local unless they match heavy-work routing', () => {
-    expect(deriveSurfaceDelegationReceiver('今日の天気おしえて')).toBeUndefined();
-    expect(deriveSurfaceDelegationReceiver('What is the weather today?')).toBeUndefined();
-    expect(deriveSurfaceDelegationReceiver('このsurfaceでは何ができるの？')).toBeUndefined();
+    expect(deriveSurfaceDelegationReceiver('今日の天気おしえて', 'slack')).toBeUndefined();
+    expect(deriveSurfaceDelegationReceiver('What is the weather today?', 'presence')).toBeUndefined();
+    expect(deriveSurfaceDelegationReceiver('このsurfaceでは何ができるの？', 'chronos')).toBeUndefined();
   });
 
   it('resolves compiled heavy-work flows to nerve-agent via receiver rules', () => {
@@ -79,7 +80,7 @@ describe('channel-surface routing helpers', () => {
         learning: { reusable_refs: [] },
       },
       source: 'llm',
-    });
+    }, 'slack');
 
     expect(receiver).toBe('nerve-agent');
   });

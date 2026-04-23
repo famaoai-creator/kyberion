@@ -4,6 +4,8 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "_status": { "type": "string" },
+    "_replacement": { "type": "string" },
     "version": { "type": "string" },
     "routing": { "$ref": "#/$defs/routingPolicy" },
     "slack": { "$ref": "#/$defs/slackPolicy" }
