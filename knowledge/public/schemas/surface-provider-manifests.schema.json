@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-provider-manifests.schema.json",
+  "title": "Surface Provider Manifests",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "providers"],
+  "properties": {
+    "version": { "type": "string" },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slack", "chronos", "presence"],
+      "properties": {
+        "slack": { "$ref": "#/$defs/providerManifest" },
+        "chronos": { "$ref": "#/$defs/providerManifest" },
+        "presence": { "$ref": "#/$defs/providerManifest" }
+      }
+    }
+  },
+  "$defs": {
+    "textMatchRule": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "type": "string", "enum": ["contains", "regex", "equals", "starts_with", "ends_with"] },
+            "value": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "receiverRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiver", "patterns"],
+      "properties": {
+        "id": { "type": "string" },
+        "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+        "patterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/textMatchRule" }
+        }
+      }
+    },
+    "compiledFlowRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiver"],
+      "properties": {
+        "id": { "type": "string" },
+        "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+        "execution_shapes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "conversation_agents": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "task_types": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "routingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text_routing", "compiled_flow_rules"],
+      "properties": {
+        "text_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["greeting_patterns", "receiver_rules"],
+          "properties": {
+            "greeting_patterns": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/textMatchRule" }
+            },
+            "receiver_rules": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/receiverRule" }
+            }
+          }
+        },
+        "compiled_flow_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compiledFlowRule" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reply", "edit", "react", "notify", "asyncRequest", "responding"],
+      "properties": {
+        "reply": { "type": "boolean" },
+        "edit": { "type": "boolean" },
+        "react": { "type": "boolean" },
+        "notify": { "type": "boolean" },
+        "asyncRequest": { "type": "boolean" },
+        "responding": { "type": "boolean" }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directReply", "supportsOutbox", "supportsNotifications"],
+      "properties": {
+        "directReply": { "type": "string", "enum": ["outbox", "notification", "none"] },
+        "supportsOutbox": { "type": "boolean" },
+        "supportsNotifications": { "type": "boolean" }
+      }
+    },
+    "providerManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "agentId", "channel", "interactionMode", "capabilities", "delivery", "routing"],
+      "properties": {
+        "id": { "type": "string", "enum": ["slack", "chronos", "presence"] },
+        "displayName": { "type": "string" },
+        "agentId": { "type": "string" },
+        "channel": { "type": "string" },
+        "interactionMode": { "type": "string", "enum": ["threaded", "session", "live"] },
+        "capabilities": { "$ref": "#/$defs/capabilities" },
+        "delivery": { "$ref": "#/$defs/delivery" },
+        "routing": { "$ref": "#/$defs/routingPolicy" },
+        "intent_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default_label"],
+          "properties": {
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "patterns"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "patterns": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/textMatchRule" }
+                  }
+                }
+              }
+            },
+            "default_label": { "type": "string" }
+          }
+        },
+        "surface_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "execution_mode": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["feasibility_patterns", "durable_task_patterns"],
+              "properties": {
+                "feasibility_patterns": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/textMatchRule" }
+                },
+                "durable_task_patterns": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/textMatchRule" }
+                }
+              }
+            },
+            "delegation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["lightweight_patterns"],
+              "properties": {
+                "lightweight_patterns": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/textMatchRule" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

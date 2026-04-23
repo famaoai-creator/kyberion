@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeWriteFile } from '@agent/core';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   getVoiceProfileRecord,
   getVoiceProfileRegistry,

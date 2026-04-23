@@ -42,9 +42,9 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/active-surfaces.json',
   },
   {
-    id: 'surface-policy',
-    schemaPath: 'knowledge/public/schemas/surface-policy.schema.json',
-    dataPath: 'knowledge/public/governance/surface-policy.json',
+    id: 'surface-provider-manifests',
+    schemaPath: 'knowledge/public/schemas/surface-provider-manifests.schema.json',
+    dataPath: 'knowledge/public/governance/surface-provider-manifests.json',
   },
   {
     id: 'model-registry',
@@ -189,46 +189,6 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.design_rules?.intent_label_rules || []).length) {
       violations.push('work-policy: design_rules.intent_label_rules must not be empty');
-    }
-  }
-
-  if (check.id === 'surface-policy') {
-    const typed = data as {
-      routing?: {
-        text_routing?: { greeting_patterns?: unknown[]; receiver_rules?: unknown[] };
-        compiled_flow_rules?: unknown[];
-      };
-      slack?: {
-        intent_rules?: { rules?: unknown[]; default_label?: string };
-        surface_rules?: {
-          execution_mode?: { feasibility_patterns?: unknown[]; durable_task_patterns?: unknown[] };
-          delegation?: { lightweight_patterns?: unknown[] };
-        };
-      };
-    };
-    if (!(typed.routing?.text_routing?.greeting_patterns || []).length) {
-      violations.push('surface-policy: routing.text_routing.greeting_patterns must not be empty');
-    }
-    if (!(typed.routing?.text_routing?.receiver_rules || []).length) {
-      violations.push('surface-policy: routing.text_routing.receiver_rules must not be empty');
-    }
-    if (!(typed.routing?.compiled_flow_rules || []).length) {
-      violations.push('surface-policy: routing.compiled_flow_rules must not be empty');
-    }
-    if (!(typed.slack?.intent_rules?.rules || []).length) {
-      violations.push('surface-policy: slack.intent_rules.rules must not be empty');
-    }
-    if (!String(typed.slack?.intent_rules?.default_label || '')) {
-      violations.push('surface-policy: slack.intent_rules.default_label must not be empty');
-    }
-    if (!(typed.slack?.surface_rules?.execution_mode?.feasibility_patterns || []).length) {
-      violations.push('surface-policy: slack.surface_rules.execution_mode.feasibility_patterns must not be empty');
-    }
-    if (!(typed.slack?.surface_rules?.execution_mode?.durable_task_patterns || []).length) {
-      violations.push('surface-policy: slack.surface_rules.execution_mode.durable_task_patterns must not be empty');
-    }
-    if (!(typed.slack?.surface_rules?.delegation?.lightweight_patterns || []).length) {
-      violations.push('surface-policy: slack.surface_rules.delegation.lightweight_patterns must not be empty');
     }
   }
 

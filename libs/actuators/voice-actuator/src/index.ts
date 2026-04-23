@@ -1,5 +1,6 @@
 import AjvModule from 'ajv';
 import {
+  collectVoiceSamples,
   compileSchemaFromPath,
   getVoiceSampleIngestionPolicy,
   getVoiceEngineRecord,
@@ -10,6 +11,7 @@ import {
   pathResolver,
   recordInteraction,
   resolveVoiceEngineForPlatform,
+  recordVoiceSample,
   safeExec,
   safeMkdir,
   safeReadFile,
@@ -29,6 +31,42 @@ const voiceActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve(
 type VoiceAction =
   | { action: 'speak_local'; params: Record<string, unknown> }
   | { action: 'list_voices'; params: Record<string, unknown> }
+  | {
+    action: 'record_voice_sample';
+    request_id: string;
+    sample_id: string;
+    duration_sec: number;
+    language?: string;
+    prompt_text?: string;
+    output_path?: string;
+  }
+  | {
+    action: 'collect_voice_samples';
+    request_id: string;
+    profile_draft?: {
+      profile_id: string;
+      display_name: string;
+      tier: 'personal' | 'confidential' | 'public';
+      languages: string[];
+      default_engine_id: string;
+      notes?: string;
+    };
+    samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
+  }
+  | {
+    action: 'collect_and_register_voice_profile';
+    request_id: string;
+    profile: {
+      profile_id: string;
+      display_name: string;
+      tier: 'personal' | 'confidential' | 'public';
+      languages: string[];
+      default_engine_id: string;
+      notes?: string;
+    };
+    samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
+    policy?: { strict_personal_voice?: boolean };
+  }
   | {
     action: 'register_voice_profile';
     request_id: string;
@@ -57,6 +95,24 @@ export async function handleSingleAction(input: VoiceAction) {
   if (input.action === 'generate_voice') {
     return generateVoice(input);
   }
+  if (input.action === 'record_voice_sample') {
+    const payload = (input as any).params
+      ? { action: 'record_voice_sample', ...((input as any).params || {}) }
+      : input;
+    return recordVoiceSample(payload as any);
+  }
+  if (input.action === 'collect_voice_samples') {
+    const payload = (input as any).params
+      ? { action: 'collect_voice_samples', ...((input as any).params || {}) }
+      : input;
+    return collectVoiceSamples(payload as any);
+  }
+  if (input.action === 'collect_and_register_voice_profile') {
+    const payload = (input as any).params
+      ? { action: 'collect_and_register_voice_profile', ...((input as any).params || {}) }
+      : input;
+    return collectAndRegisterVoiceProfile(payload as any);
+  }
   if (input.action === 'register_voice_profile') {
     const payload = (input as any).params
       ? { action: 'register_voice_profile', ...((input as any).params || {}) }
@@ -83,6 +139,42 @@ export async function handleSingleAction(input: VoiceAction) {
     return { status: 'interaction_recorded', person_slug: p.person_slug, org: p.org, history_length: node.history.length };
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
+}
+
+async function collectAndRegisterVoiceProfile(input: {
+  action: 'collect_and_register_voice_profile';
+  request_id: string;
+  profile: {
+    profile_id: string;
+    display_name: string;
+    tier: 'personal' | 'confidential' | 'public';
+    languages: string[];
+    default_engine_id: string;
+    notes?: string;
+  };
+  samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
+  policy?: { strict_personal_voice?: boolean };
+}): Promise<any> {
+  const collected = collectVoiceSamples({
+    action: 'collect_voice_samples',
+    request_id: input.request_id,
+    profile_draft: input.profile,
+    samples: input.samples,
+  });
+  const registration = await registerVoiceProfile({
+    action: 'register_voice_profile',
+    request_id: input.request_id,
+    profile: input.profile,
+    samples: collected.registration_candidate.samples,
+    policy: input.policy,
+  });
+  return {
+    status: registration.status === 'succeeded' ? 'succeeded' : registration.status,
+    action: 'collect_and_register_voice_profile',
+    request_id: input.request_id,
+    collection: collected,
+    registration,
+  };
 }
 
 export async function handleAction(input: VoiceAction) {

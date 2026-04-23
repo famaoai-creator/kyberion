@@ -47,17 +47,22 @@ export interface AgentResponse {
   text: string;
   thought?: string;
   stopReason: string;
+  trace?: Array<{ enhancer: string; action: string; details?: string }>;
 }
 
-export type AgentAskOptions = Record<string, unknown>;
+export interface AgentAskOptions extends Record<string, unknown> {
+  phase?: 'onboarding' | 'recovery' | 'alignment' | 'execution' | 'review';
+  intentId?: string;
+  tags?: string[];
+  responseMimeType?: 'text/plain' | 'application/json';
+}
 
 /**
  * Interface for model-specific enhancements (Add-ons).
- * Allows modifying prompts or adding context before execution.
  */
 export interface AgentEnhancer {
   name: string;
-  onBeforeAsk?(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }>;
+  onBeforeAsk?(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }>;
   onAfterAsk?(response: AgentResponse): Promise<AgentResponse>;
 }
 
@@ -109,25 +114,41 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
 async function applyEnhancersBeforeAsk(
   enhancers: AgentEnhancer[],
   prompt: string,
-  options?: AgentAskOptions
+  options: AgentAskOptions,
+  trace: Array<{ enhancer: string; action: string; details?: string }>
 ): Promise<{ prompt: string; options: AgentAskOptions }> {
   let currentPrompt = prompt;
-  let currentOptions: AgentAskOptions = { ...(options || {}) };
+  let currentOptions: AgentAskOptions = { ...options };
   for (const enhancer of enhancers) {
     if (!enhancer.onBeforeAsk) continue;
+    const originalPrompt = currentPrompt;
     const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
     currentPrompt = enhanced.prompt;
     currentOptions = { ...currentOptions, ...(enhanced.options || {}) };
+    
+    if (currentPrompt !== originalPrompt) {
+      trace.push({ 
+        enhancer: enhancer.name, 
+        action: 'modify_prompt', 
+        details: `Diff: ${currentPrompt.length - originalPrompt.length} chars` 
+      });
+    }
   }
   return { prompt: currentPrompt, options: currentOptions };
 }
 
-async function applyEnhancersAfterAsk(enhancers: AgentEnhancer[], response: AgentResponse): Promise<AgentResponse> {
+async function applyEnhancersAfterAsk(
+  enhancers: AgentEnhancer[], 
+  response: AgentResponse
+): Promise<AgentResponse> {
   let next = response;
+  const trace = next.trace || [];
   for (const enhancer of enhancers) {
     if (!enhancer.onAfterAsk) continue;
     next = await enhancer.onAfterAsk(next);
+    trace.push({ enhancer: enhancer.name, action: 'modify_response' });
   }
+  next.trace = trace;
   return next;
 }
 
@@ -290,10 +311,12 @@ abstract class BaseACPAdapter implements AgentAdapter {
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     if (!this.connection || !this.acpSessionId) throw new Error('Agent not booted.');
 
-    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
+    const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options || {}, trace);
 
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
+
     
     // @ts-ignore
     const response: any = await this.connection.extMethod(this.dialect.prompt, {
@@ -320,7 +343,8 @@ abstract class BaseACPAdapter implements AgentAdapter {
     const agentResponse: AgentResponse = {
       text: finalText,
       thought: this.accumulatedThought,
-      stopReason: (response as any).stopReason || 'completed'
+      stopReason: (response as any).stopReason || 'completed',
+      trace
     };
     return applyEnhancersAfterAsk(this.enhancers, agentResponse);
   }
@@ -369,9 +393,11 @@ export class GeminiAdapter extends BaseACPAdapter {
     }, 'oauth-personal'); 
     this.options = options || {};
 
-    // Auto-apply Gemini Wisdom Enhancer as default for Gemini Pro or if no model specified
+    // Auto-apply Gemini Add-ons for Pro models
     if (this.options.model?.includes('pro') || !this.options.model) {
+      this.addEnhancer(new GeminiPhaseAwareInstructionEnhancer());
       this.addEnhancer(new GeminiWisdomEnhancer());
+      this.addEnhancer(new GeminiJsonModeEnforcer());
     }
   }
 
@@ -389,13 +415,67 @@ export class GeminiAdapter extends BaseACPAdapter {
 }
 
 /**
+ * Gemini-specific Add-on: Adjusts system behavior based on mission phase.
+ */
+export class GeminiPhaseAwareInstructionEnhancer implements AgentEnhancer {
+  public name = 'GeminiPhaseAwareInstructionEnhancer';
+
+  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
+    if (!options.phase) return { prompt, options };
+
+    const phaseInstructions: Record<string, string> = {
+      alignment: 'Focus on understanding intent, clarifying ambiguity, and defining clear success criteria.',
+      execution: 'Prioritize surgical, deterministic code changes. Follow AGENTS.md strictly. Test before finality.',
+      review: 'Critically analyze changes for regressions, security leaks, and architectural consistency.',
+    };
+
+    const instruction = phaseInstructions[options.phase];
+    if (instruction) {
+      const enhancedPrompt = `
+<phase_directive phase="${options.phase}">
+${instruction}
+</phase_directive>
+
+${prompt}`;
+      return { prompt: enhancedPrompt, options };
+    }
+
+    return { prompt, options };
+  }
+}
+
+/**
+ * Gemini-specific Add-on: Enforces JSON mode for structured tasks.
+ */
+export class GeminiJsonModeEnforcer implements AgentEnhancer {
+  public name = 'GeminiJsonModeEnforcer';
+
+  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
+    // If the task implies structured output (ADF, manifest, etc.), ensure JSON mode
+    const structuredTriggers = [/\badf\b/i, /\bmanifest\b/i, /\bschema\b/i, /\bjson\b/i];
+    const isStructured = structuredTriggers.some(t => t.test(prompt)) || options.responseMimeType === 'application/json';
+
+    if (isStructured) {
+      const enhancedOptions = { 
+        ...options, 
+        responseMimeType: 'application/json' as const 
+      };
+      const enhancedPrompt = `${prompt}\n\nIMPORTANT: Return valid JSON ONLY. No markdown wrappers.`;
+      return { prompt: enhancedPrompt, options: enhancedOptions };
+    }
+
+    return { prompt, options };
+  }
+}
+
+/**
  * Gemini-specific Add-on: Loads "Wisdom" from the evolution history 
  * to leverage Gemini's large context window for self-improvement.
  */
 export class GeminiWisdomEnhancer implements AgentEnhancer {
   public name = 'GeminiWisdomEnhancer';
 
-  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
     const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/public/evolution');
     let wisdomContext = '';
 

@@ -10,10 +10,19 @@
       "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
     },
     {
+      "$ref": "../knowledge/public/schemas/voice-sample-collection.schema.json"
+    },
+    {
+      "$ref": "../knowledge/public/schemas/voice-sample-recording.schema.json"
+    },
+    {
+      "$ref": "../knowledge/public/schemas/voice-sample-collection-registration.schema.json"
+    },
+    {
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "enum": ["speak_local", "list_voices", "register_voice_profile"] },
+        "action": { "enum": ["speak_local", "list_voices", "record_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile"] },
         "params": { "type": "object" }
       }
     },
@@ -34,10 +43,19 @@
                 "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
               },
               {
+                "$ref": "../knowledge/public/schemas/voice-sample-collection.schema.json"
+              },
+              {
+                "$ref": "../knowledge/public/schemas/voice-sample-recording.schema.json"
+              },
+              {
+                "$ref": "../knowledge/public/schemas/voice-sample-collection-registration.schema.json"
+              },
+              {
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "enum": ["speak_local", "list_voices", "register_voice_profile"] },
+                  "action": { "enum": ["speak_local", "list_voices", "record_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile"] },
                   "params": { "type": "object" }
                 }
               }

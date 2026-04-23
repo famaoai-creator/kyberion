@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
 export interface VoiceProfileRecord {
@@ -43,6 +43,10 @@ let cachedRegistry: VoiceProfileRegistry | null = null;
 
 function getRegistryPath(): string {
   return process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+}
+
+export function getVoiceProfileRegistryPath(): string {
+  return getRegistryPath();
 }
 
 export function resetVoiceProfileRegistryCache(): void {
@@ -88,4 +92,12 @@ export function getVoiceProfileRecord(profileId?: string): VoiceProfileRecord {
     || registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id)
     || FALLBACK_REGISTRY.profiles[0]
   );
+}
+
+export function writeVoiceProfileRegistry(registry: VoiceProfileRegistry): string {
+  const registryPath = getRegistryPath();
+  safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
+  cachedRegistryPath = registryPath;
+  cachedRegistry = registry;
+  return registryPath;
 }

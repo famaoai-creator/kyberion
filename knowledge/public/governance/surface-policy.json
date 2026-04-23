@@ -1,4 +1,6 @@
 {
+  "_status": "deprecated",
+  "_replacement": "knowledge/public/governance/surface-provider-manifests.json",
   "version": "1.0.0",
   "routing": {
     "text_routing": {

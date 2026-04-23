@@ -65,6 +65,7 @@ import {
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
   runSurfaceConversation,
+  runSurfaceMessageConversation,
   safeExec,
   safeReadFile,
   safeAppendFileSync,
@@ -1200,6 +1201,23 @@ function warmPresenceSurfaceAgent(): void {
   });
 }
 
+function buildPresenceSurfaceConversationMessageInput(text: string, options?: {
+  forcedReceiver?: string;
+  delegationSummaryInstruction?: string;
+}): Parameters<typeof runSurfaceMessageConversation>[0] {
+  return {
+    surface: 'presence',
+    text,
+    channel: 'voice',
+    threadTs: 'voice-live',
+    actorId: 'voice-user',
+    senderAgentId: 'kyberion:voice-hub',
+    agentId: 'presence-surface-agent',
+    forcedReceiver: options?.forcedReceiver,
+    delegationSummaryInstruction: options?.delegationSummaryInstruction,
+  };
+}
+
 function detectReplyLanguage(text: string): 'ja' | 'en' {
   return /[ぁ-んァ-ン一-龯]/.test(text) ? 'ja' : 'en';
 }
@@ -1732,11 +1750,7 @@ async function tryBuildKnowledgeReply(userText: string): Promise<string | null> 
       'Retrieved knowledge:',
       knowledgeBlocks,
     ].join('\n');
-    const response = await runSurfaceConversation({
-      agentId: 'presence-surface-agent',
-      query: prompt,
-      senderAgentId: 'kyberion:voice-hub',
-    });
+    const response = await runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput(prompt));
     const text = (response.text || '').trim();
     if (text) return text;
     const fallbackTitles = results.map((entry) => entry.title).join('、');
@@ -3305,21 +3319,18 @@ function processAsyncDelegation(params: {
     try {
       const timeoutMs = getAsyncDelegationTimeoutMs(params.receiver);
       const result = await Promise.race([
-        runSurfaceConversation({
-          agentId: 'presence-surface-agent',
-          query: [
+        runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput([
             'You are replying on the live voice surface.',
             'Return only the final spoken reply.',
             'Answer the user directly in their language.',
             'Keep it concise, natural, and useful for speech playback.',
             '',
             `User: ${params.query}`,
-          ].join('\n'),
-          senderAgentId: 'kyberion:voice-hub',
+          ].join('\n'), {
           forcedReceiver: params.receiver,
           delegationSummaryInstruction:
             'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-        }),
+        })),
         new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error(`async_surface_request_timeout_${timeoutMs}`)), timeoutMs);
         }),
@@ -3478,14 +3489,14 @@ async function generateReply(userText: string, context: { sessionKey: string }):
     }
     const timeoutMs = forcedReceiver === 'chronos-mirror' ? 20_000 : 20_000;
     const result = await Promise.race([
-      runSurfaceConversation({
-        agentId: 'presence-surface-agent',
-        query: buildPresenceConversationPrompt(userText, context.sessionKey),
-        senderAgentId: 'kyberion:voice-hub',
-        forcedReceiver,
-        delegationSummaryInstruction:
-          'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-      }),
+      runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput(
+        buildPresenceConversationPrompt(userText, context.sessionKey),
+        {
+          forcedReceiver,
+          delegationSummaryInstruction:
+            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+        },
+      )),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('surface_conversation_timeout')), timeoutMs);
       }),

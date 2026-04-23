@@ -11,6 +11,7 @@ It does not auto-promote the profile to active runtime usage.
 
 - **Actuator**: `voice-actuator`
 - **Schemas**:
+  - [`voice-sample-collection.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/voice-sample-collection.schema.json)
   - [`voice-profile-registration.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/voice-profile-registration.schema.json)
   - [`voice-sample-ingestion-policy.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/voice-sample-ingestion-policy.schema.json)
 - **Governance**:
@@ -29,6 +30,14 @@ Optional:
 - `policy.strict_personal_voice` to override strict fallback behavior for this request.
 
 ## 4. Execution
+
+If raw files have not been staged yet, collect them first:
+
+- [collect-voice-samples.md](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/collect-voice-samples.md)
+
+Or use the combined shortcut:
+
+- `collect_and_register_voice_profile`
 
 Example action:
 
@@ -70,3 +79,7 @@ A successful registration emits a receipt under:
 
 Registration validates candidate input only.
 Promoting the profile into active governance remains a separate explicit review and approval step.
+
+Promotion procedure:
+
+- [promote-voice-profile.md](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)

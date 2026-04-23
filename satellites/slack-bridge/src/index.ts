@@ -7,8 +7,7 @@ import {
   safeAppendFileSync,
   prepareSlackSurfaceArtifact,
   recordSlackSurfaceArtifact,
-  buildSlackSurfacePrompt,
-  runSurfaceConversation,
+  runSurfaceMessageConversation,
   recordSlackDelivery,
   listSlackOutboxMessages,
   clearSlackOutboxMessage,
@@ -250,21 +249,24 @@ async function start() {
         subtitle: 'Slack Surface is preparing a reply.',
         transcript: [{ speaker: 'Slack User', text: message.text }],
       });
-      const conversation = await runSurfaceConversation({
-        agentId: SLACK_SURFACE_AGENT_ID,
-        query: buildSlackSurfacePrompt({
-          user: message.user,
-          text: message.text,
-          channel: message.channel,
-          ts: message.ts,
-          threadTs,
-          team,
-          channelType,
-        }),
+      const conversation = await runSurfaceMessageConversation({
+        surface: 'slack',
+        text: message.text,
+        channel: message.channel,
+        threadTs,
+        correlationId: artifact.correlationId,
+        receivedAt: message.ts,
+        actorId: message.user,
         senderAgentId: 'kyberion:slack-bridge',
+        agentId: SLACK_SURFACE_AGENT_ID,
         forcedReceiver,
         delegationSummaryInstruction:
           'Below are delegated responses. Produce the final Slack reply in the user language. Keep it concise and channel-appropriate. Do not emit any A2A blocks.',
+        metadata: {
+          user: message.user,
+          team,
+          channelType,
+        },
       });
       const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
 
