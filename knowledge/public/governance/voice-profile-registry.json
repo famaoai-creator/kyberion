@@ -6,7 +6,9 @@
       "profile_id": "operator-ja-default",
       "display_name": "Operator Japanese Default",
       "tier": "public",
-      "languages": ["ja"],
+      "languages": [
+        "ja"
+      ],
       "sample_refs": [],
       "default_engine_id": "local_say",
       "status": "active",
@@ -16,7 +18,9 @@
       "profile_id": "operator-en-default",
       "display_name": "Operator English Default",
       "tier": "public",
-      "languages": ["en"],
+      "languages": [
+        "en"
+      ],
       "sample_refs": [],
       "default_engine_id": "local_say",
       "status": "active",
@@ -26,7 +30,10 @@
       "profile_id": "shadow-multilingual-clone",
       "display_name": "Shadow Multilingual Clone",
       "tier": "confidential",
-      "languages": ["en", "ja"],
+      "languages": [
+        "en",
+        "ja"
+      ],
       "sample_refs": [
         "knowledge/confidential/voice/profiles/shadow-multilingual-clone/sample-01.wav"
       ],

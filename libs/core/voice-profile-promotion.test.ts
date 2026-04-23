@@ -7,12 +7,14 @@ import { promoteVoiceProfileFromReceipt } from './voice-profile-promotion.js';
 describe('voice profile promotion', () => {
   const tmpDir = pathResolver.sharedTmp('voice-profile-promotion-tests');
   const registryPath = `${tmpDir}/voice-profile-registry.json`;
+  const personalRegistryPath = `${tmpDir}/voice-profile-registry.personal.json`;
   const receiptPath = `${tmpDir}/receipt.json`;
 
   afterEach(() => {
     safeRmSync(tmpDir, { recursive: true, force: true });
     safeRmSync(pathResolver.sharedTmp('voice-profile-promotion'), { recursive: true, force: true });
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
+    delete process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH;
     resetVoiceProfileRegistryCache();
   });
 
@@ -112,5 +114,43 @@ describe('voice profile promotion', () => {
         approvedBy: 'operator',
       }),
     ).toThrow(/not pending promotion/u);
+  });
+
+  it('writes personal promotions to the personal overlay by default', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      receiptPath,
+      JSON.stringify({
+        kind: 'voice_profile_registration_receipt',
+        created_at: '2026-04-23T00:00:00.000Z',
+        status: 'validated_pending_promotion',
+        request_id: 'voice-reg-3',
+        profile: {
+          profile_id: 'me-ja-overlay',
+          display_name: 'Me JA Overlay',
+          tier: 'personal',
+          languages: ['ja'],
+          default_engine_id: 'open_voice_clone',
+        },
+        samples: [
+          { sample_id: 's1', path: 'knowledge/personal/voice/me-ja-overlay-01.wav', language: 'ja' },
+        ],
+      }),
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = personalRegistryPath;
+
+    const result = promoteVoiceProfileFromReceipt({
+      receiptPath,
+      approvedBy: 'operator',
+      setAsDefault: true,
+    });
+
+    expect(result.registry_path).toBe(personalRegistryPath);
+    const registry = JSON.parse(safeReadFile(personalRegistryPath, { encoding: 'utf8' }) as string) as {
+      default_profile_id: string;
+      profiles: Array<{ profile_id: string }>;
+    };
+    expect(registry.default_profile_id).toBe('me-ja-overlay');
+    expect(registry.profiles.some((profile) => profile.profile_id === 'me-ja-overlay')).toBe(true);
   });
 });

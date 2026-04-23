@@ -62,7 +62,7 @@ export interface AgentAskOptions extends Record<string, unknown> {
  */
 export interface AgentEnhancer {
   name: string;
-  onBeforeAsk?(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }>;
+  onBeforeAsk?(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }>;
   onAfterAsk?(response: AgentResponse): Promise<AgentResponse>;
 }
 
@@ -114,8 +114,8 @@ function isSafeReadOnlyPermissionTitle(title: string): boolean {
 async function applyEnhancersBeforeAsk(
   enhancers: AgentEnhancer[],
   prompt: string,
-  options: AgentAskOptions,
-  trace: Array<{ enhancer: string; action: string; details?: string }>
+  options?: AgentAskOptions,
+  trace: Array<{ enhancer: string; action: string; details?: string }> = []
 ): Promise<{ prompt: string; options: AgentAskOptions }> {
   let currentPrompt = prompt;
   let currentOptions: AgentAskOptions = { ...options };
@@ -420,8 +420,8 @@ export class GeminiAdapter extends BaseACPAdapter {
 export class GeminiPhaseAwareInstructionEnhancer implements AgentEnhancer {
   public name = 'GeminiPhaseAwareInstructionEnhancer';
 
-  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
-    if (!options.phase) return { prompt, options };
+  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+    if (!options?.phase) return { prompt, options };
 
     const phaseInstructions: Record<string, string> = {
       alignment: 'Focus on understanding intent, clarifying ambiguity, and defining clear success criteria.',
@@ -450,10 +450,10 @@ ${prompt}`;
 export class GeminiJsonModeEnforcer implements AgentEnhancer {
   public name = 'GeminiJsonModeEnforcer';
 
-  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
+  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
     // If the task implies structured output (ADF, manifest, etc.), ensure JSON mode
     const structuredTriggers = [/\badf\b/i, /\bmanifest\b/i, /\bschema\b/i, /\bjson\b/i];
-    const isStructured = structuredTriggers.some(t => t.test(prompt)) || options.responseMimeType === 'application/json';
+    const isStructured = structuredTriggers.some(t => t.test(prompt)) || options?.responseMimeType === 'application/json';
 
     if (isStructured) {
       const enhancedOptions = { 
@@ -475,7 +475,7 @@ export class GeminiJsonModeEnforcer implements AgentEnhancer {
 export class GeminiWisdomEnhancer implements AgentEnhancer {
   public name = 'GeminiWisdomEnhancer';
 
-  public async onBeforeAsk(prompt: string, options: AgentAskOptions): Promise<{ prompt: string; options: AgentAskOptions }> {
+  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
     const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/public/evolution');
     let wisdomContext = '';
 
@@ -589,7 +589,8 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
-    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
+    const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
     const { spawnSync } = await import('node:child_process');
     
@@ -605,19 +606,20 @@ export class CodexAdapter implements AgentAdapter {
       if (res.status !== 0) {
         logger.error(`[UAA] Codex Exit Code: ${res.status}`);
         logger.error(`[UAA] Codex Stderr: ${res.stderr}`);
-        return { text: '', stopReason: 'error' };
+        return { text: '', stopReason: 'error', trace };
       }
 
       const parsed = JSON.parse(res.stdout);
       const agentResponse: AgentResponse = {
         text: parsed.message || parsed.content || res.stdout,
         thought: parsed.thought,
-        stopReason: 'completed'
+        stopReason: 'completed',
+        trace
       };
       return applyEnhancersAfterAsk(this.enhancers, agentResponse);
     } catch (e: any) {
       logger.error(`[UAA] Codex Exec failed: ${e.message}`);
-      return { text: '', stopReason: 'error' };
+      return { text: '', stopReason: 'error', trace };
     }
   }
 
@@ -790,7 +792,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
 
-    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options);
+    const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
+    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
 
     this.accumulatedText = '';
     this.sawAgentDelta = false;
@@ -815,7 +818,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const early = this.earlyTurnResults.get(turnId);
     if (early) {
       this.earlyTurnResults.delete(turnId);
-      return applyEnhancersAfterAsk(this.enhancers, { text: early.text, stopReason: early.stopReason });
+      return applyEnhancersAfterAsk(this.enhancers, { text: early.text, stopReason: early.stopReason, trace });
     }
 
     const timeoutMs = this.options.timeoutMs ?? 300000;

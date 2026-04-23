@@ -36,6 +36,7 @@ import { CodexCliReasoningBackend } from './codex-cli-reasoning-backend.js';
 import { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
 import { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 import { buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
+import { buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 import { buildShellClaudeCliBackendFromEnv } from './shell-claude-cli-backend.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
@@ -184,8 +185,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   }
 
   if (mode === 'gemini-cli') {
-    const { buildGeminiCliBackendFromEnv } = require('./gemini-cli-backend.js');
-    const geminiBackend = buildGeminiCliBackendFromEnv();
+    const geminiBackend = buildGeminiCliBackendFromEnv(process.env, options.model);
     if (!geminiBackend) {
       installed = true;
       installedMode = 'stub';
