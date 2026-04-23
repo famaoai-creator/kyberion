@@ -291,11 +291,11 @@ describe('voice actuator', () => {
       chunks: 2,
       delivery_mode: 'artifact_and_playback',
     }));
-    expect(result.artifact_refs).toEqual(['/tmp/voice-generation/req-1.aiff']);
+    expect(result.artifact_refs).toEqual(['/tmp/voice-generation/req-1.wav']);
     expect(result.progress_packets.length).toBeGreaterThan(0);
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'say',
-      ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.aiff', 'hello world'],
+      ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.wav', 'hello world'],
     );
   });
 

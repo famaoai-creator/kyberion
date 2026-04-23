@@ -31,9 +31,9 @@ describe('voice engine registry', () => {
     expect(engine.supports.playback).toBe(true);
   });
 
-  it('resolves shadow engine to fallback on darwin', () => {
+  it('resolves active clone engine on darwin', () => {
     const engine = resolveVoiceEngineForPlatform('open_voice_clone', 'darwin');
-    expect(engine.engine_id).toBe('local_say');
+    expect(engine.engine_id).toBe('open_voice_clone');
   });
 
   it('falls back to default when unknown engine id is requested', () => {

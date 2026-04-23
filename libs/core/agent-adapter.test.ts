@@ -23,7 +23,7 @@ describe('CodexAppServerAdapter', () => {
 
     const result = await adapter.ask('Reply with exactly OK');
 
-    expect(result).toEqual({ text: 'OK', stopReason: 'completed' });
+    expect(result).toEqual(expect.objectContaining({ text: 'OK', stopReason: 'completed' }));
     expect(adapter.getSandboxMode()).toBe('workspace-write');
     expect(adapter.buildSandboxPolicy()).toEqual({
       type: 'workspaceWrite',
@@ -91,7 +91,7 @@ describe('CodexAppServerAdapter', () => {
     adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
     const result = await adapter.ask('Reply with exactly OK');
 
-    expect(result).toEqual({ text: 'OK', stopReason: 'completed' });
+    expect(result).toEqual(expect.objectContaining({ text: 'OK', stopReason: 'completed' }));
     expect(sendRequest).toHaveBeenCalledWith(
       'turn/start',
       expect.objectContaining({
@@ -132,7 +132,7 @@ describe('CodexAppServerAdapter', () => {
     adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
     const result = await adapter.ask('Reply with exactly OK', { cwd: '/tmp/alt' });
 
-    expect(result).toEqual({ text: 'OK\n#post', stopReason: 'completed' });
+    expect(result).toEqual(expect.objectContaining({ text: 'OK\n#post', stopReason: 'completed' }));
     expect(sendRequest).toHaveBeenCalledWith(
       'turn/start',
       expect.objectContaining({

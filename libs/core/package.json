@@ -155,6 +155,10 @@
       "types": "./dist/surface-runtime.d.ts",
       "default": "./dist/surface-runtime.js"
     },
+    "./surface-interaction-model": {
+      "types": "./dist/surface-interaction-model.d.ts",
+      "default": "./dist/surface-interaction-model.js"
+    },
     "./trust-engine": {
       "types": "./dist/trust-engine.d.ts",
       "default": "./dist/trust-engine.js"
