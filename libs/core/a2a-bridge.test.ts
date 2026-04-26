@@ -1,4 +1,8 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from './schema-loader.js';
 
 const mocks = vi.hoisted(() => {
   const warn = vi.fn();
@@ -32,6 +36,8 @@ const mocks = vi.hoisted(() => {
     getAgentManifest,
   };
 });
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('./core.js', () => ({
   logger: {
@@ -360,5 +366,45 @@ describe('a2a-bridge', () => {
     });
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.payload).toEqual({ text: 'daemon-ok' });
+  });
+
+  it('emits a2a envelopes that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json'));
+
+    expect(
+      validate({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-1',
+          sender: 'sender-x',
+          receiver: 'agent-y',
+          performative: 'request',
+        },
+        payload: {
+          text: 'hello',
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+  });
+
+  it('rejects invalid a2a envelopes', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json'));
+
+    expect(
+      validate({
+        a2a_version: '2.0',
+        header: {
+          msg_id: 'MSG-1',
+          sender: 'sender-x',
+          performative: 'request',
+        },
+        payload: {},
+      }),
+    ).toBe(false);
   });
 });

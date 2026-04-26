@@ -1,4 +1,9 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 
 // Mock dependencies before importing the module under test
 vi.mock('./approval-policy.js', () => ({
@@ -23,6 +28,8 @@ const mockResolvePolicy = vi.mocked(resolveApprovalPolicy);
 const mockListRequests = vi.mocked(listApprovalRequests);
 const mockCreateRequest = vi.mocked(createApprovalRequest);
 const mockAuditRecord = vi.mocked(auditChain.record);
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 const baseParams = {
   operationId: 'secret:set',
@@ -162,5 +169,55 @@ describe('enforceApprovalGate', () => {
         operation: 'secret:set',
       }),
     );
+  });
+
+  it('emits secret mutation approval requests that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/secret-mutation-approval.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const request = {
+      request_id: 'req-schema-1',
+      kind: 'secret_mutation',
+      status: 'pending',
+      created_at: '2026-04-26T00:00:00.000Z',
+      requested_by: {
+        surface: 'terminal',
+        actor_id: 'agent-1',
+        actor_role: 'ops',
+      },
+      target: {
+        service_id: 'github',
+        secret_key: 'token',
+        mutation: 'rotate',
+      },
+      justification: {
+        reason: 'Token rotation is due.',
+      },
+      risk: {
+        level: 'high',
+        restart_scope: 'service',
+        requires_strong_auth: true,
+      },
+      workflow: {
+        workflow_id: 'wf-schema-1',
+        mode: 'all_required',
+        required_roles: ['ops'],
+        stages: [
+          {
+            stage_id: 'stage-1',
+            required_roles: ['ops'],
+          },
+        ],
+        approvals: [
+          {
+            role: 'ops',
+            status: 'pending',
+          },
+        ],
+      },
+    };
+    const valid = validate(request);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

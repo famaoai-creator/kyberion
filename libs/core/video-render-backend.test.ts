@@ -21,7 +21,7 @@ describe('video render backend', () => {
 
   it('returns non-executed when backend rendering is disabled', async () => {
     const { renderVideoCompositionBundle } = await import('./video-render-backend.js');
-    const result = renderVideoCompositionBundle(
+    const result = await renderVideoCompositionBundle(
       {
         kind: 'video-composition-render-plan',
         version: '1.0.0',
@@ -53,7 +53,7 @@ describe('video render backend', () => {
 
   it('invokes hyperframes CLI when backend rendering is enabled', async () => {
     const { renderVideoCompositionBundle } = await import('./video-render-backend.js');
-    const result = renderVideoCompositionBundle(
+    const result = await renderVideoCompositionBundle(
       {
         kind: 'video-composition-render-plan',
         version: '1.0.0',

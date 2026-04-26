@@ -1,9 +1,14 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { safeExistsSync, safeReadFile, safeRmSync, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath, safeExistsSync, safeReadFile, safeRmSync, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
 }));
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('tesseract.js', () => ({
   default: {
@@ -698,6 +703,50 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
     expect(result.context.proposal_storyline.slides[0].design_system_id).toBe('executive-standard');
     expect(result.context.proposal_storyline.slides[0].branding.brand_name).toBe('Aster Bank');
+  });
+
+  it('emits proposal storyline adfs that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-storyline-adf.schema.json'));
+
+    expect(
+      validate({
+        kind: 'proposal-storyline-adf',
+        title: 'Digital Onboarding Transformation Proposal',
+        client: 'Aster Bank',
+        core_message: 'A lighter, guided onboarding experience reduces drop-off.',
+        slides: [
+          {
+            id: 'why-change',
+            title: 'Why change now',
+            objective: 'Explain the business case',
+            body: ['Current onboarding creates avoidable abandonment.'],
+          },
+          {
+            id: 'decision',
+            title: 'Decision',
+            objective: 'Invite approval',
+            visual: 'decision-cta',
+          },
+        ],
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+  });
+
+  it('rejects malformed proposal storyline adfs', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-storyline-adf.schema.json'));
+
+    expect(
+      validate({
+        kind: 'proposal-storyline-adf',
+        client: 'Aster Bank',
+        slides: [],
+      }),
+    ).toBe(false);
   });
 
   it('applies layout_key-aware slide rendering presets during merge_content', async () => {
@@ -1474,5 +1523,65 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.objectContaining({ value: 'Team A' }),
     );
     expect(result.context.last_xlsx_design.styles.cellXfs.length).toBeGreaterThan(1);
+  });
+
+  it('emits document briefs that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/document-brief.schema.json'));
+
+    expect(
+      validate({
+        kind: 'document-brief',
+        artifact_family: 'document',
+        document_type: 'report',
+        document_profile: 'summary-report',
+        render_target: 'docx',
+        locale: 'en-US',
+        payload: {
+          title: 'Quarterly Reliability Review',
+          summary: 'Reliability and incident posture improved across the quarter.',
+          sections: [
+            {
+              heading: 'Incident Themes',
+              body: ['Three recurring failure modes were reduced after remediation.'],
+              bullets: ['Gateway timeout handling improved', 'Retry policy standardized'],
+            },
+          ],
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+  });
+
+  it('emits proposal briefs that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-brief.schema.json'));
+
+    expect(
+      validate({
+        kind: 'proposal-brief',
+        title: 'Kyberion Platform Proposal',
+        client: 'Aster Bank',
+        objective: 'Deliver a governed proposal deck',
+        document_profile: 'executive-proposal',
+        layout_template_id: 'executive-neutral',
+        render_target: 'pptx',
+        locale: 'en-US',
+        audience: ['executive', 'ops'],
+        story: {
+          core_message: 'Kyberion makes governed execution visible and repeatable.',
+          chapters: ['Context', 'Value', 'Delivery'],
+          tone: 'confident',
+          closing_cta: 'Approve the rollout',
+        },
+        evidence: [
+          { title: 'Governed outputs', point: 'Artifacts are traceable and reproducible.' },
+        ],
+        required_sections: ['Summary', 'Evidence'],
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
   });
 });

@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/memory-candidate.schema.json",
+  "title": "Memory Promotion Candidate",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "source_type",
+    "source_ref",
+    "proposed_memory_kind",
+    "summary",
+    "evidence_refs",
+    "sensitivity_tier",
+    "ratification_required",
+    "status",
+    "queued_at"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "source_type": {
+      "type": "string",
+      "enum": ["mission", "task_session", "artifact", "incident"]
+    },
+    "source_ref": { "type": "string", "minLength": 1 },
+    "proposed_memory_kind": {
+      "type": "string",
+      "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "sensitivity_tier": {
+      "type": "string",
+      "enum": ["public", "confidential", "personal"]
+    },
+    "ratification_required": { "type": "boolean" },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "approved", "rejected", "promoted"]
+    },
+    "queued_at": { "type": "string", "minLength": 1 },
+    "ratified_at": { "type": "string", "minLength": 1 },
+    "ratification_note": { "type": "string", "minLength": 1 },
+    "promoted_ref": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

@@ -27,6 +27,7 @@ export {
   safeMkdir, 
   safeExistsSync, 
   safeExec,
+  buildSafeExecEnv,
   safeReaddir,
   safeStat,
   safeLstat,
@@ -270,6 +271,7 @@ export {
 } from './relationship-graph-store.js';
 export {
   listHeuristics,
+  queueHeuristicMemoryCandidate,
   readHeuristic,
   scoreValidity,
   summarizeHeuristics,
@@ -463,6 +465,8 @@ export type {
 } from './relationship-graph-store.js';
 export * from './distill-candidate-registry.js';
 export * from './promoted-memory.js';
+export * from './memory-promotion-queue.js';
+export * from './memory-promotion-workflow.js';
 export * from './managed-process.js';
 export * from './mission-seed-registry.js';
 export * from './mission-working-memory.js';
@@ -507,8 +511,12 @@ export * from './presence-avatar.js';
 export * from './presence-bridge.js';
 export * from './surface-agent-catalog.js';
 export * from './surface-query.js';
+export * from './surface-ux-contract.js';
+export * from './next-action-contract.js';
 export * from './task-session.js';
 export * from './intent-resolution.js';
+export * from './intent-resolution-contract.js';
+export * from './outcome-contract.js';
 export * from './analysis-contract.js';
 export * from './approval-policy.js';
 export * from './router-contract.js';
@@ -524,6 +532,7 @@ export * from './project-track-registry.js';
 export * from './sdlc-gate-readiness.js';
 export * from './service-binding-registry.js';
 export * from './artifact-record.js';
+export * from './artifact-registry.js';
 export * from './control-plane-client.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';

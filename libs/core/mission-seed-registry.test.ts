@@ -1,8 +1,13 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
 import { listMissionSeedRecords, loadMissionSeedRecord, saveMissionSeedRecord } from './mission-seed-registry.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
 
 function cleanupByPrefix(dir: string, prefix: string) {
   if (!safeExistsSync(dir)) return;
@@ -50,5 +55,22 @@ describe('mission-seed-registry', () => {
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.promoted_mission_id).toBe('MSN-TEST-ARCH');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.work_loop?.resolution.execution_shape).toBe('project_bootstrap');
     expect(listMissionSeedRecords().some((item) => item.seed_id === 'MSD-TEST-ARCH')).toBe(true);
+  });
+
+  it('emits mission seed records that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/mission-seed-record.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const record = {
+      seed_id: 'MSD-TEST-SCHEMA',
+      project_id: 'PRJ-TEST-WEB',
+      title: 'Design architecture',
+      summary: 'Design the first architecture slice.',
+      status: 'ready',
+      specialist_id: 'document-specialist',
+      created_at: new Date('2026-04-26T00:00:00.000Z').toISOString(),
+    };
+    const valid = validate(record);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

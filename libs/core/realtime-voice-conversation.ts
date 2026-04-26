@@ -7,6 +7,7 @@ import {
   type PresenceTimelineAdf,
 } from './presence-surface.js';
 import { getVoiceProfileRecord, type VoiceProfileRecord } from './voice-profile-registry.js';
+import { getVoiceRuntimePolicy } from './voice-runtime-policy.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
@@ -165,20 +166,36 @@ function synthesizeAssistantVoice(input: {
 }): Record<string, unknown> {
   const requestId = `${input.sessionId}-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
   const requestPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.json`);
-  const artifactPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.wav`);
+  const format = process.platform === 'darwin' ? 'aiff' : 'wav';
+  const artifactPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.${format}`);
+
+  const profile = getVoiceProfileRecord(input.profileId);
+  const policy = getVoiceRuntimePolicy();
+
   safeWriteFile(
     requestPath,
     JSON.stringify(
       {
         action: 'generate_voice',
         request_id: requestId,
-        profile_ref: { profile_id: input.profileId },
         text: input.text,
-        rendering: { language: input.language },
+        profile_ref: { profile_id: input.profileId },
+        engine: {
+          engine_id: profile.default_engine_id,
+        },
+        rendering: {
+          language: input.language,
+          chunking: {
+            max_chunk_chars: policy.chunking.default_max_chunk_chars,
+            crossfade_ms: policy.chunking.default_crossfade_ms,
+            preserve_paralinguistic_tags: true,
+          },
+        },
         delivery: {
           mode: input.deliveryMode,
-          format: 'wav',
+          format,
           artifact_path: artifactPath,
+          emit_progress_packets: false,
         },
         routing: {
           personal_voice_mode: input.personalVoiceMode,
@@ -193,7 +210,14 @@ function synthesizeAssistantVoice(input: {
     ['dist/libs/actuators/voice-actuator/src/index.js', '--input', requestPath],
     { timeoutMs: 120_000 },
   );
-  return JSON.parse(raw) as Record<string, unknown>;
+
+  const lines = raw.split('\n');
+  const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+  if (jsonStartIdx === -1) {
+    throw new Error(`[voice-actuator] could not find JSON in output: ${raw}`);
+  }
+  const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+  return JSON.parse(cleanStdout) as Record<string, unknown>;
 }
 
 export async function runRealtimeVoiceConversationTurn(

@@ -1,10 +1,16 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
 }));
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('@agent/core', async () => {
   const actual = await vi.importActual('@agent/core') as any;
@@ -70,5 +76,48 @@ describe('service-actuator handleAction', () => {
 
     expect(mocks.safeExec).toHaveBeenCalledWith('voice', ['speak', 'hello']);
     expect(result).toEqual({ output: 'cli-output' });
+  });
+
+  it('emits service actions that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/service-action.schema.json'));
+
+    const directRequest = {
+      service_id: 'github',
+      mode: 'API',
+      action: 'create_issue',
+      method: 'POST',
+      params: {
+        owner: 'famaoai',
+        repo: 'kyberion',
+        title: 'Schema check',
+      },
+      auth: 'secret-guard',
+    };
+    const pipelineRequest = {
+      action: 'pipeline',
+      context: {
+        request_id: 'REQ-1',
+      },
+      steps: [
+        {
+          op: 'api',
+          params: {
+            service_id: 'github',
+            action: 'create_issue',
+            params: {
+              owner: 'famaoai',
+              repo: 'kyberion',
+            },
+            auth: 'secret-guard',
+            method: 'POST',
+          },
+        },
+      ],
+    };
+
+    expect(validate(directRequest), JSON.stringify(validate.errors || [])).toBe(true);
+    expect(validate(pipelineRequest), JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

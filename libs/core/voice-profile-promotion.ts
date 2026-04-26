@@ -2,7 +2,9 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
+  getPersonalVoiceProfileRegistryPath,
   getVoiceProfileRegistry,
+  getVoiceProfileRegistryPath,
   type VoiceProfileRecord,
   type VoiceProfileRegistry,
   writeVoiceProfileRegistry,
@@ -90,6 +92,24 @@ function appendProfileToRegistry(input: {
   };
 }
 
+function loadRegistryForPromotion(targetPath: string): VoiceProfileRegistry {
+  if (!safeExistsSync(targetPath)) {
+    return {
+      version: '1.0.0',
+      default_profile_id: getVoiceProfileRegistry().default_profile_id,
+      profiles: [],
+    };
+  }
+  return JSON.parse(safeReadFile(targetPath, { encoding: 'utf8' }) as string) as VoiceProfileRegistry;
+}
+
+function resolvePromotionRegistryPath(tier: VoiceProfileRecord['tier']): string {
+  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) {
+    return getVoiceProfileRegistryPath();
+  }
+  return tier === 'personal' ? getPersonalVoiceProfileRegistryPath() : getVoiceProfileRegistryPath();
+}
+
 function writePromotionReceipt(input: {
   receipt: VoiceProfileRegistrationReceipt;
   receiptPath: string;
@@ -127,12 +147,13 @@ export function promoteVoiceProfileFromReceipt(input: PromoteVoiceProfileInput):
   const promotedStatus = input.targetStatus || 'active';
   const receipt = loadRegistrationReceipt(input.receiptPath);
   const promotedProfile = buildPromotedProfile(receipt, promotedStatus);
+  const targetRegistryPath = resolvePromotionRegistryPath(promotedProfile.tier);
   const nextRegistry = appendProfileToRegistry({
-    registry: getVoiceProfileRegistry(),
+    registry: loadRegistryForPromotion(targetRegistryPath),
     profile: promotedProfile,
     setAsDefault: Boolean(input.setAsDefault),
   });
-  const registryPath = writeVoiceProfileRegistry(nextRegistry);
+  const registryPath = writeVoiceProfileRegistry(nextRegistry, targetRegistryPath);
   const promotionReceiptPath = writePromotionReceipt({
     receipt,
     receiptPath: input.receiptPath,
