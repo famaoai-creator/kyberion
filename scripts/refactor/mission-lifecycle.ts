@@ -11,13 +11,24 @@ import {
   ledger,
   logger,
   pathResolver,
+  queueMissionMemoryPromotionCandidate,
   safeExec,
   safeExistsSync,
   safeMkdir,
+  safeReaddir,
   safeRmSync,
 } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
 import { readTrustLedger, recordAgentRuntimeEvent, updateTrustScore, validateMissionQuality } from './mission-governance.js';
+import { emitMissionLifecycleIntentSnapshot, evaluateMissionIntentDrift } from './mission-intent-delta.js';
+
+function collectMissionEvidenceRefs(missionDir: string): string[] {
+  const evidenceDir = path.join(missionDir, 'evidence');
+  if (!safeExistsSync(evidenceDir)) return [];
+  return safeReaddir(evidenceDir)
+    .filter((entry) => entry !== '.gitkeep')
+    .map((entry) => path.join(missionDir, 'evidence', entry));
+}
 
 export async function delegateMission(
   id: string,
@@ -159,6 +170,12 @@ export async function verifyMission(
 
   await saveState(upperId, state);
   await syncProjectLedgerIfLinked(upperId);
+  await emitMissionLifecycleIntentSnapshot({
+    missionId: upperId,
+    stage: 'verification',
+    text: note,
+    source: 'mission_state',
+  });
   logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
 }
 
@@ -200,6 +217,18 @@ export async function finishMission(
     return;
   }
 
+  await emitMissionLifecycleIntentSnapshot({
+    missionId: upperId,
+    stage: 'delivery',
+    text: `Finish mission ${upperId}`,
+    source: 'mission_state',
+  });
+  const driftSummary = evaluateMissionIntentDrift(upperId);
+  if (driftSummary && !driftSummary.passed) {
+    logger.error(`❌ [INTENT_DRIFT] Mission ${upperId} blocked: ${driftSummary.message}`);
+    return;
+  }
+
   const quality = await validateMissionQuality(upperId);
   if (!quality.ok) {
     logger.error(`❌ [QUALITY_REJECTION] Mission ${upperId} does not meet governance requirements: ${quality.reason}`);
@@ -208,9 +237,16 @@ export async function finishMission(
 
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
+  if (driftSummary) {
+    state.context = {
+      ...(state.context || {}),
+      intent_delta_summary: driftSummary,
+    };
+  }
 
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
+  const evidenceRefs = collectMissionEvidenceRefs(missionDir);
 
   logger.info(`🏁 Finishing Mission: ${upperId}...`);
 
@@ -231,6 +267,19 @@ export async function finishMission(
 
   if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
     await args.sealMission(upperId);
+  }
+
+  try {
+    const queued = queueMissionMemoryPromotionCandidate({
+      missionId: upperId,
+      missionType: state.mission_type,
+      tier: state.tier,
+      summary: state.outcome_contract?.requested_result || `Mission ${upperId} completed and yielded reusable operational memory.`,
+      evidenceRefs,
+    });
+    logger.info(`🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`);
+  } catch (err: any) {
+    logger.warn(`⚠️ [MEMORY_PROMOTION] queue skipped for ${upperId}: ${err?.message || err}`);
   }
 
   ledger.record('MISSION_FINISH', {

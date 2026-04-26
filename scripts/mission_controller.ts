@@ -18,10 +18,13 @@
 import * as path from 'node:path';
 import {
   findMissionPath,
+  listMemoryPromotionCandidates,
   loadProjectRecord,
   loadProjectTrackRecord,
   logger,
   pathResolver,
+  promoteMemoryCandidateToKnowledge,
+  updateMemoryPromotionCandidateStatus,
   safeReadFile,
   safeExec,
   safeExistsSync,
@@ -243,6 +246,125 @@ async function dispatchNextMission() {
   await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
     startMission(missionId, tier as any)
   );
+}
+
+function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') {
+  const rows = listMemoryPromotionCandidates()
+    .filter((row) => (filterStatus ? row.status === filterStatus : true))
+    .sort((a, b) => b.queued_at.localeCompare(a.queued_at));
+  if (rows.length === 0) {
+    logger.info(
+      filterStatus
+        ? `No memory promotion candidates with status "${filterStatus}".`
+        : 'No memory promotion candidates in queue.',
+    );
+    return;
+  }
+  const header = `${'CANDIDATE_ID'.padEnd(30)} ${'STATUS'.padEnd(10)} ${'KIND'.padEnd(20)} ${'TIER'.padEnd(13)} SOURCE`;
+  console.log('');
+  console.log(header);
+  console.log('-'.repeat(header.length + 6));
+  for (const row of rows) {
+    console.log(
+      `${row.candidate_id.padEnd(30)} ${row.status.padEnd(10)} ${row.proposed_memory_kind.padEnd(20)} ${row.sensitivity_tier.padEnd(13)} ${row.source_ref}`,
+    );
+  }
+  console.log('');
+}
+
+function approveMemoryCandidate(candidateId: string, note?: string) {
+  if (!candidateId) {
+    logger.error('Usage: mission_controller memory-approve <CANDIDATE_ID> [--note <TEXT>]');
+    return;
+  }
+  const updated = updateMemoryPromotionCandidateStatus({
+    candidateId,
+    status: 'approved',
+    ratificationNote: note || 'Approved for promotion.',
+  });
+  if (!updated) {
+    logger.error(`Memory promotion candidate not found: ${candidateId}`);
+    return;
+  }
+  logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
+}
+
+function rejectMemoryCandidate(candidateId: string, note?: string) {
+  if (!candidateId) {
+    logger.error('Usage: mission_controller memory-reject <CANDIDATE_ID> [--note <TEXT>]');
+    return;
+  }
+  const updated = updateMemoryPromotionCandidateStatus({
+    candidateId,
+    status: 'rejected',
+    ratificationNote: note || 'Rejected by operator review.',
+  });
+  if (!updated) {
+    logger.error(`Memory promotion candidate not found: ${candidateId}`);
+    return;
+  }
+  logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
+}
+
+function promoteMemoryCandidate(
+  candidateId: string,
+  executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
+  note?: string,
+) {
+  if (!candidateId) {
+    logger.error('Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]');
+    return;
+  }
+  const result = promoteMemoryCandidateToKnowledge({
+    candidateId,
+    executionRole,
+    ratificationNote: note,
+  });
+  logger.success(
+    `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`,
+  );
+}
+
+function promotePendingMemoryCandidates(input: {
+  executionRole?: 'mission_controller' | 'chronos_gateway';
+  dryRun?: boolean;
+  note?: string;
+}) {
+  const executionRole = input.executionRole || 'mission_controller';
+  const pending = listMemoryPromotionCandidates()
+    .filter((row) => row.status === 'approved')
+    .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+
+  if (pending.length === 0) {
+    logger.info('No approved memory candidates to promote.');
+    return;
+  }
+
+  if (input.dryRun) {
+    logger.info(`Dry run: ${pending.length} approved memory candidate(s) would be promoted.`);
+    for (const row of pending) {
+      console.log(`- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) ${row.source_ref}`);
+    }
+    return;
+  }
+
+  let promoted = 0;
+  let failed = 0;
+  for (const row of pending) {
+    try {
+      const result = promoteMemoryCandidateToKnowledge({
+        candidateId: row.candidate_id,
+        executionRole,
+        ratificationNote: input.note,
+      });
+      promoted += 1;
+      logger.info(`🟢 promoted ${result.candidate.candidate_id} -> ${result.promotedRef}`);
+    } catch (err: any) {
+      failed += 1;
+      logger.warn(`⚠️ failed to promote ${row.candidate_id}: ${err?.message || err}`);
+    }
+  }
+  logger.success(`✅ Memory bulk promotion finished. promoted=${promoted}, failed=${failed}`);
 }
 
 async function createMission(
@@ -504,6 +626,15 @@ Queue Commands:
   enqueue  <ID> <tier> [priority] [deps]
                                  Add a mission to the dispatch queue
   dispatch                       Start the next queued mission
+  memory-queue [status]          List memory promotion candidates
+  memory-approve <CANDIDATE_ID> [--note <TEXT>]
+                                 Mark a memory candidate as approved
+  memory-reject <CANDIDATE_ID> [--note <TEXT>]
+                                 Mark a memory candidate as rejected
+  memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]
+                                 Promote an approved candidate to governed knowledge
+  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--dry-run]
+                                 Bulk promote approved memory candidates in queue order
 
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
@@ -698,6 +829,32 @@ async function main() {
       break;
     case 'dispatch':
       await dispatchNextMission();
+      break;
+    case 'memory-queue':
+      listMemoryQueue(arg1 as any);
+      break;
+    case 'memory-approve':
+      approveMemoryCandidate(arg1, getOptionValue('--note'));
+      break;
+    case 'memory-reject':
+      rejectMemoryCandidate(arg1, getOptionValue('--note'));
+      break;
+    case 'memory-promote':
+      promoteMemoryCandidate(
+        arg1,
+        (getOptionValue('--execution-role') as 'mission_controller' | 'chronos_gateway') ||
+          'mission_controller',
+        getOptionValue('--note'),
+      );
+      break;
+    case 'memory-promote-pending':
+      promotePendingMemoryCandidates({
+        executionRole:
+          (getOptionValue('--execution-role') as 'mission_controller' | 'chronos_gateway') ||
+          'mission_controller',
+        note: getOptionValue('--note'),
+        dryRun: process.argv.includes('--dry-run'),
+      });
       break;
     case 'finish':
       await finishMission(arg1, process.argv.includes('--seal'));

@@ -1,5 +1,12 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '@agent/core';
 import { describe, expect, it } from 'vitest';
 import { compileUserIntentFlow, deriveIntentDeliveryDecision, formatClarificationPacket, inferGovernedDeliveryMode, resolveIntentCompilerTarget } from './intent-contract.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('intent-contract compiler', () => {
   it('accepts LLM-produced contract and work loop JSON when valid', async () => {
@@ -187,5 +194,64 @@ describe('intent-contract compiler', () => {
   it('infers delivery mode from governed rules', () => {
     expect(inferGovernedDeliveryMode('この要件定義を長期的に継続改善したい', 'task_session', [])).toBe('managed_program');
     expect(inferGovernedDeliveryMode('提案資料を作って', 'task_session', [])).toBe('one_shot');
+  });
+
+  it('emits intent-contract payloads that satisfy the schema', () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json'));
+
+    expect(validate({
+      kind: 'intent-contract',
+      source_text: '提案資料を作って',
+      intent_id: 'generate-presentation',
+      goal: {
+        summary: 'Create a presentation deck',
+        success_condition: 'A governed PPTX draft is prepared.',
+      },
+      resolution: {
+        execution_shape: 'task_session',
+        task_type: 'presentation_deck',
+      },
+      required_inputs: [],
+      outcome_ids: ['artifact:pptx'],
+      approval: {
+        requires_approval: false,
+      },
+      delivery_mode: 'one_shot',
+      clarification_needed: false,
+      confidence: 0.92,
+      why: 'The request is a governed presentation generation task.',
+    })).toBe(true);
+  });
+
+  it('rejects invalid intent-contract payloads', () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json'));
+
+    expect(validate({
+      kind: 'intent-contract',
+      source_text: '提案資料を作って',
+      intent_id: 'generate-presentation',
+      goal: {
+        summary: 'Create a presentation deck',
+        success_condition: 'A governed PPTX draft is prepared.',
+      },
+      resolution: {
+        execution_shape: 'invalid_shape',
+      },
+      required_inputs: [],
+      outcome_ids: ['artifact:pptx'],
+      approval: {
+        requires_approval: false,
+      },
+      delivery_mode: 'one_shot',
+      clarification_needed: false,
+      confidence: 0.92,
+      why: 'The request is a governed presentation generation task.',
+    })).toBe(false);
   });
 });

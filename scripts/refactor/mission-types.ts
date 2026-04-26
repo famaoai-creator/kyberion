@@ -6,6 +6,8 @@
 export interface MissionState {
   mission_id: string;
   mission_type?: string;
+  tenant_id?: string;
+  vision_ref?: string;
   tier: 'personal' | 'confidential' | 'public';
   status:
     | 'planned'
@@ -65,6 +67,28 @@ export interface MissionState {
     latest_commit: string;
     checkpoints: Array<{ task_id: string; commit_hash: string; ts: string }>;
   };
+  outcome_contract?: {
+    outcome_id: string;
+    requested_result: string;
+    deliverable_kind: string;
+    success_criteria: string[];
+    evidence_required: boolean;
+    expected_artifacts: Array<{ kind: string; storage_class: string }>;
+    verification_method: 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
+  };
+  context?: {
+    last_action?: string;
+    next_step?: string;
+    blockers?: string[];
+    associated_projects?: string[];
+    intent_delta_summary?: {
+      checked_at: string;
+      passed: boolean;
+      verdict: string;
+      drift_score: number;
+      message: string;
+    };
+  };
   history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
 }
 
@@ -109,6 +133,8 @@ export const VALUE_FLAGS = new Set([
   '--actor-id',
   '--actor-type',
   '--evidence',
+  '--note',
+  '--execution-role',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

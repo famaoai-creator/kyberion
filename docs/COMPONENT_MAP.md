@@ -4,6 +4,7 @@ Kyberion is a sovereign-agent ecosystem organized around a small number of high-
 
 For a layer-oriented view of the concepts themselves, read:
 
+- `knowledge/public/architecture/kyberion-canonical-concept-index.md`
 - `docs/USER_EXPERIENCE_CONTRACT.md`
 - `docs/OPERATOR_UX_GUIDE.md`
 - `knowledge/public/architecture/kyberion-concept-map.md`

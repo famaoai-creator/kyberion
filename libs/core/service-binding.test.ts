@@ -1,5 +1,11 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { resolveServiceBinding } from './service-binding.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('service-binding', () => {
   const originalMissionId = process.env.MISSION_ID;
@@ -104,5 +110,27 @@ describe('service-binding', () => {
     expect(() => resolveServiceBinding('slack', 'secret-guard')).toThrow(
       'Access denied: no service binding secret found for "slack"',
     );
+  });
+
+  it('emits service binding records that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/service-binding-record.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const binding = {
+      binding_id: 'BIND-TEST-SCHEMA',
+      service_type: 'github',
+      scope: 'repository',
+      target: 'org/repo',
+      allowed_actions: ['read', 'pull_request'],
+      secret_refs: ['vault://bindings/github/schema/token'],
+      approval_policy: {
+        pull_request: 'allowed',
+        merge: 'approval_required',
+      },
+      service_id: 'github',
+      auth_mode: 'secret-guard',
+    };
+    const valid = validate(binding);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

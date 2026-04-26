@@ -12,6 +12,7 @@ export interface PlatformCapabilities {
   hasSpeech: boolean;
   hasScreenCapture: boolean;
   hasAudioPlayback: boolean;
+  hasFFmpeg: boolean;
   nativeTerminal: string;
 }
 
@@ -35,6 +36,7 @@ export interface OSDriver {
   open(target: string): Promise<void>;
   getCapabilities(): Promise<PlatformCapabilities>;
   checkBinary(cmd: string): Promise<boolean>;
+  runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string>;
 }
 
 /**
@@ -72,8 +74,16 @@ class MacOSDriver implements OSDriver {
       hasSpeech: await commandExists('say'),
       hasScreenCapture: await commandExists('screencapture'),
       hasAudioPlayback: await commandExists('afplay'),
+      hasFFmpeg: await commandExists('ffmpeg'),
       nativeTerminal: 'Terminal.app'
     };
+  }
+
+  async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
+    if (!(await this.checkBinary(tool))) {
+      throw new Error(`${tool} not found. Please install via 'brew install ffmpeg'`);
+    }
+    return safeExec(tool, args);
   }
 }
 
@@ -106,8 +116,16 @@ class WindowsDriver implements OSDriver {
       hasSpeech: true,
       hasScreenCapture: false,
       hasAudioPlayback: true,
+      hasFFmpeg: await commandExists('ffmpeg'),
       nativeTerminal: 'powershell.exe'
     };
+  }
+
+  async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
+    if (!(await this.checkBinary(tool))) {
+      throw new Error(`${tool} not found. Please install ffmpeg and add it to your PATH.`);
+    }
+    return safeExec(tool, args);
   }
 }
 
@@ -140,8 +158,16 @@ class LinuxDriver implements OSDriver {
       hasSpeech: await commandExists('espeak'),
       hasScreenCapture: await commandExists('import'),
       hasAudioPlayback: await commandExists('aplay'),
+      hasFFmpeg: await commandExists('ffmpeg'),
       nativeTerminal: 'xterm'
     };
+  }
+
+  async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
+    if (!(await this.checkBinary(tool))) {
+      throw new Error(`${tool} not found. Please install via 'sudo apt install ffmpeg'`);
+    }
+    return safeExec(tool, args);
   }
 }
 
@@ -152,8 +178,9 @@ class UnknownDriver implements OSDriver {
   async playSound() {}
   async open() {}
   async getCapabilities(): Promise<PlatformCapabilities> {
-    return { hasSpeech: false, hasScreenCapture: false, hasAudioPlayback: false, nativeTerminal: 'sh' };
+    return { hasSpeech: false, hasScreenCapture: false, hasAudioPlayback: false, hasFFmpeg: false, nativeTerminal: 'sh' };
   }
+  async runMediaCommand(): Promise<string> { throw new Error('Unsupported platform'); }
 }
 
 /**

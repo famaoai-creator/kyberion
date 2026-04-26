@@ -15,8 +15,8 @@
   },
   "render": {
     "allowed_output_formats": ["mp4", "mov", "webm"],
-    "enable_backend_rendering": false,
-    "backend": "none",
+    "enable_backend_rendering": true,
+    "backend": "hyperframes_cli",
     "quality": "standard",
     "command_timeout_ms": 300000
   }

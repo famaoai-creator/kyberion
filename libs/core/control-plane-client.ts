@@ -1,3 +1,5 @@
+import { validateNextActionContract } from './next-action-contract.js';
+
 export type ControlPlaneSurface = 'presence' | 'chronos';
 
 export interface ControlPlaneListResponse<T> {
@@ -87,6 +89,16 @@ export interface ChronosOverviewRecord {
   missionSeeds?: ControlPlaneMissionSeedRecord[];
   pendingApprovals?: Array<Record<string, unknown>>;
   distillCandidates?: Array<Record<string, unknown>>;
+  memoryCandidates?: Array<Record<string, unknown>>;
+  nextActions?: Array<{
+    action_id: string;
+    next_action_type: 'request_clarification' | 'approve' | 'inspect_evidence' | 'retry_delivery' | 'promote_mission_seed' | 'resume_mission';
+    reason: string;
+    risk: 'low' | 'medium' | 'high';
+    suggested_command?: string;
+    suggested_surface_action?: 'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
+    approval_required: boolean;
+  }>;
 }
 
 export interface ControlPlaneErrorOptions {
@@ -277,6 +289,12 @@ export async function requestControlPlaneText(
 }
 
 export function createControlPlaneClient(surface: ControlPlaneSurface, options?: ControlPlaneClientOptions) {
+  function sanitizeNextActions(value: unknown): ChronosOverviewRecord['nextActions'] {
+    if (!Array.isArray(value)) return [];
+    const sanitized = value.filter((candidate) => validateNextActionContract(candidate).valid);
+    return sanitized as ChronosOverviewRecord['nextActions'];
+  }
+
   return {
     surface,
     baseUrl: getControlPlaneBaseUrl(surface, options?.baseUrl),
@@ -336,7 +354,11 @@ export function createControlPlaneClient(surface: ControlPlaneSurface, options?:
       return Array.isArray(body?.items) ? body.items : [];
     },
     async getChronosOverview(): Promise<ChronosOverviewRecord> {
-      return requestControlPlaneJson('chronos', '/api/intelligence', undefined, options) as Promise<ChronosOverviewRecord>;
+      const body = await requestControlPlaneJson('chronos', '/api/intelligence', undefined, options) as ChronosOverviewRecord;
+      return {
+        ...body,
+        nextActions: sanitizeNextActions(body?.nextActions),
+      };
     },
   };
 }

@@ -1,9 +1,16 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '@agent/core';
 import { describe, expect, it } from 'vitest';
 import { compileMusicGenerationADF } from './music-workflow-compiler.js';
 
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+
 describe('compileMusicGenerationADF', () => {
   it('builds an ACE-Step workflow from a music generation ADF', () => {
-    const result = compileMusicGenerationADF({
+    const adf = {
       kind: 'music-generation-adf',
       version: '1.0.0',
       intent: 'anniversary_song',
@@ -34,7 +41,8 @@ describe('compileMusicGenerationADF', () => {
         format: 'mp3',
         filename_prefix: 'anniversary-song',
       },
-    });
+    } as any;
+    const result = compileMusicGenerationADF(adf);
 
     expect(result.engine).toEqual({
       provider: 'comfyui',
@@ -64,6 +72,46 @@ describe('compileMusicGenerationADF', () => {
         filename_prefix: 'anniversary-song',
       },
     });
+  });
+
+  it('emits music-generation-adf that matches the schema', () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/music-generation-adf.schema.json'));
+
+    expect(validate({
+      kind: 'music-generation-adf',
+      version: '1.0.0',
+      intent: 'anniversary_song',
+      style: {
+        genre: 'country',
+        mood: ['warm', 'hopeful'],
+        vocal: {
+          presence: true,
+          gender: 'female',
+          language: 'ja',
+        },
+      },
+      composition: {
+        duration_sec: 180,
+        bpm: 84,
+        key: 'D major',
+        structure: ['verse', 'chorus'],
+      },
+      lyrics: {
+        mode: 'provided',
+        text: '[Verse]\nありがとう',
+      },
+      arrangement: {
+        instruments: ['acoustic_guitar', 'harmonica'],
+        mix_traits: ['intimate'],
+      },
+      output: {
+        format: 'mp3',
+        filename_prefix: 'anniversary-song',
+      },
+    })).toBe(true);
   });
 
   it('rejects vocal workflows that omit provided lyrics', () => {

@@ -8,6 +8,12 @@ import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } fr
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
+import {
+  createOutcomeContract,
+  inferTaskSessionOutcomeContract,
+  validateOutcomeContractAtCompletion,
+  type OutcomeContract,
+} from './outcome-contract.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
@@ -75,6 +81,7 @@ export interface TaskSession {
     requires_approval: boolean;
     awaiting_user_input: boolean;
   };
+  outcome_contract: OutcomeContract;
   history: TaskSessionHistoryEntry[];
   updated_at: string;
   payload?: Record<string, unknown>;
@@ -210,6 +217,7 @@ export function createTaskSession(input: {
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
   workLoop?: OrganizationWorkLoopSummary;
+  outcomeContract?: OutcomeContract;
 }): TaskSession {
   const now = new Date().toISOString();
   const requiresApproval = inferRequiresApproval(input);
@@ -227,8 +235,25 @@ export function createTaskSession(input: {
     serviceBindings: input.projectContext?.service_bindings,
     requiresApproval,
   });
+  const provisionalSessionId = input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+  const outcomeContract = input.outcomeContract || inferTaskSessionOutcomeContract({
+    sessionId: provisionalSessionId,
+    goal: input.goal,
+    taskType: input.taskType,
+  });
+  const normalizedOutcomeContract = createOutcomeContract({
+    ...outcomeContract,
+    outcomeId: outcomeContract.outcome_id,
+    requestedResult: outcomeContract.requested_result,
+    deliverableKind: outcomeContract.deliverable_kind,
+    successCriteria: outcomeContract.success_criteria,
+    evidenceRequired: outcomeContract.evidence_required,
+    expectedArtifacts: outcomeContract.expected_artifacts,
+    verificationMethod: outcomeContract.verification_method,
+  });
+
   return {
-    session_id: input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    session_id: provisionalSessionId,
     surface: input.surface,
     task_type: input.taskType,
     status: input.status || 'awaiting_instruction',
@@ -242,6 +267,7 @@ export function createTaskSession(input: {
       requires_approval: requiresApproval,
       awaiting_user_input: Boolean(input.requirements?.missing?.length),
     },
+    outcome_contract: normalizedOutcomeContract,
     history: [],
     updated_at: now,
     payload: input.payload,
@@ -393,6 +419,18 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
 }
 
 export function saveTaskSession(session: TaskSession): string {
+  if (session.status === 'completed') {
+    const completionValidation = validateOutcomeContractAtCompletion(session.outcome_contract, {
+      artifactRefs: [
+        String(session.artifact?.artifact_id || ''),
+        String(session.artifact?.output_path || ''),
+        String(session.artifact?.external_ref || ''),
+      ],
+    });
+    if (!completionValidation.ok) {
+      throw new Error(`Cannot complete task session: ${completionValidation.reason}`);
+    }
+  }
   const result = validateTaskSession(session);
   if (!result.valid) {
     throw new Error(`Invalid task session: ${result.errors.join('; ')}`);

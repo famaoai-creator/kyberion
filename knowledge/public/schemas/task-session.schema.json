@@ -114,6 +114,49 @@
       },
       "additionalProperties": false
     },
+    "outcome_contract": {
+      "type": "object",
+      "required": [
+        "outcome_id",
+        "requested_result",
+        "deliverable_kind",
+        "success_criteria",
+        "evidence_required",
+        "expected_artifacts",
+        "verification_method"
+      ],
+      "properties": {
+        "outcome_id": { "type": "string", "minLength": 1 },
+        "requested_result": { "type": "string", "minLength": 1 },
+        "deliverable_kind": { "type": "string", "minLength": 1 },
+        "success_criteria": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "evidence_required": { "type": "boolean" },
+        "expected_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "storage_class"],
+            "properties": {
+              "kind": { "type": "string", "minLength": 1 },
+              "storage_class": {
+                "type": "string",
+                "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "verification_method": {
+          "type": "string",
+          "enum": ["self_check", "review_gate", "human_acceptance", "test"]
+        }
+      },
+      "additionalProperties": false
+    },
     "history": {
       "type": "array",
       "items": {

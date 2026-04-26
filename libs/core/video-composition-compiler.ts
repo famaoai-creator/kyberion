@@ -38,6 +38,10 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     ...compiledScenes.map((scene) => path.join(bundleDir, scene.output_html)),
   ];
 
+  if (adf.audio?.narration_ref) {
+    artifactRefs.push(path.resolve(process.cwd(), adf.audio.narration_ref));
+  }
+
   return {
     kind: 'video-composition-render-plan',
     version: adf.version,
@@ -118,177 +122,201 @@ function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): C
 }
 
 function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositionScene): string {
-  const title = sceneText(scene, 'headline');
+  const title = sceneText(scene, 'title');
   const body = sceneText(scene, 'body');
   const eyebrow = sceneText(scene, 'eyebrow');
-  const cta = sceneText(scene, 'cta');
-  const statValue = sceneText(scene, 'stat_value');
-  const statLabel = sceneText(scene, 'stat_label');
-  const background = resolveAsset(scene.asset_refs, 'background') || resolveAsset(scene.asset_refs, 'hero');
-  const supporting = resolveAsset(scene.asset_refs, 'hero') || resolveAsset(scene.asset_refs, 'supporting');
-  const logo = resolveAsset(scene.asset_refs, 'logo');
-  const backgroundColor = adf.composition.background_color || '#0B1020';
+  const supporting = resolveAsset(scene.asset_refs, 'supporting');
+  const hfScript = `<script>
+  window.__hf = {
+    duration: ${scene.duration_sec},
+    seek: (time) => { console.log('[HF] seek', time); }
+  };
+</script>`;
 
   if (scene.template_id === 'split-highlight') {
     return `<!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8">
     <title>${escapeHtml(title || scene.scene_id)}</title>
     <style>
-      :root { color-scheme: dark; }
+      :root { 
+        --bg: #070912;
+        --accent: #3b82f6;
+        --text: #f8fafc;
+        --subtext: #94a3b8;
+      }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: ${backgroundColor};
-        color: #f8fafc;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
       }
-      .stage {
-        position: relative;
+      .container {
+        display: flex;
         width: 100%;
         height: 100%;
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
+        padding: 60px;
+        gap: 40px;
+        align-items: center;
+        animation: fadeIn 0.8s ease-out;
       }
-      .copy {
-        padding: 88px 72px;
+      .content {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 20px;
+        gap: 24px;
+        z-index: 10;
       }
-      .eyebrow { font-size: 18px; letter-spacing: 0.12em; text-transform: uppercase; color: #93c5fd; }
-      h1 { margin: 0; font-size: 72px; line-height: 0.95; }
-      p { margin: 0; font-size: 28px; line-height: 1.4; color: #cbd5e1; max-width: 720px; }
-      .stat { display: flex; gap: 14px; align-items: baseline; }
-      .stat strong { font-size: 44px; }
-      .panel {
-        margin: 48px;
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 28px;
-        background: rgba(15, 23, 42, 0.82);
+      .eyebrow {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--accent);
+        opacity: 0.8;
+      }
+      h1 {
+        margin: 0;
+        font-size: 64px;
+        line-height: 1.1;
+        font-weight: 800;
+        background: linear-gradient(to bottom right, #fff, #94a3b8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .body {
+        font-size: 24px;
+        line-height: 1.6;
+        color: var(--subtext);
+        max-width: 600px;
+      }
+      .visual {
+        flex: 1;
+        height: 100%;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 24px;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         position: relative;
+        box-shadow: 0 40px 100px rgba(0,0,0,0.5);
       }
-      .panel img {
+      .visual img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        display: block;
+        opacity: 0.9;
+        transform: scale(1.05);
+        animation: zoomIn 10s infinite alternate;
       }
-      .bg {
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes zoomIn { from { transform: scale(1); } to { transform: scale(1.1); } }
+      .grid {
         position: absolute;
         inset: 0;
-        background-image: ${background ? `url("${escapeHtml(background.path)}")` : 'none'};
-        background-size: cover;
-        background-position: center;
-        opacity: 0.18;
-        filter: blur(8px);
-        transform: scale(1.08);
+        background-image: radial-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+        background-size: 40px 40px;
+        z-index: 1;
       }
     </style>
   </head>
-  <body>
-    <div class="bg"></div>
-    <div class="stage">
-      <section class="copy">
+  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+    <div class="grid"></div>
+    <div class="container">
+      <div class="content">
         ${eyebrow ? `<div class="eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
-        <h1>${escapeHtml(title || 'Untitled Scene')}</h1>
-        ${body ? `<p>${escapeHtml(body)}</p>` : ''}
-        ${statValue ? `<div class="stat"><strong>${escapeHtml(statValue)}</strong><span>${escapeHtml(statLabel)}</span></div>` : ''}
-        ${cta ? `<p>${escapeHtml(cta)}</p>` : ''}
-      </section>
-      <aside class="panel">
-        ${supporting ? `<img src="${escapeHtml(supporting.path)}" alt="${escapeHtml(supporting.asset_id)}">` : `<div style="padding:32px;color:#94a3b8;">Add a hero or supporting asset to this scene.</div>`}
-      </aside>
+        <h1>${escapeHtml(title || 'Mission Logic')}</h1>
+        <div class="body">${escapeHtml(body)}</div>
+      </div>
+      <div class="visual">
+        ${supporting ? `<img src="${escapeHtml(supporting.path)}" alt="visual">` : '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.2)">[Architecture Vision]</div>'}
+      </div>
     </div>
+    ${hfScript}
   </body>
 </html>`;
   }
 
   if (scene.template_id === 'logo-outro') {
     return `<!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8">
-    <title>${escapeHtml(title || scene.scene_id)}</title>
+    <title>Outro</title>
     <style>
-      * { box-sizing: border-box; }
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
-        overflow: hidden;
+        background: #000;
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, rgba(59,130,246,0.18), transparent 45%), ${backgroundColor};
-        color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+        overflow: hidden;
       }
-      .wrap { display: flex; flex-direction: column; align-items: center; gap: 28px; text-align: center; padding: 48px; }
-      img { max-width: 220px; max-height: 220px; object-fit: contain; }
-      h1 { margin: 0; font-size: 68px; line-height: 0.95; }
-      p { margin: 0; font-size: 24px; color: #cbd5e1; max-width: 860px; }
+      .center {
+        text-align: center;
+        animation: scaleUp 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      h1 { font-size: 80px; letter-spacing: -0.02em; margin: 0; font-weight: 900; }
+      p { font-size: 24px; color: #64748b; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.4em; }
+      @keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      .glow {
+        position: absolute;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
+        z-index: -1;
+      }
     </style>
   </head>
-  <body>
-    <div class="wrap">
-      ${logo ? `<img src="${escapeHtml(logo.path)}" alt="${escapeHtml(logo.asset_id)}">` : ''}
-      <h1>${escapeHtml(title || 'Thank you')}</h1>
-      ${body ? `<p>${escapeHtml(body)}</p>` : ''}
-      ${cta ? `<p>${escapeHtml(cta)}</p>` : ''}
+  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+    <div class="glow"></div>
+    <div class="center">
+      <h1>${escapeHtml(title || 'Kyberion')}</h1>
+      <p>Initialize Your Mission.</p>
     </div>
+    ${hfScript}
   </body>
 </html>`;
   }
 
   return `<!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8">
-    <title>${escapeHtml(title || scene.scene_id)}</title>
+    <title>Scene</title>
     <style>
-      * { box-sizing: border-box; }
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
-        overflow: hidden;
+        background: #070912;
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: ${background ? `linear-gradient(rgba(11,16,32,0.48), rgba(11,16,32,0.82)), url("${escapeHtml(background.path)}") center/cover` : backgroundColor};
-        color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+        text-align: center;
       }
-      .card {
-        max-width: 1180px;
-        padding: 72px 80px;
-        border-radius: 32px;
-        border: 1px solid rgba(255,255,255,0.14);
-        background: rgba(15, 23, 42, 0.72);
-        box-shadow: 0 30px 80px rgba(2, 6, 23, 0.35);
+      .hero-text {
+        animation: reveal 1.5s cubic-bezier(0.77, 0, 0.175, 1);
       }
-      .eyebrow { font-size: 18px; letter-spacing: 0.14em; text-transform: uppercase; color: #93c5fd; margin-bottom: 20px; }
-      h1 { margin: 0; font-size: 84px; line-height: 0.94; }
-      p { margin: 18px 0 0; font-size: 28px; line-height: 1.45; color: #cbd5e1; }
+      h1 { font-size: 96px; margin: 0; font-weight: 800; letter-spacing: -0.04em; }
+      @keyframes reveal { from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
     </style>
   </head>
-  <body>
-    <div class="card">
-      ${eyebrow ? `<div class="eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
-      <h1>${escapeHtml(title || 'Untitled Scene')}</h1>
-      ${body ? `<p>${escapeHtml(body)}</p>` : ''}
-      ${cta ? `<p>${escapeHtml(cta)}</p>` : ''}
+  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+    <div class="hero-text">
+      <h1>${escapeHtml(title || 'Kyberion')}</h1>
     </div>
+    ${hfScript}
   </body>
 </html>`;
 }
@@ -326,7 +354,7 @@ function renderBundleIndexHtml(plan: VideoCompositionRenderPlan, adf: VideoCompo
       }
     </style>
   </head>
-  <body>
+  <body data-composition-id="${plan.composition_id}" data-width="${plan.width}" data-height="${plan.height}">
     <div class="shell">
       <h1>${escapeHtml(plan.title)}</h1>
       <div class="meta">${plan.width}x${plan.height} • ${plan.fps}fps • ${plan.duration_sec}s • ${escapeHtml(plan.output_format)}</div>
@@ -338,6 +366,15 @@ function renderBundleIndexHtml(plan: VideoCompositionRenderPlan, adf: VideoCompo
         <strong>Audio refs:</strong> <code>${escapeHtml(JSON.stringify(adf.audio || {}, null, 0))}</code>
       </div>
     </div>
+    <script>
+      window.__hf = {
+        duration: ${plan.duration_sec},
+        seek: (time) => { console.log('[HF] root seek to', time); }
+      };
+      window.__timelines = {
+        "${plan.composition_id}": { duration: ${plan.duration_sec} }
+      };
+    </script>
   </body>
 </html>`;
 }

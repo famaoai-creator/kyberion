@@ -1,6 +1,14 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { buildOrganizationWorkLoopSummary, loadOutcomeCatalog, loadSpecialistCatalog, resolveWorkDesign } from './work-design.js';
 import { createDistillCandidateRecord, saveDistillCandidateRecord } from './distill-candidate-registry.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { safeReadFile } from './secure-io.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('work-design', () => {
   it('loads outcome and specialist catalogs', () => {
@@ -185,5 +193,39 @@ describe('work-design', () => {
     expect(summary.review_design.required_gate_ids).toContain('SECURITY_READY');
     expect(summary.process_design.operator_checklist).toContain('confirm project root and default track');
     expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
+  });
+
+  it('keeps the governed work policy file schema-valid', () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/work-policy.schema.json'));
+    const workPolicy = JSON.parse(
+      safeReadFile(path.resolve(root, 'knowledge/public/governance/work-policy.json'), {
+        encoding: 'utf8',
+      }) as string,
+    );
+
+    expect(validate(workPolicy)).toBe(true);
+    expect(
+      validate({
+        version: '1.0.0',
+        specialist_routing: {
+          rules: [],
+          fallback_specialist_id: 42,
+        },
+        profile_routing: {
+          defaults: {
+            execution_boundary_profile_id: 'default_governed_execution',
+            runtime_design_profile_id: 'single_actor_delivery',
+          },
+        },
+        design_rules: {
+          process_checklist_rules: [],
+          execution_shape_rules: [],
+          intent_label_rules: [],
+        },
+      }),
+    ).toBe(false);
   });
 });

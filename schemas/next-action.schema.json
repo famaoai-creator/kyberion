@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/next-action.schema.json",
+  "title": "Next Action Contract",
+  "type": "object",
+  "required": [
+    "action_id",
+    "next_action_type",
+    "reason",
+    "risk",
+    "approval_required"
+  ],
+  "properties": {
+    "action_id": { "type": "string", "minLength": 1 },
+    "next_action_type": {
+      "type": "string",
+      "enum": [
+        "request_clarification",
+        "approve",
+        "inspect_evidence",
+        "retry_delivery",
+        "promote_mission_seed",
+        "resume_mission"
+      ]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+    "suggested_command": { "type": "string", "minLength": 1 },
+    "suggested_surface_action": {
+      "type": "string",
+      "enum": ["approvals", "mission-seeds", "memory-promotion-queue", "next-actions"]
+    },
+    "approval_required": { "type": "boolean" }
+  },
+  "anyOf": [
+    { "required": ["suggested_command"] },
+    { "required": ["suggested_surface_action"] }
+  ],
+  "additionalProperties": false
+}

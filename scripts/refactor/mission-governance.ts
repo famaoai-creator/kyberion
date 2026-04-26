@@ -12,9 +12,11 @@ import {
   safeAppendFileSync,
   safeExec,
   safeExistsSync,
+  safeReaddir,
   safeReadFile,
   safeWriteFile,
   trustEngine,
+  validateOutcomeContractAtCompletion,
 } from '@agent/core';
 import { loadState } from './mission-state.js';
 
@@ -73,6 +75,21 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
 
   const state = loadState(id);
   if (!state) return { ok: false, reason: 'Mission state not found.' };
+
+  if (state.outcome_contract) {
+    const missionPath = findMissionPath(id);
+    const evidenceRefs = missionPath && safeExistsSync(path.join(missionPath, 'evidence'))
+      ? safeReaddir(path.join(missionPath, 'evidence'))
+          .filter((entry) => entry !== '.gitkeep')
+          .map((entry) => path.join(missionPath, 'evidence', entry))
+      : [];
+    const outcomeCheck = validateOutcomeContractAtCompletion(state.outcome_contract, {
+      artifactRefs: evidenceRefs,
+    });
+    if (!outcomeCheck.ok) {
+      return { ok: false, reason: outcomeCheck.reason };
+    }
+  }
 
   if (reqs.require_test_success) {
     logger.info('🧪 [QualityCheck] Verification required: require_test_success=true');

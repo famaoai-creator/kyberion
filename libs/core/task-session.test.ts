@@ -1,6 +1,9 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -10,6 +13,8 @@ import {
   saveTaskSession,
   validateTaskSession,
 } from './task-session.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
 
 function cleanupTestTaskSessions() {
   const dir = pathResolver.shared('runtime/task-sessions');
@@ -44,6 +49,7 @@ describe('task-session', () => {
     });
     const result = validateTaskSession(session);
     expect(result.valid).toBe(true);
+    expect(session.outcome_contract.success_criteria.length).toBeGreaterThan(0);
     expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
     expect(session.work_loop?.intent.label).toBe('capture_photo');
   });
@@ -117,6 +123,30 @@ describe('task-session', () => {
     expect(updated?.history.at(-1)?.text).toBe('ちょっと写真をとって');
   });
 
+  it('blocks completion when outcome contract requires evidence without artifact refs', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-OUTCOME-CHECK',
+      surface: 'presence',
+      taskType: 'analysis',
+      status: 'completed',
+      goal: {
+        summary: '横断レビュー',
+        success_condition: 'レビュー結果を返す',
+      },
+      outcomeContract: {
+        outcome_id: 'ts_outcome_test',
+        requested_result: 'レビュー結果',
+        deliverable_kind: 'report',
+        success_criteria: ['findings delivered'],
+        evidence_required: true,
+        expected_artifacts: [],
+        verification_method: 'self_check',
+      },
+    });
+
+    expect(() => saveTaskSession(session)).toThrow(/requires evidence/i);
+  });
+
   it('classifies photo and workbook intents from conversational utterances', () => {
     expect(classifyTaskSessionIntent('ちょっと写真をとって')?.taskType).toBe('capture_photo');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.intentId).toBe('bootstrap-project');
@@ -153,5 +183,49 @@ describe('task-session', () => {
     expect(remediation?.payload?.source_corpus).toBe('requirements');
     expect(remediation?.payload?.action_bias).toBe('remediation');
     expect(remediation?.requirements?.missing || []).toEqual([]);
+  });
+
+  it('emits task sessions that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-SCHEMA',
+      surface: 'presence',
+      taskType: 'presentation_deck',
+      goal: {
+        summary: 'Create a deck',
+        success_condition: 'pptx exists',
+      },
+      payload: {
+        deck_purpose: 'proposal',
+      },
+    });
+    const valid = validate(session);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('accepts the canonical task-session-capture-photo example', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const example = JSON.parse(
+      safeReadFile(path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.example.json'), {
+        encoding: 'utf8',
+      }) as string,
+    );
+
+    expect(validate(example.payload), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('rejects invalid task-session-capture-photo payloads', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+
+    expect(validate({
+      device_preference: 'rear-camera',
+      save_path: 'active/shared/tmp/photo.jpg',
+    })).toBe(false);
   });
 });

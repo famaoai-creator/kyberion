@@ -120,6 +120,36 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['record-evidence', 'MSN-2D', 'review', 'Evidence recorded']);
   });
 
+  it('treats memory queue control options as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'memory-promote',
+      'MEM-123',
+      '--execution-role',
+      'chronos_gateway',
+      '--note',
+      'operator approved',
+    ]);
+
+    expect(positionalArgs).toEqual(['memory-promote', 'MEM-123']);
+  });
+
+  it('treats memory bulk promotion flags as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'memory-promote-pending',
+      '--execution-role',
+      'mission_controller',
+      '--note',
+      'batch approval',
+      '--dry-run',
+    ]);
+
+    expect(positionalArgs).toEqual(['memory-promote-pending']);
+  });
+
   it('extracts project relationship options into a normalized relationship payload', () => {
     const relationships = extractProjectRelationshipOptionsFromArgv([
       'node',

@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from './schema-loader.js';
 
 vi.mock('./path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
@@ -45,6 +48,8 @@ const designExtracted = {
   risks: [],
   open_decisions: [],
 };
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 const testExtracted = {
   app_id: 'sample-app',
@@ -148,6 +153,36 @@ describe('sdlc-artifact-store', () => {
     it('ARCHITECTURE_READY fails when no spec exists', () => {
       expect(evaluateArchitectureReadyGate('MSN-NONE').passed).toBe(false);
     });
+
+    it('emits design specs that satisfy the schema', () => {
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/design-spec.schema.json'));
+
+      const saved = saveDesignSpec({
+        missionId: 'MSN-D-SCHEMA',
+        projectName: 'Schema Project',
+        extracted: designExtracted,
+        generatedBy: 'test-suite',
+      });
+
+      expect(validate(saved), JSON.stringify(validate.errors || [])).toBe(true);
+    });
+
+    it('rejects malformed design specs', () => {
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/design-spec.schema.json'));
+
+      expect(
+        validate({
+          version: 'v1',
+          project_name: 'Broken',
+          generated_at: new Date().toISOString(),
+          components: [],
+        }),
+      ).toBe(false);
+    });
   });
 
   describe('test plan', () => {
@@ -245,7 +280,7 @@ describe('sdlc-artifact-store', () => {
       expect(gate.reasons.some((r) => r.toLowerCase().includes('cycle'))).toBe(true);
     });
 
-    it('TASK_PLAN_READY fails when must-priority tasks lack test_criteria', () => {
+  it('TASK_PLAN_READY fails when must-priority tasks lack test_criteria', () => {
       saveTaskPlan({
         missionId: 'MSN-TP4',
         projectName: 'X',
@@ -264,6 +299,36 @@ describe('sdlc-artifact-store', () => {
       const gate = evaluateTaskPlanReadyGate('MSN-TP4');
       expect(gate.passed).toBe(false);
       expect(gate.reasons.some((r) => r.includes('test_criteria'))).toBe(true);
+    });
+
+    it('emits task plans that satisfy the schema', () => {
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/task-plan.schema.json'));
+
+      const saved = saveTaskPlan({
+        missionId: 'MSN-TP5',
+        projectName: 'Schema Project',
+        decomposed,
+        generatedBy: 'test-suite',
+      });
+
+      expect(validate(saved), JSON.stringify(validate.errors || [])).toBe(true);
+    });
+
+    it('rejects malformed task plans', () => {
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/task-plan.schema.json'));
+
+      expect(
+        validate({
+          version: 'v1',
+          project_name: 'Broken',
+          generated_at: new Date().toISOString(),
+          tasks: [],
+        }),
+      ).toBe(false);
     });
   });
 });

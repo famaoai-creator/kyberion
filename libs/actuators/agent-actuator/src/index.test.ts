@@ -1,4 +1,8 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => {
   const resolveMissionTeamPlan = vi.fn();
@@ -43,49 +47,55 @@ const mocks = vi.hoisted(() => {
     restartAgentRuntime,
   };
 });
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
-vi.mock('@agent/core', () => ({
-  logger: { info: vi.fn(), error: vi.fn() },
-  createStandardYargs: () => ({
-    option() {
-      return this;
+vi.mock('@agent/core', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    logger: { info: vi.fn(), error: vi.fn() },
+    createStandardYargs: () => ({
+      option() {
+        return this;
+      },
+      parseSync() {
+        return { input: 'input.json' };
+      },
+    }),
+    agentRegistry: {
+      get: vi.fn(),
+      updateStatus: vi.fn(),
+      touch: vi.fn(),
+      list: vi.fn(() => []),
+      getHealthSnapshot: vi.fn(() => ({ total: 0, ready: 0, busy: 0, error: 0 })),
     },
-    parseSync() {
-      return { input: 'input.json' };
+    a2aBridge: {
+      route: vi.fn(),
     },
-  }),
-  agentRegistry: {
-    get: vi.fn(),
-    updateStatus: vi.fn(),
-    touch: vi.fn(),
-    list: vi.fn(() => []),
-    getHealthSnapshot: vi.fn(() => ({ total: 0, ready: 0, busy: 0, error: 0 })),
-  },
-  a2aBridge: {
-    route: vi.fn(),
-  },
-  resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
-  getMissionTeamAssignment: mocks.getMissionTeamAssignment,
-  ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
-  enqueueMissionTeamPrewarmRequest: mocks.enqueueMissionTeamPrewarmRequest,
-  startAgentRuntimeSupervisorForRequest: mocks.startAgentRuntimeSupervisorForRequest,
-  askAgentRuntime: mocks.askAgentRuntime,
-  ensureAgentRuntime: mocks.ensureAgentRuntime,
-  ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
-  askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
-  getAgentRuntimeStatusViaDaemon: mocks.getAgentRuntimeStatusViaDaemon,
-  listAgentRuntimesViaDaemon: mocks.listAgentRuntimesViaDaemon,
-  shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
-  refreshAgentRuntimeViaDaemon: mocks.refreshAgentRuntimeViaDaemon,
-  restartAgentRuntimeViaDaemon: mocks.restartAgentRuntimeViaDaemon,
-  stopAgentRuntime: mocks.stopAgentRuntime,
-  listAgentRuntimeSnapshots: mocks.listAgentRuntimeSnapshots,
-  getAgentRuntimeSnapshot: mocks.getAgentRuntimeSnapshot,
-  refreshAgentRuntime: mocks.refreshAgentRuntime,
-  restartAgentRuntime: mocks.restartAgentRuntime,
-  shutdownAllAgentRuntimes: vi.fn(),
-  safeReadFile: vi.fn(),
-}));
+    resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
+    getMissionTeamAssignment: mocks.getMissionTeamAssignment,
+    ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
+    enqueueMissionTeamPrewarmRequest: mocks.enqueueMissionTeamPrewarmRequest,
+    startAgentRuntimeSupervisorForRequest: mocks.startAgentRuntimeSupervisorForRequest,
+    askAgentRuntime: mocks.askAgentRuntime,
+    ensureAgentRuntime: mocks.ensureAgentRuntime,
+    ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
+    askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
+    getAgentRuntimeStatusViaDaemon: mocks.getAgentRuntimeStatusViaDaemon,
+    listAgentRuntimesViaDaemon: mocks.listAgentRuntimesViaDaemon,
+    shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
+    refreshAgentRuntimeViaDaemon: mocks.refreshAgentRuntimeViaDaemon,
+    restartAgentRuntimeViaDaemon: mocks.restartAgentRuntimeViaDaemon,
+    stopAgentRuntime: mocks.stopAgentRuntime,
+    listAgentRuntimeSnapshots: mocks.listAgentRuntimeSnapshots,
+    getAgentRuntimeSnapshot: mocks.getAgentRuntimeSnapshot,
+    refreshAgentRuntime: mocks.refreshAgentRuntime,
+    restartAgentRuntime: mocks.restartAgentRuntime,
+    shutdownAllAgentRuntimes: vi.fn(),
+    safeReadFile: vi.fn(),
+  };
+});
 
 describe('agent-actuator team composition actions', () => {
   beforeEach(() => {
@@ -188,6 +198,46 @@ describe('agent-actuator team composition actions', () => {
       requestedBy: 'agent_actuator',
     }));
     expect(result).toEqual({ status: 'ok', missionId: 'MSN-TEAM', runtimePlan: runtimePlan.runtime_plan });
+  });
+
+  it('emits agent actions that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/agent-action.schema.json'));
+
+    expect(
+      validate({
+        action: 'spawn',
+        params: {
+          agentId: 'agent-1',
+          missionId: 'MSN-TEAM',
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+
+    expect(
+      validate({
+        action: 'team_plan',
+        params: {
+          missionId: 'MSN-TEAM',
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+  });
+
+  it('rejects unsupported agent actions', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/agent-action.schema.json'));
+
+    expect(
+      validate({
+        action: 'unsupported',
+        params: {},
+      }),
+    ).toBe(false);
   });
 
   it('queues mission prewarm through the supervisor', async () => {

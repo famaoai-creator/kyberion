@@ -1,10 +1,16 @@
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   ledgerRecord: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
@@ -93,5 +99,21 @@ describe('secret-actuator: governed mutation', () => {
       service_id: 'slack',
       action: 'set'
     }));
+  });
+
+  it('emits secret actions that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/secret-action.schema.json'));
+    const action = {
+      action: 'set',
+      params: {
+        account: 'test_user',
+        service: 'slack',
+        value: 'secret123',
+      },
+    };
+    const valid = validate(action);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

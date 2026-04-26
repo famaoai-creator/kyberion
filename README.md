@@ -9,6 +9,7 @@ Kyberion is an Organization Work Loop engine.
 It turns organizational intent into governed execution, evidence, and reusable memory.
 
 For the top-level architecture, see [knowledge/public/architecture/organization-work-loop.md](knowledge/public/architecture/organization-work-loop.md).
+For the canonical concept baseline, see [knowledge/public/architecture/kyberion-canonical-concept-index.md](knowledge/public/architecture/kyberion-canonical-concept-index.md).
 
 The intended user experience is simple:
 

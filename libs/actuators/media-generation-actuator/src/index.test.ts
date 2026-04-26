@@ -1,4 +1,8 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -12,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
 }));
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('@agent/core', async () => {
   const actual = await vi.importActual('@agent/core') as any;
@@ -338,5 +344,81 @@ describe('media-generation-actuator', () => {
       provider: expect.objectContaining({ prompt_id: 'music-789' }),
     }));
     vi.useRealTimers();
+  });
+
+  it('emits media generation actions that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json'));
+
+    expect(
+      validate({
+        action: 'generate_image',
+        params: {
+          workflow_path: 'active/shared/tmp/image-workflow.json',
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+
+    expect(
+      validate({
+        action: 'submit_generation',
+        params: {
+          action: 'generate_music',
+          params: {
+            music_adf: {
+              kind: 'music-generation-adf',
+              version: '1.0.0',
+            },
+          },
+        },
+      }),
+      JSON.stringify(validate.errors || []),
+    ).toBe(true);
+  });
+
+  it('rejects unsupported media generation actions', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json'));
+
+    expect(
+      validate({
+        action: 'unsupported',
+        params: {},
+      }),
+    ).toBe(false);
+  });
+
+  it('emits voice-generation-adf requests that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/public/schemas/voice-generation-adf.schema.json'));
+
+    expect(validate({
+      action: 'generate_voice',
+      request_id: 'req-schema-1',
+      text: 'hello world',
+      profile_ref: {
+        profile_id: 'operator-ja-default',
+      },
+      engine: {
+        engine_id: 'local_say',
+      },
+      rendering: {
+        language: 'ja',
+        chunking: {
+          max_chunk_chars: 200,
+          crossfade_ms: 50,
+          preserve_paralinguistic_tags: true,
+        },
+      },
+      delivery: {
+        mode: 'artifact',
+        format: 'wav',
+        emit_progress_packets: true,
+      },
+    })).toBe(true);
   });
 });

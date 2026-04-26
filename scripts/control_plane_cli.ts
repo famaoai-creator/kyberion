@@ -1,14 +1,17 @@
 import {
   ControlPlaneClientError,
+  createNextActionContract,
   createControlPlaneClient,
   createStandardYargs,
   findIntentOutcomePattern,
   getControlPlaneRemediationPlan,
+  listMemoryPromotionCandidates,
   loadIntentOutcomePatterns,
   logger,
   pathResolver,
   safeReadFile,
   safeExec,
+  validateNextActionContract,
 } from "@agent/core";
 import * as path from "node:path";
 
@@ -244,6 +247,61 @@ function filterByProjectId<T extends { project_id?: string }>(items: T[], projec
 
 function isKnowledgePath(logicalPath: string): boolean {
   return /^knowledge\//.test(String(logicalPath || "").trim());
+}
+
+function listChronosMemoryCandidates(status?: string): any[] {
+  const normalized = String(status || "").trim().toLowerCase();
+  return listMemoryPromotionCandidates()
+    .filter((item) => (normalized ? item.status === normalized : true))
+    .sort((a, b) => b.queued_at.localeCompare(a.queued_at));
+}
+
+function buildChronosNextActions(input: {
+  pendingApprovals: number;
+  missionSeeds: any[];
+  memoryCandidates: any[];
+}): Array<ReturnType<typeof createNextActionContract>> {
+  const actions = [];
+  if (input.pendingApprovals > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-approve-pending",
+      type: "approve",
+      reason: `${input.pendingApprovals} pending approval request(s) require a decision.`,
+      risk: "medium",
+      suggestedCommand: "pnpm control chronos approvals",
+      suggestedSurfaceAction: "approvals",
+      approvalRequired: true,
+    }));
+  }
+
+  const approvedMemory = input.memoryCandidates.filter((item) => item.status === "approved");
+  if (approvedMemory.length > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-promote-memory",
+      type: "inspect_evidence",
+      reason: `${approvedMemory.length} approved memory candidate(s) are ready for promotion.`,
+      risk: "low",
+      suggestedCommand:
+        "node dist/scripts/mission_controller.js memory-promote-pending --dry-run",
+      suggestedSurfaceAction: "memory-promotion-queue",
+      approvalRequired: false,
+    }));
+  }
+
+  const promotableSeeds = input.missionSeeds.filter((seed) => !seed.promoted_mission_id);
+  if (promotableSeeds.length > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-promote-seed",
+      type: "promote_mission_seed",
+      reason: `${promotableSeeds.length} mission seed(s) can be promoted into active missions.`,
+      risk: "low",
+      suggestedCommand: "pnpm control chronos mission-seeds",
+      suggestedSurfaceAction: "mission-seeds",
+      approvalRequired: false,
+    }));
+  }
+
+  return actions.filter((action) => validateNextActionContract(action).valid);
 }
 
 async function executeSurfaceAction(
@@ -494,13 +552,34 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
   const handlers: Record<string, SurfaceActionHandler> = {
     overview: async (client, _args, outputJson) => {
       const body = await client.getChronosOverview();
-      if (outputJson) return printJson(body);
+      const memoryCandidates = asArray(body.memoryCandidates).length > 0
+        ? asArray(body.memoryCandidates)
+        : listChronosMemoryCandidates();
+      const nextActions = asArray(body.nextActions).length > 0
+        ? asArray(body.nextActions)
+        : buildChronosNextActions({
+        pendingApprovals: asArray(body.pendingApprovals).length,
+        missionSeeds: asArray(body.missionSeeds),
+        memoryCandidates,
+      });
+      if (outputJson) return printJson({
+        ...body,
+        memoryCandidates,
+        nextActions,
+      });
       process.stdout.write(`Chronos overview\n`);
       process.stdout.write(`- access: ${body.accessRole}\n`);
       process.stdout.write(`- projects: ${asArray(body.projects).length}\n`);
       process.stdout.write(`- mission seeds: ${asArray(body.missionSeeds).length}\n`);
       process.stdout.write(`- approvals: ${asArray(body.pendingApprovals).length}\n`);
       process.stdout.write(`- distill candidates: ${asArray(body.distillCandidates).length}\n`);
+      process.stdout.write(`- memory candidates: ${memoryCandidates.length}\n`);
+      if (nextActions.length > 0) {
+        process.stdout.write(`- next action: ${nextActions[0]?.reason}\n`);
+        if (nextActions[0]?.suggested_command) {
+          process.stdout.write(`  command: ${nextActions[0].suggested_command}\n`);
+        }
+      }
     },
     approvals: async (client, _args, outputJson) => {
       const items = await client.listApprovals();
@@ -579,7 +658,44 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       `candidate: ${item.candidate_id} · kind: ${item.target_kind || "unknown"} · tier: ${item.tier || "unknown"}`,
       `project: ${item.project_id || "standalone"} · mission: ${item.mission_id || "-"} · task: ${item.task_session_id || "-"}`,
       item.promoted_ref ? `promoted: ${item.promoted_ref}` : "promoted: -",
-    ]);
+      ]);
+    },
+    "memory-candidates": async (_client, currentArgs, outputJson) => {
+      const [status] = currentArgs;
+      const items = listChronosMemoryCandidates(status);
+      if (outputJson) return printJson(items);
+      return printItems("Memory Candidates", items, (item) => [
+        `${item.candidate_id} [${item.status || "queued"}]`,
+        `kind: ${item.proposed_memory_kind || "unknown"} · tier: ${item.sensitivity_tier || "unknown"}`,
+        `source: ${item.source_ref || "unknown"}`,
+        `evidence: ${asArray(item.evidence_refs).length}`,
+        item.promoted_ref ? `promoted: ${item.promoted_ref}` : "promoted: -",
+      ]);
+    },
+    "next-actions": async (client, _currentArgs, outputJson) => {
+      const body = await client.getChronosOverview();
+      const memoryCandidates = asArray(body.memoryCandidates).length > 0
+        ? asArray(body.memoryCandidates)
+        : listChronosMemoryCandidates();
+      const actions = asArray(body.nextActions).length > 0
+        ? asArray(body.nextActions)
+        : buildChronosNextActions({
+          pendingApprovals: asArray(body.pendingApprovals).length,
+          missionSeeds: asArray(body.missionSeeds),
+          memoryCandidates,
+        });
+      if (outputJson) return printJson(actions);
+      return printItems("Chronos Next Actions", actions, (item) => [
+        `${item.action_id} [${item.next_action_type}]`,
+        `risk: ${item.risk} · approval_required: ${item.approval_required ? "yes" : "no"}`,
+        `reason: ${item.reason}`,
+        item.suggested_command ? `command: ${item.suggested_command}` : `surface action: ${item.suggested_surface_action || "-"}`,
+      ]);
+    },
+    "promote-memory": async (client, currentArgs) => {
+      const dryRun = currentArgs.includes("--dry-run");
+      const body = await client.postJson("/api/intelligence", { action: "memory_promote_pending", dryRun });
+      return printJson(body);
     },
     distill: async (client, currentArgs) => {
       const [candidateId, decision] = currentArgs;
@@ -745,6 +861,9 @@ Usage:
   pnpm control chronos seed-track <trackId> [artifactId]
   pnpm control chronos promote-seed <seedId>
   pnpm control chronos distill-candidates
+  pnpm control chronos memory-candidates [status]
+  pnpm control chronos next-actions
+  pnpm control chronos promote-memory [--dry-run]
   pnpm control chronos distill <candidateId> <promote|archive>
   pnpm control chronos mission-control <missionId> <operation>
   pnpm control chronos surface-control <operation> [surfaceId]

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
-import { buildSafeExecEnv, safeExec, safeExistsSync } from './secure-io.js';
+import { buildSafeExecEnv, safeExec, safeExistsSync, platform } from './index.js';
 import type { VideoCompositionRenderPlan, VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
 export interface VideoRenderBackendResult {
@@ -37,14 +37,14 @@ export class VideoRenderBackendCommandError extends Error {
   }
 }
 
-export function renderVideoCompositionBundle(
+export async function renderVideoCompositionBundle(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
-): VideoRenderBackendResult {
+): Promise<VideoRenderBackendResult> {
   if (!policy.render.enable_backend_rendering) {
     return {
       executed: false,
-      backend: policy.render.backend,
+      backend: policy.render.backend as any,
       reason: 'backend rendering disabled by policy',
     };
   }
@@ -57,40 +57,51 @@ export function renderVideoCompositionBundle(
     };
   }
 
-  if (policy.render.backend !== 'hyperframes_cli') {
-    throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
+  // Check for render capability via platform abstraction
+  const caps = await platform.getCapabilities();
+  
+  if (policy.render.backend === 'hyperframes_cli') {
+    if (!caps.hasFFmpeg) {
+      return {
+        executed: false,
+        backend: 'hyperframes_cli',
+        reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
+      };
+    }
+
+    const outputPath = resolveOutputPath(plan);
+    const command = [
+      'hyperframes',
+      'render',
+      plan.bundle_dir,
+      '--output',
+      outputPath,
+      '--format',
+      plan.output_format,
+      '--fps',
+      String(plan.fps),
+      '--quality',
+      policy.render.quality,
+    ];
+
+    safeExec('npx', command, {
+      timeoutMs: policy.render.command_timeout_ms,
+      cwd: process.cwd(),
+    });
+
+    if (!safeExistsSync(outputPath)) {
+      throw new Error(`Render backend completed without output artifact: ${outputPath}`);
+    }
+
+    return {
+      executed: true,
+      backend: 'hyperframes_cli',
+      output_path: outputPath,
+      command: ['npx', ...command],
+    };
   }
 
-  const outputPath = resolveOutputPath(plan);
-  const command = [
-    'hyperframes',
-    'render',
-    plan.bundle_dir,
-    '--output',
-    outputPath,
-    '--format',
-    plan.output_format,
-    '--fps',
-    String(plan.fps),
-    '--quality',
-    policy.render.quality,
-  ];
-
-  safeExec('npx', command, {
-    timeoutMs: policy.render.command_timeout_ms,
-    cwd: process.cwd(),
-  });
-
-  if (!safeExistsSync(outputPath)) {
-    throw new Error(`Render backend completed without output artifact: ${outputPath}`);
-  }
-
-  return {
-    executed: true,
-    backend: 'hyperframes_cli',
-    output_path: outputPath,
-    command: ['npx', ...command],
-  };
+  throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
 }
 
 export async function renderVideoCompositionBundleAsync(
@@ -101,7 +112,7 @@ export async function renderVideoCompositionBundleAsync(
   if (!policy.render.enable_backend_rendering) {
     return {
       executed: false,
-      backend: policy.render.backend,
+      backend: policy.render.backend as any,
       reason: 'backend rendering disabled by policy',
     };
   }
@@ -114,41 +125,52 @@ export async function renderVideoCompositionBundleAsync(
     };
   }
 
-  if (policy.render.backend !== 'hyperframes_cli') {
-    throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
+  // Check for render capability via platform abstraction
+  const caps = await platform.getCapabilities();
+
+  if (policy.render.backend === 'hyperframes_cli') {
+    if (!caps.hasFFmpeg) {
+      return {
+        executed: false,
+        backend: 'hyperframes_cli',
+        reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
+      };
+    }
+
+    const outputPath = resolveOutputPath(plan);
+    const command = [
+      'hyperframes',
+      'render',
+      plan.bundle_dir,
+      '--output',
+      outputPath,
+      '--format',
+      plan.output_format,
+      '--fps',
+      String(plan.fps),
+      '--quality',
+      policy.render.quality,
+    ];
+
+    await runCancellableCommand('npx', command, {
+      timeout_ms: policy.render.command_timeout_ms,
+      is_cancelled: options.isCancelled,
+      poll_interval_ms: options.poll_interval_ms || 100,
+    });
+
+    if (!safeExistsSync(outputPath)) {
+      throw new Error(`Render backend completed without output artifact: ${outputPath}`);
+    }
+
+    return {
+      executed: true,
+      backend: 'hyperframes_cli',
+      output_path: outputPath,
+      command: ['npx', ...command],
+    };
   }
 
-  const outputPath = resolveOutputPath(plan);
-  const command = [
-    'hyperframes',
-    'render',
-    plan.bundle_dir,
-    '--output',
-    outputPath,
-    '--format',
-    plan.output_format,
-    '--fps',
-    String(plan.fps),
-    '--quality',
-    policy.render.quality,
-  ];
-
-  await runCancellableCommand('npx', command, {
-    timeout_ms: policy.render.command_timeout_ms,
-    is_cancelled: options.isCancelled,
-    poll_interval_ms: options.poll_interval_ms || 100,
-  });
-
-  if (!safeExistsSync(outputPath)) {
-    throw new Error(`Render backend completed without output artifact: ${outputPath}`);
-  }
-
-  return {
-    executed: true,
-    backend: 'hyperframes_cli',
-    output_path: outputPath,
-    command: ['npx', ...command],
-  };
+  throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
 }
 
 function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
