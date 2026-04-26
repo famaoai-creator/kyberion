@@ -26,5 +26,17 @@ Use the following command to check the actual status in your current environment
 pnpm capabilities
 ```
 
+## 5. Example Entry Points
+Sample inputs for individual actuators live under each actuator's `examples/` directory.
+
+- `libs/actuators/approval-actuator/examples/`
+- `libs/actuators/artifact-actuator/examples/`
+- `libs/actuators/browser-actuator/examples/`
+- `libs/actuators/android-actuator/examples/`
+- `libs/actuators/ios-actuator/examples/`
+- `libs/actuators/media-actuator/examples/`
+- `libs/actuators/media-generation-actuator/examples/`
+- `libs/actuators/modeling-actuator/examples/`
+
 ---
 *Last Updated: 2026-03-11*

@@ -12,6 +12,7 @@ import {
   logger,
   missionDir as resolveMissionDir,
   pathResolver,
+  inferMissionOutcomeContract,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -22,6 +23,7 @@ import {
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
 import { calculateRequiredTier, checkPrerequisites, loadState, normalizeRelationships, saveState } from './mission-state.js';
 import { syncRoleProcedure } from './mission-governance.js';
+import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
 
 export async function createMission(
@@ -123,6 +125,11 @@ export async function createMission(
       latest_commit: missionGitHash,
       checkpoints: [],
     },
+    outcome_contract: inferMissionOutcomeContract({
+      missionId: upperId,
+      missionType,
+      visionRef: resolvedVision,
+    }),
     history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier ${isEphemeral ? '(Ephemeral Mode)' : '(Independent Micro-Repo)'}.` }],
   };
   await saveState(upperId, initialState);
@@ -212,6 +219,13 @@ export async function startMission(
         await saveState(upperId, state);
       }
     } else {
+      if (!state.outcome_contract) {
+        state.outcome_contract = inferMissionOutcomeContract({
+          missionId: upperId,
+          missionType: state.mission_type,
+          visionRef: state.vision_ref,
+        });
+      }
       if (normalizedRelationships.project) {
         state.relationships = {
           ...(state.relationships || {}),
@@ -234,6 +248,13 @@ export async function startMission(
       state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Mission resumed.' });
       await saveState(upperId, state);
     }
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: upperId,
+      stage: 'intake',
+      text: visionRef || `Start mission ${upperId} (${missionType})`,
+      source: 'mission_state',
+    });
 
     const missionPath = findMissionPath(upperId);
     if (missionPath) {

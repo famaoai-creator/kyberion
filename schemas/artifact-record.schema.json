@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/artifact-record.schema.json",
+  "title": "Artifact Ownership Record",
+  "type": "object",
+  "required": [
+    "artifact_id",
+    "kind",
+    "storage_class",
+    "created_at",
+    "evidence_refs"
+  ],
+  "properties": {
+    "artifact_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "task_session_id": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "storage_class": {
+      "type": "string",
+      "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]
+    },
+    "path": { "type": "string", "minLength": 1 },
+    "external_ref": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": false,
+  "anyOf": [
+    { "required": ["project_id"] },
+    { "required": ["mission_id"] },
+    { "required": ["task_session_id"] }
+  ]
+}

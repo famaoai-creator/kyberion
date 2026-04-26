@@ -5,6 +5,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { loadTaskSession, saveTaskSession, type TaskSession } from './task-session.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import { appendArtifactOwnershipRecord, createArtifactOwnershipRecord } from './artifact-registry.js';
 
 export interface ArtifactRecord {
   artifact_id: string;
@@ -62,6 +63,19 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
   if (!safeExistsSync(ARTIFACT_DIR)) safeMkdir(ARTIFACT_DIR, { recursive: true });
   const filePath = artifactPath(record.artifact_id);
   safeWriteFile(filePath, JSON.stringify(record, null, 2));
+  appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+    artifact_id: record.artifact_id,
+    project_id: record.project_id,
+    mission_id: record.mission_id,
+    task_session_id: record.task_session_id,
+    kind: record.kind,
+    storage_class: record.storage_class,
+    path: record.path,
+    external_ref: record.external_ref,
+    evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
+      ? ((record.metadata as any).evidence_refs as string[])
+      : [],
+  }));
   return filePath;
 }
 
@@ -83,6 +97,19 @@ export function listArtifactRecords(): ArtifactRecord[] {
 }
 
 export function attachArtifactRecordToTaskSession(sessionId: string, record: ArtifactRecord): TaskSession | null {
+  appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+    artifact_id: record.artifact_id,
+    project_id: record.project_id,
+    mission_id: record.mission_id,
+    task_session_id: record.task_session_id || sessionId,
+    kind: record.kind,
+    storage_class: record.storage_class,
+    path: record.path,
+    external_ref: record.external_ref,
+    evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
+      ? ((record.metadata as any).evidence_refs as string[])
+      : [],
+  }), { for_delivery: true });
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   session.artifact = {

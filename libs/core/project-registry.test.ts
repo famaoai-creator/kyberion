@@ -1,10 +1,15 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
 import { buildProjectBootstrapWorkItems, listProjectRecords, loadProjectRecord, resolveProjectRecordForText, saveProjectRecord } from './project-registry.js';
 import { listServiceBindingRecords, loadServiceBindingRecord, saveServiceBindingRecord } from './service-binding-registry.js';
 import { attachArtifactRecordToTaskSession, createArtifactRecord, loadArtifactRecord, saveArtifactRecord } from './artifact-record.js';
 import { createTaskSession, saveTaskSession } from './task-session.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
 
 function cleanupByPrefix(dir: string, prefix: string) {
   if (!safeExistsSync(dir)) return;
@@ -108,5 +113,52 @@ describe('project and artifact registries', () => {
     expect(items[0]?.kind).toBe('task_session');
     expect(items[0]?.specialist_id).toBe('project-lead');
     expect(items.some((item) => item.title.toLowerCase().includes('architecture'))).toBe(true);
+  });
+
+  it('emits artifact records that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/artifact-record.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const artifact = {
+      artifact_id: 'ART-TEST-SCHEMA',
+      project_id: 'PRJ-TEST-WEB',
+      kind: 'pptx',
+      storage_class: 'artifact_store',
+      path: 'active/shared/tmp/example.pptx',
+      created_at: new Date('2026-04-26T00:00:00.000Z').toISOString(),
+      evidence_refs: ['artifact:ART-TEST-SCHEMA'],
+    };
+    const valid = validate(artifact);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('emits project records that satisfy the schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/project-record.schema.json');
+    const validate = compileSchemaFromPath(ajv, schemaPath);
+    const project = {
+      project_id: 'PRJ-TEST-SCHEMA',
+      name: 'Schema Project',
+      summary: 'Project schema validation fixture.',
+      status: 'active',
+      tier: 'confidential',
+      primary_locale: 'ja-JP',
+      service_bindings: ['BIND-TEST-SCHEMA'],
+      default_track_id: 'TRK-TEST-SCHEMA',
+      active_tracks: ['TRK-TEST-SCHEMA'],
+      bootstrap_work_items: [
+        {
+          work_id: 'WRK-TEST-SCHEMA',
+          kind: 'task_session',
+          title: 'Frame the project',
+          summary: 'Outline project scope.',
+          status: 'active',
+          specialist_id: 'project-lead',
+        },
+      ],
+      proposed_mission_ids: ['MSN-TEST-SCHEMA'],
+    };
+    const valid = validate(project);
+    expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

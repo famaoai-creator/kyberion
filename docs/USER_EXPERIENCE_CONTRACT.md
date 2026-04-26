@@ -176,3 +176,15 @@ When implementing a UI surface:
 
 This keeps the system maintainable when new locales are added.
 It also prevents each surface from inventing a separate localization model.
+
+## Contract Test Hook
+
+Surface implementations should also be verifiable by automated checks.
+
+Minimum checks:
+
+- the response includes at least one of `Request`, `Plan`, `State`, `Result`, or `Next Action`
+- default user-facing output does not leak internal-only terms such as actuator/operator schema internals
+- approval-required responses explain both:
+  - consequence of waiting or rejection
+  - concrete unblock action

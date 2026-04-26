@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Activity, AlertTriangle, Bot, GitBranch, Radar, Send, ShieldAlert } from "lucide-react";
+import { Activity, AlertTriangle, Bot, Brain, GitBranch, Radar, Send, ShieldAlert } from "lucide-react";
 import { buildAttentionItems, type AttentionItem } from "../lib/operator-console";
 import type { RuntimeTopologySnapshot } from "../lib/runtime-topology";
 import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
@@ -298,6 +298,8 @@ interface ControlActionDetail {
   mission_id?: string;
   resource_id?: string;
   operation?: string;
+  action_id?: string;
+  outcome?: string;
   why?: string;
   error?: string;
 }
@@ -537,6 +539,26 @@ function ActionDetailList({
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
             {detail.decision}
           </div>
+          {(detail.decision === "next_action_executed" || detail.decision === "memory_promote_pending_applied") ? (
+            <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+              <div>
+                operation: <span className="font-mono text-white/75">{detail.operation || "-"}</span>
+              </div>
+              <div>
+                target: <span className="font-mono text-white/75">{detail.resource_id || "-"}</span>
+              </div>
+              {detail.action_id ? (
+                <div className="col-span-2">
+                  action id: <span className="font-mono text-white/75">{detail.action_id}</span>
+                </div>
+              ) : null}
+              {detail.outcome ? (
+                <div>
+                  outcome: <span className="font-mono text-white/75">{detail.outcome}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {detail.why && <div className="mt-1 text-[10px] text-white/60">{detail.why}</div>}
           {detail.error && <div className="mt-1 text-[10px] text-red-200/70">{detail.error}</div>}
           <div className="mt-1 text-[9px] font-mono text-white/25">{new Date(detail.ts).toLocaleString()}</div>
@@ -632,6 +654,24 @@ interface IntelligencePayload {
   }>;
   missionSeeds: MissionSeedRecordSummary[];
   distillCandidates: DistillCandidateSummary[];
+  memoryCandidates?: Array<{
+    candidate_id: string;
+    status: "queued" | "approved" | "rejected" | "promoted";
+    proposed_memory_kind: string;
+    sensitivity_tier: "public" | "confidential" | "personal";
+    source_ref: string;
+    evidence_refs: string[];
+    promoted_ref?: string;
+  }>;
+  nextActions?: Array<{
+    action_id: string;
+    next_action_type: "request_clarification" | "approve" | "inspect_evidence" | "retry_delivery" | "promote_mission_seed" | "resume_mission";
+    reason: string;
+    risk: "low" | "medium" | "high";
+    suggested_command?: string;
+    suggested_surface_action?: "approvals" | "mission-seeds" | "memory-promotion-queue" | "next-actions";
+    approval_required: boolean;
+  }>;
   serviceBindings: ServiceBindingRecordSummary[];
   recentArtifacts: ArtifactRecordSummary[];
   pendingApprovals: PendingApprovalSummary[];
@@ -741,6 +781,8 @@ export function MissionIntelligence({
   const [trackSeedTarget, setTrackSeedTarget] = useState<string | null>(null);
   const [approvalTarget, setApprovalTarget] = useState<string | null>(null);
   const [surfaceActionTarget, setSurfaceActionTarget] = useState<string | null>(null);
+  const [memoryPromotionTarget, setMemoryPromotionTarget] = useState<"dry-run" | "promote" | null>(null);
+  const [nextActionTarget, setNextActionTarget] = useState<string | null>(null);
   const [browserSessionTarget, setBrowserSessionTarget] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [distillCandidateTarget, setDistillCandidateTarget] = useState<string | null>(null);
@@ -1165,6 +1207,154 @@ export function MissionIntelligence({
     }
   };
 
+  const runMemoryPromotion = async (dryRun: boolean) => {
+    try {
+      setMemoryPromotionTarget(dryRun ? "dry-run" : "promote");
+      const res = await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "memory_promote_pending",
+          dryRun,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Memory promotion action failed");
+      if (dryRun) {
+        const pending = Array.isArray(body.pending) ? body.pending.length : 0;
+        setActionResult(`memory promotion dry-run: ${pending} candidate(s)`);
+      } else {
+        setActionResult(`memory promoted: ${body.promoted_count || 0} success, ${body.failed_count || 0} failed`);
+      }
+      await refreshData();
+    } catch (err: any) {
+      setError(err.message || "Memory promotion action failed");
+    } finally {
+      setMemoryPromotionTarget(null);
+    }
+  };
+
+  const recordNextActionExecution = async (input: {
+    actionId: string;
+    operation?: string;
+    outcome?: "completed" | "failed";
+    target?: string;
+    detail?: string;
+  }) => {
+    try {
+      await fetch("/api/intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "next_action_execute",
+          actionId: input.actionId,
+          operation: input.operation || "next_action_execute",
+          outcome: input.outcome || "completed",
+          target: input.target || "next-actions",
+          detail: input.detail || "",
+        }),
+      });
+    } catch {
+      // best-effort audit emission only
+    }
+  };
+
+  const runNextAction = async (action: NonNullable<IntelligencePayload["nextActions"]>[number]) => {
+    try {
+      setNextActionTarget(action.action_id);
+      if (action.action_id === "chronos-promote-memory") {
+        await runMemoryPromotion(false);
+        await recordNextActionExecution({
+          actionId: action.action_id,
+          operation: "memory_promote_pending",
+          target: "memory-promotion-queue",
+          detail: "Executed promote approved memory action from next-actions panel.",
+        });
+        return;
+      }
+      if (action.action_id === "chronos-approve-pending" || action.next_action_type === "approve") {
+        document.getElementById("approvals")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setActionResult(`next action routed: ${action.action_id} -> approvals`);
+        await recordNextActionExecution({
+          actionId: action.action_id,
+          operation: "route_to_approvals",
+          target: "approvals",
+          detail: "Routed operator to approvals panel from next-actions.",
+        });
+        return;
+      }
+      if (action.action_id === "chronos-promote-seed" || action.next_action_type === "promote_mission_seed") {
+        document.getElementById("mission-seeds")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setActionResult(`next action routed: ${action.action_id} -> mission seeds`);
+        await recordNextActionExecution({
+          actionId: action.action_id,
+          operation: "route_to_mission_seeds",
+          target: "mission-seeds",
+          detail: "Routed operator to mission seeds panel from next-actions.",
+        });
+        return;
+      }
+      if ((action.suggested_command || "").includes("promote-memory")) {
+        await runMemoryPromotion(true);
+        await recordNextActionExecution({
+          actionId: action.action_id,
+          operation: "memory_promote_pending_dry_run",
+          target: "memory-promotion-queue",
+          detail: "Executed dry-run memory promotion from suggested command hint.",
+        });
+        return;
+      }
+      setActionResult(`manual next action: ${action.suggested_command || action.reason}`);
+      await recordNextActionExecution({
+        actionId: action.action_id,
+        operation: "manual_follow_up",
+        target: "next-actions",
+        detail: action.suggested_command || action.reason,
+      });
+    } catch (err: any) {
+      setError(err.message || "Next action execution failed");
+      await recordNextActionExecution({
+        actionId: action.action_id,
+        operation: "next_action_execute",
+        outcome: "failed",
+        target: "next-actions",
+        detail: err?.message || "Next action execution failed",
+      });
+    } finally {
+      setNextActionTarget(null);
+    }
+  };
+
+  const resolveNextActionRoute = (
+    action: NonNullable<IntelligencePayload["nextActions"]>[number],
+  ): { panelId: string; label: string } | null => {
+    const panelFromApi = String(action.suggested_surface_action || "").trim();
+    if (panelFromApi === "approvals") return { panelId: "approvals", label: "Approvals Panel" };
+    if (panelFromApi === "mission-seeds") return { panelId: "mission-seeds", label: "Mission Seeds Panel" };
+    if (panelFromApi === "memory-promotion-queue") return { panelId: "memory-promotion-queue", label: "Memory Promotion Queue" };
+    const suggested = String(action.suggested_command || "").toLowerCase();
+    if (action.action_id === "chronos-approve-pending" || action.next_action_type === "approve" || suggested.includes("chronos approvals")) {
+      return { panelId: "approvals", label: "Approvals Panel" };
+    }
+    if (action.action_id === "chronos-promote-seed" || action.next_action_type === "promote_mission_seed" || suggested.includes("mission-seeds")) {
+      return { panelId: "mission-seeds", label: "Mission Seeds Panel" };
+    }
+    if (action.action_id === "chronos-promote-memory" || suggested.includes("promote-memory") || suggested.includes("memory-promote")) {
+      return { panelId: "memory-promotion-queue", label: "Memory Promotion Queue" };
+    }
+    return null;
+  };
+
+  const jumpToNextActionRoute = (action: NonNullable<IntelligencePayload["nextActions"]>[number]) => {
+    const route = resolveNextActionRoute(action);
+    if (!route) {
+      setActionResult(`next action route unavailable: ${action.action_id}`);
+      return;
+    }
+    document.getElementById(route.panelId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setActionResult(`next action route preview: ${action.action_id} -> ${route.label}`);
+  };
+
   const runBrowserSessionControl = async (sessionId: string, action: "close_browser_session" | "restart_browser_session") => {
     try {
       setBrowserSessionTarget(`${sessionId}:${action}`);
@@ -1287,6 +1477,25 @@ export function MissionIntelligence({
   const filteredPendingApprovalsByTrack = selectedTrack
     ? filteredPendingApprovals.filter((approval) => approval.trackId === selectedTrack.track_id || approval.work_loop?.context?.track_id === selectedTrack.track_id)
     : filteredPendingApprovals;
+  const allMemoryCandidates = Array.isArray(data.memoryCandidates) ? data.memoryCandidates : [];
+  const filteredMemoryCandidates = selectedProject
+    ? allMemoryCandidates.filter((candidate) => {
+      const sourceRef = String(candidate.source_ref || "");
+      const missionMatch = sourceRef.match(/^mission:([A-Za-z0-9-]+)/u);
+      if (!missionMatch) return true;
+      return selectedProjectMissionIds.has(missionMatch[1] || "");
+    })
+    : allMemoryCandidates;
+  const filteredMemoryCandidatesByTrack = selectedTrack
+    ? filteredMemoryCandidates.filter((candidate) => {
+      const sourceRef = String(candidate.source_ref || "");
+      const missionMatch = sourceRef.match(/^mission:([A-Za-z0-9-]+)/u);
+      if (!missionMatch) return true;
+      const mission = data.activeMissions.find((item) => item.missionId === missionMatch[1]);
+      if (!mission) return true;
+      return mission.trackId === selectedTrack.track_id;
+    })
+    : filteredMemoryCandidates;
   const filteredAgentMessages = data.agentMessages.filter((message) => {
     if (selectedProject && message.missionId && !selectedProjectMissionIds.has(message.missionId)) return false;
     if (messageMissionFilter !== "all" && message.missionId !== messageMissionFilter) return false;
@@ -1356,6 +1565,9 @@ export function MissionIntelligence({
       || seed.metadata?.template_ref === selectedReferencePath
     )) || null
     : null;
+  const nextAction = data.nextActions?.[0] || null;
+  const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
+  const memoryCandidateCount = (data.memoryCandidates || []).length;
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
@@ -1457,7 +1669,7 @@ export function MissionIntelligence({
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
           icon={<ShieldAlert size={14} />}
           label={mt("chronos_attention_queue", "Needs Attention")}
@@ -1476,9 +1688,80 @@ export function MissionIntelligence({
           value={String(data.surfaceOutbox.slack + data.surfaceOutbox.chronos)}
           detail={mt("chronos_delivery_exceptions_detail", "Outbox entries awaiting operator attention")}
         />
+        <MetricCard
+          icon={<Brain size={14} />}
+          label="Memory Promotion"
+          value={String(memoryCandidateCount)}
+          detail={nextAction ? `next: ${nextAction.reason}` : "No immediate memory action recommended"}
+        />
       </div>
 
       <section className="grid gap-4">
+        <Panel id="next-actions" title="Recommended Next Actions">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            These actions are generated from current control-plane state. Execute only what is necessary to unblock mission flow.
+          </div>
+          <div className="space-y-3">
+            {nextActions.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No immediate next actions recommended.</div>
+            ) : nextActions.map((action) => (
+              <div key={action.action_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{action.action_id}</div>
+                  <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                    {action.next_action_type}
+                  </div>
+                </div>
+                <div className="mt-2 text-[10px] text-white/70">{action.reason}</div>
+                <div className="mt-2 text-[10px] text-white/50">
+                  risk: <span className="font-mono text-white/75">{action.risk}</span>
+                  <span className="mx-2 text-white/35">·</span>
+                  approval required: <span className="font-mono text-white/75">{action.approval_required ? "yes" : "no"}</span>
+                </div>
+                {resolveNextActionRoute(action) ? (
+                  <div className="mt-1 text-[10px] text-white/45">
+                    route: <span className="font-mono text-white/70">{resolveNextActionRoute(action)?.label}</span>
+                  </div>
+                ) : null}
+                {action.suggested_command ? (
+                  <div className="mt-1 text-[10px] text-white/45">
+                    command: <span className="font-mono text-white/70">{action.suggested_command}</span>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {resolveNextActionRoute(action) ? (
+                    <button
+                      type="button"
+                      onClick={() => jumpToNextActionRoute(action)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10"
+                    >
+                      jump
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => runNextAction(action)}
+                    disabled={nextActionTarget === action.action_id}
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {nextActionTarget === action.action_id ? mt("chronos_processing", "processing") : "execute"}
+                  </button>
+                  {action.action_id === "chronos-promote-memory" ? (
+                    <button
+                      type="button"
+                      onClick={() => runMemoryPromotion(true)}
+                      disabled={memoryPromotionTarget !== null}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {memoryPromotionTarget === "dry-run" ? mt("chronos_processing", "processing") : "dry-run"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
         <Panel id="needs-attention" title="Needs Attention">
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
             Start here. These are the items most likely to block mission progress or degrade operator trust. Use the action only when the control plane does not self-heal.
@@ -2083,7 +2366,7 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title="Mission Seeds">
+        <Panel id="mission-seeds" title="Mission Seeds">
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
             Proposed durable work can stay here before it becomes a full mission. Use this panel to confirm bootstrap output is structured and attributable.
           </div>
@@ -2295,7 +2578,7 @@ export function MissionIntelligence({
       </section>
 
       <section className="grid gap-4">
-        <Panel title={mt("chronos_approvals", "Approvals")}>
+        <Panel id="approvals" title={mt("chronos_approvals", "Approvals")}>
           <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
             {mt("chronos_approvals_description", "Approvals keep authority explicit. Review pending risky actions here before they cross a governed boundary.")}
           </div>
@@ -2482,6 +2765,55 @@ export function MissionIntelligence({
                     </>
                   );
                 })()}
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel id="memory-promotion-queue" title="Memory Promotion Queue">
+          <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+            Approved memory candidates can be promoted into governed knowledge in bulk. Run a dry-run first to inspect queue scope, then execute promotion.
+          </div>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => runMemoryPromotion(true)}
+              disabled={memoryPromotionTarget !== null}
+              className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-100/80 transition hover:bg-cyan-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {memoryPromotionTarget === "dry-run" ? mt("chronos_processing", "processing") : "dry-run"}
+            </button>
+            <button
+              type="button"
+              onClick={() => runMemoryPromotion(false)}
+              disabled={memoryPromotionTarget !== null}
+              className="rounded-lg border border-emerald-300/15 bg-emerald-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/80 transition hover:bg-emerald-400/12 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {memoryPromotionTarget === "promote" ? mt("chronos_processing", "processing") : "promote approved"}
+            </button>
+          </div>
+          <div className="space-y-3">
+            {filteredMemoryCandidatesByTrack.length === 0 ? (
+              <div className="text-[11px] italic text-kyberion-gold/30">No memory candidates queued.</div>
+            ) : filteredMemoryCandidatesByTrack.slice(0, 12).map((candidate) => (
+              <div key={candidate.candidate_id} className="rounded-xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-white/90">{candidate.candidate_id}</div>
+                  <div className="rounded-full bg-cyan-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.25em] text-cyan-200">
+                    {candidate.status}
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                  <div>kind: <span className="font-mono text-white/80">{candidate.proposed_memory_kind}</span></div>
+                  <div>tier: <span className="font-mono text-white/80">{candidate.sensitivity_tier}</span></div>
+                  <div className="col-span-2">source: <span className="font-mono text-white/80">{candidate.source_ref}</span></div>
+                  <div className="col-span-2">evidence: <span className="text-white/70">{candidate.evidence_refs?.join(", ") || "-"}</span></div>
+                </div>
+                {candidate.promoted_ref ? (
+                  <div className="mt-2 text-[10px] text-white/45">
+                    promoted ref: <span className="font-mono text-white/70">{candidate.promoted_ref}</span>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

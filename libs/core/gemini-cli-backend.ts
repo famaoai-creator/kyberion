@@ -48,7 +48,7 @@ export class GeminiCliBackend implements ReasoningBackend {
 
   constructor(options: GeminiCliBackendOptions = {}) {
     this.bin = options.bin ?? 'gemini';
-    this.model = options.model ?? 'gemini-2.0-flash-exp';
+    this.model = options.model ?? '';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
   }
@@ -181,13 +181,24 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
       '-y', // YOLO mode for autonomous task execution
-      '--model',
-      this.model,
+      ...(this.model ? ['--model', this.model] : []),
       ...this.extraArgs,
     ];
     // For delegation, we don't necessarily want JSON format, we want it to just do the work.
     // However, the caller expects a string result (the report).
-    return this.spawnCli(args);
+    const stdout = await this.spawnCli(args);
+    const lines = stdout.split('\n');
+    const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+    if (jsonStartIdx === -1) {
+      return stdout.trim(); // Fallback if no JSON envelope at all
+    }
+    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+    try {
+      const cliResult = JSON.parse(cleanStdout);
+      return (cliResult.response || stdout).trim();
+    } catch (_) {
+      return stdout.trim();
+    }
   }
 
   private async runStructured<T>(params: {
@@ -201,8 +212,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-o',
       'json',
       '-y',
-      '--model',
-      this.model,
+      ...(this.model ? ['--model', this.model] : []),
       ...this.extraArgs,
     ];
 
@@ -264,14 +274,7 @@ export class GeminiCliBackend implements ReasoningBackend {
           reject(new Error(`[gemini-cli] CLI exited with code ${code}. stderr: ${stderr}`));
           return;
         }
-        // Extract only the JSON part from stdout (Gemini CLI might print "YOLO mode enabled" etc)
-        const lines = stdout.split('\n');
-        const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
-        if (jsonStartIdx === -1) {
-          reject(new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`));
-          return;
-        }
-        resolve(lines.slice(jsonStartIdx).join('\n'));
+        resolve(stdout);
       });
       child.on('error', (err) => {
         clearTimeout(timer);
@@ -284,9 +287,10 @@ export class GeminiCliBackend implements ReasoningBackend {
 
 export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
+  modelOverride?: string,
 ): GeminiCliBackend | null {
   const bin = env.KYBERION_GEMINI_CLI_BIN?.trim();
-  const model = env.KYBERION_GEMINI_CLI_MODEL?.trim();
+  const model = modelOverride || env.KYBERION_GEMINI_CLI_MODEL?.trim();
   const backend = new GeminiCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),

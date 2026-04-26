@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "sovereign-personal",
+  "profiles": [
+    {
+      "profile_id": "sovereign-personal",
+      "display_name": "Sovereign Personal",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "active/shared/tmp/voice-sample-collection/MSN-SOVEREIGN-ONBOARDING-2026-04-23/sample-01.wav",
+        "active/shared/tmp/voice-sample-collection/MSN-SOVEREIGN-ONBOARDING-2026-04-23/sample-02.wav",
+        "active/shared/tmp/voice-sample-collection/MSN-SOVEREIGN-ONBOARDING-2026-04-23/sample-03.wav"
+      ],
+      "default_engine_id": "open_voice_clone",
+      "status": "active",
+      "notes": "Primary cloned voice for the Sovereign."
+    }
+  ]
+}

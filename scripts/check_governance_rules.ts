@@ -32,6 +32,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/work-policy.json',
   },
   {
+    id: 'surface-policy',
+    schemaPath: 'knowledge/public/schemas/surface-policy.schema.json',
+    dataPath: 'knowledge/public/governance/surface-policy.json',
+  },
+  {
     id: 'standard-intents',
     schemaPath: 'knowledge/public/schemas/standard-intents.schema.json',
     dataPath: 'knowledge/public/governance/standard-intents.json',

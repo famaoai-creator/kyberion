@@ -1,3 +1,6 @@
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +12,11 @@ import {
   resolveSurfaceConversationReceiverForProvider,
   shouldForceSlackDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { safeReadFile } from './secure-io.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('surface-provider-policy', () => {
   it('loads all provider manifest records from governed knowledge', () => {
@@ -88,5 +96,30 @@ describe('surface-provider-policy', () => {
 
     expect(receiver).toBe('nerve-agent');
     expect(getSurfaceProviderManifestRecord('slack').displayName).toBe('Slack');
+  });
+
+  it('keeps the governed provider manifests schema-valid', () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/public/schemas/surface-provider-manifests.schema.json'),
+    );
+    const manifests = JSON.parse(
+      safeReadFile(path.resolve(root, 'knowledge/public/governance/surface-provider-manifests.json'), {
+        encoding: 'utf8',
+      }) as string,
+    );
+
+    expect(validate(manifests)).toBe(true);
+    expect(
+      validate({
+        version: '1.0.0',
+        providers: {
+          slack: manifests.providers.slack,
+        },
+      }),
+    ).toBe(false);
   });
 });

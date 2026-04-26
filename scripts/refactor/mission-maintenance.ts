@@ -22,6 +22,7 @@ import {
   type MissionActorType,
 } from '@agent/core';
 import { getActiveMissionSearchDirs, loadState, saveState } from './mission-state.js';
+import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 
 export async function createCheckpoint(args: {
   taskId: string;
@@ -145,6 +146,12 @@ async function recordCheckpointForMission(
       );
     });
     await syncProjectLedgerIfLinked(activeMissionId);
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: activeMissionId,
+      stage: 'execution',
+      text: note || taskId,
+      source: 'mission_state',
+    });
   } catch (err: any) {
     logger.error(`Checkpoint failed: ${err.message}`);
   }

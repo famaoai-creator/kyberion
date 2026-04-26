@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { getChronosAccessRoleOrThrow, guardRequest, requireChronosAccess, roleToMissionRole } from "../../../lib/api-guard";
 import { collectA2AHandoffs, collectAgentMessages, type AgentMessageSummary, type A2AHandoffSummary } from "../../../lib/agent-message-feed";
 import { collectBrowserConversationSessions, collectBrowserSessions, type BrowserConversationSessionSummary, type BrowserSessionSummary } from "../../../lib/intelligence-observations";
@@ -12,6 +13,7 @@ import {
   buildTrackGateReadinessSummaries,
   buildTrackNextWorkProposal,
   materializeTrackArtifactSkeleton,
+  createNextActionContract,
   clearSurfaceOutboxMessage,
   createDistillCandidateRecord,
   decideApprovalRequest,
@@ -29,11 +31,13 @@ import {
   listProjectRecords,
   listProjectTrackRecords,
   listAgentRuntimeSnapshots,
+  listMemoryPromotionCandidates,
   listServiceBindingRecords,
   listSurfaceOutboxMessages,
   loadMissionSeedRecord,
   loadProjectRecord,
   loadProjectTrackRecord,
+  promoteMemoryCandidateToKnowledge,
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
@@ -204,6 +208,8 @@ interface ControlActionDetail {
   mission_id?: string;
   resource_id?: string;
   operation?: string;
+  action_id?: string;
+  outcome?: string;
   why?: string;
   error?: string;
 }
@@ -227,6 +233,70 @@ interface ControlActionAvailability {
   mission: Record<string, ControlActionDefinition[]>;
   surface: Record<string, ControlActionDefinition[]>;
   globalSurface: ControlActionDefinition[];
+}
+
+interface NextActionSummary {
+  action_id: string;
+  next_action_type:
+    | "request_clarification"
+    | "approve"
+    | "inspect_evidence"
+    | "retry_delivery"
+    | "promote_mission_seed"
+    | "resume_mission";
+  reason: string;
+  risk: "low" | "medium" | "high";
+  suggested_command?: string;
+  suggested_surface_action?: "approvals" | "mission-seeds" | "memory-promotion-queue" | "next-actions";
+  approval_required: boolean;
+}
+
+function buildChronosNextActions(input: {
+  pendingApprovals: number;
+  missionSeeds: Array<{ promoted_mission_id?: string }>;
+  memoryCandidates: Array<{ status?: string }>;
+}): NextActionSummary[] {
+  const actions: NextActionSummary[] = [];
+
+  if (input.pendingApprovals > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-approve-pending",
+      type: "approve",
+      reason: `${input.pendingApprovals} pending approval request(s) require a decision.`,
+      risk: "medium",
+      suggestedCommand: "pnpm control chronos approvals",
+      suggestedSurfaceAction: "approvals",
+      approvalRequired: true,
+    }));
+  }
+
+  const approvedMemoryCount = input.memoryCandidates.filter((item) => item.status === "approved").length;
+  if (approvedMemoryCount > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-promote-memory",
+      type: "inspect_evidence",
+      reason: `${approvedMemoryCount} approved memory candidate(s) are ready for governed promotion.`,
+      risk: "low",
+      suggestedCommand: "pnpm control chronos promote-memory --dry-run",
+      suggestedSurfaceAction: "memory-promotion-queue",
+      approvalRequired: false,
+    }));
+  }
+
+  const promotableSeedCount = input.missionSeeds.filter((seed) => !seed.promoted_mission_id).length;
+  if (promotableSeedCount > 0) {
+    actions.push(createNextActionContract({
+      actionId: "chronos-promote-seed",
+      type: "promote_mission_seed",
+      reason: `${promotableSeedCount} mission seed(s) can be promoted into active missions.`,
+      risk: "low",
+      suggestedCommand: "pnpm control chronos mission-seeds",
+      suggestedSurfaceAction: "mission-seeds",
+      approvalRequired: false,
+    }));
+  }
+
+  return actions;
 }
 
 function inferMissionSeedPromotionTargetKind(seed: {
@@ -560,6 +630,36 @@ function collectControlActions(): ControlActionSummary[] {
         continue;
       }
 
+      if (decision === "memory_promote_pending_applied") {
+        const syntheticId = `${decision}:${event.resource_id || "memory-promotion-queue"}:${event.ts || ""}`;
+        lifecycle.set(syntheticId, {
+          event_id: eventId,
+          ts: event.ts || new Date().toISOString(),
+          kind: "surface",
+          target: event.resource_id || "memory-promotion-queue",
+          operation: "memory_promote_pending",
+          status: "completed",
+          requested_by: event.requested_by || "unknown",
+          error: typeof event.error === "string" ? event.error : undefined,
+        });
+        continue;
+      }
+
+      if (decision === "next_action_executed") {
+        const syntheticId = `${decision}:${event.resource_id || "next-actions"}:${event.operation || "next_action_execute"}:${event.ts || ""}`;
+        lifecycle.set(syntheticId, {
+          event_id: eventId,
+          ts: event.ts || new Date().toISOString(),
+          kind: "surface",
+          target: event.resource_id || "next-actions",
+          operation: typeof event.operation === "string" ? event.operation : "next_action_execute",
+          status: event.outcome === "failed" ? "failed" : "completed",
+          requested_by: event.requested_by || "unknown",
+          error: typeof event.error === "string" ? event.error : undefined,
+        });
+        continue;
+      }
+
       if (
         decision === "mission_orchestration_event_failed" &&
         (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
@@ -751,6 +851,8 @@ function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
         event.event_type !== "surface_control_requested" &&
         event.decision !== "mission_control_action_applied" &&
         event.decision !== "surface_control_action_applied" &&
+        event.decision !== "next_action_executed" &&
+        event.decision !== "memory_promote_pending_applied" &&
         event.decision !== "mission_orchestration_event_started" &&
         event.decision !== "mission_orchestration_event_completed" &&
         event.decision !== "mission_orchestration_event_failed"
@@ -768,6 +870,8 @@ function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
         mission_id: event.mission_id,
         resource_id: event.resource_id,
         operation: event.operation,
+        action_id: event.action_id,
+        outcome: event.outcome,
         why: event.why,
         error: event.error,
       });
@@ -1106,6 +1210,12 @@ export async function GET(req: NextRequest) {
     const projectTracks = listProjectTrackRecords();
     const missionSeeds = listMissionSeedRecords();
     const distillCandidates = listDistillCandidateRecords();
+    const memoryCandidates = listMemoryPromotionCandidates();
+    const nextActions = buildChronosNextActions({
+      pendingApprovals: pendingApprovals.length,
+      missionSeeds,
+      memoryCandidates,
+    });
     const serviceBindings = listServiceBindingRecords();
     const allArtifacts = listArtifactRecords();
     const recentArtifacts = allArtifacts.slice(-8).reverse();
@@ -1118,6 +1228,8 @@ export async function GET(req: NextRequest) {
       gateReadiness,
       missionSeeds,
       distillCandidates,
+      memoryCandidates,
+      nextActions,
       serviceBindings,
       recentArtifacts,
       pendingApprovals,
@@ -1176,6 +1288,8 @@ export async function POST(req: NextRequest) {
       action !== "cleanup_runtime_lease" &&
       action !== "restart_runtime_lease" &&
       action !== "clear_surface_outbox" &&
+      action !== "memory_promote_pending" &&
+      action !== "next_action_execute" &&
       action !== "mission_control" &&
       action !== "surface_control" &&
       action !== "promote_mission_seed" &&
@@ -1259,6 +1373,97 @@ export async function POST(req: NextRequest) {
         },
       });
       return NextResponse.json({ ok: true, candidate: updated });
+    }
+
+    if (action === "memory_promote_pending") {
+      const dryRun = body?.dryRun === true;
+      const approved = listMemoryPromotionCandidates()
+        .filter((candidate) => candidate.status === "approved")
+        .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+      if (dryRun) {
+        return NextResponse.json({
+          status: "ok",
+          action,
+          dryRun: true,
+          pending: approved.map((candidate) => ({
+            candidate_id: candidate.candidate_id,
+            proposed_memory_kind: candidate.proposed_memory_kind,
+            sensitivity_tier: candidate.sensitivity_tier,
+            source_ref: candidate.source_ref,
+          })),
+          ts: new Date().toISOString(),
+        });
+      }
+
+      const promoted: string[] = [];
+      const failed: Array<{ candidate_id: string; reason: string }> = [];
+      for (const candidate of approved) {
+        try {
+          promoteMemoryCandidateToKnowledge({
+            candidateId: candidate.candidate_id,
+            executionRole: "chronos_gateway",
+            ratificationNote: "Promoted from Chronos control action memory_promote_pending.",
+          });
+          promoted.push(candidate.candidate_id);
+        } catch (err: any) {
+          failed.push({
+            candidate_id: candidate.candidate_id,
+            reason: err?.message || String(err),
+          });
+        }
+      }
+
+      emitMissionOrchestrationObservation({
+        event_id: `CA-MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+        decision: "memory_promote_pending_applied",
+        event_type: "memory_promote_pending_applied",
+        requested_by: "chronos_localadmin",
+        resource_id: "memory-promotion-queue",
+        operation: "memory_promote_pending",
+        action,
+        why: "Chronos localadmin triggered governed memory promotion for approved queue candidates.",
+      });
+
+      return NextResponse.json({
+        status: "ok",
+        action,
+        promoted_count: promoted.length,
+        failed_count: failed.length,
+        promoted,
+        failed,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === "next_action_execute") {
+      const actionId = typeof body?.actionId === "string" ? body.actionId : "";
+      const operation = typeof body?.operation === "string" ? body.operation : "next_action_execute";
+      const outcome = body?.outcome === "failed" ? "failed" : "completed";
+      const target = typeof body?.target === "string" ? body.target : "next-actions";
+      const detail = typeof body?.detail === "string" ? body.detail : "";
+      if (!actionId) {
+        return NextResponse.json({ error: "Missing actionId" }, { status: 400 });
+      }
+      emitMissionOrchestrationObservation({
+        event_id: `CA-NEXT-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+        decision: "next_action_executed",
+        event_type: "next_action_executed",
+        requested_by: "chronos_localadmin",
+        resource_id: target,
+        operation,
+        outcome,
+        action_id: actionId,
+        why: detail || "Chronos operator executed a recommended next action.",
+      });
+      return NextResponse.json({
+        status: "ok",
+        action,
+        actionId,
+        operation,
+        outcome,
+        target,
+        ts: new Date().toISOString(),
+      });
     }
 
     if (action === "close_browser_session" || action === "restart_browser_session") {

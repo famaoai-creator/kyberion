@@ -5,7 +5,7 @@ import {
 } from '@agent/core';
 
 async function main() {
-  installReasoningBackends();
+  await installReasoningBackends();
 
   const argv = await createStandardYargs()
     .option('session-id', { type: 'string', demandOption: true })

@@ -68,6 +68,38 @@ describe('control-plane-client', () => {
     expect(tracks[0]?.gate_readiness?.next_required_artifacts?.[0]?.artifact_id).toBe('requirements-definition');
   });
 
+  it('filters invalid next actions from chronos overview responses', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      accessRole: 'readonly',
+      nextActions: [
+        {
+          action_id: 'act-1',
+          next_action_type: 'approve',
+          reason: 'Approval is pending',
+          risk: 'medium',
+          suggested_surface_action: 'approvals',
+          approval_required: false,
+        },
+        {
+          action_id: 'act-2',
+          next_action_type: 'unknown-action',
+          reason: 'Invalid contract',
+          risk: 'low',
+          suggested_surface_action: 'approvals',
+          approval_required: false,
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch;
+
+    const client = createControlPlaneClient('chronos', { baseUrl: 'http://127.0.0.1:3000' });
+    const overview = await client.getChronosOverview();
+    expect(overview.nextActions).toHaveLength(1);
+    expect(overview.nextActions?.[0]?.action_id).toBe('act-1');
+  });
+
   it('raises a stale surface error with a suggested command', async () => {
     globalThis.fetch = vi.fn(async () => new Response(
       '<html><body><pre>Cannot GET /api/projects</pre></body></html>',

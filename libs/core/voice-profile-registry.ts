@@ -22,6 +22,7 @@ export interface VoiceProfileRegistry {
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/voice-profile-registry.json');
+const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/voice/profile-registry.json');
 
 const FALLBACK_REGISTRY: VoiceProfileRegistry = {
   version: 'fallback',
@@ -45,6 +46,30 @@ function getRegistryPath(): string {
   return process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
 }
 
+function getPersonalOverlayPath(): string | null {
+  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) return null;
+  const configured = process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_PERSONAL_OVERLAY_PATH;
+  return safeExistsSync(configured) ? configured : null;
+}
+
+export function getPersonalVoiceProfileRegistryPath(): string {
+  return process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_PERSONAL_OVERLAY_PATH;
+}
+
+function mergeRegistries(base: VoiceProfileRegistry, overlay: VoiceProfileRegistry): VoiceProfileRegistry {
+  const profiles = new Map<string, VoiceProfileRecord>();
+  for (const profile of base.profiles) profiles.set(profile.profile_id, profile);
+  for (const profile of overlay.profiles) profiles.set(profile.profile_id, profile);
+
+  const defaultProfileId = overlay.default_profile_id || base.default_profile_id;
+  return {
+    ...base,
+    ...overlay,
+    default_profile_id: profiles.has(defaultProfileId) ? defaultProfileId : base.default_profile_id,
+    profiles: [...profiles.values()],
+  };
+}
+
 export function getVoiceProfileRegistryPath(): string {
   return getRegistryPath();
 }
@@ -56,10 +81,12 @@ export function resetVoiceProfileRegistryCache(): void {
 
 export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
+  const overlayPath = getPersonalOverlayPath();
+  const cacheKey = overlayPath ? `${registryPath}::${overlayPath}` : registryPath;
+  if (cachedRegistryPath === cacheKey && cachedRegistry) return cachedRegistry;
 
   if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
+    cachedRegistryPath = cacheKey;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
   }
@@ -67,12 +94,22 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   try {
     const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
     const parsed = safeJsonParse<VoiceProfileRegistry>(raw, 'voice profile registry');
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
+    if (!overlayPath) {
+      cachedRegistryPath = cacheKey;
+      cachedRegistry = parsed;
+      return parsed;
+    }
+
+    const overlayRaw = safeReadFile(overlayPath, { encoding: 'utf8' }) as string;
+    const overlay = safeJsonParse<VoiceProfileRegistry>(overlayRaw, 'personal voice profile registry');
+    const merged = mergeRegistries(parsed, overlay);
+    cachedRegistryPath = cacheKey;
+    cachedRegistry = merged;
+    return merged;
   } catch (error: any) {
-    logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`);
-    cachedRegistryPath = registryPath;
+    const target = overlayPath ? `${registryPath} or overlay ${overlayPath}` : registryPath;
+    logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load registry at ${target}: ${error.message}`);
+    cachedRegistryPath = cacheKey;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
   }
@@ -94,10 +131,9 @@ export function getVoiceProfileRecord(profileId?: string): VoiceProfileRecord {
   );
 }
 
-export function writeVoiceProfileRegistry(registry: VoiceProfileRegistry): string {
-  const registryPath = getRegistryPath();
+export function writeVoiceProfileRegistry(registry: VoiceProfileRegistry, registryPath = getRegistryPath()): string {
   safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
-  cachedRegistryPath = registryPath;
-  cachedRegistry = registry;
+  cachedRegistryPath = null;
+  cachedRegistry = null;
   return registryPath;
 }

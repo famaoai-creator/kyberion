@@ -18,15 +18,15 @@
     },
     {
       "engine_id": "open_voice_clone",
-      "display_name": "Open Voice Clone (Shadow)",
+      "display_name": "Open Voice Clone",
       "kind": "voice_clone_service",
       "provider": "open_voice_clone",
-      "status": "shadow",
+      "status": "active",
       "platforms": ["any"],
       "supports": {
         "list_voices": false,
-        "playback": false,
-        "artifact_formats": ["wav"]
+        "playback": true,
+        "artifact_formats": ["wav", "aiff"]
       },
       "fallback_engine_id": "local_say",
       "notes": "Shadow candidate profile. Governance keeps fallback deterministic until promoted."

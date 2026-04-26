@@ -492,9 +492,8 @@ function renderNativeArtifact(
   safeMkdir(artifactDir, { recursive: true });
 
   if (process.platform === 'darwin') {
-    const format = options.format === 'wav' ? 'aiff' : options.format;
     safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
-    return artifactPath.endsWith(`.${format}`) ? artifactPath : `${artifactPath}.${format}`;
+    return artifactPath;
   }
 
   if (process.platform === 'linux') {
@@ -511,8 +510,7 @@ function renderNativeArtifact(
 function resolveArtifactPath(requestId: string, format: VoiceArtifactFormat, outputPath?: string): string {
   const requestedPath = typeof outputPath === 'string' && outputPath.trim() ? outputPath.trim() : null;
   if (requestedPath) return path.resolve(process.cwd(), requestedPath);
-  const safeFormat = process.platform === 'darwin' && format === 'wav' ? 'aiff' : format;
-  return pathResolver.sharedTmp(`voice-generation/${requestId}.${safeFormat}`);
+  return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
 }
 
 async function waitForVoiceJob(runtime: VoiceGenerationRuntime, jobId: string): Promise<any> {

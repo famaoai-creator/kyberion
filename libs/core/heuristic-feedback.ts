@@ -13,6 +13,7 @@
 import * as path from 'node:path';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { createMemoryPromotionCandidate, enqueueMemoryPromotionCandidate, type MemoryCandidate } from './memory-promotion-queue.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
 
@@ -159,4 +160,29 @@ export function summarizeHeuristics(limit = 5): HeuristicReport {
     average_validity: averageValidity,
     recent,
   };
+}
+
+export function queueHeuristicMemoryCandidate(input: {
+  entryId: string;
+  sensitivityTier?: 'public' | 'confidential' | 'personal';
+  evidenceRef?: string;
+}): MemoryCandidate {
+  const entry = readHeuristic(input.entryId);
+  if (!entry) {
+    throw new Error(`[heuristic-feedback] entry not found: ${input.entryId}`);
+  }
+  const evidenceRefs = [input.evidenceRef, entry.outcome_ref]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const candidate = createMemoryPromotionCandidate({
+    sourceType: 'incident',
+    sourceRef: `heuristic:${entry.id}`,
+    proposedMemoryKind: 'heuristic',
+    summary: entry.decision || entry.anchor,
+    evidenceRefs,
+    sensitivityTier: input.sensitivityTier || 'confidential',
+    ratificationRequired: true,
+  });
+  enqueueMemoryPromotionCandidate(candidate);
+  return candidate;
 }

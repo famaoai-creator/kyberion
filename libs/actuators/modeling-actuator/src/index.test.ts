@@ -1,7 +1,12 @@
 import * as path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core';
+import { compileSchemaFromPath, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core';
 import { handleAction } from './index.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('modeling-actuator terraform_to_architecture_adf', () => {
   it('loads and persists pipeline context via context_path', async () => {
@@ -234,5 +239,55 @@ resource "aws_db_instance" "from_symlink" {}
     const adf = result.context.architecture_adf;
     expect(adf.metadata.tf_file_count).toBe(1);
     expect(adf.nodes.some((node: any) => node.name === 'from_symlink')).toBe(false);
+  });
+});
+
+describe('modeling-actuator web_profile_to_ui_flow_adf', () => {
+  it('emits a ui-flow-adf that matches the contract schema', async () => {
+    const root = process.cwd();
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/ui-flow-adf.schema.json'));
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        web_profile: {
+          app_id: 'sample-web-app',
+          base_url: 'https://example.com',
+          login_route: '/login',
+          logout_route: '/logout',
+          guarded_routes: ['/dashboard'],
+          debug_routes: {
+            session_export: '/__kyberion/session-export',
+          },
+          selectors: {
+            login: {
+              email: '[name=email]',
+              password: '[name=password]',
+              submit: 'button[type=submit]',
+            },
+            navigation: {},
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'web_profile_to_ui_flow_adf',
+          params: {
+            from: 'web_profile',
+            export_as: 'ui_flow_adf',
+          },
+        },
+      ],
+    } as any);
+
+    const uiFlow = result.context.ui_flow_adf;
+    expect(uiFlow.kind).toBe('ui-flow-adf');
+    expect(uiFlow.platform).toBe('browser');
+    expect(uiFlow.states.some((state: any) => state.id === 'login')).toBe(true);
+    expect(uiFlow.transitions.some((transition: any) => transition.id === 'login_success')).toBe(true);
+    expect(validate(uiFlow)).toBe(true);
   });
 });
