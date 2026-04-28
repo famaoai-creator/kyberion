@@ -2,8 +2,38 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 const ROOT = pathResolver.rootDir();
+
+async function waitForAuditEntry(
+  predicate: (entry: any) => boolean,
+  timeoutMs = 1000,
+): Promise<any | null> {
+  const auditPath = path.join(
+    ROOT,
+    'active/audit',
+    `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+  );
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (safeExistsSync(auditPath)) {
+      const lines = (safeReadFile(auditPath, { encoding: 'utf8' }) as string)
+        .split('\n')
+        .filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (predicate(entry)) return entry;
+        } catch {
+          /* ignore malformed historical lines */
+        }
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return null;
+}
 
 describe('tier-guard tenant scope (IP-1)', () => {
   let savedTenant: string | undefined;
@@ -185,6 +215,26 @@ describe('tier-guard brokered missions (C8)', () => {
     if (!b.allowed) {
       expect(b.reason).not.toMatch(/tenant\.scope_violation/);
     }
+  });
+
+  it('broker mission: emits a tenant.broker_access audit entry', async () => {
+    delete process.env.KYBERION_TENANT;
+    process.env.MISSION_ID = FIX_MISSION;
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const target = path.join(ROOT, 'knowledge/confidential/acme-corp/audit-marker.md');
+    const result = validateWritePermission(target);
+    if (!result.allowed) {
+      expect(result.reason).not.toMatch(/tenant\.scope_violation/);
+    }
+
+    const entry = await waitForAuditEntry(
+      (candidate) =>
+        candidate.action === 'tenant.broker_access' &&
+        candidate.operation === 'knowledge/confidential/acme-corp/audit-marker.md' &&
+        candidate.metadata?.target_tenant === 'acme-corp',
+    );
+    expect(entry).not.toBeNull();
+    expect(entry?.metadata?.broker_tenants).toEqual(['acme-corp', 'beta-co']);
   });
 
   it('broker mission: still denies tenants outside source_tenants list', () => {

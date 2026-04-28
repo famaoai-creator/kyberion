@@ -188,7 +188,9 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
 
   let parsed: MeetingActionResult;
   try {
-    const raw = safeExec('python3', [bridgePath, JSON.stringify(input)]).trim();
+    const raw = safeExec('python3', [bridgePath], {
+      input: JSON.stringify(input),
+    }).trim();
     if (!raw) {
       parsed = { status: 'error', message: 'meeting-bridge produced no output' };
     } else {
