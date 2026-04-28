@@ -25,11 +25,15 @@ import {
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeCreateExclusiveFileSync,
+  safeUnlinkSync,
 } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 const POLICY_PATH = 'knowledge/public/governance/tenant-rate-limit-policy.json';
 const STATE_PATH = 'active/shared/runtime/tenant-rate-limit-state.json';
+const LOCK_PATH = `${STATE_PATH}.lock`;
+const LOCK_TIMEOUT_MS = 5000;
 
 interface RateLimitPolicy {
   default: {
@@ -103,6 +107,66 @@ function saveState(state: RateLimitState): void {
   safeWriteFile(abs, JSON.stringify(state, null, 2) + '\n');
 }
 
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function isStaleLock(lockPath: string): boolean {
+  try {
+    const raw = safeReadFile(lockPath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw || '{}') as { pid?: number; created_at?: string };
+    if (typeof parsed.pid !== 'number') return true;
+    process.kill(parsed.pid, 0);
+    return false;
+  } catch (err: any) {
+    if (err?.code === 'ESRCH') return true;
+    if (err?.code === 'EPERM') return false;
+    // Corrupt, unreadable, or legacy lock files should not permanently
+    // disable quota enforcement.
+    return true;
+  }
+}
+
+function withTenantRateLimitLock<T>(fn: () => T): T {
+  const lockAbs = pathResolver.rootResolve(LOCK_PATH);
+  const startedAt = Date.now();
+  let ownsLock = false;
+
+  while (Date.now() - startedAt < LOCK_TIMEOUT_MS) {
+    try {
+      safeCreateExclusiveFileSync(
+        lockAbs,
+        JSON.stringify({
+          pid: process.pid,
+          created_at: new Date().toISOString(),
+          resource: 'tenant-rate-limit-state',
+        }),
+      );
+      ownsLock = true;
+      break;
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
+      if (isStaleLock(lockAbs)) {
+        safeUnlinkSync(lockAbs);
+        continue;
+      }
+      sleepSync(50 + Math.floor(Math.random() * 50));
+    }
+  }
+
+  if (!ownsLock) {
+    throw new Error(
+      `[LOCK_TIMEOUT] Failed to acquire tenant rate-limit lock within ${LOCK_TIMEOUT_MS}ms`,
+    );
+  }
+
+  try {
+    return fn();
+  } finally {
+    safeUnlinkSync(lockAbs);
+  }
+}
+
 function tenantConfig(policy: RateLimitPolicy, tenantSlug: string) {
   const override = policy.tenants[tenantSlug] || {};
   return {
@@ -157,33 +221,35 @@ export function consumeTenantBudget(input: {
   const cfg = tenantConfig(policy, tenantSlug);
   const now = input.now ?? new Date();
 
-  const state = loadState();
-  const refilled = refillBucket(state.tenants[tenantSlug], cfg.tokens_per_minute, cfg.burst_capacity, now);
+  return withTenantRateLimitLock(() => {
+    const state = loadState();
+    const refilled = refillBucket(state.tenants[tenantSlug], cfg.tokens_per_minute, cfg.burst_capacity, now);
 
-  if (refilled.tokens < cost) {
-    const deficit = cost - refilled.tokens;
-    const refillRatePerMs = cfg.tokens_per_minute / 60_000;
-    const retryAfterMs = Math.max(
-      cfg.denial_grace_ms,
-      Math.ceil(deficit / Math.max(refillRatePerMs, 1e-9)),
-    );
+    if (refilled.tokens < cost) {
+      const deficit = cost - refilled.tokens;
+      const refillRatePerMs = cfg.tokens_per_minute / 60_000;
+      const retryAfterMs = Math.max(
+        cfg.denial_grace_ms,
+        Math.ceil(deficit / Math.max(refillRatePerMs, 1e-9)),
+      );
+      state.tenants[tenantSlug] = refilled;
+      saveState(state);
+      return {
+        allowed: false,
+        reason: `[RATE_LIMIT] tenant '${tenantSlug}' has ${refilled.tokens.toFixed(2)} tokens, op '${input.op}' costs ${cost}; retry in ~${retryAfterMs}ms`,
+        retry_after_ms: retryAfterMs,
+        tokens_remaining: refilled.tokens,
+      };
+    }
+
+    refilled.tokens -= cost;
     state.tenants[tenantSlug] = refilled;
     saveState(state);
     return {
-      allowed: false,
-      reason: `[RATE_LIMIT] tenant '${tenantSlug}' has ${refilled.tokens.toFixed(2)} tokens, op '${input.op}' costs ${cost}; retry in ~${retryAfterMs}ms`,
-      retry_after_ms: retryAfterMs,
+      allowed: true,
       tokens_remaining: refilled.tokens,
     };
-  }
-
-  refilled.tokens -= cost;
-  state.tenants[tenantSlug] = refilled;
-  saveState(state);
-  return {
-    allowed: true,
-    tokens_remaining: refilled.tokens,
-  };
+  });
 }
 
 /**

@@ -1,8 +1,10 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   pathResolver,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
   type ActionItem,
   type MeetingFacilitatorPolicy,
   recordActionItem,
@@ -105,8 +107,8 @@ describe('auditSpeakerFairnessOp', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.MISSION_ID = FIX_MISSION;
-    fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });
-    fs.writeFileSync(
+    safeMkdir(path.join(MISSION_DIR, 'evidence'), { recursive: true });
+    safeWriteFile(
       path.join(MISSION_DIR, 'mission-state.json'),
       JSON.stringify({
         mission_id: FIX_MISSION,
@@ -117,7 +119,7 @@ describe('auditSpeakerFairnessOp', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(MISSION_DIR, { recursive: true, force: true });
+    safeRmSync(MISSION_DIR, { recursive: true, force: true });
   });
 
   it('flags the warn case when one speaker dominates total share', () => {

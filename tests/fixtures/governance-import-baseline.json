@@ -2,7 +2,6 @@
   "fs_imports": [
     "libs/actuators/media-actuator/src/security-boundary.test.ts",
     "libs/actuators/meeting-actuator/src/index.test.ts",
-    "libs/actuators/wisdom-actuator/src/meeting-ops.test.ts",
     "libs/core/action-item-store.test.ts",
     "libs/core/evidence-chain.test.ts",
     "libs/core/fs-primitives.ts",
@@ -40,7 +39,6 @@
     "libs/core/src/pipeline-engine.test.ts",
     "libs/core/src/pipeline-preview.test.ts",
     "libs/core/trust-engine.test.ts",
-    "projects/faas-platform/infra/lib/stacks/lambda-runtime-stack.ts",
     "scripts/check_tier_hygiene.test.ts",
     "tests/a2a-lifecycle.test.ts",
     "tests/mission-orchestration-dashboard-contract.test.ts",
