@@ -1,0 +1,72 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "knowledge-tier-hygiene",
+  "version": "2026-04-29",
+  "description": "Three-tier knowledge isolation (`public/`, `confidential/`, `personal/`) is intact. Without this, tier-guard rejects writes and missions cannot record evidence.",
+  "capabilities": [
+    {
+      "capability_id": "tier.public",
+      "kind": "binary",
+      "description": "knowledge/public/ exists and is git-tracked.",
+      "required_for": ["mission-evidence", "knowledge-provider"],
+      "probe": {
+        "kind": "command",
+        "command": "test",
+        "args": ["-d", "knowledge/public"]
+      },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Run `pnpm onboard` to recreate the canonical knowledge tree.",
+        "command": "pnpm",
+        "args": ["onboard"]
+      }
+    },
+    {
+      "capability_id": "tier.confidential",
+      "kind": "binary",
+      "description": "knowledge/confidential/ exists. (Tier-guard refuses writes when it does not.)",
+      "required_for": ["mission-evidence"],
+      "probe": {
+        "kind": "command",
+        "command": "test",
+        "args": ["-d", "knowledge/confidential"]
+      },
+      "install": {
+        "operator_confirmed": false,
+        "command": "mkdir",
+        "args": ["-p", "knowledge/confidential"]
+      }
+    },
+    {
+      "capability_id": "tier.personal",
+      "kind": "binary",
+      "description": "knowledge/personal/ exists for the local operator's private memory.",
+      "required_for": ["operator-memory"],
+      "probe": {
+        "kind": "command",
+        "command": "test",
+        "args": ["-d", "knowledge/personal"]
+      },
+      "install": {
+        "operator_confirmed": false,
+        "command": "mkdir",
+        "args": ["-p", "knowledge/personal"]
+      }
+    },
+    {
+      "capability_id": "tier-hygiene.script",
+      "kind": "binary",
+      "description": "`pnpm run check:tier-hygiene` exits 0; the canonical tier policy is satisfied.",
+      "required_for": ["validate"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:tier-hygiene"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Re-run the hygiene script to see the violation list, fix the offending paths, and re-bootstrap. Operator-confirmed because the fixes touch tracked tiers."
+      }
+    }
+  ]
+}
