@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "name": "action-item-tracking",
+  "description": "Iterates pending team_member items in the active mission and emits one reminder per item via the configured channel adapter. Designed to run on cron / scheduler. The reminder is recorded on the action item itself (idempotent on (sent_at, channel)).",
+  "context": {
+    "mission_id": "",
+    "tone": "friendly",
+    "language": "ja",
+    "max_items_per_run": 20
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "op": "system:log",
+      "params": {
+        "message": "📨 action-item-tracking starting for mission {{mission_id}}; max_items={{max_items_per_run}}."
+      }
+    },
+    {
+      "id": "iterate_pending",
+      "type": "apply",
+      "op": "wisdom:track_pending_action_items",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "tone": "{{tone}}",
+        "language": "{{language}}",
+        "max_items": "{{max_items_per_run}}",
+        "output_path": "{{mission_evidence_dir}}/action-item-tracking-report.json"
+      }
+    },
+    {
+      "id": "log_summary",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Reminder pass complete: see {{mission_evidence_dir}}/action-item-tracking-report.json"
+      }
+    }
+  ]
+}

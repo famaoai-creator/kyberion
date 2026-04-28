@@ -9,6 +9,12 @@ import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission
 export interface MissionStartCreateOptions {
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
+  /**
+   * Tenant slug — multi-tenant isolation key. When set, the resulting
+   * mission carries `tenant_slug` and tier-guard / audit-chain enforce
+   * cross-tenant isolation.
+   */
+  tenantSlug?: string;
   missionType?: string;
   visionRef?: string;
   persona?: string;
@@ -136,9 +142,11 @@ export function extractFileRelationshipsOption(argv: string[] = process.argv): P
 }
 
 export function extractMissionStartCreateOptionsFromArgv(argv: string[] = process.argv): MissionStartCreateOptions {
+  const tenantSlug = getOptionValue('--tenant-slug', argv);
   return {
     tier: getOptionValue('--tier', argv) as MissionStartCreateOptions['tier'] | undefined,
     tenantId: getOptionValue('--tenant-id', argv) || getOptionValue('--tenant', argv),
+    ...(tenantSlug ? { tenantSlug } : {}),
     missionType: getOptionValue('--mission-type', argv),
     visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),
     persona: getOptionValue('--persona', argv),

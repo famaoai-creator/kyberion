@@ -1,0 +1,31 @@
+{
+  "action": "pipeline",
+  "name": "voice-instant-clone",
+  "description": "Zero-shot voice cloning from reference samples. Generates synthesized speech in the operator's voice without a learning step. Persona-parameterized — set context.profile_id (slug). Reference samples must already exist at knowledge/personal/voice/samples/{{profile_id}}/.",
+  "context": {
+    "profile_id": "operator-default-v1",
+    "text": "こんにちは。ゼロショット・クローニングの準備ができました。",
+    "provider": "local"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "⚡ ゼロショット・クローニング (profile={{profile_id}}, provider={{provider}}) を開始します。"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "python3 libs/actuators/voice-actuator/scripts/zero_shot_bridge.py '{\"action\": \"instant_clone_generate\", \"params\": {\"text\": \"{{text}}\", \"profile_id\": \"{{profile_id}}\", \"sample_dir\": \"knowledge/personal/voice/samples/{{profile_id}}\", \"provider\": \"{{provider}}\"}}'",
+        "export_as": "clone_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "✨ クローン音声生成結果: {{clone_result}}"
+      }
+    }
+  ]
+}

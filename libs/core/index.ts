@@ -354,6 +354,61 @@ export type {
   SecretResolver,
   ShellSecretResolverOptions,
 } from './secret-resolver.js';
+export {
+  consumeTenantBudget,
+  inspectTenantBudget,
+  withTenantBudget,
+  TenantRateLimitExceededError,
+} from './tenant-rate-limiter.js';
+export type { RateLimitDecision } from './tenant-rate-limiter.js';
+export {
+  findRelevantDistilledKnowledge,
+  formatDistilledKnowledgeSummary,
+} from './distill-knowledge-injector.js';
+export type {
+  DistilledKnowledgeEntry,
+  FindRelevantInput,
+} from './distill-knowledge-injector.js';
+export {
+  loadRestrictedActionRules,
+  matchRestrictedAction,
+} from './restricted-action-policy.js';
+export type {
+  RestrictedActionMatch,
+  RestrictedActionRule,
+} from './restricted-action-policy.js';
+export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
+export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
+export { MissionEvidenceDoc } from './mission-evidence-doc.js';
+export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
+export {
+  recordActionItem,
+  updateActionItemStatus,
+  appendReminder,
+  listActionItems,
+  listOperatorSelfPending,
+  listOthersPending,
+  listPendingSpeakerReview,
+  listPartialStatePending,
+  listRestrictedPending,
+  clearPartialState,
+  confirmActionItemBySpeaker,
+  nextActionItemId,
+} from './action-item-store.js';
+export type {
+  ActionItem,
+  ActionItemAssignee,
+  ActionItemAssigneeKind,
+  ActionItemExecution,
+  ActionItemMeetingRef,
+  ActionItemModality,
+  ActionItemPolicy,
+  ActionItemProvenance,
+  ActionItemReminder,
+  ActionItemReminderRelationship,
+  ActionItemReviewState,
+  ActionItemStatus,
+} from './action-item-store.js';
 export type {
   DesignSpec,
   GateResult as SdlcGateResult,

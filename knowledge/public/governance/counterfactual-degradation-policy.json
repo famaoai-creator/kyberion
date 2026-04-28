@@ -1,0 +1,94 @@
+{
+  "$schema": "https://kyberion.local/schemas/counterfactual-degradation-policy.schema.json",
+  "version": "1.0.0",
+  "description": "Operational fallback policy for counterfactual simulation outputs whose quality rubric ('simulation-quality.json' from wisdom:simulate_all) is not 'ok'. Surfaces what to do when LLM non-determinism produces 'warn' or 'poor', and constrains re-execution to avoid stakeholders seeing multiple contradictory analyses.",
+  "applies_to": [
+    "wisdom:simulate_all",
+    "wisdom:simulate_all_ensemble",
+    "wisdom:evaluate_simulation_quality",
+    "wisdom:evaluate_ensemble_convergence"
+  ],
+  "severities": {
+    "ok": {
+      "description": "All deterministic checks passed.",
+      "permitted_uses": ["decision_evidence", "audit_artifact", "stakeholder_share"],
+      "forbidden_uses": [],
+      "required_disclosures": [
+        "rubric-scope-disclosure"
+      ]
+    },
+    "warn": {
+      "description": "At least one soft check failed (e.g. outcome imbalance, vacuous termination, low ensemble convergence).",
+      "permitted_uses": ["decision_input", "audit_artifact"],
+      "forbidden_uses": ["unattended_decision_evidence", "automated_action_trigger"],
+      "required_disclosures": [
+        "rubric-scope-disclosure",
+        "rubric-warn-banner"
+      ],
+      "human_action_required": "expert_review",
+      "expert_review_sla_hours": 48,
+      "escalation_path": [
+        "mission_owner",
+        "tenant_risk_officer",
+        "ecosystem_architect"
+      ]
+    },
+    "poor": {
+      "description": "At least one hard check failed (zero branches, duplicate ids, contradictory terminal modes).",
+      "permitted_uses": [],
+      "forbidden_uses": [
+        "decision_evidence",
+        "audit_artifact",
+        "stakeholder_share",
+        "unattended_decision_evidence"
+      ],
+      "required_disclosures": [
+        "rubric-scope-disclosure",
+        "rubric-poor-banner"
+      ],
+      "fallback_behavior": "discard_and_human_scenario_analysis",
+      "fallback_artifact_template": "knowledge/public/procedures/system/manual-scenario-analysis-template.md"
+    }
+  },
+  "re_execution_rules": {
+    "max_runs_per_topic_per_24h": 2,
+    "first_rerun_trigger": "warn|poor",
+    "rerun_diff_threshold": {
+      "metric": "outcome_dominance_change_count",
+      "max_allowed": 1,
+      "on_exceed": "discard_both_and_escalate"
+    },
+    "rationale": "Re-running when warn/poor is acceptable once. Beyond the diff threshold, the divergence itself is the signal — present the inconsistency, do not keep retrying until a 'good' result appears.",
+    "audit_event_on_rerun": "counterfactual.rerun_executed",
+    "audit_event_on_discard": "counterfactual.rerun_discarded"
+  },
+  "override_rules": {
+    "warn_override_allowed": true,
+    "warn_override_requires": [
+      "explicit_operator_command",
+      "override_reason_text",
+      "rubric_override_audit_event"
+    ],
+    "poor_override_allowed": false,
+    "poor_override_exception": "tenant_risk_officer_documented_decision",
+    "audit_event_on_override": "rubric.override_accepted"
+  },
+  "stakeholder_communication": {
+    "executive_meeting_minimum_attachments": [
+      "simulation-summary.json",
+      "simulation-quality.json",
+      "rubric-scope-disclosure"
+    ],
+    "executive_meeting_required_when_severity_not_ok": [
+      "rubric-warn-banner_or_rubric-poor-banner"
+    ],
+    "ensemble_convergence_minimum_runs_for_critical_decisions": 3,
+    "ensemble_divergence_disclosure_required_when": "convergence_severity in [warn, poor]"
+  },
+  "review_cadence": {
+    "policy_review_frequency": "quarterly",
+    "policy_owner_authority_role": "ecosystem_architect",
+    "external_validation_required_for_critical_finance_decisions": true,
+    "external_validation_reference": "knowledge/public/governance/independent-validation-evidence-package.md"
+  }
+}

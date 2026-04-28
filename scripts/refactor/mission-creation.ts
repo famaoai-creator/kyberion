@@ -26,11 +26,27 @@ import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
 
+const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
+
+function normalizeTenantSlug(value: string | undefined | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  return TENANT_SLUG_RE.test(trimmed) ? trimmed : undefined;
+}
+
 export async function createMission(
   args: {
     id: string;
     tier?: 'personal' | 'confidential' | 'public';
     tenantId?: string;
+    /**
+     * Tenant slug for multi-tenant deployments. When set (and matches the
+     * `^[a-z][a-z0-9-]{1,30}$` pattern), the resulting mission-state.json
+     * will carry `tenant_slug` so tier-guard and audit-chain enforce
+     * cross-tenant isolation.
+     */
+    tenantSlug?: string;
     missionType?: string;
     visionRef?: string;
     persona?: string;
@@ -42,12 +58,19 @@ export async function createMission(
     id,
     tier = 'confidential',
     tenantId = 'default',
+    tenantSlug: rawTenantSlug,
     missionType = 'development',
     visionRef,
     persona = 'Ecosystem Architect',
     relationships = {},
     rootDir,
   } = args;
+  const tenantSlug = normalizeTenantSlug(rawTenantSlug);
+  if (rawTenantSlug && !tenantSlug) {
+    throw new Error(
+      `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`,
+    );
+  }
 
   const upperId = id.toUpperCase();
   const isEphemeral = process.argv.includes('--ephemeral');
@@ -116,6 +139,7 @@ export async function createMission(
     execution_mode: 'local',
     is_ephemeral: isEphemeral,
     relationships: normalizedRelationships,
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     priority: 3,
     assigned_persona: persona,
     confidence_score: 1.0,
@@ -152,6 +176,7 @@ export async function startMission(
     tier?: 'personal' | 'confidential' | 'public';
     persona?: string;
     tenantId?: string;
+    tenantSlug?: string;
     missionType?: string;
     visionRef?: string;
     relationships?: any;
@@ -163,6 +188,7 @@ export async function startMission(
     tier = 'confidential',
     persona = 'Ecosystem Architect',
     tenantId = 'default',
+    tenantSlug,
     missionType = 'development',
     visionRef,
     relationships = {},
@@ -206,6 +232,7 @@ export async function startMission(
         id: upperId,
         tier: finalTier,
         tenantId,
+        ...(tenantSlug ? { tenantSlug } : {}),
         missionType,
         visionRef,
         persona,

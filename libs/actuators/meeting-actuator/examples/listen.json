@@ -1,0 +1,7 @@
+{
+  "action": "listen",
+  "params": {
+    "platform": "auto",
+    "duration_sec": 30
+  }
+}

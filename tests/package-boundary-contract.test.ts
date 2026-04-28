@@ -4,6 +4,10 @@ import { safeLstat, safeReadFile, safeReaddir } from "@agent/core/secure-io";
 
 const rootDir = process.cwd();
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]);
+// Build-time tool configs (vitest.config, vite.config, next.config, ...) need
+// to point their resolver aliases at libs/core source files. They never run at
+// app runtime, so they are exempt from the runtime boundary contract.
+const CONFIG_FILE_PATTERN = /\.(config|setup)\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)$/;
 const IGNORED_DIRS = new Set([
   ".git",
   ".next",
@@ -35,7 +39,7 @@ function walk(relDir: string): string[] {
       continue;
     }
 
-    if (CODE_EXTENSIONS.has(path.extname(entry))) {
+    if (CODE_EXTENSIONS.has(path.extname(entry)) && !CONFIG_FILE_PATTERN.test(entry)) {
       files.push(relPath);
     }
   }

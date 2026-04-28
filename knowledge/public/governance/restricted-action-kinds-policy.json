@@ -1,0 +1,87 @@
+{
+  "$schema": "https://kyberion.local/schemas/restricted-action-kinds-policy.schema.json",
+  "version": "2026-04-27",
+  "description": "Action items whose title or summary matches one of these patterns are flagged `restricted=true` at extract time. Self-execution of a restricted item requires an approval-gate pass (operator confirmation or sudo override). This is Compliance-2 from the meeting-facilitator outcome simulation: stop AI from auto-running 'send the contract to legal' or 'wire money to vendor X' on the strength of a transcript alone.",
+  "rules": [
+    {
+      "id": "rest.financial-transfer",
+      "label": "Financial transfer / payment / wire",
+      "patterns": [
+        "\\bwire\\s+(transfer|money|funds|payment)",
+        "送金|振込|支払い|決済",
+        "\\bissue\\s+a\\s+(payment|refund)\\b",
+        "\\bpay\\s+(the\\s+)?(invoice|vendor|supplier)\\b"
+      ],
+      "rationale": "Money movement requires a human pass.",
+      "severity": "high"
+    },
+    {
+      "id": "rest.contract-binding",
+      "label": "Contract / NDA / legal binding",
+      "patterns": [
+        "\\bsign\\s+(the\\s+)?(contract|agreement|nda|mou)\\b",
+        "\\bexecute\\s+(the\\s+)?(contract|agreement)\\b",
+        "\\b(commit|bind|obligate)\\s+(us|the\\s+company)\\b",
+        "契約|締結|サイン|押印"
+      ],
+      "rationale": "Bindings should not be auto-executed from a meeting transcript.",
+      "severity": "high"
+    },
+    {
+      "id": "rest.personnel-action",
+      "label": "Personnel actions (hire / fire / promotion / discipline)",
+      "patterns": [
+        "\\b(hire|fire|terminate|promote|demote|dismiss)\\b",
+        "\\bperformance\\s+(improvement|warning)\\s+plan\\b",
+        "採用|解雇|降格|昇格|懲戒"
+      ],
+      "rationale": "Personnel actions need HR + manager review.",
+      "severity": "high"
+    },
+    {
+      "id": "rest.regulatory-notice",
+      "label": "Regulatory / compliance notification",
+      "patterns": [
+        "\\bnotify\\s+(the\\s+)?(regulator|sec|finra|sfa|fsa|fca|jfsa)\\b",
+        "\\bfile\\s+(a\\s+)?(disclosure|sar|ctr)\\b",
+        "監督当局|金融庁|証券取引等監視委員会"
+      ],
+      "rationale": "Regulatory notices require legal sign-off.",
+      "severity": "high"
+    },
+    {
+      "id": "rest.production-deploy",
+      "label": "Production deployment / rollback",
+      "patterns": [
+        "\\bdeploy\\s+to\\s+(prod|production)\\b",
+        "\\brollback\\s+(production|prod)\\b",
+        "本番(リリース|デプロイ|ロールバック)"
+      ],
+      "rationale": "Production changes need a deploy gate.",
+      "severity": "medium"
+    },
+    {
+      "id": "rest.data-destructive",
+      "label": "Destructive data operation",
+      "patterns": [
+        "\\b(drop|truncate|delete)\\s+(the\\s+)?(database|table|index|production)\\b",
+        "\\bpurge\\s+(the\\s+)?(data|records|history)\\b",
+        "\\bwipe\\s+(the\\s+)?(disk|drive|server)\\b",
+        "削除|破棄"
+      ],
+      "rationale": "Destructive operations need irreversible-action consent.",
+      "severity": "high"
+    },
+    {
+      "id": "rest.external-comms",
+      "label": "External press / customer-wide communication",
+      "patterns": [
+        "\\bsend\\s+(a\\s+)?(press\\s+release|public\\s+statement)\\b",
+        "\\bemail\\s+(all|every)\\s+(customer|client|user)s?\\b",
+        "全顧客|プレスリリース|公表"
+      ],
+      "rationale": "Mass external communication needs PR review.",
+      "severity": "medium"
+    }
+  ]
+}

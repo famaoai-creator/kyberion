@@ -241,6 +241,20 @@ export interface IdentityContext {
   missionId?: string;
   role?: string; // Functional role within a specific mission
   sudoScope?: string[];
+  /**
+   * Tenant slug — set when this identity is bound to a specific tenant
+   * (multi-tenant deployments). Resolved from KYBERION_TENANT env or
+   * from mission-state.json `tenant_slug`. Used by tier-guard to deny
+   * cross-tenant writes. Empty / undefined = tenant-agnostic.
+   */
+  tenantSlug?: string;
+  /**
+   * Cross-tenant brokerage declaration — populated when the active
+   * mission is a `cross_tenant_brokerage` mediator. tier-guard allows
+   * read/write across the listed tenants ONLY (deny rest).
+   * Brokered access emits a `tenant.broker_access` audit event.
+   */
+  brokeredTenants?: string[];
 }
 
 // ---------------------------------------------------------------------------

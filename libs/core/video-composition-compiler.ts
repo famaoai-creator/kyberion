@@ -122,7 +122,12 @@ function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): C
 }
 
 function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositionScene): string {
-  const title = sceneText(scene, 'title');
+  // Templates declare `headline` (and sometimes `title`) as the
+  // canonical content field — basic-title-card / split-highlight both
+  // ship `headline` in their `required_content_fields`. Older ADFs
+  // wrote `title` directly, so we accept either to keep both shapes
+  // working.
+  const title = sceneText(scene, 'headline') || sceneText(scene, 'title');
   const body = sceneText(scene, 'body');
   const eyebrow = sceneText(scene, 'eyebrow');
   const supporting = resolveAsset(scene.asset_refs, 'supporting');

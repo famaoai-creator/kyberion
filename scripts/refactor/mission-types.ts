@@ -7,6 +7,27 @@ export interface MissionState {
   mission_id: string;
   mission_type?: string;
   tenant_id?: string;
+  /**
+   * Tenant slug for multi-tenant isolation (lowercase, ^[a-z][a-z0-9-]{1,30}$).
+   * When set, tier-guard rejects writes/reads under another tenant's
+   * confidential prefix; audit-chain entries inherit this slug.
+   * `tenant_id` (legacy) and `tenant_slug` may both be set during migration;
+   * `tenant_slug` is authoritative for runtime isolation checks.
+   */
+  tenant_slug?: string;
+  /**
+   * Cross-tenant brokering declaration. When present, tier-guard allows
+   * the active persona to read/write across the listed tenants — but
+   * only those — and every access emits a `tenant.broker_access`
+   * audit event. The mission must live in the public tier.
+   * See knowledge/public/orchestration/cross-tenant-brokering-protocol.md.
+   */
+  cross_tenant_brokerage?: {
+    source_tenants: string[];
+    purpose: string;
+    approved_by?: string;
+    approved_at?: string;
+  };
   vision_ref?: string;
   tier: 'personal' | 'confidential' | 'public';
   status:
@@ -106,6 +127,7 @@ export const VALUE_FLAGS = new Set([
   '--persona',
   '--tenant',
   '--tenant-id',
+  '--tenant-slug',
   '--mission-type',
   '--vision',
   '--vision-ref',

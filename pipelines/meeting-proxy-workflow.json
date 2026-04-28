@@ -1,0 +1,62 @@
+{
+  "action": "pipeline",
+  "name": "meeting-proxy-workflow",
+  "description": "Generic meeting-proxy orchestration: join → register voice profile → listen → transcribe → extract action items → execute caller's slice → monitor others. Persona-parameterized via context: persona_name (display), profile_id (voice slug), agent_id (proxy agent instance).",
+  "context": {
+    "persona_name": "the operator",
+    "profile_id": "operator-default-v1",
+    "agent_id": "meeting-proxy",
+    "meeting_url": "",
+    "platform": "auto",
+    "listen_duration_sec": 30,
+    "transcript_output": "{{mission_evidence_dir}}/meeting-transcript.txt",
+    "action_items_output": "{{mission_evidence_dir}}/action-items.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Activating Meeting Proxy ({{persona_name}}, profile={{profile_id}}, agent={{agent_id}})..."
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}')",
+        "export_as": "join_result"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}')",
+        "export_as": "listen_result"
+      }
+    },
+    {
+      "op": "wisdom:extract_requirements",
+      "type": "apply",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "meeting-proxy",
+        "source_path": "{{transcript_output}}",
+        "source_type": "meeting_notes",
+        "language": "ja",
+        "export_as": "extraction"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "✅ Action items extracted to {{action_items_output}}. Initiating self-assigned task execution..."
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}')",
+        "export_as": "leave_result"
+      }
+    }
+  ]
+}

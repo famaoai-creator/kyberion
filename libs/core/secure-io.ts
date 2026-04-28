@@ -68,8 +68,14 @@ export interface SafeWriteOptions {
   __sudo?: string;
 }
 
-export function buildSafeExecEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const safeEnv: NodeJS.ProcessEnv = {
+export function buildSafeExecEnv(
+  extraEnv: Record<string, string | undefined> = {},
+): NodeJS.ProcessEnv {
+  // Use a string-indexed map locally; Next 15's global augmentation makes
+  // `NODE_ENV` a required readonly field on `NodeJS.ProcessEnv`, which is
+  // incompatible with constructing the env from scratch. We cast at the
+  // boundary instead of polluting every assignment with NODE_ENV.
+  const safeEnv: Record<string, string | undefined> = {
     FORCE_COLOR: '0',
     TERM: process.env.TERM || 'dumb',
   };
@@ -87,7 +93,7 @@ export function buildSafeExecEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.Proce
     }
   }
 
-  return safeEnv;
+  return safeEnv as NodeJS.ProcessEnv;
 }
 
 /**

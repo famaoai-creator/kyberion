@@ -1,0 +1,21 @@
+{
+  "$schema": "https://kyberion.local/schemas/tenant-rate-limit-policy.schema.json",
+  "version": "1.0.0",
+  "description": "Per-tenant rate limit policy. Bounds the cost (in 'tokens' — abstract unit, e.g. one reasoning op = 1 token by default) any single tenant can spend across reasoning-backend operations within a rolling window. Prevents one tenant exhausting shared LLM quota and starving others. Enforcement is a token-bucket algorithm: each consume() either decrements the bucket or returns retry_after_ms. Buckets persist to disk so multi-process workers share state.",
+  "default": {
+    "tokens_per_minute": 60,
+    "burst_capacity": 60,
+    "denial_grace_ms": 30000
+  },
+  "tenants": {},
+  "operation_costs": {
+    "wisdom:a2a_fanout": 1,
+    "wisdom:cross_critique": 1,
+    "wisdom:simulate_all": 1,
+    "wisdom:simulate_all_ensemble": 3,
+    "wisdom:synthesize_counterparty_persona": 1,
+    "wisdom:fork_branches": 1
+  },
+  "exempt_personas": ["sovereign", "ecosystem_architect"],
+  "rationale": "Per-tenant rate limits are a baseline isolation control. They do not replace upstream provider quotas (Anthropic/Claude/Gemini) which Kyberion does not own — but they prevent one tenant burning through a shared API key faster than others. burst_capacity allows brief spikes; denial_grace_ms is the soft delay before a denied caller may retry."
+}

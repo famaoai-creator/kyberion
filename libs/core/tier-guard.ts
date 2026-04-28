@@ -107,6 +107,88 @@ function hasAuthorityAccess(
 /**
  * Validates write permission based on security-policy.json ADF and Persona.
  */
+/**
+ * Tenant scope check — when the active identity is bound to a tenant,
+ * deny writes to other tenants' confidential prefixes (`knowledge/confidential/{other}/`
+ * or `active/missions/confidential/{other}/`). SUDO bypasses this check
+ * because cross-tenant tooling missions intentionally need broad access.
+ *
+ * Brokered missions (declared by `cross_tenant_brokerage` in the mission
+ * state) are allowed to access every tenant in their `source_tenants`
+ * list — but no others. Each brokered access emits a
+ * `tenant.broker_access` audit event so the cross-tenant action is
+ * always reviewable.
+ */
+function checkTenantScope(
+  relativePath: string,
+  tenantSlug: string | undefined,
+  brokeredTenants: string[] | undefined,
+  authorities: Authority[],
+): { allowed: boolean; reason?: string } | null {
+  if (authorities.includes('SUDO')) return null;
+  if (!tenantSlug && !brokeredTenants) return null;
+
+  const segments = relativePath.split(/[\\/]/);
+  const idx = segments.findIndex((s) => s === 'confidential');
+  if (idx === -1) return null;
+
+  const targetTenant = segments[idx + 1];
+  if (!targetTenant) return null;
+  // Legacy single-tenant layouts under confidential/{mission_id}/ are
+  // not slug-shaped → not tenant-scoped.
+  if (!/^[a-z][a-z0-9-]{1,30}$/.test(targetTenant)) return null;
+
+  // Same tenant → allow.
+  if (tenantSlug === targetTenant) return null;
+
+  // Brokered access: allow if target tenant is on the broker's list.
+  // Side-effect: emit a broker-access audit event so the cross-tenant
+  // touch is recorded even though it is permitted.
+  if (brokeredTenants && brokeredTenants.includes(targetTenant)) {
+    void recordBrokerAccess({ relativePath, brokerTenants: brokeredTenants, targetTenant });
+    return null;
+  }
+
+  const persona = tenantSlug ? `tenant '${tenantSlug}'` : 'a tenant-bound persona';
+  return {
+    allowed: false,
+    reason: `[POLICY_VIOLATION] tenant.scope_violation — persona bound to ${persona} attempted to access path of tenant '${targetTenant}' ('${relativePath}').`,
+  };
+}
+
+/**
+ * Append a `tenant.broker_access` event to the audit chain. Synchronous
+ * dynamic import to avoid a circular dep at module load (audit-chain
+ * lives in @agent/core too). Failures are swallowed because tier-guard
+ * should never block a permitted operation just because the audit
+ * forwarder hiccupped.
+ */
+function recordBrokerAccess(input: {
+  relativePath: string;
+  brokerTenants: string[];
+  targetTenant: string;
+}): void {
+  try {
+    // Synchronous dynamic import via require equivalent — we lazy-load
+    // because tier-guard is on the secure-io critical path.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { auditChain } = require('./audit-chain.js') as typeof import('./audit-chain.js');
+    auditChain.record({
+      agentId: 'tier-guard',
+      action: 'tenant.broker_access',
+      operation: input.relativePath,
+      result: 'allowed',
+      reason: `Brokered cross-tenant access to '${input.targetTenant}' via mission allowed across {${input.brokerTenants.join(', ')}}.`,
+      metadata: {
+        target_tenant: input.targetTenant,
+        broker_tenants: input.brokerTenants,
+      },
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
   const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
@@ -117,7 +199,12 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants } = resolveIdentityContext();
+
+  // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
+  const tenantDenial = checkTenantScope(relativePath, tenantSlug, brokeredTenants, authorities);
+  if (tenantDenial) return tenantDenial;
+
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
@@ -185,7 +272,11 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants } = resolveIdentityContext();
+
+  // Tenant scope — deny cross-tenant reads from confidential.
+  const tenantDenial = checkTenantScope(relativePath, tenantSlug, brokeredTenants, authorities);
+  if (tenantDenial) return tenantDenial;
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read')) return { allowed: true };

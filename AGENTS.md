@@ -13,18 +13,18 @@ These apply in every phase. No exceptions.
 1. **All file I/O through `@agent/core/secure-io`.**
    Never use `node:fs` directly. Manage mission lifecycles (start, checkpoint, finish) via `scripts/mission_controller.ts` ([KSMC](./docs/GLOSSARY.md#ksmc-kyberion-sovereign-mission-controller) v2.0). Each mission runs in its own Git repository for atomic rollback.
 
-3. **Use existing Actuators first.**
+2. **Use existing Actuators first.**
    Consult [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md) and `libs/actuators/` before writing custom code for screenshots, API calls, file conversions, etc. Temp files go in `active/shared/tmp/` or mission-local storage, not ad hoc directories.
 
-4. **Strategic Delegation via Subagents.**
+3. **Strategic Delegation via Subagents.**
    For high-volume or specialized tasks (e.g., bulk refactoring, deep codebase analysis), use `getReasoningBackend().delegateTask()`.
    - **Gemini CLI specific:** When running in `gemini-cli` mode, this method spawns an autonomous sub-agent with YOLO mode enabled, leveraging `generalist` or `codebase_investigator` tools to minimize main-loop context consumption.
    - **ADF Guardrails:** If an ADF file is invalid, use `validateAndRepairAdf` to dispatch a repair sub-agent before proceeding.
 
-5. **Execute only validated [ADF](./docs/GLOSSARY.md#adf-agentic-data-format) contracts.**
+4. **Execute only validated [ADF](./docs/GLOSSARY.md#adf-agentic-data-format) contracts.**
    Lifecycle: `draft → preflight (including sub-agent repair if needed) → auto-repair (if safe) → commit → execute`. Prefer semantic briefs and governed compilers over hand-written executable ADF. On failure, classify and repair — never retry a broken contract.
 
-6. **Enforce 3-tier data isolation.**
+5. **Enforce 3-tier data isolation.**
 
    `knowledge/personal/` (private), `knowledge/confidential/` (org-internal), `knowledge/public/` (reusable). No leaks from higher to lower tiers. Project-scoped isolation uses `confidential/{project}/`.
 

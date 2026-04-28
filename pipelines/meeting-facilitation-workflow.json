@@ -1,0 +1,108 @@
+{
+  "action": "pipeline",
+  "name": "meeting-facilitation-workflow",
+  "description": "End-to-end AI-led meeting flow: open agenda → join → listen N seconds → extract action items into the action-item-store → list operator's slice for self-execution → leave. Persona-parameterized via context.",
+  "context": {
+    "persona_name": "Operator",
+    "profile_id": "operator-default-v1",
+    "agent_id": "meeting-proxy",
+    "meeting_url": "",
+    "platform": "auto",
+    "agenda": ["Status check", "Action items"],
+    "listen_duration_sec": 60,
+    "language": "ja",
+    "operator_label": "Operator",
+    "attendees": []
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Meeting facilitation start (persona={{persona_name}}, platform={{platform}})."
+      }
+    },
+    {
+      "id": "join",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}')",
+        "export_as": "join_result"
+      }
+    },
+    {
+      "id": "facilitate_open",
+      "type": "apply",
+      "op": "wisdom:generate_facilitation_script",
+      "params": {
+        "agenda": "{{agenda}}",
+        "current_topic": "Opening",
+        "remaining_minutes": 30,
+        "facilitator_persona_label": "{{persona_name}}",
+        "language": "{{language}}"
+      }
+    },
+    {
+      "id": "listen",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}')",
+        "export_as": "listen_result"
+      }
+    },
+    {
+      "id": "extract_action_items",
+      "type": "apply",
+      "op": "wisdom:extract_action_items",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "transcript_path": "{{mission_evidence_dir}}/meeting-transcript.txt",
+        "attendees": "{{attendees}}",
+        "operator_label": "{{operator_label}}",
+        "language": "{{language}}",
+        "output_path": "{{mission_evidence_dir}}/action-items-extracted.json"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Extracted {{action_item_count}} item(s); partial={{partial_action_item_count}}; restricted={{restricted_action_item_count}}."
+      }
+    },
+    {
+      "id": "audit_speaker_fairness",
+      "type": "apply",
+      "op": "wisdom:audit_speaker_fairness",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "output_path": "{{mission_evidence_dir}}/speaker-fairness.json"
+      }
+    },
+    {
+      "id": "log_fairness",
+      "op": "system:log",
+      "params": {
+        "message": "🎤 Speaker fairness: dominant={{dominant_speaker}} warn={{speaker_fairness_warn}}"
+      }
+    },
+    {
+      "id": "leave",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}')",
+        "export_as": "leave_result"
+      }
+    },
+    {
+      "id": "wrap",
+      "op": "system:log",
+      "params": {
+        "message": "🛑 Meeting closed. Run pipelines/action-item-execute-self.json for the operator's slice and pipelines/action-item-tracking.json on cron for others."
+      }
+    }
+  ]
+}

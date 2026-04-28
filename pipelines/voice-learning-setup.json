@@ -1,0 +1,51 @@
+{
+  "action": "pipeline",
+  "name": "voice-learning-setup",
+  "description": "Voice profile learning + test synthesis. Persona-parameterized — set context.persona_name and context.profile_id. Samples must exist at knowledge/personal/voice/samples/{{profile_id}}/.",
+  "context": {
+    "persona_name": "the operator",
+    "profile_id": "operator-default-v1",
+    "test_text": "こんにちは、私は {{persona_name}} のデジタルプロファイルです。学習した音声でミーティングに参加する準備が整いました。",
+    "provider": "local"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ {{persona_name}} の音声プロファイル ({{profile_id}}) 学習セットアップを開始します。"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "サンプル ({{profile_id}}.wav / .mp3) を knowledge/personal/voice/samples/{{profile_id}}/ に配置してください。"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "python3 libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\": \"learn\", \"params\": {\"profile_id\": \"{{profile_id}}\", \"sample_dir\": \"knowledge/personal/voice/samples/{{profile_id}}\", \"provider\": \"{{provider}}\"}}'",
+        "export_as": "learning_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "✅ 学習結果: {{learning_result}}"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "python3 libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\": \"generate\", \"params\": {\"text\": \"{{test_text}}\", \"profile_id\": \"{{profile_id}}\", \"provider\": \"{{provider}}\"}}'",
+        "export_as": "test_synthesis_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "✨ テスト発話完了: {{test_synthesis_result}}"
+      }
+    }
+  ]
+}

@@ -5,12 +5,14 @@ import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedCoreFsImports = [
+  'libs/core/action-item-store.test.ts',
   'libs/core/evidence-chain.test.ts',
   'libs/core/fs-primitives.ts',
   'libs/core/heuristic-feedback.test.ts',
   'libs/core/intent-snapshot-store.test.ts',
   'libs/core/ledger.test.ts',
   'libs/core/metrics.test.ts',
+  'libs/core/mission-evidence-doc.test.ts',
   'libs/core/relationship-graph-store.test.ts',
   'libs/core/requirements-draft-store.test.ts',
   'libs/core/sdlc-artifact-store.test.ts',

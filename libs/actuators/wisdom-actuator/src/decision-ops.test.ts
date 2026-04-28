@@ -8,6 +8,8 @@ import {
   recommend,
   findSlidesByOwner,
   pptxDiff,
+  evaluateSimulationQuality,
+  evaluateEnsembleConvergence,
 } from './decision-ops.js';
 
 const TMP_ROOT = 'active/shared/tmp/decision-ops-tests';
@@ -206,5 +208,161 @@ describe('pptxDiff', () => {
     expect(diff.removed).toEqual([]);
     expect(diff.changed).toEqual([]);
     expect(diff.unchanged).toEqual([]);
+  });
+});
+
+describe('evaluateSimulationQuality', () => {
+  const mkBranch = (over: Partial<{
+    branch_id: string;
+    hypothesis_ref: string;
+    first_failure_mode: string | null;
+    first_success_mode: string | null;
+    terminated_at_step: number | null;
+  }> = {}) => ({
+    branch_id: over.branch_id ?? 'B-1',
+    hypothesis_ref: over.hypothesis_ref ?? 'H-1',
+    first_failure_mode: over.first_failure_mode ?? null,
+    first_success_mode: over.first_success_mode ?? null,
+    terminated_at_step: over.terminated_at_step ?? null,
+  });
+
+  it('reports ok for a balanced, terminated 3-branch simulation', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1', first_failure_mode: 'cost too high', terminated_at_step: 3 }),
+        mkBranch({ branch_id: 'B-2', first_success_mode: 'launched', terminated_at_step: 5 }),
+        mkBranch({ branch_id: 'B-3', first_failure_mode: 'compliance reject', terminated_at_step: 2 }),
+      ],
+    });
+    expect(report.severity).toBe('ok');
+    expect(report.branch_count).toBe(3);
+    expect(report.checks.every((c) => c.passed)).toBe(true);
+  });
+
+  it('reports poor when zero branches', () => {
+    const report = evaluateSimulationQuality({ goal: 'g', branches: [] });
+    expect(report.severity).toBe('poor');
+    expect(report.checks.find((c) => c.id === 'has_branches')!.passed).toBe(false);
+  });
+
+  it('reports poor on duplicate branch ids', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1', first_failure_mode: 'a', terminated_at_step: 1 }),
+        mkBranch({ branch_id: 'B-1', first_success_mode: 'b', terminated_at_step: 2 }),
+      ],
+    });
+    expect(report.severity).toBe('poor');
+    expect(report.checks.find((c) => c.id === 'unique_branch_ids')!.passed).toBe(false);
+  });
+
+  it('reports poor when a branch reports both failure and success modes', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1', first_failure_mode: 'x', first_success_mode: 'y', terminated_at_step: 1 }),
+      ],
+    });
+    expect(report.severity).toBe('poor');
+    expect(report.checks.find((c) => c.id === 'failure_xor_success')!.passed).toBe(false);
+  });
+
+  it('warns when no branch reaches a terminal mode', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1' }),
+        mkBranch({ branch_id: 'B-2' }),
+      ],
+    });
+    expect(report.severity).toBe('warn');
+    expect(report.checks.find((c) => c.id === 'reaches_terminal_mode')!.passed).toBe(false);
+  });
+
+  it('warns when 3+ terminated branches share an outcome', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1', first_failure_mode: 'a', terminated_at_step: 1 }),
+        mkBranch({ branch_id: 'B-2', first_failure_mode: 'b', terminated_at_step: 2 }),
+        mkBranch({ branch_id: 'B-3', first_failure_mode: 'c', terminated_at_step: 3 }),
+      ],
+    });
+    expect(report.severity).toBe('warn');
+    expect(report.checks.find((c) => c.id === 'outcome_balance')!.passed).toBe(false);
+  });
+
+  it('warns on zero-step terminations', () => {
+    const report = evaluateSimulationQuality({
+      goal: 'g',
+      branches: [
+        mkBranch({ branch_id: 'B-1', first_failure_mode: 'gave up', terminated_at_step: 0 }),
+      ],
+    });
+    expect(report.severity).toBe('warn');
+    expect(report.checks.find((c) => c.id === 'non_trivial_termination_depth')!.passed).toBe(false);
+  });
+});
+
+describe('evaluateEnsembleConvergence (IP-4)', () => {
+  const branch = (id: string, outcome: 'failure' | 'success' | 'pending') => ({
+    branch_id: id,
+    hypothesis_ref: `H-${id}`,
+    first_failure_mode: outcome === 'failure' ? 'mode-x' : null,
+    first_success_mode: outcome === 'success' ? 'mode-y' : null,
+    terminated_at_step: outcome === 'pending' ? null : 1,
+  });
+
+  it('returns severity ok when all 3 runs agree on every branch', () => {
+    const runs = [
+      { branches: [branch('B-1', 'failure'), branch('B-2', 'success')] },
+      { branches: [branch('B-1', 'failure'), branch('B-2', 'success')] },
+      { branches: [branch('B-1', 'failure'), branch('B-2', 'success')] },
+    ];
+    const report = evaluateEnsembleConvergence({ runs });
+    expect(report.severity).toBe('ok');
+    expect(report.mean_convergence).toBe(1);
+    expect(report.divergent_outcomes_warning).toBe(false);
+    expect(report.per_branch.find((b) => b.branch_id === 'B-1')!.dominant_outcome).toBe('failure');
+  });
+
+  it('returns warn when one branch flips outcome across runs', () => {
+    const runs = [
+      { branches: [branch('B-1', 'failure'), branch('B-2', 'success')] },
+      { branches: [branch('B-1', 'success'), branch('B-2', 'success')] },
+      { branches: [branch('B-1', 'failure'), branch('B-2', 'success')] },
+    ];
+    const report = evaluateEnsembleConvergence({ runs, threshold: 0.9 });
+    expect(report.severity).not.toBe('ok');
+    expect(report.divergent_outcomes_warning).toBe(true);
+    const b1 = report.per_branch.find((b) => b.branch_id === 'B-1')!;
+    expect(b1.outcome_counts).toEqual({ failure: 2, success: 1, pending: 0 });
+    expect(b1.convergence).toBeCloseTo(2 / 3, 2);
+  });
+
+  it('returns poor when there are no branches at all', () => {
+    const report = evaluateEnsembleConvergence({ runs: [{ branches: [] }] });
+    expect(report.severity).toBe('poor');
+  });
+
+  it('marks dominant_outcome as tie on equal counts', () => {
+    const runs = [
+      { branches: [branch('B-1', 'failure')] },
+      { branches: [branch('B-1', 'success')] },
+    ];
+    const report = evaluateEnsembleConvergence({ runs });
+    const b1 = report.per_branch.find((b) => b.branch_id === 'B-1')!;
+    expect(b1.dominant_outcome).toBe('tie');
+  });
+
+  it('uses default threshold 0.6 when none provided', () => {
+    const runs = [
+      { branches: [branch('B-1', 'failure')] },
+      { branches: [branch('B-1', 'success')] },
+    ];
+    const report = evaluateEnsembleConvergence({ runs });
+    expect(report.threshold).toBe(0.6);
   });
 });

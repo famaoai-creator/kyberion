@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "name": "action-item-execute-self",
+  "description": "Iterate operator_self pending action items in the active mission and dispatch each through the existing decompose → execute task chain. Marks items in_progress on dispatch and completed on success.",
+  "context": {
+    "mission_id": "",
+    "language": "ja"
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "op": "system:log",
+      "params": {
+        "message": "🚀 action-item-execute-self for mission {{mission_id}}."
+      }
+    },
+    {
+      "id": "execute_self",
+      "type": "apply",
+      "op": "wisdom:execute_self_action_items",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "language": "{{language}}",
+        "output_path": "{{mission_evidence_dir}}/action-item-self-report.json"
+      }
+    },
+    {
+      "id": "log_summary",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Self-execution sweep complete: see {{mission_evidence_dir}}/action-item-self-report.json"
+      }
+    }
+  ]
+}

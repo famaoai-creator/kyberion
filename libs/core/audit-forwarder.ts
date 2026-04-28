@@ -66,6 +66,35 @@ export class ChainAuditForwarder implements AuditForwarder {
   }
 }
 
+/**
+ * Tenant-filtering forwarder. Wraps an inner forwarder and only delegates
+ * publish() when the entry's `tenantSlug` matches one of `tenantSlugs` (or
+ * when `passThroughTenantless` is true and the entry has no tenant).
+ *
+ * Used to give each tenant its own SIEM / log sink without leaking
+ * cross-tenant events. Compose multiple of these inside a ChainAuditForwarder
+ * — one per tenant.
+ */
+export class TenantFilteringAuditForwarder implements AuditForwarder {
+  readonly name: string;
+  constructor(
+    private readonly inner: AuditForwarder,
+    private readonly tenantSlugs: string[],
+    private readonly passThroughTenantless: boolean = false,
+  ) {
+    this.name = `tenant-filter(${tenantSlugs.join(',')}→${inner.name})`;
+  }
+  async publish(entry: AuditEntry): Promise<void> {
+    const slug = entry.tenantSlug;
+    if (!slug) {
+      if (!this.passThroughTenantless) return;
+    } else if (!this.tenantSlugs.includes(slug)) {
+      return;
+    }
+    await this.inner.publish(entry);
+  }
+}
+
 export interface ShellAuditForwarderOptions {
   /**
    * Shell command. `{{entry}}` (escaped JSON string) is replaced at publish

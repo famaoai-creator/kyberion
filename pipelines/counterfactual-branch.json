@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "name": "counterfactual-branch",
-  "description": "Forks the current mission into N short-horizon simulations (STUB), one per surviving hypothesis. Results merge back as meta-evidence only. See knowledge/public/orchestration/counterfactual-simulation-protocol.md.",
+  "description": "Forks the current mission into N short-horizon simulations, one per surviving hypothesis. simulate_all writes both simulation-summary.json (LLM output) and simulation-quality.json (deterministic rubric: has_branches / failure_xor_success / unique_branch_ids / reaches_terminal_mode / outcome_balance / non_trivial_termination_depth). Results merge back as meta-evidence only. See knowledge/public/orchestration/counterfactual-simulation-protocol.md.",
   "context": {
     "mission_id": "",
     "hypothesis_tree_ref": "",

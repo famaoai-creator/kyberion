@@ -23,6 +23,14 @@ export interface AuditEntry {
     framework: string;
     control: string;
   };
+  /**
+   * Tenant slug — populated when the active execution is bound to a
+   * specific tenant. Used by audit-forwarder filter stages to route
+   * tenant-scoped events to per-tenant SIEMs without leakage. Empty /
+   * undefined = tenant-agnostic (cross-tenant tooling).
+   * Schema-additive: legacy entries without this field remain valid.
+   */
+  tenantSlug?: string;
   previousHash: string;
   currentHash: string;
 }
@@ -38,16 +46,21 @@ class AuditChainImpl {
 
   /**
    * Append a new audit entry to the chain.
+   * Auto-populates `tenantSlug` from the active identity context unless
+   * the caller has already supplied one.
    */
   record(entry: Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>): AuditEntry {
     this.entryCount++;
     const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
     const timestamp = new Date().toISOString();
 
+    const tenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+
     const fullEntry: AuditEntry = {
       id,
       timestamp,
       ...entry,
+      ...(tenantSlug ? { tenantSlug } : {}),
       previousHash: this.lastHash,
       currentHash: '', // computed below
     };
@@ -200,6 +213,35 @@ class AuditChainImpl {
     const date = new Date().toISOString().slice(0, 10);
     return path.join(this.auditDir, `audit-${date}.jsonl`);
   }
+}
+
+/**
+ * Best-effort tenant slug resolution. Reads `KYBERION_TENANT` env first,
+ * falling back to the active mission's `tenant_slug`. Kept synchronous
+ * and dependency-free to avoid circular imports with `authority.ts`.
+ */
+function resolveCurrentTenantSlug(): string | undefined {
+  const fromEnv = (process.env.KYBERION_TENANT || '').trim();
+  if (fromEnv && /^[a-z][a-z0-9-]{1,30}$/.test(fromEnv)) return fromEnv;
+  const missionId = process.env.MISSION_ID;
+  if (!missionId) return undefined;
+  // Walk up looking for a mission-state.json with tenant_slug.
+  const candidates = [
+    path.join(findProjectRoot(), 'active/missions/personal', missionId, 'mission-state.json'),
+    path.join(findProjectRoot(), 'active/missions/confidential', missionId, 'mission-state.json'),
+    path.join(findProjectRoot(), 'active/missions/public', missionId, 'mission-state.json'),
+  ];
+  for (const candidate of candidates) {
+    if (!safeExistsSync(candidate)) continue;
+    try {
+      const state = JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string);
+      const slug = (state.tenant_slug || '').trim();
+      if (slug && /^[a-z][a-z0-9-]{1,30}$/.test(slug)) return slug;
+    } catch {
+      /* ignore */
+    }
+  }
+  return undefined;
 }
 
 function findProjectRoot(): string {

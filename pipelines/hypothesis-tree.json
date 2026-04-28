@@ -11,9 +11,21 @@
       "Ruthless Auditor",
       "red-team-adversary"
     ],
-    "min_hypotheses_per_persona": 2
+    "min_hypotheses_per_persona": 2,
+    "prior_knowledge_tags": []
   },
   "steps": [
+    {
+      "id": "inject_prior_knowledge",
+      "type": "transform",
+      "op": "wisdom:inject_prior_knowledge",
+      "params": {
+        "topic": "{{topic}}",
+        "tags": "{{prior_knowledge_tags}}",
+        "limit": 5,
+        "output_path": "{{mission_evidence_dir}}/prior-knowledge.json"
+      }
+    },
     {
       "id": "diverge",
       "type": "apply",

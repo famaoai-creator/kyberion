@@ -1,0 +1,14 @@
+{
+  "actuator_id": "meeting-actuator",
+  "version": "1.0.0",
+  "description": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+  "contract_schema": "schemas/meeting-action.schema.json",
+  "capabilities": [
+    { "op": "join", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "leave", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "speak", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "listen", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "chat", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "status", "platforms": ["darwin", "linux", "win32"] }
+  ]
+}
