@@ -142,6 +142,16 @@ const CASES: GovernanceSchemaCase[] = [
     dataPath: 'knowledge/public/governance/mission-orchestration-scenario-pack.json',
     invalidPayload: { version: '1.0.0' },
   },
+  {
+    name: 'tool-actuator-routing-policy',
+    schemaPath: 'knowledge/public/schemas/tool-actuator-routing-policy.schema.json',
+    dataPath: 'knowledge/public/governance/tool-actuator-routing-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      defaults: { fallback_actuator: 'orchestrator-actuator' },
+      tool_routes: [],
+    },
+  },
 ];
 
 describe('governance contracts', () => {

@@ -132,6 +132,10 @@ export async function main() {
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
     } else {
+      const failed = result.results.find((entry) => entry.status === 'failed');
+      if (failed) {
+        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failed.error || 'unknown error'}`);
+      }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
       process.exit(1);
     }

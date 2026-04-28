@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
+import { safeExec } from './secure-io.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { getAgentManifest } from './agent-manifest.js';
@@ -32,6 +33,8 @@ import {
   type SurfaceDelegationReceiver,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
+import { resolveSurfaceIntent } from './router-contract.js';
+import { recordIntentContractOutcome, selectContractCandidates, type ContractCandidate } from './intent-contract-learning.js';
 
 import type {
   NerveRoutingProposal,
@@ -48,6 +51,307 @@ import type { UserIntentFlow } from './intent-contract.js';
 interface SurfaceRuntimeRouteHandler {
   matches: (context: SurfaceRuntimeRouteContext) => boolean;
   handle: (context: SurfaceRuntimeRouteContext) => Promise<SurfaceConversationResult>;
+}
+
+function emptySurfaceResult(text: string): SurfaceConversationResult {
+  return {
+    text,
+    a2uiMessages: [],
+    a2aMessages: [],
+    delegationResults: [],
+    approvalRequests: [],
+    routingProposals: [],
+    missionProposals: [],
+    planningPackets: [],
+  };
+}
+
+function formatExecutionReceipt(params: {
+  intentId?: string;
+  shape?: string;
+  command?: string;
+  status: 'ok' | 'error';
+  candidateSelection?: ContractCandidate[];
+}): string {
+  return JSON.stringify({
+    kind: 'execution-receipt',
+    ts: new Date().toISOString(),
+    intent_id: params.intentId || 'unknown',
+    execution_shape: params.shape || 'unknown',
+    command: params.command || '',
+    status: params.status,
+    candidate_selection: (params.candidateSelection || []).map((candidate) => ({
+      contract_ref: candidate.contract_ref,
+      score: candidate.score,
+      source: candidate.source,
+    })),
+  }, null, 2);
+}
+
+function ensureMissionId(context: SurfaceRuntimeRouteContext): string {
+  if (context.input.missionId) return context.input.missionId;
+  throw new Error('mission_id is required for this mission action');
+}
+
+function recordLearningOutcomeSafely(params: Parameters<typeof recordIntentContractOutcome>[0]): void {
+  try {
+    recordIntentContractOutcome(params);
+  } catch {
+    // Learning updates are best-effort and must not block primary execution paths.
+  }
+}
+
+function missionActionGuidance(action: NonNullable<ReturnType<typeof resolveSurfaceIntent>['missionAction']>, missionId: string): string {
+  const commandHints: Record<string, string> = {
+    classify: `node dist/scripts/mission_controller.js status ${missionId}`,
+    workflow: `node dist/scripts/compose_mission_team.js --mission-id ${missionId} --execution-shape mission --request "select workflow"`,
+    review_output: `node dist/scripts/mission_controller.js verify ${missionId} verified "worker output reviewed"`,
+    handoff: `node dist/scripts/mission_controller.js checkpoint ${missionId} handoff "handoff requested"`,
+  };
+  const hint = commandHints[action];
+  return hint
+    ? `Mission action '${action}' has no dedicated direct binding yet. Recommended command:\n${hint}`
+    : `Mission action '${action}' has no direct binding yet.`;
+}
+
+function directIntentCommand(intentId?: string): { command: string; args: string[] } | null {
+  const map: Record<string, { command: string; args: string[] }> = {
+    'bootstrap-kyberion-runtime': { command: 'pnpm', args: ['env:bootstrap'] },
+    'verify-actuator-capability': { command: 'pnpm', args: ['capabilities'] },
+  };
+  return intentId && map[intentId] ? map[intentId] : null;
+}
+
+async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+  const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
+  const intentId = resolved.intentId;
+  const candidates = intentId ? selectContractCandidates(intentId, 3) : [];
+  const direct = directIntentCommand(resolved.intentId);
+  if (direct) {
+    const command = `${direct.command} ${direct.args.join(' ')}`;
+    try {
+      const output = safeExec(direct.command, direct.args, { cwd: pathResolver.rootDir() });
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: command },
+          success: true,
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      return emptySurfaceResult(
+        [
+          `Executed intent command: ${resolved.intentId}`,
+          '',
+          formatExecutionReceipt({
+            intentId: resolved.intentId,
+            shape: resolved.shape,
+            command,
+            status: 'ok',
+            candidateSelection: candidates,
+          }),
+          '',
+          output.trim() || '(no output)',
+        ].join('\n'),
+      );
+    } catch (error: any) {
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: command },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      throw error;
+    }
+  }
+
+  if (resolved.pipelineId) {
+    const pipelinePath = `pipelines/${resolved.pipelineId}.json`;
+    const command = `node dist/scripts/run_pipeline.js --input ${pipelinePath}`;
+    let output = '';
+    try {
+      output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', pipelinePath], {
+        cwd: pathResolver.rootDir(),
+      });
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'pipeline',
+          contract_ref: { kind: 'pipeline', ref: resolved.pipelineId },
+          success: true,
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+    } catch (error: any) {
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'pipeline',
+          contract_ref: { kind: 'pipeline', ref: resolved.pipelineId },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      throw error;
+    }
+    return emptySurfaceResult(
+      [
+        `Executed pipeline: ${resolved.pipelineId}`,
+        '',
+        formatExecutionReceipt({
+          intentId: resolved.intentId,
+          shape: resolved.shape,
+          command,
+          status: 'ok',
+          candidateSelection: candidates,
+        }),
+        '',
+        output.trim() || '(no output)',
+      ].join('\n'),
+    );
+  }
+
+  if (!resolved.missionAction) {
+    throw new Error('governed execution hint not found');
+  }
+
+  if (resolved.missionAction === 'create') {
+    const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
+    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
+    let output = '';
+    try {
+      output = safeExec('node', ['dist/scripts/mission_controller.js', 'create', missionId, 'public'], {
+        cwd: pathResolver.rootDir(),
+      });
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: true,
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+    } catch (error: any) {
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: resolved.shape || 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      throw error;
+    }
+    return emptySurfaceResult(
+      [
+        `Created mission: ${missionId}`,
+        '',
+        formatExecutionReceipt({
+          intentId: resolved.intentId,
+          shape: resolved.shape,
+          command,
+          status: 'ok',
+          candidateSelection: candidates,
+        }),
+        '',
+        output.trim() || '(no output)',
+      ].join('\n'),
+    );
+  }
+
+  const missionId = ensureMissionId(context);
+  const missionCommandByAction: Record<string, string[] | undefined> = {
+    classify: ['classify', missionId],
+    workflow: ['workflow-select', missionId],
+    inspect_state: ['status', missionId],
+    compose_team: ['team', missionId],
+    prewarm_team: ['prewarm', missionId],
+    delegate_task: ['delegate', missionId, 'generalist', context.input.surfaceText || context.structuredQuery],
+    review_output: ['review-worker-output', missionId, 'verified', 'worker output reviewed from surface intent'],
+    handoff: ['handoff', missionId, 'surface_operator', 'handoff requested from surface intent'],
+    distill: ['distill', missionId],
+    close: ['finish', missionId],
+  };
+  const mapped = missionCommandByAction[resolved.missionAction];
+  if (!mapped) {
+    return emptySurfaceResult(missionActionGuidance(resolved.missionAction, missionId));
+  }
+  const command = `node dist/scripts/mission_controller.js ${mapped.join(' ')}`;
+  let output = '';
+  try {
+    output = safeExec('node', ['dist/scripts/mission_controller.js', ...mapped], {
+      cwd: pathResolver.rootDir(),
+    });
+    if (intentId) {
+      recordLearningOutcomeSafely({
+        intent_id: intentId,
+        execution_shape: resolved.shape || 'mission',
+        contract_ref: { kind: 'mission_command', ref: `mission_controller ${resolved.missionAction}` },
+        success: true,
+        context_fingerprint: {
+          execution_shape: resolved.shape,
+          surface: context.input.surface || 'unknown',
+        },
+      });
+    }
+  } catch (error: any) {
+    if (intentId) {
+      recordLearningOutcomeSafely({
+        intent_id: intentId,
+        execution_shape: resolved.shape || 'mission',
+        contract_ref: { kind: 'mission_command', ref: `mission_controller ${resolved.missionAction}` },
+        success: false,
+        error: error?.message || String(error),
+        context_fingerprint: {
+          execution_shape: resolved.shape,
+          surface: context.input.surface || 'unknown',
+        },
+      });
+    }
+    throw error;
+  }
+  return emptySurfaceResult(
+    [
+      `Executed mission action: ${resolved.missionAction} (${missionId})`,
+      '',
+      formatExecutionReceipt({
+        intentId: resolved.intentId,
+        shape: resolved.shape,
+        command,
+        status: 'ok',
+        candidateSelection: candidates,
+      }),
+      '',
+      output.trim() || '(no output)',
+    ].join('\n'),
+  );
 }
 
 function buildMissionTeamPromptContext(missionId: string): string {
@@ -365,6 +669,20 @@ async function handlePresenceForcedBypass(context: SurfaceRuntimeRouteContext): 
 }
 
 const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
+  {
+    matches: (context) => {
+      if (!context.compiledFlow) return false;
+      const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
+      return Boolean(resolved.pipelineId || resolved.missionAction);
+    },
+    handle: async (context) => {
+      try {
+        return await handleGovernedExecutionHint(context);
+      } catch (error: any) {
+        return emptySurfaceResult(`Governed execution failed: ${error?.message || String(error)}`);
+      }
+    },
+  },
   {
     matches: (context) => Boolean(context.parsedSlackPrompt && context.parsedSlackPrompt.executionMode === 'conversation' && context.computedReceiver),
     handle: handleSlackConversationBypass,
