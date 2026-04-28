@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-domain-ontology.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "intents"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "intents": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/intentDomainEntry" }
+    }
+  },
+  "$defs": {
+    "reasoningRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "capability_tags", "fallback_allowed"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "surface_reply",
+            "tool_first_execution",
+            "multi_step_reasoning",
+            "divergent_analysis"
+          ]
+        },
+        "capability_tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "fallback_allowed": { "type": "boolean" }
+      }
+    },
+    "intentDomainEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intent_id",
+        "category",
+        "legacy_category",
+        "target",
+        "action",
+        "object",
+        "exposed_to_surface",
+        "execution_shape",
+        "mission_class",
+        "workflow_template",
+        "team_template",
+        "risk_profile",
+        "outcome_ids",
+        "actuator_requirements",
+        "readiness_required",
+        "evidence_required"
+      ],
+      "properties": {
+        "intent_id": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "enum": [
+            "outcome_execution",
+            "environment_setup",
+            "actuator_management",
+            "llm_reasoning_setup",
+            "knowledge_lifecycle",
+            "system_observability",
+            "mission_process",
+            "governance_control"
+          ]
+        },
+        "legacy_category": { "type": "string", "minLength": 1 },
+        "target": {
+          "type": "string",
+          "enum": [
+            "outcome",
+            "environment",
+            "actuator",
+            "llm",
+            "knowledge",
+            "system_state",
+            "mission_process",
+            "agent_team",
+            "external_service"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "change",
+            "inspect",
+            "diagnose",
+            "prepare",
+            "verify",
+            "activate",
+            "query",
+            "distill",
+            "organize",
+            "compose",
+            "delegate",
+            "execute",
+            "review",
+            "promote"
+          ]
+        },
+        "object": { "type": "string", "minLength": 1 },
+        "exposed_to_surface": { "type": "boolean" },
+        "execution_shape": {
+          "type": "string",
+          "enum": [
+            "direct_reply",
+            "task_session",
+            "mission",
+            "project_bootstrap",
+            "browser_session",
+            "pipeline",
+            "actuator_action"
+          ]
+        },
+        "mission_class": {
+          "type": "string",
+          "enum": [
+            "product_delivery",
+            "code_change",
+            "research_and_absorption",
+            "content_and_media",
+            "operations_and_release",
+            "environment_and_recovery",
+            "decision_support",
+            "customer_engagement",
+            "platform_onboarding"
+          ]
+        },
+        "workflow_template": { "type": "string", "minLength": 1 },
+        "team_template": { "type": "string", "minLength": 1 },
+        "risk_profile": {
+          "type": "string",
+          "enum": ["low", "review_required", "approval_required", "high_stakes"]
+        },
+        "outcome_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "actuator_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "readiness_required": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence_required": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reasoning_requirements": { "$ref": "#/$defs/reasoningRequirements" }
+      }
+    }
+  }
+}

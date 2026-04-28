@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-contract-selection-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "weights", "thresholds", "risk_controls"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "weights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_match", "success_rate", "recent_failure_penalty", "latency_cost"],
+      "properties": {
+        "rule_match": { "type": "number" },
+        "success_rate": { "type": "number" },
+        "recent_failure_penalty": { "type": "number" },
+        "latency_cost": { "type": "number" }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_sample_count_for_autoselect", "min_score_delta_for_override"],
+      "properties": {
+        "min_sample_count_for_autoselect": { "type": "integer", "minimum": 0 },
+        "min_score_delta_for_override": { "type": "number", "minimum": 0 }
+      }
+    },
+    "risk_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["high_stakes_requires_approval", "allow_fallback_when_no_memory"],
+      "properties": {
+        "high_stakes_requires_approval": { "type": "boolean" },
+        "allow_fallback_when_no_memory": { "type": "boolean" }
+      }
+    }
+  }
+}

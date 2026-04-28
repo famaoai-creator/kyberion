@@ -5,7 +5,7 @@
  * `knowledge/public/governance/independent-validation-evidence-package.md`.
  *
  * Usage:
- *   pnpm tsx scripts/export_validation_bundle.ts <MISSION_ID> [--output <dir>]
+ *   node dist/scripts/export_validation_bundle.js <MISSION_ID> [--output <dir>]
  *
  * The bundle is a directory tree (not yet a tar.gz — that is a packaging
  * concern best handled by the deploying organization). Layout:
@@ -356,7 +356,7 @@ function main(): number {
   const args = process.argv.slice(2);
   const missionId = args.find((a) => !a.startsWith('--'));
   if (!missionId) {
-    logger.error('Usage: pnpm tsx scripts/export_validation_bundle.ts <MISSION_ID> [--output <dir>]');
+    logger.error('Usage: node dist/scripts/export_validation_bundle.js <MISSION_ID> [--output <dir>]');
     return 1;
   }
   const outputIdx = args.indexOf('--output');
