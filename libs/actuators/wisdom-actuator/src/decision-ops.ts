@@ -22,6 +22,26 @@ import {
   evaluateArchitectureReadyGate,
   evaluateQaReadyGate,
   evaluateTaskPlanReadyGate,
+  consumeTenantBudget,
+  TenantRateLimitExceededError,
+  findRelevantDistilledKnowledge,
+  formatDistilledKnowledgeSummary,
+  recordActionItem,
+  listActionItems,
+  listOthersPending,
+  listOperatorSelfPending,
+  appendReminder,
+  updateActionItemStatus,
+  nextActionItemId,
+  matchRestrictedAction,
+  loadMeetingFacilitatorPolicy,
+  type ActionItem,
+  type ActionItemAssignee,
+  type ActionItemAssigneeKind,
+  type ActionItemModality,
+  type ActionItemReviewState,
+  type ActionItemProvenance,
+  type MeetingFacilitatorPolicy,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -932,7 +952,7 @@ export async function simulateAll(input: {
   manifest_path?: string;
   goal: string;
   output_dir: string;
-}): Promise<{ written_to: string }> {
+}): Promise<{ written_to: string; quality_written_to: string; quality_severity: 'ok' | 'warn' | 'poor' }> {
   const backend = getReasoningBackend();
   const manifest = input.manifest_path && safeExistsSync(pathResolver.rootResolve(input.manifest_path))
     ? readJSON<any>(input.manifest_path)
@@ -947,15 +967,986 @@ export async function simulateAll(input: {
     generated_by: backend.name,
     timestamp: nowIso(),
   };
-  const outPath = `${input.output_dir.replace(/\/$/, '')}/simulation-summary.json`;
+  const outDir = input.output_dir.replace(/\/$/, '');
+  const outPath = `${outDir}/simulation-summary.json`;
   writeJSON(outPath, summary);
-  return { written_to: outPath };
+
+  const quality = evaluateSimulationQuality(summary);
+  const qualityPath = `${outDir}/simulation-quality.json`;
+  writeJSON(qualityPath, quality);
+
+  return {
+    written_to: outPath,
+    quality_written_to: qualityPath,
+    quality_severity: quality.severity,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Meeting facilitation ops (G6 / new use case)
+//
+// extract_action_items / generate_facilitation_script / generate_reminder_message
+// drive the AI-runs-meetings flow. They use `backend.delegateTask` (which
+// every reasoning backend implements) so they work uniformly across stub /
+// claude-cli / claude-agent / anthropic / gemini-cli / codex-cli.
+// ---------------------------------------------------------------------------
+
+function extractFirstJsonBlock(text: string): unknown {
+  const trimmed = text.trim();
+  // Extract JSON inside a code fence first.
+  const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+  if (fenced) return JSON.parse(fenced[1]);
+  // Fallback: locate the first top-level {...} or [...].
+  const start = trimmed.search(/[\[{]/);
+  if (start === -1) throw new Error('no JSON block in delegateTask response');
+  const open = trimmed[start];
+  const close = open === '[' ? ']' : '}';
+  let depth = 0;
+  for (let i = start; i < trimmed.length; i++) {
+    if (trimmed[i] === open) depth += 1;
+    else if (trimmed[i] === close) {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(trimmed.slice(start, i + 1));
+    }
+  }
+  throw new Error('unbalanced JSON block in delegateTask response');
+}
+
+export async function extractActionItemsOp(input: {
+  mission_id: string;
+  transcript: string;
+  attendees?: Array<{
+    name: string;
+    person_slug?: string;
+    channel_handle?: string;
+    manager_handle?: string;
+  }>;
+  operator_label?: string;
+  default_assignee_label?: string;
+  language?: string;
+  default_max_reminders?: number;
+  /**
+   * Ops-3: when true, every extracted item is recorded with
+   * `partial_state=true` so it fail-closes self-execution / tracking
+   * until cleared. Set this when the upstream listen result reported
+   * `partial_state` (bridge timeout, dropped capture, empty transcript).
+   */
+  partial_state?: boolean;
+  partial_reason?: string;
+  /**
+   * Compliance-2: when true, run each item through the restricted-action-kinds
+   * policy and tag matches with `restricted` + `restriction_rule_id`. Defaults
+   * to true; supply false only for closed-loop tests.
+   */
+  enforce_restricted_actions?: boolean;
+}): Promise<{
+  items: ActionItem[];
+  written_count: number;
+  pending_review_count: number;
+  partial_count: number;
+  restricted_count: number;
+}> {
+  const backend = getReasoningBackend();
+  const operatorLabel = input.operator_label ?? 'Operator';
+  const attendees = input.attendees ?? [];
+  const attendeesBlock = attendees.length
+    ? attendees
+        .map(
+          (a) =>
+            `  - ${a.name}${a.person_slug ? ` (slug=${a.person_slug})` : ''}${
+              a.channel_handle ? ` (channel=${a.channel_handle})` : ''
+            }`,
+        )
+        .join('\n')
+    : '  (none provided)';
+  const language = input.language ?? 'auto';
+  const defaultMaxReminders = input.default_max_reminders ?? 5;
+  const prompt = [
+    'You analyze a meeting transcript and produce a JSON array of action items.',
+    '',
+    'Output rules:',
+    '- Output ONLY a JSON array. No prose. No code fence.',
+    '- Each item: { "title": str (≤120 chars, imperative), "summary": str?, "assignee_label": str, "assignee_kind": "operator_self"|"team_member"|"external"|"unassigned", "priority": "must"|"should"|"could"|"wont", "due_at_iso": str?, "modality": "declarative"|"conditional"|"hypothetical"|"rhetorical"|"humor", "speaker_label": str, "transcript_excerpt": str (≤240 chars, verbatim), "transcript_offset_lines": [int] }',
+    '',
+    `- assignee_kind = "operator_self" when the assignee matches "${operatorLabel}".`,
+    '- assignee_kind = "team_member" when the assignee is in the attendees list (not the operator).',
+    '- assignee_kind = "external" when the assignee is named but not in the attendee list.',
+    '- assignee_kind = "unassigned" when the action item has no clear owner.',
+    '',
+    'CRITICAL — modality classification (audit-load-bearing):',
+    '- "declarative"  : a clear commitment ("I will send X by Friday").',
+    '- "conditional"  : depends on a precondition not yet met ("if budget approves, then …").',
+    '- "hypothetical" : exploratory or thought-experiment ("we could try …", "what if we …").',
+    '- "rhetorical"   : framed as a question but not requesting action ("should we even do this?").',
+    '- "humor"        : a joke / sarcasm / reductio ad absurdum ("let\\u0027s just delete prod").',
+    'When modality != "declarative", the item lands in pending_speaker_review and will NOT be auto-executed or auto-tracked. Be conservative: if uncertain whether a sentence is a real commitment, label "conditional" or "hypothetical" rather than "declarative".',
+    '',
+    '- speaker_label: who actually uttered the words (one of the attendees, the operator, or "unknown").',
+    '- transcript_excerpt: a verbatim ≤ 240-char excerpt of the source line(s).',
+    '- transcript_offset_lines: 1-based line numbers in the transcript referenced by this item.',
+    '',
+    '- Capture imperatives, owners, and any deadlines; do not invent owners or deadlines that are not in the transcript.',
+    '',
+    'Attendees:',
+    attendeesBlock,
+    '',
+    'Transcript:',
+    input.transcript,
+    '',
+    `Language hint: ${language}.`,
+  ].join('\n');
+  const extractedAt = nowIso();
+  const raw = await backend.delegateTask(prompt, `mission=${input.mission_id}`);
+  let parsed: any[];
+  try {
+    parsed = extractFirstJsonBlock(raw) as any[];
+    if (!Array.isArray(parsed)) {
+      throw new Error('expected array');
+    }
+  } catch (err: any) {
+    logger.warn(`[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`);
+    return { items: [], written_count: 0, pending_review_count: 0 };
+  }
+
+  const operatorTokens = new Set([operatorLabel.toLowerCase(), 'operator', 'self', 'me']);
+  const validModalities = new Set(['declarative', 'conditional', 'hypothetical', 'rhetorical', 'humor']);
+  const items: ActionItem[] = [];
+  let i = 0;
+  let pendingReview = 0;
+  let restrictedCount = 0;
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object') continue;
+    const title = String(entry.title ?? '').trim();
+    if (title.length < 5) continue;
+    const assigneeLabel = String(
+      entry.assignee_label ?? input.default_assignee_label ?? 'unassigned',
+    ).trim() || 'unassigned';
+    let kind: ActionItemAssigneeKind =
+      entry.assignee_kind &&
+      ['operator_self', 'team_member', 'external', 'unassigned'].includes(entry.assignee_kind)
+        ? (entry.assignee_kind as ActionItemAssigneeKind)
+        : 'unassigned';
+    if (kind === 'unassigned' && operatorTokens.has(assigneeLabel.toLowerCase())) {
+      kind = 'operator_self';
+    }
+    const matchedAttendee = attendees.find(
+      (a) => a.name.toLowerCase() === assigneeLabel.toLowerCase(),
+    );
+    if (matchedAttendee && kind !== 'operator_self') {
+      kind = 'team_member';
+    }
+    const assignee: ActionItemAssignee = {
+      kind,
+      label: assigneeLabel,
+      ...(matchedAttendee?.person_slug ? { person_slug: matchedAttendee.person_slug } : {}),
+      ...(matchedAttendee?.channel_handle
+        ? { channel_handle: matchedAttendee.channel_handle }
+        : {}),
+    };
+    // HR-2 chain-of-command: lift the manager handle off the matched
+    // attendee record. The reminder dispatcher CCs this when priority
+    // is `must` or when the per-tenant policy demands manager visibility.
+    const managerHandle = matchedAttendee?.manager_handle;
+    const modality: ActionItemModality = validModalities.has(String(entry.modality))
+      ? (entry.modality as ActionItemModality)
+      : 'declarative';
+    const reviewState: ActionItemReviewState =
+      modality === 'declarative' ? 'auto_committed' : 'pending_speaker_review';
+    if (reviewState === 'pending_speaker_review') pendingReview += 1;
+    const provenance: ActionItemProvenance = {
+      ...(typeof entry.speaker_label === 'string' ? { speaker_label: entry.speaker_label } : {}),
+      ...(typeof entry.transcript_excerpt === 'string'
+        ? { transcript_excerpt: String(entry.transcript_excerpt).slice(0, 240) }
+        : {}),
+      ...(Array.isArray(entry.transcript_offset_lines)
+        ? {
+            transcript_offset_lines: entry.transcript_offset_lines
+              .map((n: unknown) => Number(n))
+              .filter((n: number) => Number.isFinite(n) && n > 0),
+          }
+        : {}),
+      extractor: {
+        backend: backend.name,
+        model: process.env.KYBERION_CLAUDE_CLI_MODEL || 'opus',
+        extracted_at: extractedAt,
+      },
+    };
+    i += 1;
+    const itemId = nextActionItemId(input.mission_id, `M${i}`);
+    // Compliance-2: classify against restricted-action-kinds policy.
+    const restrictedHit =
+      input.enforce_restricted_actions === false
+        ? null
+        : matchRestrictedAction({
+            title: title.slice(0, 120),
+            summary: typeof entry.summary === 'string' ? entry.summary : undefined,
+          });
+    if (restrictedHit) restrictedCount += 1;
+    const summaryParts: string[] = [];
+    if (typeof entry.summary === 'string') summaryParts.push(entry.summary);
+    if (input.partial_state && input.partial_reason) {
+      summaryParts.push(`[partial_state] ${input.partial_reason}`);
+    }
+    const policy: Record<string, unknown> = {};
+    if (input.partial_state) policy.partial_state = true;
+    if (restrictedHit) {
+      policy.restricted = true;
+      policy.restriction_rule_id = restrictedHit.id;
+    }
+    if (managerHandle) policy.manager_handle = managerHandle;
+    const recorded = recordActionItem({
+      item_id: itemId,
+      mission_id: input.mission_id,
+      title: title.slice(0, 120),
+      ...(summaryParts.length ? { summary: summaryParts.join('\n') } : {}),
+      assignee,
+      ...(entry.priority &&
+      ['must', 'should', 'could', 'wont'].includes(entry.priority)
+        ? { priority: entry.priority }
+        : {}),
+      ...(entry.due_at_iso ? { due_at: entry.due_at_iso } : {}),
+      modality,
+      review_state: reviewState,
+      provenance,
+      max_reminders: defaultMaxReminders,
+      ...(Object.keys(policy).length ? { policy } : {}),
+    });
+    items.push(recorded);
+  }
+  return {
+    items,
+    written_count: items.length,
+    pending_review_count: pendingReview,
+    partial_count: input.partial_state ? items.length : 0,
+    restricted_count: restrictedCount,
+  };
+}
+
+export async function generateFacilitationScriptOp(input: {
+  agenda?: string[];
+  current_topic?: string;
+  recent_transcript_chunk?: string;
+  remaining_minutes?: number;
+  facilitator_persona_label?: string;
+  language?: string;
+}): Promise<{ speech_text: string; next_action: 'continue_listen' | 'transition_topic' | 'wrap_up' | 'pause' }> {
+  const backend = getReasoningBackend();
+  const persona = input.facilitator_persona_label ?? 'a calm professional facilitator';
+  const remaining = input.remaining_minutes ?? 30;
+  const agendaBlock = (input.agenda ?? []).map((a, i) => `  ${i + 1}. ${a}`).join('\n') || '  (no agenda provided)';
+  const language = input.language ?? 'ja';
+  const prompt = [
+    `You generate the next short facilitation utterance for ${persona} in an online meeting.`,
+    'Output ONLY a JSON object: { "speech_text": str (≤ 2 sentences), "next_action": "continue_listen"|"transition_topic"|"wrap_up"|"pause" }',
+    'No prose, no code fence.',
+    `Language: ${language}. Be concise. Do not name people unless the transcript names them. Do not introduce facts not in the transcript.`,
+    '',
+    'Agenda:',
+    agendaBlock,
+    '',
+    `Current topic: ${input.current_topic ?? '(unspecified)'}`,
+    `Time remaining: ${remaining} minutes.`,
+    '',
+    'Recent transcript chunk:',
+    input.recent_transcript_chunk ?? '(silence so far)',
+  ].join('\n');
+  const raw = await backend.delegateTask(prompt, 'meeting-facilitation');
+  try {
+    const parsed = extractFirstJsonBlock(raw) as any;
+    const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
+    const next =
+      parsed.next_action &&
+      ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
+        ? parsed.next_action
+        : 'continue_listen';
+    return { speech_text: speech, next_action: next };
+  } catch (err: any) {
+    logger.warn(`[generate_facilitation_script] parse failed: ${err?.message ?? err}`);
+    return { speech_text: '', next_action: 'continue_listen' };
+  }
+}
+
+/**
+ * Compliance-2 approval gate.
+ *
+ * Partition pending items into `allowed` (free to proceed) and
+ * `blocked` (restricted + not approved + no sudo). The caller marks
+ * blocked items as `blocked` in the store and proceeds to dispatch
+ * the rest. Pure function so the dispatch loop is testable.
+ */
+export function applyRestrictedActionGate(
+  items: ActionItem[],
+  opts: { approved_item_ids: ReadonlySet<string>; sudo_override: boolean },
+): {
+  allowed: ActionItem[];
+  blocked: Array<{
+    item: ActionItem;
+    rule_id?: string;
+    reason: string;
+  }>;
+} {
+  const allowed: ActionItem[] = [];
+  const blocked: Array<{ item: ActionItem; rule_id?: string; reason: string }> = [];
+  for (const item of items) {
+    if (
+      item.policy?.restricted &&
+      !opts.sudo_override &&
+      !opts.approved_item_ids.has(item.item_id)
+    ) {
+      const ruleId = item.policy?.restriction_rule_id;
+      blocked.push({
+        item,
+        ...(ruleId ? { rule_id: ruleId } : {}),
+        reason: `restricted-action-kinds gate: rule=${ruleId ?? 'unknown'}; set KYBERION_RESTRICTED_APPROVED_ITEMS or KYBERION_SUDO to release`,
+      });
+      continue;
+    }
+    allowed.push(item);
+  }
+  return { allowed, blocked };
+}
+
+/**
+ * Execute every operator_self pending item: gate restricted items,
+ * then for each allowed item, mark in_progress, delegate the plan to
+ * the reasoning backend, and transition to completed (or blocked on
+ * failure). Returns a structured report; mutates the action-item
+ * store via `updateActionItemStatus`.
+ */
+export async function executeSelfActionItemsOp(input: {
+  mission_id: string;
+  language?: string;
+  policy?: MeetingFacilitatorPolicy;
+}): Promise<{
+  mission_id: string;
+  dispatched: Array<{ item_id: string; title: string; plan: string }>;
+  skipped_restricted: Array<{ item_id: string; title: string; restriction_rule_id?: string }>;
+  generated_at: string;
+}> {
+  const language = input.language ?? 'ja';
+  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
+  const pending = listOperatorSelfPending(input.mission_id);
+  const { allowed, blocked } = applyRestrictedActionGate(pending, {
+    approved_item_ids: policy.restricted_approved_item_ids,
+    sudo_override: policy.sudo_override,
+  });
+  const skippedRestricted = blocked.map(({ item, rule_id, reason }) => {
+    updateActionItemStatus({
+      mission_id: input.mission_id,
+      item_id: item.item_id,
+      status: 'blocked',
+      execution: { executed_via: 'agent_delegate', result_summary: reason },
+    });
+    return {
+      item_id: item.item_id,
+      title: item.title,
+      ...(rule_id ? { restriction_rule_id: rule_id } : {}),
+    };
+  });
+
+  const backend = getReasoningBackend();
+  const dispatched: Array<{ item_id: string; title: string; plan: string }> = [];
+  for (const item of allowed) {
+    updateActionItemStatus({
+      mission_id: input.mission_id,
+      item_id: item.item_id,
+      status: 'in_progress',
+    });
+    let plan = '';
+    try {
+      plan = await backend.delegateTask(
+        [
+          `You are dispatching an action item to the operator. Output ONLY a JSON object: { "plan": str (≤ 5 sentences), "completion_summary": str (≤ 3 sentences) }.`,
+          `No prose, no code fence. Language: ${language}.`,
+          `Action item title: "${item.title}".`,
+          item.summary ? `Summary: ${item.summary}` : '',
+          item.due_at ? `Due: ${item.due_at}.` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        `self-exec:${item.item_id}`,
+      );
+      let summary = '';
+      try {
+        const parsed = extractFirstJsonBlock(plan) as any;
+        if (typeof parsed.completion_summary === 'string') summary = parsed.completion_summary;
+        if (typeof parsed.plan === 'string') plan = parsed.plan;
+      } catch {
+        /* keep raw plan */
+      }
+      updateActionItemStatus({
+        mission_id: input.mission_id,
+        item_id: item.item_id,
+        status: 'completed',
+        execution: {
+          executed_via: 'agent_delegate',
+          execution_ref: `delegateTask:self-exec:${item.item_id}`,
+          ...(summary ? { result_summary: summary } : {}),
+        },
+      });
+    } catch (err: any) {
+      updateActionItemStatus({
+        mission_id: input.mission_id,
+        item_id: item.item_id,
+        status: 'blocked',
+        execution: {
+          executed_via: 'agent_delegate',
+          result_summary: `delegateTask failed: ${err?.message ?? err}`,
+        },
+      });
+    }
+    dispatched.push({ item_id: item.item_id, title: item.title, plan });
+  }
+  return {
+    mission_id: input.mission_id,
+    dispatched,
+    skipped_restricted: skippedRestricted,
+    generated_at: nowIso(),
+  };
+}
+
+/**
+ * Track every team_member pending item: per-item, generate a reminder
+ * message, persist it as a `primary` reminder, and append `cc_manager`
+ * reminders for any HR-2 escalation channel returned by
+ * `generateReminderMessageOp`. Returns the report; mutates the store.
+ */
+export async function trackPendingActionItemsOp(input: {
+  mission_id: string;
+  tone?: 'friendly' | 'formal' | 'urgent';
+  language?: string;
+  max_items?: number;
+  policy?: MeetingFacilitatorPolicy;
+}): Promise<{
+  mission_id: string;
+  scanned: number;
+  reminded: Array<{
+    item_id: string;
+    channel: string;
+    days_overdue: number;
+    cc?: string[];
+  }>;
+  generated_at: string;
+}> {
+  const tone = input.tone ?? 'friendly';
+  const language = input.language ?? 'ja';
+  const maxItems = input.max_items ?? 20;
+  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
+  const pending = listOthersPending(input.mission_id).slice(0, maxItems);
+  const now = new Date();
+  const reminded: Array<{
+    item_id: string;
+    channel: string;
+    days_overdue: number;
+    cc?: string[];
+  }> = [];
+  for (const item of pending) {
+    const dueAt = item.due_at ? new Date(item.due_at) : null;
+    const daysOverdue = dueAt
+      ? Math.max(0, Math.floor((now.getTime() - dueAt.getTime()) / (24 * 60 * 60 * 1000)))
+      : 0;
+    const reminder = await generateReminderMessageOp({
+      item,
+      days_overdue: daysOverdue,
+      tone,
+      language,
+      policy,
+    });
+    appendReminder({
+      mission_id: input.mission_id,
+      item_id: item.item_id,
+      reminder: {
+        sent_at: now.toISOString(),
+        channel: reminder.channel,
+        message: reminder.text,
+        relationship: 'primary',
+      },
+    });
+    if (reminder.cc && reminder.cc.length) {
+      for (const ccChannel of reminder.cc) {
+        appendReminder({
+          mission_id: input.mission_id,
+          item_id: item.item_id,
+          reminder: {
+            sent_at: now.toISOString(),
+            channel: ccChannel,
+            message: reminder.text,
+            relationship: 'cc_manager',
+          },
+        });
+      }
+    }
+    reminded.push({
+      item_id: item.item_id,
+      channel: reminder.channel,
+      days_overdue: daysOverdue,
+      ...(reminder.cc && reminder.cc.length ? { cc: reminder.cc } : {}),
+    });
+  }
+  return {
+    mission_id: input.mission_id,
+    scanned: pending.length,
+    reminded,
+    generated_at: nowIso(),
+  };
+}
+
+/**
+ * HR-3 speaker fairness audit. Aggregates `provenance.speaker_label`
+ * across the mission and emits a share-of-voice report. Pure read —
+ * does not mutate the store. Defaults the dominance thresholds to
+ * the values from the meeting-facilitator outcome simulation; callers
+ * can override (per-tenant configurations).
+ */
+export interface SpeakerFairnessReport {
+  mission_id: string;
+  total_items: number;
+  attributed_items: number;
+  unattributed_items: number;
+  distribution: Array<{
+    speaker: string;
+    total: number;
+    must: number;
+    share_total: number;
+    share_must: number;
+  }>;
+  dominant_speaker: string | null;
+  warn: boolean;
+  warn_reason: string | null;
+  generated_at: string;
+}
+
+export function auditSpeakerFairnessOp(input: {
+  mission_id: string;
+  policy?: MeetingFacilitatorPolicy;
+  /** Per-call override; takes precedence over `policy.speaker_fairness_total_threshold`. */
+  total_threshold?: number;
+  /** Per-call override; takes precedence over `policy.speaker_fairness_must_threshold`. */
+  must_threshold?: number;
+}): SpeakerFairnessReport {
+  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
+  const items = listActionItems(input.mission_id);
+  const counts: Record<string, { total: number; must: number }> = {};
+  let totalAttributed = 0;
+  let mustAttributed = 0;
+  for (const it of items) {
+    const speaker = it.provenance?.speaker_label?.trim();
+    if (!speaker) continue;
+    if (!counts[speaker]) counts[speaker] = { total: 0, must: 0 };
+    counts[speaker].total += 1;
+    totalAttributed += 1;
+    if (it.priority === 'must') {
+      counts[speaker].must += 1;
+      mustAttributed += 1;
+    }
+  }
+  const distribution = Object.entries(counts)
+    .map(([speaker, c]) => ({
+      speaker,
+      total: c.total,
+      must: c.must,
+      share_total: totalAttributed ? c.total / totalAttributed : 0,
+      share_must: mustAttributed ? c.must / mustAttributed : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+  const dominant = distribution[0];
+  const totalThreshold = input.total_threshold ?? policy.speaker_fairness_total_threshold;
+  const mustThreshold = input.must_threshold ?? policy.speaker_fairness_must_threshold;
+  const warn = Boolean(
+    dominant &&
+      (dominant.share_total > totalThreshold || dominant.share_must > mustThreshold),
+  );
+  return {
+    mission_id: input.mission_id,
+    total_items: items.length,
+    attributed_items: totalAttributed,
+    unattributed_items: items.length - totalAttributed,
+    distribution,
+    dominant_speaker: dominant?.speaker ?? null,
+    warn,
+    warn_reason: warn
+      ? `dominant speaker '${dominant!.speaker}' has share_total=${dominant!.share_total.toFixed(2)}, share_must=${dominant!.share_must.toFixed(2)}`
+      : null,
+    generated_at: nowIso(),
+  };
+}
+
+export async function generateReminderMessageOp(input: {
+  item: ActionItem;
+  days_overdue?: number;
+  tone?: 'friendly' | 'formal' | 'urgent';
+  language?: string;
+  policy?: MeetingFacilitatorPolicy;
+}): Promise<{ channel: string; text: string; cc?: string[] }> {
+  const backend = getReasoningBackend();
+  const tone = input.tone ?? 'friendly';
+  const language = input.language ?? 'ja';
+  const channel = input.item.assignee.channel_handle ?? 'unspecified';
+  const overdue = input.days_overdue ?? 0;
+  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
+  const prompt = [
+    'You draft a SHORT reminder message about an outstanding action item.',
+    'Output ONLY a JSON object: { "text": str (≤ 3 sentences) }',
+    'No prose, no code fence.',
+    `Tone: ${tone}. Language: ${language}.`,
+    `Recipient label: ${input.item.assignee.label}.`,
+    `Action item: "${input.item.title}".`,
+    input.item.due_at ? `Original due: ${input.item.due_at}.` : 'No firm deadline was set.',
+    overdue > 0 ? `Days overdue: ${overdue}.` : 'Not yet overdue, this is a check-in.',
+    'Do not threaten escalation. Do not invent context. Suggest one concrete next step.',
+  ].join('\n');
+  const raw = await backend.delegateTask(prompt, `reminder:${input.item.item_id}`);
+  let text = '';
+  try {
+    const parsed = extractFirstJsonBlock(raw) as any;
+    text = typeof parsed.text === 'string' ? parsed.text : '';
+  } catch {
+    // Fall back to a deterministic template if parse fails.
+    text = `Reminder: ${input.item.title}.${input.item.due_at ? ` Original due ${input.item.due_at}.` : ''}`;
+  }
+  // HR-2 chain-of-command: CC the manager handle when priority=must,
+  // when the recipient has missed the reminder several times, or when
+  // the action item is restricted. Threshold lives in the
+  // MeetingFacilitatorPolicy (defaults to 3 from the env var).
+  const cc: string[] = [];
+  const managerHandle = input.item.policy?.manager_handle;
+  if (managerHandle) {
+    const sent = input.item.reminders?.length ?? 0;
+    const shouldCc =
+      input.item.priority === 'must' ||
+      input.item.policy?.restricted === true ||
+      sent >= policy.reminder_cc_after_n;
+    if (shouldCc) cc.push(managerHandle);
+  }
+  return { channel, text, ...(cc.length ? { cc } : {}) };
+}
+
+/**
+ * Run `simulate_all` N times against the same manifest and aggregate the
+ * outcomes into an ensemble report. Addresses IP-3 (Counterfactual ensemble
+ * layer): one shot is non-deterministic; N shots let the operator see the
+ * distribution of outcomes and reason about it.
+ *
+ * Each individual run is persisted alongside the ensemble summary so the
+ * trail is auditable. The ensemble file also carries the convergence
+ * report from `evaluateEnsembleConvergence` (IP-4).
+ */
+export async function simulateAllEnsemble(input: {
+  manifest_path?: string;
+  goal: string;
+  output_dir: string;
+  runs: number;
+  convergence_threshold?: number;
+}): Promise<{
+  ensemble_written_to: string;
+  individual_runs_dir: string;
+  convergence_severity: 'ok' | 'warn' | 'poor';
+  divergent_outcomes_warning: boolean;
+}> {
+  if (!Number.isInteger(input.runs) || input.runs < 2) {
+    throw new Error('[simulateAllEnsemble] runs must be an integer >= 2');
+  }
+  const outDir = input.output_dir.replace(/\/$/, '');
+  const runsDir = `${outDir}/ensemble-runs`;
+  safeMkdir(pathResolver.rootResolve(runsDir), { recursive: true });
+
+  const runs: any[] = [];
+  for (let i = 0; i < input.runs; i++) {
+    const runOutDir = `${runsDir}/run-${i + 1}`;
+    safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
+    const result = await simulateAll({
+      ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
+      goal: input.goal,
+      output_dir: runOutDir,
+    });
+    const summaryPath = result.written_to;
+    runs.push({
+      run_index: i + 1,
+      summary_path: summaryPath,
+      quality_severity: result.quality_severity,
+      summary: readJSON<any>(summaryPath),
+    });
+  }
+
+  const convergence = evaluateEnsembleConvergence({
+    runs: runs.map((r) => r.summary),
+    threshold: input.convergence_threshold ?? 0.6,
+  });
+
+  const ensemble = {
+    goal: input.goal,
+    runs: runs.length,
+    individual: runs.map((r) => ({
+      run_index: r.run_index,
+      summary_path: r.summary_path,
+      quality_severity: r.quality_severity,
+    })),
+    convergence,
+    timestamp: nowIso(),
+  };
+  const ensemblePath = `${outDir}/simulation-ensemble.json`;
+  writeJSON(ensemblePath, ensemble);
+
+  return {
+    ensemble_written_to: ensemblePath,
+    individual_runs_dir: runsDir,
+    convergence_severity: convergence.severity,
+    divergent_outcomes_warning: convergence.divergent_outcomes_warning,
+  };
+}
+
+/**
+ * Compute outcome convergence across an ensemble of `simulation-summary.json`
+ * shapes (IP-4 — Uncertainty Quantification).
+ *
+ * For each branch_id present in the union of runs, count how often it
+ * resolved to the same outcome category (`failure` / `success` / `pending`).
+ * Convergence score for that branch = max-count / total-runs (1.0 = full
+ * agreement). The ensemble convergence is the mean of per-branch scores.
+ *
+ * The rubric also raises `divergent_outcomes_warning` if mean < threshold,
+ * letting the operator-facing layer surface the uncertainty as
+ * "this analysis did not converge across reruns" rather than presenting
+ * a single non-deterministic answer.
+ */
+export interface EnsembleConvergenceReport {
+  severity: 'ok' | 'warn' | 'poor';
+  mean_convergence: number;
+  threshold: number;
+  divergent_outcomes_warning: boolean;
+  per_branch: Array<{
+    branch_id: string;
+    runs_seen: number;
+    outcome_counts: { failure: number; success: number; pending: number };
+    dominant_outcome: 'failure' | 'success' | 'pending' | 'tie';
+    convergence: number;
+  }>;
+  generated_at: string;
+}
+
+export function evaluateEnsembleConvergence(input: {
+  runs: Array<{
+    branches?: Array<{
+      branch_id: string;
+      first_failure_mode: string | null;
+      first_success_mode: string | null;
+    }>;
+  }>;
+  threshold?: number;
+}): EnsembleConvergenceReport {
+  const threshold = input.threshold ?? 0.6;
+  const runs = input.runs ?? [];
+  // For each branch_id, how many times did each outcome category appear?
+  const buckets = new Map<string, { failure: number; success: number; pending: number }>();
+  for (const run of runs) {
+    for (const b of run.branches ?? []) {
+      const bucket = buckets.get(b.branch_id) ?? { failure: 0, success: 0, pending: 0 };
+      if (b.first_failure_mode) bucket.failure += 1;
+      else if (b.first_success_mode) bucket.success += 1;
+      else bucket.pending += 1;
+      buckets.set(b.branch_id, bucket);
+    }
+  }
+  const total = runs.length || 1;
+  const perBranch: EnsembleConvergenceReport['per_branch'] = [];
+  for (const [branchId, counts] of buckets) {
+    const seen = counts.failure + counts.success + counts.pending;
+    const max = Math.max(counts.failure, counts.success, counts.pending);
+    let dominant: 'failure' | 'success' | 'pending' | 'tie' = 'tie';
+    const ties = ['failure', 'success', 'pending'].filter(
+      (k) => (counts as any)[k] === max,
+    );
+    if (ties.length === 1) dominant = ties[0] as any;
+    perBranch.push({
+      branch_id: branchId,
+      runs_seen: seen,
+      outcome_counts: { ...counts },
+      dominant_outcome: dominant,
+      convergence: total > 0 ? max / total : 0,
+    });
+  }
+  const meanConvergence = perBranch.length === 0
+    ? 1
+    : perBranch.reduce((acc, b) => acc + b.convergence, 0) / perBranch.length;
+  const divergentWarning = meanConvergence < threshold;
+  const severity: 'ok' | 'warn' | 'poor' = perBranch.length === 0
+    ? 'poor'
+    : meanConvergence >= threshold
+      ? 'ok'
+      : meanConvergence >= threshold / 2
+        ? 'warn'
+        : 'poor';
+  return {
+    severity,
+    mean_convergence: Number(meanConvergence.toFixed(4)),
+    threshold,
+    divergent_outcomes_warning: divergentWarning,
+    per_branch: perBranch.sort((a, b) => a.branch_id.localeCompare(b.branch_id)),
+    generated_at: nowIso(),
+  };
+}
+
+/**
+ * Sanity / quality rubric for a counterfactual `simulation-summary.json`.
+ *
+ * Applies six deterministic checks on top of the LLM-produced output to
+ * surface non-determinism, persona imbalance, or vacuous results — none of
+ * which the underlying reasoning model can be relied on to self-detect.
+ *
+ * Severity levels:
+ *   - `ok`    : every check passes
+ *   - `warn`  : at least one soft check failed (worth review, not blocking)
+ *   - `poor`  : at least one hard check failed (treat the simulation as
+ *               unreliable; re-run with a stronger model or smaller scope)
+ */
+export interface SimulationQualityReport {
+  severity: 'ok' | 'warn' | 'poor';
+  branch_count: number;
+  checks: Array<{
+    id: string;
+    severity: 'soft' | 'hard';
+    passed: boolean;
+    detail: string;
+  }>;
+  generated_at: string;
+}
+
+export function evaluateSimulationQuality(summary: {
+  goal: string;
+  branches: Array<{
+    branch_id: string;
+    hypothesis_ref: string;
+    first_failure_mode: string | null;
+    first_success_mode: string | null;
+    terminated_at_step: number | null;
+  }>;
+}): SimulationQualityReport {
+  const branches = summary.branches ?? [];
+  const checks: SimulationQualityReport['checks'] = [];
+
+  // Hard 1 — there must be at least one branch.
+  checks.push({
+    id: 'has_branches',
+    severity: 'hard',
+    passed: branches.length > 0,
+    detail: branches.length > 0
+      ? `${branches.length} branches simulated`
+      : 'simulation produced zero branches',
+  });
+
+  // Hard 2 — no branch may report both a failure and a success mode (logical XOR).
+  const xorViolators = branches.filter(
+    (b) => b.first_failure_mode && b.first_success_mode,
+  );
+  checks.push({
+    id: 'failure_xor_success',
+    severity: 'hard',
+    passed: xorViolators.length === 0,
+    detail: xorViolators.length === 0
+      ? 'every branch has at most one terminal mode'
+      : `${xorViolators.length} branches report both failure and success modes (${xorViolators.map((b) => b.branch_id).join(', ')})`,
+  });
+
+  // Hard 3 — branch_id values must be unique.
+  const ids = branches.map((b) => b.branch_id);
+  const dupCount = ids.length - new Set(ids).size;
+  checks.push({
+    id: 'unique_branch_ids',
+    severity: 'hard',
+    passed: dupCount === 0,
+    detail: dupCount === 0
+      ? 'branch ids are unique'
+      : `${dupCount} duplicate branch_id values detected`,
+  });
+
+  // Soft 4 — at least one branch must reach a terminal mode (otherwise the
+  // simulation produced no usable signal).
+  const terminated = branches.filter(
+    (b) => b.first_failure_mode || b.first_success_mode,
+  );
+  checks.push({
+    id: 'reaches_terminal_mode',
+    severity: 'soft',
+    passed: terminated.length > 0,
+    detail: terminated.length > 0
+      ? `${terminated.length}/${branches.length} branches reached a terminal mode`
+      : 'no branch reached a terminal mode — simulation is vacuous',
+  });
+
+  // Soft 5 — outcome balance: if N>=3 branches and all terminated as
+  // failures (or all successes), the simulation may be biased.
+  let outcomeBalanced = true;
+  let outcomeDetail = 'fewer than 3 terminated branches — balance not assessed';
+  if (terminated.length >= 3) {
+    const failures = terminated.filter((b) => b.first_failure_mode).length;
+    const successes = terminated.filter((b) => b.first_success_mode).length;
+    if (failures === terminated.length || successes === terminated.length) {
+      outcomeBalanced = false;
+      outcomeDetail = `all ${terminated.length} terminated branches share the same outcome (${failures === terminated.length ? 'failure' : 'success'})`;
+    } else {
+      outcomeDetail = `outcomes split ${failures} fail / ${successes} success`;
+    }
+  }
+  checks.push({
+    id: 'outcome_balance',
+    severity: 'soft',
+    passed: outcomeBalanced,
+    detail: outcomeDetail,
+  });
+
+  // Soft 6 — termination depth: every terminated branch should report a
+  // non-zero `terminated_at_step` (zero usually means the model gave up
+  // immediately rather than simulating).
+  const zeroDepth = terminated.filter(
+    (b) => b.terminated_at_step !== null && b.terminated_at_step <= 0,
+  );
+  checks.push({
+    id: 'non_trivial_termination_depth',
+    severity: 'soft',
+    passed: zeroDepth.length === 0,
+    detail: zeroDepth.length === 0
+      ? 'all terminated branches reached at least one step'
+      : `${zeroDepth.length} branches terminated at step <= 0 (likely vacuous)`,
+  });
+
+  const hardFailed = checks.some((c) => c.severity === 'hard' && !c.passed);
+  const softFailed = checks.some((c) => c.severity === 'soft' && !c.passed);
+  const severity: 'ok' | 'warn' | 'poor' = hardFailed
+    ? 'poor'
+    : softFailed
+      ? 'warn'
+      : 'ok';
+
+  return {
+    severity,
+    branch_count: branches.length,
+    checks,
+    generated_at: nowIso(),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Dispatcher — routes wisdom: decision ops from the pipeline engine.
 // Returns ctx augmented with op output if export_as is provided.
 // ---------------------------------------------------------------------------
+
+/**
+ * Ops that consume reasoning-backend budget. Listed here so the
+ * dispatcher can apply per-tenant rate limiting before delegating.
+ */
+const RATE_LIMITED_OPS = new Set([
+  'a2a_fanout',
+  'cross_critique',
+  'synthesize_counterparty_persona',
+  'a2a_roleplay',
+  'fork_branches',
+  'simulate_all',
+  'simulate_all_ensemble',
+  'extract_requirements',
+  'extract_design_spec',
+  'extract_test_plan',
+  'decompose_into_tasks',
+]);
 
 export async function dispatchDecisionOp(
   op: string,
@@ -964,7 +1955,36 @@ export async function dispatchDecisionOp(
 ): Promise<{ handled: boolean; ctx: Ctx }> {
   const resolved = (k: string) => resolveVars(params[k], ctx);
   const exportAs = params.export_as;
-  const assign = (value: any): Ctx => (exportAs ? { ...ctx, [exportAs]: value } : ctx);
+  /**
+   * Behavior: if `export_as` is set, the entire result lands at
+   * `ctx[exportAs]`. Otherwise — if the result is a plain object —
+   * its keys are merged into `ctx` so subsequent steps can reference
+   * `{{key}}` directly. This was previously a silent-drop, which made
+   * pipeline templating surprising; the merge is strictly additive.
+   */
+  const assign = (value: any): Ctx => {
+    if (exportAs) return { ...ctx, [exportAs]: value };
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      return { ...ctx, ...(value as Record<string, unknown>) };
+    }
+    return ctx;
+  };
+
+  // Per-tenant rate limit gate (IP-29 / tenant-rate-limit-policy.json).
+  // If the active execution is bound to a tenant and the op is in the
+  // rate-limited set, deduct the cost from the tenant's bucket. On denial
+  // raise so the pipeline runner records the failure (rather than silently
+  // skipping the op).
+  if (RATE_LIMITED_OPS.has(op)) {
+    const decision = consumeTenantBudget({ op: `wisdom:${op}` });
+    if (!decision.allowed) {
+      throw new TenantRateLimitExceededError(decision, '');
+    }
+  }
 
   switch (op) {
     case 'stakeholder_grid_sort': {
@@ -1012,6 +2032,272 @@ export async function dispatchDecisionOp(
         title: resolved('title'),
       });
       return { handled: true, ctx: assign(result) };
+    }
+
+    case 'inject_prior_knowledge': {
+      const topic = resolved('topic') || '';
+      const tagsParam = resolved('tags');
+      const tags = Array.isArray(tagsParam) ? tagsParam : [];
+      const limit = Number(resolved('limit')) || 5;
+      const minScore = params.min_score !== undefined
+        ? Number(resolved('min_score'))
+        : 0.0001;
+      const entries = findRelevantDistilledKnowledge({
+        topic,
+        tags,
+        limit,
+        minScore,
+      });
+      const summary = entries.length === 0
+        ? '(no relevant prior distilled knowledge found)'
+        : entries.map((e) => formatDistilledKnowledgeSummary(e)).join('\n');
+      const outputPath = resolved('output_path');
+      if (outputPath) {
+        writeJSON(outputPath, {
+          topic,
+          tags,
+          limit,
+          entries,
+          summary,
+          generated_at: nowIso(),
+        });
+      }
+      return {
+        handled: true,
+        ctx: assign({
+          prior_knowledge_entries: entries,
+          prior_knowledge_summary: summary,
+          prior_knowledge_count: entries.length,
+          ...(outputPath ? { written_to: outputPath } : {}),
+        }),
+      };
+    }
+
+    case 'extract_action_items': {
+      const transcriptPath = resolved('transcript_path');
+      const transcript = transcriptPath
+        ? (safeReadFile(pathResolver.rootResolve(transcriptPath), { encoding: 'utf8' }) as string)
+        : (resolved('transcript') as string) || '';
+      // Resolve `attendees` template; fall back to context value or empty.
+      const attendeesResolved = resolved('attendees');
+      const attendees = Array.isArray(attendeesResolved)
+        ? attendeesResolved
+        : Array.isArray(ctx[params.attendees_from || 'attendees'])
+          ? (ctx[params.attendees_from || 'attendees'] as any[])
+          : [];
+      // Ops-3: propagate partial_state from the upstream listen step.
+      // Two channels are supported: (a) explicit params, (b) the
+      // listen_result object that meeting-actuator pushes into ctx.
+      const listenResult = ctx['listen_result'] || ctx['meeting_listen_result'];
+      const partialFromCtx =
+        listenResult && typeof listenResult === 'object'
+          ? Boolean((listenResult as any).partial_state)
+          : false;
+      const partialReasonFromCtx =
+        listenResult && typeof listenResult === 'object'
+          ? ((listenResult as any).partial_reason as string | undefined)
+          : undefined;
+      const partialState =
+        params.partial_state !== undefined
+          ? Boolean(resolved('partial_state'))
+          : partialFromCtx;
+      const partialReason =
+        params.partial_reason !== undefined
+          ? String(resolved('partial_reason') ?? '')
+          : partialReasonFromCtx;
+      const result = await extractActionItemsOp({
+        mission_id: resolved('mission_id') || process.env.MISSION_ID || '',
+        transcript,
+        attendees,
+        ...(params.operator_label
+          ? { operator_label: resolved('operator_label') }
+          : {}),
+        ...(params.default_assignee_label
+          ? { default_assignee_label: resolved('default_assignee_label') }
+          : {}),
+        ...(params.language ? { language: resolved('language') } : {}),
+        ...(partialState ? { partial_state: true } : {}),
+        ...(partialReason ? { partial_reason: partialReason } : {}),
+        ...(params.enforce_restricted_actions !== undefined
+          ? { enforce_restricted_actions: Boolean(resolved('enforce_restricted_actions')) }
+          : {}),
+      });
+      const outputPath = resolved('output_path');
+      if (outputPath) {
+        writeJSON(outputPath, {
+          items: result.items,
+          written_count: result.written_count,
+          partial_count: result.partial_count,
+          restricted_count: result.restricted_count,
+          generated_at: nowIso(),
+        });
+      }
+      return {
+        handled: true,
+        ctx: assign({
+          extracted_action_items: result.items,
+          action_item_count: result.written_count,
+          partial_action_item_count: result.partial_count,
+          restricted_action_item_count: result.restricted_count,
+          ...(outputPath ? { written_to: outputPath } : {}),
+        }),
+      };
+    }
+
+    case 'generate_facilitation_script': {
+      const result = await generateFacilitationScriptOp({
+        agenda: Array.isArray(params.agenda) ? params.agenda : undefined,
+        ...(params.current_topic ? { current_topic: resolved('current_topic') } : {}),
+        ...(params.recent_transcript_chunk
+          ? { recent_transcript_chunk: resolved('recent_transcript_chunk') }
+          : {}),
+        ...(params.remaining_minutes !== undefined
+          ? { remaining_minutes: Number(resolved('remaining_minutes')) }
+          : {}),
+        ...(params.facilitator_persona_label
+          ? { facilitator_persona_label: resolved('facilitator_persona_label') }
+          : {}),
+        ...(params.language ? { language: resolved('language') } : {}),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'generate_reminder_message': {
+      const item = params.item ?? ctx[params.item_from || 'item'];
+      if (!item || typeof item !== 'object') {
+        throw new Error('generate_reminder_message: missing params.item (ActionItem)');
+      }
+      const result = await generateReminderMessageOp({
+        item: item as ActionItem,
+        ...(params.days_overdue !== undefined
+          ? { days_overdue: Number(resolved('days_overdue')) }
+          : {}),
+        ...(params.tone ? { tone: resolved('tone') } : {}),
+        ...(params.language ? { language: resolved('language') } : {}),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'execute_self_action_items': {
+      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
+      if (!missionId) {
+        throw new Error('execute_self_action_items: mission_id is required');
+      }
+      const result = await executeSelfActionItemsOp({
+        mission_id: missionId,
+        language: resolved('language') || 'ja',
+      });
+      const outputPath = resolved('output_path');
+      const report = {
+        mission_id: result.mission_id,
+        dispatched: result.dispatched.length,
+        skipped_restricted: result.skipped_restricted.length,
+        items: result.dispatched,
+        skipped_items: result.skipped_restricted,
+        generated_at: result.generated_at,
+      };
+      if (outputPath) writeJSON(outputPath, report);
+      return {
+        handled: true,
+        ctx: assign({
+          ...(outputPath ? { written_to: outputPath } : {}),
+          dispatched_count: result.dispatched.length,
+          skipped_restricted_count: result.skipped_restricted.length,
+        }),
+      };
+    }
+
+    case 'track_pending_action_items': {
+      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
+      if (!missionId) {
+        throw new Error('track_pending_action_items: mission_id is required');
+      }
+      const result = await trackPendingActionItemsOp({
+        mission_id: missionId,
+        tone: (resolved('tone') as 'friendly' | 'formal' | 'urgent' | undefined) ?? 'friendly',
+        language: resolved('language') || 'ja',
+        max_items: Number(resolved('max_items')) || 20,
+      });
+      const outputPath = resolved('output_path');
+      const report = {
+        mission_id: result.mission_id,
+        scanned: result.scanned,
+        reminded: result.reminded.length,
+        items: result.reminded,
+        generated_at: result.generated_at,
+      };
+      if (outputPath) writeJSON(outputPath, report);
+      return {
+        handled: true,
+        ctx: assign({
+          ...(outputPath ? { written_to: outputPath } : {}),
+          reminded_count: result.reminded.length,
+          scanned_count: result.scanned,
+        }),
+      };
+    }
+
+    case 'audit_speaker_fairness': {
+      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
+      if (!missionId) {
+        throw new Error('audit_speaker_fairness: mission_id is required');
+      }
+      const report = auditSpeakerFairnessOp({ mission_id: missionId });
+      const outputPath = resolved('output_path');
+      if (outputPath) writeJSON(outputPath, report);
+      return {
+        handled: true,
+        ctx: assign({
+          ...(outputPath ? { written_to: outputPath } : {}),
+          speaker_fairness_warn: report.warn,
+          dominant_speaker: report.dominant_speaker,
+        }),
+      };
+    }
+
+    case 'evaluate_simulation_quality': {
+      const sourcePath = resolved('source') || resolved('source_path');
+      const outputPath = resolved('output_path');
+      const summary = readJSON<any>(sourcePath);
+      const report = evaluateSimulationQuality(summary);
+      writeJSON(outputPath, report);
+      return { handled: true, ctx: assign({ written_to: outputPath, severity: report.severity }) };
+    }
+
+    case 'simulate_all_ensemble': {
+      const result = await simulateAllEnsemble({
+        ...(resolved('manifest_path') ? { manifest_path: resolved('manifest_path') } : {}),
+        goal: resolved('goal'),
+        output_dir: resolved('output_dir'),
+        runs: Number(resolved('runs')) || Number(params.runs) || 3,
+        ...(params.convergence_threshold !== undefined
+          ? { convergence_threshold: Number(resolved('convergence_threshold')) }
+          : {}),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'evaluate_ensemble_convergence': {
+      const sourcePaths: string[] = Array.isArray(params.sources)
+        ? params.sources.map((p: string) => resolveVars(p, ctx))
+        : [];
+      const runs = sourcePaths.map((p) => readJSON<any>(p));
+      const threshold = params.threshold !== undefined ? Number(resolved('threshold')) : undefined;
+      const report = evaluateEnsembleConvergence({
+        runs,
+        ...(threshold !== undefined ? { threshold } : {}),
+      });
+      const outputPath = resolved('output_path');
+      if (outputPath) writeJSON(outputPath, report);
+      return {
+        handled: true,
+        ctx: assign({
+          ...(outputPath ? { written_to: outputPath } : {}),
+          severity: report.severity,
+          mean_convergence: report.mean_convergence,
+          divergent_outcomes_warning: report.divergent_outcomes_warning,
+        }),
+      };
     }
 
     case 'compute_readiness_matrix': {

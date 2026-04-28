@@ -15,10 +15,12 @@ const ENV_WHITELIST = [
   'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
   'http_proxy', 'https_proxy', 'no_proxy',
 ];
-function safeEnv(): Record<string, string> {
+function safeEnv(): NodeJS.ProcessEnv {
+  // Locally a relaxed map; cast at the boundary so callers see ProcessEnv
+  // (Next 15 augmentation requires NODE_ENV; we treat that as opaque here).
   const env: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
   for (const k of ENV_WHITELIST) { if (process.env[k]) env[k] = process.env[k] as string; }
-  return env;
+  return env as unknown as NodeJS.ProcessEnv;
 }
 
 /** Walk up from cwd to find the project root (contains AGENTS.md) */

@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/cross-device-handoff.schema.json",
+  "title": "Cross-Device Handoff Envelope",
+  "description": "Canonical envelope for handing off runtime session state between Kyberion-managed surfaces (web browser, iOS WebView, Android WebView). The envelope is what export_session_handoff produces and import_session_handoff consumes. The schema is intentionally minimal — surface-specific details live under `surface_state` and are validated by the originating actuator.",
+  "type": "object",
+  "required": [
+    "envelope_version",
+    "handoff_id",
+    "issued_at",
+    "expires_at",
+    "source_surface",
+    "target_surface",
+    "mission_ref",
+    "surface_state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "envelope_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Schema version; bump when breaking the envelope shape."
+    },
+    "handoff_id": {
+      "type": "string",
+      "pattern": "^HOF-[A-Z0-9-]{6,40}$",
+      "description": "Unique handoff identifier; emitted in audit-chain on both export and import."
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the source surface produced the envelope."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Beyond this time the envelope must be rejected by importers; bound the credential exposure window."
+    },
+    "source_surface": {
+      "$ref": "#/definitions/surface"
+    },
+    "target_surface": {
+      "$ref": "#/definitions/surface"
+    },
+    "mission_ref": {
+      "type": "string",
+      "pattern": "^MSN-[A-Z0-9-]+$",
+      "description": "The mission whose state is being handed off; importer attaches the imported envelope as evidence on the same mission."
+    },
+    "principal": {
+      "type": "object",
+      "description": "Identity that authorized the handoff. Required when handing off authenticated session state.",
+      "required": ["persona", "authority_role"],
+      "properties": {
+        "persona": { "type": "string" },
+        "authority_role": { "type": "string" },
+        "scope_classes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "surface_state": {
+      "type": "object",
+      "description": "Surface-specific opaque payload. Validated by the originating actuator's own schema. Importers MUST refuse if `surface_state.contract_ref` does not match a known contract.",
+      "required": ["contract_ref"],
+      "properties": {
+        "contract_ref": {
+          "type": "string",
+          "description": "URI to the actuator-specific schema, e.g. browser-actuator.session-handoff.v1."
+        }
+      },
+      "additionalProperties": true
+    },
+    "secret_refs": {
+      "type": "array",
+      "description": "Pointers to secrets that the importer must resolve via SecretResolver. Secret values themselves MUST NOT live in the envelope.",
+      "items": {
+        "type": "object",
+        "required": ["key", "purpose"],
+        "properties": {
+          "key": { "type": "string" },
+          "purpose": { "type": "string", "enum": ["session_cookie", "auth_token", "csrf_token", "device_token", "other"] },
+          "resolver_hint": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "policy": {
+      "type": "object",
+      "description": "Constraints the importer must enforce.",
+      "properties": {
+        "max_replay_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Reject the envelope after this many imports; protects against replay."
+        },
+        "allowed_target_origins": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "description": "Importer MUST refuse if the active origin is not in this list."
+        },
+        "fallback_behavior": {
+          "type": "string",
+          "enum": ["reject_and_log", "fall_back_to_clean_session", "prompt_operator"],
+          "default": "reject_and_log"
+        }
+      },
+      "additionalProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "description": "Hash-chain anchors so the importer can verify continuity with the source surface.",
+      "required": ["source_chain_tip"],
+      "properties": {
+        "source_chain_tip": {
+          "type": "string",
+          "description": "audit-chain tip on the source side at issuance time."
+        },
+        "expected_target_chain_parent": {
+          "type": "string",
+          "description": "If set, importer must append with this as parent_hash, i.e. confirm continuity."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "surface": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["web_browser", "ios_webview", "android_webview", "desktop_native"]
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable identifier for the surface instance (browser_session_id, app_install_id, etc.)."
+        },
+        "user_agent_hint": {
+          "type": "string",
+          "description": "Loose UA / device hint for routing; do not authorize on this."
+        }
+      }
+    }
+  }
+}

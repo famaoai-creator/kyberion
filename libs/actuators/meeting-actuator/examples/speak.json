@@ -1,0 +1,7 @@
+{
+  "action": "speak",
+  "params": {
+    "platform": "auto",
+    "text": "Hello, this is the meeting proxy speaking on behalf of the operator."
+  }
+}

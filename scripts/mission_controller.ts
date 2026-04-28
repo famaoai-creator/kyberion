@@ -17,6 +17,7 @@
 
 import * as path from 'node:path';
 import {
+  auditChain,
   findMissionPath,
   listMemoryPromotionCandidates,
   loadProjectRecord,
@@ -103,6 +104,12 @@ export {
 export interface ResolvedMissionCliInput {
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
+  /**
+   * Tenant slug for multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$).
+   * When set, the resulting mission is bound to this tenant and
+   * tier-guard / audit-chain enforce cross-tenant isolation.
+   */
+  tenantSlug?: string;
   missionType?: string;
   visionRef?: string;
   persona?: string;
@@ -150,6 +157,7 @@ export function resolveMissionStartCreateInputFromArgv(
   return {
     tier: namedStartCreateOptions.tier || (arg2 as any),
     tenantId: namedStartCreateOptions.tenantId || arg3,
+    ...(namedStartCreateOptions.tenantSlug ? { tenantSlug: namedStartCreateOptions.tenantSlug } : {}),
     missionType: namedStartCreateOptions.missionType || arg4,
     visionRef: namedStartCreateOptions.visionRef || arg5,
     persona: namedStartCreateOptions.persona || arg6,
@@ -289,6 +297,68 @@ function approveMemoryCandidate(candidateId: string, note?: string) {
   logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
 }
 
+/**
+ * Record an explicit operator override of a counterfactual rubric warn/poor
+ * (IP-9). Does not mutate the simulation output — only emits a tamper-
+ * evident audit event so reviewers can see who accepted the un-rubric'd
+ * branch and why. Required by counterfactual-degradation-policy.json
+ * for `warn` severity; forbidden for `poor` unless tenant_risk_officer
+ * documents it separately.
+ */
+function acceptRubricOverride(
+  hypothesisOrBranchId: string,
+  reason?: string,
+  severity?: string,
+) {
+  if (!hypothesisOrBranchId) {
+    logger.error(
+      'Usage: mission_controller accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]',
+    );
+    return;
+  }
+  if (!reason) {
+    logger.error(
+      'accept-with-override requires --reason "<text>" — overrides without reasoning are not auditable.',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const sev = (severity || 'warn').toLowerCase();
+  if (!['warn', 'poor'].includes(sev)) {
+    logger.error('--severity must be warn or poor');
+    process.exitCode = 1;
+    return;
+  }
+  if (sev === 'poor') {
+    logger.warn(
+      "Override of 'poor' severity is not permitted by default per " +
+        "counterfactual-degradation-policy.json; only proceed if tenant_risk_officer " +
+        'has documented the exception.',
+    );
+  }
+  const missionId = process.env.MISSION_ID || getOptionValue('--mission-id') || '';
+  const entry = auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+    action: 'rubric.override_accepted',
+    operation: `accept-with-override:${hypothesisOrBranchId}`,
+    result: 'allowed',
+    reason,
+    metadata: {
+      hypothesis_or_branch_id: hypothesisOrBranchId,
+      severity: sev,
+      mission_id: missionId || undefined,
+      policy_ref: 'knowledge/public/governance/counterfactual-degradation-policy.json',
+    },
+    compliance: {
+      framework: 'counterfactual-degradation-policy.json',
+      control: `severity-${sev}-override`,
+    },
+  });
+  logger.success(
+    `✅ rubric.override_accepted recorded: ${entry.id} (severity=${sev}, branch=${hypothesisOrBranchId})`,
+  );
+}
+
 function rejectMemoryCandidate(candidateId: string, note?: string) {
   if (!candidateId) {
     logger.error('Usage: mission_controller memory-reject <CANDIDATE_ID> [--note <TEXT>]');
@@ -374,12 +444,14 @@ async function createMission(
   missionType: string = 'development',
   visionRef?: string,
   persona: string = 'Ecosystem Architect',
-  relationships: any = {}
+  relationships: any = {},
+  tenantSlug?: string,
 ) {
   return _createMission({
     id,
     tier,
     tenantId,
+    ...(tenantSlug ? { tenantSlug } : {}),
     missionType,
     visionRef,
     persona,
@@ -400,13 +472,15 @@ async function startMission(
   tenantId: string = 'default',
   missionType: string = 'development',
   visionRef?: string,
-  relationships: any = {}
+  relationships: any = {},
+  tenantSlug?: string,
 ) {
   await _startMission({
     id,
     tier,
     persona,
     tenantId,
+    ...(tenantSlug ? { tenantSlug } : {}),
     missionType,
     visionRef,
     relationships,
@@ -643,6 +717,14 @@ Visibility Commands:
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
 
+Governance Commands:
+  accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]
+                                 Record a rubric override (counterfactual warn/poor accepted by operator).
+                                 Emits the rubric.override_accepted audit event per
+                                 counterfactual-degradation-policy.json. Required for warn-severity
+                                 acceptance; forbidden for poor unless tenant_risk_officer documents
+                                 the exception separately.
+
 Maintenance Commands:
   record-task <ID> <description> Record a task intention (flight recorder)
   record-evidence <ID> <task_id> <note>
@@ -659,6 +741,7 @@ Mission Input Contract:
   Preferred named options:
     --tier <personal|confidential|public>
     --tenant-id <TENANT>
+    --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
     --mission-type <TYPE>
     --vision-ref <REF>
     --persona <NAME>
@@ -760,7 +843,8 @@ async function main() {
         input.missionType,
         input.visionRef,
         input.persona,
-        input.relationships
+        input.relationships,
+        input.tenantSlug,
       );
       break;
     }
@@ -787,7 +871,8 @@ async function main() {
         input.tenantId,
         input.missionType,
         input.visionRef,
-        input.relationships
+        input.relationships,
+        input.tenantSlug,
       );
       break;
     }
@@ -829,6 +914,13 @@ async function main() {
       break;
     case 'dispatch':
       await dispatchNextMission();
+      break;
+    case 'accept-with-override':
+      acceptRubricOverride(
+        arg1,
+        getOptionValue('--reason'),
+        getOptionValue('--severity'),
+      );
       break;
     case 'memory-queue':
       listMemoryQueue(arg1 as any);

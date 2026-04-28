@@ -1,0 +1,8 @@
+{
+  "action": "join",
+  "params": {
+    "platform": "zoom",
+    "url": "https://example.zoom.us/j/9999999999",
+    "meeting_id": "9999999999"
+  }
+}

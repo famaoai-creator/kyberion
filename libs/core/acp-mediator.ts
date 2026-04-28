@@ -19,12 +19,15 @@ const ENV_WHITELIST = [
   'http_proxy', 'https_proxy', 'no_proxy',
 ];
 
-function sanitizeEnvForChild(env: NodeJS.ProcessEnv): Record<string, string> {
+function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  // Build locally as a relaxed map; cast at the boundary because Next 15's
+  // type augmentation makes NODE_ENV required-readonly, which is not
+  // compatible with constructing a fresh sanitized env.
   const safe: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
   for (const key of ENV_WHITELIST) {
     if (env[key]) safe[key] = env[key] as string;
   }
-  return safe;
+  return safe as unknown as NodeJS.ProcessEnv;
 }
 
 // Dynamic import for ESM-only @agentclientprotocol/sdk

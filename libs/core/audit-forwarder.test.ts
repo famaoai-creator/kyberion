@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ChainAuditForwarder,
+  TenantFilteringAuditForwarder,
   getAuditForwarder,
   registerAuditForwarder,
   resetAuditForwarder,
@@ -63,5 +64,40 @@ describe('audit-forwarder', () => {
     await chain.publish(sample);
     expect(calls).toEqual(['ok']);
     expect(chain.name).toContain('flaky→ok');
+  });
+
+  describe('TenantFilteringAuditForwarder (IP-2)', () => {
+    it('passes entries whose tenantSlug matches the allowed list', async () => {
+      const seen: string[] = [];
+      const sink: AuditForwarder = {
+        name: 'sink',
+        publish: (e) => { seen.push(e.id); },
+      };
+      const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp']);
+      await filter.publish({ ...sample, id: 'A1', tenantSlug: 'acme-corp' });
+      await filter.publish({ ...sample, id: 'A2', tenantSlug: 'other-tenant' });
+      await filter.publish({ ...sample, id: 'A3' });
+      expect(seen).toEqual(['A1']);
+    });
+
+    it('passes tenantless entries when passThroughTenantless=true', async () => {
+      const seen: string[] = [];
+      const sink: AuditForwarder = {
+        name: 'sink',
+        publish: (e) => { seen.push(e.id); },
+      };
+      const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp'], true);
+      await filter.publish({ ...sample, id: 'B1' });
+      await filter.publish({ ...sample, id: 'B2', tenantSlug: 'acme-corp' });
+      await filter.publish({ ...sample, id: 'B3', tenantSlug: 'other-tenant' });
+      expect(seen).toEqual(['B1', 'B2']);
+    });
+
+    it('exposes a name reflecting the configured tenants', () => {
+      const filter = new TenantFilteringAuditForwarder(stubAuditForwarder, ['acme-corp', 'beta']);
+      expect(filter.name).toContain('acme-corp');
+      expect(filter.name).toContain('beta');
+      expect(filter.name).toContain('stub');
+    });
   });
 });

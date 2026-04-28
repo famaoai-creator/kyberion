@@ -1,0 +1,27 @@
+{
+  "record_id": "DSC-MOI6960B-AAC8C61C",
+  "kind": "pattern",
+  "tier": "public",
+  "title": "Reusable pattern",
+  "summary": "Presentation pattern should be reusable.",
+  "candidate_id": "DSC-MOI6960B-AAC8C61C",
+  "track_id": "TRK-TEST-REL1",
+  "track_name": "Release 1",
+  "artifact_ids": [
+    "ART-1"
+  ],
+  "evidence_refs": [
+    "artifact:ART-1"
+  ],
+  "created_at": "2026-04-28T05:14:42.731Z",
+  "applicability": [
+    "presentation delivery",
+    "document specialist"
+  ],
+  "reusable_steps": [
+    "Review the prior deck",
+    "Adapt the structure",
+    "Validate the output"
+  ],
+  "expected_outcome": "A reusable presentation artifact."
+}

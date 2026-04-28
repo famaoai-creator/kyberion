@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeReadFile: vi.fn(),
   active: vi.fn((p: string) => `/repo/active/${p}`),
+  findMissionPath: vi.fn((_id: string) => null as string | null),
 }));
 
 vi.mock('./secure-io.js', () => ({
@@ -13,6 +14,7 @@ vi.mock('./secure-io.js', () => ({
 
 vi.mock('./path-resolver.js', () => ({
   active: mocks.active,
+  findMissionPath: mocks.findMissionPath,
 }));
 
 describe('authority branch coverage', () => {
@@ -25,6 +27,8 @@ describe('authority branch coverage', () => {
     mocks.safeReadFile.mockReset();
     mocks.active.mockReset();
     mocks.active.mockImplementation((p: string) => `/repo/active/${p}`);
+    mocks.findMissionPath.mockReset();
+    mocks.findMissionPath.mockReturnValue(null);
     mocks.safeExistsSync.mockReturnValue(false);
     mocks.safeReadFile.mockReturnValue('{}');
 
