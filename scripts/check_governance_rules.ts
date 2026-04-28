@@ -42,6 +42,26 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/standard-intents.json',
   },
   {
+    id: 'intent-domain-ontology',
+    schemaPath: 'knowledge/public/schemas/intent-domain-ontology.schema.json',
+    dataPath: 'knowledge/public/governance/intent-domain-ontology.json',
+  },
+  {
+    id: 'intent-contract-memory',
+    schemaPath: 'knowledge/public/schemas/intent-contract-memory.schema.json',
+    dataPath: 'knowledge/public/governance/intent-contract-memory.json',
+  },
+  {
+    id: 'intent-contract-selection-policy',
+    schemaPath: 'knowledge/public/schemas/intent-contract-selection-policy.schema.json',
+    dataPath: 'knowledge/public/governance/intent-contract-selection-policy.json',
+  },
+  {
+    id: 'tool-actuator-routing-policy',
+    schemaPath: 'knowledge/public/schemas/tool-actuator-routing-policy.schema.json',
+    dataPath: 'knowledge/public/governance/tool-actuator-routing-policy.json',
+  },
+  {
     id: 'active-surfaces',
     schemaPath: 'knowledge/public/schemas/runtime-surface-manifest.schema.json',
     dataPath: 'knowledge/public/governance/active-surfaces.json',
@@ -381,7 +401,15 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
   }
 
   if (check.id === 'standard-intents') {
-    const typed = data as { intents?: Array<{ id?: string; category?: string; trigger_keywords?: unknown[] }> };
+    const typed = data as {
+      intents?: Array<{
+        id?: string;
+        category?: string;
+        legacy_category?: string;
+        exposed_to_surface?: boolean;
+        trigger_keywords?: unknown[];
+      }>;
+    };
     if (!(typed.intents || []).length) {
       violations.push('standard-intents: intents must not be empty');
     }
@@ -392,8 +420,39 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       if (!String(intent.category || '')) {
         violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define category`);
       }
+      if (!String(intent.legacy_category || '')) {
+        violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define legacy_category`);
+      }
+      if (typeof intent.exposed_to_surface !== 'boolean') {
+        violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define exposed_to_surface`);
+      }
       if (!(intent.trigger_keywords || []).length) {
         violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define trigger_keywords`);
+      }
+    }
+  }
+
+  if (check.id === 'intent-domain-ontology') {
+    const typed = data as { intents?: Array<{ intent_id?: string; legacy_category?: string; category?: string }> };
+    if (!(typed.intents || []).length) {
+      violations.push('intent-domain-ontology: intents must not be empty');
+    }
+    const ids = new Set<string>();
+    for (const intent of typed.intents || []) {
+      const intentId = String(intent.intent_id || '');
+      if (!intentId) {
+        violations.push('intent-domain-ontology: every entry must define intent_id');
+        continue;
+      }
+      if (ids.has(intentId)) {
+        violations.push(`intent-domain-ontology: duplicate intent_id detected (${intentId})`);
+      }
+      ids.add(intentId);
+      if (!String(intent.legacy_category || '')) {
+        violations.push(`intent-domain-ontology: ${intentId} must define legacy_category`);
+      }
+      if (!String(intent.category || '')) {
+        violations.push(`intent-domain-ontology: ${intentId} must define category`);
       }
     }
   }

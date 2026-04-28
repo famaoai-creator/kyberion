@@ -135,6 +135,8 @@ export type { ZonedDateParts } from './src/cron-utils.js';
 export { compileIntent, buildPipelineGenerationPrompt, resolveIntentToSteps } from './src/intent-compiler.js';
 export type { CompiledIntent } from './src/intent-compiler.js';
 export * from './intent-contract.js';
+export * from './intent-contract-learning.js';
+export * from './tool-actuator-routing.js';
 export * from './delegation-request.js';
 export * from './assistant-compiler-request.js';
 export * from './intent-contract.js';

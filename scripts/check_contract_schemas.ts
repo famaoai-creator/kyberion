@@ -2354,9 +2354,18 @@ function createChecks(): ContractCheck[] {
           intents: [
             {
               id: 'capture-photo',
-              category: 'surface',
+              category: 'outcome_execution',
+              legacy_category: 'surface',
+              exposed_to_surface: true,
+              target: 'outcome',
+              action: 'create',
+              object: 'artifact_image',
+              execution_shape: 'task_session',
+              mission_class: 'content_and_media',
+              risk_profile: 'review_required',
               description: 'Capture a photo for record keeping, sharing, or OCR source use.',
               surface_examples: ['ちょっと写真をとって'],
+              outcome_ids: ['artifact:image'],
               trigger_keywords: ['写真', '撮影', 'photo', 'picture', 'camera', 'OCR'],
             },
           ],
@@ -2368,13 +2377,45 @@ function createChecks(): ContractCheck[] {
           intents: [
             {
               id: '',
-              category: '',
+              category: 'outcome_execution',
+              legacy_category: '',
+              exposed_to_surface: true,
               description: '',
               trigger_keywords: [],
             },
           ],
         },
       ],
+    },
+    {
+      id: 'intent-domain-ontology',
+      schemaPath: 'knowledge/public/schemas/intent-domain-ontology.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/public/governance/intent-domain-ontology.json')],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          intents: [
+            {
+              intent_id: '',
+              category: 'outcome_execution',
+              legacy_category: 'surface',
+              target: 'outcome',
+              action: 'create',
+              object: 'project',
+              exposed_to_surface: true,
+              execution_shape: 'task_session',
+              mission_class: 'product_delivery',
+              workflow_template: 'single-track-default',
+              team_template: 'default',
+              risk_profile: 'review_required',
+              outcome_ids: [],
+              actuator_requirements: [],
+              readiness_required: [],
+              evidence_required: []
+            }
+          ]
+        }
+      ]
     },
     {
       id: 'a2a-task-contract',
@@ -2417,7 +2458,7 @@ function createChecks(): ContractCheck[] {
             surface_overlap_increment: 0.03,
             surface_overlap_max_confidence: 0.95,
             selected_confidence_threshold: 0.45,
-            catalog_intent_category: 'surface',
+            catalog_intent_category: 'outcome_execution',
           },
           legacy_candidates: [
             {
@@ -2449,7 +2490,7 @@ function createChecks(): ContractCheck[] {
             surface_overlap_increment: 0.03,
             surface_overlap_max_confidence: 0.95,
             selected_confidence_threshold: 0.45,
-            catalog_intent_category: 'surface',
+            catalog_intent_category: 'outcome_execution',
           },
           legacy_candidates: [
             {
