@@ -1,0 +1,27 @@
+{
+  "name": "@actuator/meeting-browser-driver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright-based MeetingJoinDriver — drives Meet/Zoom/Teams pre-join UI to acquire a real meeting session, paired with an AudioBus for I/O.",
+  "main": "../../../dist/libs/actuators/meeting-browser-driver/src/index.js",
+  "types": "../../../dist/libs/actuators/meeting-browser-driver/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  },
+  "peerDependencies": {
+    "playwright": "^1.45.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "schema-integrity",
+  "version": "2026-04-29",
+  "description": "Contract schemas, capability catalogs, and governance rules all parse and validate. This manifest is the cheap-but-reliable guard before running anything that loads schemas at startup.",
+  "capabilities": [
+    {
+      "capability_id": "contract-schemas.valid",
+      "kind": "binary",
+      "description": "All `schemas/*.schema.json` parse and validate (run by `pnpm run check:contract-schemas`).",
+      "required_for": ["validate", "wisdom-actuator", "schema-loader"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:contract-schemas"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Re-run `pnpm run check:contract-schemas` to see the failing schema. Fix the schema (or the validator pinning) and re-bootstrap."
+      }
+    },
+    {
+      "capability_id": "catalogs.consistent",
+      "kind": "binary",
+      "description": "Capability + actuator catalogs (`CAPABILITIES_GUIDE.md`, manifest.json files, schema-loader index) are mutually consistent.",
+      "required_for": ["validate", "actuator-loader"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:catalogs"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Re-run `pnpm run check:catalogs` to see the mismatch and update CAPABILITIES_GUIDE.md or the manifest."
+      }
+    },
+    {
+      "capability_id": "governance-rules.valid",
+      "kind": "binary",
+      "description": "Governance policy rules (security-policy.json, integrity-policy.json, etc.) parse and pass their own schema.",
+      "required_for": ["validate", "policy-engine"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:governance-rules"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Re-run `pnpm run check:governance-rules` to see the failing rule and fix it."
+      }
+    },
+    {
+      "capability_id": "esm-integrity",
+      "kind": "binary",
+      "description": "ESM imports across the repo do not have invalid extensions / specifier shapes (run by `pnpm run check:esm`).",
+      "required_for": ["validate", "build"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:esm"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Re-run `pnpm run check:esm` to see the violation. Fix the import (typically: append `.js` to a relative TS import in a `.ts` file)."
+      }
+    }
+  ]
+}

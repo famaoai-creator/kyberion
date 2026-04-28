@@ -1,0 +1,111 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "meeting-participation-runtime",
+  "version": "2026-04-28",
+  "description": "Environment prerequisites for `pnpm meeting:participate`: browser automation, audio I/O bus, streaming STT/TTS, and the per-mission voice-consent receipt.",
+  "capabilities": [
+    {
+      "capability_id": "playwright-chromium",
+      "kind": "npm-package",
+      "description": "Playwright + a Chromium binary so the browser-driver can drive Meet/Zoom/Teams pre-join UIs.",
+      "required_for": ["browser-meeting-join-driver"],
+      "probe": { "kind": "module", "specifier": "playwright" },
+      "install": {
+        "operator_confirmed": true,
+        "command": "pnpm",
+        "args": ["add", "-w", "playwright"],
+        "instruction": "After install, run `pnpm exec playwright install chromium` to download the browser binary. Operator confirmation required because this writes to the workspace package manifest.",
+        "docs_url": "https://playwright.dev/docs/intro",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "blackhole-2ch.darwin",
+      "kind": "virtual-audio-device",
+      "description": "BlackHole 2ch virtual audio device (macOS). Required for the AI to read meeting audio and inject TTS as the bot's mic.",
+      "required_for": ["blackhole-audio-bus"],
+      "applies_to_platforms": ["darwin"],
+      "probe": { "kind": "probe", "probe_id": "audio-bus.blackhole" },
+      "install": {
+        "operator_confirmed": true,
+        "command": "brew",
+        "args": ["install", "--cask", "blackhole-2ch"],
+        "instruction": "After install, open System Settings → Sound and create a Multi-Output Device that mirrors BlackHole 2ch + your default speaker so you can still hear the meeting locally. The bot uses the BlackHole half.",
+        "docs_url": "https://existential.audio/blackhole/",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "pulseaudio.linux",
+      "kind": "binary",
+      "description": "PulseAudio (or pipewire-pulse) running on the host. Required for the AI's audio bus when running in a Linux container.",
+      "required_for": ["pulseaudio-audio-bus"],
+      "applies_to_platforms": ["linux"],
+      "probe": { "kind": "command", "command": "pactl", "args": ["info"] },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Install pulseaudio (or pipewire + pipewire-pulse) via your distro's package manager and start it. In a container image, run `pulseaudio -D --exit-idle-time=-1` before launching the participation runtime.",
+        "docs_url": "https://wiki.archlinux.org/title/PulseAudio"
+      }
+    },
+    {
+      "capability_id": "ffmpeg",
+      "kind": "binary",
+      "description": "ffmpeg binary on PATH; both audio buses use it to negotiate AVFoundation/Pulse devices.",
+      "required_for": ["blackhole-audio-bus", "pulseaudio-audio-bus"],
+      "probe": { "kind": "command", "command": "ffmpeg", "args": ["-version"] },
+      "install": {
+        "operator_confirmed": true,
+        "command": "brew",
+        "args": ["install", "ffmpeg"],
+        "instruction": "macOS: `brew install ffmpeg`. Debian/Ubuntu: `apt-get install -y ffmpeg`. Other platforms: see the docs link.",
+        "docs_url": "https://ffmpeg.org/download.html",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "stt-command",
+      "kind": "env-var",
+      "description": "Streaming STT command, e.g. `whisper-stream --model … --json`. Without it, the participation runtime falls back to the stub (transcripts are placeholder text).",
+      "required_for": ["streaming-stt"],
+      "probe": { "kind": "env", "name": "KYBERION_STT_COMMAND", "require_non_empty": true },
+      "optional": true,
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_STT_COMMAND` (and optional `KYBERION_STT_ARGS`) to a binary that reads PCM_S16LE on stdin and emits NDJSON transcript chunks on stdout. Examples: `whisper.cpp` stream, `faster-whisper`, Deepgram CLI. Stub backend is used when unset.",
+        "docs_url": "https://github.com/ggerganov/whisper.cpp#real-time-audio-input"
+      }
+    },
+    {
+      "capability_id": "tts-command",
+      "kind": "env-var",
+      "description": "Streaming TTS command, e.g. `piper --model … --output-raw`. Falls back to stub when unset.",
+      "required_for": ["streaming-tts"],
+      "probe": { "kind": "env", "name": "KYBERION_TTS_COMMAND", "require_non_empty": true },
+      "optional": true,
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_TTS_COMMAND` to a binary that reads newline-delimited UTF-8 text on stdin and emits PCM_S16LE audio on stdout. Examples: `piper`, `coqui XTTS`, Azure Neural TTS via REST.",
+        "docs_url": "https://github.com/rhasspy/piper"
+      }
+    },
+    {
+      "capability_id": "voice-consent",
+      "kind": "mission-evidence",
+      "description": "Per-mission voice-consent.json with `consent: granted`. Speaking into a meeting is refused without it.",
+      "required_for": ["meeting-actuator.speak", "meeting-participation-coordinator"],
+      "probe": {
+        "kind": "mission-evidence",
+        "filename": "voice-consent.json",
+        "require_field": { "path": "consent", "equals": "granted" }
+      },
+      "install": {
+        "operator_confirmed": true,
+        "command": "pnpm",
+        "args": ["meeting:consent", "grant", "--mission", "${MISSION_ID}", "--operator", "${KYBERION_OPERATOR_HANDLE}"],
+        "instruction": "Run `pnpm meeting:consent grant --mission MSN-… --operator <handle> --scope \"…\"` for the active mission. The CLI lands a `voice_consent.grant` audit entry. Bootstrap will substitute MISSION_ID and KYBERION_OPERATOR_HANDLE before invoking.",
+        "retry_after_install": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "mos-operator-surface",
+  "version": "2026-04-29",
+  "description": "Minimum Operator Surface (MOS) — the Next.js read-only Web app under presence/displays/operator-surface — is built and the no-write contract test passes.",
+  "capabilities": [
+    {
+      "capability_id": "mos.workspace-installed",
+      "kind": "binary",
+      "description": "node_modules in presence/displays/operator-surface/ exists (i.e., `pnpm install` ran at least once after the latest workspace change).",
+      "required_for": ["mos"],
+      "probe": {
+        "kind": "command",
+        "command": "test",
+        "args": ["-d", "presence/displays/operator-surface/node_modules"]
+      },
+      "install": {
+        "operator_confirmed": false,
+        "command": "pnpm",
+        "args": ["install"],
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "mos.no-write-contract",
+      "kind": "binary",
+      "description": "MOS no-write-API contract test (mos.read-only audit) passes.",
+      "required_for": ["mos", "validate"],
+      "probe": {
+        "kind": "command",
+        "command": "pnpm",
+        "args": ["-s", "run", "check:mos-no-write-api"]
+      },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "MOS must remain read-only. If this fails, the MOS code introduced a write API — review the diff and back it out, then re-bootstrap."
+      }
+    },
+    {
+      "capability_id": "mos.tenant-binding",
+      "kind": "env-var",
+      "description": "When KYBERION_TENANT is set, MOS picks up the per-tenant view; for single-tenant deployments this is optional.",
+      "required_for": ["mos"],
+      "optional": true,
+      "probe": { "kind": "env", "name": "KYBERION_TENANT", "require_non_empty": true },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_TENANT=<tenant-slug>` to bind MOS to a tenant. Leave unset for single-tenant deployments."
+      }
+    }
+  ]
+}
