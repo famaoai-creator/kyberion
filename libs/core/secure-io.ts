@@ -321,6 +321,33 @@ export function safeOpenAppendFile(filePath: string): number {
 }
 
 /**
+ * Create a file exclusively. The open is atomic: it fails with EEXIST
+ * when another process already owns the path.
+ */
+export function safeCreateExclusiveFileSync(
+  filePath: string,
+  data: string | Buffer = '',
+): void {
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  const dir = path.dirname(resolved);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const fd = fs.openSync(resolved, 'wx');
+  try {
+    if (data.length > 0) fs.writeFileSync(fd, data);
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+  } catch (err) {
+    try { fs.closeSync(fd); } catch (_) {}
+    try { fs.unlinkSync(resolved); } catch (_) {}
+    throw err;
+  }
+}
+
+/**
  * Safely fsync an existing file for durability.
  */
 export function safeFsyncFile(filePath: string): void {
@@ -354,6 +381,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     encoding = 'utf8',
     maxOutputMB = 10,
     env = {},
+    input,
   } = options;
 
   return execFileSync(command, args, {
@@ -362,6 +390,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     env: buildSafeExecEnv(env),
     timeout: timeoutMs,
     maxBuffer: maxOutputMB * 1024 * 1024,
+    input,
     stdio: ['pipe', 'pipe', 'pipe'],
   }) as string;
 }

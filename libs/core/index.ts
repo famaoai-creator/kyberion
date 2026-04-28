@@ -33,7 +33,8 @@ export {
   safeLstat,
   safeReadlink,
   safeOpenAppendFile,
-  safeFsyncFile
+  safeFsyncFile,
+  safeCreateExclusiveFileSync
 } from './secure-io.js';
 
 // Backward compatibility aliases
