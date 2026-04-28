@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "title": "Environment Capability Manifest",
+  "description": "Declarative environment prerequisites for a feature. The bootstrap CLI probes each capability, prompts for operator-confirmed installs, and writes a setup receipt that downstream commands verify before doing real work.",
+  "type": "object",
+  "required": ["manifest_id", "version", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "manifest_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Stable id, used in audit and receipt filenames."
+    },
+    "version": {
+      "type": "string",
+      "description": "ISO date or semver-like; bumped when capabilities change."
+    },
+    "description": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Capability" }
+    }
+  },
+  "definitions": {
+    "Capability": {
+      "type": "object",
+      "required": ["capability_id", "kind", "description", "required_for", "probe"],
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]+$"
+        },
+        "kind": {
+          "enum": [
+            "binary",
+            "virtual-audio-device",
+            "env-var",
+            "npm-package",
+            "os-permission",
+            "vendor-credential",
+            "mission-evidence"
+          ]
+        },
+        "description": { "type": "string" },
+        "required_for": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "applies_to_platforms": {
+          "type": "array",
+          "items": { "enum": ["darwin", "linux", "win32", "freebsd", "openbsd", "sunos", "aix", "android", "haiku", "netbsd", "cygwin"] }
+        },
+        "optional": { "type": "boolean" },
+        "probe": { "$ref": "#/definitions/Probe" },
+        "install": { "$ref": "#/definitions/Install" }
+      }
+    },
+    "Probe": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "command"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "command" },
+            "command": { "type": "string" },
+            "args": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "specifier"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "module" },
+            "specifier": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "env" },
+            "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+            "require_non_empty": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "filename"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "mission-evidence" },
+            "filename": { "type": "string" },
+            "require_field": {
+              "type": "object",
+              "required": ["path", "equals"],
+              "additionalProperties": false,
+              "properties": {
+                "path": { "type": "string" },
+                "equals": {}
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "probe_id"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "probe" },
+            "probe_id": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "Install": {
+      "type": "object",
+      "required": ["operator_confirmed"],
+      "additionalProperties": false,
+      "properties": {
+        "operator_confirmed": { "type": "boolean" },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "instruction": { "type": "string" },
+        "docs_url": { "type": "string", "format": "uri" },
+        "retry_after_install": { "type": "boolean" }
+      }
+    }
+  }
+}

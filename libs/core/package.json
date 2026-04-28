@@ -59,6 +59,10 @@
       "types": "./dist/artifacts.d.ts",
       "default": "./dist/artifacts.js"
     },
+    "./blackhole-audio-bus": {
+      "types": "./dist/blackhole-audio-bus.d.ts",
+      "default": "./dist/blackhole-audio-bus.js"
+    },
     "./channel-surface": {
       "types": "./dist/channel-surface.d.ts",
       "default": "./dist/channel-surface.js"
@@ -126,6 +130,10 @@
     "./pipeline-contract": {
       "types": "./dist/pipeline-contract.d.ts",
       "default": "./dist/pipeline-contract.js"
+    },
+    "./pulse-audio-bus": {
+      "types": "./dist/pulse-audio-bus.d.ts",
+      "default": "./dist/pulse-audio-bus.js"
     },
     "./provider-discovery": {
       "types": "./dist/provider-discovery.d.ts",

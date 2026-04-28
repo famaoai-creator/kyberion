@@ -38,6 +38,8 @@
     "watch:tenant-drift": "tsx scripts/watch_tenant_drift.ts",
     "export:validation-bundle": "tsx scripts/export_validation_bundle.ts",
     "meeting:run": "tsx scripts/meeting_orchestrator.ts",
+    "meeting:participate": "tsx scripts/meeting_participate.ts",
+    "env:bootstrap": "tsx scripts/bootstrap_environment.ts",
     "meeting:consent": "tsx scripts/voice_consent.ts",
     "typecheck": "tsc --noEmit",
     "validate": "pnpm run typecheck && pnpm run check:esm && pnpm run check:catalogs && pnpm run check:governance-rules && pnpm run check:contract-schemas && pnpm run check:tier-hygiene && pnpm run check:mos-no-write-api",

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "reasoning-backend",
+  "version": "2026-04-29",
+  "description": "At least one reasoning backend is reachable: claude-cli authenticated, or ANTHROPIC_API_KEY set, or gemini-cli / codex-cli available. Stub backend is always available; this manifest distinguishes 'real backend present' from 'falling back to stub'.",
+  "capabilities": [
+    {
+      "capability_id": "reasoning-backend.any-real",
+      "kind": "vendor-credential",
+      "description": "Any of the supported real backends is reachable. Without one, Kyberion runs in stub mode (deterministic placeholders, no LLM output).",
+      "required_for": ["wisdom-actuator", "intent-extractor", "meeting-participation"],
+      "probe": { "kind": "probe", "probe_id": "reasoning-backend.any-real" },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Pick one and authenticate it. Recommended: `claude` CLI logged in (`claude auth login`). Alternates: set `ANTHROPIC_API_KEY`, install + auth `gemini` CLI, or install + auth `codex` CLI. Then set `KYBERION_REASONING_BACKEND` to the corresponding id (`claude-cli` / `anthropic` / `gemini-cli` / `codex-cli`). Setting it to `stub` is also valid for offline / deterministic-test deployments.",
+        "docs_url": "https://docs.anthropic.com/en/api/getting-started"
+      }
+    },
+    {
+      "capability_id": "reasoning-backend.preference",
+      "kind": "env-var",
+      "description": "KYBERION_REASONING_BACKEND is set so the bootstrap chooses deterministically rather than auto-discovering on every start.",
+      "required_for": ["wisdom-actuator"],
+      "optional": true,
+      "probe": { "kind": "env", "name": "KYBERION_REASONING_BACKEND", "require_non_empty": true },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "Set `KYBERION_REASONING_BACKEND` to one of `claude-cli` / `anthropic` / `gemini-cli` / `codex-cli` / `claude-agent` / `stub`. Without it, the bootstrap auto-discovers and may pick a different backend across runs."
+      }
+    }
+  ]
+}

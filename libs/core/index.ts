@@ -383,6 +383,89 @@ export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
 export { MissionEvidenceDoc } from './mission-evidence-doc.js';
 export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
 export {
+  bootstrapManifest,
+  loadEnvironmentManifest,
+  listEnvironmentManifestIds,
+  probeManifest,
+  registerEnvironmentCapabilityProbe,
+  resetEnvironmentCapabilityProbeRegistry,
+  verifyReady,
+} from './environment-capability.js';
+export { installCoreEnvironmentProbes } from './environment-capability-probes.js';
+export type {
+  BootstrapOptions,
+  CapabilityInstall,
+  CapabilityKind,
+  CapabilityProbe,
+  CapabilityStatus,
+  EnvironmentCapability,
+  EnvironmentManifest,
+  ReadinessReport,
+  SetupReceipt,
+} from './environment-capability.js';
+export type {
+  AudioChunk,
+  AudioFormat,
+  MeetingPlatform,
+  MeetingSession,
+  MeetingSessionState,
+  MeetingSessionStatus,
+  MeetingTarget,
+  TranscriptChunk,
+} from './meeting-session-types.js';
+export { StubAudioBus } from './audio-bus.js';
+export type { AudioBus, AudioBusProbe } from './audio-bus.js';
+export { BlackHoleAudioBus } from './blackhole-audio-bus.js';
+export type { BlackHoleBusOptions } from './blackhole-audio-bus.js';
+export { PulseAudioBus } from './pulse-audio-bus.js';
+export type { PulseAudioBusOptions } from './pulse-audio-bus.js';
+export { resolveAudioBus } from './audio-bus-resolver.js';
+export type { AudioBusId } from './audio-bus-resolver.js';
+export {
+  StubStreamingSpeechToTextBridge,
+  getStreamingSttBridge,
+  registerStreamingSttBridge,
+} from './streaming-stt-bridge.js';
+export type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
+export {
+  StubStreamingTextToSpeechBridge,
+  getStreamingTtsBridge,
+  registerStreamingTtsBridge,
+} from './streaming-tts-bridge.js';
+export type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
+export {
+  ShellStreamingSpeechToTextBridge,
+  installShellStreamingSttBridge,
+  installShellStreamingSttBridgeFromEnv,
+} from './shell-streaming-stt-bridge.js';
+export type { ShellStreamingSttOptions } from './shell-streaming-stt-bridge.js';
+export {
+  ShellStreamingTextToSpeechBridge,
+  installShellStreamingTtsBridge,
+  installShellStreamingTtsBridgeFromEnv,
+} from './shell-streaming-tts-bridge.js';
+export type { ShellStreamingTtsOptions } from './shell-streaming-tts-bridge.js';
+export { EnergyVad } from './voice-activity-detector.js';
+export type {
+  EnergyVadOptions,
+  VoiceActivityDetector,
+  VoiceActivityState,
+} from './voice-activity-detector.js';
+export {
+  StubMeetingJoinDriver,
+  getMeetingJoinDriver,
+  listMeetingJoinDriversFor,
+  registerMeetingJoinDriver,
+  resetMeetingJoinDriverRegistry,
+} from './meeting-join-driver.js';
+export type { MeetingJoinDriver } from './meeting-join-driver.js';
+export { MeetingParticipationCoordinator } from './meeting-participation-coordinator.js';
+export type {
+  ConversationAgent,
+  MeetingParticipationOptions,
+  MeetingParticipationReport,
+} from './meeting-participation-coordinator.js';
+export {
   recordActionItem,
   updateActionItemStatus,
   appendReminder,
