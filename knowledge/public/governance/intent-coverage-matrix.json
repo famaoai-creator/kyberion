@@ -16,7 +16,9 @@
       "status": "implemented",
       "entry_path": "voice-hub",
       "work_shape": "project_bootstrap",
-      "outcome_ids": ["project_created"],
+      "outcome_ids": [
+        "project_created"
+      ],
       "execution_path": [
         "voice-hub",
         "project-registry",
@@ -31,7 +33,9 @@
       "status": "implemented",
       "entry_path": "voice-hub + task-session",
       "work_shape": "task_session",
-      "outcome_ids": ["artifact:pptx"],
+      "outcome_ids": [
+        "artifact:pptx"
+      ],
       "execution_path": [
         "task-session classifier",
         "voice-hub brief builder",
@@ -45,7 +49,10 @@
       "status": "implemented",
       "entry_path": "voice-hub + task-session",
       "work_shape": "task_session",
-      "outcome_ids": ["artifact:docx", "artifact:pdf"],
+      "outcome_ids": [
+        "artifact:docx",
+        "artifact:pdf"
+      ],
       "execution_path": [
         "task-session classifier",
         "voice-hub brief builder",
@@ -61,7 +68,9 @@
       "status": "implemented",
       "entry_path": "voice-hub + task-session",
       "work_shape": "task_session",
-      "outcome_ids": ["artifact:xlsx"],
+      "outcome_ids": [
+        "artifact:xlsx"
+      ],
       "execution_path": [
         "task-session classifier",
         "voice-hub workbook brief",
@@ -75,7 +84,10 @@
       "status": "implemented",
       "entry_path": "voice-hub + task-session",
       "work_shape": "task_session",
-      "outcome_ids": ["service_summary", "approval_request"],
+      "outcome_ids": [
+        "service_summary",
+        "approval_request"
+      ],
       "execution_path": [
         "task-session classifier",
         "service inspection flow",
@@ -86,107 +98,770 @@
     },
     {
       "intent_id": "open-site",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "voice-hub browser route",
       "work_shape": "browser_session",
-      "outcome_ids": ["browser_navigation"],
+      "outcome_ids": [
+        "browser_navigation"
+      ],
       "execution_path": [
         "voice-hub browser conversation",
         "browser-actuator"
       ],
-      "gaps": [
-        "not yet catalog-first through the same work resolver path as task sessions"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "browser-step",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "voice-hub browser route",
       "work_shape": "browser_session",
-      "outcome_ids": ["browser_step"],
+      "outcome_ids": [
+        "browser_step"
+      ],
       "execution_path": [
         "voice-hub browser conversation",
         "browser-actuator"
       ],
-      "gaps": [
-        "runtime path still route-specific"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "knowledge-query",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "direct reply route",
       "work_shape": "direct_reply",
-      "outcome_ids": ["knowledge_answer"],
+      "outcome_ids": [
+        "knowledge_answer"
+      ],
       "execution_path": [
         "knowledge search path",
         "direct reply"
       ],
-      "gaps": [
-        "resolver path not yet unified with the catalog-first task/session flow"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "cross-project-remediation",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "task-session classifier",
       "work_shape": "task_session",
-      "outcome_ids": ["remediation_plan"],
+      "outcome_ids": [
+        "remediation_plan"
+      ],
       "execution_path": [
         "task-session classifier",
         "knowledge-backed cross-project analysis",
         "follow-up remediation planning"
       ],
-      "gaps": [
-        "follow-up fix execution and automatic mission splitting are not yet first-class",
-        "cross-project corpus resolution still depends on operator context and future binding-aware retrieval"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "incident-informed-review",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "task-session classifier",
       "work_shape": "task_session",
-      "outcome_ids": ["review_findings"],
+      "outcome_ids": [
+        "review_findings"
+      ],
       "execution_path": [
         "task-session classifier",
         "incident and failure history lookup",
         "review synthesis with governed findings"
       ],
-      "gaps": [
-        "review target binding and incident corpus retrieval are not yet first-class runtime contracts",
-        "automated review execution from the intake path remains future work"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "evolve-agent-harness",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "task-session classifier",
       "work_shape": "task_session",
-      "outcome_ids": ["harness_experiment_report"],
+      "outcome_ids": [
+        "harness_experiment_report"
+      ],
       "execution_path": [
         "task-session classifier",
         "benchmark-driven experiment design",
         "governed keep or discard reporting"
       ],
-      "gaps": [
-        "benchmark runner and experiment ledger are not yet first-class runtime actuators",
-        "protected edit boundaries are modeled in work design and docs, but not yet enforced by a dedicated execution contract compiler"
-      ]
+      "gaps": []
     },
     {
       "intent_id": "live-query",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "direct reply route",
       "work_shape": "direct_reply",
-      "outcome_ids": ["live_answer"],
+      "outcome_ids": [
+        "live_answer"
+      ],
       "execution_path": [
         "live data fetch path",
         "direct reply"
       ],
-      "gaps": [
-        "runtime path less normalized than core work flows"
-      ]
+      "gaps": []
+    },
+    {
+      "intent_id": "bootstrap-kyberion-runtime",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "environment_bootstrapped"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pnpm env:bootstrap"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "verify-environment-readiness",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "environment_readiness_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: baseline-check"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "configure-reasoning-backend",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "reasoning_backend_configured"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "register-actuator-adapter",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "actuator_adapter_registered"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "verify-actuator-capability",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "actuator_capability_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pnpm capabilities"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "rotate-integration-secret",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "secret_rotation_completed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "run-system-upgrade-check",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "pipeline",
+      "outcome_ids": [
+        "system_upgrade_check_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: system-upgrade-check"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "query-knowledge",
+      "status": "implemented",
+      "entry_path": "router-contract + surface-query",
+      "work_shape": "direct_reply",
+      "outcome_ids": [
+        "knowledge_answer"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "knowledge_search route"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "distill-mission-knowledge",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_distill_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "organize-knowledge-assets",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_organization_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "promote-memory-candidate",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "memory_promotion_result"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "sanitize-knowledge-for-public-tier",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_sanitization_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "retire-stale-knowledge",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_retirement_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "reconcile-knowledge-index",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_reconciliation_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "check-kyberion-baseline",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "pipeline",
+      "outcome_ids": [
+        "kyberion_baseline_status"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: baseline-check"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "check-kyberion-vital",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "pipeline",
+      "outcome_ids": [
+        "kyberion_vital_status"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: vital-check"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "diagnose-kyberion-system",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "pipeline",
+      "outcome_ids": [
+        "kyberion_diagnostics_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: system-diagnostics"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "inspect-mission-state",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "mission_state_summary"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller status"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "inspect-runtime-supervisor",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "runtime_supervisor_summary"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: system-diagnostics"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "verify-audit-chain",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "audit_chain_verification_result"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: system-diagnostics"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "inspect-environment-readiness",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "environment_readiness_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "pipeline runner: baseline-check"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "create-mission",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_created"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller create"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "classify-mission",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "mission_classification_result"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller classify"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "select-mission-workflow",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "mission_workflow_selected"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller workflow-select"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "compose-mission-team",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "mission_team_composed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller team"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "prewarm-mission-team",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "mission_team_prewarmed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller prewarm"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "delegate-mission-task",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_task_delegated"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller delegate"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "review-worker-output",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "worker_output_reviewed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller review-worker-output"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "handoff-mission",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_handoff_completed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller handoff"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "distill-mission",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_distilled"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller distill"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "close-mission",
+      "status": "implemented",
+      "entry_path": "surface governed fast-path",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_closed"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "router-contract",
+        "surface orchestrator fast-path",
+        "mission_controller finish"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "deprecate-actuator-adapter",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "actuator_adapter_deprecated"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "rollback-actuator-adapter",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "actuator_adapter_rolled_back"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "recover-environment",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "environment_recovered"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "reset-environment-state",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "environment_state_reset"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "audit-knowledge-tier-boundary",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "knowledge_tier_audit_report"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "trace-memory-promotion-decision",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "memory_promotion_trace"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "reassign-mission-owner",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_owner_reassigned"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "cancel-mission",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_canceled"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "pause-mission",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "mission",
+      "outcome_ids": [
+        "mission_paused"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "request-approval",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "approval_request_created"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "resolve-approval",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "approval_resolved"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "escalate-governance-issue",
+      "status": "implemented",
+      "entry_path": "catalog-first governed runtime",
+      "work_shape": "task_session",
+      "outcome_ids": [
+        "governance_issue_escalated"
+      ],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
     }
   ],
   "cross_cutting_gaps": [

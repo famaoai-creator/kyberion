@@ -12,6 +12,14 @@ const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/sche
 export type StandardIntentDefinition = {
   id?: string;
   category?: string;
+  legacy_category?: string;
+  exposed_to_surface?: boolean;
+  target?: string;
+  action?: string;
+  object?: string;
+  execution_shape?: string;
+  mission_class?: string;
+  risk_profile?: 'low' | 'review_required' | 'approval_required' | 'high_stakes';
   description?: string;
   surface_examples?: string[];
   trigger_keywords?: string[];
@@ -25,6 +33,11 @@ export type StandardIntentDefinition = {
     task_kind?: string;
     result_shape?: string;
   };
+};
+
+type IntentDomainOntologyEntry = {
+  intent_id: string;
+  exposed_to_surface?: boolean;
 };
 
 export interface IntentResolutionCandidate {
@@ -87,6 +100,7 @@ type IntentResolutionPolicyFile = {
 };
 
 let standardIntentCache: StandardIntentDefinition[] | null = null;
+let intentDomainOntologyCache: Map<string, IntentDomainOntologyEntry> | null = null;
 let standardIntentValidateFn: ValidateFunction | null = null;
 let intentResolutionPolicyCache: IntentResolutionPolicyFile | null = null;
 let intentResolutionPolicyValidateFn: ValidateFunction | null = null;
@@ -127,6 +141,21 @@ function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   }
   intentResolutionPolicyCache = parsed;
   return intentResolutionPolicyCache;
+}
+
+function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
+  if (intentDomainOntologyCache) return intentDomainOntologyCache;
+  const filePath = pathResolver.knowledge('public/governance/intent-domain-ontology.json');
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    intents?: IntentDomainOntologyEntry[];
+  };
+  const mapped = new Map<string, IntentDomainOntologyEntry>();
+  for (const entry of parsed.intents || []) {
+    if (!entry.intent_id) continue;
+    mapped.set(entry.intent_id, entry);
+  }
+  intentDomainOntologyCache = mapped;
+  return intentDomainOntologyCache;
 }
 
 function normalizeFreeText(value: string): string {
@@ -211,7 +240,14 @@ function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
 export function resolveIntentResolutionPacket(utterance: string): IntentResolutionPacket {
   const trimmed = utterance.trim();
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
-  const surfaceIntents = loadStandardIntentCatalog().filter((intent) => intent.category === scoringPolicy.catalog_intent_category);
+  const ontology = loadIntentDomainOntology();
+  const surfaceIntents = loadStandardIntentCatalog().filter((intent) => {
+    if (!intent.id) return false;
+    const ontologyEntry = ontology.get(intent.id);
+    if (ontologyEntry) return ontologyEntry.exposed_to_surface !== false;
+    if (typeof intent.exposed_to_surface === 'boolean') return intent.exposed_to_surface;
+    return intent.category === scoringPolicy.catalog_intent_category;
+  });
   const candidates = [
     ...surfaceIntents
       .map((intent) => scoreCatalogIntent(trimmed, intent))

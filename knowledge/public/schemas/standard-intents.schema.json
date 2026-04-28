@@ -43,7 +43,86 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "category": { "type": "string", "minLength": 1 },
+        "category": {
+          "type": "string",
+          "enum": [
+            "outcome_execution",
+            "environment_setup",
+            "actuator_management",
+            "llm_reasoning_setup",
+            "knowledge_lifecycle",
+            "system_observability",
+            "mission_process",
+            "governance_control"
+          ]
+        },
+        "legacy_category": { "type": "string", "minLength": 1 },
+        "exposed_to_surface": { "type": "boolean" },
+        "target": {
+          "type": "string",
+          "enum": [
+            "outcome",
+            "environment",
+            "actuator",
+            "llm",
+            "knowledge",
+            "system_state",
+            "mission_process",
+            "agent_team",
+            "external_service"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "change",
+            "inspect",
+            "diagnose",
+            "prepare",
+            "verify",
+            "activate",
+            "query",
+            "distill",
+            "organize",
+            "compose",
+            "delegate",
+            "execute",
+            "review",
+            "promote"
+          ]
+        },
+        "object": { "type": "string", "minLength": 1 },
+        "execution_shape": {
+          "type": "string",
+          "enum": [
+            "direct_reply",
+            "task_session",
+            "mission",
+            "project_bootstrap",
+            "browser_session",
+            "pipeline",
+            "actuator_action"
+          ]
+        },
+        "mission_class": {
+          "type": "string",
+          "enum": [
+            "product_delivery",
+            "code_change",
+            "research_and_absorption",
+            "content_and_media",
+            "operations_and_release",
+            "environment_and_recovery",
+            "decision_support",
+            "customer_engagement",
+            "platform_onboarding"
+          ]
+        },
+        "risk_profile": {
+          "type": "string",
+          "enum": ["low", "review_required", "approval_required", "high_stakes"]
+        },
         "description": { "type": "string", "minLength": 1 },
         "surface_examples": {
           "type": "array",
@@ -72,7 +151,21 @@
           "items": { "$ref": "#/$defs/pipelineStep" }
         }
       },
-      "required": ["id", "category", "description", "trigger_keywords"]
+      "required": [
+        "id",
+        "category",
+        "legacy_category",
+        "exposed_to_surface",
+        "target",
+        "action",
+        "object",
+        "execution_shape",
+        "mission_class",
+        "risk_profile",
+        "description",
+        "trigger_keywords",
+        "outcome_ids"
+      ]
     }
   }
 }

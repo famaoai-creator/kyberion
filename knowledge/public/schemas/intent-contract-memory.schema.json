@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-contract-memory.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "contextFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "type": "string" },
+        "merchant": { "type": "string" },
+        "locale": { "type": "string" },
+        "surface": { "type": "string" },
+        "execution_shape": { "type": "string" }
+      }
+    },
+    "contractRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["pipeline", "schema", "task_session_policy", "mission_command", "direct_reply"]
+        },
+        "ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intent_id",
+        "context_fingerprint",
+        "contract_ref",
+        "execution_shape",
+        "success_rate",
+        "sample_count",
+        "last_seen"
+      ],
+      "properties": {
+        "intent_id": { "type": "string", "minLength": 1 },
+        "context_fingerprint": { "$ref": "#/$defs/contextFingerprint" },
+        "contract_ref": { "$ref": "#/$defs/contractRef" },
+        "execution_shape": { "type": "string", "minLength": 1 },
+        "success_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sample_count": { "type": "integer", "minimum": 0 },
+        "last_seen": { "type": "string", "minLength": 1 },
+        "last_error": { "type": "string" }
+      }
+    }
+  }
+}

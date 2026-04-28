@@ -11,7 +11,7 @@
  * `action-item-execute-self.json`, and `action-item-tracking.json`.
  *
  * Usage:
- *   pnpm tsx scripts/meeting_orchestrator.ts \
+ *   node dist/scripts/meeting_orchestrator.js \
  *     --mission MSN-MEETING-2026-Q2 \
  *     --meeting-url "https://example.zoom.us/j/9999999999" \
  *     --platform zoom \

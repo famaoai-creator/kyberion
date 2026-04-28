@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "fallback_actuator": "orchestrator-actuator",
+    "require_approval_on_mismatch": true
+  },
+  "tool_routes": [
+    {
+      "tool_name": "run_pipeline",
+      "execution_mode": "deterministic_pipeline",
+      "preferred_actuators": ["orchestrator-actuator"],
+      "notes": "Pipeline execution should stay deterministic and governed."
+    },
+    {
+      "tool_name": "mission_controller",
+      "execution_mode": "mission_command",
+      "preferred_actuators": ["orchestrator-actuator"],
+      "notes": "Mission lifecycle operations route via mission controller command surface."
+    },
+    {
+      "tool_name": "web_fetch",
+      "execution_mode": "actuator_direct",
+      "preferred_actuators": ["browser-actuator", "network-actuator"],
+      "intent_ids": ["query-knowledge", "retrieve-url-content"]
+    },
+    {
+      "tool_name": "web_search",
+      "execution_mode": "llm_reasoning",
+      "preferred_actuators": ["browser-actuator", "network-actuator"],
+      "intent_ids": ["query-knowledge", "market-research"],
+      "notes": "Reasoning and summarization remain model-driven, with browser/network execution backends."
+    },
+    {
+      "tool_name": "points_portal_clickout",
+      "execution_mode": "deterministic_pipeline",
+      "preferred_actuators": ["browser-actuator", "orchestrator-actuator"],
+      "intent_ids": ["points-portal-search", "travel-booking-search"],
+      "fallback_pipeline_id": "points-portal-clickout"
+    }
+  ]
+}

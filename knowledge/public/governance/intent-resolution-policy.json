@@ -10,7 +10,7 @@
     "surface_overlap_increment": 0.03,
     "surface_overlap_max_confidence": 0.95,
     "selected_confidence_threshold": 0.45,
-    "catalog_intent_category": "surface"
+    "catalog_intent_category": "outcome_execution"
   },
   "legacy_candidates": [
     {
@@ -18,9 +18,14 @@
       "intent_id": "capture-photo",
       "confidence": 0.88,
       "source": "legacy",
-      "reasons": ["legacy capture-photo heuristic"],
+      "reasons": [
+        "legacy capture-photo heuristic"
+      ],
       "patterns": [
-        { "type": "regex", "value": "(写真|撮影|photo|picture|camera)" }
+        {
+          "type": "regex",
+          "value": "(写真|撮影|photo|picture|camera)"
+        }
       ],
       "resolution": {
         "shape": "task_session",
@@ -33,9 +38,14 @@
       "intent_id": "inspect-service",
       "confidence": 0.86,
       "source": "heuristic",
-      "reasons": ["service operation heuristic"],
+      "reasons": [
+        "service operation heuristic"
+      ],
       "patterns": [
-        { "type": "regex", "value": "(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)" }
+        {
+          "type": "regex",
+          "value": "(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)"
+        }
       ],
       "resolution": {
         "shape": "task_session",
