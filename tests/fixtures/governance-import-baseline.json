@@ -40,7 +40,6 @@
     "libs/core/src/pipeline-engine.test.ts",
     "libs/core/src/pipeline-preview.test.ts",
     "libs/core/trust-engine.test.ts",
-    "projects/faas-platform/infra/lib/stacks/lambda-runtime-stack.ts",
     "scripts/check_tier_hygiene.test.ts",
     "tests/a2a-lifecycle.test.ts",
     "tests/mission-orchestration-dashboard-contract.test.ts",
