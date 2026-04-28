@@ -25,6 +25,8 @@ import {
   logger,
   pathResolver,
   promoteMemoryCandidateToKnowledge,
+  resolveMissionClassification,
+  resolveMissionWorkflowDesign,
   updateMemoryPromotionCandidateStatus,
   safeReadFile,
   safeExec,
@@ -52,6 +54,7 @@ import {
   readFocusedMissionId as _readFocusedMissionId,
   writeFocusedMissionId as _writeFocusedMissionId,
   loadState,
+  saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
 import {
@@ -505,7 +508,11 @@ async function importMission(id: string, remoteUrl: string) {
 }
 
 async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
-  return _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinked);
+  const output = await _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinked);
+  if (result === 'verified') {
+    syncIntentContractMemorySnapshot(id, 'verify');
+  }
+  return output;
 }
 
 // distillMission, sealMission and all LLM/distillation helpers are defined
@@ -515,7 +522,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 //   - scripts/refactor/mission-seal.ts (sealMission)
 
 async function finishMission(id: string, seal: boolean = false) {
-  return _finishMission(id, seal, {
+  const result = await _finishMission(id, seal, {
     archiveDir: ARCHIVE_DIR,
     agentRuntimeEventPath: AGENT_RUNTIME_EVENT_PATH,
     getGitHash,
@@ -523,6 +530,35 @@ async function finishMission(id: string, seal: boolean = false) {
     syncProjectLedgerIfLinked,
     transitionStatus: transitionStatus as any,
   });
+  syncIntentContractMemorySnapshot(id, 'finish');
+  return result;
+}
+
+function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'): void {
+  try {
+    const upperId = id.toUpperCase();
+    const reportPath = pathResolver.shared(`runtime/reports/intent-contract-memory-sync-${upperId}-${stage}.json`);
+    const exportDir = pathResolver.shared(`exports/intent-contract-memory-sync/${upperId}`);
+    safeExec(process.execPath, [
+      'dist/scripts/sync_intent_contract_memory.js',
+      '--report',
+      reportPath,
+      '--mission-id',
+      upperId,
+      '--stage',
+      stage,
+      '--persist-export',
+      '--export-dir',
+      exportDir,
+    ], {
+      cwd: ROOT_DIR,
+      timeoutMs: 20_000,
+      maxOutputMB: 5,
+    });
+    logger.info(`🧠 Intent-contract memory synced (${stage}) report=${path.relative(ROOT_DIR, reportPath)}`);
+  } catch (error: any) {
+    logger.warn(`⚠️ Intent-contract memory sync skipped (${stage}): ${error?.message || error}`);
+  }
 }
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
@@ -716,6 +752,12 @@ Visibility Commands:
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
+  classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
+  workflow-select <ID> [intent] [task]
+                                 Resolve workflow template from mission classification
+  review-worker-output <ID> [verified|rejected] [note]
+                                 Record worker-output review result via mission verification
+  handoff <ID> <persona> [note]  Transfer mission persona ownership with audit history
 
 Governance Commands:
   accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]
@@ -784,6 +826,88 @@ async function staffMissionTeam(id: string) {
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string) {
   return _prewarmMissionTeam(id, teamRolesArg);
+}
+
+async function classifyMission(id: string, intentId?: string, taskType?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller classify <MISSION_ID> [intent_id] [task_type]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  const classification = resolveMissionClassification({
+    missionTypeHint: state.mission_type,
+    intentId,
+    taskType,
+    shape: 'mission',
+    utterance: `${state.mission_type || ''} ${state.vision_ref || ''}`.trim(),
+  });
+  console.log(JSON.stringify({ mission_id: upperId, classification }, null, 2));
+}
+
+async function selectMissionWorkflow(id: string, intentId?: string, taskType?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller workflow-select <MISSION_ID> [intent_id] [task_type]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  const classification = resolveMissionClassification({
+    missionTypeHint: state.mission_type,
+    intentId,
+    taskType,
+    shape: 'mission',
+    utterance: `${state.mission_type || ''} ${state.vision_ref || ''}`.trim(),
+  });
+  const workflow = resolveMissionWorkflowDesign({
+    missionClass: classification.mission_class,
+    deliveryShape: classification.delivery_shape,
+    riskProfile: classification.risk_profile,
+    stage: classification.stage,
+    executionShape: 'mission',
+    intentId,
+    taskType,
+  });
+  console.log(JSON.stringify({ mission_id: upperId, classification, workflow }, null, 2));
+}
+
+async function reviewWorkerOutput(id: string, result: 'verified' | 'rejected' = 'verified', note?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller review-worker-output <MISSION_ID> [verified|rejected] [note]');
+    return;
+  }
+  await verifyMission(id, result, note || `Worker output ${result} by operator review.`);
+}
+
+async function handoffMission(id: string, nextPersona: string, note?: string): Promise<void> {
+  if (!id || !nextPersona) {
+    logger.error('Usage: mission_controller handoff <MISSION_ID> <NEXT_PERSONA> [note]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  const previousPersona = state.assigned_persona;
+  state.assigned_persona = nextPersona;
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'HANDOFF',
+    note: note || `Handoff from ${previousPersona} to ${nextPersona}.`,
+  });
+  await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId);
+  logger.success(`✅ Mission ${upperId} handoff complete: ${previousPersona} -> ${nextPersona}`);
 }
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
@@ -988,6 +1112,22 @@ async function main() {
       break;
     case 'prewarm':
       await prewarmMissionTeam(arg1, arg2);
+      break;
+    case 'classify':
+      await classifyMission(arg1, arg2, arg3);
+      break;
+    case 'workflow-select':
+      await selectMissionWorkflow(arg1, arg2, arg3);
+      break;
+    case 'review-worker-output':
+      await reviewWorkerOutput(
+        arg1,
+        (arg2 as 'verified' | 'rejected') || 'verified',
+        arg3,
+      );
+      break;
+    case 'handoff':
+      await handoffMission(arg1, arg2, arg3);
       break;
     case 'sync':
       logger.info('Syncing mission registry...');

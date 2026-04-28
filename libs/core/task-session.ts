@@ -5,7 +5,7 @@ import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import {
@@ -404,8 +404,18 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   const trimmed = utterance.trim();
   if (!trimmed) return null;
   const packet = resolveIntentResolutionPacket(trimmed);
-  const builder = packet.selected_intent_id ? TASK_SESSION_INTENT_BUILDERS[packet.selected_intent_id] : undefined;
-  return builder ? builder(trimmed) : null;
+  const intentId = packet.selected_intent_id;
+  const builder = intentId ? TASK_SESSION_INTENT_BUILDERS[intentId] : undefined;
+  if (builder) return builder(trimmed);
+  if (!intentId) return null;
+
+  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
+  if (intent?.resolution?.shape !== 'task_session') return null;
+  try {
+    return buildPolicyBackedIntent(intentId, trimmed);
+  } catch {
+    return null;
+  }
 }
 
 export function validateTaskSession(session: unknown): ValidationResult<TaskSession> {
