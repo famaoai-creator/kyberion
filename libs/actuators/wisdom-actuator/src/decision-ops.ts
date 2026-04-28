@@ -1105,7 +1105,13 @@ export async function extractActionItemsOp(input: {
     }
   } catch (err: any) {
     logger.warn(`[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`);
-    return { items: [], written_count: 0, pending_review_count: 0 };
+    return {
+      items: [],
+      written_count: 0,
+      pending_review_count: 0,
+      partial_count: 0,
+      restricted_count: 0,
+    };
   }
 
   const operatorTokens = new Set([operatorLabel.toLowerCase(), 'operator', 'self', 'me']);
