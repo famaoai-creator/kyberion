@@ -157,22 +157,18 @@ function checkTenantScope(
 }
 
 /**
- * Append a `tenant.broker_access` event to the audit chain. Synchronous
- * dynamic import to avoid a circular dep at module load (audit-chain
- * lives in @agent/core too). Failures are swallowed because tier-guard
- * should never block a permitted operation just because the audit
- * forwarder hiccupped.
+ * Append a `tenant.broker_access` event to the audit chain. Uses ESM
+ * dynamic import to avoid a circular dependency at module load
+ * (audit-chain lives in @agent/core too). Failures are swallowed because
+ * tier-guard should never block a permitted operation just because the
+ * audit sink hiccupped.
  */
 function recordBrokerAccess(input: {
   relativePath: string;
   brokerTenants: string[];
   targetTenant: string;
 }): void {
-  try {
-    // Synchronous dynamic import via require equivalent — we lazy-load
-    // because tier-guard is on the secure-io critical path.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { auditChain } = require('./audit-chain.js') as typeof import('./audit-chain.js');
+  import('./audit-chain.js').then(({ auditChain }) => {
     auditChain.record({
       agentId: 'tier-guard',
       action: 'tenant.broker_access',
@@ -184,9 +180,9 @@ function recordBrokerAccess(input: {
         broker_tenants: input.brokerTenants,
       },
     });
-  } catch {
+  }).catch(() => {
     /* best-effort */
-  }
+  });
 }
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {

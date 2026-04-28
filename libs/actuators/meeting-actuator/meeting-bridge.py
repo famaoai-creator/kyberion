@@ -3,7 +3,8 @@
 Thin platform driver that dispatches to Zoom / Microsoft Teams / Google
 Meet behind a uniform JSON contract. The TS meeting-actuator
 (`libs/actuators/meeting-actuator/src/index.ts`) shells out to this
-script with one JSON payload per call and parses one JSON envelope back.
+script with one JSON payload on stdin per call and parses one JSON
+envelope back. argv[1] remains supported only for legacy callers.
 
 Contract (input → output):
 
@@ -288,12 +289,15 @@ class MeetingBridge:
 
 
 def main():
-    if len(sys.argv) < 2:
+    raw_payload = sys.stdin.read()
+    if not raw_payload and len(sys.argv) >= 2:
+        raw_payload = sys.argv[1]
+    if not raw_payload:
         print(json.dumps(_err("missing input payload")))
         sys.exit(1)
 
     try:
-        payload = json.loads(sys.argv[1])
+        payload = json.loads(raw_payload)
     except json.JSONDecodeError as exc:
         print(json.dumps(_err(f"invalid JSON input: {exc}")))
         sys.exit(1)
