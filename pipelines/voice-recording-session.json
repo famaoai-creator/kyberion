@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "name": "voice-recording-session",
+  "description": "Guides an operator to record a voice sample for cloning. Persona-parameterized — set context.persona_name (display name) and context.profile_id (slug, lowercase). Sample lands in knowledge/personal/voice/samples/{{profile_id}}/.",
+  "context": {
+    "persona_name": "the operator",
+    "profile_id": "operator-default-v1",
+    "duration_sec": 10,
+    "script_text": "こんにちは。私は{{persona_name}}です。Kyberion のデジタルプロファイルを作成するための音声サンプルを録音しています。"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ {{persona_name}} の音声録音セッションを開始します (profile={{profile_id}})。"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "{{duration_sec}} 秒間の録音を行います。次の文章を読み上げてください:\n「{{script_text}}」"
+      }
+    },
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "python3 libs/actuators/voice-actuator/scripts/record_bridge.py '{\"action\": \"record\", \"params\": {\"duration\": {{duration_sec}}, \"output_path\": \"knowledge/personal/voice/samples/{{profile_id}}/sample_01.wav\"}}'",
+        "export_as": "recording_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": {
+        "message": "✅ 録音結果: {{recording_result}}"
+      }
+    }
+  ]
+}

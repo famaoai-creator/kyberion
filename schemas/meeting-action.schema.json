@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Meeting Actuator Request",
+  "description": "Abstracted request for online meeting participation (Zoom, Teams, Google Meet).",
+  "type": "object",
+  "required": ["action", "params"],
+  "properties": {
+    "action": {
+      "enum": ["join", "leave", "speak", "listen", "chat", "status"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "platform": { "enum": ["zoom", "teams", "meet", "auto"] },
+        "url": { "type": "string", "format": "uri" },
+        "meeting_id": { "type": "string" },
+        "passcode": { "type": "string" },
+        "text": { "type": "string" },
+        "duration_sec": { "type": "integer" }
+      }
+    }
+  }
+}

@@ -107,6 +107,13 @@ function resolveSudoScope(): string[] | undefined {
   return scopes.length > 0 ? scopes : undefined;
 }
 
+function normalizeTenantSlug(value: string | undefined | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  return /^[a-z][a-z0-9-]{1,30}$/.test(trimmed) ? trimmed : undefined;
+}
+
 export function resolveIdentityContext(): IdentityContext {
   const missionId = process.env.MISSION_ID;
   const envPersona = process.env.KYBERION_PERSONA;
@@ -114,16 +121,35 @@ export function resolveIdentityContext(): IdentityContext {
 
   let persona: Persona = normalizePersona(envPersona);
   const authorities: Authority[] = [];
+  let tenantSlug: string | undefined = normalizeTenantSlug(process.env.KYBERION_TENANT);
+  let brokeredTenants: string[] | undefined;
 
-  // 1. Resolve Persona from Mission State if not in env
-  if ((persona === 'unknown') && missionId) {
-    const statePath = pathResolver.active(`missions/${missionId}/mission-state.json`);
-    try {
-      if (safeExistsSync(statePath)) {
-        const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
-        persona = normalizePersona(state.assigned_persona);
-      }
-    } catch (_) {}
+  // 1. Resolve Persona (and tenantSlug / brokeredTenants) from Mission State.
+  // Try the legacy no-tier path first, then fall back to tier-aware lookup
+  // (covers active/missions/{personal,confidential,public}/{id}/...).
+  if (missionId) {
+    const candidates: string[] = [
+      pathResolver.active(`missions/${missionId}/mission-state.json`),
+    ];
+    const tierPath = pathResolver.findMissionPath(missionId);
+    if (tierPath) candidates.push(`${tierPath}/mission-state.json`);
+    for (const statePath of candidates) {
+      try {
+        if (safeExistsSync(statePath)) {
+          const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+          if (persona === 'unknown') persona = normalizePersona(state.assigned_persona);
+          if (!tenantSlug) tenantSlug = normalizeTenantSlug(state.tenant_slug);
+          const brokered = state.cross_tenant_brokerage?.source_tenants;
+          if (Array.isArray(brokered) && brokered.length > 0) {
+            const slugs = brokered
+              .map((t: unknown) => normalizeTenantSlug(typeof t === 'string' ? t : undefined))
+              .filter((t): t is string => !!t);
+            if (slugs.length > 0) brokeredTenants = slugs;
+          }
+          break;
+        }
+      } catch (_) {}
+    }
   }
 
   // 2. Default Persona from process name if still unknown
@@ -171,6 +197,8 @@ export function resolveIdentityContext(): IdentityContext {
     missionId,
     role: envRole,
     sudoScope: resolveSudoScope(),
+    tenantSlug,
+    ...(brokeredTenants ? { brokeredTenants } : {}),
   };
 }
 

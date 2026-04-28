@@ -1,0 +1,22 @@
+{
+  "name": "@actuator/meeting",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Meeting-Actuator — abstracts Zoom / Teams / Google Meet behind a single ADF surface (join / leave / speak / listen / chat / status).",
+  "main": "../../../dist/libs/actuators/meeting-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/meeting-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "vitest": "^4.1.0"
+  }
+}
