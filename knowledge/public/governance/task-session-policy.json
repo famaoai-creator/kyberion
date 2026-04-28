@@ -9,7 +9,9 @@
         "success_condition": "A project record, kickoff context, and first work items are prepared."
       },
       "requirements": {
-        "default_missing": ["project_brief"]
+        "default_missing": [
+          "project_brief"
+        ]
       },
       "payload": {
         "static": {
@@ -29,7 +31,10 @@
           {
             "requirement": "camera_intent",
             "omit_when": [
-              { "type": "regex", "value": "(記録用|共有用|reference|record|share|ocr)" }
+              {
+                "type": "regex",
+                "value": "(記録用|共有用|reference|record|share|ocr)"
+              }
             ]
           }
         ]
@@ -40,9 +45,33 @@
             "field": "camera_intent",
             "default": "record",
             "rules": [
-              { "when": [{ "type": "regex", "value": "ocr" }], "value": "ocr_source" },
-              { "when": [{ "type": "regex", "value": "(共有|share)" }], "value": "share" },
-              { "when": [{ "type": "regex", "value": "(記録|record)" }], "value": "record" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "ocr"
+                  }
+                ],
+                "value": "ocr_source"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(共有|share)"
+                  }
+                ],
+                "value": "share"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(記録|record)"
+                  }
+                ],
+                "value": "record"
+              }
             ]
           }
         ]
@@ -60,7 +89,10 @@
           {
             "requirement": "project_name",
             "omit_when": [
-              { "type": "regex", "value": "(プロジェクト|project)" }
+              {
+                "type": "regex",
+                "value": "(プロジェクト|project)"
+              }
             ]
           }
         ]
@@ -71,7 +103,15 @@
             "field": "granularity",
             "default": "work_package",
             "rules": [
-              { "when": [{ "type": "regex", "value": "task" }], "value": "task" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "task"
+                  }
+                ],
+                "value": "task"
+              }
             ]
           }
         ]
@@ -89,7 +129,10 @@
           {
             "requirement": "deck_purpose",
             "omit_when": [
-              { "type": "regex", "value": "(提案|proposal|営業|marketing|社内共有|briefing)" }
+              {
+                "type": "regex",
+                "value": "(提案|proposal|営業|marketing|社内共有|briefing)"
+              }
             ]
           }
         ]
@@ -100,8 +143,24 @@
             "field": "deck_purpose",
             "default": "proposal",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(営業|marketing)" }], "value": "marketing" },
-              { "when": [{ "type": "regex", "value": "(社内共有|briefing)" }], "value": "internal_share" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(営業|marketing)"
+                  }
+                ],
+                "value": "marketing"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(社内共有|briefing)"
+                  }
+                ],
+                "value": "internal_share"
+              }
             ]
           }
         ]
@@ -119,7 +178,10 @@
           {
             "requirement": "report_kind",
             "omit_when": [
-              { "type": "regex", "value": "(進捗|status|要約|summary|proposal|仕様|spec)" }
+              {
+                "type": "regex",
+                "value": "(進捗|status|要約|summary|proposal|仕様|spec)"
+              }
             ]
           }
         ]
@@ -130,17 +192,57 @@
             "field": "report_kind",
             "default": "summary",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(仕様|spec)" }], "value": "spec" },
-              { "when": [{ "type": "regex", "value": "(提案|proposal)" }], "value": "proposal" },
-              { "when": [{ "type": "regex", "value": "(進捗|status)" }], "value": "status" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(仕様|spec)"
+                  }
+                ],
+                "value": "spec"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(提案|proposal)"
+                  }
+                ],
+                "value": "proposal"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(進捗|status)"
+                  }
+                ],
+                "value": "status"
+              }
             ]
           },
           {
             "field": "format",
             "default": "docx",
             "rules": [
-              { "when": [{ "type": "regex", "value": "pdf" }], "value": "pdf" },
-              { "when": [{ "type": "regex", "value": "(markdown|md)" }], "value": "markdown" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "pdf"
+                  }
+                ],
+                "value": "pdf"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(markdown|md)"
+                  }
+                ],
+                "value": "markdown"
+              }
             ]
           }
         ]
@@ -158,13 +260,19 @@
           {
             "requirement": "source_corpus",
             "omit_when": [
-              { "type": "regex", "value": "(要件定義|仕様|requirements?|incident|障害|不具合|bug)" }
+              {
+                "type": "regex",
+                "value": "(要件定義|仕様|requirements?|incident|障害|不具合|bug)"
+              }
             ]
           },
           {
             "requirement": "target_scope",
             "omit_when": [
-              { "type": "regex", "value": "(横断|横展開|across|cross-project|全体|複数プロジェクト)" }
+              {
+                "type": "regex",
+                "value": "(横断|横展開|across|cross-project|全体|複数プロジェクト)"
+              }
             ]
           }
         ]
@@ -177,23 +285,63 @@
           {
             "field": "source_corpus",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(要件定義|requirements?)" }], "value": "requirements" },
-              { "when": [{ "type": "regex", "value": "(incident|障害)" }], "value": "incidents" },
-              { "when": [{ "type": "regex", "value": "(不具合|bug)" }], "value": "bug_history" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(要件定義|requirements?)"
+                  }
+                ],
+                "value": "requirements"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(incident|障害)"
+                  }
+                ],
+                "value": "incidents"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(不具合|bug)"
+                  }
+                ],
+                "value": "bug_history"
+              }
             ]
           },
           {
             "field": "propagation_mode",
             "default": "cross_project_review",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(横展開|propagat(?:e|ion))" }], "value": "propagation_gap_review" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(横展開|propagat(?:e|ion))"
+                  }
+                ],
+                "value": "propagation_gap_review"
+              }
             ]
           },
           {
             "field": "action_bias",
             "default": "analysis",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(修正|fix)" }], "value": "remediation" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(修正|fix)"
+                  }
+                ],
+                "value": "remediation"
+              }
             ]
           }
         ]
@@ -211,13 +359,19 @@
           {
             "requirement": "incident_basis",
             "omit_when": [
-              { "type": "regex", "value": "(インシデント|障害|incident|failure|postmortem)" }
+              {
+                "type": "regex",
+                "value": "(インシデント|障害|incident|failure|postmortem)"
+              }
             ]
           },
           {
             "requirement": "review_target",
             "omit_when": [
-              { "type": "regex", "value": "(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)" }
+              {
+                "type": "regex",
+                "value": "(レビュー|review|設計|コード|変更|change|delivery|pull request|pr)"
+              }
             ]
           }
         ]
@@ -230,16 +384,48 @@
           {
             "field": "incident_basis",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(インシデント|障害|incident|failure|postmortem)" }], "value": "incident_history" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(インシデント|障害|incident|failure|postmortem)"
+                  }
+                ],
+                "value": "incident_history"
+              }
             ]
           },
           {
             "field": "review_target_kind",
             "default": "general_scope",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(コード|code|pr|pull request)" }], "value": "code_change" },
-              { "when": [{ "type": "regex", "value": "(設計|design)" }], "value": "design" },
-              { "when": [{ "type": "regex", "value": "(delivery|変更|change)" }], "value": "delivery_scope" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(コード|code|pr|pull request)"
+                  }
+                ],
+                "value": "code_change"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(設計|design)"
+                  }
+                ],
+                "value": "design"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(delivery|変更|change)"
+                  }
+                ],
+                "value": "delivery_scope"
+              }
             ]
           }
         ]
@@ -257,13 +443,19 @@
           {
             "requirement": "target_harness",
             "omit_when": [
-              { "type": "regex", "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)" }
+              {
+                "type": "regex",
+                "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)"
+              }
             ]
           },
           {
             "requirement": "evaluation_corpus",
             "omit_when": [
-              { "type": "regex", "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)" }
+              {
+                "type": "regex",
+                "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)"
+              }
             ]
           }
         ]
@@ -276,20 +468,44 @@
           {
             "field": "target_kind",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)" }], "value": "agent_harness" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(agent|エージェント|harness|ハーネス|agent\\.py|program\\.md|AGENTS\\.md)"
+                  }
+                ],
+                "value": "agent_harness"
+              }
             ]
           },
           {
             "field": "evaluation_mode",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)" }], "value": "benchmark" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(benchmark|ベンチマーク|評価|score|verifier|task suite|tasks/|evaluator)"
+                  }
+                ],
+                "value": "benchmark"
+              }
             ]
           },
           {
             "field": "change_policy",
             "default": "baseline_first",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(keep\\s*or\\s*discard|keep/discard)" }], "value": "benchmark_governed" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(keep\\s*or\\s*discard|keep/discard)"
+                  }
+                ],
+                "value": "benchmark_governed"
+              }
             ]
           }
         ]
@@ -303,7 +519,9 @@
         "success_condition": "The requested service operation completes and the result is reported back."
       },
       "requirements": {
-        "default_missing": ["service_name"]
+        "default_missing": [
+          "service_name"
+        ]
       },
       "payload": {
         "fields": [
@@ -311,13 +529,546 @@
             "field": "operation",
             "default": "start",
             "rules": [
-              { "when": [{ "type": "regex", "value": "(再起動|restart)" }], "value": "restart" },
-              { "when": [{ "type": "regex", "value": "(停止|stop)" }], "value": "stop" },
-              { "when": [{ "type": "regex", "value": "(ログ|logs?)" }], "value": "logs" },
-              { "when": [{ "type": "regex", "value": "(status|状態)" }], "value": "status" }
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(再起動|restart)"
+                  }
+                ],
+                "value": "restart"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(停止|stop)"
+                  }
+                ],
+                "value": "stop"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(ログ|logs?)"
+                  }
+                ],
+                "value": "logs"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(status|状態)"
+                  }
+                ],
+                "value": "status"
+              }
             ]
           }
         ]
+      }
+    },
+    {
+      "id": "bootstrap-kyberion-runtime",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Kyberion runtime baseline and surfaces are prepared for operation.",
+        "success_condition": "bootstrap-kyberion-runtime is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "bootstrap-kyberion-runtime",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "verify-environment-readiness",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Environment readiness is verified against declared manifests.",
+        "success_condition": "verify-environment-readiness is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "verify-environment-readiness",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "configure-reasoning-backend",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Configure or switch reasoning backend according to policy and availability.",
+        "success_condition": "configure-reasoning-backend is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "configure-reasoning-backend",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "register-actuator-adapter",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Register a new actuator adapter into governed actuator inventory.",
+        "success_condition": "register-actuator-adapter is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "register-actuator-adapter",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "verify-actuator-capability",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Verify declared actuator capability against executable probes.",
+        "success_condition": "verify-actuator-capability is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "verify-actuator-capability",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "rotate-integration-secret",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Rotate integration secret under governance controls.",
+        "success_condition": "rotate-integration-secret is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "rotate-integration-secret",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "distill-mission-knowledge",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Distill mission outputs into reusable knowledge assets.",
+        "success_condition": "distill-mission-knowledge is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "distill-mission-knowledge",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "organize-knowledge-assets",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Organize knowledge assets across taxonomy and project scopes.",
+        "success_condition": "organize-knowledge-assets is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "organize-knowledge-assets",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "promote-memory-candidate",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Promote approved memory candidate into governed tier.",
+        "success_condition": "promote-memory-candidate is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "promote-memory-candidate",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "sanitize-knowledge-for-public-tier",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Sanitize confidential or personal knowledge for public tier publication.",
+        "success_condition": "sanitize-knowledge-for-public-tier is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "sanitize-knowledge-for-public-tier",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "retire-stale-knowledge",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Retire stale or superseded knowledge entries with traceable rationale.",
+        "success_condition": "retire-stale-knowledge is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "retire-stale-knowledge",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "reconcile-knowledge-index",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Reconcile knowledge index consistency and missing links.",
+        "success_condition": "reconcile-knowledge-index is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "reconcile-knowledge-index",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "inspect-mission-state",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Inspect mission lifecycle state and blockers.",
+        "success_condition": "inspect-mission-state is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "inspect-mission-state",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "inspect-runtime-supervisor",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Inspect runtime supervisor status and active workers.",
+        "success_condition": "inspect-runtime-supervisor is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "inspect-runtime-supervisor",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "verify-audit-chain",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Verify audit chain integrity and completeness.",
+        "success_condition": "verify-audit-chain is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "verify-audit-chain",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "inspect-environment-readiness",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Inspect environment readiness state without applying changes.",
+        "success_condition": "inspect-environment-readiness is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "inspect-environment-readiness",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "classify-mission",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Classify mission into mission class, risk, and workflow hints.",
+        "success_condition": "classify-mission is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "classify-mission",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "select-mission-workflow",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Select appropriate mission workflow template for execution.",
+        "success_condition": "select-mission-workflow is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "select-mission-workflow",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "compose-mission-team",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Compose mission team blueprint based on workflow and authority model.",
+        "success_condition": "compose-mission-team is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "compose-mission-team",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "prewarm-mission-team",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Prewarm mission team runtime and capability readiness.",
+        "success_condition": "prewarm-mission-team is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "prewarm-mission-team",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "review-worker-output",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Review worker outputs before merge into mission state.",
+        "success_condition": "review-worker-output is executed with governed evidence and outcome."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "review-worker-output",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "deprecate-actuator-adapter",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Deprecate an actuator adapter under governance controls.",
+        "success_condition": "deprecate-actuator-adapter completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "deprecate-actuator-adapter"
+        }
+      }
+    },
+    {
+      "id": "rollback-actuator-adapter",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Rollback an actuator adapter to a known good state.",
+        "success_condition": "rollback-actuator-adapter completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "rollback-actuator-adapter"
+        }
+      }
+    },
+    {
+      "id": "recover-environment",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Recover environment from a degraded state.",
+        "success_condition": "recover-environment completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "recover-environment"
+        }
+      }
+    },
+    {
+      "id": "reset-environment-state",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Reset environment state under guarded procedures.",
+        "success_condition": "reset-environment-state completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "reset-environment-state"
+        }
+      }
+    },
+    {
+      "id": "audit-knowledge-tier-boundary",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Audit knowledge tier boundary violations and risks.",
+        "success_condition": "audit-knowledge-tier-boundary completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "audit-knowledge-tier-boundary"
+        }
+      }
+    },
+    {
+      "id": "trace-memory-promotion-decision",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Trace why memory candidates were promoted or rejected.",
+        "success_condition": "trace-memory-promotion-decision completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "trace-memory-promotion-decision"
+        }
+      }
+    },
+    {
+      "id": "request-approval",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Create a governance approval request.",
+        "success_condition": "request-approval completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "request-approval"
+        }
+      }
+    },
+    {
+      "id": "resolve-approval",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Resolve an existing approval request.",
+        "success_condition": "resolve-approval completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "resolve-approval"
+        }
+      }
+    },
+    {
+      "id": "escalate-governance-issue",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Escalate governance issues to operator intervention.",
+        "success_condition": "escalate-governance-issue completes with governed evidence."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "intent_id": "escalate-governance-issue"
+        }
       }
     }
   ]

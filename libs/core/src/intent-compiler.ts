@@ -16,6 +16,46 @@ export interface CompiledIntent {
   warnings?: string[];
 }
 
+function synthesizeDeterministicSteps(intentDef: any): any[] {
+  const intentId = String(intentDef?.id || '');
+  const shape = String(intentDef?.resolution?.shape || intentDef?.execution_shape || '');
+  if (!intentId || !shape) return [];
+
+  const pipelineByIntentId: Record<string, string> = {
+    'check-kyberion-baseline': 'baseline-check',
+    'diagnose-kyberion-system': 'system-diagnostics',
+    'verify-environment-readiness': 'baseline-check',
+    'inspect-environment-readiness': 'baseline-check',
+    'inspect-runtime-supervisor': 'system-diagnostics',
+    'verify-audit-chain': 'system-diagnostics',
+  };
+
+  if (shape === 'pipeline' || pipelineByIntentId[intentId]) {
+    const pipelineId = pipelineByIntentId[intentId];
+    if (!pipelineId) return [];
+    return [{
+      op: 'system:shell',
+      params: {
+        cmd: `node dist/scripts/run_pipeline.js --input pipelines/${pipelineId}.json`,
+      },
+    }];
+  }
+
+  if (shape === 'task_session') {
+    const commandByIntentId: Record<string, string> = {
+      'verify-actuator-capability': 'pnpm capabilities',
+      'inspect-runtime-supervisor': 'node dist/scripts/agent_runtime_supervisor_status.js',
+      'verify-environment-readiness': 'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
+      'inspect-environment-readiness': 'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
+    };
+    const cmd = commandByIntentId[intentId];
+    if (!cmd) return [];
+    return [{ op: 'system:shell', params: { cmd } }];
+  }
+
+  return [];
+}
+
 /**
  * Attempt to compile a natural language intent into pipeline steps.
  *
@@ -44,13 +84,17 @@ export function compileIntent(
 
   // 1. Exact ID match
   const exactMatch = standardIntents.find(si => si.id === intent || si.id === intentLower);
-  if (exactMatch && exactMatch.pipeline) {
+  if (exactMatch) {
+    const steps = exactMatch.pipeline
+      ? (exactMatch.pipeline.steps || exactMatch.pipeline)
+      : synthesizeDeterministicSteps(exactMatch);
+    if (!steps.length) return null;
     logger.info(`[INTENT_COMPILER] Exact match: ${exactMatch.id}`);
     return {
       intentId: exactMatch.id,
       confidence: 1.0,
       source: 'template',
-      steps: exactMatch.pipeline.steps || exactMatch.pipeline,
+      steps,
       explanation: `Exact match: ${exactMatch.id}`,
     };
   }
@@ -59,13 +103,17 @@ export function compileIntent(
   for (const si of standardIntents) {
     const triggers: string[] = si.triggers || si.trigger_keywords || si.keywords || [];
     const matched = triggers.some((t: string) => intentLower.includes(t.toLowerCase()));
-    if (matched && si.pipeline) {
+    if (matched) {
+      const steps = si.pipeline
+        ? (si.pipeline.steps || si.pipeline)
+        : synthesizeDeterministicSteps(si);
+      if (!steps.length) continue;
       logger.info(`[INTENT_COMPILER] Keyword match: ${si.id}`);
       return {
         intentId: si.id,
         confidence: 0.8,
         source: 'template',
-        steps: si.pipeline.steps || si.pipeline,
+        steps,
         explanation: `Keyword match: ${si.id} (trigger: ${triggers.join(', ')})`,
       };
     }

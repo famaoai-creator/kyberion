@@ -9,12 +9,12 @@
  * shell sink can ship to chat.
  *
  * Usage:
- *   pnpm tsx scripts/watch_tenant_drift.ts
- *   pnpm tsx scripts/watch_tenant_drift.ts --json
- *   pnpm tsx scripts/watch_tenant_drift.ts --quiet  # exit 1 only on drift
+ *   node dist/scripts/watch_tenant_drift.js
+ *   node dist/scripts/watch_tenant_drift.js --json
+ *   node dist/scripts/watch_tenant_drift.js --quiet  # exit 1 only on drift
  *
  * Cron example:
- *   *\/15 * * * * cd /opt/kyberion && pnpm tsx scripts/watch_tenant_drift.ts \
+ *   *\/15 * * * * cd /opt/kyberion && node dist/scripts/watch_tenant_drift.js \
  *      --quiet || /opt/kyberion/scripts/notify-slack.sh tenant-drift
  *
  * The watchdog is intentionally read-only and never mutates anything.

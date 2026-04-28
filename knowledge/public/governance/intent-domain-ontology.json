@@ -1,0 +1,1787 @@
+{
+  "version": "1.0.0",
+  "notes": [
+    "Canonical join layer between user-facing intents and governed execution design.",
+    "Every standard intent must have one domain ontology entry."
+  ],
+  "intents": [
+    {
+      "intent_id": "bootstrap-project",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "create",
+      "object": "project",
+      "exposed_to_surface": true,
+      "execution_shape": "project_bootstrap",
+      "mission_class": "product_delivery",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "product_development",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "project_created"
+      ],
+      "actuator_requirements": [
+        "orchestrator-actuator",
+        "artifact-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "knowledge-tier-hygiene",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "project-record",
+        "mission-seed-record"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "structured_output",
+          "tool_use"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "capture-photo",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_image",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "artifact:image"
+      ],
+      "actuator_requirements": [
+        "media-generation-actuator",
+        "artifact-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "artifact-record"
+      ]
+    },
+    {
+      "intent_id": "open-site",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "external_service",
+      "action": "execute",
+      "object": "browser_navigation",
+      "exposed_to_surface": true,
+      "execution_shape": "browser_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "explore-then-govern",
+      "team_template": "system_query",
+      "risk_profile": "low",
+      "outcome_ids": [
+        "browser_navigation"
+      ],
+      "actuator_requirements": [
+        "browser-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "browser-session"
+      ]
+    },
+    {
+      "intent_id": "browser-step",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "external_service",
+      "action": "execute",
+      "object": "browser_task_step",
+      "exposed_to_surface": true,
+      "execution_shape": "browser_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "explore-then-govern",
+      "team_template": "system_query",
+      "risk_profile": "low",
+      "outcome_ids": [
+        "browser_step"
+      ],
+      "actuator_requirements": [
+        "browser-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "browser-session"
+      ]
+    },
+    {
+      "intent_id": "generate-presentation",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_presentation",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "artifact:pptx"
+      ],
+      "actuator_requirements": [
+        "media-actuator",
+        "artifact-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "artifact-record",
+        "execution-receipt"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "structured_output",
+          "tool_use"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "generate-report",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_report",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "artifact:docx"
+      ],
+      "actuator_requirements": [
+        "media-actuator",
+        "artifact-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "artifact-record",
+        "execution-receipt"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "structured_output",
+          "tool_use"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "generate-workbook",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_workbook",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "artifact:xlsx"
+      ],
+      "actuator_requirements": [
+        "media-actuator",
+        "artifact-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "artifact-record",
+        "execution-receipt"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "structured_output",
+          "tool_use"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "inspect-service",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "inspect",
+      "object": "service_runtime",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "service_summary",
+        "approval_request"
+      ],
+      "actuator_requirements": [
+        "service-actuator",
+        "approval-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "knowledge-query",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "query",
+      "object": "knowledge_corpus",
+      "exposed_to_surface": true,
+      "execution_shape": "direct_reply",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "low",
+      "outcome_ids": [
+        "knowledge_answer"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ],
+      "reasoning_requirements": {
+        "mode": "surface_reply",
+        "capability_tags": [
+          "multilingual",
+          "structured_output"
+        ],
+        "fallback_allowed": true
+      }
+    },
+    {
+      "intent_id": "cross-project-remediation",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "review",
+      "object": "cross_project_evidence",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "remediation_plan"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "modeling-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "reasoning-backend",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "multi_step_reasoning",
+          "structured_output"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "incident-informed-review",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "review",
+      "object": "incident_history",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "review_findings"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "modeling-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "reasoning-backend",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "multi_step_reasoning",
+          "structured_output"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "evolve-agent-harness",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "agent_harness",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "harness_experiment_report"
+      ],
+      "actuator_requirements": [
+        "code-actuator",
+        "modeling-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": [
+          "tool_use",
+          "multi_step_reasoning"
+        ],
+        "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "live-query",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "external_service",
+      "action": "query",
+      "object": "live_information",
+      "exposed_to_surface": true,
+      "execution_shape": "direct_reply",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "system_query",
+      "risk_profile": "low",
+      "outcome_ids": [
+        "live_answer"
+      ],
+      "actuator_requirements": [
+        "network-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ],
+      "reasoning_requirements": {
+        "mode": "surface_reply",
+        "capability_tags": [
+          "tool_use"
+        ],
+        "fallback_allowed": true
+      }
+    },
+    {
+      "intent_id": "reconcile-ecosystem",
+      "category": "governance_control",
+      "legacy_category": "operator",
+      "target": "knowledge",
+      "action": "organize",
+      "object": "ecosystem_catalogs",
+      "exposed_to_surface": false,
+      "execution_shape": "pipeline",
+      "mission_class": "environment_and_recovery",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "service_summary"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "knowledge-tier-hygiene",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "audit-security",
+      "category": "governance_control",
+      "legacy_category": "operator",
+      "target": "system_state",
+      "action": "verify",
+      "object": "security_posture",
+      "exposed_to_surface": false,
+      "execution_shape": "pipeline",
+      "mission_class": "environment_and_recovery",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "incident",
+      "risk_profile": "high_stakes",
+      "outcome_ids": [
+        "service_summary"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "rebuild-env",
+      "category": "environment_setup",
+      "legacy_category": "operator",
+      "target": "environment",
+      "action": "prepare",
+      "object": "runtime_environment",
+      "exposed_to_surface": false,
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "high_stakes",
+      "outcome_ids": [
+        "service_summary"
+      ],
+      "actuator_requirements": [
+        "orchestrator-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "validate-all",
+      "category": "governance_control",
+      "legacy_category": "operator",
+      "target": "system_state",
+      "action": "verify",
+      "object": "governance_contracts",
+      "exposed_to_surface": false,
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "service_summary"
+      ],
+      "actuator_requirements": [
+        "modeling-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "maintenance-routine",
+      "category": "environment_setup",
+      "legacy_category": "operator",
+      "target": "environment",
+      "action": "change",
+      "object": "codebase_hygiene",
+      "exposed_to_surface": false,
+      "execution_shape": "pipeline",
+      "mission_class": "operations_and_release",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "service_summary"
+      ],
+      "actuator_requirements": [
+        "code-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "bootstrap-kyberion-runtime",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "prepare",
+      "object": "kyberion_runtime",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "environment_bootstrapped"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "service-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "verify-environment-readiness",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "verify",
+      "object": "environment_manifest",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "environment_readiness_report"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "readiness-report",
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "configure-reasoning-backend",
+      "category": "llm_reasoning_setup",
+      "legacy_category": "surface",
+      "target": "llm",
+      "action": "change",
+      "object": "reasoning_backend",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "reasoning_backend_configured"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "register-actuator-adapter",
+      "category": "actuator_management",
+      "legacy_category": "surface",
+      "target": "actuator",
+      "action": "create",
+      "object": "actuator_adapter",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "actuator_adapter_registered"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "schema-integrity",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "verify-actuator-capability",
+      "category": "actuator_management",
+      "legacy_category": "surface",
+      "target": "actuator",
+      "action": "verify",
+      "object": "actuator_contract",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "actuator_capability_report"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "rotate-integration-secret",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "change",
+      "object": "integration_secret",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "secret_rotation_completed"
+      ],
+      "actuator_requirements": [
+        "secret-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "audit-chain-status"
+      ]
+    },
+    {
+      "intent_id": "run-system-upgrade-check",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "diagnose",
+      "object": "system_upgrade",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "system_upgrade_check_report"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "query-knowledge",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "query",
+      "object": "knowledge_corpus",
+      "exposed_to_surface": true,
+      "execution_shape": "direct_reply",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "low",
+      "outcome_ids": [
+        "knowledge_answer"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "distill-mission-knowledge",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "distill",
+      "object": "mission_knowledge",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "knowledge_distill_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "modeling-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "organize-knowledge-assets",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "organize",
+      "object": "knowledge_assets",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "knowledge_organization_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "file-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "promote-memory-candidate",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "promote",
+      "object": "memory_candidate",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "memory_promotion_result"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "sanitize-knowledge-for-public-tier",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "organize",
+      "object": "knowledge_sanitization",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "knowledge_sanitization_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "sanitize-evidence",
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "retire-stale-knowledge",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "change",
+      "object": "knowledge_retirement",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "knowledge_retirement_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "file-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "reconcile-knowledge-index",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "verify",
+      "object": "knowledge_index",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "knowledge_reconciliation_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "file-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "check-kyberion-baseline",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "inspect",
+      "object": "kyberion_baseline",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "kyberion_baseline_status"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "check-kyberion-vital",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "inspect",
+      "object": "kyberion_vital",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "kyberion_vital_status"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "diagnose-kyberion-system",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "diagnose",
+      "object": "kyberion_system",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "kyberion_diagnostics_report"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "system-status-report"
+      ]
+    },
+    {
+      "intent_id": "inspect-mission-state",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "inspect",
+      "object": "mission_state",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_state_summary"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "inspect-runtime-supervisor",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "inspect",
+      "object": "runtime_supervisor",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "runtime_supervisor_summary"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "verify-audit-chain",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "verify",
+      "object": "audit_chain",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "audit_chain_verification_result"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "audit-chain-status"
+      ]
+    },
+    {
+      "intent_id": "inspect-environment-readiness",
+      "category": "system_observability",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "inspect",
+      "object": "environment_readiness",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "environment_readiness_report"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "create-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "create",
+      "object": "mission",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "product_delivery",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "product_development",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_created"
+      ],
+      "actuator_requirements": [
+        "orchestrator-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "mission-record",
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "classify-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "diagnose",
+      "object": "mission_classification",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "decision_support",
+      "workflow_template": "decision-support-exploratory",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_classification_result"
+      ],
+      "actuator_requirements": [
+        "modeling-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "select-mission-workflow",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "compose",
+      "object": "mission_workflow",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "decision_support",
+      "workflow_template": "decision-support-exploratory",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_workflow_selected"
+      ],
+      "actuator_requirements": [
+        "modeling-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "compose-mission-team",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "agent_team",
+      "action": "compose",
+      "object": "team_blueprint",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "product_delivery",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "product_development",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_team_composed"
+      ],
+      "actuator_requirements": [
+        "agent-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "team-blueprint",
+        "staffing-assignments",
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "prewarm-mission-team",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "agent_team",
+      "action": "prepare",
+      "object": "team_runtime",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_team_prewarmed"
+      ],
+      "actuator_requirements": [
+        "agent-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "reasoning-backend"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "delegate-mission-task",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "delegate",
+      "object": "task_contract",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "product_delivery",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "product_development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_task_delegated"
+      ],
+      "actuator_requirements": [
+        "agent-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-ledger",
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "review-worker-output",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "review",
+      "object": "worker_output",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "decision_support",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "worker_output_reviewed"
+      ],
+      "actuator_requirements": [
+        "approval-actuator",
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "handoff-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "mission_handoff",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_handoff_completed"
+      ],
+      "actuator_requirements": [
+        "agent-actuator",
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "distill-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "distill",
+      "object": "mission_knowledge",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_distilled"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "modeling-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "close-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "mission_closure",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_closed"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "orchestrator-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt",
+        "delivery-pack"
+      ]
+    },
+    {
+      "intent_id": "deprecate-actuator-adapter",
+      "category": "actuator_management",
+      "legacy_category": "surface",
+      "target": "actuator",
+      "action": "change",
+      "object": "actuator_adapter",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "actuator_adapter_deprecated"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "schema-integrity"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "rollback-actuator-adapter",
+      "category": "actuator_management",
+      "legacy_category": "surface",
+      "target": "actuator",
+      "action": "change",
+      "object": "actuator_adapter",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "actuator_adapter_rolled_back"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "recover-environment",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "prepare",
+      "object": "environment_runtime",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "environment_and_recovery",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "environment_recovered"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "service-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "reset-environment-state",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "environment",
+      "action": "change",
+      "object": "environment_state",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "environment_and_recovery",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "high_stakes",
+      "outcome_ids": [
+        "environment_state_reset"
+      ],
+      "actuator_requirements": [
+        "system-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "audit-knowledge-tier-boundary",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "inspect",
+      "object": "knowledge_tier_boundary",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "knowledge_tier_audit_report"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "trace-memory-promotion-decision",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "inspect",
+      "object": "memory_promotion_decision",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "memory_promotion_trace"
+      ],
+      "actuator_requirements": [
+        "wisdom-actuator"
+      ],
+      "readiness_required": [
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "reassign-mission-owner",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "mission_owner",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "product_development",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_owner_reassigned"
+      ],
+      "actuator_requirements": [
+        "agent-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "cancel-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "mission_cancellation",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "product_development",
+      "risk_profile": "approval_required",
+      "outcome_ids": [
+        "mission_canceled"
+      ],
+      "actuator_requirements": [
+        "process-actuator",
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "pause-mission",
+      "category": "mission_process",
+      "legacy_category": "surface",
+      "target": "mission_process",
+      "action": "change",
+      "object": "mission_pause",
+      "exposed_to_surface": true,
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "product_development",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "mission_paused"
+      ],
+      "actuator_requirements": [
+        "process-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "request-approval",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "create",
+      "object": "approval_request",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "approval_request_created"
+      ],
+      "actuator_requirements": [
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "resolve-approval",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "change",
+      "object": "approval_resolution",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "single-track-default",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": [
+        "approval_resolved"
+      ],
+      "actuator_requirements": [
+        "approval-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    },
+    {
+      "intent_id": "escalate-governance-issue",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "diagnose",
+      "object": "governance_issue",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "operations",
+      "risk_profile": "high_stakes",
+      "outcome_ids": [
+        "governance_issue_escalated"
+      ],
+      "actuator_requirements": [
+        "approval-actuator",
+        "system-actuator"
+      ],
+      "readiness_required": [
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": [
+        "execution-receipt"
+      ]
+    }
+  ]
+}

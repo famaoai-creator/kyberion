@@ -105,6 +105,293 @@
       "deliverable_kind": "project",
       "downloadable": false,
       "previewable": true
+    },
+    "environment_bootstrapped": {
+      "label": "environment bootstrapped",
+      "description": "Governed outcome for intent bootstrap-kyberion-runtime.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "environment_readiness_report": {
+      "label": "environment readiness report",
+      "description": "Governed outcome for intent verify-environment-readiness.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "reasoning_backend_configured": {
+      "label": "reasoning backend configured",
+      "description": "Governed outcome for intent configure-reasoning-backend.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "actuator_adapter_registered": {
+      "label": "actuator adapter registered",
+      "description": "Governed outcome for intent register-actuator-adapter.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "actuator_capability_report": {
+      "label": "actuator capability report",
+      "description": "Governed outcome for intent verify-actuator-capability.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "secret_rotation_completed": {
+      "label": "secret rotation completed",
+      "description": "Governed outcome for intent rotate-integration-secret.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "system_upgrade_check_report": {
+      "label": "system upgrade check report",
+      "description": "Governed outcome for intent run-system-upgrade-check.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_distill_report": {
+      "label": "knowledge distill report",
+      "description": "Governed outcome for intent distill-mission-knowledge.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_organization_report": {
+      "label": "knowledge organization report",
+      "description": "Governed outcome for intent organize-knowledge-assets.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "memory_promotion_result": {
+      "label": "memory promotion result",
+      "description": "Governed outcome for intent promote-memory-candidate.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_sanitization_report": {
+      "label": "knowledge sanitization report",
+      "description": "Governed outcome for intent sanitize-knowledge-for-public-tier.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_retirement_report": {
+      "label": "knowledge retirement report",
+      "description": "Governed outcome for intent retire-stale-knowledge.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_reconciliation_report": {
+      "label": "knowledge reconciliation report",
+      "description": "Governed outcome for intent reconcile-knowledge-index.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "kyberion_baseline_status": {
+      "label": "kyberion baseline status",
+      "description": "Governed outcome for intent check-kyberion-baseline.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "kyberion_vital_status": {
+      "label": "kyberion vital status",
+      "description": "Governed outcome for intent check-kyberion-vital.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "kyberion_diagnostics_report": {
+      "label": "kyberion diagnostics report",
+      "description": "Governed outcome for intent diagnose-kyberion-system.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_state_summary": {
+      "label": "mission state summary",
+      "description": "Governed outcome for intent inspect-mission-state.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "runtime_supervisor_summary": {
+      "label": "runtime supervisor summary",
+      "description": "Governed outcome for intent inspect-runtime-supervisor.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "audit_chain_verification_result": {
+      "label": "audit chain verification result",
+      "description": "Governed outcome for intent verify-audit-chain.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_created": {
+      "label": "mission created",
+      "description": "Governed outcome for intent create-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_classification_result": {
+      "label": "mission classification result",
+      "description": "Governed outcome for intent classify-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_workflow_selected": {
+      "label": "mission workflow selected",
+      "description": "Governed outcome for intent select-mission-workflow.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_team_composed": {
+      "label": "mission team composed",
+      "description": "Governed outcome for intent compose-mission-team.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_team_prewarmed": {
+      "label": "mission team prewarmed",
+      "description": "Governed outcome for intent prewarm-mission-team.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_task_delegated": {
+      "label": "mission task delegated",
+      "description": "Governed outcome for intent delegate-mission-task.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "worker_output_reviewed": {
+      "label": "worker output reviewed",
+      "description": "Governed outcome for intent review-worker-output.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_handoff_completed": {
+      "label": "mission handoff completed",
+      "description": "Governed outcome for intent handoff-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_distilled": {
+      "label": "mission distilled",
+      "description": "Governed outcome for intent distill-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_closed": {
+      "label": "mission closed",
+      "description": "Governed outcome for intent close-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "actuator_adapter_deprecated": {
+      "label": "actuator adapter deprecated",
+      "description": "Governed outcome for deprecate-actuator-adapter.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "actuator_adapter_rolled_back": {
+      "label": "actuator adapter rolled back",
+      "description": "Governed outcome for rollback-actuator-adapter.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "environment_recovered": {
+      "label": "environment recovered",
+      "description": "Governed outcome for recover-environment.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "environment_state_reset": {
+      "label": "environment state reset",
+      "description": "Governed outcome for reset-environment-state.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "knowledge_tier_audit_report": {
+      "label": "knowledge tier audit report",
+      "description": "Governed outcome for audit-knowledge-tier-boundary.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "memory_promotion_trace": {
+      "label": "memory promotion trace",
+      "description": "Governed outcome for trace-memory-promotion-decision.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_owner_reassigned": {
+      "label": "mission owner reassigned",
+      "description": "Governed outcome for reassign-mission-owner.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_canceled": {
+      "label": "mission canceled",
+      "description": "Governed outcome for cancel-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_paused": {
+      "label": "mission paused",
+      "description": "Governed outcome for pause-mission.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "approval_request_created": {
+      "label": "approval request created",
+      "description": "Governed outcome for request-approval.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "approval_resolved": {
+      "label": "approval resolved",
+      "description": "Governed outcome for resolve-approval.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "governance_issue_escalated": {
+      "label": "governance issue escalated",
+      "description": "Governed outcome for escalate-governance-issue.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
     }
   }
 }

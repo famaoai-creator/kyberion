@@ -1,5 +1,6 @@
 import { createStandardYargs } from '@agent/core';
 import {
+  ensureAgentRuntimeSupervisorDaemon,
   getAgentRuntimeStatusViaDaemon,
   getAgentRuntimeSupervisorHealth,
   listAgentRuntimesViaDaemon,
@@ -14,6 +15,11 @@ async function main() {
     .help()
     .parseAsync();
 
+  try {
+    await ensureAgentRuntimeSupervisorDaemon();
+  } catch (_) {
+    // fallback: getAgentRuntimeSupervisorHealth below retries through the same path
+  }
   const health = await getAgentRuntimeSupervisorHealth();
   if (argv.agentId) {
     const status = await getAgentRuntimeStatusViaDaemon(String(argv.agentId));
@@ -26,6 +32,13 @@ async function main() {
 }
 
 main().catch((error: any) => {
-  console.error(error?.message || String(error));
-  process.exit(1);
+  console.log(JSON.stringify({
+    health: {
+      ok: false,
+      degraded: true,
+      reason: error?.message || String(error),
+    },
+    runtimes: [],
+  }, null, 2));
+  process.exit(0);
 });

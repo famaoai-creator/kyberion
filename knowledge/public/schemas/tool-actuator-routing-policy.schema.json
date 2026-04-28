@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tool-actuator-routing-policy.schema.json",
+  "title": "Tool Actuator Routing Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults", "tool_routes"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fallback_actuator", "require_approval_on_mismatch"],
+      "properties": {
+        "fallback_actuator": { "type": "string", "minLength": 1 },
+        "require_approval_on_mismatch": { "type": "boolean" }
+      }
+    },
+    "tool_routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool_name", "execution_mode", "preferred_actuators"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "execution_mode": {
+            "type": "string",
+            "enum": ["deterministic_pipeline", "llm_reasoning", "mission_command", "actuator_direct"]
+          },
+          "intent_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "preferred_actuators": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "fallback_pipeline_id": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

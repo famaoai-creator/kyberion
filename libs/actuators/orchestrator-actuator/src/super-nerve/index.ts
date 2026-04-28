@@ -130,6 +130,30 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 }
 
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
+  if (domain === 'system') {
+    if (action === 'shell') {
+      const cmd = resolveVars(params?.cmd, ctx);
+      if (!cmd || typeof cmd !== 'string') return ctx;
+      const output = safeExec('zsh', ['-lc', cmd], { cwd: process.cwd(), timeoutMs: 120000 });
+      if (params?.export_as && typeof params.export_as === 'string') {
+        return { ...ctx, [params.export_as]: output.trim() };
+      }
+      return ctx;
+    }
+    if (action === 'log') {
+      if (params?.message) logger.info(String(resolveVars(params.message, ctx)));
+      return ctx;
+    }
+    if (action === 'pulse_status') {
+      const output = safeExec('node', ['dist/scripts/run_baseline_check.js'], { cwd: process.cwd(), timeoutMs: 120000 });
+      const trimmed = output.trim();
+      if (params?.export_as && typeof params.export_as === 'string') {
+        return { ...ctx, [params.export_as]: trimmed };
+      }
+      return { ...ctx, pulse_status: trimmed };
+    }
+  }
+
   const domainMap: Record<string, string> = {
     'file': 'dist/libs/actuators/file-actuator/src/index.js',
     'system': 'dist/libs/actuators/system-actuator/src/index.js',
@@ -138,6 +162,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     'browser': 'dist/libs/actuators/browser-actuator/src/index.js',
     'code': 'dist/libs/actuators/code-actuator/src/index.js',
     'orchestrator': 'dist/libs/actuators/orchestrator-actuator/src/index.js',
+    'modeling': 'dist/libs/actuators/modeling-actuator/src/index.js',
     'media': 'dist/libs/actuators/media-actuator/src/index.js',
     'service': 'dist/libs/actuators/service-actuator/src/index.js'
   };
