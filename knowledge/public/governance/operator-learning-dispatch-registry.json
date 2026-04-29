@@ -1,0 +1,217 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "rule_id": "executive-decision-support",
+      "priority": 100,
+      "match": {
+        "intent_ids": [
+          "executive-strategy-brief",
+          "executive-prioritization",
+          "executive-reporting",
+          "stakeholder-communication",
+          "sales-account-strategy"
+        ]
+      },
+      "dispatch": {
+        "decision_style_observed": "executive_options_with_recommendation",
+        "recurring_task_candidate": ["executive_decision_support"]
+      }
+    },
+    {
+      "rule_id": "technical-decision-support",
+      "priority": 95,
+      "match": {
+        "intent_ids": ["technical-decision-memo"]
+      },
+      "dispatch": {
+        "decision_style_observed": "decision_memo_with_tradeoffs",
+        "recurring_task_candidate": ["technical_decision_support"]
+      }
+    },
+    {
+      "rule_id": "technical-evaluation-provider",
+      "priority": 90,
+      "match": {
+        "intent_ids": ["llm-provider-selection"]
+      },
+      "dispatch": {
+        "decision_style_observed": "technical_evaluation",
+        "recurring_task_candidate": ["provider_selection"]
+      }
+    },
+    {
+      "rule_id": "technical-evaluation-runtime",
+      "priority": 90,
+      "match": {
+        "intent_ids": ["agent-runtime-tuning"]
+      },
+      "dispatch": {
+        "decision_style_observed": "technical_evaluation",
+        "recurring_task_candidate": ["runtime_tuning"]
+      }
+    },
+    {
+      "rule_id": "knowledge-query-dispatch",
+      "priority": 90,
+      "match": {
+        "intent_ids": ["knowledge-query"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["knowledge_query"]
+      }
+    },
+    {
+      "rule_id": "browser-navigation-dispatch",
+      "priority": 90,
+      "match": {
+        "intent_ids": ["open-site", "browser-step"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["browser_navigation"]
+      }
+    },
+    {
+      "rule_id": "approval-workflow-dispatch",
+      "priority": 90,
+      "match": {
+        "intent_ids": ["request-approval", "resolve-approval"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["approval_workflow"]
+      }
+    },
+    {
+      "rule_id": "kyberion-runtime-bootstrap",
+      "priority": 88,
+      "match": {
+        "intent_ids": [
+          "bootstrap-kyberion-runtime",
+          "verify-environment-readiness",
+          "configure-reasoning-backend",
+          "register-actuator-adapter"
+        ]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["kyberion_runtime_bootstrap"]
+      }
+    },
+    {
+      "rule_id": "onboarding-organization-toolchain",
+      "priority": 87,
+      "match": {
+        "intent_ids": ["configure-organization-toolchain"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["onboarding_setup"]
+      }
+    },
+    {
+      "rule_id": "onboarding-first-run",
+      "priority": 87,
+      "match": {
+        "intent_ids": ["launch-first-run-onboarding"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["onboarding_setup"]
+      }
+    },
+    {
+      "rule_id": "onboarding-presentation-preferences",
+      "priority": 87,
+      "match": {
+        "intent_ids": ["register-presentation-preference-profile"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["onboarding_setup"]
+      }
+    },
+    {
+      "rule_id": "kyberion-observability",
+      "priority": 88,
+      "match": {
+        "intent_ids": [
+          "check-kyberion-baseline",
+          "check-kyberion-vital",
+          "diagnose-kyberion-system",
+          "inspect-runtime-supervisor",
+          "inspect-mission-state"
+        ]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["kyberion_system_observability"]
+      }
+    },
+    {
+      "rule_id": "service-lifecycle",
+      "priority": 88,
+      "match": {
+        "intent_ids": ["start-service", "stop-service"]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["service_lifecycle"]
+      }
+    },
+    {
+      "rule_id": "kyberion-runtime-expansion",
+      "priority": 87,
+      "match": {
+        "intent_ids": [
+          "bootstrap-kyberion-runtime",
+          "verify-environment-readiness",
+          "configure-reasoning-backend",
+          "register-actuator-adapter"
+        ]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["kyberion_runtime_expansion"]
+      }
+    },
+    {
+      "rule_id": "kyberion-system-observability",
+      "priority": 87,
+      "match": {
+        "intent_ids": [
+          "check-kyberion-baseline",
+          "check-kyberion-vital",
+          "diagnose-kyberion-system",
+          "inspect-runtime-supervisor",
+          "inspect-mission-state"
+        ]
+      },
+      "dispatch": {
+        "recurring_task_candidate": ["kyberion_system_observability"]
+      }
+    },
+    {
+      "rule_id": "approval-threshold-risk",
+      "priority": 80,
+      "match": {
+        "risk_profiles": ["approval_required", "high_stakes"]
+      },
+      "dispatch": {
+        "approval_threshold_observed": ["high_risk_action"]
+      }
+    },
+    {
+      "rule_id": "approval-threshold-external-service",
+      "priority": 75,
+      "match": {
+        "targets": ["external_service"]
+      },
+      "dispatch": {
+        "approval_threshold_observed": ["external_side_effect"]
+      }
+    },
+    {
+      "rule_id": "approval-threshold-llm-reasoning",
+      "priority": 70,
+      "match": {
+        "categories": ["llm_reasoning_setup"]
+      },
+      "dispatch": {
+        "approval_threshold_observed": ["org_policy_change"]
+      }
+    }
+  ]
+}

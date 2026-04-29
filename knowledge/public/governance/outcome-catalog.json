@@ -78,6 +78,34 @@
       "downloadable": false,
       "previewable": true
     },
+    "clarification_packet": {
+      "label": "Clarification packet",
+      "description": "A structured clarification request or follow-up question set is returned to the human.",
+      "deliverable_kind": "answer",
+      "downloadable": false,
+      "previewable": true
+    },
+    "conversation_reply": {
+      "label": "Conversation reply",
+      "description": "A governed conversational reply is returned while preserving context continuity.",
+      "deliverable_kind": "answer",
+      "downloadable": false,
+      "previewable": true
+    },
+    "conversation_summary": {
+      "label": "Conversation summary",
+      "description": "A concise summary of the current conversation, decisions, and next steps is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_brief": {
+      "label": "Mission brief",
+      "description": "A governed mission brief or escalation proposal is returned from the conversation.",
+      "deliverable_kind": "brief",
+      "downloadable": false,
+      "previewable": true
+    },
     "remediation_plan": {
       "label": "Remediation plan",
       "description": "A governed cross-project remediation plan identifies where a known issue should be fixed or verified.",
@@ -144,6 +172,27 @@
     "actuator_adapter_registered": {
       "label": "actuator adapter registered",
       "description": "Governed outcome for intent register-actuator-adapter.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "organization_toolchain_configured": {
+      "label": "organization toolchain configured",
+      "description": "Governed outcome for intent configure-organization-toolchain.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "onboarding_plan": {
+      "label": "onboarding plan",
+      "description": "Governed outcome for intent launch-first-run-onboarding.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "presentation_preference_profile_registered": {
+      "label": "presentation preference profile registered",
+      "description": "Governed outcome for intent register-presentation-preference-profile.",
       "deliverable_kind": "report",
       "downloadable": false,
       "previewable": true
@@ -242,6 +291,20 @@
     "runtime_supervisor_summary": {
       "label": "runtime supervisor summary",
       "description": "Governed outcome for intent inspect-runtime-supervisor.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "service_started": {
+      "label": "service started",
+      "description": "Governed outcome for intent start-service.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "service_stopped": {
+      "label": "service stopped",
+      "description": "Governed outcome for intent stop-service.",
       "deliverable_kind": "report",
       "downloadable": false,
       "previewable": true
@@ -396,6 +459,76 @@
     "approval_resolved": {
       "label": "approval resolved",
       "description": "Governed outcome for resolve-approval.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "strategy_brief": {
+      "label": "strategy brief",
+      "description": "A concise strategy brief with options, recommendation, assumptions, risks, and next actions.",
+      "deliverable_kind": "brief",
+      "downloadable": false,
+      "previewable": true
+    },
+    "priority_roadmap": {
+      "label": "priority roadmap",
+      "description": "A focused roadmap that ranks priorities and explicitly lists deprioritized work.",
+      "deliverable_kind": "plan",
+      "downloadable": false,
+      "previewable": true
+    },
+    "executive_report": {
+      "label": "executive report",
+      "description": "A decision-ready executive summary with KPI signal, risks, and required actions.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "stakeholder_message": {
+      "label": "stakeholder message",
+      "description": "A stakeholder-facing message draft with tone, audience, and approval notes.",
+      "deliverable_kind": "brief",
+      "downloadable": false,
+      "previewable": true
+    },
+    "account_strategy_plan": {
+      "label": "account strategy plan",
+      "description": "A customer or account strategy plan with opportunity hypotheses and next actions.",
+      "deliverable_kind": "plan",
+      "downloadable": false,
+      "previewable": true
+    },
+    "technical_decision_memo": {
+      "label": "technical decision memo",
+      "description": "A concise technical decision memo with options, tradeoffs, recommendation, and rollback or revisit conditions.",
+      "deliverable_kind": "brief",
+      "downloadable": false,
+      "previewable": true
+    },
+    "provider_selection_report": {
+      "label": "provider selection report",
+      "description": "A reasoning or LLM provider comparison with recommended platform, model, constraints, and evaluation assumptions.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "runtime_tuning_plan": {
+      "label": "runtime tuning plan",
+      "description": "A runtime tuning plan with target metric, expected impact, measurement method, and rollback conditions.",
+      "deliverable_kind": "plan",
+      "downloadable": false,
+      "previewable": true
+    },
+    "release_readiness_report": {
+      "label": "release readiness report",
+      "description": "A go or no-go readiness report with blockers, conditions, evidence, and rollback notes.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "operator_learning_update": {
+      "label": "operator learning update",
+      "description": "A proposed operator-profile or request-pattern learning update with tier, evidence, and promotion decision.",
       "deliverable_kind": "report",
       "downloadable": false,
       "previewable": true

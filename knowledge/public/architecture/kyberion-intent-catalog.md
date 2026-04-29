@@ -80,7 +80,57 @@ The `counterfactual-branch` pipeline emits two artifacts per run:
   severity is `ok / warn / poor`. Use `wisdom:evaluate_simulation_quality`
   to re-run the rubric against an existing summary post-hoc.
 
-### 3.4 Stakeholder / negotiation work
+### 3.4 Conversation orchestration
+
+| Use case | Mission class | Primary intent |
+|---|---|---|
+| Ask for missing context or narrow a vague request | `customer_engagement` | `clarify-user-request` |
+| Continue an active thread without resetting context | `customer_engagement` | `continue-conversation` |
+| Summarize a discussion into decisions and next steps | `research_and_absorption` | `summarize-conversation` |
+| Turn a thread into a governed mission brief | `decision_support` | `conversation-to-mission` |
+
+These intents make human/LLM exchange explicit instead of treating it as an
+undifferentiated direct-reply fallback. The key design choice is that the
+conversation itself remains the primary object, while mission escalation is
+an explicit outcome rather than an implicit side effect.
+
+### 3.4b Schedule coordination
+
+| Use case | Mission class | Primary intent |
+|---|---|---|
+| Adjust, reschedule, or reconcile calendar constraints | `customer_engagement` | `schedule-coordination` |
+
+Schedule coordination is treated as a governed umbrella over calendar edits
+and schedule reshuffling. If the request becomes meeting-specific, Kyberion can
+hand off to `meeting-operations` after the schedule boundary is clarified.
+
+### 3.5 CEO / CTO operator harness
+
+| Use case | Mission class | Primary intent |
+|---|---|---|
+| Compare strategy options and recommend one path | `decision_support` | `executive-strategy-brief` |
+| Reduce executive focus to priorities and explicit non-priorities | `decision_support` | `executive-prioritization` |
+| Produce executive KPI or management-meeting summaries | `decision_support` | `executive-reporting` |
+| Draft stakeholder-facing communication | `customer_engagement` | `stakeholder-communication` |
+| Prepare customer or account strategy | `customer_engagement` | `sales-account-strategy` |
+| Write a CTO-style technical decision memo | `decision_support` | `technical-decision-memo` |
+| Select LLM/provider/model policy for a use case | `environment_and_recovery` | `llm-provider-selection` |
+| Plan agent runtime latency, cost, or capacity tuning | `operations_and_release` | `agent-runtime-tuning` |
+| Bootstrap or verify the Kyberion runtime | `platform_onboarding` | `bootstrap-kyberion-runtime` / `verify-environment-readiness` |
+| Configure reasoning backend or register a new actuator | `platform_onboarding` | `configure-reasoning-backend` / `register-actuator-adapter` |
+| Start a first-run onboarding wizard | `platform_onboarding` | `launch-first-run-onboarding` |
+| Configure organization-specific toolchain or save presentation preferences | `platform_onboarding` | `configure-organization-toolchain` / `register-presentation-preference-profile` |
+| Inspect Kyberion system health or runtime supervisor | `operations_and_release` | `check-kyberion-baseline` / `check-kyberion-vital` / `diagnose-kyberion-system` / `inspect-runtime-supervisor` |
+| Start or stop a governed service | `operations_and_release` | `start-service` / `stop-service` |
+| Assess release readiness and go/no-go conditions | `operations_and_release` | `release-readiness-review` |
+| Extract operator-specific preference learning | `research_and_absorption` | `operator-profile-learning` |
+
+These intents are optimized for an operator who alternates between CEO and CTO
+roles. They let Kyberion treat high-leverage executive and technical requests
+as named work shapes, while keeping personal adaptation behind explicit
+learning proposals.
+
+### 3.6 Stakeholder / negotiation work
 
 | Use case | Pipeline |
 |---|---|
@@ -89,7 +139,7 @@ The `counterfactual-branch` pipeline emits two artifacts per run:
 
 Built on the relationship-graph + dissent-log protocols.
 
-### 3.5 Content / media
+### 3.7 Content / media
 
 | Use case | Mission class | Pipeline |
 |---|---|---|
@@ -98,7 +148,7 @@ Built on the relationship-graph + dissent-log protocols.
 | Re-execute marketing iteration | `content_and_media` | `marketing-re-execute` |
 | PPTX from a template (ownership-aware) | `content_and_media` | `pptx-template-inherit` |
 
-### 3.6 Platform / API extension
+### 3.8 Platform / API extension
 
 | Use case | Pipeline |
 |---|---|
@@ -125,6 +175,15 @@ Required adapters that the pipeline expects you to register:
 - `DeploymentAdapter` (CI/CD trigger)
 - `AuditForwarder` (SIEM / log sink)
 - `SecretResolver` (HSM / Vault / cloud KMS)
+
+The first-run onboarding UX should make two reusable setup steps explicit:
+
+- first-run onboarding wizard to capture the operator's workspace and goals
+- organization toolchain registration for CI/CD, chat, deploy, and audit hooks
+- presentation preference registration for brief questions and visual theme hints
+
+Both are stored as governed knowledge so later requests can reuse the same
+setup without hard-coded branches.
 
 When the deployment serves more than one organization, follow
 [`multi-tenant-operations.md`](./multi-tenant-operations.md) for directory

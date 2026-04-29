@@ -31,7 +31,7 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
   shutdownAllAgentRuntimes: mocks.shutdownAllAgentRuntimes,
 }));
 
-vi.mock('./mission-team-composer.js', () => ({
+vi.mock('./mission-team-plan-composer.js', () => ({
   resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
   buildMissionTeamView: mocks.buildMissionTeamView,

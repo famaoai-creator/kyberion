@@ -1,7 +1,5 @@
 ---
 agentId: meeting-proxy
-provider: gemini
-modelId: gemini-2.5-pro
 capabilities: [presence, realtime, a2a, commands]
 auto_spawn: false
 trust_required: 1

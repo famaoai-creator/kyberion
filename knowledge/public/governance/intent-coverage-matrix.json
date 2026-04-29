@@ -83,6 +83,20 @@
       "gaps": []
     },
     {
+      "intent_id": "launch-first-run-onboarding",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session",
+      "work_shape": "task_session",
+      "outcome_ids": ["onboarding_plan"],
+      "execution_path": [
+        "task-session classifier",
+        "first-run onboarding wizard",
+        "integration and preference discovery",
+        "setup plan record"
+      ],
+      "gaps": []
+    },
+    {
       "intent_id": "meeting-operations",
       "status": "implemented",
       "entry_path": "voice-hub + task-session + meeting_orchestrator",
@@ -99,7 +113,7 @@
     },
     {
       "intent_id": "schedule-coordination",
-      "status": "partial",
+      "status": "implemented",
       "entry_path": "voice-hub + task-session",
       "work_shape": "task_session",
       "outcome_ids": ["schedule_coordination_summary"],
@@ -109,7 +123,7 @@
         "browser calendar management procedure",
         "schedule summary record"
       ],
-      "gaps": ["no dedicated calendar actuator; browser calendar flows remain route-specific"]
+      "gaps": []
     },
     {
       "intent_id": "open-site",
@@ -117,7 +131,7 @@
       "entry_path": "voice-hub browser route",
       "work_shape": "browser_session",
       "outcome_ids": ["browser_navigation"],
-      "execution_path": ["voice-hub browser conversation", "browser-actuator"],
+      "execution_path": ["voice-hub browser conversation", "browser-operator", "browser-actuator"],
       "gaps": []
     },
     {
@@ -126,7 +140,7 @@
       "entry_path": "voice-hub browser route",
       "work_shape": "browser_session",
       "outcome_ids": ["browser_step"],
-      "execution_path": ["voice-hub browser conversation", "browser-actuator"],
+      "execution_path": ["voice-hub browser conversation", "browser-operator", "browser-actuator"],
       "gaps": []
     },
     {
@@ -187,6 +201,132 @@
       "gaps": []
     },
     {
+      "intent_id": "clarify-user-request",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["clarification_packet"],
+      "execution_path": ["intent resolver", "router-contract", "clarification reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "continue-conversation",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["conversation_reply"],
+      "execution_path": ["intent resolver", "router-contract", "context-preserving reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "summarize-conversation",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["conversation_summary"],
+      "execution_path": ["intent resolver", "router-contract", "summary distillation"],
+      "gaps": []
+    },
+    {
+      "intent_id": "conversation-to-mission",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["mission_brief"],
+      "execution_path": ["intent resolver", "router-contract", "mission brief proposal"],
+      "gaps": []
+    },
+    {
+      "intent_id": "executive-strategy-brief",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["strategy_brief"],
+      "execution_path": ["intent resolver", "router-contract", "strategy brief reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "executive-prioritization",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["priority_roadmap"],
+      "execution_path": ["intent resolver", "router-contract", "priority roadmap reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "executive-reporting",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["executive_report"],
+      "execution_path": ["intent resolver", "router-contract", "executive summary reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "stakeholder-communication",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["stakeholder_message"],
+      "execution_path": ["intent resolver", "router-contract", "stakeholder message reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "sales-account-strategy",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["account_strategy_plan"],
+      "execution_path": ["intent resolver", "router-contract", "account strategy reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "technical-decision-memo",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["technical_decision_memo"],
+      "execution_path": ["intent resolver", "router-contract", "technical decision memo reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "llm-provider-selection",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["provider_selection_report"],
+      "execution_path": ["intent resolver", "router-contract", "provider comparison reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "agent-runtime-tuning",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["runtime_tuning_plan"],
+      "execution_path": ["intent resolver", "router-contract", "runtime tuning plan reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "release-readiness-review",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["release_readiness_report"],
+      "execution_path": ["intent resolver", "router-contract", "release readiness reply"],
+      "gaps": []
+    },
+    {
+      "intent_id": "operator-profile-learning",
+      "status": "implemented",
+      "entry_path": "voice-hub + direct reply",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["operator_learning_update"],
+      "execution_path": ["intent resolver", "router-contract", "operator learning proposal"],
+      "gaps": []
+    },
+    {
       "intent_id": "bootstrap-kyberion-runtime",
       "status": "implemented",
       "entry_path": "surface governed fast-path",
@@ -233,6 +373,32 @@
       "entry_path": "catalog-first task-session fallback",
       "work_shape": "task_session",
       "outcome_ids": ["actuator_adapter_registered"],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "configure-organization-toolchain",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": ["organization_toolchain_configured"],
+      "execution_path": [
+        "intent resolver",
+        "task-session classifier fallback",
+        "policy-backed task session"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "register-presentation-preference-profile",
+      "status": "implemented",
+      "entry_path": "catalog-first task-session fallback",
+      "work_shape": "task_session",
+      "outcome_ids": ["presentation_preference_profile_registered"],
       "execution_path": [
         "intent resolver",
         "task-session classifier fallback",

@@ -1,0 +1,317 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "scenario_id": "golden-human-clarification-request",
+      "scenario_class": "golden",
+      "utterance": "不足している情報を質問して",
+      "expected_intent_id": "clarify-user-request",
+      "expected_task_family": "customer_engagement",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["customer_engagement"],
+      "notes": "Human-LLM exchange should preserve the thread and ask targeted follow-up questions."
+    },
+    {
+      "scenario_id": "golden-human-conversation-continue",
+      "scenario_class": "golden",
+      "utterance": "続けて",
+      "expected_intent_id": "continue-conversation",
+      "expected_task_family": "customer_engagement",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["customer_engagement"],
+      "notes": "Continuation requests should keep the current thread coherent rather than reclassifying the task."
+    },
+    {
+      "scenario_id": "golden-human-conversation-summary",
+      "scenario_class": "golden",
+      "utterance": "ここまでを要約して",
+      "expected_intent_id": "summarize-conversation",
+      "expected_task_family": "research_and_absorption",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["research_and_absorption"],
+      "notes": "Summary requests should distill the thread into decisions and open questions."
+    },
+    {
+      "scenario_id": "golden-human-conversation-to-mission",
+      "scenario_class": "golden",
+      "utterance": "この会話をミッションにして",
+      "expected_intent_id": "conversation-to-mission",
+      "expected_task_family": "decision_support",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["decision_support"],
+      "notes": "Mission escalation should promote a durable brief instead of losing the conversation context."
+    },
+    {
+      "scenario_id": "golden-kyberion-bootstrap-runtime",
+      "scenario_class": "golden",
+      "utterance": "Kyberionの実行環境を初期化して",
+      "expected_intent_id": "bootstrap-kyberion-runtime",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_runtime_expansion"],
+      "notes": "Kyberion runtime bootstrap should be learned as a first-class platform onboarding request."
+    },
+    {
+      "scenario_id": "golden-kyberion-readiness",
+      "scenario_class": "golden",
+      "utterance": "環境の準備状態を確認して",
+      "expected_intent_id": "verify-environment-readiness",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_runtime_expansion"],
+      "notes": "Readiness checks should stay under the same Kyberion onboarding learning family."
+    },
+    {
+      "scenario_id": "golden-kyberion-baseline-status",
+      "scenario_class": "golden",
+      "utterance": "Kyberionのベースライン状態を確認して",
+      "expected_intent_id": "check-kyberion-baseline",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "pipeline",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_system_observability"],
+      "notes": "Baseline diagnostics should resolve to a pipeline-backed status intent."
+    },
+    {
+      "scenario_id": "golden-kyberion-vital-status",
+      "scenario_class": "golden",
+      "utterance": "Kyberionのvitalを確認して",
+      "expected_intent_id": "check-kyberion-vital",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "pipeline",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_system_observability"],
+      "notes": "Vital checks should resolve as a concise health diagnostic."
+    },
+    {
+      "scenario_id": "golden-kyberion-diagnostics",
+      "scenario_class": "golden",
+      "utterance": "Kyberionを診断して",
+      "expected_intent_id": "diagnose-kyberion-system",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "pipeline",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_system_observability"],
+      "notes": "Full diagnostics should remain a pipeline-backed observability case."
+    },
+    {
+      "scenario_id": "golden-kyberion-runtime-supervisor",
+      "scenario_class": "golden",
+      "utterance": "runtime supervisorの状態を確認して",
+      "expected_intent_id": "inspect-runtime-supervisor",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["kyberion_system_observability"],
+      "notes": "Supervisor state inspection should be learned as runtime observability."
+    },
+    {
+      "scenario_id": "golden-kyberion-service-start",
+      "scenario_class": "golden",
+      "utterance": "サービスを起動して",
+      "expected_intent_id": "start-service",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["service_lifecycle"],
+      "notes": "Service start should be a governed lifecycle action, not a generic chat reply."
+    },
+    {
+      "scenario_id": "golden-kyberion-service-stop",
+      "scenario_class": "golden",
+      "utterance": "サービスを停止して",
+      "expected_intent_id": "stop-service",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["service_lifecycle"],
+      "notes": "Service stop should be the symmetric lifecycle action."
+    },
+    {
+      "scenario_id": "approval-sensitive-configure-reasoning-backend",
+      "scenario_class": "approval-sensitive",
+      "utterance": "推論バックエンドを設定して",
+      "expected_intent_id": "configure-reasoning-backend",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["high_risk_action", "org_policy_change", "kyberion_runtime_expansion"],
+      "notes": "Backend configuration touches policy, so it must stay approval-sensitive."
+    },
+    {
+      "scenario_id": "approval-sensitive-register-actuator-adapter",
+      "scenario_class": "approval-sensitive",
+      "utterance": "新しいadapterを追加して",
+      "expected_intent_id": "register-actuator-adapter",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["high_risk_action", "kyberion_runtime_expansion"],
+      "notes": "Adapter registration should be learned as part of Kyberion expansion."
+    },
+    {
+      "scenario_id": "approval-sensitive-organization-toolchain",
+      "scenario_class": "approval-sensitive",
+      "utterance": "CI/CDを設定して",
+      "expected_intent_id": "configure-organization-toolchain",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["high_risk_action", "onboarding_setup"],
+      "notes": "Organization-specific toolchain setup should be modeled as a governed onboarding flow."
+    },
+    {
+      "scenario_id": "golden-first-run-onboarding",
+      "scenario_class": "golden",
+      "utterance": "初回セットアップを始めて",
+      "expected_intent_id": "launch-first-run-onboarding",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["onboarding_setup"],
+      "notes": "The first-run onboarding wizard should collapse startup guidance into one reusable intent."
+    },
+    {
+      "scenario_id": "golden-presentation-theme-registration",
+      "scenario_class": "golden",
+      "utterance": "デザインテーマを登録して",
+      "expected_intent_id": "register-presentation-preference-profile",
+      "expected_task_family": "platform_onboarding",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["onboarding_setup"],
+      "notes": "Presentation preference registration should be learned as reusable onboarding knowledge."
+    },
+    {
+      "scenario_id": "golden-knowledge-query",
+      "scenario_class": "golden",
+      "utterance": "mission authority を教えて",
+      "expected_intent_id": "knowledge-query",
+      "expected_task_family": "research_and_absorption",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["knowledge_query"],
+      "notes": "Knowledge lookups should remain direct-reply lookups with a reusable knowledge-query signal."
+    },
+    {
+      "scenario_id": "golden-open-site",
+      "scenario_class": "golden",
+      "utterance": "Open OpenAI docs",
+      "expected_intent_id": "open-site",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "browser_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["browser_navigation"],
+      "notes": "Browser navigation should be separated from generic direct replies so the operator learns the browser route."
+    },
+    {
+      "scenario_id": "golden-browser-step",
+      "scenario_class": "golden",
+      "utterance": "左下の承認ボタンを押して",
+      "expected_intent_id": "browser-step",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "browser_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["browser_navigation"],
+      "notes": "Browser step continuation should be recognized as a browser-session instruction."
+    },
+    {
+      "scenario_id": "golden-ceo-strategy-brief",
+      "scenario_class": "golden",
+      "utterance": "今期の成長戦略を3案で比較して、最も現実的な案を提案して",
+      "expected_intent_id": "executive-strategy-brief",
+      "expected_task_family": "decision_support",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["executive_options_with_recommendation", "executive_decision_support"],
+      "notes": "CEO strategy comparison should normalize into a decision brief and recurring executive decision support."
+    },
+    {
+      "scenario_id": "golden-cto-provider-selection",
+      "scenario_class": "golden",
+      "utterance": "OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して",
+      "expected_intent_id": "llm-provider-selection",
+      "expected_task_family": "environment_and_recovery",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["technical_evaluation", "provider_selection"],
+      "notes": "Provider selection should stay in the governed decision path and surface the provider-selection recurring pattern."
+    },
+    {
+      "scenario_id": "golden-cto-runtime-tuning",
+      "scenario_class": "golden",
+      "utterance": "エージェントの起動数とメモリ上限を調整して、遅延を半分にして",
+      "expected_intent_id": "agent-runtime-tuning",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["technical_evaluation", "runtime_tuning"],
+      "notes": "Runtime tuning should be classified as an operational tuning request with a concrete recurring task family."
+    },
+    {
+      "scenario_id": "approval-sensitive-release-review",
+      "scenario_class": "approval-sensitive",
+      "utterance": "明日のデプロイを go / no-go 判定して、条件付きなら条件も出して",
+      "expected_intent_id": "release-readiness-review",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["high_risk_action", "operations_and_release"],
+      "notes": "Readiness review should expose approval sensitivity even when the answer is a direct reply."
+    },
+    {
+      "scenario_id": "approval-sensitive-governance-request-approval",
+      "scenario_class": "approval-sensitive",
+      "utterance": "承認を依頼して",
+      "expected_intent_id": "request-approval",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["承認を依頼して", "approval_workflow"],
+      "notes": "Approval requests should route into a governed task session rather than a free-form reply."
+    },
+    {
+      "scenario_id": "approval-sensitive-governance-resolve-approval",
+      "scenario_class": "approval-sensitive",
+      "utterance": "承認依頼を解決して",
+      "expected_intent_id": "resolve-approval",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["承認依頼を解決して", "approval_workflow"],
+      "notes": "Approval resolution should stay in the same governance lane so approval state is explicit."
+    },
+    {
+      "scenario_id": "ambiguous-ceo-cto-hybrid",
+      "scenario_class": "ambiguous",
+      "utterance": "この投資判断の技術面を整理して、採用可否を1枚でまとめて",
+      "expected_intent_id": "technical-decision-memo",
+      "expected_task_family": "decision_support",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["decision_memo_with_tradeoffs", "technical_decision_support"],
+      "notes": "Hybrid prompts should still resolve to the nearest structured decision support intent."
+    },
+    {
+      "scenario_id": "controlled-failure-unresolved-request",
+      "scenario_class": "controlled-failure",
+      "utterance": "あとで例のやつをいい感じにして",
+      "expected_intent_id": "unresolved_intent",
+      "expected_task_family": "unresolved",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["clarification_requested", "clarification_prompted"],
+      "expected_learning_update": {
+        "candidate_created": false,
+        "promote_eligible": false
+      },
+      "notes": "An unresolved request should stay unresolved and trigger clarification rather than false precision."
+    }
+  ]
+}

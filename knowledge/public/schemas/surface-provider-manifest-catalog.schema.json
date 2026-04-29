@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-provider-manifest-catalog.schema.json",
+  "title": "Surface Provider Manifest Catalog Schema",
+  "type": "object",
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "channel", "manifest_path", "status"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "channel": { "type": "string", "minLength": 1 },
+          "manifest_path": { "type": "string", "minLength": 1 },
+          "policy_path": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

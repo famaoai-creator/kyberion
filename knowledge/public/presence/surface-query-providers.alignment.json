@@ -1,0 +1,13 @@
+{
+  "web_search": {
+    "maxResults": 6,
+    "timeoutMs": 4500
+  },
+  "weather": {
+    "timeoutMs": 4500
+  },
+  "knowledge": {
+    "limit": 7,
+    "phase": "alignment"
+  }
+}
