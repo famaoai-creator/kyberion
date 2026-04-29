@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/presentation-preference-registry.schema.json",
+  "title": "Presentation Preference Registry",
+  "description": "Registry of reusable presentation preference profiles with a public base and a personal overlay.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "default_profile_id", "profiles"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "default_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "profile_id", "brief_question_sets", "theme_sets"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["presentation-preference-profile"]
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["proposal", "internal_share", "briefing", "marketing", "training", "default"],
+            "default": "default"
+          },
+          "theme_selection_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["decision_mode", "ask_user_when"],
+            "properties": {
+              "decision_mode": {
+                "type": "string",
+                "enum": ["auto_with_preflight", "ask_when_uncertain", "always_confirm_theme"]
+              },
+              "ask_user_when": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "audience_unclear",
+                    "brand_alignment_unclear",
+                    "chart_density_unclear",
+                    "executive_tone_unclear",
+                    "new_deck_category",
+                    "user_requested_precheck"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "default_theme_hint": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "brief_question_sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["label", "deck_purposes", "questions"],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deck_purposes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "proposal",
+                      "internal_share",
+                      "briefing",
+                      "marketing",
+                      "training",
+                      "comparison"
+                    ]
+                  },
+                  "uniqueItems": true
+                },
+                "questions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "theme_sets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["label", "deck_purposes", "theme_hint"],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deck_purposes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "proposal",
+                      "internal_share",
+                      "briefing",
+                      "marketing",
+                      "training",
+                      "comparison"
+                    ]
+                  },
+                  "uniqueItems": true
+                },
+                "theme_hint": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "design_traits": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "executive",
+                      "brand_aligned",
+                      "minimal",
+                      "chart_heavy",
+                      "narrative",
+                      "technical",
+                      "teaching",
+                      "dense"
+                    ]
+                  },
+                  "uniqueItems": true
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

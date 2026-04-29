@@ -16,8 +16,6 @@
           "escalation_parent_team_role",
           "required_scope_classes",
           "ownership_scope",
-          "preferred_agents",
-          "preferred_models",
           "autonomy_level"
         ],
         "properties": {
@@ -28,8 +26,13 @@
           "escalation_parent_team_role": { "type": ["string", "null"] },
           "required_scope_classes": { "type": "array", "items": { "type": "string" } },
           "ownership_scope": { "type": "string" },
-          "preferred_agents": { "type": "array", "items": { "type": "string" } },
-          "preferred_models": { "type": "array", "items": { "type": "string" } },
+          "selection_hints": {
+            "type": "object",
+            "properties": {
+              "preferred_agents": { "type": "array", "items": { "type": "string" } },
+              "preferred_models": { "type": "array", "items": { "type": "string" } }
+            }
+          },
           "autonomy_level": { "enum": ["low", "medium", "high"] }
         }
       }

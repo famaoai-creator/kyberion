@@ -1,7 +1,7 @@
 import { logger } from './core.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import { type AgentHandle } from './agent-lifecycle.js';
-import { getAgentManifest, loadAgentManifests } from './agent-manifest.js';
+import { getAgentManifest, loadAgentManifests, resolveAgentSelectionHints } from './agent-manifest.js';
 import { auditChain } from './audit-chain.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
@@ -219,12 +219,13 @@ class A2ABridgeImpl {
       throw new Error(`Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/agents/${agentId}.agent.md to allow.`);
     }
 
-    const cwd = this.resolveSpawnCwd(agentId, manifest.provider || provider || 'gemini', manifest.systemPrompt, payload, runtimeContextKey);
+    const { provider: resolvedProvider, modelId: resolvedModelId } = resolveAgentSelectionHints(manifest, provider);
+    const cwd = this.resolveSpawnCwd(agentId, resolvedProvider, manifest.systemPrompt, payload, runtimeContextKey);
 
     const spawnOptions = {
       agentId,
-      provider: manifest.provider || provider || 'gemini',
-      modelId: manifest.modelId,
+      provider: resolvedProvider,
+      modelId: resolvedModelId,
       systemPrompt: manifest.systemPrompt,
       capabilities: manifest.capabilities,
       cwd,

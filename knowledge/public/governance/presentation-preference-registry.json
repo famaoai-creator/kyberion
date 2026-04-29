@@ -1,0 +1,95 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "business-deck-default",
+  "profiles": [
+    {
+      "kind": "presentation-preference-profile",
+      "profile_id": "business-deck-default",
+      "scope": "default",
+      "theme_selection_policy": {
+        "decision_mode": "ask_when_uncertain",
+        "ask_user_when": [
+          "audience_unclear",
+          "brand_alignment_unclear",
+          "chart_density_unclear",
+          "executive_tone_unclear",
+          "new_deck_category",
+          "user_requested_precheck"
+        ],
+        "default_theme_hint": "executive_clean"
+      },
+      "brief_question_sets": [
+        {
+          "label": "Proposal deck",
+          "deck_purposes": ["proposal"],
+          "questions": [
+            "誰に見せる資料ですか?",
+            "最終的に何を決めたいですか?",
+            "何枚くらいでまとめたいですか?"
+          ],
+          "notes": "Use for decision-making or approval-oriented decks."
+        },
+        {
+          "label": "Internal share deck",
+          "deck_purposes": ["internal_share"],
+          "questions": [
+            "社内のどのチーム向けですか?",
+            "結論を先に出すか、経緯を先に出すか、どちらですか?",
+            "口頭補足なしでも伝わる必要がありますか?"
+          ],
+          "notes": "Keep it short and practical for internal alignment."
+        },
+        {
+          "label": "Briefing deck",
+          "deck_purposes": ["briefing"],
+          "questions": [
+            "説明相手は経営層ですか、現場ですか?",
+            "比較資料と要点まとめのどちらが必要ですか?",
+            "スピーカーノートも必要ですか?"
+          ],
+          "notes": "Use for short, structured briefings."
+        },
+        {
+          "label": "Marketing deck",
+          "deck_purposes": ["marketing"],
+          "questions": [
+            "営業資料ですか、告知資料ですか?",
+            "ブランド準拠の強さはどの程度必要ですか?",
+            "図解中心と写真中心のどちらが良いですか?"
+          ],
+          "notes": "Prefer persuasive and brand-aligned framing."
+        }
+      ],
+      "theme_sets": [
+        {
+          "label": "Executive clean",
+          "deck_purposes": ["proposal", "briefing"],
+          "theme_hint": "executive_clean",
+          "design_traits": ["executive", "minimal", "brand_aligned"],
+          "notes": "Use for leadership decks and concise decision material."
+        },
+        {
+          "label": "Internal practical",
+          "deck_purposes": ["internal_share"],
+          "theme_hint": "internal_practical",
+          "design_traits": ["minimal", "technical"],
+          "notes": "Use for team updates and working notes."
+        },
+        {
+          "label": "Marketing branded",
+          "deck_purposes": ["marketing"],
+          "theme_hint": "marketing_branded",
+          "design_traits": ["brand_aligned", "narrative"],
+          "notes": "Use when the deck should feel polished and externally persuasive."
+        },
+        {
+          "label": "Training structured",
+          "deck_purposes": ["training", "comparison"],
+          "theme_hint": "training_structured",
+          "design_traits": ["teaching", "chart_heavy", "dense"],
+          "notes": "Use when the deck needs explanation and step-by-step coverage."
+        }
+      ]
+    }
+  ]
+}

@@ -17,10 +17,14 @@ export interface AgentRequirements {
   files?: string[];           // Required files (relative to project root)
 }
 
+export interface AgentSelectionHints {
+  preferred_provider?: AgentProvider;
+  preferred_modelId?: string;
+}
+
 export interface AgentManifest {
   agentId: string;
-  provider: AgentProvider;
-  modelId: string;
+  selection_hints?: AgentSelectionHints;
   capabilities: string[];
   autoSpawn: boolean;
   trustRequired: number;
@@ -81,12 +85,63 @@ function parseValue(raw: string): any {
   return raw;
 }
 
+function loadAgentProfileSelectionHints(rootDir: string): Record<string, AgentSelectionHints> {
+  const profilePath = path.join(rootDir, 'knowledge', 'public', 'orchestration', 'agent-profile-index.json');
+  if (!safeExistsSync(profilePath)) return {};
+  try {
+    const raw = JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as {
+      agents?: Record<string, {
+        selection_hints?: {
+          preferred_provider?: AgentProvider;
+          preferred_modelId?: string;
+        };
+      }>;
+    };
+    const result: Record<string, AgentSelectionHints> = {};
+    for (const [agentId, entry] of Object.entries(raw.agents || {})) {
+      result[agentId] = {
+        preferred_provider: entry.selection_hints?.preferred_provider,
+        preferred_modelId: entry.selection_hints?.preferred_modelId,
+      };
+    }
+    return result;
+  } catch (error: any) {
+    logger.warn(`[AGENT_MANIFEST] Failed to load profile selection hints: ${error?.message || error}`);
+    return {};
+  }
+}
+
+export function resolveAgentSelectionHints(
+  manifest: AgentManifest,
+  fallbackProvider?: AgentProvider,
+): { provider: AgentProvider; modelId: string } {
+  return resolveSelectionHints(manifest.selection_hints, fallbackProvider, manifest.agentId);
+}
+
+export function resolveSelectionHints(
+  selectionHints: AgentSelectionHints | undefined,
+  fallbackProvider?: AgentProvider,
+  fallbackModelId?: string,
+  agentId = 'unknown-agent',
+): { provider: AgentProvider; modelId: string } {
+  const provider = selectionHints?.preferred_provider || fallbackProvider;
+  const modelId = selectionHints?.preferred_modelId || fallbackModelId;
+  if (!provider) {
+    throw new Error(`Missing provider selection hint for agent "${agentId}"`);
+  }
+  if (!modelId) {
+    throw new Error(`Missing model selection hint for agent "${agentId}"`);
+  }
+  return { provider, modelId };
+}
+
 /**
  * Load all agent manifests from knowledge/agents/
  */
 export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const root = rootDir || findProjectRoot();
   const agentsDir = path.join(root, 'knowledge', 'agents');
+  const profileSelectionHints = loadAgentProfileSelectionHints(root);
 
   if (!safeExistsSync(agentsDir)) {
     logger.warn(`[AGENT_MANIFEST] Directory not found: ${agentsDir}`);
@@ -113,8 +168,8 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const { meta, body } = parseFrontmatter(content);
 
-      if (!meta.agentId || !meta.provider) {
-        logger.warn(`[AGENT_MANIFEST] Skipping ${file}: missing agentId or provider`);
+      if (!meta.agentId) {
+        logger.warn(`[AGENT_MANIFEST] Skipping ${file}: missing agentId`);
         continue;
       }
 
@@ -124,18 +179,12 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
         continue;
       }
 
-      // Validate provider
-      const validProviders = ['gemini', 'claude', 'codex', 'copilot'];
-      if (!validProviders.includes(meta.provider)) {
-        logger.warn(`[AGENT_MANIFEST] Skipping ${file}: invalid provider "${meta.provider}" (must be: ${validProviders.join(', ')})`);
-        continue;
-      }
+      const profileHints = profileSelectionHints[meta.agentId] || {};
 
       const req = meta.requires || {};
       manifests.push({
         agentId: meta.agentId,
-        provider: meta.provider,
-        modelId: meta.modelId || meta.provider,
+        selection_hints: profileHints,
         capabilities: Array.isArray(meta.capabilities) ? meta.capabilities : [],
         autoSpawn: meta.auto_spawn ?? meta.autoSpawn ?? false,
         trustRequired: meta.trust_required ?? meta.trustRequired ?? 0,

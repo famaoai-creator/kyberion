@@ -143,6 +143,53 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'operator-learning-scenario-pack',
+    schemaPath: 'knowledge/public/schemas/operator-learning-scenario-pack.schema.json',
+    dataPath: 'knowledge/public/governance/operator-learning-scenario-pack.json',
+    invalidPayload: {
+      version: '1.0.0',
+      scenarios: [],
+    },
+  },
+  {
+    name: 'operator-learning-dispatch-registry',
+    schemaPath: 'knowledge/public/schemas/operator-learning-dispatch-registry.schema.json',
+    dataPath: 'knowledge/public/governance/operator-learning-dispatch-registry.json',
+    invalidPayload: {
+      version: '1.0.0',
+      rules: [],
+    },
+  },
+  {
+    name: 'presentation-preference-registry',
+    schemaPath: 'knowledge/public/schemas/presentation-preference-registry.schema.json',
+    dataPath: 'knowledge/public/governance/presentation-preference-registry.json',
+    invalidPayload: {
+      version: '1.0.0',
+      default_profile_id: 'business-deck-default',
+      profiles: [],
+    },
+  },
+  {
+    name: 'surface-query-overlay-catalog',
+    schemaPath: 'knowledge/public/schemas/surface-query-overlay-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/surface-query-overlay-catalog.json',
+    invalidPayload: {
+      version: '1.0.0',
+      base_config_path: 'public/presence/surface-query-providers.json',
+      overlays: [{ id: 'missing-path', kind: 'role' }],
+    },
+  },
+  {
+    name: 'surface-provider-manifest-catalog',
+    schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/surface-provider-manifest-catalog.json',
+    invalidPayload: {
+      version: '1.0.0',
+      entries: [{ id: 'slack', channel: 'slack' }],
+    },
+  },
+  {
     name: 'tool-actuator-routing-policy',
     schemaPath: 'knowledge/public/schemas/tool-actuator-routing-policy.schema.json',
     dataPath: 'knowledge/public/governance/tool-actuator-routing-policy.json',

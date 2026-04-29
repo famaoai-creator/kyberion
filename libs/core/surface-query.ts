@@ -1,6 +1,9 @@
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import AjvModule, { type ValidateFunction } from 'ajv';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { listSurfaceQueryOverlayCatalogEntries, loadSurfaceQueryOverlayCatalog } from './surface-query-overlay-catalog.js';
 
 export interface SurfaceQueryProviderConfig {
   web_search?: {
@@ -28,12 +31,61 @@ export interface SurfaceQueryProviderConfig {
   };
 }
 
+export interface SurfaceQueryProviderContext {
+  role?: string;
+  phase?: string;
+}
+
 export type SurfaceQueryIntent = 'weather' | 'location' | 'web_search' | 'knowledge_search' | null;
 
 const DEFAULT_CONFIG_PATH = pathResolver.knowledge('public/presence/surface-query-providers.json');
+const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/presence/surface-query-providers.json');
+const CONFIG_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-query-providers.schema.json');
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
 
 let cachedConfig: SurfaceQueryProviderConfig | null = null;
 let cachedConfigPath: string | null = null;
+let validateFn: ValidateFunction | null = null;
+
+function ensureValidator(): ValidateFunction {
+  if (validateFn) return validateFn;
+  validateFn = compileSchemaFromPath(ajv, CONFIG_SCHEMA_PATH);
+  return validateFn;
+}
+
+function errorsFrom(validate: ValidateFunction): string[] {
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
+}
+
+function validateConfig(value: unknown, label: string): SurfaceQueryProviderConfig {
+  const validate = ensureValidator();
+  if (!validate(value)) {
+    throw new Error(`Invalid surface query provider config at ${label}: ${errorsFrom(validate).join('; ')}`);
+  }
+  return value as SurfaceQueryProviderConfig;
+}
+
+function mergeSection<T extends Record<string, unknown> | undefined>(base: T, overlay: T): T {
+  if (!base) return overlay;
+  if (!overlay) return base;
+  return { ...(base as Record<string, unknown>), ...(overlay as Record<string, unknown>) } as T;
+}
+
+function mergeConfigs(
+  base: SurfaceQueryProviderConfig,
+  overlay: SurfaceQueryProviderConfig
+): SurfaceQueryProviderConfig {
+  return {
+    web_search: mergeSection(base.web_search, overlay.web_search),
+    weather: mergeSection(base.weather, overlay.weather),
+    location: mergeSection(base.location, overlay.location),
+    knowledge: mergeSection(base.knowledge, overlay.knowledge),
+  };
+}
 
 function normalizeQuery(text: string): string {
   return text.trim().replace(/\s+/g, ' ');
@@ -47,23 +99,85 @@ function stripLeadingPhrases(text: string, patterns: RegExp[]): string {
   return current;
 }
 
-export function getSurfaceQueryProviderConfig(): SurfaceQueryProviderConfig {
+function getRoleOverlayPathForRole(role?: string): string | null {
+  const normalized = role?.trim();
+  if (!normalized) return null;
+  const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
+    (entry) => entry.kind === 'role' && entry.role === normalized
+  );
+  return catalogEntry ? pathResolver.knowledge(catalogEntry.path) : null;
+}
+
+function getPhaseOverlayPathForPhase(phase?: string): string | null {
+  const normalized = phase?.trim();
+  if (!normalized) return null;
+  const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
+    (entry) => entry.kind === 'phase' && entry.phase === normalized
+  );
+  return catalogEntry ? pathResolver.knowledge(catalogEntry.path) : null;
+}
+
+function getPersonalOverlayPath(): string | null {
+  const catalog = loadSurfaceQueryOverlayCatalog();
+  return (
+    process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH?.trim() ||
+    (catalog?.personal_overlay_path ? pathResolver.knowledge(catalog.personal_overlay_path) : DEFAULT_PERSONAL_OVERLAY_PATH)
+  );
+}
+
+function getRequestedRole(context: SurfaceQueryProviderContext): string | undefined {
+  return context.role?.trim() || process.env.KYBERION_SURFACE_QUERY_ROLE?.trim() || undefined;
+}
+
+function getRequestedPhase(context: SurfaceQueryProviderContext): string | undefined {
+  return context.phase?.trim() || process.env.KYBERION_SURFACE_QUERY_PHASE?.trim() || undefined;
+}
+
+export function getSurfaceQueryProviderConfig(
+  context: SurfaceQueryProviderContext = {}
+): SurfaceQueryProviderConfig {
   const configPath = process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH || DEFAULT_CONFIG_PATH;
-  if (cachedConfig && cachedConfigPath === configPath) return cachedConfig;
+  loadSurfaceQueryOverlayCatalog();
+  const overlayPaths = [
+    getPhaseOverlayPathForPhase(getRequestedPhase(context)),
+    getRoleOverlayPathForRole(getRequestedRole(context)),
+    getPersonalOverlayPath(),
+  ]
+    .filter((path): path is string => Boolean(path))
+    .filter((path, index, self) => self.indexOf(path) === index);
+  const cacheKey = [configPath, ...overlayPaths].join('::');
+  if (cachedConfig && cachedConfigPath === cacheKey) return cachedConfig;
 
   if (!safeExistsSync(configPath)) {
-    cachedConfigPath = configPath;
+    cachedConfigPath = cacheKey;
     cachedConfig = {};
     return cachedConfig;
   }
 
   try {
-    cachedConfig = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string) as SurfaceQueryProviderConfig;
+    let config = validateConfig(
+      JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string),
+      configPath
+    );
+    for (const overlayPath of overlayPaths) {
+      if (!safeExistsSync(overlayPath)) continue;
+      const overlay = validateConfig(
+        JSON.parse(safeReadFile(overlayPath, { encoding: 'utf8' }) as string),
+        overlayPath
+      );
+      config = mergeConfigs(config, overlay);
+    }
+    cachedConfig = config;
   } catch {
     cachedConfig = {};
   }
-  cachedConfigPath = configPath;
+  cachedConfigPath = cacheKey;
   return cachedConfig;
+}
+
+export function resetSurfaceQueryProviderConfigCache(): void {
+  cachedConfig = null;
+  cachedConfigPath = null;
 }
 
 export function isSurfaceLocationQuery(text: string): boolean {

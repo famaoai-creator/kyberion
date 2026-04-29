@@ -9,8 +9,10 @@
       "escalation_parent_team_role": null,
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns end-to-end mission objective, integration, and final acceptance.",
-      "preferred_agents": ["nerve-agent", "sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "high"
     },
     "planner": {
@@ -21,8 +23,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns decomposition, sequencing, and contract completeness.",
-      "preferred_agents": ["planner-agent", "implementation-architect", "sovereign-brain", "nerve-agent"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["planner-agent", "implementation-architect", "sovereign-brain", "nerve-agent"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "high"
     },
     "implementer": {
@@ -33,8 +37,10 @@
       "escalation_parent_team_role": "planner",
       "required_scope_classes": ["codebase_core"],
       "ownership_scope": "Owns bounded implementation changes inside assigned modules.",
-      "preferred_agents": ["implementation-architect", "nerve-agent"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["implementation-architect", "nerve-agent"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "reviewer": {
@@ -45,8 +51,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["knowledge_core"],
       "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
-      "preferred_agents": ["implementation-architect", "sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["implementation-architect", "sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "tester": {
@@ -57,8 +65,10 @@
       "escalation_parent_team_role": "planner",
       "required_scope_classes": ["codebase_core"],
       "ownership_scope": "Owns test strategy, execution evidence, and regression confidence.",
-      "preferred_agents": ["nerve-agent", "implementation-architect"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["nerve-agent", "implementation-architect"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "product_strategist": {
@@ -69,8 +79,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns product intent framing, priorities, and scope tradeoffs.",
-      "preferred_agents": ["sovereign-brain", "nerve-agent"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["sovereign-brain", "nerve-agent"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "high"
     },
     "experience_designer": {
@@ -81,8 +93,10 @@
       "escalation_parent_team_role": "product_strategist",
       "required_scope_classes": ["codebase_core"],
       "ownership_scope": "Owns UX interaction contracts and experience-level design decisions.",
-      "preferred_agents": ["implementation-architect", "sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["implementation-architect", "sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "operator": {
@@ -93,8 +107,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["communication_surface"],
       "ownership_scope": "Owns operational execution state, runtime visibility, and control actions.",
-      "preferred_agents": ["chronos-mirror", "nerve-agent"],
-      "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["chronos-mirror", "nerve-agent"],
+        "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "surface_liaison": {
@@ -105,8 +121,10 @@
       "escalation_parent_team_role": "operator",
       "required_scope_classes": ["communication_surface"],
       "ownership_scope": "Owns user-facing updates, handoff clarity, and interaction continuity.",
-      "preferred_agents": ["slack-surface-agent", "chronos-mirror", "onboarding-surface-agent"],
-      "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["slack-surface-agent", "chronos-mirror", "onboarding-surface-agent"],
+        "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"]
+      },
       "autonomy_level": "low"
     },
     "devils_advocate": {
@@ -117,8 +135,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
-      "preferred_agents": ["sovereign-brain", "nerve-agent"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["sovereign-brain", "nerve-agent"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "high"
     },
     "counterparty_persona": {
@@ -129,8 +149,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
-      "preferred_agents": ["sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "facilitator": {
@@ -141,8 +163,10 @@
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns session orchestration, dissent signal extraction, and readiness_matrix assembly.",
-      "preferred_agents": ["nerve-agent", "sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "medium"
     },
     "relationship_curator": {
@@ -153,8 +177,10 @@
       "escalation_parent_team_role": "facilitator",
       "required_scope_classes": ["knowledge_core"],
       "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
-      "preferred_agents": ["sovereign-brain"],
-      "preferred_models": ["auto-gemini-3"],
+      "selection_hints": {
+        "preferred_agents": ["sovereign-brain"],
+        "preferred_models": ["auto-gemini-3"]
+      },
       "autonomy_level": "low"
     }
   }

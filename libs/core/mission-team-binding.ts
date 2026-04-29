@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
-import type { MissionTeamPlan } from './mission-team-composer.js';
+import type { MissionTeamPlan } from './mission-team-plan-composer.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
 export interface TeamBlueprintRole {

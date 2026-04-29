@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "base_config_path": "public/presence/surface-query-providers.json",
+  "personal_overlay_path": "personal/presence/surface-query-providers.json",
+  "overlays": [
+    {
+      "id": "presence_surface_agent",
+      "kind": "role",
+      "role": "presence_surface_agent",
+      "path": "public/presence/surface-query-providers.presence_surface_agent.json",
+      "summary": "Presence-facing surface query tuning.",
+      "status": "shipped"
+    },
+    {
+      "id": "slack_surface_agent",
+      "kind": "role",
+      "role": "slack_surface_agent",
+      "path": "public/presence/surface-query-providers.slack_surface_agent.json",
+      "summary": "Slack-facing surface query tuning.",
+      "status": "shipped"
+    },
+    {
+      "id": "chronos_surface_agent",
+      "kind": "role",
+      "role": "chronos_surface_agent",
+      "path": "public/presence/surface-query-providers.chronos_surface_agent.json",
+      "summary": "Chronos-facing surface query tuning.",
+      "status": "shipped"
+    },
+    {
+      "id": "alignment",
+      "kind": "phase",
+      "phase": "alignment",
+      "path": "public/presence/surface-query-providers.alignment.json",
+      "summary": "Alignment-phase query tuning.",
+      "status": "shipped"
+    }
+  ]
+}

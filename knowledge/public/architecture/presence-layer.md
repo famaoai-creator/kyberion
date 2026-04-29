@@ -110,6 +110,22 @@ Background presence services are managed by `scripts/surface_runtime.ts` and the
 - **Maintenance**: Periodically prunes `stimuli.jsonl` by archiving processed items older than 24 hours.
 - **Observability**: Services should emit explainable events into `active/shared/observability/` so operators can reconstruct why a channel event was routed or delayed.
 
+Surface query provider selection is also knowledge-driven:
+
+- `knowledge/public/presence/surface-query-providers.json` defines the public base
+- `knowledge/public/governance/surface-query-overlay-catalog.json` lists the active overlay files and their roles/phases
+- `knowledge/public/governance/surface-provider-manifest-catalog.json` lists the active provider manifests
+- `knowledge/public/presence/surface-query-providers.<role>.json` can specialize the runtime for a surface role
+- `knowledge/public/presence/surface-query-providers.<phase>.json` can specialize the runtime for a phase
+- personal overlays may further refine the defaults without changing code
+
+Examples currently shipped in knowledge:
+
+- `surface-query-providers.presence_surface_agent.json` for presence-facing operators
+- `surface-query-providers.slack_surface_agent.json` for Slack-facing operators
+- `surface-query-providers.chronos_surface_agent.json` for time/schedule-facing operators
+- `surface-query-providers.alignment.json` for alignment-phase tuning
+
 ## 7. Developer Guide: Creating a New Sensor
 
 To add a new sensory input:

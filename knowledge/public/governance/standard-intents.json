@@ -243,6 +243,58 @@
       "risk_profile": "approval_required"
     },
     {
+      "id": "start-service",
+      "category": "system_observability",
+      "description": "Start a governed service and report the resulting state.",
+      "surface_examples": ["サービスを起動して", "start the service", "このサービスを立ち上げて"],
+      "plan_outline": [
+        "resolve target service",
+        "start the service under policy",
+        "report startup state and blockers"
+      ],
+      "outcome_ids": ["service_started"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["start", "service", "起動", "立ち上げて"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "service_started"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "execute",
+      "object": "service_runtime",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "stop-service",
+      "category": "system_observability",
+      "description": "Stop a governed service and report the resulting state.",
+      "surface_examples": ["サービスを停止して", "stop the service", "このサービスを止めて"],
+      "plan_outline": [
+        "resolve target service",
+        "stop the service under policy",
+        "report shutdown state and blockers"
+      ],
+      "outcome_ids": ["service_stopped"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["stop", "service", "停止", "止めて"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "service_stopped"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "execute",
+      "object": "service_runtime",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
       "id": "knowledge-query",
       "category": "knowledge_lifecycle",
       "description": "Search accumulated governed knowledge and return a concise answer with relevant sources.",
@@ -590,6 +642,483 @@
       "risk_profile": "low"
     },
     {
+      "id": "clarify-user-request",
+      "category": "conversation_orchestration",
+      "description": "Ask focused follow-up questions when the current request is underspecified or ambiguous.",
+      "surface_examples": [
+        "不足している情報を質問して",
+        "この依頼を明確化して",
+        "必要な前提を確認して",
+        "何を確認すればいいか整理して",
+        "Ask me the missing questions"
+      ],
+      "plan_outline": [
+        "inspect the current request and missing context",
+        "generate a small set of targeted clarification questions",
+        "return the questions without losing the current thread context"
+      ],
+      "intake_requirements": ["request_text"],
+      "outcome_ids": ["clarification_packet"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "clarify",
+        "clarification",
+        "質問",
+        "確認",
+        "不足",
+        "曖昧",
+        "missing",
+        "ambiguous",
+        "what do you need",
+        "ask"
+      ],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "clarification_packet"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "conversation",
+      "action": "query",
+      "object": "missing_request_context",
+      "execution_shape": "direct_reply",
+      "mission_class": "customer_engagement",
+      "risk_profile": "low"
+    },
+    {
+      "id": "continue-conversation",
+      "category": "conversation_orchestration",
+      "description": "Continue an active human-LLM conversation while preserving the running context and intent.",
+      "surface_examples": [
+        "続けて",
+        "それで進めて",
+        "そのまま続けて",
+        "Please continue the conversation",
+        "Keep going"
+      ],
+      "plan_outline": [
+        "preserve the current conversational thread",
+        "respond to the immediate follow-up",
+        "keep the thread state coherent"
+      ],
+      "intake_requirements": ["conversation_context"],
+      "outcome_ids": ["conversation_reply"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "continue",
+        "keep going",
+        "続けて",
+        "そのまま",
+        "次",
+        "more",
+        "follow up"
+      ],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "conversation_reply"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "conversation",
+      "action": "execute",
+      "object": "conversation_thread",
+      "execution_shape": "direct_reply",
+      "mission_class": "customer_engagement",
+      "risk_profile": "low"
+    },
+    {
+      "id": "summarize-conversation",
+      "category": "conversation_orchestration",
+      "description": "Summarize the current conversation into decisions, open questions, and next steps.",
+      "surface_examples": [
+        "ここまでを要約して",
+        "会話をまとめて",
+        "今の議論のポイントを整理して",
+        "Summarize the conversation",
+        "Give me a summary of this thread"
+      ],
+      "plan_outline": [
+        "compress the conversation history",
+        "extract decisions and open questions",
+        "return a concise summary for reuse"
+      ],
+      "intake_requirements": ["conversation_context"],
+      "outcome_ids": ["conversation_summary"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": [
+        "summarize",
+        "summary",
+        "要約",
+        "まとめ",
+        "整理",
+        "recap",
+        "thread"
+      ],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "conversation_summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "conversation",
+      "action": "distill",
+      "object": "conversation_transcript",
+      "execution_shape": "direct_reply",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "low"
+    },
+    {
+      "id": "conversation-to-mission",
+      "category": "mission_process",
+      "description": "Turn a conversation into a governed mission brief or escalation proposal.",
+      "surface_examples": [
+        "この会話をミッションにして",
+        "mission brief にまとめて",
+        "会話内容を実行可能な仕事にして",
+        "Turn this conversation into a mission",
+        "Create a mission brief from this thread"
+      ],
+      "plan_outline": [
+        "extract the durable goal from the conversation",
+        "shape the mission brief and scope boundaries",
+        "return a mission proposal that can be promoted"
+      ],
+      "intake_requirements": ["conversation_context"],
+      "outcome_ids": ["mission_brief"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "mission",
+        "ミッション",
+        "brief",
+        "仕事にして",
+        "実行可能",
+        "create a mission",
+        "turn this conversation"
+      ],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "mission_brief"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "mission_process",
+      "action": "compose",
+      "object": "mission_brief",
+      "execution_shape": "direct_reply",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "executive-strategy-brief",
+      "category": "outcome_execution",
+      "description": "Compare strategic options and return an executive-ready recommendation with assumptions, risks, and next actions.",
+      "surface_examples": [
+        "今期の成長戦略を3案で比較して、最も現実的な案を提案して",
+        "事業戦略の選択肢を比較して推奨案を出して",
+        "成長戦略の論点整理をして"
+      ],
+      "plan_outline": [
+        "clarify goal, timeframe, and constraints",
+        "compare strategic options against decision criteria",
+        "return a recommendation with risks and next actions"
+      ],
+      "intake_requirements": ["goal", "timeframe", "constraints"],
+      "outcome_ids": ["strategy_brief"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["戦略", "成長戦略", "strategy", "事業戦略", "選択肢", "推奨案"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "strategy_brief"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "strategy_brief",
+      "execution_shape": "direct_reply",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "executive-prioritization",
+      "category": "outcome_execution",
+      "description": "Prioritize executive work, explicitly separating what to do now from what to defer or stop.",
+      "surface_examples": [
+        "次の四半期にやることを5つに絞って、やらないことも決めて",
+        "今やるべきことの優先順位をつけて",
+        "やることとやらないことを整理して"
+      ],
+      "plan_outline": [
+        "clarify target horizon and success criteria",
+        "rank candidate work against constraints",
+        "return priorities, exclusions, and review triggers"
+      ],
+      "intake_requirements": ["candidate work", "decision criteria", "constraints"],
+      "outcome_ids": ["priority_roadmap"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["優先順位", "四半期", "やらない", "prioritize", "roadmap", "絞って"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "priority_roadmap"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "priority_roadmap",
+      "execution_shape": "direct_reply",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "executive-reporting",
+      "category": "outcome_execution",
+      "description": "Create a concise executive summary for management meetings, KPI reviews, or decision checkpoints.",
+      "surface_examples": [
+        "今月の経営会議向けにKPIサマリを1枚でまとめて",
+        "経営レポートを作って",
+        "役員向けのサマリを作って"
+      ],
+      "plan_outline": [
+        "resolve audience and decision purpose",
+        "select key signals and anomalies",
+        "return a decision-ready summary"
+      ],
+      "intake_requirements": ["audience", "metrics or source material", "decision purpose"],
+      "outcome_ids": ["executive_report"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["経営会議", "KPI", "経営レポート", "executive report", "役員向け", "1枚"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "executive_report"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "executive_report",
+      "execution_shape": "direct_reply",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "stakeholder-communication",
+      "category": "outcome_execution",
+      "description": "Draft stakeholder-facing communication with audience, tone, approval, and risk notes.",
+      "surface_examples": [
+        "役員会向けに社員向けメッセージのたたき台を作って",
+        "ステークホルダー向けの説明文を作って",
+        "社内向けメッセージを整えて"
+      ],
+      "plan_outline": [
+        "clarify audience, tone, and approval boundary",
+        "draft the message and anticipated questions",
+        "return approval notes and revision points"
+      ],
+      "intake_requirements": ["audience", "message goal", "approval boundary"],
+      "outcome_ids": ["stakeholder_message"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["メッセージ", "説明文", "ステークホルダー", "社員向け", "役員会", "communication"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "stakeholder_message"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "stakeholder_message",
+      "execution_shape": "direct_reply",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "sales-account-strategy",
+      "category": "outcome_execution",
+      "description": "Prepare account strategy, upsell hypotheses, and next actions for an important customer or prospect.",
+      "surface_examples": [
+        "大口顧客のアップセル戦略を整理して、提案の切り口を出して",
+        "顧客別のアカウントプランを作って",
+        "解約しそうな顧客への対応方針を考えて"
+      ],
+      "plan_outline": [
+        "clarify customer context and deal stage",
+        "map opportunities, risks, and constraints",
+        "return account strategy and next actions"
+      ],
+      "intake_requirements": ["customer context", "deal stage", "constraints"],
+      "outcome_ids": ["account_strategy_plan"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["アップセル", "アカウント", "顧客", "解約", "account", "sales", "提案"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "account_strategy_plan"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "account_strategy_plan",
+      "execution_shape": "direct_reply",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "technical-decision-memo",
+      "category": "outcome_execution",
+      "description": "Create a technical decision memo that compares options, tradeoffs, recommendation, and revisit conditions.",
+      "surface_examples": [
+        "この投資判断の技術面を整理して、採用可否を1枚でまとめて",
+        "技術判断の論点を整理して",
+        "ADRにする前の意思決定メモを作って"
+      ],
+      "plan_outline": [
+        "clarify decision scope and evaluation axes",
+        "compare options and tradeoffs",
+        "return a recommendation with rollback or revisit conditions"
+      ],
+      "intake_requirements": ["decision scope", "options", "evaluation axes"],
+      "outcome_ids": ["technical_decision_memo"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["技術判断", "意思決定メモ", "ADR", "採用可否", "technical decision", "tradeoff"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "technical_decision_memo"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "technical_decision",
+      "execution_shape": "direct_reply",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "llm-provider-selection",
+      "category": "llm_reasoning_setup",
+      "description": "Compare available LLM or reasoning providers and recommend a provider/model policy for the use case.",
+      "surface_examples": [
+        "OpenAI / Anthropic / Gemini のどれを使うべきか、コストと品質で比較して",
+        "この用途に合うLLM providerを選んで",
+        "モデル選定をコストと品質で比較して"
+      ],
+      "plan_outline": [
+        "clarify use case and constraints",
+        "compare providers by capability, cost, latency, and governance",
+        "return a recommended provider/model policy"
+      ],
+      "intake_requirements": ["use case", "quality metric", "cost or governance constraint"],
+      "outcome_ids": ["provider_selection_report"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["OpenAI", "Anthropic", "Gemini", "provider", "LLM", "モデル選定", "コスト", "品質"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "provider_selection_report"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "llm",
+      "action": "review",
+      "object": "provider_selection",
+      "execution_shape": "direct_reply",
+      "mission_class": "environment_and_recovery",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "agent-runtime-tuning",
+      "category": "system_observability",
+      "description": "Prepare a measured tuning plan for agent runtime latency, cost, capacity, or reliability.",
+      "surface_examples": [
+        "エージェントの起動数とメモリ上限を調整して、遅延を半分にして",
+        "agent runtimeを低遅延に調整したい",
+        "エージェント実行基盤のコストを下げたい"
+      ],
+      "plan_outline": [
+        "clarify target metric and runtime scope",
+        "define measurement and tuning hypotheses",
+        "return expected impact and rollback conditions"
+      ],
+      "intake_requirements": ["runtime scope", "target metric", "safety boundary"],
+      "outcome_ids": ["runtime_tuning_plan"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["runtime", "遅延", "latency", "メモリ", "起動数", "tuning", "コスト", "agent runtime"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "runtime_tuning_plan"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "prepare",
+      "object": "agent_runtime_tuning",
+      "execution_shape": "direct_reply",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "release-readiness-review",
+      "category": "outcome_execution",
+      "description": "Assess release readiness and return a go/no-go recommendation with blockers, conditions, and rollback notes.",
+      "surface_examples": [
+        "明日のデプロイをgo/no-go判定して、条件付きなら条件も出して",
+        "リリースしてよいか判定して",
+        "デプロイ前のreadinessを確認して"
+      ],
+      "plan_outline": [
+        "clarify release scope and stop conditions",
+        "compile readiness evidence",
+        "return go/no-go recommendation and conditions"
+      ],
+      "intake_requirements": ["release scope", "readiness criteria", "rollback plan"],
+      "outcome_ids": ["release_readiness_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["go/no-go", "リリース", "デプロイ", "readiness", "判定", "rollback"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "release_readiness_report"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "verify",
+      "object": "release_readiness",
+      "execution_shape": "direct_reply",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "operator-profile-learning",
+      "category": "knowledge_lifecycle",
+      "description": "Extract reusable operator preference or request-pattern learning from repeated interactions and propose a tiered memory update.",
+      "surface_examples": [
+        "私の依頼傾向を学習して",
+        "この会話から個人ナレッジに残すべき学びを抽出して",
+        "CEO/CTOとしての使い方にKyberionを最適化して"
+      ],
+      "plan_outline": [
+        "capture repeated request patterns and corrections",
+        "separate personal, confidential, and public learning candidates",
+        "return proposed profile updates and evidence"
+      ],
+      "intake_requirements": ["request history", "operator corrections", "tier policy"],
+      "outcome_ids": ["operator_learning_update"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": ["学習", "個人ナレッジ", "依頼傾向", "operator profile", "最適化", "preference"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "operator_learning_update"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "promote",
+      "object": "operator_profile_learning",
+      "execution_shape": "direct_reply",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "review_required"
+    },
+    {
       "id": "reconcile-ecosystem",
       "category": "governance_control",
       "description": "Perform full ecosystem reconciliation (dates, docs, integrity).",
@@ -839,6 +1368,99 @@
       "execution_shape": "task_session",
       "mission_class": "platform_onboarding",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "configure-organization-toolchain",
+      "category": "environment_setup",
+      "description": "Configure organization-specific tool integrations such as CI/CD, chat, and deployment hooks.",
+      "surface_examples": [
+        "CI/CDを設定して",
+        "GitHub Actionsを組み込みたい",
+        "組織のツール群を初期設定して",
+        "ツール連携を登録して"
+      ],
+      "plan_outline": [
+        "inventory required organization tools",
+        "map integrations and approval boundaries",
+        "register governed toolchain settings"
+      ],
+      "outcome_ids": ["organization_toolchain_configured"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["ci/cd", "cicd", "toolchain", "integration", "github actions", "slack", "deploy", "workspace"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "organization_toolchain_configured"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "environment",
+      "action": "change",
+      "object": "organization_toolchain",
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "launch-first-run-onboarding",
+      "category": "environment_setup",
+      "description": "Start the first-run onboarding wizard and produce the setup plan for Kyberion.",
+      "surface_examples": [
+        "初回セットアップを始めて",
+        "オンボーディングを案内して",
+        "最初に何をすればいいか教えて",
+        "初回利用の流れを始めて"
+      ],
+      "plan_outline": [
+        "confirm the user's workspace and primary goals",
+        "identify required integrations and presentation defaults",
+        "return a first-run setup plan"
+      ],
+      "outcome_ids": ["onboarding_plan"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["onboarding", "初回", "セットアップ", "案内", "first run", "wizard"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "onboarding_plan"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "environment",
+      "action": "prepare",
+      "object": "first_run_onboarding",
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "register-presentation-preference-profile",
+      "category": "knowledge_lifecycle",
+      "description": "Register reusable presentation brief and theme preferences for future decks.",
+      "surface_examples": [
+        "デザインテーマを登録して",
+        "プレゼンの見た目を保存して",
+        "今後の資料のテーマを覚えて",
+        "資料作成の好みを設定して"
+      ],
+      "plan_outline": [
+        "validate profile schema",
+        "persist personal or shared registry entry",
+        "return default brief questions and theme hint"
+      ],
+      "outcome_ids": ["presentation_preference_profile_registered"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["theme", "design", "presentation", "資料", "見た目", "register", "profile", "プレゼン"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "presentation_preference_profile_registered"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "create",
+      "object": "presentation_preference_profile",
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "review_required"
     },
     {
       "id": "verify-actuator-capability",

@@ -1,0 +1,14 @@
+{
+  "web_search": {
+    "maxResults": 2,
+    "timeoutMs": 7000
+  },
+  "weather": {
+    "timeoutMs": 7000
+  },
+  "knowledge": {
+    "limit": 3,
+    "phase": "chronos",
+    "role": "chronos_surface_agent"
+  }
+}

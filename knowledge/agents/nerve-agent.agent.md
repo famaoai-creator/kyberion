@@ -1,7 +1,5 @@
 ---
 agentId: nerve-agent
-provider: gemini
-modelId: auto-gemini-2.5
 capabilities: [reasoning, coordination, routing, analysis]
 auto_spawn: false
 trust_required: 2.0

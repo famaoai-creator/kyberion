@@ -1,0 +1,25 @@
+{
+  "web_search": {
+    "enabled": true,
+    "provider": "duckduckgo_html",
+    "maxResults": 5,
+    "timeoutMs": 6000
+  },
+  "weather": {
+    "enabled": true,
+    "provider": "open_meteo",
+    "timeoutMs": 6000
+  },
+  "location": {
+    "enabled": true,
+    "provider": "presence_context"
+  },
+  "knowledge": {
+    "enabled": true,
+    "provider": "context_ranker",
+    "limit": 6,
+    "scope": "repository",
+    "phase": "alignment",
+    "role": "presence_surface_agent"
+  }
+}

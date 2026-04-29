@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "operator-request-log.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "request_id",
+    "profile_id",
+    "received_at",
+    "surface",
+    "raw_request",
+    "normalized_intent",
+    "route",
+    "signals",
+    "verification",
+    "learning_update",
+    "privacy"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["operator-request-log"]
+    },
+    "request_id": { "type": "string", "minLength": 1 },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "received_at": { "type": "string", "format": "date-time" },
+    "surface": { "type": "string", "minLength": 1 },
+    "raw_request": { "type": "string", "minLength": 1 },
+    "normalized_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_id", "task_family"],
+      "properties": {
+        "intent_id": { "type": "string", "minLength": 1 },
+        "task_family": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string" }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "locale": { "type": "string" },
+        "active_mission_ref": { "type": ["string", "null"] },
+        "project_ref": { "type": ["string", "null"] }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "confidence"],
+      "properties": {
+        "shape": {
+          "type": "string",
+          "enum": ["direct_reply", "task_session", "mission", "project_bootstrap", "browser_session", "pipeline", "actuator_action"]
+        },
+        "reason": { "type": "string" },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision_style_observed": { "type": "string" },
+        "terminology_observed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "approval_threshold_observed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "recurring_task_candidate": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "correction_signals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "clarification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "asked": { "type": "boolean" },
+        "questions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "started": { "type": "boolean" },
+        "artifact_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "operator_correction_count"],
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": ["satisfied", "partial", "mismatch", "unverified"]
+        },
+        "mismatch_notes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "operator_correction_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "learning_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_created", "promote_eligible"],
+      "properties": {
+        "candidate_created": { "type": "boolean" },
+        "candidate_kind": { "type": "string" },
+        "promote_eligible": { "type": "boolean" },
+        "sample_count_after_update": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "contains_sensitive_info", "exportable_publicly"],
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "contains_sensitive_info": { "type": "boolean" },
+        "exportable_publicly": { "type": "boolean" },
+        "confidential_only": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,7 +1,5 @@
 ---
 agentId: planner-agent
-provider: gemini
-modelId: auto-gemini-3
 capabilities: [planning, strategy, decomposition, coordination]
 auto_spawn: false
 trust_required: 2.0

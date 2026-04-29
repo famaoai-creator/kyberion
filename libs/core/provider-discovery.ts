@@ -14,6 +14,8 @@ export interface ProviderInfo {
   version: string | null;
   protocol: 'acp' | 'print-json' | 'exec' | 'json-rpc';
   models: string[];
+  capabilities?: string[];
+  modelCapabilities?: Record<string, string[]>;
   healthy: boolean;
 }
 
@@ -50,6 +52,34 @@ function checkGemini(): ProviderInfo {
       'gemini-3.1-pro-preview', 'gemini-3-flash-preview',
       'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
     ],
+    capabilities: [
+      'reasoning',
+      'planning',
+      'coordination',
+      'analysis',
+      'code',
+      'review',
+      'architecture',
+      'a2a',
+      'structured_json',
+      'surface',
+      'conversation',
+      'realtime',
+      'low_latency',
+      'routing',
+      'delegation',
+      'dashboard',
+      'a2ui',
+    ],
+    modelCapabilities: {
+      'auto-gemini-3': ['reasoning', 'planning', 'coordination', 'analysis', 'structured_json', 'code', 'review', 'architecture', 'a2a'],
+      'auto-gemini-2.5': ['reasoning', 'planning', 'coordination', 'analysis', 'structured_json', 'low_latency', 'code', 'review', 'architecture', 'a2a'],
+      'gemini-3.1-pro-preview': ['reasoning', 'planning', 'analysis', 'structured_json', 'long_context', 'code', 'review', 'architecture'],
+      'gemini-3-flash-preview': ['low_latency', 'conversation', 'structured_json', 'surface'],
+      'gemini-2.5-pro': ['reasoning', 'planning', 'analysis', 'structured_json', 'long_context', 'a2a', 'code', 'review', 'architecture'],
+      'gemini-2.5-flash': ['structured_json', 'surface', 'conversation', 'realtime', 'low_latency', 'routing', 'delegation', 'dashboard', 'a2ui', 'slack', 'presence', 'onboarding', 'gateway'],
+      'gemini-2.5-flash-lite': ['structured_json', 'conversation', 'low_latency', 'surface', 'slack'],
+    },
     healthy: true,
   };
 }
@@ -69,6 +99,25 @@ function checkClaude(): ProviderInfo {
       'claude-sonnet-4-6', 'claude-opus-4-6',
       'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001',
     ],
+    capabilities: [
+      'reasoning',
+      'planning',
+      'coordination',
+      'analysis',
+      'review',
+      'code',
+      'long_context',
+      'structured_json',
+    ],
+    modelCapabilities: {
+      sonnet: ['reasoning', 'planning', 'coordination', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
+      opus: ['reasoning', 'planning', 'coordination', 'analysis', 'review', 'code', 'long_context', 'structured_json', 'deep_reasoning'],
+      haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
+      'claude-sonnet-4-6': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
+      'claude-opus-4-6': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json', 'deep_reasoning'],
+      'claude-sonnet-4-20250514': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
+      'claude-haiku-4-5-20251001': ['conversation', 'summarization', 'low_latency', 'structured_json'],
+    },
     healthy: true,
   };
 }
@@ -90,6 +139,19 @@ function checkCopilot(): ProviderInfo {
       'gemini-3-pro-preview',
       'gpt-5.4', 'gpt-5.3-codex',
     ],
+    capabilities: ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
+    modelCapabilities: {
+      'claude-sonnet-4.6': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
+      'claude-sonnet-4.5': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
+      'claude-sonnet-4': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
+      'claude-opus-4.6': ['reasoning', 'analysis', 'review', 'code', 'structured_json', 'deep_reasoning'],
+      'claude-opus-4.6-fast': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
+      'claude-opus-4.5': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
+      'claude-haiku-4.5': ['conversation', 'summarization', 'low_latency', 'structured_json'],
+      'gemini-3-pro-preview': ['reasoning', 'planning', 'analysis', 'structured_json'],
+      'gpt-5.4': ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
+      'gpt-5.3-codex': ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
+    },
     healthy: true,
   };
 }
@@ -107,6 +169,10 @@ function checkCodex(): ProviderInfo {
     version: which.ok ? null : (npx.stdout || null),
     protocol,
     models: ['codex'],
+    capabilities: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
+    modelCapabilities: {
+      codex: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
+    },
     healthy: installed,
   };
 }

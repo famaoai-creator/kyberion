@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scenarios"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "scenario_class",
+          "utterance",
+          "expected_intent_id",
+          "expected_task_family",
+          "expected_route_shape",
+          "expected_signals"
+        ],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "scenario_class": {
+            "type": "string",
+            "enum": ["golden", "ambiguous", "approval-sensitive", "controlled-failure"]
+          },
+          "utterance": { "type": "string", "minLength": 1 },
+          "expected_intent_id": { "type": "string", "minLength": 1 },
+          "expected_task_family": { "type": "string", "minLength": 1 },
+          "expected_route_shape": {
+            "type": "string",
+            "enum": [
+              "direct_reply",
+              "task_session",
+              "mission",
+              "project_bootstrap",
+              "browser_session",
+              "pipeline",
+              "actuator_action"
+            ]
+          },
+          "expected_verification_result": {
+            "type": "string",
+            "enum": ["satisfied", "partial", "mismatch", "unverified"]
+          },
+          "expected_signals": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "expected_learning_update": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "candidate_created": { "type": "boolean" },
+              "promote_eligible": { "type": "boolean" }
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

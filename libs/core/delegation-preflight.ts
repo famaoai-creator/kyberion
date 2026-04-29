@@ -2,7 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
-import type { MissionTeamAssignment } from './mission-team-composer.js';
+import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 
 type UnknownScopeBehavior = 'allow_with_warning' | 'block';
 

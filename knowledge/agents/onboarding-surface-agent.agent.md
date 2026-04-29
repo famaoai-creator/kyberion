@@ -1,7 +1,5 @@
 ---
 agentId: onboarding-surface-agent
-provider: gemini
-modelId: gemini-2.5-flash
 capabilities: [onboarding, surface, identity, guidance]
 auto_spawn: false
 trust_required: 0

@@ -1,0 +1,14 @@
+{
+  "web_search": {
+    "maxResults": 4,
+    "timeoutMs": 6500
+  },
+  "weather": {
+    "timeoutMs": 6500
+  },
+  "knowledge": {
+    "limit": 5,
+    "phase": "alignment",
+    "role": "slack_surface_agent"
+  }
+}

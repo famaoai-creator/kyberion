@@ -23,6 +23,11 @@ Keep two layers distinct:
 
 Use `presentation-preference-profile` to store the reusable theme and the first questions Kyberion should ask.
 
+On first use, Kyberion should register the profile through the
+`register-presentation-preference-profile` intent and persist it in the
+presentation preference registry. That keeps theme selection and brief
+questions out of code and lets the operator refine them as knowledge grows.
+
 ## Preflight
 
 Before drafting slides, decide which brief questions and theme to use.
@@ -31,6 +36,7 @@ Before drafting slides, decide which brief questions and theme to use.
 2. Pick the brief question set that matches the deck purpose.
 3. Pick the theme set that matches the same purpose and audience.
 4. Ask only the first 1-3 questions that would materially change the outline or the visual approach.
+5. If no profile exists yet, create one in the personal overlay before drafting.
 
 Keep this preflight short. It should decide how to frame the deck, not write the deck itself.
 

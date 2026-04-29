@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import {
-  composeMissionTeamBrief,
   createStandardYargs,
   composeMissionTeamPlan,
   findMissionPath,
@@ -9,6 +8,7 @@ import {
   safeReadFile,
   writeMissionTeamPlan,
 } from '@agent/core';
+import { composeMissionTeamBrief } from '../libs/core/mission-team-brief-composer.js';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
   const previousRole = process.env.MISSION_ROLE;

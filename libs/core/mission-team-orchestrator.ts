@@ -1,7 +1,7 @@
 import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
 import { ensureAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
 import { agentRegistry } from './agent-registry.js';
-import { loadAgentProfileIndex, loadMissionTeamPlan, type MissionTeamAssignment } from './mission-team-composer.js';
+import { loadMissionTeamPlan, type MissionTeamAssignment } from './mission-team-plan-composer.js';
 
 export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
   runtime_status: 'spawned' | 'already_ready' | 'unfilled' | 'failed';
@@ -33,7 +33,6 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
     throw new Error(`Mission team plan not found for ${missionId}`);
   }
 
-  const profiles = loadAgentProfileIndex();
   const assignments: MissionTeamRuntimeAssignment[] = [];
   const resolvedRuntimeStatus = new Map<string, MissionTeamRuntimeAssignment>();
 
@@ -70,27 +69,17 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
       continue;
     }
 
-    const profile = profiles[assignment.agent_id];
-    if (!profile) {
-      const resolved = {
-        ...assignment,
-        runtime_status: 'failed',
-        error: `Agent profile not found: ${assignment.agent_id}`,
-      } satisfies MissionTeamRuntimeAssignment;
-      resolvedRuntimeStatus.set(assignment.agent_id, resolved);
-      assignments.push(resolved);
-      continue;
-    }
-
     try {
+      if (!assignment.provider) {
+        throw new Error(`Mission team assignment missing provider: ${assignment.team_role}`);
+      }
       const spawnPayload = {
         agentId: assignment.agent_id,
-        provider: profile.provider,
-        modelId: profile.modelId,
-        capabilities: profile.capabilities,
+        provider: assignment.provider,
+        modelId: assignment.modelId || undefined,
+        capabilities: assignment.required_capabilities,
         runtimeMetadata: {
-          provider_strategy: profile.provider_strategy || 'adaptive',
-          fallback_providers: profile.fallback_providers || [],
+          skip_provider_resolution: true,
         },
         missionId: missionId.toUpperCase(),
         requestedBy: 'mission_team_orchestrator',
