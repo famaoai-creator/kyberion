@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { buildKnowledgeIndex, queryKnowledge, type KnowledgeHintIndex } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
+import { secureFetch } from './network.js';
 import { safeExec } from './secure-io.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
-import { getAgentManifest } from './agent-manifest.js';
+import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
 import { ensureAgentRuntime, getAgentRuntimeHandle } from './agent-runtime-supervisor.js';
 import {
   createSupervisorBackedAgentHandle,
@@ -17,8 +19,10 @@ import {
   buildMissionTeamView,
   loadMissionTeamPlan,
   resolveMissionTeamReceiver,
-} from './mission-team-composer.js';
+} from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
+import { classifyTaskSessionIntent, createTaskSession, saveTaskSession } from './task-session.js';
+import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
   deriveSlackIntentLabelFromProviderPolicy,
@@ -97,6 +101,351 @@ function formatExecutionReceipt(params: {
     },
     null,
     2
+  );
+}
+
+function structuredSurfaceQueryText(context: SurfaceRuntimeRouteContext): string {
+  return (context.input.surfaceText || context.input.query || context.structuredQuery || '').trim();
+}
+
+function deriveSurfaceQueryRole(context: SurfaceRuntimeRouteContext): string | undefined {
+  if (context.input.agentId.includes('presence')) return 'presence_surface_agent';
+  if (context.input.agentId.includes('slack')) return 'slack_surface_agent';
+  if (context.input.agentId.includes('chronos')) return 'chronos_surface_agent';
+  return undefined;
+}
+
+let knowledgeIndexPromise: Promise<KnowledgeHintIndex> | null = null;
+
+async function loadKnowledgeHintIndex(): Promise<KnowledgeHintIndex> {
+  knowledgeIndexPromise ||= buildKnowledgeIndex(pathResolver.knowledge());
+  return knowledgeIndexPromise;
+}
+
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, ' ');
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+function extractDuckDuckGoResults(html: string, limit = 3): Array<{ title: string; url: string; snippet?: string }> {
+  const anchors = [...html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+  const results: Array<{ title: string; url: string; snippet?: string }> = [];
+
+  for (let i = 0; i < anchors.length && results.length < limit; i++) {
+    const anchor = anchors[i];
+    const nextAnchorIndex = anchors[i + 1]?.index ?? html.length;
+    const block = html.slice(anchor.index || 0, nextAnchorIndex);
+    const snippetMatch = block.match(/result__snippet[^>]*>([\s\S]*?)<\/a>/);
+    const rawUrl = anchor[1];
+    const url = (() => {
+      try {
+        const parsed = new URL(rawUrl, 'https://duckduckgo.com');
+        const forwarded = parsed.searchParams.get('uddg');
+        return forwarded ? decodeURIComponent(forwarded) : parsed.toString();
+      } catch {
+        return rawUrl;
+      }
+    })();
+    results.push({
+      title: decodeHtmlEntities(stripHtmlTags(anchor[2]).trim()),
+      url,
+      snippet: snippetMatch ? decodeHtmlEntities(stripHtmlTags(snippetMatch[1]).trim()) : undefined,
+    });
+  }
+
+  return results;
+}
+
+function extractLocationHint(queryText: string): string | null {
+  const stripped = queryText
+    .replace(/(今日|今|現在|明日|この|その|あの)?(の)?(天気|weather|forecast|気温|降水確率|雨|晴れ|天候)/gi, ' ')
+    .replace(/(を)?(教えて|知りたい|見せて|検索して|調べて|お願いします|please)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!stripped) return null;
+  if (/^(です|ます|ください|please|weather|forecast)$/i.test(stripped)) return null;
+  return stripped;
+}
+
+async function fetchCurrentLocationSummary(): Promise<string> {
+  const data = await secureFetch<any>({
+    method: 'GET',
+    url: 'https://ipapi.co/json/',
+  });
+  const parts = [
+    data?.city,
+    data?.region || data?.region_code,
+    data?.country_name || data?.country,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : 'unknown location';
+}
+
+async function fetchWeatherSummary(queryText: string): Promise<string> {
+  const locationHint = extractLocationHint(queryText);
+  let latitude: number | undefined;
+  let longitude: number | undefined;
+  let label = locationHint || '';
+
+  if (locationHint) {
+    const geocode = await secureFetch<any>({
+      method: 'GET',
+      url: 'https://geocoding-api.open-meteo.com/v1/search',
+      params: {
+        name: locationHint,
+        count: 1,
+        language: 'ja',
+        format: 'json',
+      },
+    });
+    const candidate = geocode?.results?.[0];
+    latitude = candidate?.latitude;
+    longitude = candidate?.longitude;
+    label = candidate?.name || locationHint;
+  }
+
+  if (latitude === undefined || longitude === undefined) {
+    const currentLocation = await secureFetch<any>({
+      method: 'GET',
+      url: 'https://ipapi.co/json/',
+    });
+    latitude = currentLocation?.latitude;
+    longitude = currentLocation?.longitude;
+    label = currentLocation?.city
+      ? [currentLocation.city, currentLocation.region, currentLocation.country_name]
+          .filter(Boolean)
+          .join(', ')
+      : 'current location';
+  }
+
+  if (latitude === undefined || longitude === undefined) {
+    throw new Error('weather location could not be resolved');
+  }
+
+  const weather = await secureFetch<any>({
+    method: 'GET',
+    url: 'https://api.open-meteo.com/v1/forecast',
+    params: {
+      latitude,
+      longitude,
+      current: 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m',
+      timezone: 'auto',
+    },
+  });
+  const current = weather?.current || {};
+  const temperature = current.temperature_2m;
+  const weatherCode = current.weather_code;
+  const wind = current.wind_speed_10m;
+  const humidity = current.relative_humidity_2m;
+
+  return [
+    `Weather for ${label}:`,
+    typeof temperature === 'number' ? `temperature ${temperature}°C` : 'temperature unavailable',
+    weatherCode !== undefined ? `code ${weatherCode}` : 'weather code unavailable',
+    typeof wind === 'number' ? `wind ${wind} km/h` : 'wind unavailable',
+    typeof humidity === 'number' ? `humidity ${humidity}%` : 'humidity unavailable',
+  ].join(', ');
+}
+
+async function runWebSearch(queryText: string): Promise<string> {
+  const response = await secureFetch<string>({
+    method: 'GET',
+    url: 'https://html.duckduckgo.com/html/',
+    params: {
+      q: queryText,
+    },
+  });
+  const results = extractDuckDuckGoResults(response, 3);
+  if (results.length === 0) {
+    return `No web search results were parsed for: ${queryText}`;
+  }
+  return [
+    `Web search results for: ${queryText}`,
+    ...results.map((result, index) => {
+      const snippet = result.snippet ? `\n  ${result.snippet}` : '';
+      return `${index + 1}. ${result.title}\n   ${result.url}${snippet}`;
+    }),
+  ].join('\n');
+}
+
+async function handleSurfaceQueryRoute(
+  context: SurfaceRuntimeRouteContext,
+  resolved: ReturnType<typeof resolveSurfaceIntent>
+): Promise<SurfaceConversationResult> {
+  const queryText = resolved.queryText || structuredSurfaceQueryText(context);
+  const queryType = resolved.queryType || 'knowledge_search';
+  const providerConfig = getSurfaceQueryProviderConfig({
+    role: deriveSurfaceQueryRole(context),
+    phase: process.env.KYBERION_SURFACE_QUERY_PHASE?.trim() || undefined,
+  });
+
+  if (!queryText) {
+    return emptySurfaceResult('No query text was provided.');
+  }
+
+  if (queryType === 'knowledge_search') {
+    const providerLabel = providerConfig.knowledge?.provider || 'local_index';
+    const index = await loadKnowledgeHintIndex();
+    const results = queryKnowledge(index, queryText, { maxResults: 5 });
+    const text =
+      results.length === 0
+        ? `No local knowledge hints matched: ${queryText}`
+        : [
+            `Knowledge results for: ${queryText}`,
+            `Provider: ${providerLabel}`,
+            ...results.map((result, index) => {
+              const source = result.source ? ` (${result.source})` : '';
+              const tags = result.tags?.length ? ` [${result.tags.join(', ')}]` : '';
+              return `${index + 1}. ${result.topic}${source}${tags}\n   ${result.hint}`;
+            }),
+          ].join('\n');
+    if (resolved.intentId) {
+      recordLearningOutcomeSafely({
+        intent_id: resolved.intentId,
+        execution_shape: resolved.shape || 'direct_reply',
+        contract_ref: { kind: 'direct_reply', ref: 'knowledge-query' },
+        success: true,
+        context_fingerprint: {
+          execution_shape: resolved.shape,
+          surface: context.input.surface || 'unknown',
+        },
+      });
+    }
+    return emptySurfaceResult(
+      [
+        text,
+        '',
+        formatExecutionReceipt({
+          intentId: resolved.intentId,
+          shape: resolved.shape,
+          command: `knowledge-query ${queryText}`,
+          status: 'ok',
+        }),
+      ].join('\n')
+    );
+  }
+
+  let answer = '';
+  if (queryType === 'location') {
+    if (providerConfig.location?.enabled === false) {
+      return emptySurfaceResult('Location provider is disabled by configuration.');
+    }
+    const providerLabel = providerConfig.location?.provider || 'presence_context';
+    answer = `Provider: ${providerLabel}\nCurrent location: ${await fetchCurrentLocationSummary()}`;
+  } else if (queryType === 'weather') {
+    if (providerConfig.weather?.enabled === false) {
+      return emptySurfaceResult('Weather provider is disabled by configuration.');
+    }
+    const providerLabel = providerConfig.weather?.provider || 'open_meteo';
+    answer = `Provider: ${providerLabel}\n${await fetchWeatherSummary(queryText)}`;
+  } else if (queryType === 'web_search') {
+    if (providerConfig.web_search?.enabled === false) {
+      return emptySurfaceResult('Web search provider is disabled by configuration.');
+    }
+    const providerLabel = providerConfig.web_search?.provider || 'duckduckgo_html';
+    answer = `Provider: ${providerLabel}\n${await runWebSearch(queryText)}`;
+  } else {
+    answer = `Unsupported live query type for: ${queryText}`;
+  }
+
+  if (resolved.intentId) {
+    recordLearningOutcomeSafely({
+      intent_id: resolved.intentId,
+      execution_shape: resolved.shape || 'direct_reply',
+      contract_ref: { kind: 'direct_reply', ref: `live-query:${queryType}` },
+      success: true,
+      context_fingerprint: {
+        execution_shape: resolved.shape,
+        surface: context.input.surface || 'unknown',
+      },
+    });
+  }
+
+  return emptySurfaceResult(
+    [
+      answer,
+      '',
+      formatExecutionReceipt({
+        intentId: resolved.intentId,
+        shape: resolved.shape,
+        command: `live-query ${queryType} ${queryText}`,
+        status: 'ok',
+      }),
+    ].join('\n')
+  );
+}
+
+async function handleTaskSessionRoute(
+  context: SurfaceRuntimeRouteContext
+): Promise<SurfaceConversationResult> {
+  const queryText = structuredSurfaceQueryText(context);
+  const intent = classifyTaskSessionIntent(queryText);
+  if (!intent?.intentId) {
+    return emptySurfaceResult('No task-session intent could be resolved.');
+  }
+
+  const session = createTaskSession({
+    sessionId: `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    surface: context.input.surface || 'presence',
+    taskType: intent.taskType,
+    status: intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
+    intentId: intent.intentId,
+    goal: intent.goal,
+    projectContext: intent.projectContext,
+    requirements: intent.requirements,
+    payload: intent.payload,
+  });
+  saveTaskSession(session);
+
+  if (intent.intentId) {
+    recordLearningOutcomeSafely({
+      intent_id: intent.intentId,
+      execution_shape: session.work_loop?.resolution.execution_shape || 'task_session',
+      contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
+      success: true,
+      context_fingerprint: {
+        execution_shape: session.work_loop?.resolution.execution_shape,
+        surface: context.input.surface || 'unknown',
+      },
+    });
+  }
+
+  const missing = session.requirements?.missing?.length
+    ? `Missing inputs: ${session.requirements.missing.join(', ')}`
+    : 'No missing inputs were detected.';
+
+  const handoffIntentId =
+    typeof session.payload?.['handoff_intent_id'] === 'string'
+      ? String(session.payload['handoff_intent_id'])
+      : '';
+  const handoff = handoffIntentId ? `Handoff intent: ${handoffIntentId}` : '';
+
+  return emptySurfaceResult(
+    [
+      `Created task session: ${session.session_id}`,
+      `Intent: ${intent.intentId}`,
+      `Task type: ${session.task_type}`,
+      `Goal: ${session.goal.summary}`,
+      missing,
+      handoff,
+      '',
+      formatExecutionReceipt({
+        intentId: intent.intentId,
+        shape: session.work_loop?.resolution.execution_shape || 'task_session',
+        command: `task-session ${intent.intentId}`,
+        status: 'ok',
+      }),
+    ]
+      .filter(Boolean)
+      .join('\n')
   );
 }
 
@@ -423,11 +772,12 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
   if (!manifest) {
     throw new Error(`Surface agent manifest not found: ${agentId}`);
   }
+  const { provider, modelId } = resolveAgentSelectionHints(manifest);
 
   const spawnOptions = {
     agentId,
-    provider: manifest.provider,
-    modelId: manifest.modelId,
+    provider,
+    modelId,
     systemPrompt: manifest.systemPrompt,
     capabilities: manifest.capabilities,
     cwd: cwd || pathResolver.rootDir(),
@@ -740,6 +1090,66 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
         return await handleGovernedExecutionHint(context);
       } catch (error: any) {
         return emptySurfaceResult(`Governed execution failed: ${error?.message || String(error)}`);
+      }
+    },
+  },
+  {
+    matches: (context) => {
+      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
+      return (
+        resolved.intentId === 'knowledge-query' ||
+        resolved.intentId === 'query-knowledge' ||
+        resolved.intentId === 'live-query'
+      );
+    },
+    handle: async (context) => {
+      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
+      try {
+        return await handleSurfaceQueryRoute(context, resolved);
+      } catch (error: any) {
+        return emptySurfaceResult(`Query route failed: ${error?.message || String(error)}`);
+      }
+    },
+  },
+  {
+    matches: (context) => {
+      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
+      return resolved.intentId === 'open-site' || resolved.intentId === 'browser-step';
+    },
+    handle: async (context) => {
+      const query = structuredSurfaceQueryText(context);
+      try {
+        const delegationResults = await routeForcedDelegation(
+          'browser-operator',
+          query,
+          context.input.senderAgentId,
+          context.input.missionId
+        );
+        const successful = delegationResults.filter((result) => !result.error);
+        const firstResponse = successful[0]?.response || '';
+        const parsed = extractSurfaceBlocks(firstResponse);
+        return {
+          text: firstResponse,
+          a2uiMessages: [],
+          a2aMessages: [],
+          delegationResults,
+          approvalRequests: [],
+          routingProposals: [],
+          missionProposals: parsed.missionProposals || [],
+          planningPackets: parsed.planningPackets || [],
+        };
+      } catch (error: any) {
+        return emptySurfaceResult(`Browser route failed: ${error?.message || String(error)}`);
+      }
+    },
+  },
+  {
+    matches: (context) => Boolean(classifyTaskSessionIntent(structuredSurfaceQueryText(context))),
+    handle: async (context) => {
+      try {
+        return await handleTaskSessionRoute(context);
+      } catch (error: any) {
+        return emptySurfaceResult(`Task-session route failed: ${error?.message || String(error)}`);
       }
     },
   },

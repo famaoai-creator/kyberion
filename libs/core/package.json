@@ -107,6 +107,10 @@
       "types": "./dist/mission-team-composer.d.ts",
       "default": "./dist/mission-team-composer.js"
     },
+    "./mission-team-plan-composer": {
+      "types": "./dist/mission-team-plan-composer.d.ts",
+      "default": "./dist/mission-team-plan-composer.js"
+    },
     "./mission-team-orchestrator": {
       "types": "./dist/mission-team-orchestrator.d.ts",
       "default": "./dist/mission-team-orchestrator.js"

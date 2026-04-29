@@ -33,6 +33,21 @@ describe('Mission team composition contract', () => {
     }
   });
 
+  it('requires selection hints on all agent and team role records', () => {
+    const agentIndex = loadJson('knowledge/public/orchestration/agent-profile-index.json');
+    const roleIndex = loadJson('knowledge/public/orchestration/team-role-index.json');
+
+    for (const [agentId, record] of Object.entries(agentIndex.agents || {})) {
+      expect(record.selection_hints?.preferred_provider, `missing provider hint for ${agentId}`).toBeTruthy();
+      expect(record.selection_hints?.preferred_modelId, `missing model hint for ${agentId}`).toBeTruthy();
+    }
+
+    for (const [teamRole, record] of Object.entries(roleIndex.team_roles || {})) {
+      expect(record.selection_hints?.preferred_agents?.length, `missing agent hints for ${teamRole}`).toBeGreaterThan(0);
+      expect(record.selection_hints?.preferred_models?.length, `missing model hints for ${teamRole}`).toBeGreaterThan(0);
+    }
+  });
+
   it('composes a development mission team with required assignments', () => {
     const authorityRoles = loadAuthorityRoleIndex();
     const teamRoles = loadTeamRoleIndex();

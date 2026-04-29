@@ -7,7 +7,7 @@ import {
   buildMissionTeamBlueprint,
   initializeMissionTeamBindings,
 } from './mission-team-binding.js';
-import type { MissionTeamPlan } from './mission-team-composer.js';
+import type { MissionTeamPlan } from './mission-team-plan-composer.js';
 
 const MISSION_ID = 'MSN-BINDING-TEST-001';
 const TEST_MISSION_DIR = pathResolver.sharedTmp(`mission-team-binding-tests/${MISSION_ID}`);

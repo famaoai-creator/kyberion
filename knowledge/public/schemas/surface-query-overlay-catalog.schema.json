@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-query-overlay-catalog.schema.json",
+  "title": "Surface Query Overlay Catalog Schema",
+  "type": "object",
+  "required": ["version", "base_config_path", "overlays"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "base_config_path": { "type": "string", "minLength": 1 },
+    "personal_overlay_path": { "type": "string", "minLength": 1 },
+    "overlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "path"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["role", "phase", "personal"] },
+          "role": { "type": "string", "minLength": 1 },
+          "phase": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string" },
+          "status": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

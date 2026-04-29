@@ -40,6 +40,7 @@ the canonical surface(s) involved.
 | A8 | Marketing strategy / content | `marketing-strategy` / `marketing-content` | distill → render | ✅ |
 | A9 | Add a FaaS API by conversation | `add-api.sh` → `faas-add-api` | NL → schema → CDK → Lambda | ✅ |
 | A10 | GitHub issue → mission | `github-issue-ingest` | issue text → mission scaffold | ✅ |
+| A11 | Calendar reschedule / schedule coordination | `schedule-coordination` | schedule brief → summary / handoff | ✅ |
 
 ## B. Operations / day-2
 
@@ -128,6 +129,12 @@ the canonical surface(s) involved.
 | I5 | STT bridge | `SpeechToTextBridge` | ✅ |
 | I6 | Audit ledger storage policy | local hash-chain authoritative + forwarder | ✅ |
 | I7 | Whole-org onboarding | `platform-onboarding` pipeline | ✅ |
+| I8 | Kyberion runtime bootstrap / readiness | `bootstrap-kyberion-runtime` / `verify-environment-readiness` | ✅ |
+| I9 | Kyberion system observability | `check-kyberion-baseline` / `check-kyberion-vital` / `diagnose-kyberion-system` / `inspect-runtime-supervisor` | ✅ |
+| I10 | Governed service lifecycle | `start-service` / `stop-service` | ✅ |
+| I11 | Organization toolchain setup | `configure-organization-toolchain` | ✅ |
+| I12 | Presentation preference registration | `register-presentation-preference-profile` | ✅ |
+| I13 | First-run onboarding wizard | `launch-first-run-onboarding` | ✅ |
 
 ## J. Recovery / incidents
 
@@ -174,15 +181,15 @@ the canonical surface(s) involved.
 ## Summary
 
 ```
-✅ Fully covered:    67
+✅ Fully covered:    71
 ☐ Partial:           0
 📝 Deployment-time:  1 (M6 WAF / OIDC / mTLS)
 ❌ Not covered:      0
 ```
 
 All in-code scenarios are now fully covered. The single 📝 item is
-intentional: WAF / OIDC / mTLS are perimeter concerns that the
-deploying organization owns, not Kyberion code.
+intentional: WAF / OIDC / mTLS are perimeter concerns that the deploying
+organization owns, not Kyberion code.
 
 **G6 / K5 closure (2026-04-27 takeover)**: the real-time voice +
 meeting proxy track was previously ☐. The takeover generalized the
