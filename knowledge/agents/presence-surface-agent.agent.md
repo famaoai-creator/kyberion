@@ -1,7 +1,5 @@
 ---
 agentId: presence-surface-agent
-provider: gemini
-modelId: gemini-2.5-flash
 capabilities: [presence, surface, conversation, realtime]
 auto_spawn: false
 trust_required: 0

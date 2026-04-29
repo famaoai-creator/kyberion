@@ -101,6 +101,92 @@
       ]
     },
     {
+      "intent_id": "configure-organization-toolchain",
+      "canonical_flow": [
+        "intent normalization",
+        "organization toolchain inventory",
+        "approval boundary mapping",
+        "governed integration registration",
+        "onboarding report persistence"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "integration_registry"
+      ],
+      "primary_outcome_ids": ["organization_toolchain_configured"],
+      "evidence": [
+        "integration registry entry",
+        "toolchain onboarding report"
+      ],
+      "completion_criteria": [
+        "required integrations are identified",
+        "approval and trust boundaries are explicit",
+        "the org-specific toolchain is persisted"
+      ],
+      "follow_up": [
+        "CI/CD or workspace onboarding can reuse the registered settings",
+        "later missions can reference the same toolchain profile"
+      ]
+    },
+    {
+      "intent_id": "launch-first-run-onboarding",
+      "canonical_flow": [
+        "intent normalization",
+        "workspace and goal confirmation",
+        "integration and preference discovery",
+        "setup plan generation"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "onboarding_plan"
+      ],
+      "primary_outcome_ids": ["onboarding_plan"],
+      "evidence": [
+        "first-run onboarding plan",
+        "workspace and baseline goal summary"
+      ],
+      "completion_criteria": [
+        "first-run onboarding path is explicit",
+        "toolchain and preference follow-up steps are named",
+        "operator can continue into setup or defer"
+      ],
+      "follow_up": [
+        "toolchain registration can be launched from the plan",
+        "presentation preference registration can be launched from the plan"
+      ]
+    },
+    {
+      "intent_id": "register-presentation-preference-profile",
+      "canonical_flow": [
+        "intent normalization",
+        "presentation preference schema validation",
+        "tier selection",
+        "registry persistence",
+        "theme and brief hint return"
+      ],
+      "contract_layers": [
+        "task_session",
+        "knowledge_profile",
+        "registry_record"
+      ],
+      "primary_outcome_ids": ["presentation_preference_profile_registered"],
+      "evidence": [
+        "presentation preference registry entry",
+        "returned brief question set and theme hint"
+      ],
+      "completion_criteria": [
+        "profile validates against the governed schema",
+        "profile is stored in the selected tier or overlay",
+        "future deck work can reuse the saved theme preference"
+      ],
+      "follow_up": [
+        "presentation generation can reuse the saved profile",
+        "the operator can refine the profile after reviewing the first deck"
+      ]
+    },
+    {
       "intent_id": "generate-report",
       "canonical_flow": [
         "intent normalization",
@@ -243,6 +329,35 @@
       ]
     },
     {
+      "intent_id": "schedule-coordination",
+      "canonical_flow": [
+        "intent normalization",
+        "schedule scope and date range capture",
+        "constraint resolution",
+        "schedule proposal or application",
+        "follow-up or meeting handoff recording"
+      ],
+      "contract_layers": [
+        "task_session",
+        "organization_work_loop",
+        "calendar_snapshot"
+      ],
+      "primary_outcome_ids": ["schedule_coordination_summary"],
+      "evidence": [
+        "calendar snapshot",
+        "schedule coordination summary"
+      ],
+      "completion_criteria": [
+        "schedule scope is explicit",
+        "date range and fixed constraints are captured",
+        "the result says whether the calendar was updated or only proposed"
+      ],
+      "follow_up": [
+        "meeting-specific handoff can continue into meeting operations",
+        "the summary can seed a governed follow-up task"
+      ]
+    },
+    {
       "intent_id": "knowledge-query",
       "canonical_flow": [
         "intent normalization",
@@ -372,6 +487,112 @@
       ]
     },
     {
+      "intent_id": "clarify-user-request",
+      "canonical_flow": [
+        "intent normalization",
+        "thread context inspection",
+        "missing information detection",
+        "clarification question synthesis",
+        "direct reply return"
+      ],
+      "contract_layers": [
+        "direct reply answer",
+        "conversation context"
+      ],
+      "primary_outcome_ids": ["clarification_packet"],
+      "evidence": [
+        "clarification packet content",
+        "preserved conversation context"
+      ],
+      "completion_criteria": [
+        "missing inputs are identified",
+        "questions are narrow and actionable",
+        "the response preserves the current thread"
+      ],
+      "follow_up": [
+        "the clarified thread can continue without losing context"
+      ]
+    },
+    {
+      "intent_id": "continue-conversation",
+      "canonical_flow": [
+        "intent normalization",
+        "thread context preservation",
+        "follow-up response synthesis",
+        "direct reply return"
+      ],
+      "contract_layers": [
+        "direct reply answer",
+        "conversation context"
+      ],
+      "primary_outcome_ids": ["conversation_reply"],
+      "evidence": [
+        "conversation reply content",
+        "thread continuity"
+      ],
+      "completion_criteria": [
+        "the current thread remains coherent",
+        "the next answer stays scoped to the existing exchange",
+        "the reply does not reset the conversation"
+      ],
+      "follow_up": [
+        "the same thread can be summarized or escalated later"
+      ]
+    },
+    {
+      "intent_id": "summarize-conversation",
+      "canonical_flow": [
+        "intent normalization",
+        "conversation transcript compression",
+        "decision and open-question extraction",
+        "summary return"
+      ],
+      "contract_layers": [
+        "direct reply answer",
+        "conversation transcript"
+      ],
+      "primary_outcome_ids": ["conversation_summary"],
+      "evidence": [
+        "conversation summary content",
+        "preserved decision list"
+      ],
+      "completion_criteria": [
+        "the exchange is reduced to a reusable summary",
+        "decisions and open questions are called out",
+        "the summary can be reused in follow-up work"
+      ],
+      "follow_up": [
+        "the summary can seed a mission brief"
+      ]
+    },
+    {
+      "intent_id": "conversation-to-mission",
+      "canonical_flow": [
+        "intent normalization",
+        "goal extraction from thread",
+        "scope and boundary shaping",
+        "mission brief synthesis",
+        "escalation-ready return"
+      ],
+      "contract_layers": [
+        "direct reply answer",
+        "mission brief"
+      ],
+      "primary_outcome_ids": ["mission_brief"],
+      "evidence": [
+        "mission brief content",
+        "scope boundary declaration"
+      ],
+      "completion_criteria": [
+        "the durable goal is extracted from the thread",
+        "scope and constraints are explicit",
+        "the result is promotable into governed mission work"
+      ],
+      "follow_up": [
+        "the brief can be promoted into a governed mission"
+      ]
+    },
+    {
       "intent_id": "live-query",
       "canonical_flow": [
         "intent normalization",
@@ -393,6 +614,176 @@
       "follow_up": [
         "query can be escalated into task session when sustained work is needed"
       ]
+    },
+    {
+      "intent_id": "executive-strategy-brief",
+      "canonical_flow": [
+        "intent normalization",
+        "goal and constraint clarification",
+        "option comparison",
+        "recommendation synthesis"
+      ],
+      "contract_layers": ["direct reply answer", "decision brief"],
+      "primary_outcome_ids": ["strategy_brief"],
+      "evidence": ["strategy brief content", "assumption and risk notes"],
+      "completion_criteria": [
+        "options are compared against explicit criteria",
+        "a recommendation and next actions are returned"
+      ],
+      "follow_up": ["brief can seed a decision-support mission"]
+    },
+    {
+      "intent_id": "executive-prioritization",
+      "canonical_flow": [
+        "intent normalization",
+        "candidate work inventory",
+        "priority scoring",
+        "roadmap and exclusions return"
+      ],
+      "contract_layers": ["direct reply answer", "priority roadmap"],
+      "primary_outcome_ids": ["priority_roadmap"],
+      "evidence": ["priority list", "deprioritized work list"],
+      "completion_criteria": [
+        "priorities are ranked",
+        "deferred or stopped work is explicit"
+      ],
+      "follow_up": ["roadmap can become mission or project planning input"]
+    },
+    {
+      "intent_id": "executive-reporting",
+      "canonical_flow": [
+        "intent normalization",
+        "audience and source binding",
+        "signal extraction",
+        "executive summary return"
+      ],
+      "contract_layers": ["direct reply answer", "executive report"],
+      "primary_outcome_ids": ["executive_report"],
+      "evidence": ["executive report content", "source signal notes"],
+      "completion_criteria": [
+        "summary is decision-ready",
+        "risks and required actions are visible"
+      ],
+      "follow_up": ["report can be rendered into artifact form when needed"]
+    },
+    {
+      "intent_id": "stakeholder-communication",
+      "canonical_flow": [
+        "intent normalization",
+        "audience and tone clarification",
+        "message drafting",
+        "approval notes return"
+      ],
+      "contract_layers": ["direct reply answer", "message draft"],
+      "primary_outcome_ids": ["stakeholder_message"],
+      "evidence": ["message draft", "approval and risk notes"],
+      "completion_criteria": [
+        "audience and tone are explicit",
+        "draft includes approval-sensitive notes"
+      ],
+      "follow_up": ["draft can enter review or publishing workflow"]
+    },
+    {
+      "intent_id": "sales-account-strategy",
+      "canonical_flow": [
+        "intent normalization",
+        "customer context binding",
+        "opportunity and risk mapping",
+        "account plan return"
+      ],
+      "contract_layers": ["direct reply answer", "account plan"],
+      "primary_outcome_ids": ["account_strategy_plan"],
+      "evidence": ["account strategy plan", "next-action list"],
+      "completion_criteria": [
+        "customer context is captured",
+        "next sales actions are explicit"
+      ],
+      "follow_up": ["plan can seed customer engagement mission work"]
+    },
+    {
+      "intent_id": "technical-decision-memo",
+      "canonical_flow": [
+        "intent normalization",
+        "decision scope clarification",
+        "option and tradeoff comparison",
+        "technical decision memo return"
+      ],
+      "contract_layers": ["direct reply answer", "technical decision memo"],
+      "primary_outcome_ids": ["technical_decision_memo"],
+      "evidence": ["decision memo", "tradeoff table"],
+      "completion_criteria": [
+        "options and tradeoffs are explicit",
+        "recommendation includes revisit or rollback conditions"
+      ],
+      "follow_up": ["memo can be promoted into ADR or mission brief"]
+    },
+    {
+      "intent_id": "llm-provider-selection",
+      "canonical_flow": [
+        "intent normalization",
+        "use-case and constraints binding",
+        "provider capability comparison",
+        "provider policy recommendation"
+      ],
+      "contract_layers": ["direct reply answer", "provider selection report"],
+      "primary_outcome_ids": ["provider_selection_report"],
+      "evidence": ["provider comparison", "evaluation assumptions"],
+      "completion_criteria": [
+        "selection criteria are visible",
+        "recommendation states provider, model, and fallback conditions"
+      ],
+      "follow_up": ["recommendation can update provider policy after approval"]
+    },
+    {
+      "intent_id": "agent-runtime-tuning",
+      "canonical_flow": [
+        "intent normalization",
+        "target metric clarification",
+        "tuning hypothesis definition",
+        "measurement and rollback plan return"
+      ],
+      "contract_layers": ["direct reply answer", "runtime tuning plan"],
+      "primary_outcome_ids": ["runtime_tuning_plan"],
+      "evidence": ["tuning plan", "measurement notes"],
+      "completion_criteria": [
+        "target metric is explicit",
+        "plan includes measurement and rollback conditions"
+      ],
+      "follow_up": ["plan can become a governed runtime change mission"]
+    },
+    {
+      "intent_id": "release-readiness-review",
+      "canonical_flow": [
+        "intent normalization",
+        "release scope and stop-condition binding",
+        "readiness evidence synthesis",
+        "go/no-go recommendation return"
+      ],
+      "contract_layers": ["direct reply answer", "release readiness report"],
+      "primary_outcome_ids": ["release_readiness_report"],
+      "evidence": ["readiness report", "blocker and condition list"],
+      "completion_criteria": [
+        "go/no-go recommendation is explicit",
+        "blockers, conditions, and rollback notes are present"
+      ],
+      "follow_up": ["report can trigger approval or release execution"]
+    },
+    {
+      "intent_id": "operator-profile-learning",
+      "canonical_flow": [
+        "intent normalization",
+        "request pattern and correction signal extraction",
+        "tier classification",
+        "learning update proposal"
+      ],
+      "contract_layers": ["direct reply answer", "operator learning update"],
+      "primary_outcome_ids": ["operator_learning_update"],
+      "evidence": ["learning candidate", "tier decision notes"],
+      "completion_criteria": [
+        "personal, confidential, and public learning candidates are separated",
+        "profile update is proposed rather than silently applied"
+      ],
+      "follow_up": ["approved updates can be stored in personal or confidential knowledge"]
     }
   ]
 }

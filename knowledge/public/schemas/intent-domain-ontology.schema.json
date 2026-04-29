@@ -69,6 +69,7 @@
             "environment_setup",
             "actuator_management",
             "llm_reasoning_setup",
+            "conversation_orchestration",
             "knowledge_lifecycle",
             "system_observability",
             "mission_process",
@@ -87,7 +88,8 @@
             "system_state",
             "mission_process",
             "agent_team",
-            "external_service"
+            "external_service",
+            "conversation"
           ]
         },
         "action": {

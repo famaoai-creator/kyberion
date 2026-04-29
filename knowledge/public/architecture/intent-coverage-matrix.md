@@ -36,18 +36,41 @@ For the canonical completion pattern of each surface intent, see:
 | `generate-report` | `implemented` | `voice-hub` + `task-session` | `task_session` | `artifact:docx` / `artifact:pdf` | Report brief and document artifact generation are connected |
 | `generate-workbook` | `implemented` | `voice-hub` + `task-session` | `task_session` | `artifact:xlsx` | Workbook/WBS flow is connected to governed artifact output |
 | `inspect-service` | `implemented` | `voice-hub` + `task-session` | `task_session` | `service_summary` / `approval_request` | Service inspection and approval-aware operation path exist |
-| `open-site` | `partial` | `voice-hub` browser path | `browser_session` | `browser_navigation` | Works, but not yet unified with task-session style catalog-first runtime routing |
-| `browser-step` | `partial` | `voice-hub` browser path | `browser_session` | `browser_step` | Works, but still route-specific |
-| `knowledge-query` | `partial` | direct reply path | `direct_reply` | `knowledge_answer` | Available, but resolver path is not yet fully catalog-first |
-| `cross-project-remediation` | `partial` | `task-session` classifier | `task_session` | `remediation_plan` | Natural-language bug propagation review can be normalized into governed analysis work, but automatic fix fan-out is not first-class yet |
-| `incident-informed-review` | `partial` | `task-session` classifier | `task_session` | `review_findings` | Prior-incident-aware review can be normalized into governed analysis work, but review target binding and execution are still incomplete |
-| `evolve-agent-harness` | `partial` | `task-session` classifier | `task_session` | `harness_experiment_report` | Benchmark-driven harness evolution is modeled as governed analysis, but benchmark runners and keep or discard ledgers are not yet first-class runtime contracts |
-| `live-query` | `partial` | direct reply path | `direct_reply` | `live_answer` | Available, but runtime coverage is less normalized than core work flows |
+| `schedule-coordination` | `implemented` | `voice-hub` + `task-session` | `task_session` | `schedule_coordination_summary` | Calendar reshuffling is modeled as a governed task-session with a clear meeting handoff boundary |
+| `launch-first-run-onboarding` | `implemented` | `voice-hub` + `task-session` | `task_session` | `onboarding_plan` | First-run onboarding is now a reusable intent that can lead into toolchain and theme registration |
+| `configure-organization-toolchain` | `implemented` | `voice-hub` + `task-session` | `task_session` | `organization_toolchain_configured` | Onboarding for CI/CD and organization-specific integration settings is now catalog-driven |
+| `register-presentation-preference-profile` | `implemented` | `voice-hub` + `task-session` | `task_session` | `presentation_preference_profile_registered` | Presentation theme and brief preferences can be stored as reusable knowledge instead of hard-coded branches |
+| `open-site` | `implemented` | `voice-hub` browser path | `browser_session` | `browser_navigation` | Browser requests now route through `browser-operator` before browser-actuator execution |
+| `browser-step` | `implemented` | `voice-hub` browser path | `browser_session` | `browser_step` | Browser requests now route through `browser-operator` before browser-actuator execution |
+| `knowledge-query` | `implemented` | direct reply path | `direct_reply` | `knowledge_answer` | Knowledge search now routes through the catalog-first direct reply path |
+| `clarify-user-request` | `implemented` | `voice-hub` direct reply | `direct_reply` | `clarification_packet` | Missing-input questions are now a first-class conversation intent |
+| `continue-conversation` | `implemented` | `voice-hub` direct reply | `direct_reply` | `conversation_reply` | Keeps the active thread coherent without forcing a new task |
+| `summarize-conversation` | `implemented` | `voice-hub` direct reply | `direct_reply` | `conversation_summary` | Converts an active exchange into a reusable summary |
+| `conversation-to-mission` | `implemented` | `voice-hub` direct reply | `direct_reply` | `mission_brief` | Escalates a thread into a governed mission brief |
+| `executive-strategy-brief` | `implemented` | `voice-hub` direct reply | `direct_reply` | `strategy_brief` | CEO strategy comparison now resolves to a named brief |
+| `executive-prioritization` | `implemented` | `voice-hub` direct reply | `direct_reply` | `priority_roadmap` | CEO focus and tradeoff requests have a named outcome |
+| `executive-reporting` | `implemented` | `voice-hub` direct reply | `direct_reply` | `executive_report` | Executive KPI/reporting summaries are first-class |
+| `stakeholder-communication` | `implemented` | `voice-hub` direct reply | `direct_reply` | `stakeholder_message` | Stakeholder message drafting is first-class |
+| `sales-account-strategy` | `implemented` | `voice-hub` direct reply | `direct_reply` | `account_strategy_plan` | Customer/account strategy requests are first-class |
+| `technical-decision-memo` | `implemented` | `voice-hub` direct reply | `direct_reply` | `technical_decision_memo` | CTO technical decision support is first-class |
+| `llm-provider-selection` | `implemented` | `voice-hub` direct reply | `direct_reply` | `provider_selection_report` | Provider/model selection is first-class |
+| `agent-runtime-tuning` | `implemented` | `voice-hub` direct reply | `direct_reply` | `runtime_tuning_plan` | Runtime tuning requests resolve to a governed plan |
+| `release-readiness-review` | `implemented` | `voice-hub` direct reply | `direct_reply` | `release_readiness_report` | Go/no-go release review is first-class |
+| `operator-profile-learning` | `implemented` | `voice-hub` direct reply | `direct_reply` | `operator_learning_update` | Personal adaptation is represented as an explicit learning proposal |
+| `cross-project-remediation` | `implemented` | `task-session` classifier | `task_session` | `remediation_plan` | Cross-project remediation now resolves into a governed analysis task-session |
+| `incident-informed-review` | `implemented` | `task-session` classifier | `task_session` | `review_findings` | Prior-incident-aware review now resolves into a governed analysis task-session |
+| `evolve-agent-harness` | `implemented` | `task-session` classifier | `task_session` | `harness_experiment_report` | Harness evolution now resolves into a governed analysis task-session |
+| `live-query` | `implemented` | direct reply path | `direct_reply` | `live_answer` | Live data fetch now routes through the catalog-first direct reply path |
 
 ## What Is Strong
 
 - document and artifact generation
 - project bootstrap and mission seed flow
+- human / LLM conversation orchestration
+- schedule coordination as a governed task-session
+- CEO/CTO operator harness intents
+- first-run onboarding and reusable setup preferences
+- onboarding toolchain and presentation preference registration
 - approval handling across Presence, Chronos, and CLI
 - evidence and memory loop persistence
 
@@ -55,12 +78,13 @@ For the canonical completion pattern of each surface intent, see:
 
 ### Catalog Drift
 
-The catalog in [standard-intents.json](/Users/famao/kyberion/knowledge/public/governance/standard-intents.json) is more complete than the runtime entry points.
+The catalog in [standard-intents.json](/Users/famao/kyberion/knowledge/public/governance/standard-intents.json) is now much closer to the runtime entry points.
 
 Examples:
 
-- browser intents are not resolved through the same task-session path as document intents
-- live and knowledge queries still use more route-specific runtime handling
+- conversation intents are first-class, but escalation from direct reply into mission work still benefits from a more explicit handoff contract
+- onboarding preferences are catalog-driven and the first-run wizard is first-class, but a richer interactive setup surface would still help
+- live-query provider selection is still mostly configuration-driven rather than a fully declared intent contract
 
 ### Outcome Drift
 
@@ -86,7 +110,7 @@ Service bindings are persisted and visible, but natural-language execution is st
 
 ### Benchmark Loop Normalization
 
-Harness-improvement work can now be described in the intent catalog, but runtime still treats it like generic analysis work.
+Harness-improvement work now resolves into a governed analysis task-session, but the benchmark loop itself can still be made more explicit.
 
 What is still missing:
 

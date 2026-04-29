@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MissionTeamAssignment } from './mission-team-composer.js';
+import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegation-preflight.js';
 
 function assignmentWithContract(overrides: Partial<MissionTeamAssignment['delegation_contract']> = {}): MissionTeamAssignment {
