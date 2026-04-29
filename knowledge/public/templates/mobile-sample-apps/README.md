@@ -3,9 +3,9 @@
 debug-only WebView session handoff を組み込んだ sample app skeleton 集です。
 
 - Android:
-  [`android-webview-handoff-skeleton/README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/android-webview-handoff-skeleton/README.md)
+  [`android-webview-handoff-skeleton/README.md`](./android-webview-handoff-skeleton/README.md)
 - iOS:
-  [`ios-webview-handoff-skeleton/README.md`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/README.md)
+  [`ios-webview-handoff-skeleton/README.md`](./ios-webview-handoff-skeleton/README.md)
 
 位置づけは次です。
 

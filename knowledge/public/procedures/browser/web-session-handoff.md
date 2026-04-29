@@ -14,35 +14,35 @@ Web アプリが debug-only hook を使って browser session を export し、B
 
 ## Contracts
 
-- [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/webview-session-handoff.schema.json)
-- [`web-app-profile.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/web-app-profile.schema.json)
-- [`example-web-login-guarded.json`](/Users/famao/kyberion/knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json)
+- [`webview-session-handoff.schema.json`](../../schemas/webview-session-handoff.schema.json)
+- [`web-app-profile.schema.json`](../../schemas/web-app-profile.schema.json)
+- [`example-web-login-guarded.json`](../../orchestration/web-app-profiles/example-web-login-guarded.json)
 
 ## Shared Templates
 
-- [`web-sample-apps/README.md`](/Users/famao/kyberion/knowledge/public/templates/web-sample-apps/README.md)
+- [`web-sample-apps/README.md`](../../templates/web-sample-apps/README.md)
 
 ## Browser Examples
 
 - export template:
-  [`web-runtime-session-handoff-export-template.json`](/Users/famao/kyberion/libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
+  [`web-runtime-session-handoff-export-template.json`](../../../../libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
 - import template:
-  [`web-runtime-session-handoff-import.json`](/Users/famao/kyberion/libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json)
+  [`web-runtime-session-handoff-import.json`](../../../../libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json)
 
 ## Orchestration
 
-- [`web-session-handoff-runner.json`](/Users/famao/kyberion/pipelines/web-session-handoff-runner.json)
+- [`web-session-handoff-runner.json`](../../../../pipelines/web-session-handoff-runner.json)
 
 ## Route And Test Modeling
 
 - UI flow example:
-  [`web-profile-to-ui-flow.json`](/Users/famao/kyberion/libs/actuators/modeling-actuator/examples/web-profile-to-ui-flow.json)
+  [`web-profile-to-ui-flow.json`](../../../../libs/actuators/modeling-actuator/examples/web-profile-to-ui-flow.json)
 - execution plan example:
-  [`web-profile-to-browser-plan.json`](/Users/famao/kyberion/libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json)
+  [`web-profile-to-browser-plan.json`](../../../../libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json)
 - UI flow schema:
-  [`ui-flow-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/ui-flow-adf.schema.json)
+  [`ui-flow-adf.schema.json`](../../schemas/ui-flow-adf.schema.json)
 - test inventory schema:
-  [`test-case-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/test-case-adf.schema.json)
+  [`test-case-adf.schema.json`](../../schemas/test-case-adf.schema.json)
 
 ## Notes
 

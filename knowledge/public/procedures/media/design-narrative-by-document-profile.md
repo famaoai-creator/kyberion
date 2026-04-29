@@ -22,16 +22,16 @@ The generation boundary is:
 
 Reference:
 
-- [media-document-generation-boundary.md](/Users/famao/kyberion/knowledge/public/architecture/media-document-generation-boundary.md)
+- [media-document-generation-boundary.md](../../architecture/media-document-generation-boundary.md)
 
 The preset catalog is stored as directory-scanned knowledge packs at:
 
-- [media-design-systems](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/media-design-systems/defaults.json)
-- [document-composition-presets](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/document-composition-presets/defaults.json)
-- [slide-layout-presets](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/slide-layout-presets/defaults.json)
-- [semantic-render-tokens](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/semantic-render-tokens/defaults.json)
-- [artifact-library](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/artifact-library/project-mgmt-high-fidelity.json)
-- [design-md-catalog](/Users/famao/kyberion/knowledge/public/design-patterns/media-templates/design-md-catalog/README.md)
+- [media-design-systems](../../design-patterns/media-templates/media-design-systems/defaults.json)
+- [document-composition-presets](../../design-patterns/media-templates/document-composition-presets/defaults.json)
+- [slide-layout-presets](../../design-patterns/media-templates/slide-layout-presets/defaults.json)
+- [semantic-render-tokens](../../design-patterns/media-templates/semantic-render-tokens/defaults.json)
+- [artifact-library](../../design-patterns/media-templates/artifact-library/project-mgmt-high-fidelity.json)
+- [design-md-catalog](../../design-patterns/media-templates/design-md-catalog/README.md)
 
 `document-composition-presets` contains the curated default profiles for common Kyberion flows.
 

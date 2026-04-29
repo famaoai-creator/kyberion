@@ -37,5 +37,5 @@ Separate the report into:
 7. `document_report_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Examples
-- [`document-brief-report-docx.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-report-docx.json)
-- [`document-brief-report-pdf.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-report-pdf.json)
+- [`document-brief-report-docx.json`](../../../../libs/actuators/media-actuator/examples/document-brief-report-docx.json)
+- [`document-brief-report-pdf.json`](../../../../libs/actuators/media-actuator/examples/document-brief-report-pdf.json)

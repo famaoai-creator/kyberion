@@ -8,16 +8,16 @@ This path is for deterministic scene composition, not prompt-led model generatio
 
 For single-action scenario execution (`brief -> compile -> prepare`), use:
 
-- [`create-narrated-intro-movie.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
+- [`create-narrated-intro-movie.md`](./create-narrated-intro-movie.md)
 
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
-- **Schema**: [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
-- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
+- **Schema**: [`video-composition-adf.schema.json`](../../schemas/video-composition-adf.schema.json)
+- **Brief Schema**: [`narrated-video-brief.schema.json`](../../schemas/narrated-video-brief.schema.json)
 - **Governance**:
-  - [`video-composition-template-registry.json`](/Users/famao/kyberion/knowledge/public/governance/video-composition-template-registry.json)
-  - [`video-render-runtime-policy.json`](/Users/famao/kyberion/knowledge/public/governance/video-render-runtime-policy.json)
+  - [`video-composition-template-registry.json`](../../governance/video-composition-template-registry.json)
+  - [`video-render-runtime-policy.json`](../../governance/video-render-runtime-policy.json)
 
 ## 3. Contract Shape
 
@@ -40,8 +40,8 @@ When backend rendering is enabled and a narration reference is present, the rend
 
 Example input:
 
-- [`prepare-product-explainer.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
-- [`compile-kyberion-intro-brief.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
+- [`prepare-product-explainer.json`](../../../../libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
+- [`compile-kyberion-intro-brief.json`](../../../../libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
 
 Run the actuator directly:
 

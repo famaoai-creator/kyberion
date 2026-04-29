@@ -11,11 +11,11 @@ It does not auto-promote the profile to active runtime usage.
 
 - **Actuator**: `voice-actuator`
 - **Schemas**:
-  - [`voice-sample-collection.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-sample-collection.schema.json)
-  - [`voice-profile-registration.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-profile-registration.schema.json)
-  - [`voice-sample-ingestion-policy.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-sample-ingestion-policy.schema.json)
+  - [`voice-sample-collection.schema.json`](../../schemas/voice-sample-collection.schema.json)
+  - [`voice-profile-registration.schema.json`](../../schemas/voice-profile-registration.schema.json)
+  - [`voice-sample-ingestion-policy.schema.json`](../../schemas/voice-sample-ingestion-policy.schema.json)
 - **Governance**:
-  - [`voice-sample-ingestion-policy.json`](/Users/famao/kyberion/knowledge/public/governance/voice-sample-ingestion-policy.json)
+  - [`voice-sample-ingestion-policy.json`](../../governance/voice-sample-ingestion-policy.json)
 
 ## 3. Contract Shape
 
@@ -33,7 +33,7 @@ Optional:
 
 If raw files have not been staged yet, collect them first:
 
-- [collect-voice-samples.md](/Users/famao/kyberion/knowledge/public/procedures/media/collect-voice-samples.md)
+- [collect-voice-samples.md](./collect-voice-samples.md)
 
 Or use the combined shortcut:
 
@@ -82,4 +82,4 @@ Promoting the profile into active governance remains a separate explicit review 
 
 Promotion procedure:
 
-- [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+- [promote-voice-profile.md](./promote-voice-profile.md)

@@ -17,19 +17,19 @@
 
 Web:
 
-- [`design-clone-and-build-web.md`](/Users/famao/kyberion/knowledge/public/procedures/service/design-clone-and-build-web.md)
+- [`design-clone-and-build-web.md`](../procedures/service/design-clone-and-build-web.md)
 
 Mobile:
 
-- [`design-clone-and-build-mobile.md`](/Users/famao/kyberion/knowledge/public/procedures/service/design-clone-and-build-mobile.md)
+- [`design-clone-and-build-mobile.md`](../procedures/service/design-clone-and-build-mobile.md)
 
 Deliverables:
 
-- [`deliver-design-spec-and-test-pack.md`](/Users/famao/kyberion/knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md)
+- [`deliver-design-spec-and-test-pack.md`](../procedures/service/deliver-design-spec-and-test-pack.md)
 
 Intake:
 
-- [`design-clone-request-intake.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/design-clone-request-intake.md)
+- [`design-clone-request-intake.md`](../templates/blueprints/design-clone-request-intake.md)
 
 ## Current Readiness
 

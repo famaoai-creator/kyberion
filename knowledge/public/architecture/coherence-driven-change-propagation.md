@@ -104,7 +104,7 @@ The responsibility boundary for this flow is:
 
 Reference:
 
-- [analysis-execution-boundary.md](/Users/famao/kyberion/knowledge/public/architecture/analysis-execution-boundary.md)
+- [analysis-execution-boundary.md](./analysis-execution-boundary.md)
 
 ## Remaining Work
 

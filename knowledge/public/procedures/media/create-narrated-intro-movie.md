@@ -11,10 +11,10 @@ Execute a single top-level scenario that:
 
 - **Actuator**: `video-composition-actuator`
 - **Schemas**:
-  - [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
-  - [`video-composition-action.schema.json`](/Users/famao/kyberion/schemas/video-composition-action.schema.json)
+  - [`narrated-video-brief.schema.json`](../../schemas/narrated-video-brief.schema.json)
+  - [`video-composition-action.schema.json`](schemas/video-composition-action.schema.json)
 - **Procedure**:
-  - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+  - [`compose-video-from-adf.md`](./compose-video-from-adf.md)
 
 ## 3. Contract Shape
 
@@ -35,7 +35,7 @@ Optional:
 
 Example input:
 
-- [`create-kyberion-intro-movie.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
+- [`create-kyberion-intro-movie.json`](../../../../libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
 
 Run:
 

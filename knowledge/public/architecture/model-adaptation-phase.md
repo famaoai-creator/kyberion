@@ -103,8 +103,8 @@ It is also:
 
 Detailed responsibility split and capability-boundary guidance are defined in:
 
-- [CLI Harness Coordination Model](/Users/famao/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
-- [Wisdom Policy Adapter Guide](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy-guide.md)
+- [CLI Harness Coordination Model](./cli-harness-coordination-model.md)
+- [Wisdom Policy Adapter Guide](../governance/wisdom-policy-guide.md)
 
 ## Position In The Operating Model
 
@@ -151,7 +151,7 @@ Recommended severity classes:
 - `major`
   - new model family or major harness capability shift, requires full adaptation cycle
 
-When the change is reasoning-only, record the selected profile and adapter in [`wisdom-policy.json`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy.json) first, then add code only for genuinely new adapters.
+When the change is reasoning-only, record the selected profile and adapter in [`wisdom-policy.json`](../governance/wisdom-policy.json) first, then add code only for genuinely new adapters.
 
 ## Goals
 

@@ -33,6 +33,6 @@ Separate the diagram into:
    - `document_diagram_render_from_brief` remains available as a compatibility adapter for direct `brief -> file` flows
 
 ## 5. Examples
-- [`document-brief-mermaid-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json)
-- [`document-brief-d2-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-d2-diagram.json)
-- [`document-brief-drawio-diagram.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-drawio-diagram.json)
+- [`document-brief-mermaid-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-mermaid-diagram.json)
+- [`document-brief-d2-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-d2-diagram.json)
+- [`document-brief-drawio-diagram.json`](../../../../libs/actuators/media-actuator/examples/document-brief-drawio-diagram.json)

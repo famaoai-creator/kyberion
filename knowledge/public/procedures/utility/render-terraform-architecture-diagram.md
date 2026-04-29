@@ -38,8 +38,8 @@ node dist/libs/actuators/media-actuator/src/index.js \
 ```
 
 ## 6. Example Artifacts
-- [`terraform-to-architecture-adf.json`](/Users/famao/kyberion/libs/actuators/modeling-actuator/examples/terraform-to-architecture-adf.json)
-- [`terraform-architecture-adf-to-drawio.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/terraform-architecture-adf-to-drawio.json)
+- [`terraform-to-architecture-adf.json`](../../../../libs/actuators/modeling-actuator/examples/terraform-to-architecture-adf.json)
+- [`terraform-architecture-adf-to-drawio.json`](../../../../libs/actuators/media-actuator/examples/terraform-architecture-adf-to-drawio.json)
 
 ## 7. Expected Output
 - an `architecture-adf` JSON artifact

@@ -35,6 +35,6 @@ Use a pipeline that targets the real actuators directly.
 
 Reference example:
 
-- [`physical-browser-system-sequence.json`](/Users/famao/kyberion/knowledge/public/governance/pipelines/physical-browser-system-sequence.json)
+- [`physical-browser-system-sequence.json`](../../governance/pipelines/physical-browser-system-sequence.json)
 
 This keeps execution explicit, avoids temporary wrapper artifacts, and preserves actuator ownership boundaries.

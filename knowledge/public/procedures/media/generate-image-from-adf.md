@@ -6,7 +6,7 @@ Generate a governed image artifact from an `image-generation-adf` contract inste
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with an SDXL-compatible checkpoint available
-- **Schema**: [`image-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/image-generation-adf.schema.json)
+- **Schema**: [`image-generation-adf.schema.json`](../../schemas/image-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `image-generation-adf` is the stable public interface.
@@ -22,8 +22,8 @@ The actuator compiles this contract into a local SDXL-oriented ComfyUI workflow 
 ## 4. Execution
 Example inputs:
 
-- [`image-adf-country-cover.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json)
-- [`submit-image-generation-job.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/submit-image-generation-job.json)
+- [`image-adf-country-cover.json`](../../../../libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json)
+- [`submit-image-generation-job.json`](../../../../libs/actuators/media-generation-actuator/examples/submit-image-generation-job.json)
 
 Run the synchronous example:
 
@@ -47,9 +47,9 @@ Follow-up job actions:
 
 Orchestrator-ready bundle:
 
-- [`image-generation-pipeline-bundle.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/image-generation-pipeline-bundle.json)
-- [`image-bundle-to-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/image-bundle-to-execution-plan-set.json)
-- [`image-bundle-to-run-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/image-bundle-to-run-execution-plan-set.json)
+- [`image-generation-pipeline-bundle.json`](../../../../libs/actuators/orchestrator-actuator/examples/image-generation-pipeline-bundle.json)
+- [`image-bundle-to-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/image-bundle-to-execution-plan-set.json)
+- [`image-bundle-to-run-execution-plan-set.json`](../../../../libs/actuators/orchestrator-actuator/examples/image-bundle-to-run-execution-plan-set.json)
 
 ## 5. Expected Output
 - ComfyUI `prompt_id`

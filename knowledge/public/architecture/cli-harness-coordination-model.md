@@ -183,7 +183,7 @@ That last mode is likely to be the most powerful pattern in practice.
 
 ## Required Contracts
 
-Reasoning-specific routing should use the policy surface in [`wisdom-policy.json`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy.json).
+Reasoning-specific routing should use the policy surface in [`wisdom-policy.json`](../governance/wisdom-policy.json).
 That policy declares the profile, command, and adapter that should be used for mission distillation and similar structured reasoning tasks.
 
 ## 1. Harness Capability Registry

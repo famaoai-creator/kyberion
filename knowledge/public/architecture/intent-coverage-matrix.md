@@ -15,8 +15,8 @@ It exists to prevent drift between:
 
 For the canonical completion pattern of each surface intent, see:
 
-- [intent-outcome-patterns.md](/Users/famao/kyberion/knowledge/public/architecture/intent-outcome-patterns.md)
-- [intent-outcome-patterns.json](/Users/famao/kyberion/knowledge/public/governance/intent-outcome-patterns.json)
+- [intent-outcome-patterns.md](./intent-outcome-patterns.md)
+- [intent-outcome-patterns.json](../governance/intent-outcome-patterns.json)
 
 ## Coverage Levels
 
@@ -79,7 +79,7 @@ For the canonical completion pattern of each surface intent, see:
 
 ### Catalog Drift
 
-The catalog in [standard-intents.json](/Users/famao/kyberion/knowledge/public/governance/standard-intents.json) is now much closer to the runtime entry points.
+The catalog in [standard-intents.json](../governance/standard-intents.json) is now much closer to the runtime entry points.
 
 Examples:
 
@@ -89,11 +89,11 @@ Examples:
 
 ### Outcome Drift
 
-[work-design.ts](/Users/famao/kyberion/libs/core/work-design.ts) can reason about outcomes that should always be declared in [outcome-catalog.json](/Users/famao/kyberion/knowledge/public/governance/outcome-catalog.json).
+[work-design.ts](../../../libs/core/work-design.ts) can reason about outcomes that should always be declared in [outcome-catalog.json](../governance/outcome-catalog.json).
 
 ### Execution Taxonomy Drift
 
-[super-nerve](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/src/super-nerve/index.ts) still relies on a hand-maintained action classification list for `capture / transform / apply`.
+[super-nerve](../../../libs/actuators/orchestrator-actuator/src/super-nerve/index.ts) still relies on a hand-maintained action classification list for `capture / transform / apply`.
 
 ### Visual Capability Split
 

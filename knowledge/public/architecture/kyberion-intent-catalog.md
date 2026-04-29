@@ -199,8 +199,8 @@ single-tenant → multi-tenant migration recipe.
 
 Mission distillation and other structured reasoning workflows are policy-driven through:
 
-- [`wisdom-policy.json`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy.json)
-- [`Wisdom Policy Adapter Guide`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy-guide.md)
+- [`wisdom-policy.json`](../governance/wisdom-policy.json)
+- [`Wisdom Policy Adapter Guide`](../governance/wisdom-policy-guide.md)
 
 Use this policy surface to select profiles and adapters without hardcoding provider branches in mission scripts.
 

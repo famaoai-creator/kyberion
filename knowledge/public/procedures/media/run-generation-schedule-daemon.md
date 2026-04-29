@@ -20,7 +20,7 @@ pnpm generation:schedule --action register --input libs/actuators/media-generati
 ## 4. Surface Declaration
 Example surface record:
 
-- [`generation-schedule-surface.json`](/Users/famao/kyberion/knowledge/public/governance/pipelines/generation-schedule-surface.json)
+- [`generation-schedule-surface.json`](../../governance/pipelines/generation-schedule-surface.json)
 
 Run:
 

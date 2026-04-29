@@ -277,7 +277,7 @@ Two schemas anchor the learning layer:
 
 The runtime helper is:
 
-- [`operator-learning.ts`](/Users/famao/kyberion/libs/core/operator-learning.ts)
+- [`operator-learning.ts`](../../../libs/core/operator-learning.ts)
 
 It validates profile and request-log records, can create an
 `operator-request-log` from an `intent_resolution_packet`, builds an

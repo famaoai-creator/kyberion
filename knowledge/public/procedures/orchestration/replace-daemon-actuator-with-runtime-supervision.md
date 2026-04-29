@@ -29,7 +29,7 @@ That model is now legacy. Kyberion has two explicit runtime ownership models:
 
 ## Surface Runtime Pattern
 
-Use [`knowledge/public/governance/active-surfaces.json`](/Users/famao/kyberion/knowledge/public/governance/active-surfaces.json) as the declaration source, then reconcile with:
+Use [`knowledge/public/governance/active-surfaces.json`](../../governance/active-surfaces.json) as the declaration source, then reconcile with:
 
 ```bash
 pnpm surfaces:reconcile
@@ -43,6 +43,6 @@ Use `process-actuator` when you need explicit runtime ownership for a process bu
 
 The old generation schedule daemon should now be expressed as a surface declaration:
 
-- [`generation-schedule-surface.json`](/Users/famao/kyberion/knowledge/public/governance/pipelines/generation-schedule-surface.json)
+- [`generation-schedule-surface.json`](../../governance/pipelines/generation-schedule-surface.json)
 
 This keeps background process management inside the runtime supervisor instead of handing it off to OS-specific daemon files.
